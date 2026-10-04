@@ -60,6 +60,14 @@ name: report-snapshot-suite
 #      month's 100th report, the same key sent twice at once, one subscription named for two brokerages at once, an issue under REPEATABLE READ
 #      refused, a second apply, the rollback with paid reports stored (the six readers put back to exactly their earlier definitions), the refusals
 #      when a layer or a splice anchor is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run).
+#  10. THE LAUNCH GATE (test/launch_gate_pg; Development Activity build step 13), in its own job: the plan's end-to-end sequence as ONE scenario, through the
+#      real handlers and data layers of development-activity-trial, get-development-activity-report, manage-billing and development-activity-billing-webhook,
+#      against the SHIPPED SQL of every layer the product stands on: sign-up (admin creates the trial, owner joins, owner invites an agent), twenty free
+#      reports, the end of the trial, the owner's checkout, the processor's test payment (which grants nothing) and live payment (which binds the subscription
+#      to the brokerage and opens a month of 100), a hundred paid reports, the 101st refused, saved reports across both ledgers, another brokerage unable to
+#      read or take any of it, and a cancellation that ends new reports and deletes nothing. The payment processor is a stand-in that records what it was sent:
+#      NOTHING here reaches Lemon Squeezy, holds a real key or charges anyone, and the processor's field names are still the unconfirmed ones (see
+#      docs/development-activity-launch-gate-2026-10-04.md). Its mutation loop (test/launch_gate_mutants.py) is manual, like the other mutation loops.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
@@ -139,6 +147,8 @@ on:
       - 'docs/payment-event-ledger.sql'
       - 'docs/report-header.sql'
       - 'test/brokerage_billing_pg/**'
+      - 'test/launch_gate_pg/**'
+      - 'test/launch-gate-structure.test.mjs'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
       - 'test/lemon-billing.test.mjs'
@@ -216,6 +226,8 @@ on:
       - 'docs/payment-event-ledger.sql'
       - 'docs/report-header.sql'
       - 'test/brokerage_billing_pg/**'
+      - 'test/launch_gate_pg/**'
+      - 'test/launch-gate-structure.test.mjs'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
       - 'test/lemon-billing.test.mjs'
@@ -410,3 +422,43 @@ jobs:
         run: |
           set -o pipefail
           bash test/brokerage_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/billing.log
+
+  launch-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential, processor key or signing secret is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${LEMON_SQUEEZY_API_KEY:-}${LEMON_SQUEEZY_WEBHOOK_SECRET:-}" ]; then
+            echo "ABORT: this gate must only ever address the disposable container and a stand-in processor."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      # 22, not the runner's default: the round trip imports the real TypeScript handlers and modules, and Node strips types on import from 22.18
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The launch gate - sign-up, twenty free reports, the end of the trial, checkout, payment, a hundred paid reports, the 101st refused, cancellation - through the real handlers and the shipped SQL
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/launch_gate_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/launch-gate.log
