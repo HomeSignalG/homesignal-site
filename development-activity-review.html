@@ -285,7 +285,11 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     var V = window.HS && window.HS.daReportView;
     if (!V || !V.mount($('report'), body, opts)) { say('The report came back but could not be shown.', true); return; }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
-    say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
+    // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
+    // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
+    var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
+    if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('viewnote').textContent = view === 'internal'
       ? 'Internal view: it includes records from sources that are not yet cleared for paying customers, so a client would see fewer.'
       : 'Customer view: only records from sources cleared for paying customers.';

@@ -38,7 +38,7 @@ RS = FN + '_shared/report-snapshot.ts'
 BILL = 'docs/brokerage-billing.sql'
 LEDGER = 'docs/payment-event-ledger.sql'
 SQLS = ['brokerage-account-spine', 'report-private-context', 'report-snapshot', 'evaluation-entitlement', 'saved-reports', 'report-share', 'report-share-delivery',
-        'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing']
+        'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'report-rate-limit']
 M = {}
 
 
@@ -90,6 +90,27 @@ m('an_old_event_displaces_a_newer_one', LEDGER, "   order by e.occurred_at desc,
 m('billing_open_to_a_resident_role', BILL, "grant execute on function public.billing_usage(uuid)                                  to service_role;", "grant execute on function public.billing_usage(uuid)                                  to service_role, authenticated;")
 
 
+# ---- the report rate limit (section 15 of the gate): the gate alone must see each of these ------------------------------------------------------------
+RDATA = FN + 'get-development-activity-report/data.ts'
+RRD = FN + '_shared/rate-reads.ts'
+CLAIM_BLOCK = ("      if (trial) {\n"
+               "        const verdict = await deps.rateClaim(trial.userId);\n"
+               "        if (!verdict.allowed) {\n"
+               "          const limited = reply(req, {\n"
+               "            error: 'rate_limited', retry_after_seconds: verdict.retryAfterSeconds, limited_by: verdict.limitedBy, ...trialInfo,\n"
+               "          }, 429);\n"
+               "          limited.headers.set('Retry-After', String(verdict.retryAfterSeconds));\n"
+               "          return limited;\n"
+               "        }\n"
+               "      }\n")
+m('the_report_function_stops_claiming', RH, CLAIM_BLOCK, "")
+m('an_unreadable_limiter_lets_the_request_through', RH, "const verdict = await deps.rateClaim(trial.userId);", "const verdict = await deps.rateClaim(trial.userId).catch(() => ({ allowed: true } as RateVerdict));")
+m('a_refusal_keeps_going_to_the_geocoder', RH, "          return limited;\n        }\n      }\n", "        }\n      }\n")
+m('the_reader_treats_a_database_error_as_allowed', RRD, "if (error) throw new DataUnavailable('report_rate_claim');", "if (error) return { allowed: true };")
+m('the_limiter_counts_a_refused_request', 'docs/report-rate-limit.sql', "    return query select false, v_worst, v_scope, v_win;\n    return;\n", "    return query select false, v_worst, v_scope, v_win;\n")
+m('the_limiter_ignores_the_window_rolling_over', 'docs/report-rate-limit.sql', "      set used         = case when w.window_start >= excluded.window_start then w.used + 1 else 1 end,", "      set used         = w.used + 1,")
+
+
 def run_gate(root, db, env):
     e = dict(env, PGDATABASE=db)
     p = subprocess.run(['bash', str(root / 'test/launch_gate_pg/run.sh')], capture_output=True, text=True, env=e, timeout=900)
@@ -104,6 +125,8 @@ def make_copy(dest):
     (dest / 'test/launch_gate_pg').mkdir(parents=True)
     for f in ['run.sh', 'roundtrip.mjs']:
         shutil.copy(ROOT / 'test/launch_gate_pg' / f, dest / 'test/launch_gate_pg' / f)
+    (dest / 'test/lib').mkdir(parents=True)
+    shutil.copy(ROOT / 'test/lib/launch-test-location.mjs', dest / 'test/lib/launch-test-location.mjs')   # the one test location the round trip imports
     (dest / 'test/evaluation_entitlement_pg').mkdir(parents=True)
     shutil.copy(ROOT / 'test/evaluation_entitlement_pg/fixture.sql', dest / 'test/evaluation_entitlement_pg/fixture.sql')
 

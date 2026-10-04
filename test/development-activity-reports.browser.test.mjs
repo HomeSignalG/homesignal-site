@@ -24,6 +24,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
+import { LAUNCH_TEST_LOCATION, OTHER_PROPERTY, addressNo, geocodeStandIn } from './lib/launch-test-location.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
 const TH = await import('../supabase/functions/development-activity-trial/handler.ts');
@@ -46,7 +47,8 @@ const PAGE = '/development-activity-reports.html';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/';
 const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report', WATCH_FN = SB + 'manage-property-watch', BILLING_FN = SB + 'manage-billing';
 const CHECKOUT_URL = 'https://homesignal.lemonsqueezy.com/checkout/custom/test-checkout-1';
-const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477', OTHER = '744 Evergreen Terrace, Springfield, OR 97477';
+// the launch test location: Brigham City, UT 84302 (test/lib/launch-test-location.mjs; founder, 2026-10-04)
+const ADDRESS = LAUNCH_TEST_LOCATION.address, OTHER = OTHER_PROPERTY;
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const UID = 'a1111111-1111-4111-8111-111111111111';
 const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -79,7 +81,7 @@ window.supabase = { createClient: function () { return { auth: {
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true } = {}) {
   // build step 11: `plan` is the state the database would answer for this brokerage (none, paid, past_due, canceled, ...), `paidUsed` the reports used this month
-  const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
+  const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
     watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
@@ -173,7 +175,9 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
   });
   w.reportHandler = RH.makeHandler({
     ...gate, now: () => NOW, rights: w.rights,
-    geocode: async (a) => ({ matchedAddress: a.toUpperCase(), lat: 44.04612, lng: -122.98123, zip: '97477' }),
+    geocode: async (a) => geocodeStandIn(a),
+    // the report rate limit (docs/report-rate-limit.sql): the database's answer, a refusal when the test sets `w.rate`
+    rateClaim: async () => (w.rate ? { allowed: false, ...w.rate } : { allowed: true }),
     zipSupported: async () => true,
     radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
     trialOf: async () => state(),
@@ -341,6 +345,17 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await make(o2.page);
   ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^16 free reports left$/.test(await text(o2.page, '#trial-count')),
     '2e a "No data ingested" report says it used nothing, and the count stays', [await text(o2.page, '#creditnote'), await text(o2.page, '#trial-count')]);
+  // the empty-source state on the launch test location (Brigham City, UT 84302), read off the page the way a person sees it: a plain answer, not a failure
+  const hero = await o2.page.$eval('#report .da-rv-sec--outcome', (e) => ({ title: e.querySelector('.da-rv-h2').textContent.trim(), body: e.querySelector('.da-rv-outcome-p').textContent.trim() })).catch(() => null);
+  ok(hero && hero.title === 'No data ingested' && /It is not a finding that there is no development\./.test(hero.body) && (await o2.page.$$('#report .da-rv-card')).length === 0,
+    '2e2 the report page leads with "No data ingested" and the founder\'s sentence that it is not a finding of no development, and draws no project', hero);
+  const st2 = await o2.page.$eval('#status', (e) => ({ text: e.textContent.trim(), cls: e.className }));
+  ok(/^Report ready: No data ingested for this address\./.test(st2.text) && !/\b0 official records?\b/.test(st2.text) && st2.cls === '',
+    '2e3 the status line says "No data ingested", never "0 official records within 0.5 miles", and is not styled as an error', st2);
+  ok(await o2.page.$eval('#report', (e) => !e.hidden) && (await o2.page.$$('#status.err')).length === 0 && !/\b(error|could not|try again|something went wrong)\b/i.test(await text(o2.page, '#report')),
+    '2e4 nothing on the page reads or looks like an error: the report is shown, the status is not red, no failure wording', await text(o2.page, '#report'));
+  ok(!/\b0 (official )?(records?|projects?)\b/i.test(await text(o2.page, '#report')) && !(await text(o2.page, '#report')).includes('No development activity'),
+    '2e5 and it states no measured zero and does not use the other outcome\'s words ("No development activity"): the two founder outcomes are never confused');
   ok(errors.length === 0 && o2.errors.length === 0 && foreign.length === 0 && o2.foreign.length === 0, '2f no page error, nothing foreign fetched', { errors, e2: o2.errors });
   await o2.ctx.close();
 }
@@ -366,6 +381,43 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await make(page, OTHER);
   ok(reports.length === 4 && reports[3].body.idempotency_key !== reports[2].body.idempotency_key && w.used === 3,
     '3e once an answer arrived, asking again is a new report with a new key (the page never reuses a finished key)');
+  await ctx.close();
+}
+
+// ---- 3x. the report rate limit, in plain words: nothing was made, nothing used, and it says how long to wait ---------------------------------------------------
+{
+  const cases = [
+    [{ retryAfterSeconds: 30, limitedBy: 'user', windowSeconds: 60 }, /^You have asked for a lot of reports in a short time\. Try again in 30 seconds\. This did not use a free report\.$/, 'a person\'s own ceiling, 30 seconds'],
+    [{ retryAfterSeconds: 1, limitedBy: 'user', windowSeconds: 60 }, /Try again in 1 second\. This did not use a free report\.$/, 'one second is singular'],
+    [{ retryAfterSeconds: 600, limitedBy: 'brokerage', windowSeconds: 3600 }, /^Your brokerage has asked for a lot of reports in a short time\. Try again in 10 minutes\./, 'the brokerage\'s ceiling, 10 minutes'],
+    [{ retryAfterSeconds: 72000, limitedBy: 'user', windowSeconds: 86400 }, /Try again in 20 hours\./, 'the day\'s ceiling, 20 hours'],
+  ];
+  for (const [rate, re, what] of cases) {
+    const w = world({ used: 4 });
+    const { ctx, page, reports, errors, foreign } = await open({ w });
+    await waitCount(page, /^16 free reports left$/);
+    w.rate = rate;
+    await make(page);
+    const st = await page.$eval('#status', (e) => ({ text: e.textContent.trim(), err: e.classList.contains('err') }));
+    ok(re.test(st.text) && st.err, '3x ' + what + ': the page says so in plain words and shows it as a refusal', st);
+    ok(w.used === 4 && /^16 free reports left$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 16 free reports left', [w.used, await text(page, '#trial-count')]);
+    ok(reports.length === 1 && (await page.$$('#report .da-rv-sec')).length === 0, '3x ' + what + ': one request was sent and no report is drawn', [reports.length, (await page.$$('#report .da-rv-sec')).length]);
+    const shown = await text(page, 'main');
+    ok(!/\b429\b|rate_limited|retry_after/.test(shown), '3x ' + what + ': no status code, error code or field name is shown to the person', shown.slice(0, 200));
+    // Chromium itself logs one console line for any non-2xx answer; that single line is the expected network log, not a page error
+    ok(errors.filter((e) => !/Failed to load resource: the server responded with a status of 429/.test(e)).length === 0 && errors.length <= 1 && foreign.length === 0, '3x ' + what + ': no page error and nothing foreign fetched (the one network log Chromium writes for a 429 is expected)', errors);
+    await ctx.close();
+  }
+  // when the window has passed, the very same page makes the report
+  const w = world({ used: 4 });
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /^16 free reports left$/);
+  w.rate = { retryAfterSeconds: 5, limitedBy: 'user', windowSeconds: 60 };
+  await make(page);
+  w.rate = null;
+  await page.click('#go');
+  await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
+  ok(w.used === 5 && /^15 free reports left$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 15 left', [w.used]);
   await ctx.close();
 }
 
@@ -529,7 +581,7 @@ for (const [label, w, count] of [
 }
 
 // ---- 7. saved reports (build step 6): the brokerage's stored reports, opened as stored, never charged ---------------------------------
-const ADDRESS_2 = '1600 Pennsylvania Ave NW, Washington, DC 20500';
+const ADDRESS_2 = addressNo(2);
 const savedShown = (page) => page.$eval('#saved', (e) => !e.hidden);
 const rowsOf = (page) => page.$$eval('#saved-list button', (bs) => bs.map((b) => b.textContent.trim()));
 const waitRows = (page, k) => page.waitForFunction((c) => document.querySelectorAll('#saved-list button').length === c, k, { timeout: 8000 }).catch(() => {});
@@ -943,7 +995,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(/You are watching this property, since October 3, 2026\./.test(st) && /The first check runs within a few minutes\./.test(st) && /Next check: October 3, 2026\./.test(st),
     '10g after the start the card says since when, that the first check is soon and when the next one is', st);
   ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: false, stop: true }) && w.watches.length === 1, '10h now "Stop watching" is offered and "Watch this property" is not; the server holds exactly one watch');
-  ok(!JSON.stringify(watchCalls).includes('Evergreen') && !(await text(page, '#watch')).includes('Evergreen'), '10i neither the Watch requests nor the card carry the property\'s address');
+  ok(!JSON.stringify(watchCalls).includes('N Main St') && !(await text(page, '#watch')).includes('N Main St'), '10i neither the Watch requests nor the card carry the property\'s address');
 
   // every outcome, in plain words (the page reads the stored outcome; it decides none)
   const WORDS = { CHECKED: /Last checked October 3, 2026: nothing new\. Next check/, CHECKED_PARTIAL: /nothing new, but some official sources near the property could not be fully read/, NOTIFIED: /a change was found and emailed to you\./,
@@ -1113,7 +1165,7 @@ const tableOf = (page) => page.evaluate(() => {
   };
 });
 const rowCells = (t, label) => (t.rows.find((r) => r.label === label) || { cells: [] }).cells;
-const A1 = '1 First Ave, Springfield, OR 97477', A2 = '2 Second Ave, Springfield, OR 97477', A3 = '3 Third Ave, Springfield, OR 97477', A4 = '4 Fourth Ave, Springfield, OR 97477', A5 = '5 Fifth Ave, Springfield, OR 97477', A6 = '6 Sixth Ave, Springfield, OR 97477';
+const A1 = '1 First Ave, Brigham City, UT 84302', A2 = '2 Second Ave, Brigham City, UT 84302', A3 = '3 Third Ave, Brigham City, UT 84302', A4 = '4 Fourth Ave, Brigham City, UT 84302', A5 = '5 Fifth Ave, Brigham City, UT 84302', A6 = '6 Sixth Ave, Brigham City, UT 84302';
 const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
 {
   // before there are two reports there is nothing to compare, and the card says so
@@ -1155,7 +1207,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   //
   ok(/Compared 3 saved reports\. Opening them did not use a free report\./.test(await text(page, '#compare-status')), '11j the card says it compared three and that opening them used no free report');
   const t = await tableOf(page);
   ok(t.heads.join() === 'Report 3,Report 2,Report 1', '11k the columns are in the saved list\'s order, newest first, not the order they were ticked', t.heads);
-  ok(/742 Evergreen|3 THIRD AVE/i.test(t.legend[0]) && /Report 3/.test(t.legend[0]) && t.legend.length === 3 && !t.heads.some((h) => /Ave/.test(h)), '11l the list says which address is which report, and the column headings are only "Report N"', t.legend);
+  ok(/20 N Main St|3 THIRD AVE/i.test(t.legend[0]) && /Report 3/.test(t.legend[0]) && t.legend.length === 3 && !t.heads.some((h) => /Ave/.test(h)), '11l the list says which address is which report, and the column headings are only "Report N"', t.legend);
   // the numbers equal what each report shows when it is opened on its own (same report rules, in the real page)
   const own = [];
   for (const num of [3, 2, 1]) {

@@ -337,12 +337,13 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     for (const [name, fn] of Object.entries({
       trialOf: async () => TRIAL,
       planOf: async () => PLAN(),
+      rateClaim: async () => ({ allowed: true }),   // the report rate limit (docs/report-rate-limit.sql): the database's answer; test/report-rate-limit-function.test.mjs tests the refusals
       issue: async () => ({ replayed: false, report_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', content_hash: 'h', report_version: M.REPORT_VERSION, generated_at: '2026-10-02T19:00:00Z',
         private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', report: { stored: 'body' }, credit: { ordinal: 4, credits_used: 4, credits_remaining: 16, evaluation_status: 'active', allotment: 'trial', period_ends_at: null } }),
       storedReport: async () => JSON.stringify({ stored: 'first', coverage: { state: 'REPORT_READY' } }),
       contextMatches: async () => 'match',
       headerOf: async () => HEADER,
-      ...Object.fromEntries(Object.entries(over).filter(([k]) => ['trialOf', 'planOf', 'issue', 'storedReport', 'contextMatches', 'headerOf'].includes(k))),
+      ...Object.fromEntries(Object.entries(over).filter(([k]) => ['trialOf', 'planOf', 'rateClaim', 'issue', 'storedReport', 'contextMatches', 'headerOf'].includes(k))),
     })) f.deps[name] = rec(name, fn);
     for (const name of ['authenticate', 'isAdmin']) { const fn = f.deps[name]; f.deps[name] = rec(name, fn); }
     return f;
@@ -360,7 +361,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     '8a and the answer says how many free reports are left (asked of the database by the auth user\'s id, never the email)', r.json.trial);
   ok(JSON.stringify(r.json.plan) === '{"state":"none","role":"owner","credit_limit":100,"credits_used":0,"credits_remaining":0,"period_ends_at":null}' && f.args.planOf[0] === USER && !JSON.stringify(r.json).includes(BKID),
     '8a and the plan rides the answer (state, role and the month\'s figures), asked of the database by the auth user\'s id, and the brokerage id is never sent to the page', r.json.plan);
-  ok(JSON.stringify(f.calls.slice(0, 5)) === '["authenticate","isAdmin","trialOf","planOf","geocode"]', '8a the order: who you are, the allow-list, the trial, the plan, and only then the address', f.calls);
+  ok(JSON.stringify(f.calls.slice(0, 6)) === '["authenticate","isAdmin","trialOf","planOf","rateClaim","geocode"]', '8a the order: who you are, the allow-list, the trial, the plan, the rate limit, and only then the address', f.calls);
 
   // once a source is cleared and a record is shown, the report uses one free report: stored and charged in one call
   f = trialFakes();

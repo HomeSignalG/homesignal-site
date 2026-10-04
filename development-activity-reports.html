@@ -1033,10 +1033,24 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var h = Array.prototype.map.call(b, function(x){ return (x < 16 ? '0' : '') + x.toString(16); }).join('');
     return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
   }
+  /** A wait in plain words, from the seconds the report function reports (docs/report-rate-limit.sql). */
+  function waitWords(n){
+    n = Number(n);
+    if (!isFinite(n) || n < 1) return 'a little while';
+    if (n < 90) return Math.ceil(n) + (Math.ceil(n) === 1 ? ' second' : ' seconds');
+    if (n < 5400) return Math.ceil(n / 60) + ' minutes';
+    var h = Math.ceil(n / 3600);
+    return h + (h === 1 ? ' hour' : ' hours');
+  }
   /** What to tell the customer for each answer the report function can give. Plain words; never a raw error code. */
   function messageFor(httpStatus, body){
     body = body || {};
     if (httpStatus === 401) return 'Sign in first.';
+    // too many requests in a short time (the report rate limit): not an error with the account, nothing was made, and it says how long to wait
+    if (httpStatus === 429 && body.error === 'rate_limited') {
+      return (body.limited_by === 'brokerage' ? 'Your brokerage has asked for a lot of reports in a short time.' : 'You have asked for a lot of reports in a short time.')
+        + ' Try again in ' + waitWords(body.retry_after_seconds) + '. This did not use ' + oneOf() + '.';
+    }
     if (httpStatus === 403 && body.error === 'evaluation_complete') return "All 20 of your brokerage's free reports are used.";
     if (httpStatus === 403 && body.error === 'allotment_complete') return "All 100 of your brokerage's reports for this month are used.";
     if (httpStatus === 403) return 'This account cannot make reports right now.';
@@ -1095,7 +1109,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['pdf'] })) { say('The report came back but could not be shown.', true); return; }
     if (shareable) { showShare(body.report_id); showWatch(body.report_id); }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
-    say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
+    // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
+    // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
+    var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
+    if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
     if (body.stored === true) { savedFresh = false; showSaved(true); } // a report that was just saved joins the list
   }

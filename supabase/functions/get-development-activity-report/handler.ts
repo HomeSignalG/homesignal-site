@@ -21,6 +21,13 @@
 // figures, never an id) is read once per request and rides every member answer as `plan`. A trial that is complete, with no paid plan, can make
 // no report; a paid plan whose month is complete can make no report either (`allotment_complete`). There is no overage and no extra purchase.
 //
+// THE RATE LIMIT (docs/report-rate-limit.sql). The entitlement limits what is STORED AND CHARGED; it does not limit what is ASKED, and a request the credit
+// rule does not charge ("No data ingested", an address that cannot be found, an address outside coverage) is free work for the geocoder and the spatial
+// reads. So a signed-in member's report request takes one from the person's and the brokerage's windows (`deps.rateClaim`, the database's decision) AFTER
+// the request is validated and BEFORE the geocoder is asked, and a full window answers 429 `rate_limited` with how long to wait. A refused request consumed
+// nothing. A claim that cannot be made answers 502 and never goes on to the geocoder (fails closed). It does not touch the 20 free or the 100 paid, and it
+// is not applied to an admin, to the list/open reads, or to a request refused earlier (an invalid body, a spent trial).
+//
 // SAVED REPORTS (build step 6). A trial member may also LIST their brokerage's stored reports (`{ action: 'list' }`) and REOPEN one by its
 // permanent id (`{ action: 'open', report_id }`). Both are reads through the one membership resolver (public.evaluation_reports_of and
 // public.evaluation_report_open): they reach neither the engine, the geocoder, the credit rule nor the issue function, so opening a report
@@ -36,6 +43,7 @@ import type { TrialState } from '../_shared/admin-gate.ts';
 import { AllotmentComplete, EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
 import { planSummary } from '../_shared/billing-reads.ts';
 import type { BillingUsage } from '../_shared/billing-reads.ts';
+import type { RateVerdict } from '../_shared/rate-reads.ts';
 import { UUID } from '../_shared/evaluation-reads.ts';
 import type { OpenedReport, ReportHeader, SavedReport } from '../_shared/evaluation-reads.ts';
 import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
@@ -65,6 +73,8 @@ export type Deps = {
   trialOf: (userId: string) => Promise<TrialState | null>;
   /** The member's plan (build step 11): public.billing_usage by auth user id. Null when the person is not a member of any account. */
   planOf: (userId: string) => Promise<BillingUsage | null>;
+  /** The report rate limit (docs/report-rate-limit.sql): take one request from the person's and the brokerage's windows, or learn one is full. Throws DataUnavailable when it cannot say. */
+  rateClaim: (userId: string) => Promise<RateVerdict>;
   issue: (userId: string, idempotencyKey: string, intelligence: Record<string, unknown>, privateContext: PrivateContext | null,
     opts: { reportVersion: string; engineInputs: Record<string, unknown> }) => Promise<EvaluationIssue>;
   storedReport: (reportId: string) => Promise<string | null>;
@@ -97,6 +107,7 @@ export function capability() {
     stores_reports: 'only a member\'s report that uses a report from the allotment (credit rule): a free one, or one of the paid month\'s; never an admin report',
     saved_reports: 'list: the stored reports of a trial member\'s trial; open: one of them by its id, as stored, never charged',
     credit_rule: CREDIT_RULE_VERSION,
+    rate_limit: 'a signed-in member\'s report requests are rate limited; a full window answers 429 rate_limited with retry_after_seconds (the limits are set in the database)',
   };
 }
 
@@ -195,6 +206,19 @@ export function makeHandler(deps: Deps) {
 
     try {
       const rights = validateRights(deps.rights); // a malformed registry fails the request: never "everything is cleared"
+
+      // 2b. the rate limit: a member's request that has passed validation takes one from the person's and the brokerage's windows BEFORE any work is
+      // done for it. A refusal consumed nothing; a claim that cannot be made is DataUnavailable (502) and the geocoder is never asked.
+      if (trial) {
+        const verdict = await deps.rateClaim(trial.userId);
+        if (!verdict.allowed) {
+          const limited = reply(req, {
+            error: 'rate_limited', retry_after_seconds: verdict.retryAfterSeconds, limited_by: verdict.limitedBy, ...trialInfo,
+          }, 429);
+          limited.headers.set('Retry-After', String(verdict.retryAfterSeconds));
+          return limited;
+        }
+      }
 
       // 3. resolve the address, then the ZIP — before any credit-shaped decision
       const g = await deps.geocode(address);
