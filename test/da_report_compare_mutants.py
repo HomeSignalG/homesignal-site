@@ -163,7 +163,7 @@ def main():
         print('HARNESS - the unmutated tree does not pass %s (%s)' % (which, line))
         return 2
     originals = {f: (ROOT / f).read_text() for f in {v[0] for v in M.values()}}
-    survived, harness = [], []
+    survived, harness, ran = [], [], []
     names = [k for k in M if not only or k in only]
     try:
         for name in names:
@@ -173,6 +173,7 @@ def main():
                     continue
                 tests = [PB]
             original = originals[f]
+            ran.append(name)
             mutated, fault = original, None
             for old, new in pairs:
                 if mutated.count(old) != 1:
@@ -200,7 +201,7 @@ def main():
     finally:
         for f, original in originals.items():
             (ROOT / f).write_text(original)
-    print('\n%d mutation(s): %d killed, %d survived, %d harness fault(s)' % (len(names), len(names) - len(survived) - len(harness), len(survived), len(harness)))
+    print('\n%d mutation(s): %d killed, %d survived, %d harness fault(s)' % (len(ran), len(ran) - len(survived) - len(harness), len(survived), len(harness)))
     return 2 if harness else (1 if survived else 0)
 
 

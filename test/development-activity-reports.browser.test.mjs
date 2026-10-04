@@ -1301,6 +1301,52 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   //
   await d.ctx.close();
 }
 
+{
+  // the report's own Compare button is live on a REOPENED saved report too, and not only on a report just made
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.click('#saved-list button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live') })));
+  ok(/Saved report/.test(await text(page, '#saved-status')) && btn.some((b) => b.act === 'compare' && b.live), '11z6 on a REOPENED saved report the "Compare property" button is live too', btn);
+  await ctx.close();
+}
+{
+  // a saved list that cannot be read empties the card's list and says so; it never leaves a stale list to compare
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  ok(!(await compareHidden(page)), '11z7a with two saved reports the card is on screen');
+  w.listFails = true;
+  await make(page, A3);
+  await page.waitForFunction(() => /could not be read/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  w.listFails = false;
+  ok((await compareBoxes(page)).length === 0 && (await page.$eval('#compare-go', (b) => b.disabled)) && /saved reports could not be read just now/.test(await text(page, '#compare-status')),
+    '11z7 when the saved list cannot be read the card holds no stale list to compare, the button is off, and it says so in plain words', [(await compareBoxes(page)).length, await text(page, '#compare-status')]);
+  await ctx.close();
+}
+{
+  // a report that comes back but is not a report the page can show is never compared (the same answer as one that cannot be found)
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  const keys = [...w.made.keys()];
+  w.made.get(keys[0]).report = { not: 'a report' };
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const said = await text(page, '#compare-status');
+  ok(/could not be opened just now/.test(said) && (await page.$$('#compare-result .da-cmp')).length === 0, '11z8 a saved report that is not a report the page can show is refused in plain words and nothing is drawn', said);
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);

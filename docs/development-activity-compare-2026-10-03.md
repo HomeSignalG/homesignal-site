@@ -112,13 +112,22 @@ already exist (step 6). Nothing is applied to the database and nothing is deploy
   the late answer dropped; the card cleared on sign-out; nothing server-side mentions it.
 - `test/da-report-view.test.mjs` (158) and `test/da-report-view-structure.test.mjs` (63) — the view the comparison reads; the three pins that
   said "one place" now name the new single place.
-- `test/development-activity-reports.browser.test.mjs` — 36 new checks in Chromium against the real report handler: the card with 0, 1 and 3
+- `test/development-activity-reports.browser.test.mjs` — 40 new checks in Chromium against the real report handler: the card with 0, 1 and 3
   saved reports; two to five; the sixth waits; exactly the chosen reports are opened, with the person's token and only the action and the
   report id; **no report made and no free report used** (the count stays 17); each column's stage counts equal what that report shows when
   opened on its own; "No data ingested" in every count cell; a report that cannot be found, and reports made over different distances,
-  refused with nothing drawn; the report's own Compare button; sign-out, another person, and a late answer after sign-out; a 390 px screen
+  refused with nothing drawn; the report's own Compare button (on a report just made and on one reopened); a saved list that cannot be read; a report that comes back but cannot be shown; sign-out, another person, and a late answer after sign-out; a 390 px screen
   stacks and does not scroll sideways; a wide screen is a real table.
-- `test/da_report_compare_mutants.py` — MUTATION_SUMMARY.
+- `test/da_report_compare_mutants.py` — 64 deliberate breakages of the comparison module, the report view it reads and the page, each run against
+  the tests that should catch it: **64 killed, 0 survived, 0 harness faults** (the first full run killed 63 and one survived, a report that does not state its day or its window; that was given its own check, 8b2, and its breakage was killed on a re-run; see the final run recorded in section 7). A second pass runs each of the page's 18 breakages against the
+  Chromium suite alone (`--browser-only`): **16 are killed by Chromium alone**. The two that are not, and why:
+  `compare_goes_in_tick_order` is **behaviourally identical** to the code it replaces (both read the boxes in the saved list's order, because the
+  page asks the document for the ticked boxes and the document keeps the list's order), so no browser test can tell them apart; the structural pin
+  that names the form of the line kills it. `card_shown_to_everyone` removes the `hidden` attribute from the page's own HTML, which the page's
+  script puts back before anyone sees it, so only the file's text can show it; the structural pin kills it. Three more that Chromium alone first
+  missed (the Compare button on a reopened report, an unreadable saved list, a report that comes back but is not one the page can show) now
+  have checks of their own (11z6 to 11z8) and are killed there (13 of 18 before those checks, 16 of 18 after; the summary line of the first
+  pass printed the whole table's count, which the harness now corrects to the number it ran).
 
 ## 7. Shipping it
 
