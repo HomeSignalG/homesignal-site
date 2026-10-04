@@ -130,7 +130,12 @@ const watchCode = code(WATCH_SQL);
 // and its precondition. Never the member table; it writes neither this spine's tables nor any column of them.
 const BILLING_SQL = 'docs/brokerage-billing.sql';
 const billingCode = code(BILLING_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL])
+// docs/report-rate-limit.sql adds ONE more reader of the RESOLVER and nothing else: the claim asks which brokerage the caller is in (so a brokerage's own ceiling can be
+// shared by its people), once, plus the precondition that the resolver exists (its test and its message: three mentions in all). Never the account or member tables; it writes only its own counter table.
+const RATE_SQL = 'docs/report-rate-limit.sql';
+const rateCode = code(RATE_SQL);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL])
+   && (rateCode.match(/brokerage_membership_of\(/g) || []).length === 3 && /from public\.brokerage_membership_of\(p_user\) m/.test(rateCode) && !/brokerage_account|brokerage_member\b/.test(rateCode)
    && (billingCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 3 && (billingCode.match(/brokerage_account/g) || []).length === 4 && !/brokerage_member\b/.test(billingCode)
    && (billingCode.match(/from public\.brokerage_account a where a\.id = p_brokerage/g) || []).length === 2 && (billingCode.match(/references public\.brokerage_account \(id\)/g) || []).length === 1
    && !/\b(insert\s+into|update|delete\s+from|truncate|alter\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(billingCode)

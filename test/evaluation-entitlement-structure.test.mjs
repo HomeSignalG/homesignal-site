@@ -182,8 +182,14 @@ const watchCode = code(WATCH_SQL);
 // this layer. test/brokerage_billing_pg proves that, and test/billing-structure.test.mjs pins its structure.
 const BILLING_SQL = 'docs/brokerage-billing.sql';
 const billingCode = code(BILLING_SQL);
+// docs/report-rate-limit.sql is a sixth SQL file that names this layer, ONLY to read the free-report number: its post-condition refuses to apply if
+// public.evaluation_report_limit() is not 20, so that file can never be the reason the founder's number moved. It writes no row of this layer (its one table is
+// report_rate_window) and calls nothing else here. test/report_rate_limit_pg proves that; test/report-rate-limit-structure.test.mjs pins its structure.
+const RATE_SQL = 'docs/report-rate-limit.sql';
+const rateCode = code(RATE_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, EVAL_READS].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, EVAL_READS].sort())
+   && [...new Set(rateCode.match(new RegExp(OURS.source, 'g')) || [])].join() === 'evaluation_report_limit' && dmlTargets(rateCode).length >= 1 && dmlTargets(rateCode).every((t) => t === 'report_rate_window')
    && dmlTargets(billingCode).length >= 2 && dmlTargets(billingCode).every((t) => /^brokerage_(subscription|paid_credit)$/.test(t))
    && !/\bexecute\b[^;]*\b(insert|update|delete)\b[^;]*\bevaluation(_credit)?\b/i.test(billingCode)
    && (billingCode.match(/\bpublic\.evaluation_report_issue\(/g) || []).length === 2 && /from public\.evaluation_report_issue\(p_user_id, p_idempotency_key, p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) t;/.test(billingCode)

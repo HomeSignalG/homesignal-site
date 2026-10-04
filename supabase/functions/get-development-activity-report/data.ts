@@ -15,6 +15,7 @@ import { makeChangeReads } from '../_shared/change-reads.ts';
 import { issueBrokerageReport } from '../_shared/report-snapshot.ts';
 import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
 import { makeBillingReads } from '../_shared/billing-reads.ts';
+import { makeRateReads } from '../_shared/rate-reads.ts';
 import { makePrivateSubjectReads } from '../_shared/private-subject.ts';
 import { norm } from '../_shared/national-report.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
@@ -34,6 +35,8 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const subjects = makePrivateSubjectReads(rpc);
   // the plan (build step 11): one definition, shared with the Billing function (_shared/billing-reads.ts)
   const billing = makeBillingReads(rpc);
+  // the report rate limit: one definition, the database's (docs/report-rate-limit.sql); this file only calls it
+  const rate = makeRateReads(rpc);
 
   return {
     now: cfg.now ?? (() => new Date()),
@@ -75,6 +78,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
     // ── the trial (build step 5b): every one of these goes through a database function that owns the decision ──
     trialOf: evaluation.trialOf,
     planOf: billing.usageOf,
+    rateClaim: rate.claim,
 
     issue(userId, idempotencyKey, intelligence, privateContext, opts) {
       return issueBrokerageReport(rpc, { userId, idempotencyKey }, intelligence, privateContext, opts);

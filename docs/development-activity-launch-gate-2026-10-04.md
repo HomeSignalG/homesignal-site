@@ -7,9 +7,12 @@ the end of the trial, payment and a 100-report month."**
 
 | | |
 |---|---|
-| **The end-to-end test** | **BUILT AND GREEN.** `test/launch_gate_pg` runs the whole sequence as one scenario (section 2) through the real handlers and the shipped SQL. 73 checks, all passing. It runs in CI on every change to anything it stands on. |
-| **The Enterprise page buttons** | **NOT LIVE.** Four of the five things that have to be true first are not (section 4). They stay hidden and inert (`<div data-commerce hidden>`, `aria-disabled`), and `test/development-activity-landing.test.mjs` still fails if one becomes visible. |
-| **Step 13 in the checklist** | **NOT struck.** The checklist strikes a step only after the work is merged, deployed and read back live. The buttons are the second half of this step and they are not live. |
+| **The end-to-end test** | **BUILT AND GREEN.** `test/launch_gate_pg` runs the whole sequence as one scenario (section 2) through the real handlers and the shipped SQL. **86 checks, all passing: the original 73 (sections 1-14 of the scenario), unchanged, plus 13 (section 15, the report rate limit).** It runs in CI on every change to anything it stands on. |
+| **The launch / manual test location** | **Brigham City, UT 84302** (founder, 2026-10-04), defined once in `test/lib/launch-test-location.mjs` and used by every launch-path test and the manual test. It is a *place*, not a source and not a clearance (section 8). |
+| **The report rate limit** | **BUILT, NOT APPLIED, NOT DEPLOYED.** `docs/report-rate-limit.sql` + the report function's claim + the page's plain-words message, with its own suites and mutation loops (section 9). Applying the SQL to production and deploying the function are your calls: nothing live has changed. |
+| **Step 12 (Utah source requests)** | **STILL OPEN.** No request has been sent and no source is cleared; `report-rights.json` still reads `cleared: []`. A test ZIP does not replace sending the requests or clearing a source. |
+| **The Enterprise page buttons** | **NOT LIVE.** Four of the five things that have to be true first are not (section 4). They stay hidden and inert (`<div data-commerce hidden>`, `aria-disabled`), and `test/development-activity-landing.test.mjs` still fails if one becomes visible (evidence in section 11). |
+| **Step 13 in the checklist** | **STILL OPEN, not struck.** The checklist strikes a step only after the work is merged, deployed and read back live. Lemon Squeezy account creation, the product, the webhook, the secrets and a real payment test are **deferred, not done**; the buttons are not live. |
 | **Any payment made** | **None.** No request has ever reached Lemon Squeezy from this build. The processor in the gate is a stand-in that records what it was sent. |
 
 ## 2. What the gate runs
@@ -39,9 +42,10 @@ it) and the processor.
 12. **Isolation.** The other brokerage's plan is untouched, its checkout names only itself, and an event naming its brokerage for this brokerage's subscription is refused (409) and recorded nowhere.
 13. **Cancellation.** The allotment ends at once (D-11-1); all 120 stored reports still list and open; nothing is deleted; a new checkout is available; an older event arriving late does not undo the cancellation.
 14. **The audit.** Every billing invariant reads zero beside controls that are not zero; the processor's key, the signing secret, the checkout address and the owner's email are written in no table of the public schema; no resident role can run a billing function.
+15. **The report rate limit** *(added with `docs/report-rate-limit.sql`; sections 1-14 are unchanged)*. A second brokerage, on the real clock and the real wrapper: a member asking quickly is let through up to the person's ceiling and then refused with 429 and the wait in the body and in `Retry-After`; the refusal carries no report, no charge, no address and no brokerage id; the geocoder and the issuing function are asked once per report let through and **never** for the refused one; four more refused requests consume nothing; the agent of the same brokerage is still served; the limited person can still list saved reports; the free and paid numbers are still 20 and 100; once the minute has passed the person is served again; with the limiter unreadable the request is a 502 and the geocoder is never reached (fails closed). *Sections 1-14 clear the limiter's counters before each request* (they make ~140 reports in about a minute to test the **entitlement**, far above the ceiling by design); section 15 does not.
 
 Run it: `bash test/launch_gate_pg/run.sh` with `PGHOST`/`PGDATABASE` pointing at a disposable Postgres (the script refuses any database whose name does not contain
-"disposable" and refuses to run if any Supabase credential is present). About 70 seconds. In CI it is the `launch-gate` job of `report-snapshot-suite.yml`.
+"disposable" and refuses to run if any Supabase credential is present). About 90 seconds (section 15 begins early in a wall-clock minute, which can add up to half a minute of waiting). In CI it is the `launch-gate` job of `report-snapshot-suite.yml`.
 
 ## 3. What the gate does NOT prove
 
@@ -93,7 +97,7 @@ The plan says the buttons go live after the test. These are what has to be true 
 | 2 | **The $79 product exists in Lemon Squeezy, a second webhook points at `development-activity-billing-webhook`, the four secrets are set, and ONE test payment has been made and its ledger rows checked.** | **Founder action, not done.** Steps: `docs/development-activity-billing-2026-10-04.md` section 5. Until the secrets are set, `manage-billing` answers 503 and the webhook 503: everything fails closed. |
 | 3 | **At least one source is cleared for paying customers**, so a report can show projects. | **Founder action, not done.** The Utah requests are drafted and send-ready (`docs/utah-source-requests-send-ready-2026-10-04.md`) and have **not been sent**. Nothing is "pending" until a person sends them. |
 | 4 | **What the public "Start with 20 free reports" and "Join for $79/month" buttons DO.** | **A product decision, not made.** See below. |
-| 5 | The items the checklist carries as "open before step 13": the free-report rate limit; the public link endpoint is not rate-limited; an owner cannot list or withdraw invite links or remove an agent; **there is no billing-portal link, so a customer cannot change a card or cancel from the page**; `run-property-watch` has no rate limit beyond its private secret; an ended or failing watch is not emailed to the agent. | **Open.** None was fixed in this step; the first three and the billing-portal link bear directly on opening the door to the public. |
+| 5 | The items the checklist carries as "open before step 13" (kept explicit; the full table with evidence is section 10): **(a) the free-report rate limit — BUILT in this change, awaiting your go to apply and deploy (section 9);** **(b) there is no billing-portal link, so a customer cannot change a card or cancel from the page — OPEN, not built;** (c) the public client link endpoint is not rate-limited — OPEN; (d) an owner cannot list or withdraw invite links or remove an agent — OPEN; (e) `run-property-watch` has no rate limit beyond its private secret — OPEN; (f) an ended or failing watch is not emailed to the agent — OPEN. | **(a) built, not live. (b)-(f) open.** (a) and (b) bear most directly on opening the door to the public, and neither is complete: the limiter is not applied, and there is still no self-service card update or cancellation. |
 
 ### The decision the buttons need (D-13-1) — not made here
 
@@ -108,7 +112,7 @@ brokerage to pay for. Making the buttons live therefore means choosing, which is
 
 - **A. Request-and-invite (needs no new code on the server).** "Start with 20 free reports" opens a request form; the founder creates the trial and sends the owner link, exactly as now.
   "Join for $79/month" takes a signed-in owner to the Billing card. Manual: the founder is the gate on who gets a trial.
-- **B. Self-serve trial creation.** A new function lets a signed-in person create their own brokerage and trial. That is new code and a new abuse surface (the free-report rate limit in item 5 would have to exist first).
+- **B. Self-serve trial creation.** A new function lets a signed-in person create their own brokerage and trial. That is new code and a new abuse surface. The report rate limit (section 9) is a prerequisite and is now built, but it is **not enough on its own**: section 11 lists what else would have to exist first, and none of it is built.
 
 Either way, **the buttons stay hidden until items 2, 3 and 4 are true**, because a live button that leads to "No data ingested" or to a checkout that cannot complete is worse than no button.
 
@@ -120,7 +124,7 @@ Either way, **the buttons stay hidden until items 2, 3 and 4 are true**, because
 3. Make the buttons call it; remove `hidden` from the four `data-commerce` divs; update `test/development-activity-landing.test.mjs`, which today fails on exactly that.
 4. Deploy, then read the live page back from homesignal.net (the buttons visible and doing what D-13-1 says), and only then strike step 13.
 
-## 6. Decisions made in this step
+## 6. Decisions made in this step (build step 13)
 
 - The gate lives in `report-snapshot-suite.yml` as its **own job** (`launch-gate`), beside `snapshot` and `billing`, so its 70 seconds and its 100-report loop do not share another job's time. It takes no repository secret.
 - The processor is a **stand-in that records the request**, and the webhook body it "sends" is built from the custom data of the checkout request the real `manage-billing` handler made, so the binding that ties a payment to a brokerage is exercised end to end.
@@ -132,4 +136,85 @@ Either way, **the buttons stay hidden until items 2, 3 and 4 are true**, because
 - `test/launch_gate_pg/run.sh`, `test/launch_gate_pg/roundtrip.mjs` — the gate.
 - `test/launch-gate-structure.test.mjs` — its structure: stands on the real layers, answered through an allowlist, reads no environment, runs in CI, says what it does not prove.
 - `test/launch_gate_mutants.py` — the mutation loop (manual, like the others).
-- `.github/workflows/report-snapshot-suite.yml` — the `launch-gate` job and its path filters.
+- `.github/workflows/report-snapshot-suite.yml` — the `launch-gate` and `report-rate-limit` jobs and their path filters.
+- `docs/report-rate-limit.sql`, `supabase/functions/_shared/rate-reads.ts`, `test/report_rate_limit_pg/`, `test/report-rate-limit-function.test.mjs`, `test/report-rate-limit-structure.test.mjs`, `test/report_rate_limit_mutants.py` — the rate limit and its proof.
+- `test/lib/launch-test-location.mjs`, `test/brigham-city-84302-journey.test.mjs`, `test/launch-location-structure.test.mjs`, `docs/development-activity-manual-test-brigham-city-84302.md` — the test location.
+
+## 8. Brigham City, UT 84302 — the launch / manual test location (founder, 2026-10-04)
+
+"Use Brigham City, Utah 84302 everywhere the launch/manual test location is needed. Do not use Bingham Canyon or ZIP 84006." It is defined once, in `test/lib/launch-test-location.mjs`
+(address `20 N Main St, Brigham City, UT 84302`, Box Elder County), imported by the launch gate, the trial round trip, the customer page in Chromium and the journey test below, and
+quoted by the manual test (`docs/development-activity-manual-test-brigham-city-84302.md`). `test/launch-location-structure.test.mjs` fails if a launch-path file uses another place.
+
+**What was verified, and with what** (`test/brigham-city-84302-journey.test.mjs`, 28 checks; the real request handler, the real data layer, the engine, the credit rule and `report-rights.json` as shipped; the network is a fetch stand-in that records every request):
+
+- **Accepted and routed.** The typed address goes to the one geocoder exactly as typed; the ZIP it returns (84302) is asked of `canonical_zip_registry`; the 0.5-mile spatial read is made at the geocoded point; the records that read names are the ones hydrated; and the rate limit is asked first. An address in a ZIP outside the registry is `OUTSIDE_COVERAGE`, one the geocoder cannot find is `ADDRESS_NOT_RESOLVED`: both free, neither "No data ingested".
+- **The empty-source state is accurate.** With the rights registry as shipped, the report for this location says **"No data ingested"**: HTTP 200 and no `error` field, no project, nothing charged or stored, the issuing function never called, the trial count unchanged — and none of the **41 stored UDOT records** the database holds for this ZIP appears in the answer (by name, family or address). The empty answer is caused by the rights registry and not by the location: the control that clears a *fixture* family for the very same journey shows development and uses one free report. Clearing a *different* source changes nothing, and a malformed rights registry fails the request instead of clearing everything.
+- **It does not look like an error.** In Chromium (`development-activity-reports.browser.test.mjs` 2e2-2e5; `development-activity-review.browser.test.mjs` 3c2) the page leads with the heading **"No data ingested"** and the founder's sentence "It is not a finding that there is no development", draws no project, shows no red status, and says no measured zero and none of the other outcome's words ("No development activity"). *This pass found and fixed one real defect:* the status line under the button read **"Report ready: 0 official records within 0.5 miles."** for this state, which is a measured zero for something that was not measured (ruling R5). It now reads "Report ready: No data ingested for this address. It is not a finding that there is no development nearby." in both pages; populated reports are unchanged. The new check was proven load-bearing by restoring the old line (it fails).
+- **Read from production, read-only, 2026-10-04:** 84302 is one of the 12,722 rows of `canonical_zip_registry`; the database holds 41 stored UDOT development rows and 22 EPA facility rows for it. Those are stored, not cleared.
+
+**What it does NOT prove.**
+- **The ZIP is not a data source and not a clearance.** Being covered says where a report can be asked for, never that any publisher's records may be shown to a paying customer. Nothing is cleared (step 12), so a real Brigham City report is "No data ingested" today and will be until a source is cleared.
+- **The live geocoder was not called** (the sandbox has no egress and no external request was made). Whether the live `geocode-address` resolves `20 N Main St, Brigham City, UT 84302` to 84302 is the first thing the manual test checks, by a person.
+- The street address and the point are fixture values (copied from `test/national-report.test.mjs`), standing in for what the geocoder returns.
+
+## 9. The free-report rate limit — built, not applied, not deployed
+
+**Why it was needed.** The entitlement limits what is *stored and charged* (20 free, 100 paid a month). It does not limit what is *asked*, and a request the credit rule does not charge — "No data ingested" (today **every** request), an address that cannot be found, an address outside coverage — is free work for the geocoder and the spatial reads. Behind an admin-created trial that is bounded by who was invited; before any self-serve trial it is not.
+
+**What it is.** `docs/report-rate-limit.sql`: fixed windows of a minute, an hour and a day, per signed-in person and per brokerage, counted by the database (advisory locks, so two requests cannot both take the last slot). A request is allowed only if **every** window has room, and only then are all of them incremented, together; **a refused attempt consumes nothing**. The report function claims after the request is validated and **before the geocoder**, for members only (not admins, not the list/open reads, not a request already refused as invalid or because the trial or month is spent). A full window answers **429** `rate_limited` with the wait in the body and in `Retry-After`; the page says, in plain words, "You have asked for a lot of reports in a short time. Try again in 30 seconds. This did not use a free report." A claim that cannot be made is a 502 and the geocoder is **never** asked (fails closed). It stores only a person's id or a brokerage's id and counters: no email, address or IP. It touches neither the 20 nor the 100 (its post-condition refuses to apply if either is anything else, and a fingerprint of everything else in the schema is identical before and after applying it).
+
+**The numbers — D-RL-1, proposed, not founder-set** (one function, `public.report_rate_limits()`; nothing in the edge repeats them):
+
+| | a minute | an hour | a day |
+|---|---:|---:|---:|
+| a person | 10 | 60 | 200 |
+| a brokerage | 30 | 200 | 1,000 |
+
+They are chosen to sit well above a person working through addresses by hand and well below a script. **Nothing in the plan or the rulings names a request ceiling** (the 20 and the 100 are the only founder numbers and they are untouched), so these are mine; say if you want different ones. Changing them is a one-function edit and a re-apply.
+
+**Proof.**
+- `test/report_rate_limit_pg` against a real Postgres: 71 checks. Fixed instants for every window boundary (the longer wait is the one reported; an old clock cannot reopen a window); **eight real concurrent sessions racing one person's minute admit exactly ten of their 160 requests; sixteen real sessions across four people of one brokerage admit exactly thirty** (the brokerage's ceiling, not the sum of the people's); a claim above READ COMMITTED refused; the API roles refused by the database itself; applying changes nothing the entitlement owns; a second apply; an exact rollback; the refusal when a layer is absent. **29 prohibited mutations of the SQL, all killed by a named check** (`mutate_all.sh`; a crash does not count).
+- `test/report-rate-limit-function.test.mjs`: 70 checks of the edge, written to fail by name, and `test/report-rate-limit-structure.test.mjs`: where the claim sits, who it is for, that no other file reaches the counters, that the credit path does not know it exists. **Edge mutation loop `test/report_rate_limit_mutants.py`: see section 12 for the record.**
+- Section 15 of the launch gate, above, end to end; `test/brigham-city-84302-journey.test.mjs` 6a-6d for the test location.
+- `.github/workflows/report-snapshot-suite.yml` gains a `report-rate-limit` job (database suite and mutation loop) and the new paths.
+
+**Apply order — needs your go, because it is a production database change and a function deploy.**
+1. Apply `docs/report-rate-limit.sql` **first**. It is additive, system-only, idempotent, and changes nothing a person sees. (The deployed function calls the claim; deployed *before* the SQL it would fail closed with 502 for every member.)
+2. Deploy `get-development-activity-report` (`deploy-edge-functions.yml`).
+3. The page change goes live **by merging** (Pages deploys on push to `main`). It is safe before the function change: the 429 message is dead code until the function can send one.
+4. Read it back live: a member's report still works; the claim row appears in `report_rate_window`; `select * from public.report_rate_check()` reads zero on every invariant.
+
+## 10. Anti-abuse audit — what is limited, what is not, and why
+
+Each row says what exists **today** and the evidence. "NOT COVERED" means no rate limit applies; it is not a claim that the surface is unsafe.
+
+| Surface | Who can reach it | What a flood or abuse costs | Control today | Status |
+|---|---|---|---|---|
+| **Report generation** (`get-development-activity-report`) | a signed-in trial or paid member | a geocoder call + spatial reads per request; "No data ingested", not-found and outside-coverage requests are free of charge and unlimited | the 20 / 100 entitlement (database-enforced) for what is *charged*; **the new rate limit for what is *asked*** | **Covered by this change** (not yet applied or deployed) |
+| Report **admin** use | an admin | same as above | none, by design: the founder's own tool (`dashboard_admins`) | NOT COVERED, accepted |
+| **Saved-report list and open** | a member, for their own brokerage | indexed database reads of the caller's own rows; no geocoder, no charge | membership resolver; no request ceiling | NOT COVERED — low risk; open |
+| **Trial creation** | an admin only | one brokerage row + one invite per call | `development-activity-trial` `create` answers 403 to anyone else *before any field is read* (`test/development-activity-trial-function.test.mjs` 6a, 6b). **No public or self-serve path exists** | Not abusable from outside today. **A self-serve path does not exist, and must not until section 11 is done** |
+| **Invite redeem** | anyone holding a token | one database call per try | tokens are `hse1_` + 64 hex (256 bits), one-time, expire in 14 days (`evaluation-entitlement.sql`; the format is pinned); guessing is not feasible | NOT COVERED by a request ceiling; protected by entropy |
+| **Owner mints an agent invite** | an active owner of that brokerage (D-L8) | an invite row per call | seat limit chosen by the admin per trial (`NULL` = none, D-L2: **no number has been chosen**); an owner cannot list or withdraw invites | NOT COVERED — open (d) |
+| **Checkout creation** (`manage-billing`) | the owner of a brokerage | once the Lemon Squeezy key is set, **one outbound call to the processor per request** | owner-only; answers 503 today because no key is set; refuses a second checkout while paid | **NOT COVERED — must be added before the processor key is set** |
+| **Billing webhook** | the processor (signed) | a ledger write per event | HMAC signature; unsigned or wrong-secret is 401 and records nothing; a retry is a duplicate | Signature-gated; no request ceiling needed for a signed caller |
+| **Share-link create / list / revoke** | a member of the report's brokerage | a row per link | at most 25 links per report, counted under a lock (`report_share_limit()`) | Bounded per report; no per-person request ceiling |
+| **Public client link** (`view-shared-report`, `verify_jwt = false`) | **anyone with the link** | a hash lookup per request | 256-bit token; the handler's own header says rate limiting "is not built here" | **NOT COVERED — open (c); the one unauthenticated surface** |
+| **Property Watch** start | a member | a row per watch | at most 25 per brokerage (`property_watch_limit()`) | Bounded; the daily runner is behind a private secret (open (e)) |
+| **`geocode-address`** | **anyone with the public anon key** (CORS `*`; the site's add-your-home box calls it) | a call to the U.S. Census geocoder per request | none; no rate limit | **NOT COVERED — a pre-existing exposure outside the report path.** The new limit protects the geocoder *from the report function*; it cannot protect a direct call to this function |
+| **Billing portal / card update / cancel** | — | — | none exists: a customer cannot change a card or cancel from the page | **OPEN (b)** — a customer-facing gap, not an abuse control |
+
+## 11. Request-access / self-serve trial — what it needs, and what was left alone
+
+**Today's operating model, unchanged: an admin creates the trial, the owner joins by invite link.** The admin does it from `development-activity-review.html`; the owner receives a link by hand.
+
+**Nothing public was added.** The "Start with 20 free reports" and "Join for $79/month" buttons remain inside `<div data-commerce hidden>`, inert, with no destination. Evidence that the landing tests would fail if one became visible: in a copy of the page, un-hiding **each of the four wrappers on its own**, un-hiding all of them, making a button clickable, adding a new visible "Start with 20 free reports" outside a wrapper, and replacing "Join for $79/month" with a live link **each fail both** `development-activity-landing.test.mjs` and its browser test, by name. (One try first reported a survivor: it had changed the *comment* that quotes the wrapper, not a wrapper — a harness error, corrected by editing the four real wrappers separately.)
+
+**Why a request-access path was not built.** It needs a real destination, and every candidate for one is a decision that is yours, not mine: **D-RA-1** where a request goes (the founder's inbox by a mailto to an address you name, or a form that stores a row and tells you) · **D-RA-2** if it stores an email address or name, that is subscriber data/PII and needs consent wording, which is a legal/consent change · **D-RA-3** what happens to the request (who creates the trial, in what time). A page button with no real destination is exactly what you said not to expose, so none was added.
+
+**Self-serve trial creation (D-13-1 option B) needs all of this, and none of it exists:** a verified identity to create under (an email confirmed by sign-in, one trial per person); a limit on trial *creations* per person, per email domain and per network address per day (the report limit does not cover this: it protects report requests, not account creation); a **default seat limit** (D-L2: no number has been chosen); a checkout request ceiling (section 10); a rate limit on the public client link; and a way for the founder to see and stop abuse (a monitor check on request volume and on trials created per day — the pipeline monitor lives in `homesignal-ingest`, a cross-repo change I did not make). The report limit is the first of these, not the last.
+
+## 12. Tests and checks run for this change
+
+*(Filled in at the foot of the PR with the final numbers; see the PR description.)*

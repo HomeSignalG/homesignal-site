@@ -9,6 +9,7 @@
 // rows) are fixtures, as in test/national_report_pg. Every assertion is about what the database holds afterwards.
 //   Run through: bash test/trial_report_pg/run.sh   (it prepares the database and refuses anything not named disposable)
 import { spawnSync } from 'node:child_process';
+import { LAUNCH_TEST_LOCATION as LOC, OTHER_PROPERTY, addressNo, geocodeStandIn } from '../lib/launch-test-location.mjs';
 
 const H = await import('../../supabase/functions/get-development-activity-report/handler.ts');
 const D = await import('../../supabase/functions/get-development-activity-report/data.ts');
@@ -33,6 +34,8 @@ const RPC = {
   // brokerage_report_issue, the ONE entry that decides which allotment a report uses. The free evaluation's own issue function is NOT listed:
   // the handler calling it directly would be a second way to charge a report, and an unlisted call stops this run.
   billing_usage: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.billing_usage(:'u'::uuid) t", { u: a.p_user_id }],
+  // the report rate limit (docs/report-rate-limit.sql): the wrapper on the database's own clock. The clocked variant is NOT listed: the handler must not be able to reach it.
+  report_rate_claim: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_rate_claim(:'u'::uuid) t", { u: a.p_user }],
   brokerage_report_issue: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
   report_private_context_read: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_private_context_read(:'c'::uuid) t", { c: a.p_context }],
@@ -195,20 +198,23 @@ const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10
 const NONE = { version: 1, cleared: [] };
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0' };
-const HOME = '742 Evergreen Terrace, Springfield, OR 97477', NEIGHBOUR = '744 Evergreen Terrace, Springfield, OR 97477';
+const HOME = LOC.address, NEIGHBOUR = OTHER_PROPERTY; // the launch test location: Brigham City, UT 84302 (test/lib/launch-test-location.mjs)
 function handlerFor(rights, userId) {
   const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', rights, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
   return H.makeHandler({
     ...real,
     authenticate: async () => ({ email: 'agent@example.test', id: userId }),
     isAdmin: async () => false,
-    geocode: async (a) => ({ matchedAddress: a.toUpperCase(), lat: 44.04612, lng: -122.98123, zip: '97477' }),
+    geocode: async (a) => geocodeStandIn(a),
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
     hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
   });
 }
+// This suite makes dozens of reports in seconds to test the ENTITLEMENT (the 20, the ledger, saved reports); the report rate limit has its own suites
+// (test/report_rate_limit_pg and section 15 of test/launch_gate_pg). So its counters are cleared before each request here, as the table's owner.
 async function ask(rights, userId, body) {
+  one('truncate public.report_rate_window');
   const res = await handlerFor(rights, userId)(new Request('https://x/functions/v1/get-development-activity-report',
     { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
@@ -227,7 +233,7 @@ ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1 && one("se
   '1b the database holds ONE stored report and ONE credit, and the credit points at that report');
 const ctx = JSON.parse(one("select row_to_json(c) from public.report_private_context c join public.report_snapshot s on s.private_context_id = c.context_id where s.report_id = :'r'::uuid", { r: firstId }));
 ok(ctx.address === HOME && ctx.state === 'active', '1c the typed address is in the deletable private context');
-ok(!one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: firstId }).includes('Evergreen'), '1d and NOT in the permanent report body');
+ok(!one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: firstId }).includes('N Main St'), '1d and NOT in the permanent report body');
 ok(JSON.parse(one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: firstId })).activity.outcome === 'DEVELOPMENT_SHOWN',
   '1e the stored report carries its outcome, so a reopened report says the same words');
 
@@ -265,7 +271,7 @@ ok(count('evaluation_credit') === 1, '5b and nothing is charged');
 
 // ---- 6. the twentieth report ends the trial; the twenty-first is refused before any work ----------------------------------------------
 // the second charged report (i = 10) carries a client label, typed with stray spaces: it is kept in the private layer only (build step 7)
-for (let i = 10; i < 29; i++) await ask(CLEARED, MEMBER, { address: (100 + i) + ' Evergreen Terrace, Springfield, OR 97477', idempotency_key: key(i), ...(i === 10 ? { label: ' Smith   buyers ' } : {}) });
+for (let i = 10; i < 29; i++) await ask(CLEARED, MEMBER, { address: addressNo(i), idempotency_key: key(i), ...(i === 10 ? { label: ' Smith   buyers ' } : {}) });
 ok(count('evaluation_credit') === 20 && count('report_snapshot') === 20 && one("select status from public.evaluation where evaluation_id = :'e'::uuid", { e: evalId }) === 'complete',
   '6a after twenty charged reports the trial is complete: twenty credits, twenty stored reports', [count('evaluation_credit'), count('report_snapshot')]);
 const before = seen.length;
@@ -325,7 +331,7 @@ ok(!/Smith|Pat\b|Round Trip Realty/.test(secondBody) && JSON.stringify(secondOpe
   '7h4 the PERMANENT report holds neither the label, an agent\'s name nor the brokerage\'s name, and a reopened report is that stored body unchanged');
 const publicTables = one("select string_agg(table_name, ',' order by table_name) from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE'").split(',');
 const holders = (needle) => publicTables.filter((tb) => Number(one('select count(*) from public."' + tb + '" x where x::text like :\'n\'', { n: '%' + needle + '%' })) > 0);
-ok(publicTables.length > 8 && holders('Round Trip Realty').includes('brokerage_account') && holders('742 Evergreen').includes('report_private_context'),
+ok(publicTables.length > 8 && holders('Round Trip Realty').includes('brokerage_account') && holders('20 N Main St').includes('report_private_context'),
   '7h5 (control) the scan finds a value where it is kept: the brokerage\'s name on its account and the address in the private layer', publicTables.length);
 ok(HDR_ALL.every((v) => holders(v).length === 0), '7h6 an agent\'s name is written in NO table of this database\'s public schema: it lives in their sign-in account alone', HDR_ALL.map(holders));
 ok(JSON.stringify(holders('Smith')) === '["report_private_context"]' && holders('Smith buyers').length === 0,

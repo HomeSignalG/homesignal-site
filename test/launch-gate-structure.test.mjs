@@ -25,10 +25,10 @@ const count = (s, re) => (s.match(re) || []).length;
 // ---- 1. the setup script --------------------------------------------------------------------------------------------------------------------
 const RUN = stripSh(read('test/launch_gate_pg/run.sh'));
 const LAYERS = ['brokerage-account-spine', 'report-private-context', 'report-snapshot', 'evaluation-entitlement', 'saved-reports', 'report-share', 'report-share-delivery',
-  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing'];
+  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'report-rate-limit'];
 const applied = (/for f in ([^;]+); do/.exec(RUN) || [, ''])[1].trim().split(/\s+/);
 ok(RUN.length > 400 && applied.length > 5, '1a the setup script is read and lists the layers it applies (positive control)', applied.length);
-ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the eleven layers the product stands on, in the order production applied them (the billing file last)', applied.join(','));
+ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the twelve layers the product stands on, in the order production applied them (the billing file, then the report rate limit)', applied.join(','));
 ok(/case "\$PGDATABASE" in \*disposable\*\)/.test(RUN) && /exit 1/.test(RUN) && /SUPABASE_DB_URL/.test(RUN) && /SUPABASE_ACCESS_TOKEN/.test(RUN) && /SUPABASE_WRITE_KEY/.test(RUN),
   '1c it refuses a database not named disposable and refuses to run when any Supabase credential is present');
 ok(LAYERS.every((f) => existsSync(join(ROOT, 'docs', f + '.sql'))) && existsSync(join(ROOT, 'test/evaluation_entitlement_pg/fixture.sql')), '1d every layer it applies, and the roles fixture, exist');
@@ -115,6 +115,21 @@ const LAND = read('development-activity.html');
 const commerce = LAND.match(/<div[^>]*(?:checkout|billing|commerce|buy)[^>]*>/gi) || [];
 ok(LAND.length > 1000 && (commerce.length === 0 || commerce.every((t) => /\bhidden\b|display:\s*none|inert/.test(t))), '5e the landing page\'s commerce buttons are still hidden or inert', commerce.join(' | ').slice(0, 200));
 ok(!existsSync(join(ROOT, 'supabase/functions/lemonsqueezy-webhook')), '5f the map product\'s own webhook is not in this repo and is not touched');
+
+// ---- 6. the report rate limit's section 15 (added 2026-10-04) ----------------------------------------------------------------------------------------------------
+// The original scenario is sections 1-14 and MUST stay exactly what it was; the rate limit is a new trailing section. Pinned by counting check call sites on either side
+// of the section-15 marker, with a positive control that the marker was found and that section 15 has checks of its own.
+const S15 = RTRAW.indexOf('// ---- 15. THE REPORT RATE LIMIT');
+const checksIn = (t) => (stripJs(t).match(/(^|[^\w.])ok\(/g) || []).length;
+ok(S15 > 0 && checksIn(RTRAW.slice(S15)) === 13, '6a (control) section 15 is found and carries 13 checks of its own', [S15, S15 > 0 && checksIn(RTRAW.slice(S15))]);
+ok(S15 > 0 && checksIn(RTRAW.slice(0, S15)) === 73, '6b the original scenario, sections 1-14, is still exactly 73 checks: none was removed, merged or weakened to make room', S15 > 0 && checksIn(RTRAW.slice(0, S15)));
+ok(/report_rate_claim: \(a\) => \[asJson\("public\.report_rate_claim\(:'u'::uuid\)"\)/.test(RT) && !/report_rate_claim_at/.test(RT), '6c the round trip lets the handler reach the claim WRAPPER only: the clocked variant is not on the allowlist');
+ok(/async function ask\(userId, body, \{ limited = false \} = \{\}\) \{\s*if \(!limited\) one\('truncate public\.report_rate_window'\);/.test(RT), '6d sections 1-14 clear the limiter\'s counters before each request (they test the entitlement, far above the ceiling by design), and the clearing is opt-out');
+const after15 = stripJs(RTRAW.slice(S15));
+ok(S15 > 0 && (after15.match(/\{ limited: true \}/g) || []).length >= 7 && (after15.match(/truncate public\.report_rate_window/g) || []).length === 1,
+  '6e section 15 asks WITHOUT the reset (limited: true on its requests) and clears the counters exactly once, at its start');
+ok(/geocodeCalls/.test(RT) && /geocodeCalls - geoBefore === allowedBurst\.length/.test(RT), '6f it counts the geocoder\'s calls, so "a refused request never reaches the geocoder" is measured and not assumed');
+ok(['docs/report-rate-limit.sql', 'test/report_rate_limit_pg/**', 'supabase/functions/_shared/rate-reads.ts'].every((p) => pr.includes("'" + p + "'") && push.includes("'" + p + "'")), '6g and the gate runs when the rate limit\'s SQL, its suites or its shared reader change');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

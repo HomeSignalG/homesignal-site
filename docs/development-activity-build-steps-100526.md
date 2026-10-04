@@ -337,7 +337,7 @@ through once each step is complete").
      email can list everything recorded since the report was made; a watch is the agent's own, not the brokerage's; the recipient
      is the agent's sign-in email, read at send time and stored nowhere; the agent is not emailed when a watch ends (standing lost,
      address purged) or when a check keeps failing, an alarm reports failures instead.
-   - Open before step 13 (unchanged, plus three): the free-report rate limit; the public link endpoint is not rate-limited; an
+   - Open before step 13 (unchanged, plus three; **the free-report rate limit is now BUILT, not applied or deployed: see step 13**): the free-report rate limit; the public link endpoint is not rate-limited; an
      owner cannot list or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into HTTP answers is
      unchecked against production; the signed-in paths are not exercised live; **`run-property-watch` has no rate limit beyond its
      private secret and its per-call limit of 5**; **an ended or failing watch is not emailed to the agent (D-9-5, D-9-7)**; **the
@@ -438,7 +438,12 @@ through once each step is complete").
      (28 checks; 16 deliberate breakages of its rules, all caught). A registry entry is refused unless it points at a real, filled-in
      evidence section that names the source, quotes the publisher's own words and carries the attribution the publisher required.*
    - *Consequence for step 13: until one source is cleared, every report is "No data ingested" (free, never stored), so the 20 free reports
-     and the paid month cannot be exercised on real data. They can be exercised on test data.)*
+     and the paid month cannot be exercised on real data. They can be exercised on test data.*
+   - *Test location (founder, 2026-10-04): **Brigham City, Utah 84302** is the launch and manual test location everywhere (defined once in
+     `test/lib/launch-test-location.mjs`; manual test: `docs/development-activity-manual-test-brigham-city-84302.md`). **A test ZIP does not replace
+     sending the Utah source requests or clearing a source, and it is not a source:** the journey through the real handler for 20 N Main St, Brigham City
+     (`test/brigham-city-84302-journey.test.mjs`) shows "No data ingested", and none of the 41 stored UDOT rows for the ZIP appears, because none is cleared.
+     Step 12 stays OPEN: no request has been sent.)*
 13. **End-to-end launch test, then the Enterprise page buttons go live.** A test brokerage runs sign-up,
     20 reports, the end of the trial, payment and a 100-report month.
    *(**HALF done, and not struck.** The test is built and green; the buttons are NOT live. Full record: `docs/development-activity-launch-gate-2026-10-04.md`.*
@@ -446,7 +451,7 @@ through once each step is complete").
      `get-development-activity-report`, `manage-billing`, `development-activity-billing-webhook`) and the shipped SQL of every layer: an admin creates the
      trial, the owner joins and invites an agent, twenty free reports, the 21st refused, the owner's checkout, a test payment that grants nothing, the live
      payment that binds the subscription and opens a month of 100, a hundred paid reports, the 101st refused (by the handler and by the database), all 120
-     listed and opened, a second brokerage unable to read or take any of it, and a cancellation that ends new reports and deletes nothing. 73 checks.
+     listed and opened, a second brokerage unable to read or take any of it, and a cancellation that ends new reports and deletes nothing. 73 checks, **plus 13 added 2026-10-04 in a new section 15 for the report rate limit: 86 in all, the original 73 unchanged.**
      It runs in CI as its own job (`launch-gate` in `report-snapshot-suite.yml`). A manual loop (`test/launch_gate_mutants.py`) makes 28 breaks of the edge, the shared modules and the SQL, one at a time in a copy, and the gate alone kills 28 of 28; its first pass found two real gaps in the gate (an id-leak check made on the wrong answer; an event-name guard hidden behind the type guard) and two assertions that threw, all fixed.*
    - ***What it does not prove:** nothing reached Lemon Squeezy (the processor is a stand-in that records the request), **no payment has been made**, the
      processor's field names are still the unconfirmed ones, and the reports are fixture reports because no source is cleared.*
@@ -454,7 +459,20 @@ through once each step is complete").
      live: the Lemon Squeezy product, second webhook, four secrets and one test payment (step 11, founder) · at least one source cleared (step 12, founder,
      requests not yet sent) · **D-13-1, a decision: what do the public "Start with 20 free reports" and "Join for $79/month" buttons do?** Today a trial is
      created by an admin and joined by an invite link, and only an existing brokerage's owner can start a checkout, so neither button has anything to call ·
-     and the carried open items (the free-report rate limit; no billing-portal link, so a customer cannot change a card or cancel from the page).)*
+     and the carried open items (the free-report rate limit; no billing-portal link, so a customer cannot change a card or cancel from the page).*
+   - *2026-10-04 (continued, nothing live changed): **the free-report rate limit is built, NOT applied and NOT deployed.** `docs/report-rate-limit.sql` plus the
+     report function's claim (after validation, before the geocoder, for members only), a 429 with the wait, the page's plain-words message, a database suite with real
+     concurrent sessions, an edge test suite, structure pins, two mutation loops, and section 15 of the launch gate. It touches neither the 20 free nor the 100 paid reports.
+     The numbers (a person 10 a minute, 60 an hour, 200 a day; a brokerage 30, 200, 1,000) are **proposed, not founder-set: decision D-RL-1**. Apply order, which needs your
+     go: apply the SQL first, then deploy `get-development-activity-report`. Record: section 9 of the launch record. The audit of every other surface, with what is NOT
+     covered (section 10 of the launch record), and what a request-access or self-serve trial path would need (section 11; decisions D-RA-1 to D-RA-3) are written down;
+     **no public path was added.***
+   - *The launch / manual test location is **Brigham City, UT 84302** (above, step 12). The empty-source state was verified: it says "No data ingested" in the page, is not
+     styled as an error, and a status line that read "0 official records" for it (a measured zero for something not measured) was corrected in both pages.*
+   - ***Step 13 stays OPEN.** Lemon Squeezy account creation, the product, the webhook, the secrets and a real payment test are **deferred, not done**. The buttons are not live.
+     **Carried open items, kept explicit:** (a) the free-report rate limit: built, not applied or deployed; (b) **there is no billing-portal link, so a customer cannot change a
+     card or cancel from the page: open, not built**; (c) the public client link endpoint is not rate-limited; (d) an owner cannot list or withdraw invite links or remove
+     an agent; (e) `run-property-watch` has no rate limit beyond its private secret; (f) an ended or failing watch is not emailed to the agent.)*
 
 ## Founder actions, and when
 
@@ -465,4 +483,7 @@ through once each step is complete").
 | ~~Before step 8~~ | ~~How long share links last; whether the client sees the address~~ Answered 2026-10-03: 6 months; yes. |
 | Step 11 (build done, still yours) | Create the Lemon Squeezy product and a second webhook, set the four secrets and test mode, make one test payment, check the ledger rows before going live. Steps: section 5 of `docs/development-activity-billing-2026-10-04.md`. Also decide D-11-1 (a cancelled subscription ends access at once) |
 | Step 13 (test done, buttons still yours) | Decide D-13-1: what "Start with 20 free reports" and "Join for $79/month" do on the public page (request-and-invite, or self-serve trial creation). Then, with the Lemon Squeezy test payment made and one source cleared, the buttons can go live. Record: `docs/development-activity-launch-gate-2026-10-04.md` section 4 |
+| Before the rate limit is live (new, 2026-10-04) | Say **go** to apply `docs/report-rate-limit.sql` and then deploy `get-development-activity-report`, and say whether the proposed numbers (D-RL-1: a person 10 a minute, 60 an hour, 200 a day; a brokerage 30, 200, 1,000) are the ones you want. Nothing else depends on it. Record: section 9 of `docs/development-activity-launch-gate-2026-10-04.md`. |
+| Manual test (new, 2026-10-04) | Run Part A of `docs/development-activity-manual-test-brigham-city-84302.md` after the status-line fix is merged: one line back saying what you saw. It is the only check against the live address lookup. |
+| Step 13, request-access (new, 2026-10-04) | If you want a request-access path (D-13-1 option A): D-RA-1 where a request goes, D-RA-2 consent wording if an email is stored, D-RA-3 who creates the trial and how fast. Nothing public is built until you decide. Section 11 of the launch record. |
 | Any time, needed by step 12 | Send the three Utah permission requests (UDOT, Salt Lake City, Provo). Ready to send, with the steps: `docs/utah-source-requests-send-ready-2026-10-04.md`. Two recipients still have to be found. Tell me each date you send one |

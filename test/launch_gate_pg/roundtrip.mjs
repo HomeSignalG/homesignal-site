@@ -2,7 +2,8 @@
 //   "A test brokerage runs sign-up, 20 reports, the end of the trial, payment and a 100-report month."
 // Every request goes through the real request handler and real data layer of the function a customer or the processor would reach:
 //   development-activity-trial            an admin creates the trial, an owner joins it, an owner invites an agent, an agent joins
-//   get-development-activity-report       the 20 free reports, the refusal of the 21st, the 100 paid reports, the refusal of the 101st, saved reports
+//   get-development-activity-report       the 20 free reports, the refusal of the 21st, the 100 paid reports, the refusal of the 101st, saved reports,
+//                                         and (section 15, added with the report rate limit) the ceiling on how fast a member may ASK for them
 //   manage-billing                        the plan, and the owner's checkout
 //   development-activity-billing-webhook  the processor's signed events (the test payment, the live payment, the cancellation)
 // against the SHIPPED SQL of every layer the product stands on. The only translations are the network (a request the data layer would send to PostgREST is
@@ -13,6 +14,7 @@
 // so the binding that ties a payment to a brokerage is exercised end to end rather than assumed.
 //   Run through: bash test/launch_gate_pg/run.sh   (it prepares the database and refuses anything not named disposable)
 import { spawnSync } from 'node:child_process';
+import { addressNo, geocodeStandIn } from '../lib/launch-test-location.mjs';
 
 const H = await import('../../supabase/functions/get-development-activity-report/handler.ts');
 const D = await import('../../supabase/functions/get-development-activity-report/data.ts');
@@ -61,6 +63,8 @@ const RPC = {
   evaluation_report_open: (a) => [asJson("public.evaluation_report_open(:'u'::uuid, :'r'::uuid)"), { u: a.p_user_id, r: a.p_report_id }],
   report_header_of: (a) => [asJson("public.report_header_of(:'u'::uuid)"), { u: a.p_user_id }],
   brokerage_membership_of: (a) => [asJson("public.brokerage_membership_of(:'u'::uuid)"), { u: a.p_user_id }],
+  // the report rate limit (docs/report-rate-limit.sql): the wrapper that takes the DATABASE's clock. The clocked variant is NOT listed: the handler must not be able to reach it.
+  report_rate_claim: (a) => [asJson("public.report_rate_claim(:'u'::uuid)"), { u: a.p_user }],
   evaluation_invite_mint: (a) => [asJson("public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid)"),
     { e: a.p_evaluation_id, r: a.p_role, u: a.p_actor }],
 };
@@ -104,14 +108,15 @@ async function fetchToSql(url, init = {}) {
 // ---- the people ------------------------------------------------------------------------------------------------------------------------------------
 const ADMIN = 'd4444444-4444-4444-8444-444444444444', OWNER = 'a1111111-1111-4111-8111-111111111111', AGENT = 'c3333333-3333-4333-8333-333333333333';
 const OUTSIDER = 'b2222222-2222-4222-8222-222222222222', RIVAL = 'e5555555-5555-4555-8555-555555555555';
-one("insert into auth.users (id, email) values (:'a'::uuid, 'founder@example.test'), (:'o'::uuid, 'owner@example.test'), (:'g'::uuid, 'agent@example.test'), (:'s'::uuid, 'outsider@example.test'), (:'r'::uuid, 'rival@example.test')",
+one("insert into auth.users (id, email) values (:'a'::uuid, 'founder@example.test'), (:'o'::uuid, 'owner@example.test'), (:'g'::uuid, 'agent@example.test'), (:'s'::uuid, 'outsider@example.test'), (:'r'::uuid, 'rival@example.test'), ('f6666666-6666-4666-8666-666666666666', 'rateowner@example.test'), ('f7777777-7777-4777-8777-777777777777', 'rateagent@example.test')",
   { a: ADMIN, o: OWNER, g: AGENT, s: OUTSIDER, r: RIVAL });
 
 // ---- the four functions, each built from its real handler and real data layer -------------------------------------------------------------------
 const SUPABASE = { url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real' };
 const BILLING = { apiKey: 'fixture-api-key-not-real', storeId: '4242', variantId: '555', secret: 'fixture-signing-secret-not-real', testMode: false };
 const VARIANT = 555;
-const emailOf = (id) => ({ [ADMIN]: 'founder', [OWNER]: 'owner', [AGENT]: 'agent', [OUTSIDER]: 'outsider', [RIVAL]: 'rival' }[id]) + '@example.test';
+const RATE_OWNER = 'f6666666-6666-4666-8666-666666666666', RATE_AGENT = 'f7777777-7777-4777-8777-777777777777'; // section 15's own brokerage
+const emailOf = (id) => ({ [ADMIN]: 'founder', [OWNER]: 'owner', [AGENT]: 'agent', [OUTSIDER]: 'outsider', [RIVAL]: 'rival', [RATE_OWNER]: 'rateowner', [RATE_AGENT]: 'rateagent' }[id]) + '@example.test';
 const post = (body, headers = {}) => new Request('https://x/functions/v1/f', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 async function trialAsk(userId, body, admin = false) {
@@ -141,25 +146,30 @@ const FAM = 'wsdot-project-delivery-plan-proposed';
 const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'launch-gate fixture', attribution: 'Data: WSDOT' }] };
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0' };
+let geocodeCalls = 0; // how often the geocoder was asked (section 15: a request the rate limit refuses must never reach it)
 function handlerFor(userId) {
   const real = D.makeDeps({ ...SUPABASE, rights: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
   return H.makeHandler({
     ...real,
     authenticate: async () => ({ email: emailOf(userId), id: userId }),
     isAdmin: async () => false,
-    geocode: async (a) => ({ matchedAddress: a.toUpperCase(), lat: 44.04612, lng: -122.98123, zip: '97477' }),
+    geocode: async (a) => { geocodeCalls++; return geocodeStandIn(a); },
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
     hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
   });
 }
-async function ask(userId, body) {
+// Sections 1-14 make ~140 reports in about a minute of wall clock, which is far above the report rate limit's ceiling by design; they test the ENTITLEMENT, so the
+// limiter's counters are cleared before each of their requests (as the owner of the table - no API role can). Section 15 asks with `{ limited: true }`: no reset,
+// the real wrapper on the real clock.
+async function ask(userId, body, { limited = false } = {}) {
+  if (!limited) one('truncate public.report_rate_window');
   const res = await handlerFor(userId)(post(body));
-  return { status: res.status, json: await res.json() };
+  return { status: res.status, json: await res.json(), retryAfter: res.headers.get('retry-after') };
 }
 const count = (t) => Number(one('select count(*) from public.' + t));
 const key = (i) => '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
-const addr = (i) => (100 + i) + ' Evergreen Terrace, Springfield, OR 97477';
+const addr = (i) => addressNo(i); // the launch test location: Brigham City, UT 84302 (test/lib/launch-test-location.mjs)
 const tokenOf = (link) => new URL(link).hash.slice('#invite='.length);
 const reportRpcs = () => seen.filter((s) => /rpc\/brokerage_report_issue$/.test(s)).length;
 
@@ -397,6 +407,68 @@ ok([BILLING.apiKey, BILLING.secret, CHECKOUT_URL, 'fixture-store.lemonsqueezy.co
   '14d the processor\'s key, the signing secret, the checkout address and the owner\'s email are written in NO table of the public schema');
 ok(['anon', 'authenticated'].every((role) => ['public.billing_usage(uuid)', 'public.billing_event_apply(uuid, jsonb)', 'public.brokerage_report_issue(uuid, uuid, text, text, text, jsonb, jsonb)']
      .every((f) => one("select has_function_privilege(:'r', :'f', 'execute')", { r: role, f }) === 'f')), '14e no resident role can run the billing functions: only the system can');
+
+// ---- 15. THE REPORT RATE LIMIT (added with docs/report-rate-limit.sql; sections 1-14 above are unchanged) ----------------------------------------------------
+// A second brokerage, so this section does not depend on the first one's cancelled state. Requests here go through the REAL wrapper on the REAL clock, with
+// no reset. The windows are 60 seconds, so every check that depends on a count is made inside one window by taking the window's START as the reference:
+// if the clock rolls into a new minute mid-run the check re-reads the stored window rather than guessing.
+t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Rate Gate Realty' }, true);
+t = await trialAsk(RATE_OWNER, { action: 'redeem', token: tokenOf(t.json.invite_link) });
+const rateOwnerOk = t.status === 200 && t.json.role === 'owner';
+t = await trialAsk(RATE_OWNER, { action: 'invite' });
+t = await trialAsk(RATE_AGENT, { action: 'redeem', token: tokenOf(t.json.invite_link) });
+ok(rateOwnerOk && t.status === 200 && t.json.role === 'agent', '15a a second test brokerage (an owner and an agent) is signed up for the rate-limit checks', t.json);
+const rateBrokerage = one("select id from public.brokerage_account where name = 'Rate Gate Realty'");
+one('truncate public.report_rate_window');
+// The person's window is a WALL-CLOCK minute. The checks below (15b-15i) take a few seconds and several of them count inside ONE minute, so they begin early
+// in a minute: a burst that straddled two would be let through legitimately and read as a defect. Costs up to half a minute of waiting, in this section only.
+{ const sec = new Date().getUTCSeconds(); if (sec > 30) await new Promise((res) => setTimeout(res, (61 - sec) * 1000)); }
+const minuteOf = (u) => Number(one("select coalesce(used, 0) from public.report_rate_window where bucket = 'user' and subject = :'u'::uuid and window_secs = 60", { u }) || 0);
+const allowedBurst = [];
+let blocked = null;
+const geoBefore = geocodeCalls, issueBefore = reportRpcs();
+for (let i = 1; i <= 14; i++) {
+  const x = await ask(RATE_OWNER, { address: addr(300 + i), idempotency_key: key(300 + i) }, { limited: true });
+  if (x.status === 429) { blocked = { ...x, at: i }; break; }
+  allowedBurst.push(x);
+}
+ok(blocked !== null && allowedBurst.length >= 1 && allowedBurst.length <= 10 && allowedBurst.every((x) => x.status === 200 && x.json.charged === true),
+  '15b a member asking quickly is let through up to the person\'s ceiling (ten in a minute) and then refused with 429; every one let through is an ordinary charged report', [allowedBurst.length, blocked?.status, blocked?.json]);
+ok(blocked?.json?.error === 'rate_limited' && blocked?.json?.limited_by === 'user' && Number.isInteger(blocked?.json?.retry_after_seconds) && blocked.json.retry_after_seconds >= 1 && blocked.json.retry_after_seconds <= 60
+   && blocked.retryAfter === String(blocked.json.retry_after_seconds),
+  '15c the refusal says rate_limited, that it was the person\'s own ceiling, and how many seconds to wait (1 to 60), in the body and in the Retry-After header', [blocked?.json, blocked?.retryAfter]);
+ok(blocked?.json?.report === undefined && blocked?.json?.credit === undefined && blocked?.json?.charged === undefined && !JSON.stringify(blocked?.json).includes(rateBrokerage)
+   && !JSON.stringify(blocked?.json).includes('Main St') && blocked?.json?.trial?.credits_used === allowedBurst.length,
+  '15d the refusal carries no report, no charge, no address and no brokerage id, and the trial figures it does carry equal the reports actually made', blocked?.json);
+ok(geocodeCalls - geoBefore === allowedBurst.length && reportRpcs() - issueBefore === allowedBurst.length,
+  '15e the geocoder and the issuing function were asked exactly once for each report let through and NEVER for the refused request', [geocodeCalls - geoBefore, reportRpcs() - issueBefore, allowedBurst.length]);
+const used0 = minuteOf(RATE_OWNER);
+for (let i = 0; i < 4; i++) await ask(RATE_OWNER, { address: addr(320 + i), idempotency_key: key(320 + i) }, { limited: true });
+ok(minuteOf(RATE_OWNER) === used0 && count('evaluation_credit') >= 0 && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length,
+  '15f four more refused requests consume nothing: the person\'s minute is unchanged and the free ledger holds exactly the reports that were let through', [used0, minuteOf(RATE_OWNER)]);
+const agentTry = await ask(RATE_AGENT, { address: addr(340), idempotency_key: key(340) }, { limited: true });
+ok(agentTry.status === 200 && agentTry.json.charged === true, '15g the owner being limited does not limit the agent: the same brokerage\'s other person is still let through', [agentTry.status, agentTry.json.error]);
+const listWhileLimited = await ask(RATE_OWNER, { action: 'list' }, { limited: true });
+ok(listWhileLimited.status === 200 && listWhileLimited.json.reports?.length === allowedBurst.length + 1, '15h and the limited person can still list their saved reports: reading what is stored is not what the limit is for', [listWhileLimited.status, listWhileLimited.json.reports?.length]);
+ok(one('select public.evaluation_report_limit() || chr(47) || public.billing_report_limit()') === '20/100'
+   && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length + 1,
+  '15i the founder\'s numbers are still 20 free and 100 paid, and the free ledger counts every report made and none refused', one('select public.evaluation_report_limit()'));
+// the window rolls over: age the stored minute by two minutes (as the table's owner), and the same person is let through again
+one("update public.report_rate_window set window_start = window_start - interval '2 minutes' where bucket = 'user' and subject = :'u'::uuid and window_secs = 60", { u: RATE_OWNER });
+const afterRoll = await ask(RATE_OWNER, { address: addr(350), idempotency_key: key(350) }, { limited: true });
+ok(afterRoll.status === 200 && afterRoll.json.charged === true && minuteOf(RATE_OWNER) === 1, '15j once the minute has passed the same person is let through again, and the new minute counts one', [afterRoll.status, afterRoll.json.error, minuteOf(RATE_OWNER)]);
+// FAIL CLOSED: when the limiter cannot be read the request is refused (502) and the geocoder is never asked
+one('alter function public.report_rate_claim(uuid) rename to report_rate_claim_offline');
+const geoDown = geocodeCalls, issueDown = reportRpcs();
+const down = await ask(RATE_AGENT, { address: addr(360), idempotency_key: key(360) }, { limited: true });
+one('alter function public.report_rate_claim_offline(uuid) rename to report_rate_claim');
+ok(down.status === 502 && down.json.error === 'data_unavailable' && geocodeCalls === geoDown && reportRpcs() === issueDown && down.json.report === undefined,
+  '15k with the limiter unreadable the request answers 502 data_unavailable and the geocoder and the issuing function are NEVER reached: it fails closed', [down.status, down.json]);
+const backUp = await ask(RATE_AGENT, { address: addr(361), idempotency_key: key(361) }, { limited: true });
+ok(backUp.status === 200, '15l and with the limiter back the same person is served', [backUp.status, backUp.json.error]);
+ok(Number(one("select count(*) from public.report_rate_window where subject = :'u'::uuid or subject = :'b'::uuid", { u: RATE_OWNER, b: rateBrokerage })) === 6
+   && Number(one("select count(*) from public.report_rate_check() where kind = 'invariant' and n <> 0")) === 0,
+  '15m the counters are the person\'s three windows and the brokerage\'s three, and the limiter\'s own audit reads zero');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

@@ -183,6 +183,9 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
     '3b with nothing cleared, the customer view says "No data ingested" over the coverage notice, and the page says which view it is', await sections(page));
   ok(W_CUSTOMER.credit.uses_report === false && (await page.textContent('#creditnote')) === 'For a trial customer, this report would not use a free report: No data ingested.',
     '3c the founder sees that today\'s customer report would not use a free report, and why (ruling R5)', await page.textContent('#creditnote'));
+  const st3 = await status(page);
+  ok(!st3.error && st3.text.startsWith('Report ready: No data ingested for this address.') && !/\b0 official records?\b/.test(st3.text),
+    '3c2 the status line for an empty-source report says "No data ingested" (ruling R5), not "0 official records within 0.5 miles", and is not an error', st3);
   await ctx.close();
 }
 {
