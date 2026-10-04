@@ -164,6 +164,12 @@ None of these has been done. In this order:
 - **The edge** — `test/lemon-billing.test.mjs` (the processor module), `test/billing-functions.test.mjs` (both functions over a stand-in
   database, processor and clock), `test/billing-structure.test.mjs` (the shape, the single modules, the order of the checks, the wiring), and
   the report function's and snapshot module's suites. `test/billing_mutants.py` is the manual mutation loop for these: 96 prohibited mutations of the processor module, the two functions, the report function, the snapshot module, the wiring and the page, each failing a named check (one candidate, removing the early hex check in `verifySignature`, is recorded as an equivalent mutant and not counted: a header that is not 64 hex characters cannot equal the HMAC either way).
+- **The real handler over the real SQL — `test/trial_report_pg/`** (95 checks): the report function's real handler and data layer, with the network
+  translated to psql calls of the database's own functions. It applies the billing file twice on top of the layers it stands on, answers the plan
+  read (`billing_usage`) and the ONE issue function (`brokerage_report_issue`), and does **not** answer the free evaluation's own issue function:
+  a handler that charged a report by calling that directly would be a second way to charge, and the unlisted call stops the run. A trial pays for
+  nothing (no paid credit exists after twenty free reports). *Found by CI, not by the local run:* this suite's first push failed (502
+  `data_unavailable`) because it had neither the billing file nor those two answers; the structure test now pins both (5h).
 - **The page** — `test/development-activity-reports.browser.test.mjs` section 12 (232 checks in all): the Billing card in every plan state, the
   owner's checkout against the real `manage-billing` handler, an agent offered no button, the processor not set up, an address that is not the
   processor's never opened, a plan that cannot be read never shown as paid or free, "Check again", a paid report using the month and not a free

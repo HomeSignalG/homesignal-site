@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A TRIAL REPORT THROUGH THE REAL LAYERS (Development Activity build steps 5b, 5c, 5d, 5e, 6 and 7).
-#   1. a fresh DISPOSABLE Postgres gets the shipped account spine, private context, snapshot and evaluation SQL, exactly as
+#   1. a fresh DISPOSABLE Postgres gets the shipped account spine, private context, snapshot, evaluation, share, watch, payment-ledger and billing SQL, exactly as
 #      production has them (the fixture adds only the Supabase roles and auth.users);
 #   2. roundtrip.mjs drives the REAL request handlers and data layers of development-activity-trial (creating, joining, and an
 #      owner inviting agents) and get-development-activity-report (reports), whose network is translated to psql calls of the
@@ -20,6 +20,14 @@ P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1 || { echo "FAIL — the sn
 P -f "$root/docs/evaluation-entitlement.sql" >/dev/null 2>&1 || { echo "FAIL — the evaluation entitlement does not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply a second time"; exit 1; }
+# the layers the billing file stands on (it splices the six ownership readers of saved reports, share links and the watch, and reads the payment
+# ledger), in the order production applied them, then the header function, then billing: a member's report is stored by
+# public.brokerage_report_issue, which the real handler now calls, so this suite must have it
+for f in report-share report-share-delivery property-watch payment-event-ledger; do
+  P -f "$root/docs/$f.sql" >/dev/null 2>&1 || { echo "FAIL — docs/$f.sql does not apply"; exit 1; }
+done
 P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply"; exit 1; }
 P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply a second time"; exit 1; }
+P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the billing layer does not apply"; exit 1; }
+P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the billing layer does not apply a second time"; exit 1; }
 exec node "$here/roundtrip.mjs"

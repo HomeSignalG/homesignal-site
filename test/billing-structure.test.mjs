@@ -227,6 +227,13 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
     '5e the written record states the canonical truth path, the decision owners, the defaults taken, the founder\'s actions, what was not exercised live and what is unverified about the processor');
   const steps = read('docs/development-activity-build-steps-100526.md');
   ok(/\$79\/month checkout/.test(steps), '5f the build-steps record still names the step');
+  // the real handler is driven over the real SQL by test/trial_report_pg, and a member's report is now stored by brokerage_report_issue: that suite
+  // must stand on the billing file, list the plan read and the ONE issue function, and must NOT list the free evaluation's own issue function (a
+  // handler that called it directly would be a second way to charge a report, and an unlisted call stops the run)
+  const TRIP = read('test/trial_report_pg/run.sh'), TRIR = stripJs(read('test/trial_report_pg/roundtrip.mjs'));
+  ok(count(stripSql(TRIP.replace(/^#.*$/gm, '')), /docs\/brokerage-billing\.sql/g) === 2 && /payment-event-ledger/.test(TRIP) && /report-share-delivery/.test(TRIP) && /property-watch/.test(TRIP)
+     && /^\s*brokerage_report_issue: /m.test(TRIR) && /^\s*billing_usage: /m.test(TRIR) && !/^\s*evaluation_report_issue: /m.test(TRIR),
+    '5h the trial suite (the real handler over the real SQL) applies the billing file twice on top of the layers it stands on, answers the plan read and the ONE issue function, and does not answer the free function called directly');
   // the other webhook is not in this repo and is untouched
   const dirs = readdirSync(join(ROOT, FN));
   ok(!dirs.includes('lemonsqueezy-webhook') && !/lemonsqueezy-webhook/.test(stripJs([BR, LB, ...Object.values(MB), ...Object.values(WB)].join('\n'))),
