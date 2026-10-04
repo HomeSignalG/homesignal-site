@@ -97,12 +97,12 @@ ok(/id='propWatch'>Watch this address</.test(map), 'SHIPPED A-023 ...and the map
 // ── LEFTOVERS: measured, recorded, and deliberately NOT closed ───────────────────────────
 // Each of these is the kind of thing a later session "tidies up" in good faith. Pinning
 // them makes closing one a DELIBERATE act with a failing test attached, not a drive-by.
-// LEFTOVER 1 CLOSED 2026-10-02 (founder, Revised Index Design, 2026-09-30, §14). The homepage
-// search no longer leaves the page: a ZIP turns the homepage's Map 1 iframe into the normal
-// interactive embed for that ZIP, and it no longer asks HS.data.isCovered.
-ok(!/community\.html\?zip=/.test(idxRaw) && /'homesignalmap\.html\?embed=1&zip=' \+ zip/.test(idxRaw)
+// LEFTOVER 1 CLOSED 2026-10-02, then CHANGED 2026-10-04 (founder: "when an address or zip code is
+// entered it should automatically take you to the development map"). The homepage ZIP search
+// goes to Map 1's own ZIP route, and it still never asks HS.data.isCovered.
+ok(!/community\.html\?zip=/.test(idxRaw) && /location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(idxRaw)
    && !/HS\.data\.isCovered/.test(idxRaw),
-  'LEFTOVER 1 CLOSED: the homepage ZIP search stays on index.html and loads the Map 1 embed');
+  'LEFTOVER 1 CLOSED: the homepage ZIP search goes to homesignalmap.html?zip=<zip>');
 ok(/HS\.shareUrlOverride = HS_CONFIG\.BASE_URL \+ '\/community\.html\?zip=' \+ zip;/.test(cp),
   'LEFTOVER 2 HS.shareUrlOverride is still the community.html?zip= URL');
 ok(!/hs-resolve\.js/.test(map + dev + alerts + props + dash + idxRaw + read('community.html')),

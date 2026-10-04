@@ -58,8 +58,8 @@ ok((text.match(/Explore Enterprise/g) || []).length === 1, 'the Enterprise messa
 
 // The live-result copy lives in the script, word for word
 const script = html.replace(/[\s\S]*<\/template>/, '');
-ok(script.includes("'Open full development map →'"), 'live ZIP CTA: Open full development map →');
-ok(script.includes("'Development within 2 miles of this address.'"), 'live address subline');
+// A search now hands off to Map 1, so the homepage carries no live-result copy of its own.
+ok(!script.includes("Open full development map") && !script.includes('Development within 2 miles of this address.'), 'no live-result copy on the homepage: Map 1 owns it');
 ok(script.includes("'No local permit/planning records to list here.'"), 'complete-and-empty list copy');
 ok(script.includes("'Recent development list unavailable right now.'"), 'unavailable list copy');
 

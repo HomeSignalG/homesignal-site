@@ -5111,6 +5111,20 @@ HS.onReady(function(){
       }
       return;
     }
+    // HOMEPAGE HANDOFF (founder, 2026-10-04). index.html cannot put an address in a URL, and this
+    // page has no address route of its own, so the homepage leaves the typed text in this tab's
+    // sessionStorage and navigates here. It is read ONCE and removed before anything else runs,
+    // so a reload or Back never repeats the search. An explicit ?zip= / ?addr= in the URL wins.
+    var handed = "";
+    try {
+      handed = String(sessionStorage.getItem("hs.homeSearchAddress") || "").trim();
+      sessionStorage.removeItem("hs.homeSearchAddress");
+    } catch(_e) { handed = ""; }
+    if(handed && !u.searchParams.get("addr") && !u.searchParams.get("zip")){
+      $("addr").value = handed;
+      run(handed);
+      return;
+    }
     var a = u.searchParams.get("addr");
     // ?addr= is an ADDRESS route. Declared for symmetry with the ZIP branch below, and so a
     // URL carrying BOTH params can never be read as a ZIP Place: the route asked for a

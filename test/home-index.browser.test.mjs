@@ -8,12 +8,9 @@
 //      order, auto-sized to its document, and shows STATUS / PROJECT TYPE / REGULATORY RECORDS
 //      and the map key with no scrollbar inside the frame, at a 430 / 400 / 340 px canvas.
 //   3. The three records are HS.data.projects' first three, labelled by lib/project-type.js.
-//   4. A ZIP search stays on index.html, turns the map into the normal interactive embed,
-//      rewrites both ZIP links, never asks HS.data.isCovered, and writes nothing.
-//   5. An address search uses HS.resolveAddress once, loads the 2-mile address embed full
-//      width, hides the ZIP-only column and links, and saves nothing; a failure says so and
-//      leaves the page as it was.
-//   6. A slow answer for an earlier search never overwrites a newer one.
+//   4. A search leaves for the Development Map (founder, 2026-10-04) and the homepage keeps
+//      showing only its static example. (Items 4-6 and 11 of the first version, which proved
+//      the inline results, retired with that behavior.)
 //   7. The compact header (1023px and narrower) and its Menu panel.
 //   8. Signed in, the avatar replaces Sign in and the page still stays put.
 //   9. Map 1's own embed hides the site header and footer; preview=1 needs embed=1.
@@ -200,102 +197,20 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(s1.viewZip === null, '10 the sample map did not write the tab\'s viewed ZIP', s1.viewZip);
   ok(s1.storage.length === 0 || s1.storage.every((k) => !/myZip|myCommunities|follows|activeProp/.test(k)), '3 loading the homepage saved no place', s1.storage);
 
-  // ───────────────────────────────────────────────────────────────── 4: ZIP search ──
-  console.log('--- 4. ZIP search: stays on index.html, read-only ---');
+  // ───────────────────────────────────────────────────────── 4: a search leaves for Map 1 ──
+  // (founder, 2026-10-04.) The homepage no longer shows results of its own: the sample stays a
+  // sample, and a search goes to the Development Map. The ZIP and address hand-off details are
+  // test/home-zip-or-address.browser.test.mjs; this checks the homepage itself is left alone.
+  console.log('--- 4. a search never turns the sample into results; it leaves for Map 1 ---');
   const before = await ui(page);
+  let went = null;
+  await page.route('**/homesignalmap.html?zip=*', (route) => { went = new URL(route.request().url()).search; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
   await search(page, '78657');
-  await waitForMap(page, /homesignalmap\.html\?embed=1&zip=78657$/);
-  await page.waitForTimeout(500);
-  const z = await ui(page), zf = await frameInfo(page);
-  ok(z.path === '/index.html' && z.search === '' && z.hash === '' && z.histLen === before.histLen, '4 still index.html, no query, no history entry', z);
-  ok(zf.src === 'homesignalmap.html?embed=1&zip=78657' && !zf.sample && zf.tabindex === null && zf.pointer === 'auto' && zf.preview === false,
-    '4 the map is the normal interactive embed (no preview, no lock, tabbable)', zf);
-  ok(zf.title === 'Development map for ZIP 78657', '4 iframe title names the ZIP', zf.title);
-  ok(zf.height === 760, '4 live map height is 760px at 1440px', zf.height);
-  ok(z.heading === '78657 · Horseshoe Bay, TX', '4 heading is <ZIP> · <place>', z.heading);
-  ok(z.cta === 'Open full development map →' && z.ctaHref === 'homesignalmap.html?zip=78657' && z.seeAll && z.seeAllHref === 'development.html?zip=78657',
-    '4 "Open full development map →" and "See all development →" point at the searched ZIP', z);
-  ok(z.records && z.names.length === 3, '4 the ZIP list is shown', z.names);
-  ok(z.active === 'homeResultsHeading', '4 focus moves to the results heading', z.active);
-  ok(z.coveredReads === 0, '4 HS.data.isCovered is never asked', z.coveredReads);
-  ok(!z.locModalShown && z.writes.length === 0 && JSON.stringify(z.storage) === JSON.stringify(before.storage) && z.viewZip === null,
-    '4 no follow, save, subscribe, coverage form, storage write or viewed-ZIP write', z);
+  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
+  ok(went === '?zip=78657', '4 a ZIP search opens homesignalmap.html?zip=78657', went);
+  ok(before.heading === 'See an example: 78657 · Horseshoe Bay, Texas' && before.sub === null && before.records, '4 before it, the homepage still shows only the static example', before);
 
-  console.log('--- 4b. a ZIP whose list cannot be read, and one with no records ---');
-  await search(page, '78701');
-  await page.waitForFunction(() => /78701/.test(document.getElementById('homeMapFrame').getAttribute('src')));
-  await page.waitForTimeout(400);
-  const zf2 = await ui(page);
-  ok(zf2.heading === 'ZIP 78701', '4b no place row: the heading is "ZIP <zip>"', zf2.heading);
-  ok(zf2.note === 'Recent development list unavailable right now.' && zf2.names.length === 0, '4b an incomplete read shows the unavailable copy, never a 0', zf2);
-  await search(page, '78702');
-  await page.waitForTimeout(400);
-  const zf3 = await ui(page);
-  ok(zf3.note === 'No local permit/planning records to list here.', '4b a complete, empty read says so', zf3.note);
-
-  // ─────────────────────────────────────────────────────────────── 5: address search ──
-  console.log('--- 5. address search ---');
-  const invokesBefore = (await ui(page)).invokes;
-  await search(page, ADDR_OK);
-  await waitForMap(page, /homesignalmap\.html\?embed=1&lat=30\.54&lng=-98\.37&radius=2$/);
-  await page.waitForTimeout(400);
-  const a = await ui(page), af = await frameInfo(page);
-  const invoked = await page.evaluate(() => window.__invokes.slice(-1)[0]);
-  ok(a.invokes === invokesBefore + 1 && invoked.fn === 'geocode-address' && invoked.address === ADDR_OK, '5 one geocode-address call, with the typed address', invoked);
-  ok(af.src === 'homesignalmap.html?embed=1&lat=30.54&lng=-98.37&radius=2' && !af.sample && af.pointer === 'auto', '5 the 2-mile address embed, interactive', af.src);
-  ok(af.title === 'Development within 2 miles of ' + MATCH.matchedAddress, '5 iframe title names the confirmed address', af.title);
-  ok(a.heading === MATCH.matchedAddress && a.sub === 'Development within 2 miles of this address.', '5 heading is the confirmed address, with the exact subline', a);
-  ok(!a.records && !a.seeAll && a.cta === null && a.ctaHref === null && a.seeAllHref === null && a.full,
-    '5 full width; the ZIP list, "See all", and the full-map link are hidden, with no stale ZIP href', a);
-  ok(a.writes.length === 0 && a.viewZip === null && JSON.stringify(a.storage) === JSON.stringify(before.storage) && a.path === '/index.html' && a.histLen === before.histLen,
-    '5 nothing saved, no history entry', a);
-
-  console.log('--- 5b. failures keep the page as it was; short input is caught before the geocoder ---');
-  const kept = { src: af.src, heading: a.heading };
-  for (const [addr, msg, label] of [
-    [ADDR_NOMATCH, "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.", 'no_match'],
-    [ADDR_OUTAGE, "The address service couldn't be reached — please try again in a minute.", 'unavailable'],
-    [ADDR_BADPOINT, "We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.", 'invalid_coords']
-  ]) {
-    await search(page, addr);
-    await page.waitForFunction(() => !document.getElementById('homeSearchErr').hidden, null, { timeout: 10000 });
-    const e = await ui(page), ef = await frameInfo(page);
-    ok(e.err === msg && ef.src === kept.src && e.heading === kept.heading && !e.busy && e.ariaBusy === 'false',
-      '5b ' + label + ': its message under the box; map, heading and links unchanged', { err: e.err, src: ef.src, heading: e.heading });
-  }
-  const nInv = (await ui(page)).invokes;
-  await search(page, 'abc');
-  const sh = await ui(page);
-  ok(sh.err === 'Enter a 5-digit ZIP code, or a street address with its city or ZIP.' && sh.invokes === nInv, '5b too-short input: validation copy, no geocoder call', sh);
-
-  console.log('--- 5c. mode switch: address -> ZIP brings back the ZIP column and links ---');
-  await search(page, '78657');
-  await waitForMap(page, /homesignalmap\.html\?embed=1&zip=78657$/);
-  await page.waitForTimeout(300);
-  const back = await ui(page);
-  ok(back.records && back.seeAll && back.cta === 'Open full development map →' && back.ctaHref === 'homesignalmap.html?zip=78657'
-     && back.seeAllHref === 'development.html?zip=78657' && !back.full && back.sub === null && back.err === null,
-    '5c ZIP after address: list, both links (searched ZIP), half-width map, no subline, no error', back);
-
-  // ───────────────────────────────────────────────────────────────────── 6: races ──
-  console.log('--- 6. a slow earlier search never overwrites a newer one ---');
-  await search(page, '78601');          // community + projects answers delayed 1.5 s
-  await search(page, '78657');
-  await page.waitForTimeout(2200);
-  const race = await ui(page), racef = await frameInfo(page);
-  ok(race.heading === '78657 · Horseshoe Bay, TX' && racef.src === 'homesignalmap.html?embed=1&zip=78657'
-     && JSON.stringify(race.names) === JSON.stringify(PROJECTS_78657.slice(0, 3).map((p) => p.name)) && race.ctaHref === 'homesignalmap.html?zip=78657',
-    '6 ZIP A (slow) then ZIP B: B\'s heading, map, records and links stand', race);
-  await search(page, ADDR_SLOW);       // the resolver answers after 1.5 s
-  const busy = await ui(page);
-  ok(busy.busy && busy.ariaBusy === 'true', '6 the Search button is busy while the address resolves', busy);
-  await page.evaluate(() => { document.getElementById('homeQuery').value = '78657'; document.getElementById('homeSearch').requestSubmit(); });
-  await page.waitForTimeout(2200);
-  const race2 = await ui(page), race2f = await frameInfo(page);
-  ok(race2f.src === 'homesignalmap.html?embed=1&zip=78657' && race2.heading === '78657 · Horseshoe Bay, TX' && race2.records && !race2.full && !race2.busy,
-    '6 a stale address answer does not replace the newer ZIP result', race2);
-
-  ok(errors.length === 0, '1–6 no page or console errors across load and repeated searches', errors);
+  ok(errors.length === 0, '1–4 no page or console errors across load and a search', errors);
   await ctx.close();
 }
 
@@ -311,10 +226,6 @@ for (const [w, h, want, live] of [[1280, 900, 430, 760], [1024, 768, 430, 760], 
   ok(f.canvas === want && f.panelScroll === 0 && Math.abs(f.height - f.docHeight) <= 1 && f.rowsNotVisible.length === 0,
     '2b ' + w + 'x' + h + ': canvas ' + want + 'px, every filter group visible, no internal scroll, auto height', f);
   ok(overflow === 0, '2b ' + w + 'x' + h + ': no horizontal overflow', overflow);
-  await search(page, '78657');
-  await waitForMap(page, /embed=1&zip=78657$/);
-  const lf = await frameInfo(page);
-  ok(lf.height === live, '2b ' + w + 'x' + h + ': live map height ' + live + 'px', lf.height);
   ok(errors.length === 0, '2b ' + w + 'x' + h + ': no errors', errors);
   await ctx.close();
 }
@@ -398,21 +309,6 @@ console.log('--- 9. Map 1 embed hides the site chrome; preview needs embed ---')
   }));
   ok(!f.preview && !f.embed && f.header !== 'none' && f.footers === 1 && f.active === 'Explore', '9 full-page Map 1 ignores preview=1 and keeps the header, footer and Explore', f);
   await c2.close();
-}
-
-// ─────────────────────────────────────────────────────────────── 11: reduced motion ──
-console.log('--- 11. the results scroll is smooth, or instant under prefers-reduced-motion ---');
-for (const [mode, want] of [['no-preference', 'smooth'], ['reduce', 'auto']]) {
-  const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB, reducedMotion: mode });
-  await page.evaluate(() => {
-    window.__scrolls = [];
-    const orig = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (o) { window.__scrolls.push(o && o.behavior); return orig.call(this, o); };
-  });
-  await search(page, '78657');
-  const got = await page.evaluate(() => window.__scrolls.slice(-1)[0]);
-  ok(got === want, '11 ' + mode + ': scroll behavior ' + want, got);
-  await ctx.close();
 }
 
 await browser.close();
