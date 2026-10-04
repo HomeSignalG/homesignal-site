@@ -1,5 +1,6 @@
-// The homepage search box: one box takes a ZIP code OR an address, and both stay on the
-// homepage. Run: node test/home-zip-or-address.browser.test.mjs
+// The homepage search box: one box takes a ZIP code OR an address, and both go to the
+// Development Map (founder, 2026-10-04; this replaced "both stay on the homepage").
+// Run: node test/home-zip-or-address.browser.test.mjs
 //
 // History. This file first pinned #1528 (founder, 2026-10-01: "this should be enter a zip code
 // or address"; "it should be go to MY places"): the box sent a ZIP, or an address's confirmed
@@ -11,11 +12,10 @@
 // is kept here:
 //   1. the box takes letters and more than five characters (no numeric keypad, no maxlength),
 //      and its accessible name says address or ZIP; the hero has no Dashboard link;
-//   2. a ZIP never calls the geocoder;
-//   3. an address is sent once to geocode-address, exactly as typed; it is not put in the URL,
-//      nothing is written anywhere, and the lookup event carries the confirmed ZIP alone;
-//   4. an address the Census cannot confirm, a geocoder outage, and input too short to be
-//      either each say so under the box, go nowhere, and leave the button usable;
+//   2. a ZIP goes to homesignalmap.html?zip=<zip>;
+//   3. an address goes to homesignalmap.html, handed over once in sessionStorage (never in a
+//      URL); Map 1 reads and removes it and runs its own search (the one geocoder call);
+//   4. input too short to be a ZIP or an address says so under the box and goes nowhere;
 //   5. the placeholder is not cut off, side by side on a desktop and stacked on a phone.
 // The layout, races and mode switches are test/home-index.browser.test.mjs.
 //
@@ -109,73 +109,95 @@ console.log('--- 1. the box and the line under it ---');
   await ctx.close();
 }
 
+// Searching leaves the homepage for Map 1. The navigation is answered with a blank page, so
+// the request URL and what the homepage left in the tab's sessionStorage can be read.
+const HANDOFF_KEY = 'hs.homeSearchAddress';
+async function searchAndCatch(typed, how) {
+  const o = await homepage();
+  const { page } = o;
+  let hit = null;
+  await page.route('**/homesignalmap.html*', (route) => {
+    const u = new URL(route.request().url());
+    hit = { path: u.pathname, search: u.search, href: u.href };
+    return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' });
+  });
+  await submit(page, typed, how);
+  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
+  const stored = await page.evaluate((k) => { try { return sessionStorage.getItem(k); } catch (e) { return 'ERR'; } }, HANDOFF_KEY);
+  return { ...o, hit, stored };
+}
+
 // ═══ 2. A ZIP ═══
-console.log('--- 2. a ZIP opens its map here and never calls the geocoder ---');
+console.log('--- 2. a ZIP goes straight to the Development Map ---');
 for (const how of ['enter', 'click']) {
-  const { ctx, page, errors } = await homepage();
-  await submit(page, '84302', how);
-  await page.waitForFunction(() => /zip=84302$/.test(document.getElementById('homeMapFrame').getAttribute('src') || ''), null, { timeout: 8000 }).catch(() => {});
-  const s = await state(page);
-  ok(s.src === 'homesignalmap.html?embed=1&zip=84302', `2 "84302" (${how}) opens Map 1 for that ZIP`, s.src);
-  ok(s.path === '/index.html', `2 "84302" (${how}) stays on the homepage`, s.path);
-  ok(s.invokes.length === 0, `2 "84302" (${how}) does not call the geocoder`, s.invokes);
-  ok(s.inserts.length === 0, `2 "84302" (${how}) writes nothing`, s.inserts);
+  const { ctx, hit, stored, errors } = await searchAndCatch('84302', how);
+  ok(hit && hit.path === '/homesignalmap.html' && hit.search === '?zip=84302', `2 "84302" (${how}) opens homesignalmap.html?zip=84302`, hit);
+  ok(stored === null, `2 "84302" (${how}) hands nothing over in storage`, stored);
   ok(errors.length === 0, `2 (${how}) no page errors`, errors);
   await ctx.close();
 }
 
 // ═══ 3. An address ═══
-console.log('--- 3. an address: sent once, as typed; never in the URL; nothing written ---');
+console.log('--- 3. an address goes to the Development Map, handed over once and never in the URL ---');
 for (const how of ['click', 'enter']) {
-  const { ctx, page, errors } = await homepage();
-  await submit(page, ADDR_OK, how);
-  await page.waitForFunction(() => /lat=/.test(document.getElementById('homeMapFrame').getAttribute('src') || ''), null, { timeout: 8000 }).catch(() => {});
-  const s = await state(page);
-  ok(s.src === 'homesignalmap.html?embed=1&lat=30.17&lng=-97.61&radius=2', `3 (${how}) the confirmed point opens the 2-mile map`, s.src);
-  ok(s.invokes.length === 1 && s.invokes[0].fn === 'geocode-address' && s.invokes[0].address === ADDR_OK,
-    `3 (${how}) sent once to geocode-address, exactly as typed`, s.invokes);
-  ok(s.path === '/index.html' && !/coomes|13313|del%20valle|del\+valle/i.test(s.url), `3 (${how}) the address is not in the URL`, s.url);
-  ok(s.inserts.length === 0, `3 (${how}) the address is not written anywhere (no insert of any kind)`, s.inserts);
-  ok(s.logs.length === 1 && s.logs[0][0] === 'property_lookup', `3 (${how}) one property_lookup event is recorded`, s.logs);
-  ok(s.logs.length === 1 && JSON.stringify(s.logs[0][1]) === JSON.stringify({ zip_code: '78617' }),
-    `3 (${how}) ...carrying the confirmed ZIP alone, never the address`, s.logs);
+  const { ctx, hit, stored, errors } = await searchAndCatch(ADDR_OK, how);
+  ok(hit && hit.path === '/homesignalmap.html', `3 (${how}) opens the Development Map`, hit);
+  ok(hit && hit.search === '' && !/coomes|13313|del%20valle|del\+valle|lat=|lng=/i.test(hit.href), `3 (${how}) the address is not in the URL`, hit);
+  ok(stored === ADDR_OK, `3 (${how}) the address is handed over exactly as typed, in this tab's sessionStorage`, stored);
   ok(errors.length === 0, `3 (${how}) no page errors`, errors);
   await ctx.close();
 }
 {
-  // The same address searched twice records one event (the old homepage's rule).
-  const { ctx, page } = await homepage();
-  await submit(page, ADDR_OK);
-  await page.waitForFunction(() => window.__logs.length === 1, null, { timeout: 8000 }).catch(() => {});
-  await submit(page, ADDR_OK);
-  await page.waitForFunction(() => window.__invokes.length === 2, null, { timeout: 8000 }).catch(() => {});
-  await page.waitForTimeout(300);
-  const s = await state(page);
-  ok(s.invokes.length === 2 && s.logs.length === 1, '3 the same address searched twice records one lookup event', { invokes: s.invokes.length, logs: s.logs });
-  await ctx.close();
+  // Map 1 takes the handoff: it fills its own box, removes the key at once, and runs ITS address
+  // search (one geocoder call). A reload does not repeat it.
+  const o = await homepage();
+  const geocodes = [];
+  await o.page.route('**/functions/v1/geocode-address', (route) => {
+    geocodes.push(JSON.parse(route.request().postData() || '{}').address);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ match: null }) });
+  });
+  await o.page.evaluate(([k, v]) => sessionStorage.setItem(k, v), [HANDOFF_KEY, ADDR_OK]);
+  await o.page.goto(base + '/homesignalmap.html', { waitUntil: 'domcontentloaded' });
+  await o.page.waitForFunction(() => window.HS && window.HS.ready, null, { timeout: 30000 });
+  await o.page.waitForTimeout(800);
+  const m = await o.page.evaluate((k) => ({ box: document.getElementById('addr').value, left: sessionStorage.getItem(k), url: location.href }), HANDOFF_KEY);
+  ok(m.box === ADDR_OK, '3 Map 1 puts the handed-over address in its own box', m.box);
+  ok(m.left === null, '3 Map 1 removes the handoff the moment it reads it', m.left);
+  ok(geocodes.length === 1 && geocodes[0] === ADDR_OK, '3 Map 1 runs its own address search: one geocoder call, exactly as typed', geocodes);
+  ok(!/coomes|13313/i.test(m.url), '3 the address never reaches Map 1\'s URL either', m.url);
+  await o.page.reload({ waitUntil: 'domcontentloaded' });
+  await o.page.waitForTimeout(800);
+  ok(geocodes.length === 1, '3 a reload does not repeat the search', geocodes);
+  await o.ctx.close();
+}
+{
+  // An explicit ?zip= in the URL wins over a stale handoff, and the handoff is still cleared.
+  const o = await homepage();
+  const geocodes = [];
+  await o.page.route('**/functions/v1/geocode-address', (route) => { geocodes.push(1); return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }); });
+  await o.page.evaluate(([k, v]) => sessionStorage.setItem(k, v), [HANDOFF_KEY, ADDR_OK]);
+  await o.page.goto(base + '/homesignalmap.html?zip=84302', { waitUntil: 'domcontentloaded' });
+  await o.page.waitForFunction(() => window.HS && window.HS.ready, null, { timeout: 30000 });
+  await o.page.waitForTimeout(500);
+  const left = await o.page.evaluate((k) => sessionStorage.getItem(k), HANDOFF_KEY);
+  ok(geocodes.length === 0 && left === null, '3 an explicit ?zip= beats a stale handoff, which is cleared', { geocodes: geocodes.length, left });
+  await o.ctx.close();
 }
 
 // ═══ 4. Refusals ═══
-console.log('--- 4. what cannot be confirmed says so and goes nowhere ---');
+console.log('--- 4. input too short to be a ZIP or an address says so and goes nowhere ---');
 const REFUSALS = [
-  [ADDR_NOMATCH, /couldn.t confirm that address against U\.S\. Census records/, 1, 'an address the Census cannot confirm'],
-  [ADDR_OUTAGE, /address service couldn.t be reached/, 1, 'a geocoder outage'],
-  ['abc', /5-digit ZIP code, or a street address/, 0, 'an input too short to be either'],
-  ['1234', /5-digit ZIP code, or a street address/, 0, 'four digits'],
-  ['84302-1234', /5-digit ZIP code, or a street address/, 0, 'a ZIP+4 (§14: a ZIP is exactly five digits)']
+  ['abc', 'an input too short to be either'],
+  ['1234', 'four digits'],
+  ['84302-1234', 'a ZIP+4 (§14: a ZIP is exactly five digits)']
 ];
-for (const [typed, re, calls, what] of REFUSALS) {
-  const { ctx, page, errors } = await homepage();
-  const before = await state(page);
-  await submit(page, typed);
-  await page.waitForFunction(() => !document.getElementById('homeSearchErr').hidden, null, { timeout: 8000 }).catch(() => {});
+for (const [typed, what] of REFUSALS) {
+  const { ctx, page, hit, stored, errors } = await searchAndCatch(typed, 'click');
   await page.waitForTimeout(300);
-  const s = await state(page);
-  ok(re.test(s.msg), `4 ${what}: the page says why`, s.msg);
-  ok(s.path === '/index.html' && s.src === before.src, `4 ${what}: stays on the homepage, map unchanged`, { path: s.path, src: s.src });
-  ok(s.invokes.length === calls, `4 ${what}: geocoder called ${calls} time(s)`, s.invokes.length);
-  ok(s.inserts.length === 0 && s.logs.length === 0, `4 ${what}: nothing written, no lookup event`, { inserts: s.inserts, logs: s.logs });
-  ok(s.btnDisabled === false, `4 ${what}: the button is usable again`, s.btnDisabled);
+  const s = await page.evaluate(() => { const e = document.getElementById('homeSearchErr'); return { path: location.pathname, msg: e && !e.hidden ? e.textContent : '' }; });
+  ok(/5-digit ZIP code, or a street address/.test(s.msg), `4 ${what}: the page says why`, s.msg);
+  ok(s.path === '/index.html' && hit === null, `4 ${what}: stays on the homepage`, { path: s.path, hit });
+  ok(stored === null, `4 ${what}: nothing handed over`, stored);
   ok(errors.length === 0, `4 ${what}: no page errors`, errors);
   await ctx.close();
 }

@@ -125,18 +125,20 @@
 <script src="shell.js?v=d066a57f"></script>
 <script>
 (function () {
-  // EXPLORE SEARCH. Read-only discovery: a search never follows, saves, subscribes, changes a
-  // primary place, opens the coverage-request form, or touches browser history. It turns the
-  // sample map into Map 1's normal interactive embed for the ZIP or the confirmed address, and
-  // the visitor stays on this page.
-  //
-  // ONE RUN ID. Every submit increments homeSearchRunId, and every async completion compares
-  // the value it captured before it writes anything, so a slow answer for an earlier search
-  // can never overwrite a newer one.
+  // EXPLORE SEARCH. A search hands the visitor to the Development Map (Map 1, homesignalmap.html)
+  // (founder, 2026-10-04: "when an address or zip code is entered it should automatically take
+  // you to the development map"). This replaces the 2026-09-30 "search stays on the homepage"
+  // behaviour. Nothing here follows, saves, subscribes or changes a primary place.
+  //   - A 5-digit ZIP goes to homesignalmap.html?zip=<zip>, Map 1's own ZIP route.
+  //   - An address has no URL route on the full page (and an address must not be put in a URL),
+  //     so it is handed over once through this tab's sessionStorage under HANDOFF_KEY. Map 1
+  //     reads it at boot, removes it at once, and runs its own address search.
+  //     That search is the one geocoder call, the one `property_lookup` event (ZIP only), and
+  //     the one place that explains a failed lookup.
+  // The sample map and records below the hero stay a static example.
   var SAMPLE_ZIP = '78657';
+  var HANDOFF_KEY = 'hs.homeSearchAddress';   // read and removed by homesignalmap.html
   var homeSearchRunId = 0;
-  // The last address that recorded a lookup event, so searching it again records no second one.
-  var homeLogged = null;
   var sampleObserver = null;
   var $ = function (id) { return document.getElementById(id); };
 
@@ -179,23 +181,6 @@
     }
     sizeSample();
   }
-  // A NEW IFRAME ELEMENT, NOT A NEW src. Navigating an existing iframe adds an entry to the
-  // tab's history, so the browser's Back button would step the map back through earlier
-  // searches; a search must not touch history. A fresh element's first load adds none. There
-  // is still exactly one iframe on the page, and it is still Map 1.
-  function goLive(src, title) {
-    var wrap = $('homeMapWrap'), old = $('homeMapFrame');
-    if (sampleObserver) { sampleObserver.disconnect(); sampleObserver = null; }
-    wrap.classList.remove('is-sample');
-    if (old.getAttribute('src') === src) { old.title = title; return; }
-    var f = document.createElement('iframe');
-    f.id = 'homeMapFrame';
-    f.className = old.className;
-    f.title = title;              // the live heights are CSS: 760 / 700 / 660 px by breakpoint
-    f.setAttribute('src', src);
-    old.replaceWith(f);
-  }
-
   // ---- the local records column --------------------------------------------------------
   // The list beside the map is HS.data.projects(zip): local permit and planning records, in
   // the order the read returns them, the first three only when the read is complete. It does
@@ -232,94 +217,29 @@
     $('homeRecordList').innerHTML = projects.slice(0, 3).map(recordCard).join('');
   }
 
-  // ---- results state -----------------------------------------------------------------
-  function showResults(mode) {
-    // 'zip' shows the records column and both ZIP links; 'address' hides all three, because
-    // the full-page Map 1 has no address route and a ZIP list beside a 2-mile map would be
-    // a different area.
-    var zipMode = mode === 'zip';
-    $('homeRecords').hidden = !zipMode;
-    $('homeSeeAll').hidden = !zipMode;
-    $('homeMapCta').hidden = !zipMode;
-    $('homeResultsGrid').classList.toggle('home-index__results-grid--full', !zipMode);
-  }
-  function revealResults() {
-    var sec = $('homeExploreResults');
-    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-    $('homeResultsHeading').focus({ preventScroll: true });
-  }
+  // ---- search ------------------------------------------------------------------------
   function searchError(text) {
     var box = $('homeSearchErr');
     box.textContent = text || '';
     box.hidden = !text;
   }
-  function setBusy(busy) {
-    var b = $('homeSearchBtn');
-    b.disabled = !!busy;
-    if (busy) b.setAttribute('aria-busy', 'true'); else b.setAttribute('aria-busy', 'false');
-  }
-
-  function searchZip(zip, runId) {
-    setBusy(false);
-    goLive('homesignalmap.html?embed=1&zip=' + zip, 'Development map for ZIP ' + zip);
-    showResults('zip');
-    $('homeResultsHeading').textContent = 'ZIP ' + zip;
-    $('homeResultsSub').hidden = true;
-    $('homeMapCta').textContent = 'Open full development map →';
-    $('homeMapCta').setAttribute('href', 'homesignalmap.html?zip=' + zip);
-    $('homeSeeAll').setAttribute('href', 'development.html?zip=' + zip);
-    $('homeRecordsHeading').textContent = 'Recent development records in ' + zip;
-    $('homeRecordList').textContent = 'Loading recent records…';
-    revealResults();
-    // Place name only: the map never waits for it, and a missing row leaves "ZIP <zip>".
-    (async function () {
-      var c = null;
-      try { c = await HS.data.community(zip); } catch (e) { c = null; }
-      if (runId !== homeSearchRunId) return;
-      if (c && c.name) $('homeResultsHeading').textContent = zip + ' · ' + c.name + (c.state ? ', ' + c.state : '');
-    })();
-    loadRecords(zip, runId, 'No local permit/planning records to list here.');
-  }
-
-  async function searchAddress(q, runId) {
-    setBusy(true);
-    var res = await HS.resolveAddress(q);
-    if (runId !== homeSearchRunId) return;
-    setBusy(false);
-    // A failure says so under the box and changes nothing else on the page.
-    if (!res.ok) { searchError(res.message); return; }
-    var m = res.match;
-    // The entry-family count of address lookups (docs/events-entry-family.sql). It carries the
-    // confirmed ZIP alone, never the address, exactly as the homepage recorded it before.
-    try {
-      if (HS.logEvent && homeLogged !== q) { homeLogged = q; HS.logEvent('property_lookup', { zip_code: m.zip }); }
-    } catch (e) { /* a lookup event never blocks the search */ }
-    goLive('homesignalmap.html?embed=1&lat=' + encodeURIComponent(m.lat) + '&lng=' + encodeURIComponent(m.lng) + '&radius=2',
-      'Development within 2 miles of ' + m.matchedAddress);
-    showResults('address');
-    $('homeResultsHeading').textContent = m.matchedAddress;
-    $('homeResultsSub').textContent = 'Development within 2 miles of this address.';
-    $('homeResultsSub').hidden = false;
-    $('homeMapCta').removeAttribute('href');
-    $('homeSeeAll').removeAttribute('href');
-    revealResults();
-  }
 
   function submit(e) {
     if (e) e.preventDefault();
     var q = String($('homeQuery').value || '').trim();
-    var runId = ++homeSearchRunId;
     searchError('');
-    if (/^\d{5}$/.test(q)) { searchZip(q, runId); return; }
+    if (/^\d{5}$/.test(q)) { location.assign('homesignalmap.html?zip=' + q); return; }
     // The same minimum the Add-an-address box asks for before it calls the geocoder.
     if (q.length < 8 || q.indexOf(' ') < 0) {
-      setBusy(false);
       searchError('Enter a 5-digit ZIP code, or a street address with its city or ZIP.');
       $('homeQuery').focus();
       return;
     }
-    searchAddress(q, runId);
+    // sessionStorage can be unavailable (private window, blocked site data). Then the address
+    // cannot travel, and saying so beats landing on an empty map.
+    try { sessionStorage.setItem(HANDOFF_KEY, q); }
+    catch (err) { searchError('Your browser blocked the search. Open the Development Map and enter the address there.'); return; }
+    location.assign('homesignalmap.html');
   }
 
   HS.onReady(function () {

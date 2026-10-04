@@ -7,11 +7,12 @@
 //      never an image, and index.html carries no map, marker, filter or classifier code.
 //   2. The sample is the dedicated preview shape, lazy, out of the tab order, pointer-locked,
 //      and never given a fixed height; preview=1 is layout-only and scoped to .hs-embed.hs-preview.
-//   3. Explore is read-only: no redirect, no follow / save / subscribe, no history change, no
-//      HS.data.isCovered gate, no HS.findCommunity, and every async completion is guarded by
-//      one run id.
+//   3. A search hands off to the Development Map (founder, 2026-10-04): a ZIP goes to
+//      homesignalmap.html?zip=, an address is handed over once in sessionStorage and never put
+//      in a URL. No follow / save / subscribe, no history change, no HS.data.isCovered gate.
 //   4. ONE ADDRESS RESOLVER: shell.js calls geocode-address exactly once, inside
-//      HS.resolveAddress, and the homepage, HS.findHome and saveOnboardingAddress all use it.
+//      HS.resolveAddress, and HS.findHome and saveOnboardingAddress use it. (The homepage no
+//      longer geocodes: Map 1's own address search does.)
 //   5. The shared header is Explore | My Places | Enterprise | Share | Sign in-or-account; the
 //      old sidebar and top-bar utilities are gone from the chrome while their functions stay;
 //      ONE shared footer; both hidden in Map 1's embed mode.
@@ -84,27 +85,27 @@ ok(/\.home-index__map-frame\{display:block;width:100%;border:0;height:760px\}/.t
    && /@media \(max-width:767px\)\{[\s\S]*?\.home-index__map-frame\{height:660px\}/.test(css),
   'the live map is 760 / 700 / 660 px by breakpoint');
 
-console.log('--- 3. Explore is read-only discovery ---');
-ok(!/lib\/landing\.js/.test(idx) && !/HS\.landingFor/.test(idxNoComments) && !/location\.(replace|assign)|location\.href\s*=/.test(pageScript),
-  'index.html no longer loads lib/landing.js, calls HS.landingFor, or redirects');
+console.log('--- 3. a search hands off to the Development Map (founder, 2026-10-04) ---');
+ok(!/lib\/landing\.js/.test(idx) && !/HS\.landingFor/.test(idxNoComments), 'index.html no longer loads lib/landing.js or calls HS.landingFor');
+// The ONLY navigations the page script makes are to Map 1, and only from the submit handler.
+const navs = pageScript.match(/location\.(replace|assign)\([^)]*\)|location\.href\s*=[^;]*/g) || [];
+ok(navs.length === 2 && navs.every((n) => /homesignalmap\.html/.test(n)), 'the page script navigates only to homesignalmap.html', navs.join(' | '));
+ok(/location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(pageScript), 'a 5-digit ZIP goes to homesignalmap.html?zip=<zip>');
+ok(/location\.assign\('homesignalmap\.html'\)/.test(pageScript) && /sessionStorage\.setItem\(HANDOFF_KEY, q\)/.test(pageScript),
+  'an address goes to homesignalmap.html with the text handed over once in sessionStorage');
+const urls = (pageScript.match(/'homesignalmap\.html[^']*'/g) || []).join(' ');
+ok(!/addr|address|lat=|lng=/i.test(urls), 'no address or coordinate is ever placed in a URL', urls);
+ok(/HANDOFF_KEY = 'hs\.homeSearchAddress'/.test(pageScript) && /sessionStorage\.getItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html'))
+   && /sessionStorage\.removeItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html')),
+  'Map 1 reads the same key and removes it in the same step');
 ok(!/history\.(pushState|replaceState)|location\.hash\s*=/.test(pageScript), 'no search touches browser history');
 ok(!/HS\.data\.isCovered|HS\.findCommunity|HS\.openLoc|openModal|followCommunity|ensureAreaSubscribed|app_follows|app_properties|\.insert\(|saveHome|LS\.set|localStorage/.test(pageScript),
-  'no search follows, saves, subscribes, opens the coverage form or writes storage');
+  'no search follows, saves, subscribes, opens the coverage form or writes persistent storage');
 const controls = (tpl.match(/<(a|button)\b[\s\S]*?<\/\1>/g) || []).join(' ');
 ok(controls.length > 200 && !/Follow|Get alerts|alerts\.html/i.test(controls), 'no Follow or Get alerts control on the homepage');
-ok(/var homeSearchRunId = 0;/.test(pageScript) && /var runId = \+\+homeSearchRunId;/.test(pageScript), 'one integer run id, incremented on every submit');
-const guards = (pageScript.match(/if \(runId !== homeSearchRunId\) return;/g) || []).length;
-ok(guards >= 3, 'every async completion (community, projects, resolver) checks the run id before writing', guards);
+ok(!/HS\.resolveAddress|functions\.invoke|goLive|searchZip|searchAddress/.test(pageScript), 'the homepage no longer geocodes or renders results itself; Map 1 does');
 ok(/HS\.data\.projects\(zip, null\)/.test(pageScript) && /projects\.complete !== true/.test(pageScript)
-   && /projects\.slice\(0, 3\)/.test(pageScript), 'the list is HS.data.projects(zip, null), first three, only when complete');
-ok(/'homesignalmap\.html\?embed=1&zip=' \+ zip/.test(pageScript), 'a ZIP search loads homesignalmap.html?embed=1&zip=<zip>');
-ok(/'homesignalmap\.html\?embed=1&lat=' \+ encodeURIComponent\(m\.lat\) \+ '&lng=' \+ encodeURIComponent\(m\.lng\) \+ '&radius=2'/.test(pageScript),
-  'a confirmed address loads homesignalmap.html?embed=1&lat=<lat>&lng=<lng>&radius=2');
-ok(/'homesignalmap\.html\?zip=' \+ zip/.test(pageScript) && /'development\.html\?zip=' \+ zip/.test(pageScript),
-  'the two ZIP links are rewritten to the searched ZIP');
-ok(/\$\('homeMapCta'\)\.removeAttribute\('href'\)/.test(pageScript) && /\$\('homeSeeAll'\)\.removeAttribute\('href'\)/.test(pageScript),
-  'address mode leaves no stale ZIP href behind');
-ok(/prefers-reduced-motion: reduce/.test(pageScript) && /focus\(\{ preventScroll: true \}\)/.test(pageScript), 'scroll respects reduced motion, then focuses the heading without scrolling');
+   && /projects\.slice\(0, 3\)/.test(pageScript), 'the sample list is HS.data.projects(zip, null), first three, only when complete');
 ok(/scroll-margin-top:88px/.test(css), '#homeExploreResults keeps clear of the sticky header');
 
 console.log('--- 4. one address resolver ---');
@@ -122,7 +123,6 @@ const findHome = (shellJs.match(/HS\.findHome = async function \(\) \{[\s\S]*?\n
 const onb = (shellJs.match(/async function saveOnboardingAddress\(addr\) \{[\s\S]*?\n  \}\n/) || [''])[0];
 ok(/await HS\.resolveAddress\(q\)/.test(findHome), 'HS.findHome uses it');
 ok(/await HS\.resolveAddress\(addr\)/.test(onb), 'saveOnboardingAddress uses it');
-ok(/await HS\.resolveAddress\(q\)/.test(pageScript) && !/functions\.invoke/.test(pageScript), 'the homepage uses it and calls no edge function itself');
 
 console.log('--- 5. the shared header and footer ---');
 const header = (shellNoComments.match(/<header class="hs-header" id="hs-top">[\s\S]*?<\/header>/) || [''])[0];
