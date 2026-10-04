@@ -56,9 +56,13 @@ const C = code(SRC);
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
   const basis = (C.match(/function changeBasis\(report\) \{[\s\S]*?\n  \}\n/) || [''])[0];
-  ok(basis.length > 200 && !/firstDetected/.test(C) && (C.match(/homesignal_observation/g) || []).length === (basis.match(/homesignal_observation/g) || []).length
-    && (C.match(/first_observed_at/g) || []).length === (basis.match(/first_observed_at/g) || []).length && /day\(o\.first_observed_at\)/.test(basis),
-    '2a2 the ledger\'s first observation is read in changeBasis() only, and only as a day for the Change History sentence (no "First detected" line reads it)');
+  const ledger = (C.match(/function ledgerFirstRead\(p\) \{[^\n]*\}\n/) || [''])[0];
+  const inFns = (re) => (basis.match(re) || []).length + (ledger.match(re) || []).length;
+  ok(basis.length > 200 && ledger.length > 50 && !/firstDetected/.test(C) && (C.match(/homesignal_observation/g) || []).length === inFns(/homesignal_observation/g)
+    && (C.match(/first_observed_at/g) || []).length === inFns(/first_observed_at/g) && /day\(o\.first_observed_at\)/.test(basis),
+    '2a2 the ledger\'s first observation is read in two functions only: changeBasis() (the Change History sentence) and ledgerFirstRead() (the internal page\'s line); no "First detected" line reads it');
+  ok((C.match(/ledgerFirstRead\(/g) || []).length === 3 && /\(showLifecycle && ledgerFirstRead\(p\) \? line\('Ledger first read', ledgerFirstRead\(p\)\) : ''\)/.test(C),
+    '2a2b ledgerFirstRead() is called only behind showLifecycle (its definition plus one guarded line), so the customer view cannot print it');
   ok(/function changeReady\(report\) \{[\s\S]*?return cov\.change_ready === true;/.test(C) && (C.match(/cov\.change_ready/g) || []).length === 1
     && (basis.match(/\.change_ready/g) || []).length === 1 && (C.match(/change_ready/g) || []).length === 2
     && /var b = changeReady\(report\) \? changeBasis\(report\) : null;/.test(C) && /if \(!b\) return CHANGE_NOT_READY;/.test(C),

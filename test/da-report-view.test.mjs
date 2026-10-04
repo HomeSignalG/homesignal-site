@@ -653,6 +653,13 @@ const htmlLife = viewLife(W);
   ok(histText(noObs) === 'Change History ' + V.CHANGE_NOT_READY, '13i with no per-record observation it makes no claim');
   const badDay = quiet(); badDay.report.projects.forEach((p) => { p.homesignal_observation.first_observed_at = 'not a date'; });
   ok(histText(badDay) === 'Change History ' + V.CHANGE_NOT_READY, '13j with no readable start day it makes no claim');
+  // the INTERNAL review page (showLifecycle) shows the ledger's first read under its own plain name; the customer view never does
+  const inter = V.html(quiet(), { showLifecycle: true }), cust = V.html(quiet(), {});
+  const interCards = ['permitted', 'approved', 'proposed'].flatMap((k) => cardsOf(sec(inter, k).html));
+  ok(interCards.length > 0 && interCards.every((c) => /Ledger first read: Sep 25, 2026/.test(textOf(c))) && !/First detected by HomeSignal/.test(textOf(inter.slice(inter.indexOf('da-rv-sec--approved')))), '13k the internal review page labels the ledger\'s first read "Ledger first read" on every stage card, and never calls it a detection', interCards.length);
+  ok(!/Ledger first read/.test(textOf(cust)), '13l the customer view never prints the ledger first read');
+  const noObs2 = quiet(); noObs2.report.projects.forEach((p) => { delete p.homesignal_observation; });
+  ok(!/Ledger first read/.test(textOf(V.html(noObs2, { showLifecycle: true }))), '13m with no observation the internal line is absent, not a placeholder');
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);
