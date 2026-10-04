@@ -173,5 +173,19 @@ ok(/@media print\{[\s\S]*?header\.top,\.card,#status,#creditnote,\.auth-overlay\
 ok(/not your name, not your client label/.test(page) && /6 months/.test(page) && /street address/.test(page), '9k the card tells the agent what the client will and will not see, and how long the link lasts (founder, 2026-10-03)');
 ok(!/shared-report/.test(read('development-activity.html')) && !/shared-report/.test(read('partials/shell.html')) && !/shared-report/.test(read('shell.js')), '9l no public page links the client\'s page: a client reaches it only from a link an agent made');
 
+// ---- 10. a card the script hides is NOT DRAWN (Manual Test Part B, 2026-10-04) ------------------------------------------------------------
+// The page hides cards with the `hidden` attribute, and the browser's own rule for it loses to any page rule that sets a display. Eight of the page's cards and
+// panels have one (display:grid by id), so without the page's own [hidden] rule a signed-out visitor was shown Billing, "Invite an agent" and "Saved reports", an agent was
+// shown the owner's invite card, and a report that was not saved showed the "Share this report with your client" box. Every check before this one read the attribute, never
+// what is drawn. The browser suite now reads what is drawn (2g-2j); this is the required, offline half: the rule must exist, in the CSS and not only in a comment, and it must be
+// able to win (!important).
+const css = (page.match(/<style>([\s\S]*?)<\/style>/) || ['', ''])[1].replace(/\/\*[\s\S]*?\*\//g, '');
+const idDisplay = [...css.matchAll(/(^|\})\s*(#[a-z0-9-]+)\{[^}]*\bdisplay:\s*(grid|flex|block)\b/g)].map((m) => m[2]);
+ok(idDisplay.length >= 8 && ['#billing', '#team', '#saved', '#share', '#watch', '#compare', '#profile', '#minted'].every((id) => idDisplay.includes(id)),
+  '10a the reason for the rule exists in this page: the hidden cards each carry a display of their own (control: the rule is not guarding nothing)', idDisplay);
+ok((css.match(/(^|\})\s*\[hidden\]\{display:none!important\}/g) || []).length === 1, '10b the page has its own [hidden]{display:none!important} rule, once, in the CSS (a comment does not count)');
+ok(css.search(/(^|\})\s*\[hidden\]\{display:none!important\}/) < css.search(/(^|\})\s*#[a-z0-9-]+\{[^}]*\bdisplay:\s*(grid|flex|block)\b/),
+  '10c and it comes before the first rule that sets a display, so nobody reads it as an afterthought that a later rule could be thought to override');
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
