@@ -24,6 +24,10 @@ A second address in the same place, for "another property":
 
 ## Part A — the live address lookup and the empty-source state (no cost, no trial needed)
 
+> **Result so far (founder, 2026-10-04, 1:02 PM CDT / 18:02 UTC, reported with a screenshot): the live address lookup and coverage PASSED.** Entered on the landing page's coverage check, `20 N Main St, Brigham City, UT 84302` resolved to "20 N MAIN ST, BRIGHAM CITY, UT, 84302 · ZIP 84302" and showed "INSIDE THE PRODUCT NETWORK", no error. That control calls the same `geocode-address` function the report uses, so it settles "does the live lookup find this address" and "is 84302 covered".
+>
+> **Still to see: steps 1-4 below, on the admin review page.** The landing check never makes a report, so it cannot show the "No data ingested" heading, the status line or the credit note, and "no '0 official records' claim" is not evidence there (that page has no such text). One line back on those is what remains.
+
 You need to be signed in as an admin. An admin report is never charged and nothing is stored.
 
 > The new "No data ingested" status line (below) goes live when the change that carries it is merged. Before that, the line under the button still says "Report ready: 0 official records within 0.5 miles." for this address. That wording is the defect this change fixes, so if you see it, the change has not been merged yet.
