@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW } from './lib/da-report-view-world.mjs';
+import { RICH, RIGHTS_SHIPPED, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
 const TH = await import('../supabase/functions/development-activity-trial/handler.ts');
@@ -238,6 +238,8 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
       // a saved-reports read (build step 6) is not a report request: it is kept apart so "one request per report" stays checkable
       (url === REPORT_FN ? (body && body.action ? saved : reports) : trials).push(rec);
       if (url === REPORT_FN) w.lastAddress = body && body.address;
+      // holdNextOpen: the server has the saved report and the answer is on its way; it arrives only when the test lets it (after the person has moved on)
+      if (url === REPORT_FN && w.holdNextOpen && body && body.action === 'open') { w.holdNextOpen = false; await new Promise((res) => { w.releaseOpen = res; }); }
       const res = await (url === REPORT_FN ? w.reportHandler : w.trialHandler)(new Request(url, { method: 'POST', headers: { authorization: rec.auth || '', 'content-type': 'application/json' }, body: r.postData() }));
       const answer = await res.text();
       if (url === REPORT_FN && !(body && body.action) && lose(body)) return route.abort(); // the server did the work (and charged); only its answer is lost
@@ -792,11 +794,11 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(after.some((r) => /^Withdrawn · made /.test(r) && !/Withdraw$/.test(r)) && after.some((r) => /^Working/.test(r)), '9k a withdrawn link is listed as withdrawn with no button; the other still works', after);
   ok(w.shares.filter((r) => r.status === 'REVOKED').length === 1 && (await page.$eval('#share-new', (e) => e.hidden)), '9l the server revoked exactly that one, and the page no longer shows the link');
 
-  // the report's own bar: Share and Watch are live and go to their cards, Download PDF is live and prints; Compare stays inert
+  // the report's own bar: Compare (build step 10), Share and Watch are live and go to their cards, Download PDF is live and prints
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ t: e.textContent, live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action'), disabled: e.getAttribute('aria-disabled') })));
   ok(JSON.stringify(bar.map((b) => b.t)) === JSON.stringify(['Compare property', 'Watch property', 'Share report', 'Download PDF'])
-     && bar[0].disabled === 'true' && bar[1].live && bar[1].act === 'watch' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf',
-    '9m the report\'s own bar has Watch (build step 9), Share and Download PDF live, and Compare inert as before', bar);
+     && bar[0].live && bar[0].act === 'compare' && bar[0].disabled === null && bar[1].live && bar[1].act === 'watch' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf',
+    '9m the report\'s own bar has Compare (build step 10), Watch (build step 9), Share and Download PDF all live', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
   await page.click('#share-pdf');
@@ -1068,6 +1070,280 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await waitWatch(page, /You are watching this property, since/);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(wide <= 0, '10z on a 390 px screen the Watch card does not scroll the page sideways', wide);
+  await ctx.close();
+}
+
+// ---- 11. build step 10: comparing saved reports side by side ------------------------------------------------------------------------------
+const compareHidden = (page) => page.$eval('#compare', (e) => e.hidden);
+const compareBoxes = (page) => page.$$eval('#compare-list input', (els) => els.map((e) => ({ checked: e.checked, disabled: e.disabled })));
+const waitBoxes = (page, n) => page.waitForFunction((k) => document.querySelectorAll('#compare-list input').length === k, n, { timeout: 8000 }).catch(() => {});
+const waitCompared = (page) => page.waitForFunction(() => document.querySelector('#compare-result .da-cmp') !== null || /could not|cannot|Choose|not made over|Sign in/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
+const tableOf = (page) => page.evaluate(() => {
+  const rows = [...document.querySelectorAll('#compare-result .da-cmp-table tbody tr')].filter((tr) => tr.querySelector('.da-cmp-rowh'));
+  return {
+    heads: [...document.querySelectorAll('#compare-result .da-cmp-table thead th')].slice(1).map((e) => e.textContent.trim()),
+    legend: [...document.querySelectorAll('#compare-result .da-cmp-legend li')].map((e) => e.textContent.replace(/\s+/g, ' ').trim()),
+    rows: rows.map((tr) => ({ label: tr.querySelector('.da-cmp-rowh').textContent.trim(), cells: [...tr.querySelectorAll('td .da-cmp-v')].map((e) => e.textContent.trim()) })),
+  };
+});
+const rowCells = (t, label) => (t.rows.find((r) => r.label === label) || { cells: [] }).cells;
+const A1 = '1 First Ave, Springfield, OR 97477', A2 = '2 Second Ave, Springfield, OR 97477', A3 = '3 Third Ave, Springfield, OR 97477', A4 = '4 Fourth Ave, Springfield, OR 97477', A5 = '5 Fifth Ave, Springfield, OR 97477', A6 = '6 Sixth Ave, Springfield, OR 97477';
+const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
+{
+  // before there are two reports there is nothing to compare, and the card says so
+  const w = world();
+  const { ctx, page, saved, foreign, errors } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => !document.getElementById('compare').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(!(await compareHidden(page)) && /Comparing needs at least 2 saved reports/.test(await text(page, '#compare-status')) && (await page.$eval('#compare-go', (b) => b.disabled)),
+    '11a with no saved report the card says comparing needs at least two, and the button is off', await text(page, '#compare-status'));
+  await make(page, A1);
+  await waitBoxes(page, 1);
+  ok((await compareBoxes(page)).length === 1 && /needs at least 2/.test(await text(page, '#compare-status')) && (await page.$eval('#compare-go', (b) => b.disabled)), '11b with one saved report it still needs two');
+  await ctx.close();
+  const o = await open({ w: world(), signedIn: false });
+  ok(await compareHidden(o.page), '11c signed out, the Compare card is not shown');
+  await o.ctx.close();
+}
+{
+  // three saved reports: the card lists them, two to five can be chosen, and comparing opens exactly the chosen ones
+  const w = world();
+  const { ctx, page, saved, reports, foreign, errors } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2); await make(page, A3);
+  await waitBoxes(page, 3);
+  const labels = await page.$$eval('#compare-list label', (els) => els.map((e) => e.textContent.trim()));
+  ok(labels.length === 3 && /^Report 3 · 3 Third Ave/.test(labels[0]) && /^Report 1 · 1 First Ave/.test(labels[2]), '11d the card lists the saved reports, newest first, each as "Report N · address · date"', labels);
+  ok((await compareBoxes(page)).every((b) => !b.checked && !b.disabled) && (await page.$eval('#compare-go', (b) => b.disabled)) && /Choose 2 to 5 reports\./.test(await text(page, '#compare-count')), '11e nothing is ticked at first: the button is off and the count says to choose 2 to 5');
+  await page.check('#compare-list li:nth-child(1) input');
+  ok((await page.$eval('#compare-go', (b) => b.disabled)) && /1 report chosen\./.test(await text(page, '#compare-count')), '11f one chosen is not enough');
+  await page.check('#compare-list li:nth-child(3) input');
+  ok(!(await page.$eval('#compare-go', (b) => b.disabled)) && /2 reports chosen\./.test(await text(page, '#compare-count')), '11g two chosen turns the button on');
+  const usedBefore = w.used, madeBefore = reports.length, listsBefore = saved.length;
+  await page.check('#compare-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
+  ok(opens.length === 3 && opens.every((c) => c.auth === 'Bearer user-token' && Object.keys(c.body).sort().join() === 'action,report_id' && /^[0-9a-f-]{36}$/.test(c.body.report_id)), '11h comparing opens exactly the three chosen saved reports, each with the person\'s own token and nothing in the request but the action and the report id', opens.map((c) => c.body));
+  ok(reports.length === madeBefore && w.used === usedBefore && /^17 free reports left$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 17', [reports.length, w.used, await text(page, '#trial-count')]);
+  ok(/Compared 3 saved reports\. Opening them did not use a free report\./.test(await text(page, '#compare-status')), '11j the card says it compared three and that opening them used no free report');
+  const t = await tableOf(page);
+  ok(t.heads.join() === 'Report 3,Report 2,Report 1', '11k the columns are in the saved list\'s order, newest first, not the order they were ticked', t.heads);
+  ok(/742 Evergreen|3 THIRD AVE/i.test(t.legend[0]) && /Report 3/.test(t.legend[0]) && t.legend.length === 3 && !t.heads.some((h) => /Ave/.test(h)), '11l the list says which address is which report, and the column headings are only "Report N"', t.legend);
+  // the numbers equal what each report shows when it is opened on its own (same report rules, in the real page)
+  const own = [];
+  for (const num of [3, 2, 1]) {
+    await page.click('#saved-list li:nth-child(' + (4 - num) + ') button');
+    await page.waitForFunction((k) => new RegExp('Saved report ' + k).test(document.getElementById('saved-status').textContent), num, { timeout: 8000 }).catch(() => {});
+    own.push(await page.evaluate(() => { const m = /On the record within 0\.5 miles: (\d+) permitted \/ under construction · (\d+) approved \/ coming · (\d+) proposed \/ under review\./.exec(document.getElementById('report').textContent.replace(/\s+/g, ' ')); return m ? [m[1], m[2], m[3]] : null; }));
+  }
+  ok(own.every((o2) => o2 && o2.join() === '0,2,4') && [0, 1, 2].every((i) => rowCells(t, 'Permitted / Under Construction')[i] === own[i][0] && rowCells(t, 'Approved / Coming')[i] === own[i][1] && rowCells(t, 'Proposed / Under Review')[i] === own[i][2]),
+    '11m each column\'s stage counts are exactly what that report prints for itself when opened on its own (0 / 2 / 4)', [own, rowCells(t, 'Approved / Coming')]);
+  ok(foreign.length === 0 && errors.length === 0, '11n no page error, and nothing fetched but the page, its libraries, the sign-in stand-in and the functions', { foreign, errors });
+  await ctx.close();
+}
+{
+  // the limit: five may be chosen and no sixth; a changed choice clears the old comparison
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
+  await waitBoxes(page, 6);
+  for (let i = 1; i <= 5; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  let boxes = await compareBoxes(page);
+  ok(boxes.filter((b) => b.checked).length === 5 && boxes[5].disabled && !boxes[5].checked && !(await page.$eval('#compare-go', (b) => b.disabled)) && /5 reports chosen\./.test(await text(page, '#compare-count')),
+    '11o with five chosen the sixth cannot be ticked, and five is enough to compare', boxes);
+  await page.click('#compare-go');
+  await waitCompared(page);
+  let t = await tableOf(page);
+  ok(t.heads.length === 5 && t.rows.length === 13 && t.rows.every((r) => r.cells.length === 5), '11p five reports compare: five columns and thirteen rows', [t.heads, t.rows.length]);
+  await page.uncheck('#compare-list li:nth-child(1) input');
+  ok((await page.$$('#compare-result .da-cmp')).length === 0 && (await text(page, '#compare-status')) === '' && !(await compareBoxes(page))[5].disabled, '11q changing the choice clears the comparison, so it never sits beside a different choice, and frees the sixth box');
+  await ctx.close();
+}
+{
+  // a column that cannot say what is nearby says so; it is never a zero
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  const keys = [...w.made.keys()];
+  w.made.get(keys[0]).report = clone(WNONE_REPORT);                   // report 1 is stored as the engine saves a report with no data ingested
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const t = await tableOf(page);
+  ok(['Records with a recent official event', 'Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'].every((l) => rowCells(t, l)[1] === 'No data ingested' && rowCells(t, l)[0] !== 'No data ingested'),
+    '11r the report with "No data ingested" says so in every count cell and is not a zero; the report beside it still has its numbers', t.rows.map((r) => r.label + '=' + r.cells.join('/')));
+  const notes = await page.$eval('#compare-result', (e) => e.textContent.replace(/\s+/g, ' '));
+  ok(/No data ingested\. HomeSignal cannot yet confirm it receives official development records for this address/.test(notes), '11s the engine\'s own words for it appear under the table');
+  await ctx.close();
+}
+{
+  // refusals: a report that cannot be found, and reports made over different distances. Nothing partial is drawn.
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2); await make(page, A3);
+  await waitBoxes(page, 3);
+  for (let i = 1; i <= 3; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  const keys = [...w.made.keys()];
+  const gone = w.made.get(keys[1]);
+  w.made.delete(keys[1]);                                              // report 2 is no longer there when the page asks for it
+  await page.click('#compare-go');
+  await waitCompared(page);
+  ok(/could not be found/.test(await text(page, '#compare-status')) && (await page.$$('#compare-result .da-cmp')).length === 0, '11t if one of the chosen reports cannot be found the page says so in plain words and draws no partial comparison', await text(page, '#compare-status'));
+  w.made.set(keys[1], gone);
+  w.made.get(keys[2]).report = { ...clone(w.made.get(keys[2]).report), radius_mi: 1 };
+  await page.click('#compare-go');
+  await waitCompared(page);
+  ok(/not made over the same distance/.test(await text(page, '#compare-status')) && (await page.$$('#compare-result .da-cmp')).length === 0, '11u reports made over different distances are refused in plain words and nothing is drawn', await text(page, '#compare-status'));
+  ok(!(await page.$eval('#compare-go', (b) => b.disabled)), '11u2 and the button is free to try again');
+  await ctx.close();
+}
+{
+  // the report's own "Compare property" button adds the report on screen to the choice
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live'), label: e.textContent.trim() })));
+  ok(btn.some((b) => b.act === 'compare' && b.live && b.label === 'Compare property'), '11v on a saved report the "Compare property" button is live', btn);
+  await page.click('.da-rv-act[data-da-action="compare"]');
+  const boxes = await compareBoxes(page);
+  ok(boxes.filter((b) => b.checked).length === 1 && boxes[0].checked && /1 report chosen\./.test(await text(page, '#compare-count')) && (await page.evaluate(() => document.activeElement && document.activeElement.closest('#compare-list') !== null)),
+    '11w pressing it ticks the report on screen (the newest, report 2) and moves to the card; it compares nothing by itself', boxes);
+  ok((await page.$$('#compare-result .da-cmp')).length === 0, '11w2 ... and no comparison is drawn until the person asks for one');
+  await ctx.close();
+}
+{
+  // another person, signing out, and a late answer: nothing of one person's reports is left for the next
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  ok((await page.$$('#compare-result .da-cmp')).length === 1, '11x a comparison is on screen');
+  await page.evaluate(() => { window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); });
+  await page.waitForTimeout(200);
+  const out = await page.evaluate(() => ({ hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#compare-list li').length, result: document.getElementById('compare-result').textContent.trim(), status: document.getElementById('compare-status').textContent, count: document.getElementById('compare-count').textContent, go: document.getElementById('compare-go').disabled }));
+  ok(out.hidden && out.list === 0 && out.result === '' && out.status === '' && out.count === '' && out.go, '11y signing out hides the card and takes the list, the comparison and the messages away', out);
+  await ctx.close();
+}
+{
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const swap = await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#compare-list li').length, result: document.getElementById('compare-result').textContent.trim() };
+  });
+  ok(swap.hidden && swap.list === 0 && swap.result === '', '11z a different person signing in takes the first person\'s list and comparison away at once', swap);
+  await ctx.close();
+}
+{
+  // a late answer for a person who has since signed out is dropped: it must not paint a comparison for nobody
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  w.holdNextOpen = true;
+  await page.click('#compare-go');
+  await page.waitForFunction(() => /Opening 2 saved reports/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(await page.$eval('#compare-go', (b) => b.disabled), '11z2 while the reports are being opened the button is off, so a second press cannot start a second comparison');
+  await page.evaluate(() => { window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); });
+  await page.waitForTimeout(150);
+  w.releaseOpen();
+  await page.waitForTimeout(500);
+  const late = await page.evaluate(() => ({ hidden: document.getElementById('compare').hidden, result: document.getElementById('compare-result').innerHTML.trim(), status: document.getElementById('compare-status').textContent }));
+  ok(late.hidden && late.result === '' && late.status === '', '11z3 an answer that arrives after sign-out paints nothing', late);
+  await ctx.close();
+}
+{
+  // a phone: five reports side by side never scroll the page sideways, and each cell says which report it is
+  const w = world();
+  const { ctx, page } = await open({ w, width: 390, height: 844 });
+  await waitCount(page, /free reports left/);
+  for (const a of [A1, A2, A3, A4, A5]) await make(page, a);
+  await waitBoxes(page, 5);
+  for (let i = 1; i <= 5; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const m = await page.evaluate(() => {
+    const cell = document.querySelector('#compare-result .da-cmp-table tbody td .da-cmp-r');
+    const th = document.querySelector('#compare-result .da-cmp-table thead');
+    return { wide: document.documentElement.scrollWidth - document.documentElement.clientWidth, tag: getComputedStyle(cell).display, head: getComputedStyle(th).position, tableDisplay: getComputedStyle(document.querySelector('#compare-result .da-cmp-table')).display };
+  });
+  ok(m.wide <= 0 && m.tag !== 'none' && m.head === 'absolute' && m.tableDisplay === 'block', '11z4 on a 390 px screen the comparison stacks (each cell starts with its report number) and the page does not scroll sideways', m);
+  await ctx.close();
+  const d = await open({ w: world() });
+  await waitCount(d.page, /free reports left/);
+  await make(d.page, A1); await make(d.page, A2);
+  await waitBoxes(d.page, 2);
+  await d.page.check('#compare-list li:nth-child(1) input'); await d.page.check('#compare-list li:nth-child(2) input');
+  await d.page.click('#compare-go');
+  await waitCompared(d.page);
+  const desk = await d.page.evaluate(() => ({ tag: getComputedStyle(document.querySelector('#compare-result .da-cmp-table tbody td .da-cmp-r')).display, tableDisplay: getComputedStyle(document.querySelector('#compare-result .da-cmp-table')).display, wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
+  ok(desk.tag === 'none' && desk.tableDisplay === 'table' && desk.wide <= 0, '11z5 on a wide screen it is a real table with the report numbers in the column headings', desk);
+  await d.ctx.close();
+}
+
+{
+  // the report's own Compare button is live on a REOPENED saved report too, and not only on a report just made
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.click('#saved-list button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live') })));
+  ok(/Saved report/.test(await text(page, '#saved-status')) && btn.some((b) => b.act === 'compare' && b.live), '11z6 on a REOPENED saved report the "Compare property" button is live too', btn);
+  await ctx.close();
+}
+{
+  // a saved list that cannot be read empties the card's list and says so; it never leaves a stale list to compare
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  ok(!(await compareHidden(page)), '11z7a with two saved reports the card is on screen');
+  w.listFails = true;
+  await make(page, A3);
+  await page.waitForFunction(() => /could not be read/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  w.listFails = false;
+  ok((await compareBoxes(page)).length === 0 && (await page.$eval('#compare-go', (b) => b.disabled)) && /saved reports could not be read just now/.test(await text(page, '#compare-status')),
+    '11z7 when the saved list cannot be read the card holds no stale list to compare, the button is off, and it says so in plain words', [(await compareBoxes(page)).length, await text(page, '#compare-status')]);
+  await ctx.close();
+}
+{
+  // a report that comes back but is not a report the page can show is never compared (the same answer as one that cannot be found)
+  const w = world();
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  const keys = [...w.made.keys()];
+  w.made.get(keys[0]).report = { not: 'a report' };
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const said = await text(page, '#compare-status');
+  ok(/could not be opened just now/.test(said) && (await page.$$('#compare-result .da-cmp')).length === 0, '11z8 a saved report that is not a report the page can show is refused in plain words and nothing is drawn', said);
   await ctx.close();
 }
 

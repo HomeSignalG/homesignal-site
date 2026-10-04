@@ -184,7 +184,7 @@ m('page_outcome_unexplained', "    NOTIFIED: 'a change was found and emailed to 
 m('page_first_check_claimed_after_one', "    else parts.push('The first check runs within a few minutes.');", "    else parts.push('');", PAGES, PAGE)
 m('page_claims_not_watching_when_it_does_not_know', "      $('watch-state').textContent = ''; $('watch-start').hidden = false; $('watch-stop').hidden = true; // starting is safe to offer: it does nothing twice",
   "      paintWatch(null); // starting is safe to offer: it does nothing twice", PAGES, PAGE)
-m('page_offers_watch_for_an_unsaved_report', "live: shareable ? ['share', 'watch', 'pdf'] : ['pdf'] })", "live: ['share', 'watch', 'pdf'] })", PAGES, PAGE)
+m('page_offers_watch_for_an_unsaved_report', "live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['pdf'] })", "live: ['share', 'watch', 'pdf', 'compare'] })", PAGES, PAGE)
 m('page_card_printed', '<section class="card" id="watch"', '<section id="watch"', PAGES, PAGE)
 m('page_signed_out_keeps_the_watch', "hideShare(); hideWatch();\n      $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen", "hideShare();\n      $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen", PAGES, PAGE)
 m('page_next_person_inherits_the_watch', "hideShare(); hideWatch(); // another person's role", "hideShare(); // another person's role", PAGES, PAGE)
