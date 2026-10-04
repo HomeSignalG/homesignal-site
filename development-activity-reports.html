@@ -52,6 +52,12 @@
    stops the watch for the report on screen and says in plain words how the last check went. It never shows or sends the property's
    address (the report above it shows that) and the email does not carry it; who may watch, how many a brokerage may have and when a check
    runs are the database's, through the watch functions.
+
+   Build step 10: two to five SAVED reports can be COMPARED side by side. "Compare properties" lists the saved reports with a checkbox each,
+   opens the chosen ones through the same `open` call that reopens a saved report (the same standing check, the same stored body, no free
+   report used) and hands them to lib/da-report-compare.js, which reads each one through the view's own functions, so a number in the
+   comparison is the number on that report. The page makes no report, scores nothing and ranks nothing; to compare a new address, make its
+   report first (that is a report, charged by the one rule).
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -121,6 +127,16 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #watch-state{margin:0;font-size:14px;max-width:70ch}
 #watch-status{margin:0;font-size:14px;min-height:1.5em}
 #watch-status.err{color:var(--red);font-weight:600}
+#compare{display:grid;gap:10px}
+#compare h2{margin:0;font-size:17px}
+#compare .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#compare-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+#compare-list label{display:flex;align-items:flex-start;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;min-height:44px;overflow-wrap:anywhere;cursor:pointer}
+#compare-list input{margin:2px 0 0;width:18px;height:18px;flex:none}
+#compare-list input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#compare-count{margin:0}
+#compare-status{margin:0;font-size:14px;min-height:1.5em}
+#compare-status.err{color:var(--red);font-weight:600}
 /* PRINT: only the report goes on the paper (build step 8). Every card, the form, the status lines and the sign-in are left off; the report's
    own stylesheet (lib/da-report-view.js) takes care of the report. */
 @media print{
@@ -174,6 +190,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report.</p>
     <ul id="saved-list"></ul>
     <p id="saved-status" role="status" aria-live="polite"></p>
+  </section>
+  <section class="card" id="compare" aria-labelledby="compare-title" hidden>
+    <h2 id="compare-title">Compare properties</h2>
+    <p class="sub">Choose 2 to 5 of your saved reports to see them side by side: what changed, what is approved, proposed or under construction, the project Types, and what each report says about its own coverage. It sets facts next to each other and does not score or rank properties. To compare a new address, make its report first. Comparing does not use a free report.</p>
+    <ul id="compare-list"></ul>
+    <p class="hint" id="compare-count"></p>
+    <div class="row"><button type="button" class="go" id="compare-go" disabled>Compare selected reports</button></div>
+    <p id="compare-status" role="status" aria-live="polite"></p>
+    <div id="compare-result"></div>
   </section>
   <section class="card" id="profile" aria-labelledby="profile-title" hidden>
     <h2 id="profile-title">Your name on reports</h2>
@@ -237,7 +262,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=a333c8c7"></script>
+<script src="lib/da-report-view.js?v=09e9661a"></script>
+<script src="lib/da-report-compare.js?v=e0b8a59d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================================
@@ -259,6 +285,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
+  var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
@@ -436,7 +463,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function savedSay(text, isError){ var s=$('saved-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide or show the card. Hiding also forgets the list, so one person's reports are never left on the page for the next. */
   function showSaved(on){
-    if (!on) { savedFresh = false; $('saved-list').textContent = ''; savedSay('', false); $('saved').hidden = true; return; }
+    if (!on) { savedFresh = false; $('saved-list').textContent = ''; savedSay('', false); $('saved').hidden = true; hideCompare(); return; }
     $('saved').hidden = false;
     if (!savedFresh) refreshSaved();
   }
@@ -453,18 +480,98 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var r = await post(REPORT_FN, { action: 'list' });
     if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
     var body = r.body || {};
-    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; savedSay(savedMessage(r.status), true); return; }
+    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; savedSay(savedMessage(r.status), true); paintCompare(null); return; }
     var list = $('saved-list');
     list.textContent = '';
     savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your free reports.', false);
+    var offered = [];
     body.reports.forEach(function(rep){
       if (!rep || typeof rep.report_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(rep.report_id)) return;
+      offered.push(rep);
       var li = document.createElement('li'), b = document.createElement('button');
       b.type = 'button';
       b.textContent = 'Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '');
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
       li.appendChild(b); list.appendChild(li);
     });
+    paintCompare(offered);
+  }
+  // ---- comparing saved reports (build step 10) --------------------------------------------------------------------------------
+  function compareSay(text, isError){ var s=$('compare-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  function chosenIds(){
+    return Array.prototype.filter.call($('compare-list').querySelectorAll('input'), function(c){ return c.checked; }).map(function(c){ return c.value; });
+  }
+  /** Hide the card and forget everything on it, so one person's reports and comparison are never left on the page for the next. */
+  function hideCompare(){
+    compareRows = []; comparing = false;
+    $('compare').hidden = true; $('compare-list').textContent = ''; $('compare-result').textContent = ''; $('compare-count').textContent = '';
+    $('compare-go').disabled = true; compareSay('', false);
+  }
+  /** Keep the button and the count in step with the boxes: 2 to 5 may be chosen, and once 5 are the rest wait. */
+  function syncCompare(){
+    var n = chosenIds().length, C = window.HS && window.HS.daReportCompare, max = C ? C.MAX : 5, min = C ? C.MIN : 2;
+    Array.prototype.forEach.call($('compare-list').querySelectorAll('input'), function(c){ c.disabled = !c.checked && n >= max; });
+    $('compare-go').disabled = comparing || n < min || n > max;
+    $('compare-count').textContent = compareRows.length >= min ? (n === 0 ? 'Choose ' + min + ' to ' + max + ' reports.' : n + (n === 1 ? ' report' : ' reports') + ' chosen.') : '';
+  }
+  /** Offer these saved reports ([{ report_id, number, address, generated_at }]), or say they could not be read (null). A choice that is still there is kept. */
+  function paintCompare(rows){
+    var keep = chosenIds();
+    compareRows = Array.isArray(rows) ? rows : [];
+    var list = $('compare-list');
+    list.textContent = '';
+    compareRows.forEach(function(rep){
+      var li = document.createElement('li'), lab = document.createElement('label'), cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = rep.report_id; cb.checked = keep.indexOf(rep.report_id) >= 0;
+      cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
+      lab.appendChild(cb);
+      lab.appendChild(document.createTextNode('Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '')));
+      li.appendChild(lab); list.appendChild(li);
+    });
+    $('compare').hidden = false;
+    if (rows === null) compareSay('The saved reports could not be read just now. Try again in a minute.', true);
+    else if (compareRows.length < 2) compareSay('Comparing needs at least 2 saved reports. Make another report, then come back.', false);
+    else compareSay('', false);
+    syncCompare();
+  }
+  /** The report on screen joins the choice: its own "Compare property" button. */
+  function chooseForCompare(reportId){
+    var boxes = $('compare-list').querySelectorAll('input'), first = null;
+    Array.prototype.forEach.call(boxes, function(c){ if (!first) first = c; if (c.value === reportId && !c.checked && !c.disabled) { c.checked = true; $('compare-result').textContent = ''; compareSay('', false); } });
+    syncCompare();
+    $('compare').scrollIntoView();
+    if (first) first.focus();
+  }
+  function compareMessage(httpStatus){
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 404) return 'One of those saved reports could not be found.';
+    if (httpStatus === 403) return 'This account cannot open saved reports right now.';
+    return 'The saved reports could not be opened just now. Try again in a minute.';
+  }
+  async function runCompare(){
+    if (comparing || !session || !session.user) return;
+    var C = window.HS && window.HS.daReportCompare, V = window.HS && window.HS.daReportView;
+    if (!C || !V) { compareSay('The comparison could not be loaded. Reload the page.', true); return; }
+    var ids = chosenIds(), chosen = compareRows.filter(function(r){ return ids.indexOf(r.report_id) >= 0; }); // in the saved list's order, never the order they were ticked
+    if (chosen.length < C.MIN || chosen.length > C.MAX) { compareSay(C.message('count'), true); return; }
+    var forUser = session.user.id;
+    comparing = true; syncCompare(); $('compare-result').textContent = '';
+    compareSay('Opening ' + chosen.length + ' saved reports…', false);
+    var results = await Promise.all(chosen.map(function(c){ return post(REPORT_FN, { action: 'open', report_id: c.report_id }); }));
+    comparing = false;
+    if (!session || !session.user || session.user.id !== forUser) return; // the person changed or signed out while the answers were on their way
+    syncCompare();
+    var entries = [];
+    for (var i = 0; i < results.length; i++) {
+      var r = results[i], body = r.body || {};
+      if (r.status === 401) { session = null; openAuth(); compareSay(compareMessage(401), true); return; }
+      if (r.status !== 200 || body.status !== 'OK' || body.reopened !== true || !V.renderable(body)) { compareSay(compareMessage(r.status), true); return; }
+      entries.push({ number: typeof body.number === 'number' ? body.number : chosen[i].number, address: typeof body.address === 'string' ? body.address : '',
+        label: typeof body.client_label === 'string' ? body.client_label : '', generated_at: body.generated_at, response: body });
+    }
+    var built = C.mount($('compare-result'), entries);
+    if (!built.ok) { compareSay(C.message(built.reason), true); return; }
+    compareSay('Compared ' + entries.length + ' saved reports. Opening them did not use a free report.', false);
   }
   async function openSaved(reportId, number){
     if (opening || busy || !session || !session.user) return;
@@ -480,7 +587,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var canShare = r.status === 200 && body.status === 'OK' && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
     if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, {
       subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
-      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf'] : ['pdf']
+      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['pdf']
     })) {
       if (canShare) { showShare(body.report_id); showWatch(body.report_id); }
       savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
@@ -839,7 +946,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var hd = headerOf(body);
     // only a report that was saved (it has a permanent id) can be shared with a client; any report on screen can be printed
     var shareable = body.stored === true && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
-    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf'] : ['pdf'] })) { say('The report came back but could not be shown.', true); return; }
+    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['pdf'] })) { say('The report came back but could not be shown.', true); return; }
     if (shareable) { showShare(body.report_id); showWatch(body.report_id); }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
@@ -866,13 +973,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('share-pdf').addEventListener('click', printReport);
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
-    // the report's own Watch, Share and Download PDF buttons (lib/da-report-view.js writes them with data-da-action; the page decides what they do)
+    $('compare-go').addEventListener('click', runCompare);
+    // the report's own Compare, Watch, Share and Download PDF buttons (lib/da-report-view.js writes them with data-da-action; the page decides what they do)
     $('report').addEventListener('click', function(e){
       var b = e.target && e.target.closest ? e.target.closest('[data-da-action]') : null;
       if (!b) return;
       var act = b.getAttribute('data-da-action');
       if (act === 'pdf') printReport();
       else if (act === 'share' && !$('share').hidden) { $('share').scrollIntoView(); $('share-make').focus(); }
+      else if (act === 'compare' && !$('compare').hidden) chooseForCompare(shareFor);
       else if (act === 'watch' && !$('watch').hidden) { $('watch').scrollIntoView(); var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : null); if (wb) wb.focus(); }
     });
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });

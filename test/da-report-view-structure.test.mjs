@@ -56,7 +56,9 @@ const C = code(SRC);
   // HomeSignal has observed long enough), each read in ONE function and printed only as a date or a sentence
   ok((C.match(/homesignal_observation/g) || []).length === 2 && (C.match(/first_observed_at/g) || []).length === 1 && /function firstDetected\(p\) \{ return isObj\(p\.homesignal_observation\) \? day\(p\.homesignal_observation\.first_observed_at\) : ''; \}/.test(C),
     '2a2 the ledger\'s first observation is read in firstDetected() only, and only as a day');
-  ok((C.match(/change_ready/g) || []).length === 1 && /var msg = cov\.change_ready === true/.test(C), '2a3 the ledger\'s readiness is read once, to choose between two fixed Change History sentences');
+  // build step 10 moved the read into changeReady(), so Change History and the side-by-side comparison read it from ONE function
+  ok((C.match(/change_ready/g) || []).length === 1 && /function changeReady\(report\) \{[\s\S]*?return cov\.change_ready === true;/.test(C) && /var msg = changeReady\(report\)/.test(C),
+    '2a3 the ledger\'s readiness is read once (changeReady), to choose between two fixed Change History sentences');
   const INTERNAL = ['report_private_context', 'report_snapshot', 'private_context', 'snapshot', 'report_id', 'content_hash', 'storage_blockers', 'storable', 'source_family', 'source_families_in_report',
     'registry_id', 'observation_count', 'last_observed_at', 'assessment_basis', 'coverage_state', 'INTERNAL_VIEW',
     'CONTAINS_UNCLEARED', 'HOLD', 'CLEARED', 'rights', 'matched_address', 'latitude', 'longitude', 'normalized_address', 'property_key', 'label_in_body', 'audit_ref', 'cleared_on'];
@@ -77,9 +79,13 @@ const C = code(SRC);
 {
   const AUTH = ['classifyProjectType', 'canonicalLifecycle', 'canonicalProjectType', 'lifecycleKey', 'LIFECYCLE_LABELS', 'LIFECYCLE_KEYS', 'statusKey', 'TYPE_EXACT', 'isActiveUndecided', 'browsingBucket', 'TYPE_FILTER_KEYS'];
   ok(AUTH.every((t) => !C.includes(t)), '3a the module does not call or copy the Type or lifecycle authority (lib/project-type.js)', AUTH.filter((t) => C.includes(t)));
-  const regUses = [...C.matchAll(/CATEGORY_REGISTRY/g)].length, reg = (C.match(/function filtersSection\(current, stageFor\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok(regUses === 2 && (reg.match(/CATEGORY_REGISTRY/g) || []).length === 2 && /reg\[k\]\.isFacility \? txt\(reg\[k\]\.label\)/.test(reg) && !/classify|canonical/.test(reg),
-    '3a2 the Type authority\'s registry is read in ONE place, the Type filter, for its labels only (and a regulated facility is never offered as a Type, ruling 1)');
+  // build step 10 moved the registry read out of filtersSection into typeLabelFor(), so the Type filter AND the side-by-side comparison
+  // (through HS.daReportView.typeCounts) take a Type's label from ONE function. Still one place, still labels only.
+  const regUses = [...C.matchAll(/CATEGORY_REGISTRY/g)].length, reg = (C.match(/function typeLabelFor\(k, seen\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(regUses === 2 && reg.length > 100 && (reg.match(/CATEGORY_REGISTRY/g) || []).length === 2 && /reg\[k\]\.isFacility \? txt\(reg\[k\]\.label\)/.test(reg) && !/classify|canonical/.test(reg),
+    '3a2 the Type authority\'s registry is read in ONE place, typeLabelFor (the Type filter and the comparison both use it), for its labels only (and a regulated facility is never offered as a Type, ruling 1)');
+  const filt = (C.match(/function filtersSection\(current, stageFor\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(filt.length > 300 && !/CATEGORY_REGISTRY/.test(filt) && /typeLabelFor\(k, seen\)/.test(filt), '3a3 (control) the Type filter reaches the registry only through typeLabelFor, so there is no second read to drift');
   ok(!/['"](decided|on file|built|active)['"]/i.test(C), '3b no publisher status word is mapped to anything: the code carries no status vocabulary at all');
   ok(/var SHAPES = \{\s*approved:[\s\S]*proposed:[\s\S]*operating:[\s\S]*unknown:[\s\S]*\};/.test(C) && /['"](decided|on file|built|active)['"]/i.test("x 'Decided' y"),
     '3b (control) the only lifecycle words in the code are the four keys of the shape table, and the status-word scan can see a status word');
@@ -96,9 +102,12 @@ const C = code(SRC);
   const absHits = [...C.matchAll(ABS)].map((m) => m[0]);
   ok(absHits.length === 1 && /NO_DEVELOPMENT_ACTIVITY: \{\n\s*title: 'No development activity',/.test(C),
     '3g the only wording that says there was no activity is the title for the engine\'s own "No development activity" outcome (plan hard rule 66; ruling R5)', absHits);
-  ok((C.match(/report\.activity/g) || []).length === 2 && /var key = a && typeof a\.outcome === 'string' && has\(OUTCOMES, a\.outcome\) \? a\.outcome : '';/.test(C)
-    && /if \(!key \|\| report\.projects\.length !== 0\) return '';/.test(C) && !/a\.label|activity\.label|\.rule_version/.test(C),
-    '3g2 the outcome is read in ONE function, from the engine\'s code only (never its label), and shown only when the report carries no projects');
+  // build step 10 moved the read of the engine's outcome code into outcomeKeyOf(), so the report and the comparison read it from one function
+  const okf = (C.match(/function outcomeKeyOf\(report\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok((C.match(/report\.activity/g) || []).length === 2 && okf.length > 100 && (okf.match(/report\.activity/g) || []).length === 2
+    && /return a && typeof a\.outcome === 'string' && has\(OUTCOMES, a\.outcome\) \? a\.outcome : '';/.test(okf)
+    && (C.match(/outcomeKeyOf\(report\)/g) || []).length === 2 && /var o = outcomeText\(report\);\s*if \(!o \|\| report\.projects\.length !== 0\) return '';/.test(C) && !/a\.label|activity\.label|\.rule_version/.test(C),
+    '3g2 the outcome is read in ONE function (outcomeKeyOf), from the engine\'s code only (never its label), and the report shows it only when it carries no projects');
   ok(!/projects\.length === 0 \?|NO_DATA_INGESTED['"]?\s*[:=]\s*report|outcome\s*=\s*['"]/.test(C), '3g3 the view never assigns an outcome itself');
   ok(!/\.coverage_state\b|\.stored\b|LIMITED_COVERAGE|REPORT_READY|CHANGE_READY/.test(C), '3h it never reads or prints the coverage state: the report speaks through the engine\'s limitation text');
 }
@@ -165,10 +174,14 @@ const C = code(SRC);
     // build step 5c: the customer page for invited trial members, and its tests
     CUSTOMER_PAGE, 'test/development-activity-reports.test.mjs', 'test/development-activity-reports.browser.test.mjs',
     // build step 8: the client's page for a private share link, its tests, and the structural test of the whole share unit
-    CLIENT_PAGE, 'test/shared-report-page.test.mjs', 'test/shared-report-page.browser.test.mjs', 'test/report-share-delivery-structure.test.mjs']);
+    CLIENT_PAGE, 'test/shared-report-page.test.mjs', 'test/shared-report-page.browser.test.mjs', 'test/report-share-delivery-structure.test.mjs',
+    // build step 10: the side-by-side comparison READS the view's functions (read, typeCounts, outcomeText, describe...) so its counts are the report's own;
+    // it is a module, not a page, and the customer page loads it beside the view. Its tests, its mutation harness and its record are listed with it.
+    'lib/da-report-compare.js', 'test/da-report-compare.test.mjs', 'test/da-report-compare-structure.test.mjs',
+    'test/da_report_compare_mutants.py', 'docs/development-activity-compare-2026-10-03.md']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
-  ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers: the private review page (build step 4), the customer page (build step 5c) and the client\'s page for a share link (build step 8)', stray);
+  ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
   const pages = readdirSync(root).filter((f) => f.endsWith('.html')).concat(readdirSync(join(root, 'partials')).map((f) => 'partials/' + f));
   const loaders = pages.filter((p) => /da-report-view/.test(read(p)));
   ok(pages.length > 10 && loaders.sort().join() === [CLIENT_PAGE, CUSTOMER_PAGE, REVIEW_PAGE].sort().join() && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
