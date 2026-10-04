@@ -494,7 +494,17 @@ changes (the view renders from the stored report, so a reopened or shared report
      links are dataset-level), plain-English scope and timing columns (the registry maps no such fields), street names on the map (no cleared basemap),
      parcel and MLS numbers in the header (private-context contract), a corridor group (needs lineage proof or a founder ruling), the 90-day status-change
      sentence (the ledger's first run was 2026-09-29), alert types the ledger cannot detect, agent notes (none built).
-15. **Comparison table.** A table at the top of each stage section; the full cards stay below it. Not struck until deployed and read back live.
+15. **Comparison table.** Not struck until deployed and read back live. Founder-approved 2026-10-04 (E: "a comparison table instead of three repeated cards").
+   - Each stage section opens with a table: map number (with the marker's own shape), record, distance, Type, publisher stage and official link. A column no
+     record has a value for is left out (no placeholder cells). The rows carry the same Type and Stage the cards and map markers do, so the filters, the map
+     numbers and the counts agree.
+   - The cards stay, in one "Full official detail" detail below the table (closed on screen). **Printing shows them**: the stylesheet shows a closed detail's
+     content in print, and a print hook opens every detail around the dialog and puts back only the ones it opened. Checked with a real print-to-PDF.
+   - On a phone each row stacks into one block per record (plan line 1072: large tables collapse into rows rather than shrink), with the table roles kept.
+   - **A rule restated, not dropped:** "the lifecycle text and shape are visible on every card without opening anything" is now met by the rows (marker shape and
+     number) and the stage heading; the cards show them once their detail is open. Pins 2f and 3a say so.
+   - Each record's official link now appears twice (its row and its card), so a keyboard user has one more stop per record. The cards inside a closed detail are
+     not tab stops, and Enter on "Full official detail" opens them.
 
 ## Founder actions, and when
 
