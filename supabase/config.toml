@@ -52,3 +52,15 @@ verify_jwt = true
 # deploy workflow's --no-verify-jwt exception.
 [functions.run-property-watch]
 verify_jwt = true
+
+# A brokerage member reads their plan, and a brokerage OWNER starts the $79 a month checkout (build step 11). JWT stays ON, and the handler
+# additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-billing]
+verify_jwt = true
+
+# The payment processor's signed subscription events (build step 11). The SECOND Development Activity function with JWT verification OFF, and
+# the deploy workflow's third --no-verify-jwt exception: the processor sends no Supabase token, so its HMAC signature over the raw body is the
+# only credential, checked before the body is parsed. The function refuses every request when its signing secret is not configured. It records
+# an event for the brokerage a HomeSignal checkout named (public.billing_event_apply) and writes nothing else.
+[functions.development-activity-billing-webhook]
+verify_jwt = false

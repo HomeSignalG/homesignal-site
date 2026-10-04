@@ -75,8 +75,8 @@ const all = Object.values(src).map(code).join('\n');
 {
   const inFn = readdirSync(join(root, FN)).map((f) => read(FN + '/' + f)).join('\n');
   const fnCode = code(inFn), dataCode = code(src.data), hanCode = code(src.handler);
-  ok(!/issueSnapshot|report_snapshot_issue/.test(fnCode) && (dataCode.match(/issueEvaluationReport\(/g) || []).length === 1 && !/issueEvaluationReport/.test(hanCode),
-    '3a the edge function never calls the plain snapshot writer: its ONE store is issueEvaluationReport (snapshot + credit, one transaction), called once, from the data layer');
+  ok(!/issueSnapshot|report_snapshot_issue/.test(fnCode) && (dataCode.match(/issueBrokerageReport\(/g) || []).length === 1 && !/issueBrokerageReport/.test(hanCode),
+    '3a the edge function never calls the plain snapshot writer: its ONE store is issueBrokerageReport (snapshot + credit, one transaction, the allotment decided by the database), called once, from the data layer');
   ok((hanCode.match(/deps\.issue\(/g) || []).length === 1 && /if \(!trial \|\| !credit\.uses_report\) \{\n\s*return reply\(req, \{[\s\S]*?\}\);\n\s*\}\n\s*\n\s*\n?\s*let issued: EvaluationIssue;/.test(hanCode),
     '3a2 and the handler reaches it only past the one branch that returns for an admin, and for a report the credit rule does not charge');
   const tablesNamed = [...fnCode.matchAll(/report_private_context\w*|report_snapshot\w*/g)].map((m) => m[0]);
@@ -99,10 +99,11 @@ const all = Object.values(src).map(code).join('\n');
   const rpcs = [...dataCode.matchAll(/\brpc\('(\w+)'/g)].map((m) => m[1]);
   const restCode = code(read('supabase/functions/_shared/service-rest.ts'));
   ok(methods.length === 1 && methods.every((m) => m === 'POST') && (code(src.reportReads).match(/method: 'POST'/g) || []).length === 1 && JSON.stringify(rpcs) === '["report_private_context_read"]'
-     && /issueEvaluationReport\(rpc,/.test(dataCode) && /const evaluation = makeEvaluationReads\(rpc\);/.test(dataCode) && /trialOf: evaluation\.trialOf,/.test(dataCode)
+     && /issueBrokerageReport\(rpc,/.test(dataCode) && /const evaluation = makeEvaluationReads\(rpc\);/.test(dataCode) && /trialOf: evaluation\.trialOf,/.test(dataCode)
+     && /const billing = makeBillingReads\(rpc\);/.test(dataCode) && /planOf: billing\.usageOf,/.test(dataCode)
      && /const \{ base, svc, rest, rpc, authenticate, isAdmin \} = makeServiceReads\(cfg, fetchFn\);/.test(dataCode)
      && (restCode.match(/method: 'POST'/g) || []).length === 1 && /base \+ '\/rest\/v1\/rpc\/' \+ fn/.test(restCode),
-    '3g the only POSTs here are the geocoder call (this file) and the spatial read (_shared/report-reads.ts, one POST); every database function goes through the ONE helper in service-rest.ts: the private-context check here, the trial read through _shared/evaluation-reads.ts, and the charged issue through the snapshot module', [methods, rpcs]);
+    '3g the only POSTs here are the geocoder call (this file) and the spatial read (_shared/report-reads.ts, one POST); every database function goes through the ONE helper in service-rest.ts: the private-context check here, the trial read through _shared/evaluation-reads.ts, the plan read through _shared/billing-reads.ts, and the charged issue through the snapshot module', [methods, rpcs]);
 }
 
 // ---- 4. the access model ---------------------------------------------------------------------------------------------------------------
@@ -111,10 +112,11 @@ const all = Object.values(src).map(code).join('\n');
   ok(/\[functions\.get-development-activity-report\]\s*\nverify_jwt = true/.test(cfg), '4a the function pins verify_jwt = true');
   const wf = read('.github/workflows/deploy-edge-functions.yml').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n'); // YAML comments removed
   const noJwt = [...wf.matchAll(/--no-verify-jwt/g)].length;
-  // build step 8 adds the SECOND, deliberate exception: view-shared-report, for the client who opens a private share link and has no account.
-  // The pin is exactly those two branches, so a third cannot arrive unnoticed (test/report-share-delivery-structure.test.mjs pins the second).
-  ok(noJwt === 2 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && !/get-development-activity-report/.test(wf),
-    '4b the deploy workflow\'s only --no-verify-jwt exceptions are get-address-report and view-shared-report, and this function is not in them', noJwt);
+  // build step 8 adds the SECOND, deliberate exception: view-shared-report, for the client who opens a private share link and has no account; build step 11 adds
+  // the THIRD: development-activity-billing-webhook, for the payment processor, which sends no Supabase token (its HMAC signature is the credential).
+  // The pin is exactly those three branches, so a fourth cannot arrive unnoticed (test/report-share-delivery-structure.test.mjs and test/billing-structure.test.mjs pin the others).
+  ok(noJwt === 3 && /if \[ "\$FN" = "get-address-report" \]/.test(wf) && /elif \[ "\$FN" = "view-shared-report" \]/.test(wf) && /elif \[ "\$FN" = "development-activity-billing-webhook" \]/.test(wf) && !/get-development-activity-report/.test(wf),
+    '4b the deploy workflow\'s only --no-verify-jwt exceptions are get-address-report, view-shared-report and development-activity-billing-webhook, and this function is not in them', noJwt);
   const h = code(src.handler);
   const g = code(src.gate);
   const at = (s) => h.indexOf(s);

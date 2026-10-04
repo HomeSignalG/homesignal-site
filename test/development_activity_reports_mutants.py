@@ -57,16 +57,16 @@ m('malformed_invite_sent', '    if (INVITE.test(fromHash)) { store(fromHash); re
 m('new_key_every_press', '    if (!attempt || attempt.address !== address) attempt = { key: newKey(), address: address };',
   '    attempt = { key: newKey(), address: address };')
 m('key_kept_after_an_answer', '    attempt = null; // the server answered: this request is finished\n', '', [BRO])
-m('key_sent_for_an_admin', "    if (access === 'trial') payload.idempotency_key = attempt.key;", '    payload.idempotency_key = attempt.key;')
+m('key_sent_for_an_admin', "    if (access !== 'admin') payload.idempotency_key = attempt.key;", '    payload.idempotency_key = attempt.key;')
 m('key_not_random', "    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();\n",
   "    return '00000000-0000-4000-8000-' + String(Date.now()).slice(-12).padStart(12, '0');\n")
 
 # ---- what the person is told -------------------------------------------------------------------------------------------------------------------
-m('reports_offered_to_everyone', "    $('go').disabled = busy || !(a === 'trial' || a === 'admin');", "    $('go').disabled = busy;")
+m('reports_offered_to_everyone', "    $('go').disabled = busy || !canMake();", "    $('go').disabled = busy;")
 m('count_not_updated_after_a_report', "      showTrial(body.trial.status === 'complete' ? 'complete' : 'trial', body.trial, '');\n", '', [BRO])
 m('charge_decided_on_the_page', '    if (body.charged === true) return', '    if (body.report && body.report.projects && body.report.projects.length > 0) return')
-m('no_data_ingested_unexplained', "    if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use a free report: No data ingested.';\n", '', [BRO])
-m('replay_called_a_new_charge', "    if (body.replayed === true) return 'This is the report you already made for this address. It did not use another free report.';\n", '', [BRO])
+m('no_data_ingested_unexplained', "    if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use ' + oneOf() + ': No data ingested.';\n", '', [BRO])
+m('replay_called_a_new_charge', "    if (body.replayed === true) return 'This is the report you already made for this address. It did not use another ' + (paid ? 'report' : 'free report') + '.';\n", '', [BRO])
 m('trial_used_up_unexplained', "    if (httpStatus === 403 && body.error === 'evaluation_complete') return \"All 20 of your brokerage's free reports are used.\";\n", '', [SRC])
 m('prints_the_raw_code', '    if (!ok) { say(messageFor(r.status, body), true); return; }',
   '    if (!ok) { say(String(body.error || body.status || r.status), true); return; }')

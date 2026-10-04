@@ -68,7 +68,7 @@ m('unreadable_role_called_none', "      if (error) throw new DataUnavailable('br
 # ---- the customer page: offered to an owner of an active trial only; the server's link, once, kept nowhere -------------------------------------
 m('card_for_every_member', "showTeam(a === 'trial' && role === 'owner');", "showTeam(a === 'trial');", [SRC, BRO], PAGE)
 m('card_for_an_ended_trial', "showTeam(a === 'trial' && role === 'owner');", "showTeam(role === 'owner');", [SRC, BRO], PAGE)
-m('role_set_by_the_page', "{ role = st.body.role; showTrial(st.body.access, st.body.trial, ''); }", "{ role = 'owner'; showTrial(st.body.access, st.body.trial, ''); }", [SRC, BRO], PAGE)
+m('role_set_by_the_page', "{ role = st.body.role; await present(st.body.access, st.body.trial, ''); }", "{ role = 'owner'; await present(st.body.access, st.body.trial, ''); }", [SRC, BRO], PAGE)
 m('card_survives_sign_out', '      access = null; role = null; attempt = null; showTeam(false);', '      access = null; role = null; attempt = null;', [SRC, BRO], PAGE)
 m('card_survives_a_new_person', '        role = null; showTeam(false); showSaved(false); showProfile(false); // another person', '        showSaved(false); showProfile(false); // another person', [SRC, BRO], PAGE)
 m('hiding_keeps_the_link', "    if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }\n", '', [SRC, BRO], PAGE)

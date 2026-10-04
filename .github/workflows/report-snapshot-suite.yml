@@ -52,6 +52,14 @@ name: report-snapshot-suite
 #      the saved-reports functions and every prohibited mutation; then the schedule (the pg_cron job, the wrapper, the health read and the
 #      alertable monitor check) against stand-ins for pg_cron, pg_net, the vault and the monitor, with its own exact rollback, refusals and
 #      prohibited mutations. Each mutation MUST fail a NAMED check of the suite (a mutation that only crashes it fails the run).
+#   9. BILLING (docs/brokerage-billing.sql; Development Activity build step 11): the $79 a month plan's database layer, in its own job so its
+#      mutation loop does not share the first job's time. A processor subscription is bound to one brokerage, the plan state is derived from the
+#      payment ledger's latest live event, a paid brokerage's reports are charged to a 100-a-month allotment kept in its own append-only ledger (the
+#      cap is a CONSTRAINT), and the six readers that decide whose a report is read one view over both ledgers. Against the REAL account spine,
+#      private layer, snapshot, entitlement, saved-reports, share, watch, payment-event and header SQL: the checks, two REAL sessions racing for a
+#      month's 100th report, the same key sent twice at once, one subscription named for two brokerages at once, an issue under REPEATABLE READ
+#      refused, a second apply, the rollback with paid reports stored (the six readers put back to exactly their earlier definitions), the refusals
+#      when a layer or a splice anchor is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run).
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
@@ -127,6 +135,17 @@ on:
       - 'supabase/functions/_shared/report-reads.ts'
       - 'supabase/functions/manage-property-watch/**'
       - 'supabase/functions/run-property-watch/**'
+      - 'docs/brokerage-billing.sql'
+      - 'docs/payment-event-ledger.sql'
+      - 'docs/report-header.sql'
+      - 'test/brokerage_billing_pg/**'
+      - 'test/billing-structure.test.mjs'
+      - 'test/billing-functions.test.mjs'
+      - 'test/lemon-billing.test.mjs'
+      - 'supabase/functions/_shared/billing-reads.ts'
+      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/manage-billing/**'
+      - 'supabase/functions/development-activity-billing-webhook/**'
       - '.github/workflows/report-snapshot-suite.yml'
   push:
     branches: [main]
@@ -193,6 +212,17 @@ on:
       - 'supabase/functions/_shared/report-reads.ts'
       - 'supabase/functions/manage-property-watch/**'
       - 'supabase/functions/run-property-watch/**'
+      - 'docs/brokerage-billing.sql'
+      - 'docs/payment-event-ledger.sql'
+      - 'docs/report-header.sql'
+      - 'test/brokerage_billing_pg/**'
+      - 'test/billing-structure.test.mjs'
+      - 'test/billing-functions.test.mjs'
+      - 'test/lemon-billing.test.mjs'
+      - 'supabase/functions/_shared/billing-reads.ts'
+      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/manage-billing/**'
+      - 'supabase/functions/development-activity-billing-webhook/**'
       - '.github/workflows/report-snapshot-suite.yml'
   workflow_dispatch: {}
 
@@ -344,3 +374,39 @@ jobs:
         run: |
           set -o pipefail
           bash test/property_watch_schedule_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pws.log
+
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Billing passes; two sessions racing for the 100th report of a month cannot both have it; one key is charged once; a subscription belongs to one brokerage; the file applies twice and rolls back exactly with paid reports stored; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/brokerage_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/billing.log

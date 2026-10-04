@@ -198,9 +198,14 @@ ok(scanned.length > 50 && scanned.includes('supabase/functions/_shared/report-sn
 // delivery SQL that gives it an owner, a lifetime and a reader (docs/report-share-delivery.sql), and the ONE edge module that calls them
 // (_shared/share-reads.ts). No page, script, workflow or other function names a share object; test/report-share-delivery-structure.test.mjs
 // pins what those two additions may and may not do.
-const SHARE_FILES = ['docs/report-share-delivery.sql', 'docs/report-share.sql', 'supabase/functions/_shared/share-reads.ts'];
-ok(JSON.stringify([...namesShare].sort()) === JSON.stringify(SHARE_FILES),
-  '10: nothing outside the SQL of record, the delivery SQL and the one share-reads module names a share object or function — no page, script, other edge function or other SQL creates, revokes or resolves a share', namesShare.join(','));
+// Build step 11 adds a fourth: docs/brokerage-billing.sql, which names report_share_open twice and does nothing else with it: once in its precondition (the function
+// must exist) and once in the list of ownership readers whose bodies it re-reads from the catalog so they read the one ownership view. It neither creates, revokes,
+// calls nor resolves a share; test/brokerage_billing_pg proves the splice leaves the reader's attributes and behaviour as they were.
+const SHARE_FILES = ['docs/brokerage-billing.sql', 'docs/report-share-delivery.sql', 'docs/report-share.sql', 'supabase/functions/_shared/share-reads.ts'];
+ok(JSON.stringify([...namesShare].sort()) === JSON.stringify(SHARE_FILES)
+   && (codeOf('docs/brokerage-billing.sql').match(/\breport_share\w*/g) || []).join() === 'report_share_open,report_share_open'
+   && !/\b(create\s+(or\s+replace\s+)?function|insert\s+into|update|delete\s+from|select[^;]*from)\s+(public\.)?report_share/i.test(codeOf('docs/brokerage-billing.sql')),
+  '10: nothing outside the SQL of record, the delivery SQL, the one share-reads module and (build step 11) the billing SQL, which names the client read twice and never creates, calls or writes a share, names a share object or function — no page, script, other edge function or other SQL creates, revokes or resolves a share', namesShare.join(','));
 const importsModule = scanned.filter((f) => f !== 'supabase/functions/_shared/report-share.ts' && /report-share(\.ts|\.js)?['"`]/.test(readFileSync(join(ROOT, f), 'utf8')));
 // The scan above stops at the code directories. A workflow that curls the RPC, or a data file that calls it, is also a caller, so the
 // FUNCTION names (not the table names, which this unit's own workflow path filters mention) are searched in the places a caller could hide.

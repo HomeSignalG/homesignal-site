@@ -238,11 +238,11 @@ ok(!/randomUUID|gen_random_uuid|Math\.random|crypto\.getRandomValues/.test(CODE)
   '6c it mints no identifier of any kind: the report_id and the private context id can only come from the database');
 ok(!/\b(nyc|new york|manhattan|brooklyn|queens|bronx|staten|socrata|dob|tucson|phoenix|denver)\b/i.test(CODE),
   '6d it names no city, market or source: it is engine-agnostic');
-// build step 5b adds the trial writer (issueEvaluationReport -> evaluation_report_issue, which stores the snapshot and the credit in one
-// transaction). Each writer makes ONE call, and both prepare the body through the same function, so neither can store what the other refuses.
+// build step 5b adds the member writer, and build step 11 renames it (issueBrokerageReport -> brokerage_report_issue, the one entry that decides the
+// allotment and stores the snapshot and the credit in one transaction). Each writer makes ONE call, and both prepare the body through the same function, so neither can store what the other refuses.
 const calls = [...CODE.matchAll(/rpc\('(\w+)'/g)].map((m) => m[1]);
-ok((CODE.match(/rpc\(/g) || []).length === 2 && JSON.stringify(calls) === '["report_snapshot_issue","evaluation_report_issue"]',
-  '6e it makes exactly two database calls, one per writer: the snapshot writer, and the evaluation\'s issue function (snapshot + credit, one transaction)', calls);
+ok((CODE.match(/rpc\(/g) || []).length === 2 && JSON.stringify(calls) === '["report_snapshot_issue","brokerage_report_issue"]',
+  '6e it makes exactly two database calls, one per writer: the snapshot writer, and the brokerage\'s one issuing entry (it decides the allotment; snapshot + credit, one transaction)', calls);
 ok((CODE.match(/await prepare\('/g) || []).length === 2 && (CODE.match(/snapshotBodyOf\(intelligence\)/g) || []).length === 1 && (CODE.match(/subjectRelativeKeys\(JSON\.parse\(body\)\)/g) || []).length === 1,
   '6e2 both writers prepare the body through ONE function: one body, one subject-relative-key check');
 const touches = [...CODE.matchAll(/privateContext\.(\w+)/g)].map((m) => m[1]);

@@ -91,7 +91,7 @@ const PAGE_SRC = read(PAGE);
   const PC = code(PAGE_SRC.slice(PAGE_SRC.indexOf('<script>', PAGE_SRC.indexOf('da-report-compare.js')))); // the page's own script, comments stripped
   ok(PC.length > 5000, '5a (control) the page\'s script was read (' + PC.length + ' bytes)');
   const fnUrls = [...PC.matchAll(/var ([A-Z_]+_FN) = SB_URL \+ '\/functions\/v1\/([a-z-]+)'/g)].map((m) => m[1] + '=' + m[2]);
-  ok(fnUrls.join(',') === 'REPORT_FN=get-development-activity-report,TRIAL_FN=development-activity-trial,SHARE_FN=manage-shared-report,WATCH_FN=manage-property-watch', '5b the page still calls exactly the same four functions: comparing adds no function and no endpoint', fnUrls);
+  ok(fnUrls.join(',') === 'REPORT_FN=get-development-activity-report,TRIAL_FN=development-activity-trial,SHARE_FN=manage-shared-report,WATCH_FN=manage-property-watch,BILLING_FN=manage-billing', '5b the page calls exactly the four functions it called before comparing, plus (build step 11) the Billing function: comparing adds no function and no endpoint', fnUrls);
   const run = (PC.match(/async function runCompare\(\)\s*\{[\s\S]*?\n  \}\n/) || [''])[0];
   ok(run.length > 800 && /post\(REPORT_FN, \{ action: 'open', report_id: c\.report_id \}\)/.test(run), '5c comparing opens each chosen saved report with the report function\'s `open` action and a report id: the same call that reopens a saved report');
   ok((run.match(/post\(/g) || []).length === 1 && !/WATCH_FN|SHARE_FN|TRIAL_FN|idempotency_key|address:|label:|view:|newKey|attempt/.test(run.replace(/address: typeof body\.address/, '').replace(/label: typeof body\.client_label/, '')),

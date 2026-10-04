@@ -58,6 +58,14 @@
    report used) and hands them to lib/da-report-compare.js, which reads each one through the view's own functions, so a number in the
    comparison is the number on that report. The page makes no report, scores nothing and ranks nothing; to compare a new address, make its
    report first (that is a report, charged by the one rule).
+
+   Build step 11: the BILLING card. A brokerage member sees their plan in words: the free trial, the $79/month plan with how many of its 100
+   reports this month are left and when the month ends, or what is wrong with a subscription that is not active. An OWNER with no live
+   subscription may press "Subscribe for $79/month": the page asks the billing function (manage-billing) for a checkout and sends the
+   browser to the payment provider's own page. Nothing about the plan changes by pressing it or by coming back: the plan changes only when
+   the provider's signed event reaches HomeSignal's server, so after a checkout the page just asks again ("Check again"). The page decides
+   nothing about money: which reports a brokerage may still make, which allotment one used and when the month ends are the database's,
+   through the report and billing functions; this page shows what it is told.
    ============================================================================ */
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
@@ -74,6 +82,13 @@ header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch
 #trial .count{margin:0;font-size:17px;font-weight:600}
 #trial .count.out{color:var(--red)}
 #trial .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#billing{display:grid;gap:10px}
+#billing h2{margin:0;font-size:17px}
+#billing .plan{margin:0;font-size:17px;font-weight:600}
+#billing .plan.out{color:var(--red)}
+#billing .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#billing-status{margin:0;font-size:14px;min-height:1.5em}
+#billing-status.err{color:var(--red);font-weight:600}
 form{display:grid;gap:12px}
 label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
 input[type=text]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
@@ -173,6 +188,17 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   <section class="card" id="trial" aria-live="polite">
     <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
     <p class="sub" id="trial-sub"></p>
+  </section>
+  <section class="card" id="billing" aria-labelledby="billing-title" hidden>
+    <h2 id="billing-title">Billing</h2>
+    <p class="plan" id="billing-plan"></p>
+    <p class="sub" id="billing-sub"></p>
+    <div class="row">
+      <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
+      <button type="button" class="go ghost" id="billing-refresh">Check again</button>
+    </div>
+    <p class="hint" id="billing-hint" hidden>Back from the payment page? Press Check again: your plan appears here once the payment provider has confirmed it.</p>
+    <p id="billing-status" role="status" aria-live="polite"></p>
   </section>
   <section class="card" id="team" aria-labelledby="team-title" hidden>
     <h2 id="team-title">Invite an agent</h2>
@@ -278,6 +304,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var TRIAL_FN = SB_URL + '/functions/v1/development-activity-trial';
   var SHARE_FN = SB_URL + '/functions/v1/manage-shared-report';
   var WATCH_FN = SB_URL + '/functions/v1/manage-property-watch';
+  var BILLING_FN = SB_URL + '/functions/v1/manage-billing';
   var SHARE_LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
   var INVITE = /^hse1_[0-9a-f]{64}$/;
   var STASH = 'hs-da-invite';
@@ -286,6 +313,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
   var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
+  var plan = null, checkoutState = null, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
@@ -361,6 +389,16 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   }
 
   // ---- the trial panel: the trial function's answer, in words ------------------------------------------------------------
+  /** Whether the brokerage's plan is paid right now, as the billing function says. The page never works this out. */
+  function isPaid(){ return !!plan && plan.state === 'paid'; }
+  /** Whether "Make report" may be pressed. The report function decides every report; this only keeps a button from inviting one it will refuse. */
+  function canMake(){
+    if (access === 'admin') return true;
+    if (access !== 'trial' && access !== 'complete') return false;
+    return isPaid() ? plan.credits_remaining > 0 : access === 'trial';
+  }
+  /** What a report that did not use one of the brokerage's reports says it did not use. */
+  function oneOf(){ return isPaid() ? 'one of your reports' : 'a free report'; }
   function showTrial(a, trial, note){
     access = a;
     var count = $('trial-count'), sub = $('trial-sub');
@@ -382,14 +420,118 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       count.textContent = 'This account is not part of a trial yet'; count.className = 'count out';
       sub.textContent = 'Open the invite link your brokerage sent you, then sign in with this email.';
     }
+    if ((a === 'trial' || a === 'complete') && isPaid()) {
+      // a paid plan: every new report is one of the month's (the database decides); the free reports are kept apart and neither used nor lost
+      var end = monthEndWords(), n = plan.credits_remaining;
+      if (n > 0) {
+        count.className = 'count';
+        count.textContent = n === 1 ? '1 report left this month' : n + ' reports left this month';
+        sub.textContent = "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it" + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
+      } else {
+        count.className = 'count out';
+        count.textContent = 'All 100 reports for this month are used';
+        sub.textContent = (end ? 'A new month of 100 reports starts ' + end + '. ' : '') + 'Your saved reports stay available.';
+      }
+    }
     if (note) sub.textContent = note + ' ' + sub.textContent;
-    $('go').disabled = busy || !(a === 'trial' || a === 'admin');
+    $('go').disabled = busy || !canMake();
     showTeam(a === 'trial' && role === 'owner');
     showSaved(a === 'trial' || a === 'complete');
     showProfile(a === 'trial' || a === 'complete');
   }
+
+  // ---- billing (build step 11): the brokerage's plan, in words, and an owner's checkout ------------------------------------
+  function billingSay(text, isError){ var s=$('billing-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  function monthEndWords(){ return plan && plan.period_ends_at ? dateWords(plan.period_ends_at) : ''; }
+  function hideBilling(){ plan = null; checkoutState = null; $('billing').hidden = true; $('subscribe').hidden = true; $('billing-hint').hidden = true; $('billing-plan').textContent = ''; $('billing-sub').textContent = ''; billingSay('', false); }
+  /** Show or hide the card. Hiding also forgets the plan, so one person's billing is never left on the page for the next. */
+  function showBilling(member){
+    if (!member) { hideBilling(); return; }
+    $('billing').hidden = false;
+    var p = $('billing-plan'), sub = $('billing-sub'), buy = $('subscribe');
+    p.className = 'plan'; buy.hidden = true; $('billing-hint').hidden = true;
+    if (!plan) {
+      p.className = 'plan out'; p.textContent = 'Your plan could not be read just now';
+      sub.textContent = 'Press Check again in a minute. Your saved reports are not affected.';
+      return;
+    }
+    var owner = plan.role === 'owner';
+    var offer = ' $79/month gives your brokerage 100 new reports each month. Cancel anytime.';
+    var who = owner ? '' : " Only your brokerage's owner can subscribe.";
+    var closed = owner && checkoutState === 'not_set_up' ? ' Subscribing is not open yet.' : '';
+    if (plan.state === 'paid') {
+      var end = monthEndWords();
+      p.textContent = '$79/month plan: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
+      sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your brokerage's 20 free reports, which are kept as they were.";
+      return;
+    }
+    if (plan.state === 'none' || plan.state === 'test_only') {
+      p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : 'Free trial used');
+      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : "Your brokerage's 20 free reports are separate from the plan.") + offer + who + closed;
+    } else if (plan.state === 'canceled') {
+      p.className = 'plan out'; p.textContent = 'Your subscription has ended';
+      sub.textContent = 'Your saved reports stay available. Subscribe again for 100 new reports each month.' + who + closed;
+    } else if (plan.state === 'past_due') {
+      p.className = 'plan out'; p.textContent = 'Your subscription needs attention';
+      sub.textContent = 'The last payment did not go through, so new reports are paused. Your saved reports stay available.';
+    } else {
+      p.className = 'plan out'; p.textContent = 'Your subscription status is not clear';
+      sub.textContent = 'New reports are paused until it is. Your saved reports stay available.';
+    }
+    if (checkoutState === 'available') { buy.textContent = plan.state === 'canceled' ? 'Subscribe again for $79/month' : 'Subscribe for $79/month'; buy.hidden = false; }
+    $('billing-hint').hidden = false;
+  }
+  /** Ask the billing function for the plan. A failure leaves no plan (never "paid"), and the card says it could not be read. */
+  async function loadBilling(){
+    var r = await post(BILLING_FN, { action: 'status' });
+    var b = r.body;
+    if (r.status === 200 && b && b.status === 'OK' && b.plan && typeof b.plan.state === 'string' && typeof b.plan.credits_remaining === 'number') {
+      plan = b.plan; checkoutState = typeof b.checkout === 'string' ? b.checkout : null;
+    } else { plan = null; checkoutState = null; }
+  }
+  /** Show the trial and the plan together, for a person the trial function has just answered about. */
+  async function present(a, trial, note){
+    var member = a === 'trial' || a === 'complete';
+    var forUser = session && session.user ? session.user.id : null;
+    if (member) await loadBilling(); else { plan = null; checkoutState = null; }
+    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way: show them nothing of it
+    showTrial(a, trial, note);
+    showBilling(member);
+  }
+  function billingMessage(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 0) return 'The payment service could not be reached. Check your connection and try again.';
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 503 && body.error === 'billing_not_set_up') return 'Subscribing is not open yet.';
+    if (httpStatus === 409 && body.error === 'already_paid') return 'Your brokerage already has the plan.';
+    if (httpStatus === 409) return 'Your brokerage already has a subscription, so a second one was not started.';
+    if (httpStatus === 403) return "Only your brokerage's owner can subscribe.";
+    return 'The payment page could not be opened just now. Try again in a minute.';
+  }
+  /** The processor's page, and only that: an https address on its own domain. The server checks the same; a page that sent a person anywhere else would be a phishing door. */
+  function checkoutOk(url){
+    try { var u = new URL(url); var h = u.hostname.toLowerCase(); return u.protocol === 'https:' && !u.username && !u.password && (h === 'lemonsqueezy.com' || /\.lemonsqueezy\.com$/.test(h)); } catch (e) { return false; }
+  }
+  async function subscribe(){
+    if (subscribing || !session || !plan || plan.role !== 'owner' || checkoutState !== 'available') return;
+    subscribing = true; $('subscribe').disabled = true; billingSay('Opening the payment page…', false);
+    var r = await post(BILLING_FN, { action: 'checkout' });
+    subscribing = false; $('subscribe').disabled = false;
+    var b = r.body || {};
+    if (r.status === 200 && b.status === 'OK' && typeof b.url === 'string' && checkoutOk(b.url)) { billingSay('Taking you to the payment page…', false); location.assign(b.url); return; }
+    billingSay(billingMessage(r.status, b), true);
+    if (r.status === 409 || r.status === 403) await refreshBilling(true);
+  }
+  /** Ask the trial function and the billing function again, as after a checkout: nothing the page held is trusted. */
+  async function refreshBilling(keepSay){
+    if (!session || !session.user) return;
+    if (!keepSay) billingSay('Checking…', false);
+    var say = $('billing-status').textContent, was = $('billing-status').className;
+    await loadTrial();
+    if (keepSay) { billingSay(say, was === 'err'); } else billingSay('', false);
+  }
   function trialUnreadable(){
-    access = null; role = null; showTeam(false); showSaved(false); showProfile(false);
+    access = null; role = null; showTeam(false); showSaved(false); showProfile(false); hideBilling();
     $('trial-count').className = 'count out';
     $('trial-count').textContent = 'Your trial could not be read just now';
     $('trial-sub').textContent = 'Reload the page in a minute.';
@@ -407,16 +549,16 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       invite = null; store(null);
       if (r.status === 200 && r.body && r.body.status === 'OK') {
         role = r.body.role;
-        showTrial(r.body.access, r.body.trial, r.body.replayed ? '' : 'You have joined your brokerage’s trial.');
+        await present(r.body.access, r.body.trial, r.body.replayed ? '' : 'You have joined your brokerage’s trial.');
         return;
       }
       var note = r.body && REDEEM_NOTE[r.body.error] ? REDEEM_NOTE[r.body.error] : 'That invite link could not be used.';
       var s = await post(TRIAL_FN, { action: 'status' });
-      if (s.status === 200 && s.body && s.body.status === 'OK') { role = s.body.role; showTrial(s.body.access, s.body.trial, note); } else trialUnreadable();
+      if (s.status === 200 && s.body && s.body.status === 'OK') { role = s.body.role; await present(s.body.access, s.body.trial, note); } else trialUnreadable();
       return;
     }
     var st = await post(TRIAL_FN, { action: 'status' });
-    if (st.status === 200 && st.body && st.body.status === 'OK') { role = st.body.role; showTrial(st.body.access, st.body.trial, ''); } else trialUnreadable();
+    if (st.status === 200 && st.body && st.body.status === 'OK') { role = st.body.role; await present(st.body.access, st.body.trial, ''); } else trialUnreadable();
   }
 
   // ---- an owner invites an agent (build step 5e): one link per agent, shown once -----------------------------------------
@@ -483,7 +625,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; savedSay(savedMessage(r.status), true); paintCompare(null); return; }
     var list = $('saved-list');
     list.textContent = '';
-    savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your free reports.', false);
+    savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your brokerage’s reports.', false);
     var offered = [];
     body.reports.forEach(function(rep){
       if (!rep || typeof rep.report_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(rep.report_id)) return;
@@ -864,12 +1006,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (session.user && session.user.id !== was) {
-        role = null; showTeam(false); showSaved(false); showProfile(false); hideShare(); hideWatch(); // another person's role, invite link, reports, client links, watches and name are never shown to this one
+        role = null; showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch(); // another person's role, invite link, reports, plan, client links, watches and name are never shown to this one
         $('report').textContent = ''; $('creditnote').hidden = true; say('', false);
-        loadTrial().then(function(){ if (pendingRun && (access === 'trial' || access === 'admin')) { pendingRun = false; run(); } });
+        loadTrial().then(function(){ if (pendingRun && canMake()) { pendingRun = false; run(); } });
       }
     } else {
-      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false); hideShare(); hideWatch();
+      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch();
       $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
@@ -896,6 +1038,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     body = body || {};
     if (httpStatus === 401) return 'Sign in first.';
     if (httpStatus === 403 && body.error === 'evaluation_complete') return "All 20 of your brokerage's free reports are used.";
+    if (httpStatus === 403 && body.error === 'allotment_complete') return "All 100 of your brokerage's reports for this month are used.";
     if (httpStatus === 403) return 'This account cannot make reports right now.';
     if (httpStatus === 409) return 'That report could not be made. Try again.';
     if (httpStatus === 400 && body.detail === 'address') return 'Enter a full street address with the city and state.';
@@ -903,31 +1046,32 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (httpStatus === 413) return 'The request was too large.';
     if (body.error === 'geocoder_unavailable') return 'The address lookup service could not be reached. Try again in a minute.';
     if (body.error === 'data_unavailable') return "HomeSignal's records could not be read just now. Try again in a minute.";
-    if (body.status === 'ADDRESS_NOT_RESOLVED') return 'That address could not be found. Check the street number, city and state. This did not use a free report.';
-    if (body.status === 'OUTSIDE_COVERAGE') return 'That address is in ZIP ' + (typeof body.zip === 'string' && /^\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet. This did not use a free report.';
+    if (body.status === 'ADDRESS_NOT_RESOLVED') return 'That address could not be found. Check the street number, city and state. This did not use ' + oneOf() + '.';
+    if (body.status === 'OUTSIDE_COVERAGE') return 'That address is in ZIP ' + (typeof body.zip === 'string' && /^\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet. This did not use ' + oneOf() + '.';
     return 'Something went wrong making the report. Try again.';
   }
-  /** Whether this report used a free report, as the report function decided it (body.charged / body.replayed / body.credit). */
+  /** Whether this report used one of the brokerage's reports, and which, as the report function decided it (body.charged / body.replayed / body.allotment / body.credit). */
   function chargeLine(body){
     if (access === 'admin') return 'Admin report: no free report was used.';
-    if (body.replayed === true) return 'This is the report you already made for this address. It did not use another free report.';
-    if (body.charged === true) return 'This report used 1 of your brokerage’s free reports.';
+    var paid = body.allotment === 'paid';
+    if (body.replayed === true) return 'This is the report you already made for this address. It did not use another ' + (paid ? 'report' : 'free report') + '.';
+    if (body.charged === true) return paid ? 'This report used 1 of your brokerage’s 100 reports this month.' : 'This report used 1 of your brokerage’s free reports.';
     var c = body.credit;
-    if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use a free report: No data ingested.';
-    return 'This report did not use a free report.';
+    if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use ' + oneOf() + ': No data ingested.';
+    return 'This report did not use ' + oneOf() + '.';
   }
   async function run(){
     if (busy) return;
     var address = field('addr');
     if (address.length < 8 || address.indexOf(' ') < 0) { say('Enter a full street address with the city and state.', true); $('addr').focus(); return; }
     if (!session) { pendingRun = true; say('Sign in to make a report.', false); openAuth(); return; }
-    if (access !== 'trial' && access !== 'admin') { say('This account cannot make reports right now.', true); return; }
+    if (!canMake()) { say(isPaid() && (access === 'trial' || access === 'complete') ? "All 100 of your brokerage's reports for this month are used." : 'This account cannot make reports right now.', true); return; }
     // the same address after a lost answer reuses its key; anything else is a new report
     if (!attempt || attempt.address !== address) attempt = { key: newKey(), address: address };
     var payload = { address: address, view: 'customer' };
     var clientLabel = field('label'); // optional (build step 7): the function keeps it with the address in its deletable private layer, never in the report
     if (clientLabel) payload.label = clientLabel;
-    if (access === 'trial') payload.idempotency_key = attempt.key; // an admin report is never charged and takes no key
+    if (access !== 'admin') payload.idempotency_key = attempt.key; // an admin report is never charged and takes no key; every member report (a free one or one of the month's) does
     busy = true; $('go').disabled = true; say('Making the report…', false);
     $('creditnote').hidden = true; $('report').textContent = ''; hideShare(); hideWatch();
     var r = await post(REPORT_FN, payload);
@@ -935,8 +1079,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (r.status === 0) { say('The report service could not be reached. Check your connection, then press Make report again: it will not use a second free report.', true); return; }
     attempt = null; // the server answered: this request is finished
     var body = r.body || {};
-    if (body.trial && typeof body.trial.credits_remaining === 'number' && access === 'trial') {
+    if (body.plan && typeof body.plan.state === 'string' && typeof body.plan.credits_remaining === 'number' && (access === 'trial' || access === 'complete')) plan = body.plan; // the plan as the database left it after this report
+    if (body.trial && typeof body.trial.credits_remaining === 'number' && (access === 'trial' || access === 'complete')) {
       showTrial(body.trial.status === 'complete' ? 'complete' : 'trial', body.trial, '');
+      showBilling(true);
     }
     if (r.status === 401) { session = null; pendingRun = true; openAuth(); }
     if (r.status === 403) loadTrial();
@@ -967,6 +1113,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
     $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });
     $('mint').addEventListener('click', mintInvite);
+    $('subscribe').addEventListener('click', subscribe);
+    $('billing-refresh').addEventListener('click', function(){ refreshBilling(false); });
     $('copy-invite').addEventListener('click', copyInvite);
     $('share-make').addEventListener('click', makeShare);
     $('share-copy').addEventListener('click', copyShare);

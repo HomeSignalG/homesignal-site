@@ -176,14 +176,23 @@ const deliveryCode = code(DELIVERY_SQL);
 // check saved reports use) and the list joins evaluation_credit once to show a report's number. Every row it writes is a row of its own two property_watch tables.
 const WATCH_SQL = 'docs/property-watch.sql';
 const watchCode = code(WATCH_SQL);
+// Build step 11: docs/brokerage-billing.sql is a fifth SQL file that reads the ledger. It adds the paid month's ledger as a SECOND credit table and puts
+// both behind ONE view (evaluation_credit_all), reads the free ledger through the view and through one existence check, and calls this layer's issue
+// function (evaluation_report_issue) UNCHANGED for the free allotment. Every row it writes is a row of its own two billing tables; it never writes a row of
+// this layer. test/brokerage_billing_pg proves that, and test/billing-structure.test.mjs pins its structure.
+const BILLING_SQL = 'docs/brokerage-billing.sql';
+const billingCode = code(BILLING_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, EVAL_READS, SNAP_MOD].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, EVAL_READS].sort())
+   && dmlTargets(billingCode).length >= 2 && dmlTargets(billingCode).every((t) => /^brokerage_(subscription|paid_credit)$/.test(t))
+   && !/\bexecute\b[^;]*\b(insert|update|delete)\b[^;]*\bevaluation(_credit)?\b/i.test(billingCode)
+   && (billingCode.match(/\bpublic\.evaluation_report_issue\(/g) || []).length === 2 && /from public\.evaluation_report_issue\(p_user_id, p_idempotency_key, p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) t;/.test(billingCode)
    && dmlTargets(watchCode).length >= 5 && dmlTargets(watchCode).every((t) => /^property_watch/.test(t))
    && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(watchCode) && (watchCode.match(new RegExp(OURS.source, 'g')) || []).join() === 'evaluation_credit,evaluation_credit'
    && !/\b(insert\s+into|update|delete\s+from|truncate)\b/i.test(deliveryCode.replace(/'(?:[^']|'')*'/g, "''"))
    && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(deliveryCode)
-   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '["evaluation_report_issue"]',
-  '4: outside its SQL (and the read-only saved-reports SQL, build step 6, the share-delivery SQL, build step 8, and the property-watch SQL, build step 9, which write no row of this layer), exactly two files name this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), and the shared snapshot module charges through evaluation_report_issue only — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
+   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '[]' && (code(SNAP_MOD).match(/rpc\('brokerage_report_issue'/g) || []).length === 1,
+  '4: outside its SQL (and the billing SQL, build step 11, which calls the issue function unchanged and writes only its own two tables, and the read-only saved-reports SQL, build step 6, the share-delivery SQL, build step 8, and the property-watch SQL, build step 9, which write no row of this layer), exactly one file names this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), while the shared snapshot module names none of it and charges through brokerage_report_issue only (build step 11: the one entry, which calls evaluation_report_issue for the free allotment) — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 {
   const ER = code(EVAL_READS);
   const mints = [...ER.matchAll(/rpc\('evaluation_invite_mint', \{([^}]*)\}\)/g)];
@@ -194,8 +203,9 @@ const strip4 = (t) => stripJs(t);
 const NAMES_L1 = /evaluation_(report_issue|invite|credit|event|create|revoke|usage|check)|public\.evaluation\b|brokerage/i;
 ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLLOW.length > 1500 && HAN_REPORT.length > 1500
    && ![GATE, REST, HAN_FOLLOW, HAN_REPORT].some((t) => NAMES_L1.test(strip4(t)))
-   && JSON.stringify([...strip4(SNAPMOD).matchAll(new RegExp(NAMES_L1.source, 'gi'))].map((m) => m[0])) === '["evaluation_report_issue"]',
-  '4b: the gate, the service reader and both report handlers name no evaluation table or function and no brokerage (the gate asks deps.trialOf; the decision stays in the database), and the snapshot module names only the issue function it calls');
+   && JSON.stringify([...strip4(SNAPMOD).matchAll(/evaluation_(report_issue|invite|credit|event|create|revoke|usage|check)|public\.evaluation\b/gi)].map((m) => m[0])) === '[]'
+   && JSON.stringify([...strip4(SNAPMOD).matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1])) === '["report_snapshot_issue","brokerage_report_issue"]',
+  '4b: the gate, the service reader and both report handlers name no evaluation table or function and no brokerage (the gate asks deps.trialOf; the decision stays in the database), and the snapshot module names no evaluation function: its two database calls are the snapshot writer and the ONE issuing entry (build step 11)');
 {
   const TH = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/handler.ts'), 'utf8');
   const TD = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/data.ts'), 'utf8');
@@ -206,9 +216,10 @@ ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLL
     '4b2: the trial function (build steps 5c, 5d, 5e) names no evaluation function, no resolver and no id: it asks the shared trial module (status, role, redeem, create, invite), and never returns an evaluation, brokerage or invite id');
 }
 const callers = SCAN.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
-ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/report-snapshot.ts') && callers.includes(SQL_FILE)
-   && callers.every((f) => [SNAP_FILE, 'supabase/functions/_shared/report-snapshot.ts', SQL_FILE].includes(f)),
-  '4c: the snapshot writer has exactly three files that name it anywhere — its own SQL, the one shared module, and this layer\'s issue function — searched across code, workflows, data/ and every non-prose docs file (control: all three are found)', callers.join(','));
+ok(callers.includes(SNAP_FILE) && callers.includes('supabase/functions/_shared/report-snapshot.ts') && callers.includes(SQL_FILE) && callers.includes(BILLING_SQL)
+   && callers.every((f) => [SNAP_FILE, 'supabase/functions/_shared/report-snapshot.ts', SQL_FILE, BILLING_SQL].includes(f))
+   && (billingCode.match(/report_snapshot_issue\(/g) || []).length === 2 && /from public\.report_snapshot_issue\(p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) s;/.test(billingCode),
+  '4c: the snapshot writer has exactly four files that name it anywhere — its own SQL, the one shared module, this layer\'s issue function, and the paid allotment\'s one issuing helper (build step 11, called once, straight through) — searched across code, workflows, data/ and every non-prose docs file (control: all four are found)', callers.join(','));
 const calls = (SQL.match(/report_snapshot_issue\(/g) || []).length;
 ok(calls === 2 && /from public\.report_snapshot_issue\(p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) s;/.test(ISSUE) && (ISSUE.match(/report_snapshot_issue\(/g) || []).length === 1,
   '4d: the writer is called ONCE, inside evaluation_report_issue (the other mention is the precondition\'s existence check), with the body, hash, version, engine inputs and private context passed straight through');

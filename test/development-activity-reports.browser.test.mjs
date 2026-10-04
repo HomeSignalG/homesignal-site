@@ -32,6 +32,7 @@ const MH = await import('../supabase/functions/manage-shared-report/handler.ts')
 const SR = await import('../supabase/functions/_shared/share-reads.ts');
 const WH = await import('../supabase/functions/manage-property-watch/handler.ts');  // build step 9: the agent's Watch function
 const WR = await import('../supabase/functions/_shared/watch-reads.ts');
+const BH = await import('../supabase/functions/manage-billing/handler.ts');          // build step 11: the Billing function
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0, total = 0;
@@ -43,7 +44,8 @@ const ok = (c, name, detail) => {
 
 const PAGE = '/development-activity-reports.html';
 const SB = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/';
-const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report', WATCH_FN = SB + 'manage-property-watch';
+const REPORT_FN = SB + 'get-development-activity-report', TRIAL_FN = SB + 'development-activity-trial', MANAGE_FN = SB + 'manage-shared-report', WATCH_FN = SB + 'manage-property-watch', BILLING_FN = SB + 'manage-billing';
+const CHECKOUT_URL = 'https://homesignal.lemonsqueezy.com/checkout/custom/test-checkout-1';
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477', OTHER = '744 Evergreen Terrace, Springfield, OR 97477';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const UID = 'a1111111-1111-4111-8111-111111111111';
@@ -75,8 +77,9 @@ window.supabase = { createClient: function () { return { auth: {
 
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
-function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok' } = {}) {
-  const w = { used, trial, admin, rights, redeem, role, mint, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
+function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true } = {}) {
+  // build step 11: `plan` is the state the database would answer for this brokerage (none, paid, past_due, canceled, ...), `paidUsed` the reports used this month
+  const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
     watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false };
   const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
@@ -156,20 +159,34 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     },
     addressOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return m ? m.address : null; },
   });
-  const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active' });
+  const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active', allotment: 'trial', period_ends_at: null });
+  const PAID_END = '2026-11-04T12:00:00+00:00';
+  const paidCredit = () => ({ ordinal: 20 + w.paidUsed, credits_used: w.paidUsed, credits_remaining: 100 - w.paidUsed, evaluation_status: 'paid', allotment: 'paid', period_ends_at: PAID_END });
+  // the plan, as public.billing_usage answers it for this brokerage (null when the person belongs to none)
+  const usage = () => (w.trial === null ? null : { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: w.role, state: w.plan, credit_limit: 100,
+    credits_used: w.plan === 'paid' ? w.paidUsed : 0, credits_remaining: w.plan === 'paid' ? 100 - w.paidUsed : 0, period_ends_at: w.plan === 'paid' ? PAID_END : null });
+  w.billingHandler = BH.makeHandler({
+    ...gate,
+    usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
+    configured: () => w.configured,
+    createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
+  });
   w.reportHandler = RH.makeHandler({
     ...gate, now: () => NOW, rights: w.rights,
     geocode: async (a) => ({ matchedAddress: a.toUpperCase(), lat: 44.04612, lng: -122.98123, zip: '97477' }),
     zipSupported: async () => true,
     radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
     trialOf: async () => state(),
+    planOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     issue: async (_u, key, intelligence, privateContext) => {
       const prior = w.made.get(key);
-      if (prior) return { replayed: true, report_id: prior.id, generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, credit: credit() };
-      w.used++;
-      const id = 'c0000000-0000-4000-8000-' + String(w.used).padStart(12, '0');
-      w.made.set(key, { id, address: w.lastAddress, label: (privateContext && privateContext.label) || null, report: intelligence });
-      return { replayed: false, report_id: id, content_hash: 'h', report_version: 'v', generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, report: intelligence, credit: credit() };
+      if (prior) return { replayed: true, report_id: prior.id, generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, credit: prior.paid ? paidCredit() : credit() };
+      // the database's one issuing entry: the month's allotment when the plan is paid, otherwise the free evaluation's
+      const paid = w.plan === 'paid';
+      if (paid) w.paidUsed++; else w.used++;
+      const id = (paid ? 'c1000000' : 'c0000000') + '-0000-4000-8000-' + String(paid ? w.paidUsed : w.used).padStart(12, '0');
+      w.made.set(key, { id, paid, address: w.lastAddress, label: (privateContext && privateContext.label) || null, report: intelligence });
+      return { replayed: false, report_id: id, content_hash: 'h', report_version: 'v', generated_at: NOW.toISOString(), private_context_id: 'ctx-' + key, report: intelligence, credit: paid ? paidCredit() : credit() };
     },
     contextMatches: async (ctx, address) => { const m = w.made.get(ctx.slice(4)); return m && m.address === address ? 'match' : 'mismatch'; },
     storedReport: async (id) => { for (const m of w.made.values()) if (m.id === id) return JSON.stringify(m.report); return null; },
@@ -211,7 +228,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
-  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [];
+  const errors = [], reports = [], trials = [], foreign = [], saved = [], shareCalls = [], watchCalls = [], billingCalls = [], checkouts = [];
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
@@ -224,6 +241,15 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
       const res = await w.manageHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
       return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
     }
+    if (url === BILLING_FN) {
+      const body = r.postData() ? JSON.parse(r.postData()) : null;
+      billingCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
+      if (w.billingGone) return route.abort(); // the answer never reaches the page
+      const res = await w.billingHandler(new Request(url, { method: 'POST', headers: { authorization: r.headers().authorization || '', 'content-type': 'application/json' }, body: r.postData() }));
+      return route.fulfill({ status: res.status, contentType: 'application/json', body: await res.text() });
+    }
+    // the provider's own checkout page: the browser is sent here and nothing is exchanged with it; this stands in for it
+    if (url.startsWith('https://homesignal.lemonsqueezy.com/')) { checkouts.push(url); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Checkout</title><p>Checkout</p>' }); }
     if (url === WATCH_FN) {
       const body = r.postData() ? JSON.parse(r.postData()) : null;
       watchCalls.push({ auth: r.headers().authorization || null, apikey: r.headers().apikey || null, body });
@@ -251,7 +277,7 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, w };
+  return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
 const TRIALS = new WeakMap();
@@ -1344,6 +1370,189 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_SHIPPED })).report;   //
   await waitCompared(page);
   const said = await text(page, '#compare-status');
   ok(/could not be opened just now/.test(said) && (await page.$$('#compare-result .da-cmp')).length === 0, '11z8 a saved report that is not a report the page can show is refused in plain words and nothing is drawn', said);
+  await ctx.close();
+}
+
+// ---- 12. build step 11: the Billing card, the plan and the $79/month checkout ---------------------------------------------------------------------
+// The billing function and the report function are answered by their REAL handlers on a fake database whose plan is the world's: the page's own
+// requests are validated by the real code. Nothing here pays anything: the provider's page is a stand-in that only records that the browser was sent.
+const billingText = (page) => page.$eval('#billing', (e) => e.textContent.replace(/\s+/g, ' ').trim());
+const billingShown = (page) => page.$eval('#billing', (e) => !e.hidden);
+const waitBilling = (page, re) => page.waitForFunction((src) => { var b = document.getElementById('billing'); return !b.hidden && new RegExp(src).test(b.textContent); }, re.source, { timeout: 8000 }).catch(() => {});
+const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
+{
+  // 12a-12d. an owner with no plan: the offer in the landing page's own words, one status call, and a checkout that goes to the provider only
+  const w = world({ role: 'owner', used: 3 });
+  const { ctx, page, errors, foreign, billingCalls, checkouts } = await open({ w });
+  await waitBilling(page, /Free trial/);
+  const t = await billingText(page);
+  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(t) && /20 free reports are separate from the plan/.test(t),
+    '12a an owner with no plan sees the Billing card: the free trial, and the $79/month offer in the landing page\'s own words (100 new reports each month, cancel anytime)', t);
+  ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
+    '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
+  ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe for \$79\/month$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe for $79/month"');
+  ok(!(await page.content()).includes(BKID) && !(await page.evaluate(() => document.body.innerText)).includes(BKID), '12c2 the brokerage\'s id is nowhere on the page');
+  await page.click('#subscribe');
+  await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
+  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL && page.url().startsWith('https://homesignal.lemonsqueezy.com/'),
+    '12d pressing it asks for ONE checkout and sends the browser to the provider\'s own page (nothing is charged and no plan changes by pressing it)', [w.checkoutMade, checkouts, page.url()]);
+  ok(billingCalls.length === 2 && JSON.stringify(billingCalls[1].body) === '{"action":"checkout"}', '12d2 the checkout request carries no brokerage id, no price and no address: the server knows whose it is', billingCalls.map((c) => c.body));
+  ok(foreign.length === 0 && errors.length === 0, '12d3 nothing else was fetched and the page raised no error', [foreign, errors]);
+  await ctx.close();
+}
+{
+  // 12e-12h. an agent, a processor that is not set up, a refusal, and a lost answer
+  let o = await open({ w: world({ role: 'agent' }) });
+  await waitBilling(o.page, /Free trial/);
+  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && /Only your brokerage's owner can subscribe\./.test(await billingText(o.page)), '12e an agent is told only the owner can subscribe and is offered no button');
+  ok(o.billingCalls.length === 1, '12e2 and makes no checkout call');
+  await o.page.evaluate(() => document.getElementById('subscribe').click()); // the hidden button pressed anyway, by a script
+  await settled(o.page);
+  ok(o.billingCalls.length === 1 && o.checkouts.length === 0, '12e3 and a checkout forced through the hidden button still asks for nothing: the page checks the role itself, not only the button');
+  await o.ctx.close();
+
+  o = await open({ w: world({ role: 'owner', configured: false }) });
+  await waitBilling(o.page, /Free trial/);
+  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && /Subscribing is not open yet\./.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
+    '12f with the processor not set up the owner is told subscribing is not open yet and is offered no button (and the free trial still works)');
+  await o.ctx.close();
+
+  const w = world({ role: 'owner' });
+  o = await open({ w });
+  await waitBilling(o.page, /Free trial/);
+  w.checkoutFails = true;
+  await o.page.click('#subscribe');
+  await o.page.waitForFunction(() => /could not be opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/The payment page could not be opened just now/.test(await text(o.page, '#billing-status')) && await o.page.$eval('#billing-status', (e) => e.className === 'err') && o.checkouts.length === 0 && !o.page.url().includes('lemonsqueezy'),
+    '12g a provider that cannot give a checkout is said in plain words, and the browser is not sent anywhere');
+  ok(await o.page.$eval('#subscribe', (e) => !e.disabled && !e.hidden), '12g2 the button is usable again, so a retry is one press');
+  await o.ctx.close();
+
+  // the server's own answer is a foreign or unsafe address: the page refuses it as well (the server checks it too)
+  const w2 = world({ role: 'owner' });
+  o = await open({ w: w2 });
+  await waitBilling(o.page, /Free trial/);
+  let forced = '';
+  await o.page.route(BILLING_FN, async (route) => { const r = route.request(); const b = r.postData() ? JSON.parse(r.postData()) : {}; if (b.action === 'checkout') return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'OK', url: forced }) }); return route.fallback(); });
+  for (const bad of ['https://evil.example/pay', 'http://checkout.lemonsqueezy.com/pay', 'https://user:pw@checkout.lemonsqueezy.com/pay', 'https://lemonsqueezy.com.evil.example/pay']) {
+    forced = bad;
+    await o.page.evaluate(() => { document.getElementById('billing-status').textContent = ''; });
+    await o.page.click('#subscribe');
+    await o.page.waitForFunction(() => /could not be opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+    ok(o.page.url().startsWith(base) && !o.page.url().includes('evil') && !o.page.url().includes('lemonsqueezy') && /could not be opened/.test(await text(o.page, '#billing-status')),
+      '12h an address that is not the provider\'s own, or is not plain https, or carries credentials, is never opened: the page checks it too and says the payment page could not be opened (' + bad + ')');
+  }
+  await o.ctx.close();
+}
+{
+  // 12i-12m. a paid brokerage: the month's reports, whose number the page shows and never works out
+  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 3 });
+  const { ctx, page, reports, errors, foreign } = await open({ w });
+  await waitCount(page, /reports left this month/);
+  ok(/^97 reports left this month$/.test(await text(page, '#trial-count')) && /100 new reports each month/.test(await text(page, '#trial-sub')) && /this month ends November 4, 2026/.test(await text(page, '#trial-sub')),
+    '12i a brokerage whose free reports are used and whose plan is paid is told how many of the month\'s reports are left and when the month ends', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
+  const t = await billingText(page);
+  ok(/\$79\/month plan: 3 of 100 reports used this month/.test(t) && /kept as they were/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, and no second checkout');
+  ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
+  await make(page);
+  ok(reports.length === 1 && V4.test(reports[0].body.idempotency_key), '12k2 a report made on the paid plan carries a random key, like every member report', reports.map((r) => r.body));
+  ok(w.paidUsed === 4 && w.used === 20 && /^96 reports left this month$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
+    '12l the report used one of the MONTH\'s (4 used, 96 left), the 20 free ones are untouched, and the page says which it used', [w.paidUsed, w.used, await text(page, '#trial-count'), await text(page, '#creditnote')]);
+  ok(/\$79\/month plan: 4 of 100 reports used this month/.test(await billingText(page)), '12l2 the Billing card follows the report, from the database\'s own answer');
+  // a retry of a finished paid report
+  ok(foreign.length === 0 && errors.length === 0, '12m nothing else was fetched and the page raised no error', [foreign, errors]);
+  await ctx.close();
+}
+{
+  // 12n-12o. a paid month that is used up
+  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 100 });
+  const { ctx, page, reports } = await open({ w });
+  await waitCount(page, /All 100 reports for this month are used/);
+  ok(/All 100 reports for this month are used/.test(await text(page, '#trial-count')) && await page.$eval('#trial-count', (e) => e.className === 'count out') && /November 4, 2026/.test(await text(page, '#trial-sub')),
+    '12n a month whose 100 reports are used says so, and says when the next month starts');
+  ok(await page.$eval('#go', (e) => e.disabled), '12n2 "Make report" is off');
+  await page.fill('#addr', ADDRESS);
+  await page.evaluate(() => document.getElementById('rf').requestSubmit());
+  await page.waitForFunction(() => /used/.test(document.getElementById('status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(reports.length === 0 && /All 100 of your brokerage's reports for this month are used/.test(await text(page, '#status')), '12o pressing it anyway sends NO report request and says why', reports.length);
+  await ctx.close();
+}
+{
+  // 12p-12s. a plan that is not paid never opens a used-up trial, and says what is wrong in plain words
+  for (const [state, card, buy] of [['past_due', /Your subscription needs attention/, false], ['canceled', /Your subscription has ended/, true], ['unknown', /Your subscription status is not clear/, false],
+    ['trialing', /Your subscription status is not clear/, false], ['test_only', /Test subscription only/, true]]) {
+    const w = world({ role: 'owner', used: 20, plan: state });
+    const { ctx, page, reports } = await open({ w });
+    await waitBilling(page, card);
+    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /All 20 free reports are used/.test(await text(page, '#trial-count')) && reports.length === 0,
+      '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
+    await ctx.close();
+  }
+  const w = world({ role: 'owner', used: 20, plan: 'canceled' });
+  const { ctx, page } = await open({ w });
+  await waitBilling(page, /ended/);
+  ok(await page.$eval('#subscribe', (e) => /^Subscribe again for \$79\/month$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again for $79/month"');
+  await ctx.close();
+}
+{
+  // 12t-12v. the plan cannot be read, Check again, and a different person
+  const w = world({ role: 'owner', used: 3 });
+  w.billingFails = true;
+  const { ctx, page, billingCalls } = await open({ w });
+  await waitBilling(page, /could not be read/);
+  ok(/Your plan could not be read just now/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden), '12t a plan that cannot be read says so and offers no checkout (never "paid", never "free")');
+  w.billingFails = false;
+  await page.click('#billing-refresh');
+  await waitBilling(page, /Free trial/);
+  ok(/Free trial/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => !e.hidden), '12u "Check again" asks again and the card follows', billingCalls.map((c) => c.body));
+  // the provider has confirmed a payment: the page learns it only by asking
+  w.plan = 'paid'; w.paidUsed = 0; w.used = 20;
+  await page.click('#billing-refresh');
+  await waitBilling(page, /\$79\/month plan/);
+  ok(/\$79\/month plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^100 reports left this month$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
+    '12u2 once the database says the plan is paid, "Check again" shows it, and "Make report" opens: the page changed nothing until it was told');
+  // the plan can no longer be read: the card says so and forgets the plan it showed (never the old figures)
+  w.billingFails = true;
+  await page.click('#billing-refresh');
+  await waitBilling(page, /could not be read/);
+  ok(/Your plan could not be read just now/.test(await billingText(page)) && !/\$79\/month plan: /.test(await page.$eval('#billing-plan', (e) => e.textContent)) && await page.$eval('#subscribe', (e) => e.hidden),
+    '12u3 when the plan can no longer be read the card says so and forgets the plan it showed (never the old figures, never "paid")');
+  w.billingFails = false;
+  await page.click('#billing-refresh');
+  await waitBilling(page, /\$79\/month plan/);
+  await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
+  await page.evaluate(() => { window.__sb.session = null; });
+  await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
+  await page.waitForFunction(() => document.getElementById('billing').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(await page.$eval('#billing', (e) => e.hidden) && (await billingText(page)).includes('Billing') && !/\$79\/month plan|3 of 100|0 of 100/.test(await page.$eval('#billing-plan', (e) => e.textContent)),
+    '12v signing out hides the Billing card and forgets the plan, so it is never left for the next person');
+  await ctx.close();
+}
+{
+  // 12v2. a different person signing in on the same tab: the first person's plan is gone in the same moment
+  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 3 });
+  const { ctx, page } = await open({ w });
+  await waitBilling(page, /\$79\/month plan/);
+  const swap = await page.evaluate(() => {
+    const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
+    window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
+    return { hidden: document.getElementById('billing').hidden, plan: document.getElementById('billing-plan').textContent, sub: document.getElementById('billing-sub').textContent, buy: document.getElementById('subscribe').hidden };
+  });
+  ok(swap.hidden && swap.plan === '' && swap.sub === '' && swap.buy, '12v2 a different person signing in takes the first person\'s plan away at once, so it is never left for the next person', swap);
+  await ctx.close();
+}
+{
+  // 12w. not a member: no billing card at all
+  for (const [what, w] of [['an account with no trial', world({ trial: null })], ['an admin', world({ admin: true })], ['a revoked trial', world({ trial: 'revoked' })]]) {
+    const { ctx, page, billingCalls } = await open({ w });
+    await settled(page);
+    ok(!(await billingShown(page)) && billingCalls.length === 0, '12w ' + what + ' has no Billing card and makes no billing call', [billingCalls.length]);
+    await ctx.close();
+  }
+  // a phone
+  const { ctx, page } = await open({ w: world({ role: 'owner', used: 3 }), width: 390, height: 844 });
+  await waitBilling(page, /Free trial/);
+  ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), '12x at 390 px wide the page with the Billing card does not scroll sideways');
   await ctx.close();
 }
 

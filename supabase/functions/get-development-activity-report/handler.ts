@@ -10,11 +10,16 @@
 //   a TRIAL MEMBER (public.evaluation_usage: an active, unexpired brokerage evaluation): the customer view only, with a page-minted
 //     idempotency key. Anyone else is refused before the body is read.
 //
-// WHETHER A REPORT USES A FREE REPORT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every answer that
-// is a report or says why there is none carries its decision as `credit`. Only a trial report the rule charges is stored, and only
-// through public.evaluation_report_issue (via _shared/report-snapshot.ts `issueEvaluationReport`), which stores the snapshot and the
-// credit in ONE transaction. This function never calls the plain snapshot writer (`issueSnapshot`), so no report is stored without a
-// credit; a structural test fails if it does. A retried key returns the first report, and only if it is about the same property (D-L6).
+// WHETHER A REPORT USES A REPORT FROM THE ALLOTMENT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every answer
+// that is a report or says why there is none carries its decision as `credit`. Only a member's report the rule charges is stored, and only
+// through public.brokerage_report_issue (via _shared/report-snapshot.ts `issueBrokerageReport`), which stores the snapshot and the credit in ONE
+// transaction, in the free evaluation's 20 or, when the brokerage's plan is paid, in the month's 100 (docs/brokerage-billing.sql: the database
+// decides which; this file asks and reports). This function never calls the plain snapshot writer (`issueSnapshot`), so no report is stored
+// without a credit; a structural test fails if it does. A retried key returns the first report, and only if it is about the same property (D-L6).
+//
+// THE PLAN (build step 11). A member's plan (public.billing_usage, read through _shared/billing-reads.ts `planSummary`: state, role, this month's
+// figures, never an id) is read once per request and rides every member answer as `plan`. A trial that is complete, with no paid plan, can make
+// no report; a paid plan whose month is complete can make no report either (`allotment_complete`). There is no overage and no extra purchase.
 //
 // SAVED REPORTS (build step 6). A trial member may also LIST their brokerage's stored reports (`{ action: 'list' }`) and REOPEN one by its
 // permanent id (`{ action: 'open', report_id }`). Both are reads through the one membership resolver (public.evaluation_reports_of and
@@ -28,7 +33,9 @@ import { readReportInputs } from '../_shared/report-run.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
 import { authorizeReportCaller, trialSummary, MAX_BODY_BYTES, ALLOWED_ORIGINS, readBounded, reply, TOO_LARGE, corsFor } from '../_shared/admin-gate.ts';
 import type { TrialState } from '../_shared/admin-gate.ts';
-import { EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
+import { AllotmentComplete, EvaluationComplete, NotEntitled } from '../_shared/report-snapshot.ts';
+import { planSummary } from '../_shared/billing-reads.ts';
+import type { BillingUsage } from '../_shared/billing-reads.ts';
 import { UUID } from '../_shared/evaluation-reads.ts';
 import type { OpenedReport, ReportHeader, SavedReport } from '../_shared/evaluation-reads.ts';
 import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
@@ -56,6 +63,8 @@ export type Deps = {
   health: (families: string[]) => Promise<SourceHealth[]>;
   // the trial (build step 5b)
   trialOf: (userId: string) => Promise<TrialState | null>;
+  /** The member's plan (build step 11): public.billing_usage by auth user id. Null when the person is not a member of any account. */
+  planOf: (userId: string) => Promise<BillingUsage | null>;
   issue: (userId: string, idempotencyKey: string, intelligence: Record<string, unknown>, privateContext: PrivateContext | null,
     opts: { reportVersion: string; engineInputs: Record<string, unknown> }) => Promise<EvaluationIssue>;
   storedReport: (reportId: string) => Promise<string | null>;
@@ -85,7 +94,7 @@ export function capability() {
     radius_mi: [REPORT_RADIUS_MI],
     recent_days: RECENT_DAYS,
     access: 'signed-in: an internal admin (dashboard_admins), or an invited trial member with an active trial (customer view only).',
-    stores_reports: 'only a trial report that uses a free report (credit rule); never an admin report',
+    stores_reports: 'only a member\'s report that uses a report from the allotment (credit rule): a free one, or one of the paid month\'s; never an admin report',
     saved_reports: 'list: the stored reports of a trial member\'s trial; open: one of them by its id, as stored, never charged',
     credit_rule: CREDIT_RULE_VERSION,
   };
@@ -113,6 +122,13 @@ export function makeHandler(deps: Deps) {
     if (raw === TOO_LARGE) return reply(req, { error: 'request_too_large' }, 413);
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return reply(req, { error: 'invalid_request' }, 400);
     const b = raw as Record<string, unknown>;
+    // the member's plan (build step 11), read once: it rides every member answer, and a paid plan changes who may make a report
+    let plan: BillingUsage | null = null;
+    if (trial) {
+      try { plan = await deps.planOf(trial.userId); } catch { return reply(req, { error: 'data_unavailable' }, 502); }
+    }
+    const planInfo = trial ? { plan: planSummary(plan) } : {};
+    const paid = plan?.state === 'paid';
     // saved reports (build step 6): a request with an action reads what is already stored, and carries nothing else
     if (b.action !== undefined) {
       if (b.action !== 'list' && b.action !== 'open') return reply(req, { error: 'invalid_request', detail: 'action' }, 400);
@@ -127,7 +143,7 @@ export function makeHandler(deps: Deps) {
           const reports = await Promise.all(rows.map(async (r) => ({
             report_id: r.report_id, number: r.number, generated_at: r.generated_at, address: (await deps.subjectOf(r.private_context_id)).address,
           })));
-          return reply(req, { status: 'OK', reports, trial: trialSummary(trial.trial) });
+          return reply(req, { status: 'OK', reports, trial: trialSummary(trial.trial), ...planInfo });
         }
         if (typeof b.report_id !== 'string' || !UUID.test(b.report_id)) return reply(req, { error: 'invalid_request', detail: 'report_id' }, 400);
         const opened = await deps.openSavedReport(trial.userId, b.report_id);
@@ -141,15 +157,17 @@ export function makeHandler(deps: Deps) {
         return reply(req, {
           status: 'OK', coverage_state: stored.coverage?.state ?? null, report: stored,
           stored: true, reopened: true, report_id: opened.report_id, number: opened.number, generated_at: opened.generated_at,
-          address: subject.address, client_label: subject.label, header, charged: false, trial: trialSummary(trial.trial),
+          address: subject.address, client_label: subject.label, header, charged: false, trial: trialSummary(trial.trial), ...planInfo,
         });
       } catch (e) {
         if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
         return reply(req, { error: 'internal' }, 500);
       }
     }
-    // a trial whose 20 free reports are used can make no more: refused here, before anything is read, geocoded or charged
-    if (trial && trial.complete) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial) }, 403);
+    // a trial whose 20 free reports are used can make no more unless the brokerage has paid, and a paid month whose 100 are used can make no
+    // more: refused here, before anything is read, geocoded or charged
+    if (trial && trial.complete && !paid) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);
+    if (trial && paid && plan!.credits_remaining <= 0) return reply(req, { error: 'allotment_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);
     const unknown = Object.keys(b).filter((k) => !['address', 'radius_mi', 'view', 'label', 'idempotency_key'].includes(k));
     if (unknown.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + unknown[0] }, 400);
     const address = typeof b.address === 'string' ? b.address.trim() : '';
@@ -168,7 +186,7 @@ export function makeHandler(deps: Deps) {
       if (typeof b.idempotency_key !== 'string' || !IDEMPOTENCY_KEY.test(b.idempotency_key)) return reply(req, { error: 'invalid_request', detail: 'idempotency_key' }, 400);
       idempotencyKey = b.idempotency_key;
     }
-    const trialInfo = trial ? { trial: trialSummary(trial.trial) } : {};
+    const trialInfo = trial ? { trial: trialSummary(trial.trial), ...planInfo } : {};
     let label: string | undefined;
     if (b.label !== undefined) {
       if (typeof b.label !== 'string' || b.label.length > LABEL_MAX) return reply(req, { error: 'invalid_request', detail: 'label' }, 400);
@@ -219,7 +237,7 @@ export function makeHandler(deps: Deps) {
         });
       }
 
-      // 6. a trial report that uses a free report: stored and charged in ONE database transaction (evaluation_report_issue)
+      // 6. a member's report that uses a report from the allotment: stored and charged in ONE database transaction (brokerage_report_issue)
       let issued: EvaluationIssue;
       try {
         issued = await deps.issue(trial.userId, idempotencyKey!, out.intelligence!, out.privateContext,
@@ -227,10 +245,17 @@ export function makeHandler(deps: Deps) {
       } catch (e) {
         // a refusal stores nothing and charges nothing, and returns no report (a report given anyway would be a free report)
         if (e instanceof EvaluationComplete) return reply(req, { error: 'evaluation_complete' }, 403);
+        if (e instanceof AllotmentComplete) return reply(req, { error: 'allotment_complete' }, 403);
         if (e instanceof NotEntitled) return reply(req, { error: 'forbidden' }, 403);
         throw e;
       }
-      const used = { trial: { status: issued.credit.evaluation_status, credits_used: issued.credit.credits_used, credits_remaining: issued.credit.credits_remaining } };
+      // which allotment the report used is the database's answer. A free report moves the trial's figures; a paid one moves the month's and
+      // leaves the trial as it was (the free reports do not count toward the plan, founder 2026-10-02).
+      const c = issued.credit;
+      const used = c.allotment === 'paid'
+        ? { allotment: 'paid', trial: trialSummary(trial.trial),
+            plan: { ...planSummary(plan), state: 'paid', credit_limit: c.credits_used + c.credits_remaining, credits_used: c.credits_used, credits_remaining: c.credits_remaining, period_ends_at: c.period_ends_at } }
+        : { allotment: 'trial', trial: { status: c.evaluation_status, credits_used: c.credits_used, credits_remaining: c.credits_remaining }, ...planInfo };
       if (issued.replayed) {
         // the key was already charged: the answer is the FIRST report, and only if it is about this same property (D-L6)
         const same = issued.private_context_id ? await deps.contextMatches(issued.private_context_id, address) : 'unknown';
