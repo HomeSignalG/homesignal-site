@@ -237,7 +237,7 @@ Run 2026-10-04 on the final tree, in a sandbox with **no network egress** (so no
 | `test/launch-location-structure.test.mjs` | 22 / 22 |
 | `test/launch-gate-structure.test.mjs` | 67 / 67 (the original 73 gate checks are pinned by name in 6a-6g) |
 | `test/evaluation-entitlement-structure.test.mjs` · `brokerage-account-structure` · `national-report-function` | 76 / 76 · 57 / 57 · 194 / 194 |
-| `test/report_rate_limit_pg/run.sh` (the limiter against a real Postgres, incl. real concurrent sessions) | 71 / 71 |
+| `test/report_rate_limit_pg/run.sh` (the limiter against a real Postgres, incl. real concurrent sessions) | 71 / 71 *(73 / 73 since section 14a added the deterministic overlap check)* |
 | `test/launch_gate_pg/run.sh` (invite to a 100-report paid month, over the real handlers and SQL) | **86 / 86** = the original 73 + 13 in section 15 |
 | `test/trial_report_pg/run.sh` | 95 / 95 |
 | Chromium: `development-activity-reports.browser` · `development-activity-review.browser` | 257 / 257 · 54 / 54 |
@@ -289,8 +289,32 @@ Run 2026-10-04 on the final tree, in a sandbox with **no network egress** (so no
 
 **What it does not do.** It does not make every ZIP show records. **8,215** of the 12,722 ZIPs have any development record in HomeSignal's data; the other 4,507 correctly keep saying "No data ingested". A report covers half a mile, and a completed (operating) record appears only with an official event in the recent window (R3). It clears only registry sources (not facilities, scores or Local News). It does not clear the geocoder or ZCTA terms, change the Terms of Use, or open billing.
 
-**Not live, and what is open before it goes live.**
-1. **Deploy.** The list is read by `get-development-activity-report`, `follow-development-report` and `run-property-watch`. Merging does not redeploy them, but `deploy-edge-functions.yml` ships whatever `main` is, so a later unrelated deploy would ship this too. It goes live on the founder's go.
-2. **Real reports will be stored for the first time.** Until now `report_snapshot` holds 0 rows because no report ever had a record to store. The private-context contract (`docs/report-private-context-contract-2026-09-30.md` §6) lists the gates to close before a real customer report is stored, and the structure pin that used to say "re-read §6 (gates 1, 2, 5) in that change" asks for exactly this check. **It was not re-done:** the attempt to read that section in this session was refused by the tool's safety check, and was not retried by another route. The last confirmed state is the engine record of 2026-10-01 (`development-activity-report-engine-2026-09-30.md` §6: gates 1, 2, 3 proven, gate 4 built, gate 5 armed) which also says parts of gates 1, 2 and 5 remain open. **That is unverified today.**
-3. **The Terms of Use** still say personal, non-commercial use; that is for counsel.
-4. **Local runs not made after the last edit** (the safety check refused the batch, and it was not re-run in pieces): `launch-location-structure`, and the browser suites for the customer page, the review page and the report view after they moved to `RIGHTS_NONE`. The whole offline suite ran once before that edit with one file failing (`launch-location-structure`, fixed by the edit); CI runs all of them on the pull request.
+**What was open when this was written, and where each item stands (updated the same day).**
+1. **Deploy.** The list is read by `get-development-activity-report`, `follow-development-report` and `run-property-watch`. Merging does not redeploy them, but `deploy-edge-functions.yml` ships whatever `main` is. **The founder gave the go on 2026-10-04** (section 14a). The deploy and the live read-back are recorded in section 16, which is written after the deploy.
+2. **Real reports will be stored for the first time.** Until now `report_snapshot` holds 0 rows because no report ever had a record to store. The private-context contract (`docs/report-private-context-contract-2026-09-30.md` §6) lists the gates to close before a real customer report is stored. **Re-read on 2026-10-04 at the founder's choice, after the first attempt was refused by the tool's safety check; the result is section 14a.**
+3. **The Terms of Use** still say personal, non-commercial use; that is for counsel. Unchanged.
+4. **Local runs not made after the last edit.** Superseded: CI ran them on the pull request. On head `63813117`: unit, structural, isolation, launch-gate, billing, verify and browser were green; `report-rate-limit` was red for a reason unrelated to this change (section 14a); `snapshot` was still running when this was written.
+
+## 14a. The private-context gates, re-read, and the founder's go (2026-10-04)
+
+**What was read.** `docs/report-private-context-contract-2026-09-30.md` §6, "The five gates before the first real customer report is stored", and its dated note of 2026-10-02: clearing the first source turns the storing path on, and that change is the moment to re-read gates 1, 2 and 5. R7 is that change.
+
+**Where the five stand** (the contract's own words, checked against the code and against production today):
+
+| # | Gate | Standing |
+|---|---|---|
+| 1 | the exact address resides only in the deletable layer | closed in tests on a disposable Postgres; the engine emits intelligence and private context as two objects |
+| 2 | the permanent record holds the address nowhere else | a backstop with stated limits: the database matches whole values only; the engine's own `boundaryFindings` also looks for fragments (the street line) before any store and, on a finding, marks the report not storable (not stored, not charged: `handler.ts` 242-256, `credit-rule.ts` 51) |
+| 3 | deleting the private context does not damage report history | proven (`report_snapshot_pg` P01-P06) |
+| 4 | Changes Since Report works while the context is active | proven on a disposable Postgres; the function is deployed; no signed-in call has been made against production |
+| 5 | the clock and the purge are testable and auditable | applied and live. Read on 2026-10-04 just after 19:20 UTC: pg_cron job 70 `5,20,35,50 * * * *`, active; **96 runs in 24 hours, 96 succeeded**, newest 19:20:00Z; monitor check `report_private_context_retention` `ok = true` (updated 19:10:00Z, "0 private context(s) held (0 ever created)"). The purge of a real due context has not been seen in production because none exists |
+
+**Production before the go (read-only, same minute):** `report_snapshot` 0 rows, `report_private_context` 0 rows, 0 open needs.
+
+**Two consequences put to the founder in plain words before the go:**
+1. **Nothing closes a saved report yet.** The contract (D-4) keeps the `report` need open until Orders J and L define what closes a report. The 90-day purge starts only when the last need closes, so a stored address stays until a verified privacy request purges it (`report_private_context_purge(context, 'verified_privacy_request')`, a manual step today). This matches the founder's rule as written ("keep while the report is active") and is not what "90 days" sounds like.
+2. **A property that is itself a record's address is shown but not saved.** The contract §8.3 names the missing allow-list. The report fails closed: not stored, not charged. With R7 this will be common, because many addresses carry their own permit record.
+
+**The founder's decision, 2026-10-04: "go live."** Both consequences above had been stated. No gate was reinterpreted; the open parts listed in the contract (the limits of gate 2, the indefinite Follow, the unseen real purge, the missing close-rule) are accepted risks, not closed items.
+
+**One test hardened in this change (not part of R7).** The `report-rate-limit` job went red on this pull request because the prohibited mutation `no_advisory_locks` was not caught that time: it was caught only by the eight-session race, which depends on timing (caught 20 of 20 on an idle machine, missed once on a busy runner; the same job had passed on this branch's first commit). `test/report_rate_limit_pg/run.sh` gains one deterministic overlap check (R3b, R3c): a person at 9 of 10 has the tenth claim held open for three seconds while a second claim arrives one second later; with the locks the second waits and is refused (the minute ends at 10), without them it is admitted (the minute ends at 11). Measured locally on PostgreSQL 16: the suite passes **73 / 73** (it was 71), and the mutation fails R3b and R3c in **10 of 10** runs. No rate-limit rule, number or SQL changed.
