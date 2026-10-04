@@ -222,7 +222,7 @@ const htmlLife = viewLife(W);
   ok(attrs(html).length > 40, '4e (control) there were attributes to scan (' + attrs(html).length + ')');
   const ALLOWED_ATTRS = new Set(['class', 'aria-label', 'aria-hidden', 'data-lifecycle', 'href', 'target', 'rel', 'viewBox', 'width', 'height', 'focusable', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'd',
     // the 100526 layout: stage badges, the filters, the map, the action bar
-    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-value', 'aria-pressed', 'type', 'role', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
+    'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
   const seen = new Set(Object.values(outputs).flatMap((o) => attrs(o).map(([k]) => k)));
   ok([...seen].every((k) => ALLOWED_ATTRS.has(k)) && seen.has('data-lifecycle') && seen.has('href'), '4e2 the only attribute NAMES that ever appear are the closed set of presentation ones: no id, no data-id, no title, no style, no other data-*', [...seen].filter((k) => !ALLOWED_ATTRS.has(k)));
   ok(!/<(script|iframe|object|embed|form|input|img|select|textarea)\b/i.test(html) && !/\son[a-z]+=/i.test(html), '4f the output has no script, frame, form, input or event-handler attribute');
@@ -315,11 +315,12 @@ const htmlLife = viewLife(W);
   L('k-old-appr', '//example.com/x'); L('k-op', 'data:text/html,<script>alert(1)</script>'); L('k-unk', 'https://evil.example/"onmouseover="alert(1)'); L('k-sched', 'https://example.gov/ok?x=1&y=2');
   const hl = view(links);
   const hrefs = [...hl.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
-  ok(hrefs.join() === 'https://example.gov/ok?x=1&amp;y=2', '6d of eight source URLs only the real http(s) one is linked (javascript:, JAVASCRIPT:, ftp:, a space, protocol-relative, data:, a quote)', hrefs);
+  ok(hrefs.length > 0 && [...new Set(hrefs)].join() === 'https://example.gov/ok?x=1&amp;y=2', '6d of eight source URLs only the real http(s) one is linked, wherever it is linked (the table row and the card): not javascript:, JAVASCRIPT:, ftp:, a space, protocol-relative, data:, a quote', hrefs);
   ok(!/\sonmouseover=/.test(hl), '6e the quote-carrying URL did not become an attribute');
   const real = [...html.matchAll(/<a class="da-rv-link" href="([^"]*)" target="_blank" rel="noopener noreferrer">/g)];
   const nLinks = [...html.matchAll(/<a\b/g)].length;
-  ok(real.length === nLinks && real.length === 11 && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer (8 cards and 3 review items: 11 of 11)', real.length);
+  const inTable = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].reduce((a, t) => a + (t[0].match(/<a\b/g) || []).length, 0);
+  ok(real.length === nLinks && inTable > 0 && real.length === 11 + inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer (8 cards and 3 review items: 11, plus one per table row that has a link: ' + inTable + ')', [real.length, inTable]);
   ok(/Official source <span aria-hidden="true">→<\/span><span class="da-rv-sr"> for Menchaca Apartments \(opens in a new tab\)<\/span>/.test(html), '6g a link\'s accessible name carries the record it belongs to');
   const subj = '742 Evergreen Terrace, Springfield, OR 97477';
   const hs = V.html(W, { subject: subj });
@@ -576,6 +577,46 @@ const htmlLife = viewLife(W);
   // the lifecycle line is a customer-view omission only
   ok(!/HomeSignal lifecycle/.test(hb) && !/HomeSignal lifecycle/.test(mixed) && /HomeSignal lifecycle/.test(htmlLife) && V.html(WB, { showLifecycle: 'yes' }).indexOf('HomeSignal lifecycle') === -1 && V.html(WB, { showLifecycle: true }).indexOf('HomeSignal lifecycle') > -1,
     '11o the lifecycle line is left out by default and shown only for opts.showLifecycle === true (a truthy string is not enough), so a customer page cannot show it by passing something loose');
+}
+
+// ---- 12. the comparison table (step 15): rows above the cards, which stay below in an expandable detail --------------------------------------------
+{
+  const tableOf = (h) => (/<table[\s\S]*?<\/table>/.exec(h) || [''])[0];
+  const rowsOf = (tb) => [...tb.matchAll(/<tr role="row" data-da-type="(\w+)" data-da-stage="(\w+)">([\s\S]*?)<\/tr>/g)].map((m) => ({ type: m[1], stage: m[2], html: m[3], title: decode((/<th scope="row"[^>]*>([^<]*)<\/th>/.exec(m[3]) || [0, ''])[1]) }));
+  const heads = (tb) => [...tb.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map((m) => decode(m[1]));
+  for (const k of ['approved', 'proposed']) {
+    const s = sec(html, k), tb = tableOf(s.html), rows = rowsOf(tb), cards = cardsOf(s.html);
+    ok(tb !== '' && rows.length === cards.length && rows.length > 0 && rows.every((r) => r.stage === k) && rows.map((r) => r.title).join('|') === cards.map(cardTitle).join('|'),
+      '12a (' + k + ') the stage section opens with a table of exactly the records its cards show, in the same order, each row carrying the Type and Stage the filters match on', [rows.length, cards.length]);
+    ok(s.html.indexOf('<table') < s.html.indexOf('<details') && /<details class="da-rv-detail"><summary class="da-rv-sum">Full official detail<\/summary><div class="da-rv-cards">/.test(s.html) && s.html.indexOf('<details') < s.html.indexOf('<article'),
+      '12b (' + k + ') the table comes first and every card sits inside the one "Full official detail" detail below it');
+  }
+  const none = sec(html, 'permitted');
+  ok(!/<table|<details/.test(none.html) && /No projects at this stage in this report\./.test(none.html), '12c an empty stage has no table and no detail, only its honest empty line');
+  const ph = heads(tableOf(sec(html, 'proposed').html));
+  ok(ph.join('|') === 'Map|Record|Distance|Type|Official source', '12d the columns, in order, for records that state a distance, a Type and a link but no publisher stage: Map, Record, Distance, Type, Official source', ph);
+  const stagedW = await wire({ rows: [row('s1', 0.12, FAM_A)], projects: [proj('s1', FAM_A, { name: 'Staged', type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })], ledger: [], events: [], health: [] });
+  ok(heads(tableOf(sec(V.html(stagedW, {}), 'permitted').html)).join('|') === 'Map|Record|Distance|Type|Publisher stage|Official source' && /Under Construction/.test(textOf(tableOf(sec(V.html(stagedW, {}), 'permitted').html))),
+    '12d2 a record that states a publisher stage adds the Publisher stage column, in the publisher\'s own words');
+  // an absent field stays absent: a column no record has a value for is not drawn, and a cell is never a placeholder
+  const bare = clone(W); delete bare.render; bare.report.projects.forEach((p) => { p.source = { url: '', attribution: '' }; p.publisher_stage = null; });
+  const hb2 = V.html(bare, {});
+  const bh = heads(tableOf(sec(hb2, 'proposed').html));
+  ok(bh.join('|') === 'Map|Record|Type', '12e with no distances, no stage words and no links the table is Map, Record, Type only (no empty columns, no "not stated" cells)', bh);
+  ok(!/not stated|N\/A|&mdash;|—/.test(tableOf(sec(hb2, 'proposed').html)), '12f no placeholder text in any cell');
+  // every value in a cell is escaped, and the link is the one validated link
+  const hostileT = clone(W); hostileT.report.projects.find((p) => p.project_id === 'k-proposed').name = '<script>alert(1)</script>';
+  const ht = V.html(hostileT, {});
+  ok(!/<script/.test(ht) && /<th scope="row"[^>]*>&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/th>/.test(tableOf(sec(ht, 'proposed').html)), '12g a hostile record name is escaped in its table row');
+  const rowLinks = [...tableOf(sec(html, 'proposed').html).matchAll(/<a class="da-rv-link" href="([^"]*)" target="_blank" rel="noopener noreferrer">Official source /g)].map((m) => m[1]);
+  ok(rowLinks.length === 4 && rowLinks.every((u) => /^https:\/\/example\.gov\/records\//.test(u)), '12h each row\'s official link is the record\'s own http(s) link, opening in a new tab with noopener noreferrer', rowLinks);
+  ok(!/lifecycle|storage|HOLD|registry|family/i.test(textOf(tableOf(sec(html, 'proposed').html))), '12i the table carries no lifecycle line and nothing internal');
+  const first = rowsOf(tableOf(sec(html, 'proposed').html))[0];
+  ok(/<svg class="da-rv-shape"/.test(first.html) && />\d+<\/span>/.test(first.html), '12j a row opens with the marker\'s own shape and map number, the same number the map and the card carry', first.html.slice(0, 160));
+  // the numbers match the map markers and the cards
+  const nums = [...tableOf(sec(html, 'proposed').html).matchAll(/da-rv-td--num"><svg[^>]*>.*?<\/svg><span>(\d+)<\/span>/g)].map((m) => m[1]);
+  const cardNums = cardsOf(sec(html, 'proposed').html).map((c) => (/Map (\d+)/.exec(c) || [0, ''])[1]);
+  ok(nums.length === 4 && nums.join() === cardNums.join(), '12k the map numbers in the rows are the numbers on the cards', [nums, cardNums]);
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);

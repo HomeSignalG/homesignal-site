@@ -116,6 +116,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
 {
   const { ctx, page, errors } = await open(390, 844);
   await mount(page, hostile, ADDRESS);
+  await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; }));
   const m = await page.evaluate(() => {
     const vw = window.innerWidth;
     const root = document.querySelector('.da-rv');
@@ -125,6 +126,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   ok(m.docOver <= 0 && m.bodyOver <= 0 && m.wide.length === 0, '2a at 390px there is NO horizontal scroll, with a 140-character unbroken name, a 120-character unbroken status and a 200-character URL on the page', m);
   ok(m.longName, '2a (control) the long unbroken text really is on the page, so the overflow check had something to fail on');
   await mount(page, W, ADDRESS);
+  await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; })); // the cards sit in an expandable detail below each table; measure them open
   const lay = await page.evaluate(() => {
     const secs = [...document.querySelectorAll('.da-rv-sec')].map((s) => ({ label: s.getAttribute('aria-label'), top: s.getBoundingClientRect().top + scrollY, left: s.getBoundingClientRect().left, width: s.getBoundingClientRect().width }));
     const cols = [...document.querySelectorAll('.da-rv-cards')].map((g) => [...new Set([...g.children].map((c) => Math.round(c.getBoundingClientRect().left)))].length);
@@ -147,9 +149,12 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const rt = t.getBoundingClientRect(), rs = s.getBoundingClientRect(), cs = getComputedStyle(t);
     return rt.width > 20 && rt.height > 8 && rs.width >= 12 && rs.height >= 12 && cs.visibility === 'visible' && cs.display !== 'none' && t.textContent.trim().length > 0;
   }));
-  ok(vis.length === 8 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card without opening anything (8 of 8)', vis);
+  ok(vis.length === 8 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card once its detail is open (8 of 8); the rows above show the marker shape without opening anything (2f2)', vis);
+  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('svg.da-rv-shape'), n = r.querySelector('.da-rv-td--num span'); const a = sv && sv.getBoundingClientRect(), b = n && n.getBoundingClientRect(); return !!(a && b && a.width >= 12 && a.height >= 12 && b.width > 4 && /^\d+$/.test(n.textContent.trim())); }));
+  ok(rowsVis.length === 6 && rowsVis.every(Boolean), '2f2 every table row shows its marker shape and map number without opening anything (6 of 6: the eight cards less the two hero rows that sit outside the stage sections)', rowsVis);
   const links = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width)]; }));
-  ok(links.length === 11 && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (8 cards, 3 review items) is at least 32px tall and 60px wide on a phone: tappable', links);
+  const tableLinks = await page.evaluate(() => document.querySelectorAll('.da-rv-table .da-rv-link').length);
+  ok(tableLinks > 0 && links.length === 11 + tableLinks && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (8 cards, 3 review items, ' + tableLinks + ' table rows) is at least 32px tall and 60px wide on a phone: tappable', links);
   const chipsH = await page.evaluate(() => [...document.querySelectorAll('.da-rv-chip, .da-rv-act')].map((b) => Math.round(b.getBoundingClientRect().height)));
   ok(chipsH.length >= 8 && chipsH.every((h) => h >= 36), '2g2 every filter chip and action button is at least 36px tall on a phone', chipsH);
   const sr = await page.evaluate(() => { const e = document.querySelector('.da-rv-sr'); const r = e.getBoundingClientRect(); return [r.width, r.height]; });
@@ -175,11 +180,20 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   const inside = seq.filter((s) => s.inReport), left = seq[seq.length - 1];
   const reached = inside.filter((s) => s.kind === 'link');
   const kinds = inside.map((s) => s.kind);
-  ok(reached.length === 11 && kinds.filter((k) => k === 'chip').length === 8 && kinds.filter((k) => k === 'action').length === 4 && kinds.every((k) => ['link', 'chip', 'action'].includes(k)) && left.inReport === false,
-    '3a Tab reaches every source link (11), every filter chip (8) and the four actions, one per press, and then leaves the report: it holds no other control', kinds.join(','));
+  const expect = await page.evaluate(() => ({ reachable: [...document.querySelectorAll('.da-rv-link')].filter((a) => !a.closest('details:not([open])')).length, review: document.querySelectorAll('.da-rv-rev .da-rv-link').length, table: document.querySelectorAll('.da-rv-table .da-rv-link').length, sums: document.querySelectorAll('.da-rv-sum').length }));
+  ok(expect.review === 3 && expect.table > 0 && expect.sums === 2 && reached.length === expect.reachable && expect.reachable === 2 + expect.review + expect.table && kinds.filter((k) => k === 'chip').length === 8 && kinds.filter((k) => k === 'action').length === 4
+    && kinds.filter((k) => k === 'SUMMARY').length === 2 && kinds.every((k) => ['link', 'chip', 'action', 'SUMMARY'].includes(k)) && left.inReport === false,
+    '3a Tab reaches the two hero links, the review links (3), the table links (' + expect.table + '), every filter chip (8), the two "Full official detail" toggles (the Permitted section is empty in this report) and the four actions, one per press, and then leaves the report; the cards inside a closed detail are not tab stops', kinds.join(','));
   ok(inside.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link, chip and action shows a visible focus ring of at least 2px', inside.filter((s) => !(s.outline !== 'none' && s.outlineWidth >= 2)).map((s) => s.kind));
   ok(inside.every((s, i) => i === 0 || s.top >= inside[i - 1].top - 1), '3c focus follows reading order, top to bottom (items in one row share a top)', inside.map((s) => s.top));
   ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view');
+  // a keyboard user opens a detail with Enter and the next Tab press lands on a card inside it
+  await page.focus('.da-rv-sum');
+  await page.keyboard.press('Enter');
+  const opened = await page.evaluate(() => document.querySelector('.da-rv-sum').parentElement.open);
+  await page.keyboard.press('Tab');
+  const nxt = await page.evaluate(() => { const a = document.activeElement; return { inCard: !!(a && a.closest && a.closest('.da-rv-detail[open] .da-rv-card')), tag: a ? a.tagName : null }; });
+  ok(opened === true && nxt.inCard, '3e Enter on "Full official detail" opens it, and the next Tab press lands on a link inside the opened cards', [opened, nxt]);
   const hrefs = reached.map((s) => s.href);
   ok(new Set(hrefs).size === 8 && hrefs.every((h) => /^https:\/\/example\.gov\/records\/k-/.test(h)), '3e the links are the eight records\' own official sources (a Things to Review item links to its record\'s source)', [...new Set(hrefs)]);
   const attrs = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => a.target + ' ' + a.rel));
@@ -294,6 +308,92 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   }));
   ok(laidOut.approved === 0 && laidOut.marks === 4, '7h on a host page whose CSS sets display on article and g, a filtered-out card and marker still take no space', laidOut);
   await ctx.close();
+}
+
+{
+  // The comparison table (realtor wording pass, step 15): rows above the cards, which stay below in an expandable detail.
+  // Desktop is a real table; a phone stacks one block per record; the filters, the keyboard and print all still reach every record.
+  const { execFileSync } = await import('node:child_process');
+  {
+    const { ctx, page, errors } = await open(1280, 900);
+    await mount(page, W, ADDRESS);
+    const d = await page.evaluate(() => {
+      const t = document.querySelector('.da-rv-sec--proposed .da-rv-table'), th = [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim());
+      const head = t.querySelector('thead').getBoundingClientRect(), cs = getComputedStyle(t);
+      const det = document.querySelector('.da-rv-sec--proposed .da-rv-detail');
+      const card = det.querySelector('.da-rv-card');
+      return { display: cs.display, th, headH: Math.round(head.height), rows: t.querySelectorAll('tbody tr').length, cards: det.querySelectorAll('.da-rv-card').length, open: det.open, cardShown: card.checkVisibility({ contentVisibilityAuto: true, checkVisibilityCSS: true }),
+        titles: [...t.querySelectorAll('tbody th[scope=row]')].map((x) => x.textContent.trim()), cardTitles: [...det.querySelectorAll('.da-rv-title')].map((x) => x.textContent.trim()) };
+    });
+    ok(d.display === 'table' && d.headH > 10 && d.th[0] === 'Map' && d.th[1] === 'Record' && d.th.includes('Official source') && d.rows === 4, '12a on a desktop the stage section opens with a real table: Map, Record, ... Official source, one row per record', d);
+    ok(d.open === false && d.cardShown === false && d.cards === 4 && d.rows === d.cards && d.titles.join('|') === d.cardTitles.join('|'), '12b the cards are in the DOM but collapsed until opened, and the rows list the same records in the same order', [d.open, d.cardShown, d.titles, d.cardTitles]);
+    ok(errors.length === 0, '12c no page error and no console error', errors);
+    // the filters: a Stage filter takes the other sections' rows, table and detail with it; a Type filter does the same inside a section
+    await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
+    const f1 = await page.evaluate(() => ({ approvedWrap: document.querySelector('.da-rv-sec--approved .da-rv-tablewrap').hidden, approvedDet: document.querySelector('.da-rv-sec--approved .da-rv-detail').hidden,
+      proposedRows: [...document.querySelectorAll('.da-rv-sec--proposed .da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length, note: !document.querySelector('.da-rv-sec--approved .da-rv-nomatch').hidden }));
+    ok(f1.approvedWrap && f1.approvedDet && f1.proposedRows === 4 && f1.note, '12d Stage = Proposed hides the Approved table and its detail (and says nothing matches there), and the four Proposed rows stay', f1);
+    await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
+    const types = await page.evaluate(() => [...document.querySelectorAll('.da-rv-chip[data-da-filter="type"]')].map((b) => b.getAttribute('data-da-value')).filter((v) => v !== 'all'));
+    await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="' + types[0] + '"]');
+    const f2 = await page.evaluate((ty) => ({ shown: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).map((r) => r.getAttribute('data-da-type')), all: document.querySelectorAll('.da-rv-table tbody tr').length, ty }), types[0]);
+    ok(f2.shown.length > 0 && f2.shown.length < f2.all && f2.shown.every((t) => t === f2.ty), '12e a Type filter leaves only that Type\'s rows in every table (rows carry the same Type and Stage the cards and map markers do)', f2);
+    await ctx.close();
+  }
+  {
+    const { ctx, page, errors } = await open(390, 844);
+    await mount(page, W, ADDRESS);
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('.da-rv-sec--proposed .da-rv-table'), vw = innerWidth;
+      const row = t.querySelector('tbody tr'), r = row.getBoundingClientRect(), head = t.querySelector('thead').getBoundingClientRect();
+      const labels = [...row.querySelectorAll('.da-rv-lab')].filter((l) => getComputedStyle(l).display !== 'none').map((l) => l.textContent.trim());
+      return { rowDisplay: getComputedStyle(row).display, rowW: Math.round(r.width), vw, headW: Math.round(head.width), headH: Math.round(head.height), labels, over: document.documentElement.scrollWidth - vw,
+        role: t.getAttribute('role'), rowRole: row.getAttribute('role'), hasRowHeader: !!row.querySelector('th[role=rowheader]'),
+        tops: [...row.children].map((c) => Math.round(c.getBoundingClientRect().top)) };
+    });
+    ok(m.rowDisplay === 'block' && m.rowW <= m.vw - 20 && m.headW <= 1 && m.headH <= 1 && m.over <= 0, '12f on a phone the table stacks: one block per record, inside the screen, the header row gone from view, no sideways scroll', m);
+    ok(m.labels.includes('Distance:') && m.labels.includes('Type:') && m.labels.includes('Official source:') && !m.labels.includes('Publisher stage:') && m.tops.every((t, i) => i === 0 || t >= m.tops[i - 1]),
+      '12g each stacked cell says what it is ("Distance:", "Type:", "Official source:"), a record with no publisher stage has no empty "Publisher stage:" cell, and the cells run top to bottom', m);
+    ok(m.role === 'table' && m.rowRole === 'row' && m.hasRowHeader, '12h the stacked rows keep their table roles (table, row, row header) for screen readers', m);
+    ok(errors.length === 0, '12i no page error and no console error on a phone', errors);
+    await ctx.close();
+  }
+  {
+    // an absent field stays absent: no distances (a reopened or shared report) means no Distance column, and no links means no Official source column
+    const bare = clone(W); delete bare.render; bare.report.projects.forEach((p) => { p.source = { url: '', attribution: '' }; });
+    const { ctx, page } = await open(1280, 900);
+    await mount(page, bare, ADDRESS);
+    const th = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table')].map((t) => [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim()).join('|')));
+    ok(th.length === 2 && th.every((h) => !/Distance/.test(h) && !/Official source/.test(h) && /^Map\|Record/.test(h)), '12j a column no record has a value for is left out: no Distance without distances, no Official source without a link', th);
+    await ctx.close();
+  }
+  {
+    // print: the cards are collapsed on screen, but a printed report is the whole report
+    const { ctx, page } = await open(1280, 900);
+    await mount(page, W, ADDRESS);
+    const closed = await page.evaluate(() => [...document.querySelectorAll('.da-rv-detail')].every((d) => !d.open));
+    const { writeFileSync, mkdtempSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'da-print-'));
+    const textOf = async (name) => { writeFileSync(join(dir, name), await page.pdf({ format: 'Letter', printBackground: true })); return execFileSync('pdftotext', ['-layout', join(dir, name), '-'], { encoding: 'utf8' }); };
+    const tClosed = await textOf('closed.pdf');
+    await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; }));
+    const tOpen = await textOf('open.pdf');
+    const n = (t, re) => (t.match(re) || []).length;
+    ok(closed && tClosed === tOpen && n(tClosed, /Publisher status:/g) >= 6 && !/Full official detail/.test(tClosed),
+      '12k printing the report with every detail collapsed on screen prints exactly what it prints with every detail open (the whole report), and not the "Full official detail" toggle', { closed, same: tClosed === tOpen, status: n(tClosed, /Publisher status:/g), toggle: /Full official detail/.test(tClosed) });
+    ok(/MAP\s+RECORD/i.test(tClosed) && n(tClosed, /Official source/g) >= 12, '12l the printed report carries the table (Map, Record ...) and a link line for each record in the table and in its card', [/MAP\s+RECORD/i.test(tClosed), n(tClosed, /Official source/g)]);
+    // both print paths: the stylesheet shows a closed detail's content in print, and the print hook opens every detail around the dialog and puts them back
+    await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = false; })); // closed, as a reader leaves them
+    await page.emulateMedia({ media: 'print' });
+    const css = await page.evaluate(() => [...document.querySelectorAll('.da-rv-detail')].map((d) => getComputedStyle(d, '::details-content').contentVisibility + '/' + getComputedStyle(d.querySelector('.da-rv-sum')).display));
+    await page.emulateMedia({ media: 'screen' });
+    const hook = await page.evaluate(() => { const ds = [...document.querySelectorAll('.da-rv-detail')]; ds.forEach((d) => { d.open = false; }); window.dispatchEvent(new Event('beforeprint')); const during = ds.every((d) => d.open); window.dispatchEvent(new Event('afterprint')); return { during, after: ds.every((d) => !d.open) }; });
+    const keep = await page.evaluate(() => { const d = document.querySelector('.da-rv-detail'); d.open = true; window.dispatchEvent(new Event('beforeprint')); window.dispatchEvent(new Event('afterprint')); return d.open; });
+    ok(css.length === 2 && css.every((c) => c === 'visible/none') && hook.during && hook.after && keep === true,
+      '12m in print the stylesheet shows each closed detail\'s content and hides its toggle, and the print hook opens every detail and closes only the ones it opened (a detail the reader had open stays open)', { css, hook, keep });
+    await ctx.close();
+  }
 }
 
 {
