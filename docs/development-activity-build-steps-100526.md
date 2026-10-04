@@ -447,7 +447,7 @@ through once each step is complete").
      trial, the owner joins and invites an agent, twenty free reports, the 21st refused, the owner's checkout, a test payment that grants nothing, the live
      payment that binds the subscription and opens a month of 100, a hundred paid reports, the 101st refused (by the handler and by the database), all 120
      listed and opened, a second brokerage unable to read or take any of it, and a cancellation that ends new reports and deletes nothing. 73 checks.
-     It runs in CI as its own job (`launch-gate` in `report-snapshot-suite.yml`). MUTATION_SUMMARY*
+     It runs in CI as its own job (`launch-gate` in `report-snapshot-suite.yml`). A manual loop (`test/launch_gate_mutants.py`) makes 28 breaks of the edge, the shared modules and the SQL, one at a time in a copy, and the gate alone kills 28 of 28; its first pass found two real gaps in the gate (an id-leak check made on the wrong answer; an event-name guard hidden behind the type guard) and two assertions that threw, all fixed.*
    - ***What it does not prove:** nothing reached Lemon Squeezy (the processor is a stand-in that records the request), **no payment has been made**, the
      processor's field names are still the unconfirmed ones, and the reports are fixture reports because no source is cleared.*
    - ***The buttons stay hidden and inert** (`data-commerce hidden`; `test/development-activity-landing.test.mjs` still fails if one is shown). Before they go

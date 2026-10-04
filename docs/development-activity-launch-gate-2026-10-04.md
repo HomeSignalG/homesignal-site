@@ -67,7 +67,21 @@ A gate that only passes when everything is right and cannot tell is not a gate. 
 gate reads — edge functions, shared modules, and the SQL — in a *copy* (the working tree is never edited), against its own disposable database, and requires the gate
 alone to fail with a named `FAIL —` line. An unmutated copy runs first as the positive control. A run that only crashes is **not** counted as a kill.
 
-MUTATION_RECORD_PLACEHOLDER
+**Record, 2026-10-04.** 28 mutations in four groups: who may start a checkout and when (6), the checkout and the webhook (8), the report function's refusals (4), and the
+database — plan state, the cap, numbering, the binding, the lock-down (10). Run it with
+`PGHOST=… PGPORT=… PGUSER=… python3 test/launch_gate_mutants.py` against a Postgres it may create databases in.
+
+- **First pass, on the first version of the gate (72 checks): 24 killed, 2 survived, 2 only crashed.** The survivors were real gaps in the gate, found by the loop:
+  1. `plan_answer_names_the_brokerage` — the gate checked "no billing answer names the brokerage" on the refusal an outsider gets, which carries no plan at all, so an id
+     added to a plan answer passed. It is now checked on the owner's and the agent's status, the checkout answer, a report answer and the webhook's answer.
+  2. `order_events_recorded` — the gate's order event also failed the separate "this is a subscription" check, which hid the event-name check behind it. A new check sends a
+     subscription-shaped payment notice, which only the event-name check can refuse.
+  The two crashes (`complete_trial_reaches_the_issue_function`, `spent_month_reaches_the_issue_function`) were assertions that threw on an answer with no plan field instead of
+  failing. They now fail by name, and the gate ends any throw as a named failure with its summary (the loop counts that line as a crash, not a kill).
+- **Final pass, on the committed gate (73 checks): the unmutated control passes in full, and 28 of 28 mutations are killed**, each by a named check.
+- **What this does and does not say.** 28 breaks along the path are a sample, not every possible break. The layer suites carry the rest (`test/billing_mutants.py`,
+  `test/brokerage_billing_pg/mutate.py`, and the trial and report suites); this loop answers a different question — whether the gate, on its own, notices a break in the
+  layer it stands on.
 
 ## 4. Why the buttons are not live
 
