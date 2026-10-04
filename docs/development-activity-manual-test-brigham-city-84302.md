@@ -81,7 +81,7 @@ You need to be signed in as an admin. An admin report is never charged and nothi
 
 ## Part C — the rate limit (only after it has been applied and deployed)
 
-Not live yet. It is live only after (1) `docs/report-rate-limit.sql` is applied and (2) `get-development-activity-report` is deployed. If you do this before then, nothing is limited and nothing breaks.
+Live since 2026-10-04: `docs/report-rate-limit.sql` is applied and `get-development-activity-report` is deployed (launch record, section 9, receipt). This is the only check that sends a real member's request through the live limiter, which has not been seen yet: it needs the invited test owner from Part B.
 
 As the invited owner from Part B (an admin is never limited):
 

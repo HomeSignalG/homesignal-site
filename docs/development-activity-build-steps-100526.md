@@ -337,7 +337,7 @@ through once each step is complete").
      email can list everything recorded since the report was made; a watch is the agent's own, not the brokerage's; the recipient
      is the agent's sign-in email, read at send time and stored nowhere; the agent is not emailed when a watch ends (standing lost,
      address purged) or when a check keeps failing, an alarm reports failures instead.
-   - Open before step 13 (unchanged, plus three; **the free-report rate limit is now BUILT, not applied or deployed: see step 13**): the free-report rate limit; the public link endpoint is not rate-limited; an
+   - Open before step 13 (unchanged, plus three; **the free-report rate limit is now APPLIED and DEPLOYED (2026-10-04): see step 13**): the free-report rate limit; the public link endpoint is not rate-limited; an
      owner cannot list or withdraw invite links or remove an agent; how PostgREST turns the database's refusals into HTTP answers is
      unchecked against production; the signed-in paths are not exercised live; **`run-property-watch` has no rate limit beyond its
      private secret and its per-call limit of 5**; **an ended or failing watch is not emailed to the agent (D-9-5, D-9-7)**; **the
@@ -460,17 +460,16 @@ through once each step is complete").
      requests not yet sent) · **D-13-1, a decision: what do the public "Start with 20 free reports" and "Join for $79/month" buttons do?** Today a trial is
      created by an admin and joined by an invite link, and only an existing brokerage's owner can start a checkout, so neither button has anything to call ·
      and the carried open items (the free-report rate limit; no billing-portal link, so a customer cannot change a card or cancel from the page).*
-   - *2026-10-04 (continued, nothing live changed): **the free-report rate limit is built, NOT applied and NOT deployed.** `docs/report-rate-limit.sql` plus the
+   - *2026-10-04 (continued): **the free-report rate limit was built, then APPLIED and DEPLOYED the same day on the founder's "go 1" / "go 2"** (PR #1622 merged as `46f3cb43`; the SQL applied from `main`, then `get-development-activity-report` deployed from `main`, version 14 to 15; read back from production, receipt in section 9 of the launch record). It has not yet been seen limiting a real member: that needs the invited test owner of manual test Parts B and C. `docs/report-rate-limit.sql` plus the
      report function's claim (after validation, before the geocoder, for members only), a 429 with the wait, the page's plain-words message, a database suite with real
      concurrent sessions, an edge test suite, structure pins, two mutation loops, and section 15 of the launch gate. It touches neither the 20 free nor the 100 paid reports.
-     The numbers (a person 10 a minute, 60 an hour, 200 a day; a brokerage 30, 200, 1,000) are **proposed, not founder-set: decision D-RL-1**. Apply order, which needs your
-     go: apply the SQL first, then deploy `get-development-activity-report`. Record: section 9 of the launch record. The audit of every other surface, with what is NOT
+     The numbers (a person 10 a minute, 60 an hour, 200 a day; a brokerage 30, 200, 1,000) are **proposed, not founder-set: decision D-RL-1**, and are live as proposed (the founder said go without changing them; changing them is a one-function edit and a re-apply). Record: section 9 of the launch record. The audit of every other surface, with what is NOT
      covered (section 10 of the launch record), and what a request-access or self-serve trial path would need (section 11; decisions D-RA-1 to D-RA-3) are written down;
      **no public path was added.***
    - *The launch / manual test location is **Brigham City, UT 84302** (above, step 12). The empty-source state was verified: it says "No data ingested" in the page, is not
      styled as an error, and a status line that read "0 official records" for it (a measured zero for something not measured) was corrected in both pages.*
    - ***Step 13 stays OPEN.** Lemon Squeezy account creation, the product, the webhook, the secrets and a real payment test are **deferred, not done**. The buttons are not live.
-     **Carried open items, kept explicit:** (a) the free-report rate limit: built, not applied or deployed; (b) **there is no billing-portal link, so a customer cannot change a
+     **Carried open items, kept explicit:** (a) the free-report rate limit: APPLIED and DEPLOYED 2026-10-04, not yet seen limiting a real member; (b) **there is no billing-portal link, so a customer cannot change a
      card or cancel from the page: open, not built**; (c) the public client link endpoint is not rate-limited; (d) an owner cannot list or withdraw invite links or remove
      an agent; (e) `run-property-watch` has no rate limit beyond its private secret; (f) an ended or failing watch is not emailed to the agent.)*
 
