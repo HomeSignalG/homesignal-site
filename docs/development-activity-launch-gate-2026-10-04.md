@@ -217,4 +217,34 @@ Each row says what exists **today** and the evidence. "NOT COVERED" means no rat
 
 ## 12. Tests and checks run for this change
 
-*(Filled in at the foot of the PR with the final numbers; see the PR description.)*
+Run 2026-10-04 on the final tree, in a sandbox with **no network egress** (so nothing below touched the live geocoder, Supabase, Lemon Squeezy or any publisher). Disposable Postgres 16 for every database suite; no credential was present.
+
+**Suites**
+
+| Suite | Result |
+|---|---|
+| Offline unit suite (`node scripts/run-unit-tests.mjs --offline`, the required CI check) | **all 325 files pass** (run after the last code change; the docs edit that followed was re-checked by `launch-location-structure`, below) |
+| `test/brigham-city-84302-journey.test.mjs` | 28 / 28 |
+| `test/report-rate-limit-function.test.mjs` | 70 / 70 |
+| `test/report-rate-limit-structure.test.mjs` | 42 / 42 |
+| `test/launch-location-structure.test.mjs` | 22 / 22 |
+| `test/launch-gate-structure.test.mjs` | 67 / 67 (the original 73 gate checks are pinned by name in 6a-6g) |
+| `test/evaluation-entitlement-structure.test.mjs` · `brokerage-account-structure` · `national-report-function` | 76 / 76 · 57 / 57 · 194 / 194 |
+| `test/report_rate_limit_pg/run.sh` (the limiter against a real Postgres, incl. real concurrent sessions) | 71 / 71 |
+| `test/launch_gate_pg/run.sh` (invite to a 100-report paid month, over the real handlers and SQL) | **86 / 86** = the original 73 + 13 in section 15 |
+| `test/trial_report_pg/run.sh` | 95 / 95 |
+| Chromium: `development-activity-reports.browser` · `development-activity-review.browser` | 257 / 257 · 54 / 54 |
+
+**Mutation loops** (each mutation is applied to a copy and must be killed by a *named failing check*; a crash does not count)
+
+| Loop | Result |
+|---|---|
+| SQL, `test/report_rate_limit_pg/mutate_all.sh` | **29 killed, 0 survived**, control 71 / 71 |
+| Edge, `test/report_rate_limit_mutants.py` | **35 killed, 0 survived** |
+| Launch gate, `test/launch_gate_mutants.py` (the original 28 + 6 rate-limit mutations) | **34 killed, 0 survived**, control 86 / 86 |
+
+**An instrument defect found and fixed during this run.** The first SQL mutation re-run reported "killed 0, survived 29". It was run in a shell with no database named, so `run.sh` stopped on its first line and printed no failing check, which the loop read as "survived" for every mutation. It failed in the safe direction, but a suite that never ran must not be filed as a surviving mutant. `mutate_all.sh` now requires `PGHOST` and `PGDATABASE`, runs the **unmutated** suite first and refuses to judge any mutation unless it passes, and reports a mutation whose suite did not run as a harness failure. Shown: no database named → abort (exit 1); a database that does not exist → "the unmutated suite did not pass, so no mutation can be judged" (exit 2); the real run → 29 / 29 killed.
+
+**The whole browser sweep (reported-only in CI).** `node scripts/run-unit-tests.mjs --browser` ended "17 test file(s) failed" out of 55. That is **not** caused by this change, shown rather than assumed: the same 17 files were run on a pristine checkout of `main` (`2c0246dc`) and all 17 fail there too. 15 fail with the identical set of failing check names. The two that differed by one check were re-run three times each, alone, on both trees: `user-journey` matched on `main` every time (the extra failure only appeared while other jobs were loading the machine), and in `home-zip-or-address` the extra "no page errors" check is `console: Failed to load resource: net::ERR_TUNNEL_CONNECTION_FAILED`, a sandbox network-proxy failure on an external resource, in a page this change does not touch (no file in the diff is loaded by the home page). The failures I read were the sandbox itself: no network (Map 1 and the geocoder checks need the live database and geocoder), and in one file a Chrome channel that is not installed. I did not read every line of all 17; the evidence that none is this change's is that each one fails on `main` too. A first baseline attempt was **invalid** and is not used: the pristine checkout had no `node_modules`, so those tests printed "SKIP — playwright not installed" and exited 0 without running.
+
+**Not tested, and why.** The live address lookup was never asked for `20 N Main St, Brigham City, UT 84302` (no egress): that is Part A of the manual test. `docs/report-rate-limit.sql` has been run only against disposable Postgres, never against production: applying it and deploying the function wait for a go. Nothing in this change was merged, applied, deployed, sent or made public.
