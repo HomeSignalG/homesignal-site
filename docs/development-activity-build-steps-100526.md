@@ -343,7 +343,33 @@ through once each step is complete").
      private secret and its per-call limit of 5**; **an ended or failing watch is not emailed to the agent (D-9-5, D-9-7)**; **the
      ledger rows for runner applies (`property_watch`, `property_watch_schedule`) are hand-written backfills with empty statements**.
      Also carried: several older mutation harnesses have stale anchors that predate step 7; none guards step 9.
-10. **Compare.** Two to five addresses side by side, same report rules.
+10. ~~**Compare.**~~ Two to five addresses side by side, same report rules.
+   *(Done: #1612 merged as `cf7aba5`.*
+   - *No SQL and no edge function in this step: nothing was applied to the database and nothing was deployed to the edge. It ships with
+     the site (Pages), and the saved-report calls from step 6 are unchanged.*
+   - *Pages deployed (run `37165714825`, success). Read back from homesignal.net by md5 and size, byte-identical to `main`:
+     `development-activity-reports.html` (`a3b58820…`, 67,779 bytes), `lib/da-report-view.js?v=09e9661a` (`b86cec10…`, 56,840),
+     `lib/da-report-compare.js?v=e0b8a59d` (`52ec98a4…`, 18,587), `development-activity-review.html` (`da2e4058…`, 26,349) and
+     `shared-report.html` (`f78ba5f3…`, 9,901).*
+   - *Not exercised live: opening or comparing a real saved report. No brokerage member and no stored report exist in production, and
+     none was created. It is proven by the tests: 74 checks on the comparison, 50 on the structure, 40 in Chromium against the real
+     handlers, and 64 deliberate breakages, all caught (16 of 18 page breakages by Chromium alone; the two others are explained in the
+     record).)*
+   - On the agent's reports page a **Compare properties** card lists the saved reports with a checkbox each. The agent ticks two to
+     five and the page opens exactly those (the same open call that reopens a saved report) and sets them side by side: what changed,
+     by stage, by type, the latest timeline facts, and coverage and freshness in the engine's own words. A comparison does not use a
+     free report, and it is rebuilt from the saved reports each time.
+   - Defaults taken, the founder may change any (full list D-10-1 to D-10-7 in `docs/development-activity-compare-2026-10-03.md`):
+     Compare works on saved reports, so an address is added by making its report first (a report is charged by the one rule);
+     distance is not compared, because a saved report does not keep it; columns follow the saved list's order, newest first, and
+     nothing is ranked; reports of different distances are refused; the comparison is not printed or shared; "published timelines"
+     are the publisher's latest event and the newest change HomeSignal detected; a count is of source records, not of proven
+     separate projects.
+   - Open before step 13 (unchanged): the free-report rate limit; the public link endpoint is not rate-limited; an owner cannot list or
+     withdraw invite links or remove an agent; how PostgREST turns the database's refusals into HTTP answers is unchecked against
+     production; the signed-in paths are not exercised live; `run-property-watch` has no rate limit beyond its private secret; an ended or
+     failing watch is not emailed to the agent. Also carried: several older mutation harnesses have stale anchors that predate step 7;
+     none guards step 10.
 11. **$79/month checkout** on the existing Lemon Squeezy connection: 100 reports a month, Billing tab.
     *Founder action:* create the $79 product in Lemon Squeezy and make one test payment.
 
