@@ -423,6 +423,22 @@ through once each step is complete").
     projects. *Founder action:* send the drafted Utah requests (UDOT, Salt Lake City, Provo;
     `docs/corporate-output-utah-clearance-2026-10-02.md`). Each source is added to
     `supabase/functions/_shared/report-rights.json` as its answer arrives.
+   *(**NOT done, and not struck.** This step is complete when sources are cleared, and none is: `report-rights.json` still says
+   `"cleared": []`. **No request has been sent and none is pending.** State on 2026-10-04:*
+   - *The requests are re-drafted and send-ready in `docs/utah-source-requests-send-ready-2026-10-04.md`, replacing the body in the
+     2026-10-02 file (kept as the dated record). The old body predated saved reports, client links, Watch, Compare and the
+     subscription; sent as it stood it would have under-described the use. The new body states each of them, and the three requests
+     differ only in the dataset they name (checked when generated).*
+   - *Re-read on 2026-10-04 through the database's HTTP extension: the three publishers' posted wording is unchanged (UDOT a warranty
+     disclaimer plus a contact, Salt Lake City the label "Open Data", Provo silent). All three stay HOLD. The Utah development rows are 10,426,
+     of which UDOT is 9,665 (92.7%). The Provo page cited in the old draft now answers 404 and is dropped.*
+   - *Recipients: UDOT's is `udotgis@utah.gov`, printed in its own license text. **Salt Lake City's and Provo's were not found** (Provo's city
+     site shows only its general line); none is invented. The pack says how to find them.*
+   - *A control now exists for the day an answer arrives: `docs/source-clearance-evidence-template.md` and `test/report-rights-evidence.test.mjs`
+     (28 checks; 16 deliberate breakages of its rules, all caught). A registry entry is refused unless it points at a real, filled-in
+     evidence section that names the source, quotes the publisher's own words and carries the attribution the publisher required.*
+   - *Consequence for step 13: until one source is cleared, every report is "No data ingested" (free, never stored), so the 20 free reports
+     and the paid month cannot be exercised on real data. They can be exercised on test data.)*
 13. **End-to-end launch test, then the Enterprise page buttons go live.** A test brokerage runs sign-up,
     20 reports, the end of the trial, payment and a 100-report month.
 
@@ -434,4 +450,4 @@ through once each step is complete").
 | ~~Before step 5~~ | ~~Does a limited-coverage report use up a free report?~~ Answered 2026-10-02: "No development activity" is charged, "No data ingested" is not. |
 | ~~Before step 8~~ | ~~How long share links last; whether the client sees the address~~ Answered 2026-10-03: 6 months; yes. |
 | Step 11 (build done, still yours) | Create the Lemon Squeezy product and a second webhook, set the four secrets and test mode, make one test payment, check the ledger rows before going live. Steps: section 5 of `docs/development-activity-billing-2026-10-04.md`. Also decide D-11-1 (a cancelled subscription ends access at once) |
-| Any time, needed by step 12 | Send the Utah permission requests |
+| Any time, needed by step 12 | Send the three Utah permission requests (UDOT, Salt Lake City, Provo). Ready to send, with the steps: `docs/utah-source-requests-send-ready-2026-10-04.md`. Two recipients still have to be found. Tell me each date you send one |
