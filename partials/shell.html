@@ -44,7 +44,19 @@
         </div>
       </div>
       <a href="properties.html" data-nav="props">My Places</a>
-      <a href="development-activity.html" data-nav="enterprise">Enterprise</a>
+      <!-- THE ENTERPRISE DROPDOWN (founder, 2026-10-05): "My reports" is how an agent gets back to
+           the reports page (development-activity-reports.html), which no other page linked. It is
+           built exactly like the Explore dropdown (same classes, same open/close behaviour).
+           "Enterprise" itself still goes to development-activity.html. The entries carry no
+           data-nav, so they never light a primary item. -->
+      <div class="hs-navgroup" id="hs-enterprise">
+        <a href="development-activity.html" data-nav="enterprise">Enterprise</a>
+        <button type="button" class="hs-navcaret" id="hs-enterprise-toggle" aria-label="Enterprise pages" aria-expanded="false" aria-controls="hs-enterprise-sub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="hs-navsub" id="hs-enterprise-sub">
+          <a href="development-activity.html" data-sub="overview">Enterprise overview</a>
+          <a href="development-activity-reports.html" data-sub="reports">My reports</a>
+        </div>
+      </div>
     </nav>
     <div class="hs-header__actions">
       <button class="hs-header__share" type="button" id="hs-share" onclick="HS.openModal('shareModal')">Share</button>

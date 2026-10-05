@@ -82,7 +82,10 @@ ok(navBlock.length > 0, 'the primary nav block was found');
 // The Explore dropdown (founder, 2026-10-02) adds three SUB-entries; primary items are the
 // links that carry data-nav, and there are still exactly three.
 const exploreSub = (navBlock.match(/<div class="hs-navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
-const navPrimary = navBlock.replace(exploreSub, '');
+// The Enterprise dropdown (founder, 2026-10-05) adds two more: "Enterprise overview" and "My reports".
+const enterpriseSub = (navBlock.match(/<div class="hs-navsub" id="hs-enterprise-sub">[\s\S]*?<\/div>/) || [''])[0];
+ok(enterpriseSub.length > 0, 'the Enterprise dropdown block was found (control for the check below)');
+const navPrimary = navBlock.replace(exploreSub, '').replace(enterpriseSub, '');
 ok(exploreSub.length > 0, 'the Explore dropdown block was found (control for the two checks below)');
 ok((navPrimary.match(/<a /g) || []).length === 3,
   'the primary nav is EXACTLY THREE items (v3)', (navPrimary.match(/data-nav="[a-z]+"/g) || []));

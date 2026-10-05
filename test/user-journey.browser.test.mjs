@@ -281,8 +281,8 @@ ok(await page.locator('.hs-nav a[data-nav]').count() === 3,
 ok((await page.locator('.hs-nav a[data-nav]').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
      === 'explore|props|enterprise',
   '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
-ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.hs-nav a').count() === 6,
-  '3 ...plus the Explore dropdown\'s three pages, and nothing else', await page.locator('.hs-nav a').count());
+ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.hs-nav a').count() === 8,
+  '3 ...plus the Explore dropdown\'s three pages and the Enterprise dropdown\'s two, and nothing else', await page.locator('.hs-nav a').count());
 // The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
 c = await chrome();
 ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',

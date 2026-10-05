@@ -555,12 +555,63 @@ await away();
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
-  ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|Enterprise',
+  ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|Enterprise|Enterprise overview|My reports',
     '8 phone: the Menu panel lists the three pages under Explore', m.items);
   ok(!m.caret && JSON.stringify(m.current) === JSON.stringify(['activity']) && m.minH >= 44 && m.overflow === 0,
     '8 phone: no chevron, the current page marked, 44px targets, no sideways scroll', m);
   await M.ctx.close();
 }
+
+// ═══ 9. The Enterprise dropdown: "My reports" (founder, 2026-10-05) ═══
+// An agent had no way back to development-activity-reports.html: no page linked it. Enterprise now
+// opens a menu of "Enterprise overview" and "My reports", built like Explore's (hover, chevron,
+// Escape, click outside). The Explore and Enterprise menus are independent.
+console.log('--- 9. the Enterprise dropdown ---');
+await away();
+await D.page.goto(base + '/development.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitReady(D.page);
+await D.page.waitForSelector('#hs-enterprise-toggle', { state: 'attached', timeout: 30000 });
+const entDrop = () => D.page.evaluate(() => {
+  const sub = document.getElementById('hs-enterprise-sub');
+  const r = sub.getBoundingClientRect();
+  const btn = document.getElementById('hs-enterprise-toggle');
+  const ex = document.getElementById('hs-explore-sub');
+  return {
+    open: getComputedStyle(sub).display !== 'none' && r.height > 0,
+    exploreOpen: getComputedStyle(ex).display !== 'none' && ex.getBoundingClientRect().height > 0,
+    labels: [...sub.querySelectorAll('a')].map((a) => a.textContent.trim()),
+    hrefs: [...sub.querySelectorAll('a')].map((a) => a.getAttribute('href')),
+    expanded: btn.getAttribute('aria-expanded'),
+    focusOnCaret: document.activeElement === btn,
+    offscreen: r.right > window.innerWidth,
+  };
+});
+let e9 = await entDrop();
+ok(!e9.open && e9.expanded === 'false', '9 the Enterprise dropdown starts closed', e9);
+await D.page.hover('#hs-nav a[data-nav="enterprise"]');
+e9 = await entDrop();
+ok(e9.open && !e9.exploreOpen, '9 hovering Enterprise opens it, and not the Explore menu', e9);
+ok(e9.labels.join('|') === 'Enterprise overview|My reports'
+   && e9.hrefs.join('|') === 'development-activity.html|development-activity-reports.html',
+  '9 ...listing Enterprise overview and My reports, "My reports" opening development-activity-reports.html', e9);
+ok(!e9.offscreen, '9 ...and the menu fits inside the window', e9);
+await away();
+await D.page.click('#hs-enterprise-toggle');
+e9 = await entDrop();
+ok(e9.open && e9.expanded === 'true', '9 the chevron opens it too (touch and keyboard)', e9);
+await D.page.keyboard.press('Escape');
+await away();
+e9 = await entDrop();
+ok(!e9.open && e9.focusOnCaret, '9 Escape closes it and returns focus to the chevron', e9);
+await D.page.click('#hs-enterprise-toggle');
+await D.page.mouse.click(40, 600);
+await away();
+e9 = await entDrop();
+ok(!e9.open, '9 a click outside closes it', e9);
+await D.page.click('#hs-enterprise-toggle');
+await Promise.all([D.page.waitForURL(/development-activity-reports\.html/, { timeout: 30000 }).catch(() => null),
+  D.page.click('#hs-enterprise-sub a[data-sub="reports"]')]);
+ok(/development-activity-reports\.html/.test(D.page.url()), '9 choosing "My reports" opens the reports page', D.page.url());
 
 ok(D.errors.filter((e) => !/\bL is not defined|maplibregl|THREE\b/.test(e)).length === 0,
   'no uncaught page errors outside the stubbed map libraries', D.errors);

@@ -985,11 +985,14 @@
   // the chevron beside Explore opens and closes it here, for touch and keyboard, and a click
   // outside it, Escape or picking an entry closes it. In the compact Menu panel the CSS
   // always lists the three under Explore, so this class changes nothing there.
-  function setExploreOpen(open) {
-    const g = $('hs-explore'); if (!g) return;
+  // The Enterprise dropdown (founder, 2026-10-05; "Enterprise overview", "My reports") is the
+  // same control, so both groups share these three functions, keyed by the group's id.
+  function setNavGroupOpen(id, open) {
+    const g = $(id); if (!g) return;
     g.classList.toggle('open', !!open);
-    const b = $('hs-explore-toggle'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const b = $(id + '-toggle'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
+  function setExploreOpen(open) { setNavGroupOpen('hs-explore', open); }
   HS.toggleExplore = function () {
     const g = $('hs-explore');
     setExploreOpen(!(g && g.classList.contains('open')));
@@ -2514,19 +2517,24 @@
       const head = $('hs-top');
       if (head && head.classList.contains('menu-open') && !head.contains(e.target)) closeMenu();
     });
-    // the Explore dropdown: its button toggles it; an entry, Escape or a click outside closes it
-    const exploreBtn = $('hs-explore-toggle');
-    if (exploreBtn) exploreBtn.addEventListener('click', HS.toggleExplore);
-    document.querySelectorAll('#hs-explore-sub a').forEach(a => a.addEventListener('click', () => setExploreOpen(false)));
-    document.addEventListener('keydown', function (e) {
-      const g = $('hs-explore');
-      if (e.key !== 'Escape' || !g || !g.classList.contains('open')) return;
-      setExploreOpen(false);
-      if (exploreBtn) exploreBtn.focus();
-    });
-    document.addEventListener('click', function (e) {
-      const g = $('hs-explore');
-      if (g && g.classList.contains('open') && !g.contains(e.target)) setExploreOpen(false);
+    // the nav dropdowns (Explore, Enterprise): a button toggles one; an entry, Escape or a click outside closes it
+    ['hs-explore', 'hs-enterprise'].forEach(function (id) {
+      const btn = $(id + '-toggle');
+      if (btn) btn.addEventListener('click', function () {
+        const g = $(id);
+        setNavGroupOpen(id, !(g && g.classList.contains('open')));
+      });
+      document.querySelectorAll('#' + id + '-sub a').forEach(a => a.addEventListener('click', () => setNavGroupOpen(id, false)));
+      document.addEventListener('keydown', function (e) {
+        const g = $(id);
+        if (e.key !== 'Escape' || !g || !g.classList.contains('open')) return;
+        setNavGroupOpen(id, false);
+        if (btn) btn.focus();
+      });
+      document.addEventListener('click', function (e) {
+        const g = $(id);
+        if (g && g.classList.contains('open') && !g.contains(e.target)) setNavGroupOpen(id, false);
+      });
     });
   }
 

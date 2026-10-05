@@ -175,7 +175,18 @@ ok(!/href="today\.html"/.test(navBlock), 'A-020 Today is not in the sidebar');
 // sub-entries with no data-nav, so they never light a section and never count as primary
 // items; read the header nav without the dropdown for the primary-item checks.
 const exploreSub = (navBlock.match(/<div class="hs-navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
-const navPrimary = navBlock.replace(exploreSub, '');
+// The Enterprise dropdown (founder, 2026-10-05) is how an agent gets back to the reports page,
+// which no other page linked. Same shape as Explore's: sub-entries with no data-nav.
+const enterpriseSub = (navBlock.match(/<div class="hs-navsub" id="hs-enterprise-sub">[\s\S]*?<\/div>/) || [''])[0];
+const entLinks = [...enterpriseSub.matchAll(/<a href="([^"]+)"\s+data-sub="([a-z]+)">([^<]+)<\/a>/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
+ok(JSON.stringify(entLinks) === JSON.stringify([
+  'development-activity.html|overview|Enterprise overview',
+  'development-activity-reports.html|reports|My reports']),
+  'the Enterprise dropdown is exactly Enterprise overview, My reports, in that order', entLinks);
+ok(!/data-nav=/.test(enterpriseSub), 'the Enterprise dropdown entries light no primary item');
+ok(/<a href="development-activity\.html" data-nav="enterprise">Enterprise<\/a>\s*<button[^>]*id="hs-enterprise-toggle"/.test(navBlock),
+  'Enterprise itself still opens development-activity.html, with its chevron beside it');
+const navPrimary = navBlock.replace(exploreSub, '').replace(enterpriseSub, '');
 ok(!/href="community\.html"/.test(navPrimary), 'A-021 Zip Code Activity is not a primary nav item');
 const subLinks = [...exploreSub.matchAll(/<a href="([^"]+)"\s+data-sub="([a-z]+)">([^<]+)<\/a>/g)].map((m) => m[1] + '|' + m[2] + '|' + m[3]);
 ok(JSON.stringify(subLinks) === JSON.stringify([

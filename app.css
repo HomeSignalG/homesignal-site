@@ -625,6 +625,7 @@ body.onboarding-lock{overflow:hidden}
 .hs-nav .hs-navsub a:hover{background:var(--line-2);color:var(--ink)}
 body[data-explore="qol"] .hs-navsub a[data-sub="qol"],
 body[data-explore="map"] .hs-navsub a[data-sub="map"],
+body[data-enterprise="overview"] .hs-navsub a[data-sub="overview"],
 body[data-explore="activity"] .hs-navsub a[data-sub="activity"]{font-weight:600;color:var(--ink);box-shadow:inset 3px 0 0 var(--green)}
 @media (hover:hover) and (min-width:1024px){
   .hs-navgroup:hover .hs-navsub{display:flex}

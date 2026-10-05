@@ -58,7 +58,7 @@ ROOT_FILES = (
     # linked from nowhere. The function it calls refuses anyone not signed in and on dashboard_admins.
     'development-activity-review.html',
     # The customer page for invited trial members (build step 5c): noindex, robots-disallowed, reached from an invite link and
-    # linked from no other page yet. Both functions it calls answer only a signed-in person, about that person.
+    # (since 2026-10-05) from "My reports" in the header's Enterprise dropdown. Both functions it calls answer only a signed-in person, about that person.
     'development-activity-reports.html',
     # The client's page for a private share link (build step 8): noindex, robots-disallowed, linked from nowhere, reached only from a link an
     # agent made. It sends no referrer and holds no sign-in; its one function (view-shared-report) answers only a token the database says is usable.
