@@ -204,7 +204,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   console.log('--- 4. a search never turns the sample into results; it leaves for Map 1 ---');
   const before = await ui(page);
   let went = null;
-  await page.route('**/homesignalmap.html?zip=*', (route) => { went = new URL(route.request().url()).search; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
+  await page.route('**/homesignalmap.html?zip=*', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); went = new URL(route.request().url()).search; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
   await search(page, '78657');
   await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
   ok(went === '?zip=78657', '4 a ZIP search opens homesignalmap.html?zip=78657', went);

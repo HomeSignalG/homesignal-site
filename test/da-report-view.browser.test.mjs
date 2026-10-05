@@ -88,7 +88,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-card').length,
   }));
-  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Things to Review With Your Client|Type and stage|Development Activity Map|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
+  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Type and stage|Development Activity Map|Things to Review With Your Client|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
     '1c the sections render as headings, in the plan\'s order with the filters directly above the map', info.h2);
   ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight cards', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
@@ -135,9 +135,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { secs, cols, cardW, headBottom: head.bottom + scrollY, viewport: innerWidth };
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
-  const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
+  const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Development Activity Map', 'Things to Review With Your Client', 'Approved / Coming', 'Proposed / Under Review',
     'Permitted / Under Construction', 'Change History', 'Official evidence & coverage'];
-  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the plan\'s mobile order with the filters directly above the map: what changed, things to review, the filters, the map, the three stages, history, evidence', lay.secs.map((s) => s.label));
+  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the page-one order with the filters directly above the map: what changed, the filters, the map, things to review, the three stages, history, evidence', lay.secs.map((s) => s.label));
   const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
   ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
   const plot = await page.evaluate(() => { const r = document.querySelector('.da-rv-plot').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 0.5]; });
@@ -352,8 +352,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
         tops: [...row.children].map((c) => Math.round(c.getBoundingClientRect().top)) };
     });
     ok(m.rowDisplay === 'block' && m.rowW <= m.vw - 20 && m.headW <= 1 && m.headH <= 1 && m.over <= 0, '12f on a phone the table stacks: one block per record, inside the screen, the header row gone from view, no sideways scroll', m);
-    ok(m.labels.includes('Distance:') && m.labels.includes('Type:') && m.labels.includes('Official source:') && !m.labels.includes('Publisher stage:') && m.tops.every((t, i) => i === 0 || t >= m.tops[i - 1]),
-      '12g each stacked cell says what it is ("Distance:", "Type:", "Official source:"), a record with no publisher stage has no empty "Publisher stage:" cell, and the cells run top to bottom', m);
+    ok(m.labels.includes('Distance:') && m.labels.includes('Type:') && m.labels.includes('Official source:') && !m.labels.includes('Agency stage:') && m.tops.every((t, i) => i === 0 || t >= m.tops[i - 1]),
+      '12g each stacked cell says what it is ("Distance:", "Type:", "Official source:"), a record with no agency stage has no empty "Agency stage:" cell, and the cells run top to bottom', m);
     ok(m.role === 'table' && m.rowRole === 'row' && m.hasRowHeader, '12h the stacked rows keep their table roles (table, row, row header) for screen readers', m);
     ok(errors.length === 0, '12i no page error and no console error on a phone', errors);
     await ctx.close();
@@ -386,8 +386,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; }));
       const tOpen = await textOf('open.pdf');
       const n = (t, re) => (t.match(re) || []).length;
-      ok(tClosed === tOpen && n(tClosed, /Publisher status:/g) >= 6 && !/Full official detail/.test(tClosed),
-        '12k printing the report with every detail collapsed on screen prints exactly what it prints with every detail open (the whole report), and not the "Full official detail" toggle', { same: tClosed === tOpen, status: n(tClosed, /Publisher status:/g), toggle: /Full official detail/.test(tClosed) });
+      ok(tClosed === tOpen && n(tClosed, /Official agency status:/g) >= 6 && !/Full official detail/.test(tClosed),
+        '12k printing the report with every detail collapsed on screen prints exactly what it prints with every detail open (the whole report), and not the "Full official detail" toggle', { same: tClosed === tOpen, status: n(tClosed, /Official agency status:/g), toggle: /Full official detail/.test(tClosed) });
       ok(/MAP\s+RECORD/i.test(tClosed) && n(tClosed, /Official source/g) >= 12, '12l the printed report carries the table (Map, Record ...) and a link line for each record in the table and in its card', [/MAP\s+RECORD/i.test(tClosed), n(tClosed, /Official source/g)]);
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = false; }));
     }
