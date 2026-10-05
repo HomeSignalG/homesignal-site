@@ -76,15 +76,15 @@ const htmlLife = viewLife(W);
 
 // ---- 1. section order: the 100526 plan's (ruling 3) ----------------------------------------------------------------------------------------------
 {
-  const FULL = 'changed,activity,filters,review,map,approved,proposed,permitted,history,evidence';
-  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Type and stage, Things to Review, the map, the three stages, Change History, Evidence', keysOf(html));
-  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Type and stage | Things to Review With Your Client | Development Activity Map | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
+  const FULL = 'changed,activity,review,filters,map,approved,proposed,permitted,history,evidence';
+  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Things to Review, Type and stage, the map, the three stages, Change History, Evidence', keysOf(html));
+  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Things to Review With Your Client | Type and stage | Development Activity Map | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
     '1b the section titles are the plan\'s (ruling 3 and the visual layout contract)', sections(html).map((s) => s.label));
   ok(keysOf(htmlNone) === 'outcome,evidence', '1c an empty report renders only its outcome and Official evidence & coverage', keysOf(htmlNone));
-  ok(keysOf(htmlCold) === 'activity,filters,review,map,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
+  ok(keysOf(htmlCold) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
   const quiet = { rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01', name: 'Quiet Approved Plat' })], ledger: [], events: [], health: [] };
   const hq = view(await wire(quiet));
-  ok(keysOf(hq) === 'activity,filters,review,map,approved,proposed,permitted,history,evidence' && /da-rv-hero/.test(sec(hq, 'activity').cls) && metricsOf(sec(hq, 'activity')).join() === 'Records with official activity in the last 90 days=0',
+  ok(keysOf(hq) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence' && /da-rv-hero/.test(sec(hq, 'activity').cls) && metricsOf(sec(hq, 'activity')).join() === 'Records with official activity in the last 90 days=0',
     '1e only an approved record with no recent event: the hero is a measured zero over this report\'s records, then the full layout', keysOf(hq));
   const prop = { rows: [row('p1', 0.4, FAM_B)], projects: [proj('p1', FAM_B, { status: 'Proposed', date_kind: 'scheduled', submitted_at: '2027-02-01', name: 'Planned Retail' })], ledger: [], events: [], health: [] };
   const hp = view(await wire(prop));
@@ -96,9 +96,13 @@ const htmlLife = viewLife(W);
   ok(/Things to Review With Your Client/.test(all) && /Permitted \/ Under Construction/.test(all) && /Development Activity Map/.test(all) && /Compare property/.test(html),
     '1g2 the sections the 100526 plan adds are present: Things to Review, Permitted / Under Construction, the map and the action bar');
   const idx = (t) => html.indexOf('aria-label="' + t + '"');
-  const order = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Things to Review With Your Client', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
+  const order = ['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
     'Permitted / Under Construction', 'Change History', 'Official evidence &amp; coverage', 'Report actions'];
   ok(order.every((t, i) => idx(t) > 0 && (i === 0 || idx(t) > idx(order[i - 1]))), '1h the same order, read straight off the markup positions, ending with the action bar', order.map(idx));
+  // the filters control the map and the three stage sections, so they sit directly above the map (founder, 2026-10-04); nothing sits between them
+  const between = html.slice(html.indexOf('aria-label="Type and stage"'), html.indexOf('aria-label="Development Activity Map"'));
+  ok(idx('Type and stage') > idx('Things to Review With Your Client') && idx('Type and stage') < idx('Development Activity Map') && (between.match(/<section /g) || []).length === 1,
+    '1h2 the Type and Stage filters come directly above the map: after Things to Review, before the map, with no other section between them', (between.match(/<section /g) || []).length);
   ok(html.startsWith('<article class="da-rv') && html.indexOf('<header') < html.indexOf('<section'), '1i the property / address header comes before every section');
 }
 
@@ -399,7 +403,7 @@ const htmlLife = viewLife(W);
   ok(V.SCOPE_LINE === quote('Planned, approved, permitted and changing development found in'), '9b the scope line is the plan\'s (line 1261)');
   ok(V.SCOPE_NOTE === quote('This report focuses on development activity and change.'), '9c the supporting scope note is the plan\'s (line 1265)');
   ok(V.EYEBROW === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && V.EYEBROW === M.PRODUCT_NAME, '9d the eyebrow equals the engine\'s product name (ruling R6)');
-  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Things to Review With Your Client', 'Development Activity Map',
+  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map',
     'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Change History', 'Official evidence & coverage', 'Report actions']), '9e the section titles, in the 100526 plan\'s order');
   const p100526 = readFileSync(join(root, 'docs/development-activity-plan-100526.md'), 'utf8');
   ok(['WHAT CHANGED AROUND THIS PROPERTY', 'THINGS TO REVIEW WITH YOUR CLIENT', 'DEVELOPMENT ACTIVITY MAP', 'APPROVED / COMING', 'PROPOSED / UNDER REVIEW', 'PERMITTED / UNDER CONSTRUCTION', 'CHANGE HISTORY'].every((t) => p100526.includes(t))
@@ -533,7 +537,7 @@ const htmlLife = viewLife(W);
   ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The first item under “Things to Review With Your Client” is about 0.1 miles away.' + TAIL,
     '11b the Brigham City shape: the briefing says how many, in which stages, that this REPORT lists nothing future-stage (not that the area has none), how far the first review item is, and one neutral check-the-source line', brief(hb));
   ok(hb.indexOf('</header>') > -1 && hb.indexOf('</header>') < hb.indexOf('data-da-briefing') && hb.indexOf('data-da-briefing') < hb.indexOf('<section'), '11c the briefing is a paragraph directly under the header and before the first section; it is not a section, so the plan\'s section order is untouched');
-  ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,filters,review,map,approved,proposed,permitted,history,evidence', '11d it adds no heading and no section key');
+  ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence', '11d it adds no heading and no section key');
   const b = brief(hb);
   ok(!/SR-13|Main St|20 N|Brigham|84302|Smith|ABC Realty|Pat Agent/.test(b) && !/(value|traffic|noise|appreciat|desirab|impact|disrupt|nearest|closest)/i.test(b) && /coming/i.test(b.replace(/approved \/ coming/gi, '')) === false,
     '11e it names no address, project, label, brokerage or agent, makes no claim about value, traffic or effect, and keeps "coming" to the stage name', b);

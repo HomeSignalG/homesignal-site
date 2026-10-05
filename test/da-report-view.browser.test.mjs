@@ -88,8 +88,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-card').length,
   }));
-  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Type and stage|Things to Review With Your Client|Development Activity Map|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
-    '1c the sections render as headings, in the 100526 plan\'s order', info.h2);
+  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Things to Review With Your Client|Type and stage|Development Activity Map|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
+    '1c the sections render as headings, in the plan\'s order with the filters directly above the map', info.h2);
   ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight cards', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
   ok(await page.evaluate(() => document.querySelectorAll('#da-rv-style').length) === 1, '1e mounting again does not add a second stylesheet');
@@ -135,9 +135,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { secs, cols, cardW, headBottom: head.bottom + scrollY, viewport: innerWidth };
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
-  const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Things to Review With Your Client', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
+  const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
     'Permitted / Under Construction', 'Change History', 'Official evidence & coverage'];
-  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the plan\'s mobile order: what changed, the filters, things to review, the map, the three stages, history, evidence', lay.secs.map((s) => s.label));
+  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the plan\'s mobile order with the filters directly above the map: what changed, things to review, the filters, the map, the three stages, history, evidence', lay.secs.map((s) => s.label));
   const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
   ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
   const plot = await page.evaluate(() => { const r = document.querySelector('.da-rv-plot').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 0.5]; });
