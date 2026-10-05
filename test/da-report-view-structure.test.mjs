@@ -52,13 +52,21 @@ const C = code(SRC);
   const EXPECT = ['as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'project_id',
     'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'what_changed_recently'];
   ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these nineteen (a new one must be added here on purpose)', snake);
-  // three keys step 1 kept internal are now shown on purpose (100526 plan: a card shows "First detected", and Change History says whether
-  // HomeSignal has observed long enough), each read in ONE function and printed only as a date or a sentence
-  ok((C.match(/homesignal_observation/g) || []).length === 2 && (C.match(/first_observed_at/g) || []).length === 1 && /function firstDetected\(p\) \{ return isObj\(p\.homesignal_observation\) \? day\(p\.homesignal_observation\.first_observed_at\) : ''; \}/.test(C),
-    '2a2 the ledger\'s first observation is read in firstDetected() only, and only as a day');
-  // build step 10 moved the read into changeReady(), so Change History and the side-by-side comparison read it from ONE function
-  ok((C.match(/change_ready/g) || []).length === 1 && /function changeReady\(report\) \{[\s\S]*?return cov\.change_ready === true;/.test(C) && /var msg = changeReady\(report\)/.test(C),
-    '2a3 the ledger\'s readiness is read once (changeReady), to choose between two fixed Change History sentences');
+  // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
+  // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
+  // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
+  const basis = (C.match(/function changeBasis\(report\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+  const ledger = (C.match(/function ledgerFirstRead\(p\) \{[^\n]*\}\n/) || [''])[0];
+  const inFns = (re) => (basis.match(re) || []).length + (ledger.match(re) || []).length;
+  ok(basis.length > 200 && ledger.length > 50 && !/firstDetected/.test(C) && (C.match(/homesignal_observation/g) || []).length === inFns(/homesignal_observation/g)
+    && (C.match(/first_observed_at/g) || []).length === inFns(/first_observed_at/g) && /day\(o\.first_observed_at\)/.test(basis),
+    '2a2 the ledger\'s first observation is read in two functions only: changeBasis() (the Change History sentence) and ledgerFirstRead() (the internal page\'s line); no "First detected" line reads it');
+  ok((C.match(/ledgerFirstRead\(/g) || []).length === 3 && /\(showLifecycle && ledgerFirstRead\(p\) \? line\('Ledger first read', ledgerFirstRead\(p\)\) : ''\)/.test(C),
+    '2a2b ledgerFirstRead() is called only behind showLifecycle (its definition plus one guarded line), so the customer view cannot print it');
+  ok(/function changeReady\(report\) \{[\s\S]*?return cov\.change_ready === true;/.test(C) && (C.match(/cov\.change_ready/g) || []).length === 1
+    && (basis.match(/\.change_ready/g) || []).length === 1 && (C.match(/change_ready/g) || []).length === 2
+    && /var b = changeReady\(report\) \? changeBasis\(report\) : null;/.test(C) && /if \(!b\) return CHANGE_NOT_READY;/.test(C),
+    '2a3 the ledger\'s readiness is read once per level (the engine\'s flag in changeReady, each record\'s in changeBasis), and noChangeMessage claims nothing unless both agree');
   const INTERNAL = ['report_private_context', 'report_snapshot', 'private_context', 'snapshot', 'report_id', 'content_hash', 'storage_blockers', 'storable', 'source_family', 'source_families_in_report',
     'registry_id', 'observation_count', 'last_observed_at', 'assessment_basis', 'coverage_state', 'INTERNAL_VIEW',
     'CONTAINS_UNCLEARED', 'HOLD', 'CLEARED', 'rights', 'matched_address', 'latitude', 'longitude', 'normalized_address', 'property_key', 'label_in_body', 'audit_ref', 'cleared_on'];
