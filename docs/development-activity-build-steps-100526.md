@@ -505,8 +505,8 @@ changes (the view renders from the stored report, so a reopened or shared report
      number) and the stage heading; the cards show them once their detail is open. Pins 2f and 3a say so.
    - Each record's official link now appears twice (its row and its card), so a keyboard user has one more stop per record. The cards inside a closed detail are
      not tab stops, and Enter on "Full official detail" opens them.
-16. **Realtor value review, second pass (founder: "complete steps for what is partly done, then what is not done", 2026-10-05).** In review; struck through
-    once merged and read back live. Page one is now the header, the briefing, the headline numbers and the map; the nearest records follow the map.
+16. ~~**Realtor value review, second pass (founder: "complete steps for what is partly done, then what is not done", 2026-10-05).**~~ Done: merged in #1655 (`813d39b`), deployed by `pages` run `37365927729` (the first publish attempts sat 15 minutes without a runner and were cancelled; the third attempt ran and succeeded), and read back live 2026-10-05 (four files byte-equal to the merge; `lib/da-report-view.js` md5 `6d9e0eb1…`, the reports, review and share pages `93fceab2…`, `0faf5b90…`, `3247cfee…`). Not viewed signed in by the builder: the founder should open a saved report and check page one and Download PDF.
+    Struck through once merged and read back live. Page one is now the header, the briefing, the headline numbers and the map; the nearest records follow the map.
    - **Done (view only, no new data):**
      - The briefing paragraph has its own heading, "Client Briefing: Nearby Activity", and names the nearest listed record with its distance and compass
        direction ("… about 0.1 miles to the north"). The direction comes from the bearing the response carries; a reopened or shared report has none, so it
