@@ -906,8 +906,67 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.click('.da-rv-act[data-da-action="pdf"]');
   await page.click('#share-pdf');
   ok((await page.evaluate(() => window.__prints)) === 2, '9n both Download PDF buttons open the browser\'s print window (no PDF is made on a server)');
+  // the report's own Share button opens a popup that makes the private link and offers it right there (follow-up to build step 8, founder 2026-10-04)
+  const createCount = () => shareCalls.filter((c) => c.body.action === 'create').length;
+  const popState = () => page.evaluate(() => ({ open: !document.getElementById('share-pop').hidden, body: !document.getElementById('share-pop-body').hidden, link: document.getElementById('share-pop-link').value,
+    focus: document.activeElement && document.activeElement.id, role: document.getElementById('share-pop').getAttribute('role'), modal: document.getElementById('share-pop').getAttribute('aria-modal'),
+    msg: document.getElementById('share-pop-msg').textContent, msgErr: document.getElementById('share-pop-msg').classList.contains('err'), note: document.getElementById('share-pop-note').textContent,
+    hrefs: [...document.querySelectorAll('#share-pop a')].map((a) => a.getAttribute('href')), html: document.getElementById('share-pop').innerHTML, native: !document.getElementById('share-pop-native').hidden,
+    opener: document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('data-da-action') }));
+  const addrTyped = await page.$eval('#addr', (e) => e.value);
+  const c0 = createCount();
   await page.click('.da-rv-act[data-da-action="share"]');
-  ok(await page.evaluate(() => document.activeElement && document.activeElement.id) === 'share-make', '9o the report\'s Share button takes the person to the card (focus on "Make a client link")');
+  await page.waitForFunction(() => !document.getElementById('share-pop-body').hidden, null, { timeout: 8000 }).catch(() => {});
+  const pop = await popState();
+  ok(pop.open && pop.body && LINK.test(pop.link) && pop.link === (await page.$eval('#share-link', (e) => e.value)) && pop.role === 'dialog' && pop.modal === 'true' && pop.focus === 'share-pop-copy' && createCount() === c0 + 1,
+    '9o the report\'s Share button opens a popup that made ONE client link and shows it, with focus on Copy', { c0, now: createCount(), pop: { ...pop, html: undefined } });
+  const lastCreate = shareCalls.filter((c) => c.body.action === 'create').pop();
+  ok(Object.keys(lastCreate.body).sort().join() === 'action,report_id', '9o2 the popup\'s create request names the report and nothing else (no address, no label)');
+  const decoded = pop.hrefs.map((h) => decodeURIComponent((h.split('body=')[1] || h.split('text=')[1] || '')));
+  ok(pop.hrefs.length === 3 && /^sms:/.test(pop.hrefs[0]) && /^mailto:/.test(pop.hrefs[1]) && /^https:\/\/wa\.me\//.test(pop.hrefs[2]) && decoded.every((d) => d.indexOf(pop.link) > -1),
+    '9o3 it offers Text message, Email and WhatsApp, each carrying the same client link', pop.hrefs);
+  ok(!/facebook|twitter|reddit|linkedin|bsky|nextdoor/i.test(pop.html + pop.hrefs.join(' ')) && !decoded.join(' ').includes(addrTyped.split(',')[0]), '9o4 no public network is offered, and the message names no street address');
+  ok(/Anyone who has it can read this report/.test(pop.note) && /only this once/.test(pop.note), '9o5 the popup says anyone with the link can read the report and that the link is shown once', pop.note);
+  // copy
+  await page.evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } }, configurable: true }); });
+  await page.click('#share-pop-copy');
+  await page.waitForFunction(() => document.getElementById('share-pop-copy').textContent === 'Copied', null, { timeout: 4000 }).catch(() => {});
+  ok((await page.evaluate(() => window.__copied)) === pop.link && (await page.$eval('#share-pop-copy', (e) => e.textContent)) === 'Copied', '9o6 Copy link copies exactly the client link and says Copied');
+  // keyboard: Tab stays inside the popup in both directions
+  const inside = [];
+  for (let i = 0; i < 14; i++) { await page.keyboard.press(i < 7 ? 'Tab' : 'Shift+Tab'); inside.push(await page.evaluate(() => document.getElementById('share-pop').contains(document.activeElement))); }
+  ok(inside.every(Boolean), '9o7 Tab and Shift+Tab never leave the popup', inside);
+  // Escape closes it and gives focus back to the Share button
+  await page.keyboard.press('Escape');
+  const afterEsc = await popState();
+  ok(!afterEsc.open && afterEsc.opener === 'share', '9o8 Escape closes the popup and puts focus back on the report\'s Share button', { open: afterEsc.open, opener: afterEsc.opener });
+  // pressing Share again re-opens the SAME link: no second link is made, and the card still holds the link
+  await page.click('.da-rv-act[data-da-action="share"]');
+  const again = await popState();
+  ok(again.open && again.body && again.link === pop.link && createCount() === c0 + 1, '9o9 pressing Share again shows the same link and makes no second one', { c0, now: createCount() });
+  // the phone's own share sheet is offered only where the browser has one
+  ok(again.native === false, '9o10 without a share sheet in the browser the Share\u2026 button is not offered');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { window.__shared = null; navigator.share = function (d) { window.__shared = d; return Promise.resolve(); }; });
+  await page.click('.da-rv-act[data-da-action="share"]');
+  await page.click('#share-pop-native');
+  const shared = await page.evaluate(() => window.__shared);
+  ok(shared && shared.url === pop.link && !JSON.stringify(shared).includes(addrTyped.split(',')[0]) && (await popState()).native, '9o11 with a share sheet in the browser, Share\u2026 hands it the client link and no address');
+  // Close button and a click on the dimmed background both close it
+  await page.click('#share-pop-close');
+  const closed = await popState();
+  await page.click('.da-rv-act[data-da-action="share"]');
+  await page.mouse.click(4, 4);
+  ok(!closed.open && !(await popState()).open, '9o12 the Close button and a click outside the box both close the popup');
+  // print: the popup is never on the paper
+  await page.click('.da-rv-act[data-da-action="share"]');
+  await page.emulateMedia({ media: 'print' });
+  const onPaper = await page.evaluate(() => document.getElementById('share-pop').getClientRects().length);
+  await page.emulateMedia({ media: 'screen' });
+  await page.keyboard.press('Escape');
+  ok(onPaper === 0, '9o13 an open share popup takes no room in print', onPaper);
+  // the old behaviour (scroll up to the card) is gone, but the card is still there to list and withdraw links
+  ok(!(await shareHidden(page)) && (await shareList(page)).length >= 1, '9o14 the card above still lists the links, so one can still be withdrawn');
 
   // print: only the report goes on the paper
   await page.emulateMedia({ media: 'print' });
@@ -952,9 +1011,12 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(!(await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '', '9v opening a saved report shows its card with no link on it (a link is never shown a second time)');
   await page.click('#share-make');
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
+  await page.click('.da-rv-act[data-da-action="share"]');
+  const openedBefore = await page.evaluate(() => !document.getElementById('share-pop').hidden && document.getElementById('share-pop-link').value !== '');
   await page.evaluate(() => { const o = window.__sb.session; window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); void o; });
   await page.waitForTimeout(200);
   ok((await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '' && (await shareList(page)).length === 0, '9w signing out clears the card, the link and the list');
+  ok(openedBefore && await page.evaluate(() => document.getElementById('share-pop').hidden && document.getElementById('share-pop-link').value === ''), '9w2 signing out with the share popup open closes it and leaves no link behind');
   await ctx.close();
 }
 {
@@ -968,6 +1030,13 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => /could not be done/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/Try again in a minute/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)) && !(await page.$eval('#share-make', (e) => e.disabled)),
     '9x an unreachable service says so in plain words, shows no link, and leaves the button free');
+  // the same failure reached through the report's own Share button is said inside the popup, not left behind in a card out of sight
+  await page.click('#share-pop-close').catch(() => {});
+  await page.click('.da-rv-act[data-da-action="share"]');
+  await page.waitForFunction(() => /could not be done/.test(document.getElementById('share-pop-msg').textContent), null, { timeout: 8000 }).catch(() => {});
+  const failPop = await page.evaluate(() => ({ open: !document.getElementById('share-pop').hidden, body: !document.getElementById('share-pop-body').hidden, msg: document.getElementById('share-pop-msg').textContent, err: document.getElementById('share-pop-msg').classList.contains('err'), link: document.getElementById('share-pop-link').value }));
+  ok(failPop.open && !failPop.body && failPop.err && /Try again in a minute/.test(failPop.msg) && failPop.link === '', '9x2 when the link cannot be made the popup says so in plain words and shows no link', failPop);
+  await page.click('#share-pop-close');
   w.shareFails = false; w.shareLimit = true;
   await page.click('#share-make');
   await page.waitForFunction(() => /most client links/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -983,6 +1052,16 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(wide <= 0, '9z on a 390 px screen the share card, the link and the list do not scroll the page sideways', wide);
+  // and the popup from the report's own Share button fits the phone: a sheet along the bottom, all inside the screen, every control easy to tap
+  await page.click('.da-rv-act[data-da-action="share"]');
+  await page.waitForFunction(() => !document.getElementById('share-pop-body').hidden, null, { timeout: 8000 }).catch(() => {});
+  const ph = await page.evaluate(() => {
+    const box = document.querySelector('#share-pop .box').getBoundingClientRect();
+    const ctl = [...document.querySelectorAll('#share-pop button, #share-pop a.go')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { id: e.id, h: Math.round(r.height), inside: r.left >= -0.5 && r.right <= innerWidth + 0.5 }; });
+    return { box: { l: Math.round(box.left), r: Math.round(box.right), t: Math.round(box.top), b: Math.round(box.bottom) }, vw: innerWidth, vh: innerHeight, ctl, side: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  ok(ph.box.l >= 0 && ph.box.r <= ph.vw + 0.5 && ph.box.t >= 0 && ph.box.b <= ph.vh + 0.5 && ph.box.b >= ph.vh - 2 && ph.side <= 0 && ph.ctl.length >= 5 && ph.ctl.every((c) => c.inside && c.h >= 40),
+    '9z2 on a 390 px screen the share popup is a sheet along the bottom, inside the screen, with every control at least 40 px tall and no sideways scroll', ph);
   await ctx.close();
 }
 

@@ -51,7 +51,7 @@ ok(/shouldCreateUser:\s*true/.test(code) && !/shouldCreateUser:\s*false/.test(co
 
 // ---- 3. two functions, no decisions -----------------------------------------------------------------------------------------------------------
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co'])
+ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co', 'https://wa.me/?text='])
    && /var REPORT_FN = SB_URL \+ '\/functions\/v1\/get-development-activity-report';/.test(code) && /var TRIAL_FN = SB_URL \+ '\/functions\/v1\/development-activity-trial';/.test(code)
    && /var SHARE_FN = SB_URL \+ '\/functions\/v1\/manage-shared-report';/.test(code) && /var WATCH_FN = SB_URL \+ '\/functions\/v1\/manage-property-watch';/.test(code)
    && /var BILLING_FN = SB_URL \+ '\/functions\/v1\/manage-billing';/.test(code)
@@ -62,7 +62,7 @@ ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'in
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
 ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|report-rights|\.cleared\b|\.rights\b|\.stage\.key|\.lifecycle\.key|creditDecision|uses_report/.test(code),
   '3d no lifecycle, Type, stage, rights or credit rule on the page');
-ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['pdf'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
+ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
 ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
@@ -169,7 +169,7 @@ ok(/<section class="card" id="share"[^>]*\shidden>/.test(page) && /var shareable
   '9h the card is hidden until a report that was SAVED is on screen: an unsaved report has no permanent id to share');
 ok(/function printReport\(\)\{ window\.print\(\); \}/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib|\.pdf\b/i.test(page.replace(/Download PDF|Save as PDF|\bPDF\b/g, '')),
   '9i "Download PDF" is the browser\'s own print window and nothing else: no PDF library, no canvas, no file made');
-ok(/@media print\{[\s\S]*?header\.top,\.card,#status,#creditnote,\.auth-overlay\{display:none!important\}/.test(page), '9j the print stylesheet leaves the header, every card, the status lines and the sign-in off the paper');
+ok(/@media print\{[\s\S]*?header\.top,\.card,#status,#creditnote,\.auth-overlay,#share-pop\{display:none!important\}/.test(page), '9j the print stylesheet leaves the header, every card, the status lines, the sign-in and the share popup off the paper');
 ok(/not your name, not your client label/.test(page) && /6 months/.test(page) && /street address/.test(page), '9k the card tells the agent what the client will and will not see, and how long the link lasts (founder, 2026-10-03)');
 ok(!/shared-report/.test(read('development-activity.html')) && !/shared-report/.test(read('partials/shell.html')) && !/shared-report/.test(read('shell.js')), '9l no public page links the client\'s page: a client reaches it only from a link an agent made');
 
@@ -186,6 +186,21 @@ ok(idDisplay.length >= 8 && ['#billing', '#team', '#saved', '#share', '#watch', 
 ok((css.match(/(^|\})\s*\[hidden\]\{display:none!important\}/g) || []).length === 1, '10b the page has its own [hidden]{display:none!important} rule, once, in the CSS (a comment does not count)');
 ok(css.search(/(^|\})\s*\[hidden\]\{display:none!important\}/) < css.search(/(^|\})\s*#[a-z0-9-]+\{[^}]*\bdisplay:\s*(grid|flex|block)\b/),
   '10c and it comes before the first rule that sets a display, so nobody reads it as an afterthought that a later rule could be thought to override');
+
+// ---- the report's own "Share report" popup (follow-up to build step 8, founder 2026-10-04) -----------------------------------------------------
+// The popup decides nothing: the link is made by the share function through makeShare, and the popup only hands that one validated link to the person's own apps.
+const popMarkup = (page.match(/<div id="share-pop"[\s\S]*?<div id="report">/) || [''])[0];
+ok(/<div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>/.test(popMarkup) && (popMarkup.match(/<a class="go ghost"/g) || []).length === 3
+   && !/facebook|twitter|reddit|linkedin|bsky|nextdoor|telegram/i.test(popMarkup + code.slice(code.indexOf('function fillSharePop'), code.indexOf('function copyPop'))),
+  '9k the popup is a hidden, labelled modal dialog with exactly three link targets (text, email, WhatsApp) and no public network anywhere in it');
+const wa = (code.match(/https:\/\/wa\.me\/\?text=/g) || []);
+ok(wa.length === 1 && /\$\('share-pop-wa'\)\.href = 'https:\/\/wa\.me\/\?text=' \+ t;/.test(code) && !/fetch\([^)]*wa\.me|post\([^)]*wa\.me/.test(code),
+  '9l the only non-project URL is the WhatsApp link, written once onto the popup\'s own anchor (a link the person follows, never a request the page makes)');
+ok(/else if \(act === 'share'\) shareFromReport\(b\);/.test(code) && !/\$\('share'\)\.scrollIntoView/.test(code) && /var made = await makeShare\(\);/.test(code),
+  '9m the report\'s Share button runs shareFromReport, which makes the link through makeShare (the old scroll-to-the-card is gone)');
+ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\]/g) || []).length === 2,
+  '9n a report that was not saved gets a plain explanation from the Share button (never a silent click), on both ways a report reaches the page');
+ok(!/'#share='|share=' \+|\+ '#share/.test(code.replace(/var SHARE_LINK = [^\n]*\n/, '')), '9o the page builds no part of the client link: it only checks the one the server made against SHARE_LINK');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
