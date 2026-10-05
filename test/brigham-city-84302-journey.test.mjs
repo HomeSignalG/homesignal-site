@@ -71,7 +71,7 @@ function world({ geocode = (a) => ({ match: { ...geocodeStandIn(a) } }), registr
 function ask({ rights = SHIPPED, net = world(), body = { address: L.address }, used = 3 } = {}) {
   const calls = { issue: 0, trialOf: 0 };
   const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', rights, now: () => NOW }, net.fetchFn);
-  const trial = { status: 'active', credits_used: used, credits_remaining: 20 - used, expired: false };
+  const trial = { status: 'active', credits_used: used, credits_remaining: 10 - used, expired: false };
   const deps = {
     ...real,
     authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: USER } : null),
@@ -82,7 +82,7 @@ function ask({ rights = SHIPPED, net = world(), body = { address: L.address }, u
     issue: async (_u, key, intelligence) => {
       calls.issue++;
       return { replayed: false, report_id: 'c0000000-0000-4000-8000-000000000001', content_hash: 'h', report_version: 'v', generated_at: NOW.toISOString(), private_context_id: 'ctx', report: intelligence,
-        credit: { ordinal: used + 1, credits_used: used + 1, credits_remaining: 19 - used, evaluation_status: 'active', allotment: 'trial', period_ends_at: null } };
+        credit: { ordinal: used + 1, credits_used: used + 1, credits_remaining: 9 - used, evaluation_status: 'active', allotment: 'trial', period_ends_at: null } };
     },
   };
   const go = async () => {
@@ -136,7 +136,7 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   ok(rep.projects.every((p) => p.source && /^https:\/\//.test(p.source.url) && p.source_family === UDOT_LINES), '2.3 each record carries its official link and its source family', rep.projects.map((p) => p.source));
   ok(r.json.charged === true && r.json.stored === true && typeof r.json.report_id === 'string' && t.calls.issue === 1 && r.json.credit.uses_report === true && r.json.credit.reason === 'DEVELOPMENT_SHOWN',
     '2.4 it is charged as one free report and stored: the issuing function is called once and the credit decision says a report is used', [r.json.charged, r.json.stored, r.json.credit]);
-  ok(r.json.trial.credits_used === 4 && r.json.trial.credits_remaining === 16, '2.5 the trial now reads 4 used / 16 left', r.json.trial);
+  ok(r.json.trial.credits_used === 4 && r.json.trial.credits_remaining === 6, '2.5 the trial now reads 4 used / 6 left', r.json.trial);
   ok(rep.projects.every((p) => p.source.attribution === null) && rep.coverage && rep.coverage.state !== 'LIMITED_COVERAGE', '2.6 these sources require no credit line, and the report is not marked limited coverage', rep.coverage);
 }
 
@@ -152,8 +152,8 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   ok(STORED_NAMES.every((nm) => !blob.includes(nm)) && !blob.includes('udot') && !blob.includes('SR-13'),
     '2d and none of the 41 stored records (UDOT) leaks into the answer by name, family or address: an uncleared source shows nothing at all', blob.length);
   ok(r.json.charged === false && r.json.stored === false && r.json.report_id === null && t.calls.issue === 0, '2e it is not charged, not stored and the issuing function is never called');
-  ok(r.json.credit.uses_report === false && r.json.credit.reason === 'NO_DATA_INGESTED' && r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 17,
-    '2f the credit decision says no free report is used, and the trial still reads 3 used / 17 left', [r.json.credit, r.json.trial]);
+  ok(r.json.credit.uses_report === false && r.json.credit.reason === 'NO_DATA_INGESTED' && r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 7,
+    '2f the credit decision says no free report is used, and the trial still reads 3 used / 7 left', [r.json.credit, r.json.trial]);
   ok(r.json.coverage_state !== 'OUTSIDE_COVERAGE' && typeof r.json.coverage_state === 'string', '2g the coverage state is not "outside coverage": the place IS covered, the SOURCE is what is missing', r.json.coverage_state);
 }
 

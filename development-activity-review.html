@@ -238,13 +238,13 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     if (body.status === 'OUTSIDE_COVERAGE') return 'That address is in ZIP ' + (typeof body.zip === 'string' && /^\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet.';
     return 'Something went wrong making the report. Try again.';
   }
-  /** Whether a trial customer's report would use one of the 20 free reports, as the report function's ONE credit rule decided it
+  /** Whether a trial customer's report would use one of the free reports, as the report function's ONE credit rule decided it
    *  (body.credit; founder ruling R5). This page decides nothing: it puts the rule's answer into words. */
   function creditLine(body){
     var c = body && body.credit;
     if (!c || typeof c !== 'object') return '';
     if (c.uses_report === true) {
-      return 'For a trial customer, this report would use one of the 20 free reports (' + (c.reason === 'NO_DEVELOPMENT_ACTIVITY' ? 'No development activity' : 'development shown') + ').';
+      return 'For a trial customer, this report would use one of the free reports (' + (c.reason === 'NO_DEVELOPMENT_ACTIVITY' ? 'No development activity' : 'development shown') + ').';
     }
     if (c.reason === 'INTERNAL_VIEW') return 'The internal view is never charged. Choose \u201cWhat a paying customer sees today\u201d to see whether a client\u2019s report would use a free report.';
     if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';

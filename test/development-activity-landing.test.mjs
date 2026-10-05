@@ -71,7 +71,7 @@ const COPY = [
   'HomeSignal Development Activity',
   'Know what’s changing around a property before your client does.',
   'HomeSignal shows development that is proposed, approved, permitted and under construction around a property—organized from covered official sources into one client-ready Development Activity report.',
-  'Start with 20 free reports', 'See a sample report →', 'Check coverage →',
+  'Start with 10 free reports', 'See a sample report →', 'Check coverage →',
   'No credit card required · For real-estate agents and brokerages',
   'Scan by Type. Understand the Stage.',
   'HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.',
@@ -84,15 +84,15 @@ const COPY = [
   'Built for the client conversation', 'For buyers', 'For listings', 'For agents',
   'Don’t just tell your client. Show them the record.',
   'Clear enough for your client. Sourced enough for you.',
-  'Simple, transparent pricing', 'Start Free', '20 Development Activity reports free', 'No credit card required.',
-  'Individual accounts receive 20 individual evaluation reports. Brokerage evaluation accounts share 20 reports across their invited evaluation users.',
+  'Simple, transparent pricing', 'Start Free', '10 Development Activity reports free', 'No credit card required.',
+  'Individual accounts receive 10 individual evaluation reports. Brokerage evaluation accounts share 10 reports across their invited evaluation users.',
   'New Member Price', '$79', '/month', '100 new Development Activity reports each month',
   'Reopen existing reports without using another report.', 'Share existing reports with clients.',
   'Download or print existing reports.', 'Cancel anytime.', 'Join for $79/month',
   'Need access for a brokerage, team, or organization?', 'Contact us for Enterprise Pricing →',
   'Enterprise Pricing is for organizations requiring arrangements beyond the standard self-service account.',
   'You know what’s there.', 'HomeSignal shows you what’s changing.',
-  'Start with 20 Development Activity reports free. No credit card required.',
+  'Start with 10 Development Activity reports free. No credit card required.',
   'Development activity within 0.5 miles of this property', 'Only tracked development/project activity is shown.',
   'Development Activity Map', 'Recent Official Activity'
 ];
@@ -141,9 +141,9 @@ const inSitemap = sitemap.includes('/' + PAGE);
 const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
 ok(cta.length === 4 && cta.filter((c) => c.cta === 'start-free').length === 3 && cta.filter((c) => c.cta === 'join').length === 1,
-  'the hero, pricing and closing "Start with 20 free reports" plus the "Join for $79/month" button are all present', cta.map((c) => c.cta));
+  'the hero, pricing and closing "Start with 10 free reports" plus the "Join for $79/month" button are all present', cta.map((c) => c.cta));
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
-  'each commerce button is inert (aria-disabled, no href, no handler): the 20-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
+  'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 ok(!/href="[^"]*(checkout|lemonsqueezy|stripe|billing|subscribe)/i.test(markup) && !/lemonsqueezy|stripe|checkout/i.test(scriptCode),
   'the page links to no checkout or payment processor and its code calls none');
@@ -160,7 +160,7 @@ ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_si
 const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^>]*data-cta="[^"]+"[^>]*>[^<]*<\/button>)\s*<span class="da-soon">Opens at launch\.<\/span>\s*<\/div>/g)]
   .map((m) => ({ hidden: !!m[1], tag: m[2] }));
 // Counted, not matched by tag: three buttons share one tag, so a tag match would let an unhidden
-// "Start with 20 free reports" borrow a hidden sibling's wrapper.
+// "Start with 10 free reports" borrow a hidden sibling's wrapper.
 const isInert = (tag) => /aria-disabled="true"/.test(tag);
 const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
 ok(wrappers.length === 4 && (markup.match(/data-commerce/g) || []).length === 4 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),

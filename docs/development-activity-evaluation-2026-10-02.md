@@ -1,5 +1,7 @@
 # Brokerage evaluation entitlement — Order L1: the 20-report credit ledger, built dark (2026-10-02)
 
+> **2026-10-05 — the free allowance is now 10, not 20 (founder).** This document records the design and the build as they were written, under 20; the number now lives in `public.evaluation_report_limit()` as 10, moved by `docs/free-report-limit-10.sql`. Read every "20" below that means the free allowance as 10, and the paid numbers (from 21) as from 11.
+
 Plan: `docs/development-activity-plan-2026-09-30.md`, Order L, Master Step 11 (launch rules, Hard Rules 28 and 38–41). Rulings:
 `docs/development-activity-founder-rulings-2026-09-30.md`. Status: `docs/development-activity-status-2026-09-30.md` (Order L stays
 **open**). Builds on Order K0 (`docs/development-activity-agent-workspace-2026-10-01.md`, PR #1534) and on the snapshot and

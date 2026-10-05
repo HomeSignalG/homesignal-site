@@ -4,7 +4,7 @@
 -- Development Activity build step 11: the $79 a month plan's database layer. A processor subscription is BOUND to one brokerage (the webhook's one
 -- writer, billing_event_apply, records the event through the payment ledger that already exists); the plan state is DERIVED from the ledger's latest
 -- live event; a paid brokerage's reports are charged to a 100-a-month allotment kept in its own append-only ledger (the cap is a constraint), never
--- to the 20 free reports; and the six readers that decide whose a report is read ONE view over both ledgers. This suite stands on the REAL account
+-- to the 10 free reports; and the six readers that decide whose a report is read ONE view over both ledgers. This suite stands on the REAL account
 -- spine, private-context layer, snapshot writer, evaluation entitlement, saved reports, share links, property watch and payment-event ledger, applied
 -- unmutated. What only two real sessions can prove (the 100th credit of a month, one key) is in run.sh.
 -- Every expected answer is a HARD-CODED constant, never computed by the code under test. The suite runs as the table owner; refusals for the API
@@ -171,8 +171,8 @@ select pg_temp._ck('A05 the functions that touch a table are SECURITY DEFINER wi
      and p.proname in ('billing_plan_of', 'billing_event_apply', 'billing_usage', 'billing_paid_issue', 'brokerage_report_issue', 'billing_check')
      and p.proconfig::text like '%search_path=public, pg_temp%'),
   null);
-select pg_temp._ck('A06 the two numbers are written once each and are the founder''s: 20 free reports and 100 a month',
-  public.evaluation_report_limit() = 20 and public.billing_report_limit() = 100, public.billing_report_limit()::text);
+select pg_temp._ck('A06 the two numbers are written once each and are the founder''s: 10 free reports and 100 a month',
+  public.evaluation_report_limit() = 10 and public.billing_report_limit() = 100, public.billing_report_limit()::text);
 select pg_temp._ck('A07 as anon, authenticated and service_role, reading either table, the view, or calling a billing function that is not theirs is refused (42501)',
   pg_temp._as('anon', 'select * from public.brokerage_subscription') like '42501:%'
   and pg_temp._as('authenticated', 'select * from public.brokerage_paid_credit') like '42501:%'
@@ -314,9 +314,9 @@ select pg_temp._run('hen free', $x$do $d$ begin
   perform pg_temp._iss('hen1', 3, 301, (select j from _pv where name = 'p0'));
   perform pg_temp._iss('hen2', 3, 302);
 end $d$$x$);
-select pg_temp._ck('D01 a brokerage whose plan is not paid is charged the FREE evaluation by the one entry: allotment trial, ordinals 1 and 2 of 20, status active, no period',
-  (select allot = 'trial' and ordinal = 1 and used = 1 and remaining = 19 and status = 'active' and ends is null and not replayed from _i where label = 'hen1')
-  and (select allot = 'trial' and ordinal = 2 and used = 2 and remaining = 18 from _i where label = 'hen2')
+select pg_temp._ck('D01 a brokerage whose plan is not paid is charged the FREE evaluation by the one entry: allotment trial, ordinals 1 and 2 of 10, status active, no period',
+  (select allot = 'trial' and ordinal = 1 and used = 1 and remaining = 9 and status = 'active' and ends is null and not replayed from _i where label = 'hen1')
+  and (select allot = 'trial' and ordinal = 2 and used = 2 and remaining = 8 from _i where label = 'hen2')
   and pg_temp._free_n('hen') = 2 and pg_temp._paid_n('hen') = 0, coalesce(pg_temp._ierr('hen1'), pg_temp._ierr('hen2')));
 select pg_temp._run('owl free', $x$select pg_temp._iss('owl1', 4, 401)$x$);
 select pg_temp._ck('D02 a brokerage with only a TEST subscription is charged the FREE evaluation, never the paid month',
@@ -325,16 +325,16 @@ select pg_temp._run('cod issue while paid', $x$select pg_temp._iss('cod1', 7, 70
 
 -- Fox: some free reports first (3), then pays (it already paid in C03, so these free reports are made through the entry BEFORE its first paid report by
 -- using the idempotency of a free key: a free report made while not paid. Fox is paid already; make a separate brokerage's free history instead.)
-select pg_temp._run('yak free x20', $x$do $d$ declare n int; begin
-  for n in 1..20 loop perform pg_temp._iss('y' || n, 6, 6000 + n); end loop; end $d$$x$);
-select pg_temp._ck('D03 a brokerage''s 20 free reports are used up through the one entry, the evaluation is complete, and the 21st free report is refused (EVALUATION_COMPLETE, EV002) while it has no paid plan',
-  (select count(*) = 20 from _i where label ~ '^y[0-9]+$' and report_id is not null and allot = 'trial')
+select pg_temp._run('yak free x10', $x$do $d$ declare n int; begin
+  for n in 1..10 loop perform pg_temp._iss('y' || n, 6, 6000 + n); end loop; end $d$$x$);
+select pg_temp._ck('D03 a brokerage''s 10 free reports are used up through the one entry, the evaluation is complete, and the 11th free report is refused (EVALUATION_COMPLETE, EV002) while it has no paid plan',
+  (select count(*) = 10 from _i where label ~ '^y[0-9]+$' and report_id is not null and allot = 'trial')
   and (select status = 'complete' from public.evaluation where evaluation_id = pg_temp._ev('yak'))
-  and pg_temp._why($$select pg_temp._iss('y21', 6, 6021)$$) = 'ok' and pg_temp._ierr('y21') like 'EV002: EVALUATION_COMPLETE%',
-  coalesce(pg_temp._ierr('y21'), (select count(*)::text from _i where label ~ '^y[0-9]+$')));
+  and pg_temp._why($$select pg_temp._iss('y11', 6, 6011)$$) = 'ok' and pg_temp._ierr('y11') like 'EV002: EVALUATION_COMPLETE%',
+  coalesce(pg_temp._ierr('y11'), (select count(*)::text from _i where label ~ '^y[0-9]+$')));
 select pg_temp._run('yak pays', $$select pg_temp._pay('yak1', pg_temp._bk('yak'), '8001', 'active', '2026-10-04T12:00:00Z', true, 'subscription_created')$$);
-select pg_temp._ck('D04 paying does not touch the free ledger and the free reports do not count toward the plan: 20 used, complete, and the paid month still shows 100 of 100',
-  pg_temp._plan(pg_temp._bk('yak')) = 'paid' and pg_temp._free_n('yak') = 20 and pg_temp._usage(6) = 'owner/paid/100/0/100'
+select pg_temp._ck('D04 paying does not touch the free ledger and the free reports do not count toward the plan: 10 used, complete, and the paid month still shows 100 of 100',
+  pg_temp._plan(pg_temp._bk('yak')) = 'paid' and pg_temp._free_n('yak') = 10 and pg_temp._usage(6) = 'owner/paid/100/0/100'
   and (select status = 'complete' from public.evaluation where evaluation_id = pg_temp._ev('yak')), pg_temp._usage(6));
 
 -- =====================================================================================================
@@ -349,12 +349,12 @@ select pg_temp._ck('E01 a brokerage whose free reports are all used makes a repo
   and (select allot = 'paid' and ordinal = 2 and used = 2 and remaining = 98 from _i where label = 'yp2')
   and (select ends = (select (b.bound_at at time zone 'UTC' + interval '1 month') at time zone 'UTC' from public.brokerage_subscription b where b.subscription_ref = '8001') from _i where label = 'yp1'),
   coalesce(pg_temp._ierr('yp1'), pg_temp._ierr('yp2')));
-select pg_temp._ck('E02 the free ledger is untouched by paid reports (still 20, complete) and the paid ledger holds 2; the usage shows 2 used and 98 left',
-  pg_temp._free_n('yak') = 20 and pg_temp._paid_n('yak') = 2 and pg_temp._usage(6) = 'owner/paid/100/2/98', pg_temp._usage(6));
-select pg_temp._ck('E03 paid reports are numbered from 21 (the free ones are 1 to 20): the first two paid reports are 21 and 22, and the saved list shows all twenty-two, newest first (22, 21, 20)',
-  (select min(c.number) = 21 and max(c.number) = 22 and count(*) = 2 from public.brokerage_paid_credit c where c.brokerage_id = pg_temp._bk('yak'))
-  and (select count(*) = 22 from public.evaluation_reports_of(pg_temp._u(6)))
-  and (select (array_agg(t.number order by t.ord))[1:3] = array[22, 21, 20] from public.evaluation_reports_of(pg_temp._u(6)) with ordinality as t(report_id, number, generated_at, private_context_id, ord)),
+select pg_temp._ck('E02 the free ledger is untouched by paid reports (still 10, complete) and the paid ledger holds 2; the usage shows 2 used and 98 left',
+  pg_temp._free_n('yak') = 10 and pg_temp._paid_n('yak') = 2 and pg_temp._usage(6) = 'owner/paid/100/2/98', pg_temp._usage(6));
+select pg_temp._ck('E03 paid reports are numbered from 11 (the free ones are 1 to 10): the first two paid reports are 11 and 12, and the saved list shows all twelve, newest first (12, 11, 10)',
+  (select min(c.number) = 11 and max(c.number) = 12 and count(*) = 2 from public.brokerage_paid_credit c where c.brokerage_id = pg_temp._bk('yak'))
+  and (select count(*) = 12 from public.evaluation_reports_of(pg_temp._u(6)))
+  and (select (array_agg(t.number order by t.ord))[1:3] = array[12, 11, 10] from public.evaluation_reports_of(pg_temp._u(6)) with ordinality as t(report_id, number, generated_at, private_context_id, ord)),
   (select (array_agg(t.number order by t.ord))[1:3]::text from public.evaluation_reports_of(pg_temp._u(6)) with ordinality as t(report_id, number, generated_at, private_context_id, ord)));
 select pg_temp._run('fx issue', $x$do $d$ begin perform pg_temp._iss('fx1', 1, 1101); perform pg_temp._iss('fx2', 2, 1102); end $d$$x$);
 select pg_temp._ck('E04 the agent and the owner of one brokerage draw from ONE paid month: fox owner makes one, fox agent makes one, the ordinals are 1 and 2 and the usage is 2 used for both seats',
@@ -372,7 +372,7 @@ select pg_temp._ck('E06 the other agent retrying the same key is answered too (a
 select pg_temp._run('yfree', $x$select pg_temp._iss('yfree', 6, 6001)$x$);
 select pg_temp._ck('E07 a retried key is answered across BOTH ledgers: a key that made a FREE report, retried after the plan became paid, returns that free report (replayed, allotment trial) and charges the paid month nothing',
   (select replayed and report_id = pg_temp._rp('y1') and allot = 'trial' from _i where label = 'yfree')
-  and pg_temp._paid_n('yak') = 2 and pg_temp._free_n('yak') = 20, coalesce(pg_temp._ierr('yfree'), 'x'));
+  and pg_temp._paid_n('yak') = 2 and pg_temp._free_n('yak') = 10, coalesce(pg_temp._ierr('yfree'), 'x'));
 select pg_temp._ck('E08 a key is required (22023, IDEMPOTENCY_KEY_REQUIRED)',
   pg_temp._why($$select * from public.brokerage_report_issue(pg_temp._u(1), null, '{"n":1}', pg_temp._h('{"n":1}'), 'v', '{}'::jsonb, null)$$) like '22023: IDEMPOTENCY_KEY_REQUIRED%', null);
 
@@ -390,9 +390,9 @@ select pg_temp._ck('E10 a brokerage''s paid month cannot be spent by another bro
 -- a refusal by the snapshot costs nothing and leaves no gap
 select pg_temp._run('bad hash', $x$select pg_temp._iss('badhash', 1, 1103, null, 'not-a-hash')$x$);
 select pg_temp._run('good after bad', $x$select pg_temp._iss('fx3', 1, 1104)$x$);
-select pg_temp._ck('E11 a report the snapshot refuses (a bad content hash) is charged nothing and leaves no hole: the next report is ordinal 3 and number 23-style contiguous, and the ledger holds 3',
+select pg_temp._ck('E11 a report the snapshot refuses (a bad content hash) is charged nothing and leaves no hole: the next report is ordinal 3 and number 13-style contiguous, and the ledger holds 3',
   pg_temp._ierr('badhash') is not null and (select ordinal = 3 and used = 3 and remaining = 97 from _i where label = 'fx3')
-  and pg_temp._paid_n('fox') = 3 and (select max(number) = 23 and count(*) = 3 from public.brokerage_paid_credit where brokerage_id = pg_temp._bk('fox')),
+  and pg_temp._paid_n('fox') = 3 and (select max(number) = 13 and count(*) = 3 from public.brokerage_paid_credit where brokerage_id = pg_temp._bk('fox')),
   coalesce(pg_temp._ierr('badhash'), 'no error') || ' / ' || coalesce(pg_temp._ierr('fx3'), 'ok'));
 
 -- states that do not grant fall back to the free evaluation
@@ -412,7 +412,7 @@ select pg_temp._ck('E14 a brokerage that lapsed AFTER using its free reports up 
   and pg_temp._ierr('yp3') like 'EV002: EVALUATION_COMPLETE%' and pg_temp._paid_n('yak') = 2,
   coalesce(pg_temp._ierr('yp3'), 'no error'));
 select pg_temp._ck('E15 the usage after the lapse reads canceled with nothing to spend, though two paid reports were made; the reports themselves stay readable',
-  pg_temp._usage(6) = 'owner/canceled/100/0/0' and (select count(*) = 22 from public.evaluation_reports_of(pg_temp._u(6))), pg_temp._usage(6));
+  pg_temp._usage(6) = 'owner/canceled/100/0/0' and (select count(*) = 12 from public.evaluation_reports_of(pg_temp._u(6))), pg_temp._usage(6));
 
 -- an evaluation the admin ended ends the brokerage's right to make reports, paid or not
 select pg_temp._run('elk issue', $x$select pg_temp._iss('elk1', 5, 5201)$x$);
@@ -448,7 +448,7 @@ select pg_temp._ck('F01 a brokerage makes 100 paid reports in its month, ordinal
 select pg_temp._run('hen 101', $x$select pg_temp._iss('h101', 3, 3201)$x$);
 select pg_temp._ck('F02 the 101st report of the month is refused by the function (ALLOTMENT_COMPLETE, EV010) and costs nothing: still 100 in the ledger, and no snapshot was stored for it',
   pg_temp._ierr('h101') like 'EV010: ALLOTMENT_COMPLETE%' and pg_temp._paid_n('hen') = 100
-  and (select count(*) = 100 from public.evaluation_credit_all a join public.evaluation e on e.evaluation_id = a.evaluation_id where e.brokerage_id = pg_temp._bk('hen') and a.ordinal > 20),
+  and (select count(*) = 100 from public.evaluation_credit_all a join public.evaluation e on e.evaluation_id = a.evaluation_id where e.brokerage_id = pg_temp._bk('hen') and a.ordinal > 10),
   pg_temp._ierr('h101'));
 select pg_temp._ck('F03 the cap holds by CONSTRAINT even for a writer that bypasses the function: inserting ordinal 101, or a second row in an ordinal already used, is refused by the table itself (check / primary key), as the table owner',
   pg_temp._why($$insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id)
@@ -462,15 +462,15 @@ select pg_temp._ck('F04 the MONTH is stamped by the database: a writer that name
   and (select count(*) = 0 from public.brokerage_paid_credit where period_index = 7), null);
 select pg_temp._ck('F05 a paid credit needs a LIVE binding of the SAME brokerage: a test binding is refused (55000), and a binding of another brokerage is refused by the foreign key (23503)',
   pg_temp._why($$insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id)
-     select b.binding_id, b.brokerage_id, 0, 1, 21, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":3}', pg_temp._h('{"x":3}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '9001' and not b.livemode$$) like '55000:%'
+     select b.binding_id, b.brokerage_id, 0, 1, 11, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":3}', pg_temp._h('{"x":3}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '9001' and not b.livemode$$) like '55000:%'
   and pg_temp._why($$insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id)
-     select b.binding_id, pg_temp._bk('fox'), 0, 1, 21, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":4}', pg_temp._h('{"x":4}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '55000:%',
+     select b.binding_id, pg_temp._bk('fox'), 0, 1, 11, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":4}', pg_temp._h('{"x":4}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '55000:%',
   null);
-select pg_temp._ck('F06 a number can never be reused: a second row with an existing number for the brokerage is refused by the unique constraint, and a number at or below 20 (a free report''s) is refused by the check',
+select pg_temp._ck('F06 a number can never be reused: a second row with an existing number for the brokerage is refused by the unique constraint, and a number at or below 10 (a free report''s) is refused by the check',
   pg_temp._why($$insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id)
-     select b.binding_id, b.brokerage_id, 0, 1, 20, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":5}', pg_temp._h('{"x":5}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '23514:%brokerage_paid_credit_number%'
+     select b.binding_id, b.brokerage_id, 0, 1, 10, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":5}', pg_temp._h('{"x":5}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '23514:%brokerage_paid_credit_number%'
   and pg_temp._why($$insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id)
-     select b.binding_id, b.brokerage_id, 0, 1, 21, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":6}', pg_temp._h('{"x":6}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '23505:%',
+     select b.binding_id, b.brokerage_id, 0, 1, 11, gen_random_uuid(), (select report_id from public.report_snapshot_issue('{"x":6}', pg_temp._h('{"x":6}'), 'v', '{}'::jsonb, null)) from public.brokerage_subscription b where b.subscription_ref = '5200'$$) like '23505:%',
   null);
 
 -- the next month: a binding made 35 days ago has a month 1; the usage and the cap are per month
@@ -483,7 +483,7 @@ select pg_temp._run('bat old month', $x$do $d$ declare n int; begin
   alter table public.brokerage_paid_credit disable trigger brokerage_paid_credit_guard;
   for n in 1..100 loop
     insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id, issued_at)
-    select b.binding_id, b.brokerage_id, 0, n, 20 + n, gen_random_uuid(),
+    select b.binding_id, b.brokerage_id, 0, n, 10 + n, gen_random_uuid(),
            (select report_id from public.report_snapshot_issue(format('{"bat":%s}', n), pg_temp._h(format('{"bat":%s}', n)), 'v', '{}'::jsonb, null)),
            now() - interval '34 days'
       from public.brokerage_subscription b where b.subscription_ref = '5300';
@@ -495,10 +495,10 @@ select pg_temp._ck('F07 a binding made 35 days ago is in its SECOND month (index
   and (select count(*) = 100 from public.brokerage_paid_credit c join public.brokerage_subscription b using (binding_id) where b.subscription_ref = '5300' and c.period_index = 0)
   and pg_temp._usage(9) = 'owner/paid/100/0/100', pg_temp._usage(9));
 select pg_temp._run('bat new month', $x$do $d$ begin perform pg_temp._iss('bn1', 9, 9001); perform pg_temp._iss('bn2', 9, 9002); end $d$$x$);
-select pg_temp._ck('F08 in the second month the first report is ordinal 1 again and the NUMBER carries on from 121 (the month resets, the numbers never repeat), and the month ends one calendar month after the second month began',
+select pg_temp._ck('F08 in the second month the first report is ordinal 1 again and the NUMBER carries on from 111 (the month resets, the numbers never repeat), and the month ends one calendar month after the second month began',
   (select ordinal = 1 and used = 1 and remaining = 99 and allot = 'paid' from _i where label = 'bn1')
   and (select ordinal = 2 from _i where label = 'bn2')
-  and (select max(number) = 122 and count(*) = 102 from public.brokerage_paid_credit where brokerage_id = pg_temp._bk('bat'))
+  and (select max(number) = 112 and count(*) = 102 from public.brokerage_paid_credit where brokerage_id = pg_temp._bk('bat'))
   and (select ends = (select ((b.bound_at at time zone 'UTC') + interval '2 months') at time zone 'UTC' from public.brokerage_subscription b where b.subscription_ref = '5300') from _i where label = 'bn1'),
   coalesce(pg_temp._ierr('bn1'), 'x'));
 select pg_temp._ck('F09 month arithmetic: whole calendar months from the bound day, computed in UTC (31 Jan + 1 month is 28 Feb; a time before the binding is month 0; the boundary instant belongs to the NEW month)',
@@ -533,8 +533,8 @@ select pg_temp._ck('H01 every one of the six ownership readers now reads public.
      and pg_get_functiondef(p.oid) like '%public.evaluation_credit_all c%' and pg_get_functiondef(p.oid) not like '%public.evaluation_credit c%')
   and (select attrs from _base) = pg_temp._reader_attrs(),
   null);
-select pg_temp._ck('H02 the saved list of a paid brokerage shows its paid reports beside its free ones, newest first, and its number is the report''s (fox: 3 paid reports, 21 to 23)',
-  (select count(*) = 3 and min(number) = 21 and max(number) = 23 from public.evaluation_reports_of(pg_temp._u(1))), (select count(*)::text from public.evaluation_reports_of(pg_temp._u(1))));
+select pg_temp._ck('H02 the saved list of a paid brokerage shows its paid reports beside its free ones, newest first, and its number is the report''s (fox: 3 paid reports, 11 to 13)',
+  (select count(*) = 3 and min(number) = 11 and max(number) = 13 from public.evaluation_reports_of(pg_temp._u(1))), (select count(*)::text from public.evaluation_reports_of(pg_temp._u(1))));
 select pg_temp._ck('H03 a paid report opens for its own brokerage''s members (the owner AND the agent) with the stored body, and for NOBODY else: another brokerage''s owner and a stranger see zero rows',
   (select count(*) = 1 from public.evaluation_report_open(pg_temp._u(1), pg_temp._rp('fx1')))
   and (select count(*) = 1 from public.evaluation_report_open(pg_temp._u(2), pg_temp._rp('fx1')))
@@ -564,8 +564,8 @@ select pg_temp._run('watch paid', $x$do $d$ begin
   perform pg_temp._iss('fxp', 1, 1105, (select j from _pv where name = 'p1'));
   insert into _w select * from public.evaluation_property_watch_start(pg_temp._u(1), pg_temp._rp('fxp'));
 end $d$$x$);
-select pg_temp._ck('H07 a property watch can be started on a PAID report that kept its private context, and the watch list shows it under its paid number (24)',
-  (select started from _w) and (select count(*) = 1 and bool_and(number = 24) from public.evaluation_property_watches_of(pg_temp._u(1))),
+select pg_temp._ck('H07 a property watch can be started on a PAID report that kept its private context, and the watch list shows it under its paid number (14)',
+  (select started from _w) and (select count(*) = 1 and bool_and(number = 14) from public.evaluation_property_watches_of(pg_temp._u(1))),
   coalesce((select err from (select pg_temp._ierr('fxp') as err) x), 'x'));
 
 -- =====================================================================================================

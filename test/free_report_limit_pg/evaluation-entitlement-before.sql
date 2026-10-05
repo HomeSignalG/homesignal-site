@@ -2,7 +2,7 @@
 -- EVALUATION ENTITLEMENT  (Development Activity plan, Order L1 — 2026-10-02)
 -- SQL OF RECORD. PARKED: NOT APPLIED to production. New schema in production needs its own founder go, and
 -- docs/brokerage-account-spine.sql (Order K0) must be applied first: this file hangs off it.
--- The database layer of the 10-report brokerage evaluation, built DARK: nothing calls it, no function is deployed,
+-- The database layer of the 20-report brokerage evaluation, built DARK: nothing calls it, no function is deployed,
 -- no page, schedule or edge function changed, and no report is stored.
 --
 -- WHAT IT IS
@@ -19,7 +19,7 @@
 --                              public.brokerage_member (K0 left that table with no writer; this is the writer).
 --   evaluation_invite_revoke / evaluation_revoke   end an open invite / the whole evaluation.
 --   evaluation_report_issue    THE credit: in ONE transaction it locks the evaluation, answers a retried key with the
---                              stored report (no charge), refuses report 11 with EVALUATION_COMPLETE, calls the existing
+--                              stored report (no charge), refuses report 21 with EVALUATION_COMPLETE, calls the existing
 --                              public.report_snapshot_issue (the one snapshot and private-context writer), and appends the
 --                              ledger row. Any refusal rolls everything back, so no credit is lost to a failure.
 --   evaluation_usage           the one reader: status and credits used / remaining for a signed-in member's evaluation.
@@ -35,18 +35,18 @@
 --     whether a credit is consumed ............ evaluation_report_issue (one credit per SUCCESSFUL call). Whether a
 --                                               limited-coverage or thin report SHOULD be charged is open decision R5; the
 --                                               future handler decides when to call this function, nothing here hard-codes it.
---     how many credits exist .................. evaluation_report_limit(), the one definition of the number 10.
+--     how many credits exist .................. evaluation_report_limit(), the one definition of the number 20.
 --     paid state ................................ a later order (M) writes evaluation.status; public.subscriptions is the
 --                                               map-paywall product and is not read here.
 --
--- THE 10-REPORT CAP HOLDS BY CONSTRAINT AT ANY ISOLATION LEVEL, not by a lock and a count.
+-- THE 20-REPORT CAP HOLDS BY CONSTRAINT AT ANY ISOLATION LEVEL, not by a lock and a count.
 --   A row lock serialises concurrent writers only at READ COMMITTED; at REPEATABLE READ the waiter keeps its old snapshot and a
 --   count taken from it is stale (measured on K0's owner guard: two sessions both passed and left zero owners). So the ledger
 --   carries an ORDINAL: primary key (evaluation_id, ordinal) and CHECK (ordinal between 1 and evaluation_report_limit()). At
---   most 10 distinct ordinals exist per evaluation, so an 11th row cannot be inserted by ANY writer, in any transaction, at any
+--   most 20 distinct ordinals exist per evaluation, so a 21st row cannot be inserted by ANY writer, in any transaction, at any
 --   isolation level, including one that bypasses the functions. Likewise unique (evaluation_id, idempotency_key) and
---   unique (report_id). The status flips to 'complete' in a trigger on the 10th ledger row, so it cannot be skipped.
---   What remains lock-based is only the FRIENDLY behaviour (a retried key returns the stored report, the 11th call says
+--   unique (report_id). The status flips to 'complete' in a trigger on the 20th ledger row, so it cannot be skipped.
+--   What remains lock-based is only the FRIENDLY behaviour (a retried key returns the stored report, the 21st call says
 --   EVALUATION_COMPLETE, the next ordinal is contiguous, agent seats are counted, and an actor's membership is re-read after the
 --   evaluation lock). evaluation_report_issue, evaluation_invite_redeem, evaluation_invite_mint and evaluation_invite_revoke
 --   therefore REFUSE any transaction that is not READ COMMITTED (errcode 55000) instead of
@@ -73,13 +73,13 @@
 --         because hashing an address into the ledger would store an identifier that resolves to one address. A retry with the
 --         same key and a DIFFERENT address returns the FIRST report; the handler must detect that mismatch from the private
 --         context while it is active.
---   D-L7  an evaluation is a state: active -> complete (the 10th credit) | revoked; complete -> revoked; revoked is terminal.
+--   D-L7  an evaluation is a state: active -> complete (the 20th credit) | revoked; complete -> revoked; revoked is terminal.
 --         Order M adds the paid transition deliberately (it amends evaluation_guard); a paid continuation is not decided here.
 --   D-L8  an owner may mint AGENT invites only. Another owner is minted by the admin (p_actor null).
 --
 -- ERRORS (message, SQLSTATE) — the handler maps on the message
 --   INVITE_UNUSABLE EV001   an unknown, malformed, expired, revoked or already-redeemed invite: ONE generic refusal.
---   EVALUATION_COMPLETE EV002   all 10 credits are used (a retried key still returns its report).
+--   EVALUATION_COMPLETE EV002   all 20 credits are used (a retried key still returns its report).
 --   NOT_ENTITLED EV003      not a member, a removed member, another brokerage, a revoked, expired or suspended evaluation.
 --   ALREADY_A_MEMBER EV004  the person already has an ACTIVE membership somewhere (K0: one per user, so no second pool).
 --   SEAT_LIMIT_REACHED EV005   the evaluation's agent seats are full.
@@ -122,7 +122,7 @@ end $pre$;
 
 -- ---- 1. THE ONE DEFINITION OF THE NUMBER OF FREE REPORTS ---------------------------------------------
 create or replace function public.evaluation_report_limit() returns integer
-language sql immutable as $$ select 10 $$;
+language sql immutable as $$ select 20 $$;
 
 -- ---- 2. THE EVALUATION -------------------------------------------------------------------------------
 create table if not exists public.evaluation (
@@ -551,7 +551,7 @@ begin
     select count(*)::integer into v_used from public.evaluation_credit c where c.evaluation_id = ev.evaluation_id;
     return query
       select s.report_id, s.generated_at, s.private_context_id, true, v_prior.ordinal, v_used,
-             greatest(public.evaluation_report_limit() - v_used, 0), ev.status
+             public.evaluation_report_limit() - v_used, ev.status
         from public.report_snapshot s where s.report_id = v_prior.report_id;
     return;
   end if;
@@ -576,7 +576,7 @@ returns table (evaluation_id uuid, status text, credit_limit integer, credits_us
                expires_at timestamptz, expired boolean)
 language sql stable security definer set search_path = public, pg_temp
 as $$
-  select e.evaluation_id, e.status, public.evaluation_report_limit(), u.n, greatest(public.evaluation_report_limit() - u.n, 0),
+  select e.evaluation_id, e.status, public.evaluation_report_limit(), u.n, public.evaluation_report_limit() - u.n,
          e.expires_at, (e.expires_at is not null and e.expires_at <= now())
     from public.brokerage_membership_of(p_user_id) r
     join public.evaluation e on e.brokerage_id = r.brokerage_id

@@ -58,8 +58,8 @@ select pg_temp._ck('A01 the limits are exactly the six this file states (person 
   (select string_agg(bucket || ':' || window_secs || ':' || max_requests, ',' order by bucket collate "C", window_secs) from public.report_rate_limits())
     = 'brokerage:60:30,brokerage:3600:200,brokerage:86400:1000,user:60:10,user:3600:60,user:86400:200',
   (select string_agg(bucket || ':' || window_secs || ':' || max_requests, ',' order by bucket collate "C", window_secs) from public.report_rate_limits()));
-select pg_temp._ck('A02 the founder''s 20 free reports and 100 paid reports a month are untouched',
-  public.evaluation_report_limit() = 20 and public.billing_report_limit() = 100,
+select pg_temp._ck('A02 the founder''s 10 free reports and 100 paid reports a month are untouched',
+  public.evaluation_report_limit() = 10 and public.billing_report_limit() = 100,
   public.evaluation_report_limit() || '/' || public.billing_report_limit());
 select pg_temp._ck('A03 nothing the entitlement owns refers to the limiter: it is beside the credit path, not in it',
   not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname not like 'report\_rate\_%' and p.prosrc like '%report_rate%'),

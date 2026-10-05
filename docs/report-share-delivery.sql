@@ -45,7 +45,7 @@
 --   5. THE CLIENT READ (report_share_open) returns ZERO rows unless the link is ACTIVE. An unknown, revoked and expired link are
 --      indistinguishable from each other: there is no oracle for whether a token ever existed. It also returns nothing when the owning
 --      brokerage's evaluation was REVOKED by an administrator or the brokerage is not active: a link does not outlive a withdrawn
---      account. An evaluation that merely ended (its time ran out, or its 20 reports are used) does NOT take back a report already shared.
+--      account. An evaluation that merely ended (its time ran out, or its 10 reports are used) does NOT take back a report already shared.
 --   6. What the client read returns: the stored text unchanged, when it was made, the snapshot's opaque context handle, and the owning
 --      brokerage's name. No share_id, no ordinal, no evaluation, no user, no agent: a share records no actor, so the shared view names
 --      the brokerage and no individual (see WHAT THIS DOES NOT HOLD).

@@ -74,7 +74,7 @@ async function identify(req: Request, deps: AdminGateDeps): Promise<Response | {
 
 // ── WHO MAY MAKE A DEVELOPMENT ACTIVITY REPORT (build step 5b) ───────────────────────────────────────────────────────────────
 //
-// An admin, exactly as before, or a member of an ACTIVE, unexpired brokerage evaluation (the 20-report trial). The gate decides
+// An admin, exactly as before, or a member of an ACTIVE, unexpired brokerage evaluation (the 10-report trial). The gate decides
 // nothing about the trial itself: whether this person is a member, and of which evaluation, is public.evaluation_usage (built on the
 // ONE resolver public.brokerage_membership_of, docs/evaluation-entitlement.sql). This only asks it, by the auth user's id, and reads
 // its status. Only the report function uses this gate; Follow / Changes Since Report stay admin-only (authorizeAdmin).
@@ -82,7 +82,7 @@ async function identify(req: Request, deps: AdminGateDeps): Promise<Response | {
 /** A trial as public.evaluation_usage reports it. */
 export type TrialState = { status: string; credits_used: number; credits_remaining: number; expired: boolean };
 /**
- * `complete` is true for a trial whose 20 free reports are used. Such a member can no longer MAKE a report (the handler refuses it), but
+ * `complete` is true for a trial whose 10 free reports are used. Such a member can no longer MAKE a report (the handler refuses it), but
  * their brokerage's stored reports stay readable (build step 6), so the gate lets them through and the handler decides by what they ask.
  */
 export type ReportCaller = { kind: 'admin' } | { kind: 'trial'; userId: string; trial: TrialState; complete: boolean };
@@ -94,11 +94,11 @@ export function trialSummary(t: TrialState) {
 }
 
 /**
- * Whether a trial may make reports now: 'active', 'complete' (its 20 reports are used) or 'ended' (revoked, expired, or any status
+ * Whether a trial may make reports now: 'active', 'complete' (its 10 reports are used) or 'ended' (revoked, expired, or any status
  * this code does not know). The ONE reading of a trial's state: the report gate refuses on it and the trial page shows it.
  */
 export function trialStanding(t: TrialState): 'active' | 'complete' | 'ended' {
-  // a trial whose 20 reports are used is over; making more reports (even free ones) is the paid product's (Order M)
+  // a trial whose 10 reports are used is over; making more reports (even free ones) is the paid product's (Order M)
   if (t.status === 'complete') return 'complete';
   if (t.status === 'active' && !t.expired) return 'active';
   return 'ended';

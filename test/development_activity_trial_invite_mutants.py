@@ -41,7 +41,7 @@ def m(name, old, new, tests, f):
 
 # ---- the function: an active trial, the database decides who is an owner, the answer is the link and nothing else ----------------------------
 m('invite_without_a_trial', "        if (!trial) return reply(req, { error: 'forbidden' }, 403);\n        if (trialStanding(trial) !== 'active')",
-  "        if (trialStanding(trial ?? { status: 'active', credits_used: 0, credits_remaining: 20, expired: false }) !== 'active')", [FNT, PG], FN)
+  "        if (trialStanding(trial ?? { status: 'active', credits_used: 0, credits_remaining: 10, expired: false }) !== 'active')", [FNT, PG], FN)
 m('invite_on_an_ended_trial', "        if (trialStanding(trial) !== 'active') return reply(req, { error: 'trial_not_active' }, 409);\n", '', [FNT, PG], FN)
 m('refusal_called_unavailable', "          if (e instanceof NotEntitled) return reply(req, { error: 'not_owner' }, 403);\n", '', [FNT, PG], FN)
 m('refusal_called_no_trial', "return reply(req, { error: 'not_owner' }, 403);", "return reply(req, { error: 'forbidden' }, 403);", [FNT, BRO, PG], FN)

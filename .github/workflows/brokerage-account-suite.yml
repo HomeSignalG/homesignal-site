@@ -14,13 +14,13 @@ name: brokerage-account-suite
 #      apply, and a stray grant is revoked by it;
 #   4. every prohibited mutation of that SQL, each of which MUST fail the executable checks (test/brokerage_account_mutants.py).
 #
-# 2. THE EVALUATION ENTITLEMENT (docs/evaluation-entitlement.sql; Order L1): the database layer of the 20-report brokerage evaluation,
+# 2. THE EVALUATION ENTITLEMENT (docs/evaluation-entitlement.sql; Order L1): the database layer of the 10-report brokerage evaluation,
 # built DARK on top of the spine, the private-context layer and the snapshot writer, which job `evaluation` applies UNMUTATED first.
 #   1. the suite — hashed one-time invites bound to a user id; the redeem function is the writer of the membership and honours every
-#      spine rule; the credit ledger is append-only and the 20-report cap is a CONSTRAINT; a retried key returns the stored report and
+#      spine rule; the credit ledger is append-only and the 10-report cap is a CONSTRAINT; a retried key returns the stored report and
 #      charges nothing; a refusal by the snapshot costs no credit; nothing an agent typed reaches any new table;
 #   2. REAL concurrent sessions: two issues serialise, the last credit goes to one caller, one key is one credit, thirty callers win
-#      exactly twenty credits, one token and one seat go to one person, a member removed while waiting is refused, a mint during a
+#      exactly ten credits, one token and one seat go to one person, a member removed while waiting is refused, a mint during a
 #      revocation is refused; and at REPEATABLE READ and SERIALIZABLE a writer that bypasses the functions still cannot add a 21st row;
 #   3. the stored token hash equals what an independent tool (sha256sum) computes; the file applies twice with an identical definition;
 #      a poisoned state is refused; the ROLLBACK footer removes exactly its own objects;
@@ -41,6 +41,8 @@ on:
       - 'docs/report-private-context.sql'
       - 'test/evaluation_entitlement_pg/**'
       - 'test/evaluation_entitlement_mutants.py'
+      - 'docs/free-report-limit-10.sql'
+      - 'test/free_report_limit_pg/**'
       - '.github/workflows/brokerage-account-suite.yml'
   push:
     branches: [main]
@@ -53,6 +55,8 @@ on:
       - 'docs/report-private-context.sql'
       - 'test/evaluation_entitlement_pg/**'
       - 'test/evaluation_entitlement_mutants.py'
+      - 'docs/free-report-limit-10.sql'
+      - 'test/free_report_limit_pg/**'
       - '.github/workflows/brokerage-account-suite.yml'
   workflow_dispatch: {}
 
@@ -135,3 +139,39 @@ jobs:
         run: |
           set -o pipefail
           bash test/evaluation_entitlement_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/ev.log
+
+  free-report-limit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: freelimit_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The free allowance migration (20 to 10) preserves every ledger row, completes an evaluation that had used ten, never shows a negative remaining, applies twice to the same result, equals a fresh install of the SQL of record, and refuses when it should
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: freelimit_disposable
+        run: |
+          set -o pipefail
+          bash test/free_report_limit_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/fl.log

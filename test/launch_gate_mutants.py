@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Prohibited mutations of the product the LAUNCH GATE stands on (Development Activity build step 13). The gate is test/launch_gate_pg/run.sh: one scenario,
-invite -> 20 free reports -> the end of the trial -> checkout -> payment -> 100 paid reports -> the 101st refused -> cancellation, through the REAL handlers
+invite -> 10 free reports -> the end of the trial -> checkout -> payment -> 100 paid reports -> the 101st refused -> cancellation, through the REAL handlers
 and the SHIPPED SQL of every layer. Each mutation breaks ONE rule somewhere on that path (an edge function, a shared module, or the SQL) and the gate MUST fail on
 its own - it does not borrow the verdict of the layer suites (test/billing_mutants.py, test/brokerage_billing_pg/mutate.py), which already kill most of these.
 A gate that only passes when everything is right and cannot see the breaks is not a gate.

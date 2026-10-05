@@ -1,8 +1,9 @@
 // THE LAUNCH GATE (Development Activity build step 13): the plan's own end-to-end sequence, one scenario, through the REAL layers.
 //   "A test brokerage runs sign-up, 20 reports, the end of the trial, payment and a 100-report month."
+//   (a quotation of the plan as written; the free allowance was cut from 20 to 10 on 2026-10-05, so this scenario now runs ten free reports)
 // Every request goes through the real request handler and real data layer of the function a customer or the processor would reach:
 //   development-activity-trial            an admin creates the trial, an owner joins it, an owner invites an agent, an agent joins
-//   get-development-activity-report       the 20 free reports, the refusal of the 21st, the 100 paid reports, the refusal of the 101st, saved reports,
+//   get-development-activity-report       the 10 free reports, the refusal of the 11th, the 100 paid reports, the refusal of the 101st, saved reports,
 //                                         and (section 15, added with the report rate limit) the ceiling on how fast a member may ASK for them
 //   manage-billing                        the plan, and the owner's checkout
 //   development-activity-billing-webhook  the processor's signed events (the test payment, the live payment, the cancellation)
@@ -186,7 +187,7 @@ let t = await trialAsk(ADMIN, { action: 'create', brokerage_name: 'Launch Gate R
 ok(t.status === 200 && /#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link), '1a an admin creates the test brokerage\'s trial and gets the owner invite link', t.json);
 const ownerToken = tokenOf(t.json.invite_link);
 t = await trialAsk(OWNER, { action: 'redeem', token: ownerToken });
-ok(t.status === 200 && t.json.role === 'owner' && t.json.access === 'trial' && t.json.trial?.credits_remaining === 20, '1b the owner opens the link: owner, twenty free reports left', t.json);
+ok(t.status === 200 && t.json.role === 'owner' && t.json.access === 'trial' && t.json.trial?.credits_remaining === 10, '1b the owner opens the link: owner, ten free reports left', t.json);
 t = await trialAsk(OWNER, { action: 'invite' });
 const agentLink = t.json.invite_link;
 t = await trialAsk(AGENT, { action: 'redeem', token: tokenOf(agentLink) });
@@ -209,30 +210,30 @@ const idsIn = (x) => { const s = JSON.stringify(x); return s.includes(brokerageI
 ok(ownerStatus.json.plan && agentStatus.json.plan && !idsIn(ownerStatus.json) && !idsIn(agentStatus.json) && !idsIn(b.json),
   '2d no billing answer names the brokerage or its trial - checked on the answers that CARRY a plan (owner, agent), not only on the refusal', Object.keys(ownerStatus.json.plan || {}));
 
-// ---- 3. the twenty free reports --------------------------------------------------------------------------------------------------------------------
+// ---- 3. the ten free reports --------------------------------------------------------------------------------------------------------------------
 let r = await ask(OWNER, { address: addr(1), idempotency_key: key(1) });
-ok(r.status === 200 && r.json.charged === true && r.json.stored === true && r.json.allotment === 'trial' && r.json.trial?.credits_used === 1 && r.json.trial?.credits_remaining === 19
-   && r.json.plan?.state === 'none' && !idsIn(r.json), '3a the first report is charged to the free trial: one used, nineteen left, plan still "none"', [r.status, r.json.allotment, r.json.trial, r.json.error]);
+ok(r.status === 200 && r.json.charged === true && r.json.stored === true && r.json.allotment === 'trial' && r.json.trial?.credits_used === 1 && r.json.trial?.credits_remaining === 9
+   && r.json.plan?.state === 'none' && !idsIn(r.json), '3a the first report is charged to the free trial: one used, nine left, plan still "none"', [r.status, r.json.allotment, r.json.trial, r.json.error]);
 const firstId = r.json.report_id;
-for (let i = 2; i <= 20; i++) {
+for (let i = 2; i <= 10; i++) {
   r = await ask(i % 2 ? OWNER : AGENT, { address: addr(i), idempotency_key: key(i) });
   if (r.status !== 200 || r.json.allotment !== 'trial' || r.json.trial?.credits_used !== i) break;
 }
-ok(r.status === 200 && r.json.trial?.credits_used === 20 && r.json.trial?.credits_remaining === 0 && r.json.trial?.status === 'complete',
-  '3b the twentieth report (made by the agent) ends the trial: twenty used, none left, complete', [r.status, r.json.trial, r.json.error]);
-ok(count('evaluation_credit') === 20 && count('report_snapshot') === 20 && count('brokerage_paid_credit') === 0
-   && one("select string_agg(ordinal::text, ',' order by ordinal) from public.evaluation_credit") === Array.from({ length: 20 }, (_, i) => i + 1).join(','),
-  '3c the database holds twenty stored reports, a free ledger numbered 1 to 20 with no gap, and no paid credit');
+ok(r.status === 200 && r.json.trial?.credits_used === 10 && r.json.trial?.credits_remaining === 0 && r.json.trial?.status === 'complete',
+  '3b the tenth report (made by the agent) ends the trial: ten used, none left, complete', [r.status, r.json.trial, r.json.error]);
+ok(count('evaluation_credit') === 10 && count('report_snapshot') === 10 && count('brokerage_paid_credit') === 0
+   && one("select string_agg(ordinal::text, ',' order by ordinal) from public.evaluation_credit") === Array.from({ length: 10 }, (_, i) => i + 1).join(','),
+  '3c the database holds ten stored reports, a free ledger numbered 1 to 10 with no gap, and no paid credit');
 ok(one("select status from public.evaluation where evaluation_id = :'e'::uuid", { e: evalId }) === 'complete', '3d the trial is marked complete by the database');
 
-// ---- 4. the end of the trial: the 21st report is refused before any work, and nothing can be charged ---------------------------------------------------
-const before21 = seen.length, issued21 = reportRpcs();
-r = await ask(OWNER, { address: addr(21), idempotency_key: key(21) });
-ok(r.status === 403 && r.json.error === 'evaluation_complete' && r.json.plan?.state === 'none' && reportRpcs() === issued21,
-  '4a the 21st report is refused (403 evaluation_complete) and the issue function is never asked', r.json);
-ok(seen.slice(before21).every((s) => /rpc\/(evaluation_usage|billing_usage)$/.test(s)) && count('report_snapshot') === 20 && count('evaluation_credit') === 20,
+// ---- 4. the end of the trial: the 11th report is refused before any work, and nothing can be charged ---------------------------------------------------
+const before11 = seen.length, issued11 = reportRpcs();
+r = await ask(OWNER, { address: addr(11), idempotency_key: key(11) });
+ok(r.status === 403 && r.json.error === 'evaluation_complete' && r.json.plan?.state === 'none' && reportRpcs() === issued11,
+  '4a the 11th report is refused (403 evaluation_complete) and the issue function is never asked', r.json);
+ok(seen.slice(before11).every((s) => /rpc\/(evaluation_usage|billing_usage)$/.test(s)) && count('report_snapshot') === 10 && count('evaluation_credit') === 10,
   '4b nothing but the trial and plan reads ran: nothing stored, nothing charged');
-r = await ask(AGENT, { address: addr(21), idempotency_key: key(22) });
+r = await ask(AGENT, { address: addr(11), idempotency_key: key(12) });
 ok(r.status === 403 && r.json.error === 'evaluation_complete', '4c the agent is refused the same way', r.json);
 
 // ---- 5. the checkout: only the owner, only a new subscription; nothing is charged or changed by asking ---------------------------------------------------
@@ -269,8 +270,8 @@ let w = await hook(subEvent(custom, { id: '9001', test: true, k: 1 }));
 ok(w.status === 200 && w.json.outcome === 'RECORDED', '6a a test-mode subscription event is recorded', w.json);
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'test_only' && b.json.plan?.credits_remaining === 0 && b.json.checkout === 'available', '6b the plan reads "test only", with no paid reports, and a real checkout is still available', b.json);
-r = await ask(OWNER, { address: addr(21), idempotency_key: key(21) });
-ok(r.status === 403 && r.json.error === 'evaluation_complete' && count('brokerage_paid_credit') === 0 && count('report_snapshot') === 20, '6c a test payment lets no report through: the 21st is still refused, no paid credit exists', r.json);
+r = await ask(OWNER, { address: addr(11), idempotency_key: key(11) });
+ok(r.status === 403 && r.json.error === 'evaluation_complete' && count('brokerage_paid_credit') === 0 && count('report_snapshot') === 10, '6c a test payment lets no report through: the 11th is still refused, no paid credit exists', r.json);
 ok(one("select livemode::text from public.brokerage_subscription where subscription_ref = '9001'") === 'false', '6d the database holds the test subscription as NOT live');
 
 // ---- 7. the webhook refuses what it cannot trust -------------------------------------------------------------------------------------------------------
@@ -311,43 +312,43 @@ ok(one("select count(*) from public.brokerage_subscription where subscription_re
   '8c the database holds ONE live binding of subscription 7001 to this brokerage and ONE event for it');
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'paid' && b.json.plan?.credit_limit === 100 && b.json.plan?.credits_used === 0 && b.json.plan?.credits_remaining === 100 && b.json.checkout === 'already_paid'
-   && typeof b.json.plan?.period_ends_at === 'string', '8d the plan is paid: a month of 100, none used (the twenty free reports do not count toward it), and no second checkout is offered', b.json);
+   && typeof b.json.plan?.period_ends_at === 'string', '8d the plan is paid: a month of 100, none used (the ten free reports do not count toward it), and no second checkout is offered', b.json);
 const lemonN = lemon.calls.length;
 b = await billingAsk(OWNER, { action: 'checkout' });
 ok(b.status === 409 && b.json.error === 'already_paid' && lemon.calls.length === lemonN, '8e a paid brokerage is refused a second checkout (409) and the processor is not contacted: nobody is billed twice', b.json);
 b = await billingAsk(AGENT, { action: 'status' });
 ok(b.json.plan?.state === 'paid' && b.json.plan?.credits_remaining === 100 && b.json.checkout === 'not_owner', '8f the agent sees the paid plan too');
 
-// ---- 9. the 100-report month: paid reports 21 to 120 -------------------------------------------------------------------------------------------------
-r = await ask(OWNER, { address: addr(21), idempotency_key: key(21) });
+// ---- 9. the 100-report month: paid reports 11 to 110 -------------------------------------------------------------------------------------------------
+r = await ask(OWNER, { address: addr(11), idempotency_key: key(11) });
 ok(r.status === 200 && !idsIn(r.json) && r.json.charged === true && r.json.stored === true && r.json.allotment === 'paid' && r.json.plan?.state === 'paid' && r.json.plan?.credits_used === 1 && r.json.plan?.credits_remaining === 99
-   && r.json.trial?.credits_used === 20 && r.json.trial?.status === 'complete', '9a the first report after payment is a PAID one: one of the month\'s hundred, and the free trial is untouched', [r.status, r.json.allotment, r.json.plan, r.json.trial, r.json.error]);
+   && r.json.trial?.credits_used === 10 && r.json.trial?.status === 'complete', '9a the first report after payment is a PAID one: one of the month\'s hundred, and the free trial is untouched', [r.status, r.json.allotment, r.json.plan, r.json.trial, r.json.error]);
 const paidFirstId = r.json.report_id;
-const dupe = await ask(OWNER, { address: addr(21), idempotency_key: key(21) });
+const dupe = await ask(OWNER, { address: addr(11), idempotency_key: key(11) });
 ok(dupe.status === 200 && dupe.json.replayed === true && dupe.json.charged === false && dupe.json.report_id === paidFirstId && count('brokerage_paid_credit') === 1,
   '9b a retry of the same request returns the same report and charges nothing', [dupe.json.replayed, dupe.json.charged]);
 let made = 1, last = r;
-for (let i = 22; i <= 120; i++) {
+for (let i = 12; i <= 110; i++) {
   last = await ask(i % 2 ? OWNER : AGENT, { address: addr(i), idempotency_key: key(i) });
-  if (last.status !== 200 || last.json.allotment !== 'paid' || last.json.plan?.credits_used !== i - 20) break;
+  if (last.status !== 200 || last.json.allotment !== 'paid' || last.json.plan?.credits_used !== i - 10) break;
   made++;
 }
 ok(made === 100 && last.status === 200 && last.json.plan?.credits_used === 100 && last.json.plan?.credits_remaining === 0,
   '9c one hundred paid reports are made, by the owner and the agent in turn; the hundredth leaves none', [made, last.status, last.json.plan, last.json.error]);
-ok(count('brokerage_paid_credit') === 100 && count('evaluation_credit') === 20 && count('report_snapshot') === 120, '9d the database holds 100 paid credits, the 20 free ones untouched, and 120 stored reports');
+ok(count('brokerage_paid_credit') === 100 && count('evaluation_credit') === 10 && count('report_snapshot') === 110, '9d the database holds 100 paid credits, the 10 free ones untouched, and 110 stored reports');
 ok(one("select string_agg(ordinal::text, ',' order by ordinal) from public.brokerage_paid_credit") === Array.from({ length: 100 }, (_, i) => i + 1).join(',')
-   && one("select min(number) || '-' || max(number) || '-' || count(distinct number) from public.brokerage_paid_credit") === '21-120-100',
-  '9e the paid ledger is the ordinals 1 to 100 with no gap, and the reports are numbered 21 to 120 (each number used once)');
+   && one("select min(number) || '-' || max(number) || '-' || count(distinct number) from public.brokerage_paid_credit") === '11-110-100',
+  '9e the paid ledger is the ordinals 1 to 100 with no gap, and the reports are numbered 11 to 110 (each number used once)');
 ok(one("select count(distinct period_index) || ':' || max(period_index) from public.brokerage_paid_credit") === '1:0', '9f all hundred belong to one month (the first)');
 
 // ---- 10. the 101st report: refused, and there is no way to buy more -------------------------------------------------------------------------------
 const issued101 = reportRpcs();
-r = await ask(OWNER, { address: addr(121), idempotency_key: key(121) });
-ok(r.status === 403 && r.json.error === 'allotment_complete' && r.json.plan?.credits_remaining === 0 && reportRpcs() === issued101 && count('report_snapshot') === 120 && count('brokerage_paid_credit') === 100,
+r = await ask(OWNER, { address: addr(111), idempotency_key: key(111) });
+ok(r.status === 403 && r.json.error === 'allotment_complete' && r.json.plan?.credits_remaining === 0 && reportRpcs() === issued101 && count('report_snapshot') === 110 && count('brokerage_paid_credit') === 100,
   '10a the 101st report is refused (403 allotment_complete) before any work: nothing stored, nothing charged', r.json);
-const rawIssue = psql("select * from public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, 'x', 'x', 'v', '{}'::jsonb, null)", { u: OWNER, k: key(122) });
+const rawIssue = psql("select * from public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, 'x', 'x', 'v', '{}'::jsonb, null)", { u: OWNER, k: key(112) });
 ok(!rawIssue.ok && /ALLOTMENT_COMPLETE/.test(rawIssue.err) && count('brokerage_paid_credit') === 100, '10b asked directly, the DATABASE refuses the 101st (ALLOTMENT_COMPLETE): the handler\'s check is not the only guard');
-const rawRow = psql("insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id) select binding_id, brokerage_id, 0, 101, 121, gen_random_uuid(), report_id from public.brokerage_paid_credit limit 1");
+const rawRow = psql("insert into public.brokerage_paid_credit (binding_id, brokerage_id, period_index, ordinal, number, idempotency_key, report_id) select binding_id, brokerage_id, 0, 101, 111, gen_random_uuid(), report_id from public.brokerage_paid_credit limit 1");
 ok(!rawRow.ok && /brokerage_paid_credit_ordinal/.test(rawRow.err) && count('brokerage_paid_credit') === 100,
   '10c and the cap is a CONSTRAINT of the ledger, named in the refusal: a 101st row cannot be written by any path', rawRow.err.slice(0, 160));
 b = await billingAsk(OWNER, { action: 'checkout' });
@@ -355,14 +356,14 @@ ok(b.status === 409 && b.json.error === 'already_paid', '10d there is no overage
 
 // ---- 11. every report stays readable: saved reports list and open, free and paid -------------------------------------------------------------------------
 const listed = await ask(OWNER, { action: 'list' });
-ok(listed.status === 200 && listed.json.reports?.length === 120 && listed.json.reports?.[0]?.number === 120 && listed.json.reports?.[119]?.number === 1
-   && new Set(listed.json.reports?.map((x) => x.number)).size === 120, '11a the owner lists all 120 reports, newest first, numbered 120 down to 1: the free and the paid in one list', listed.json.reports && listed.json.reports?.length);
+ok(listed.status === 200 && listed.json.reports?.length === 110 && listed.json.reports?.[0]?.number === 110 && listed.json.reports?.[109]?.number === 1
+   && new Set(listed.json.reports?.map((x) => x.number)).size === 110, '11a the owner lists all 110 reports, newest first, numbered 110 down to 1: the free and the paid in one list', listed.json.reports && listed.json.reports?.length);
 const agentList = await ask(AGENT, { action: 'list' });
-ok(agentList.status === 200 && JSON.stringify(agentList.json.reports) === JSON.stringify(listed.json.reports), '11b the agent sees the same 120');
+ok(agentList.status === 200 && JSON.stringify(agentList.json.reports) === JSON.stringify(listed.json.reports), '11b the agent sees the same 110');
 const openFree = await ask(AGENT, { action: 'open', report_id: firstId });
 const openPaid = await ask(AGENT, { action: 'open', report_id: paidFirstId });
-ok(openFree.status === 200 && openFree.json.number === 1 && openFree.json.charged === false && openPaid.status === 200 && openPaid.json.number === 21 && openPaid.json.charged === false,
-  '11c a free report (number 1) and a paid report (number 21) both open, and opening charges nothing');
+ok(openFree.status === 200 && openFree.json.number === 1 && openFree.json.charged === false && openPaid.status === 200 && openPaid.json.number === 11 && openPaid.json.charged === false,
+  '11c a free report (number 1) and a paid report (number 11) both open, and opening charges nothing');
 const rivalList = await ask(RIVAL, { action: 'list' });
 const rivalOpen = await ask(RIVAL, { action: 'open', report_id: paidFirstId });
 ok(rivalList.status === 200 && rivalList.json.reports?.length === 0 && rivalOpen.status === 404 && rivalOpen.json.error === 'not_found',
@@ -385,12 +386,12 @@ w = await hook(subEvent(custom, { name: 'subscription_cancelled', status: 'cance
 ok(w.status === 200 && w.json.outcome === 'RECORDED', '13a the cancellation is recorded', w.json);
 b = await billingAsk(OWNER, { action: 'status' });
 ok(b.json.plan?.state === 'canceled' && b.json.plan?.credits_remaining === 0 && b.json.checkout === 'available', '13b the plan reads "canceled", with no paid reports, and a new checkout is available (D-11-1)', b.json);
-r = await ask(OWNER, { address: addr(121), idempotency_key: key(123) });
-ok(r.status === 403 && r.json.error === 'evaluation_complete' && count('report_snapshot') === 120, '13c a canceled brokerage can make no new report (the trial is spent and the plan is not paid)', r.json);
+r = await ask(OWNER, { address: addr(111), idempotency_key: key(123) });
+ok(r.status === 403 && r.json.error === 'evaluation_complete' && count('report_snapshot') === 110, '13c a canceled brokerage can make no new report (the trial is spent and the plan is not paid)', r.json);
 const kept = await ask(OWNER, { action: 'list' });
 const keptOpen = await ask(OWNER, { action: 'open', report_id: paidFirstId });
-ok(kept.status === 200 && kept.json.reports?.length === 120 && keptOpen.status === 200 && count('brokerage_paid_credit') === 100,
-  '13d but all 120 stored reports still list and open, and nothing was deleted: cancelling ends new reports, never the ones already made');
+ok(kept.status === 200 && kept.json.reports?.length === 110 && keptOpen.status === 200 && count('brokerage_paid_credit') === 100,
+  '13d but all 110 stored reports still list and open, and nothing was deleted: cancelling ends new reports, never the ones already made');
 w = await hook(subEvent(custom, { name: 'subscription_updated', status: 'active', id: '7001', k: 25 }));
 b = await billingAsk(OWNER, { action: 'status' });
 ok(w.status === 200 && b.json.plan?.state === 'canceled', '13e an OLDER event arriving late does not undo the cancellation (the processor\'s own time orders them)', b.json.plan);
@@ -419,6 +420,11 @@ t = await trialAsk(RATE_OWNER, { action: 'invite' });
 t = await trialAsk(RATE_AGENT, { action: 'redeem', token: tokenOf(t.json.invite_link) });
 ok(rateOwnerOk && t.status === 200 && t.json.role === 'agent', '15a a second test brokerage (an owner and an agent) is signed up for the rate-limit checks', t.json);
 const rateBrokerage = one("select id from public.brokerage_account where name = 'Rate Gate Realty'");
+// The free allowance (10) now EQUALS the person's per-minute ceiling (10), so under it a person can never reach the ceiling: the free trial would be complete first
+// and the 11th request would answer 403 evaluation_complete, not 429. The ceiling only matters once a brokerage can make more than ten reports, which is a PAID
+// brokerage. So this brokerage pays before the burst: the same system-only writer the webhook calls (public.billing_event_apply), a live subscription bound to it.
+one("select outcome from public.billing_event_apply(:'b'::uuid, :'e'::jsonb)", { b: rateBrokerage, e: JSON.stringify({ processor: 'lemonsqueezy', idempotency_key: 'rate-gate-paid:1', subscription_ref: '7101', event_name: 'subscription_created', processor_status: 'active', occurred_at: new Date().toISOString(), product_ref: '11', variant_ref: '22', livemode: true }) });
+ok(one("select state from public.billing_plan_of(:'b'::uuid)", { b: rateBrokerage }) === 'paid', '15a2 the rate-limit brokerage is on a PAID plan, so its burst can pass the free allowance of ten', one("select state from public.billing_plan_of(:'b'::uuid)", { b: rateBrokerage }));
 one('truncate public.report_rate_window');
 // The person's window is a WALL-CLOCK minute. The checks below (15b-15i) take a few seconds and several of them count inside ONE minute, so they begin early
 // in a minute: a burst that straddled two would be let through legitimately and read as a defect. Costs up to half a minute of waiting, in this section only.
@@ -438,21 +444,21 @@ ok(blocked?.json?.error === 'rate_limited' && blocked?.json?.limited_by === 'use
    && blocked.retryAfter === String(blocked.json.retry_after_seconds),
   '15c the refusal says rate_limited, that it was the person\'s own ceiling, and how many seconds to wait (1 to 60), in the body and in the Retry-After header', [blocked?.json, blocked?.retryAfter]);
 ok(blocked?.json?.report === undefined && blocked?.json?.credit === undefined && blocked?.json?.charged === undefined && !JSON.stringify(blocked?.json).includes(rateBrokerage)
-   && !JSON.stringify(blocked?.json).includes('Main St') && blocked?.json?.trial?.credits_used === allowedBurst.length,
+   && !JSON.stringify(blocked?.json).includes('Main St') && (blocked?.json?.plan?.credits_used ?? blocked?.json?.trial?.credits_used) === allowedBurst.length,
   '15d the refusal carries no report, no charge, no address and no brokerage id, and the trial figures it does carry equal the reports actually made', blocked?.json);
 ok(geocodeCalls - geoBefore === allowedBurst.length && reportRpcs() - issueBefore === allowedBurst.length,
   '15e the geocoder and the issuing function were asked exactly once for each report let through and NEVER for the refused request', [geocodeCalls - geoBefore, reportRpcs() - issueBefore, allowedBurst.length]);
 const used0 = minuteOf(RATE_OWNER);
 for (let i = 0; i < 4; i++) await ask(RATE_OWNER, { address: addr(320 + i), idempotency_key: key(320 + i) }, { limited: true });
-ok(minuteOf(RATE_OWNER) === used0 && count('evaluation_credit') >= 0 && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length,
+ok(minuteOf(RATE_OWNER) === used0 && count('evaluation_credit') >= 0 && Number(one("select count(*) from public.evaluation_credit_all c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length,
   '15f four more refused requests consume nothing: the person\'s minute is unchanged and the free ledger holds exactly the reports that were let through', [used0, minuteOf(RATE_OWNER)]);
 const agentTry = await ask(RATE_AGENT, { address: addr(340), idempotency_key: key(340) }, { limited: true });
 ok(agentTry.status === 200 && agentTry.json.charged === true, '15g the owner being limited does not limit the agent: the same brokerage\'s other person is still let through', [agentTry.status, agentTry.json.error]);
 const listWhileLimited = await ask(RATE_OWNER, { action: 'list' }, { limited: true });
 ok(listWhileLimited.status === 200 && listWhileLimited.json.reports?.length === allowedBurst.length + 1, '15h and the limited person can still list their saved reports: reading what is stored is not what the limit is for', [listWhileLimited.status, listWhileLimited.json.reports?.length]);
-ok(one('select public.evaluation_report_limit() || chr(47) || public.billing_report_limit()') === '20/100'
-   && Number(one("select count(*) from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length + 1,
-  '15i the founder\'s numbers are still 20 free and 100 paid, and the free ledger counts every report made and none refused', one('select public.evaluation_report_limit()'));
+ok(one('select public.evaluation_report_limit() || chr(47) || public.billing_report_limit()') === '10/100'
+   && Number(one("select count(*) from public.evaluation_credit_all c join public.evaluation e on e.evaluation_id = c.evaluation_id where e.brokerage_id = :'b'::uuid", { b: rateBrokerage })) === allowedBurst.length + 1,
+  '15i the founder\'s numbers are still 10 free and 100 paid, and the free ledger counts every report made and none refused', one('select public.evaluation_report_limit()'));
 // the window rolls over: age the stored minute by two minutes (as the table's owner), and the same person is let through again
 one("update public.report_rate_window set window_start = window_start - interval '2 minutes' where bucket = 'user' and subject = :'u'::uuid and window_secs = 60", { u: RATE_OWNER });
 const afterRoll = await ask(RATE_OWNER, { address: addr(350), idempotency_key: key(350) }, { limited: true });

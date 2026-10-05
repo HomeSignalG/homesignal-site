@@ -3,7 +3,7 @@
 // see is whether the limiter is still WHERE and WHAT they proved: a claim moved after the geocoder, one that quietly gained an admin or a read, a second copy of the
 // numbers, a path to the counters that is not the claim, a limiter that has drifted into the credit path, or a CI job that stopped running it would go on printing PASS.
 // Pinned here on COMMENT-STRIPPED text, each with a positive control so a scan that matched nothing cannot pass:
-//   * the SQL: system-only, the counters and nothing private, the founder's 20 and 100 asserted untouched, the rollback present;
+//   * the SQL: system-only, the counters and nothing private, the founder's 10 and 100 asserted untouched, the rollback present;
 //   * the edge: the claim is made only for a member, after validation and before any work, answers 429 with Retry-After, fails closed; the shared reader names
 //     only the wrapper (never the clocked variant, never the table) and holds no number; no other file in the product reaches the counters;
 //   * the credit path: nothing the entitlement owns names the limiter;
@@ -38,8 +38,8 @@ ok(!/\bto\s+(public|anon|authenticated)\b/i.test(SQL) && /alter table public\.re
 ok(/revoke all on public\.report_rate_window from public, anon, authenticated, service_role/.test(SQL), '1d every privilege on the counter table is revoked from every role, the system role included: it reaches the counters only through the functions');
 const cols = [...(/create table if not exists public\.report_rate_window \(([\s\S]*?)\n\);/.exec(SQL) || [, ''])[1].matchAll(/^\s{2}(\w+)\s+(\w+)/gm)].filter((m) => !/^constraint$/i.test(m[1])).map((m) => m[1] + ':' + m[2]);
 ok(cols.join() === 'bucket:text,subject:uuid,window_secs:integer,window_start:timestamptz,used:integer', '1e the table holds a bucket, a subject that is a uuid, a window and a count - no email, address, IP or token column', cols);
-ok(/evaluation_report_limit\(\) <> 20/.test(SQL) && /billing_report_limit\(\) <> 100/.test(SQL) && /raise exception 'report_rate_limit: the free report limit is not 20/.test(SQL) && /raise exception 'report_rate_limit: the paid monthly limit is not 100/.test(SQL),
-  '1f the post-condition refuses to apply if the founder\'s 20 free or 100 paid reports are anything else');
+ok(/evaluation_report_limit\(\) <> 10/.test(SQL) && /billing_report_limit\(\) <> 100/.test(SQL) && /raise exception 'report_rate_limit: the free report limit is not 10/.test(SQL) && /raise exception 'report_rate_limit: the paid monthly limit is not 100/.test(SQL),
+  '1f the post-condition refuses to apply if the founder\'s 10 free or 100 paid reports are anything else');
 ok(!/\b(insert|update|delete)\b[^;]*\b(evaluation|brokerage_paid_credit|brokerage_subscription|report_snapshot)\b/i.test(SQL.replace(/'(?:[^']|'')*'/g, "''")), '1g it writes no row of the credit ledgers or the snapshot: its only writes are to its own table');
 ok(/pg_advisory_xact_lock/.test(SQL) && /read committed/.test(SQL) && /RATE_CLAIM_NEEDS_READ_COMMITTED/.test(SQL), '1h the claim is serialised by advisory locks and refuses to run above READ COMMITTED');
 ok(/-- ROLLBACK \(this file only/.test(SQLRAW) && (SQLRAW.match(/^-- drop /gm) || []).length === 5, '1i the file carries its rollback (five drop statements)');
@@ -61,7 +61,7 @@ ok(claimAt > 0 && geoAt > 0 && labelAt > 0 && completeAt > 0 && keyAt > 0 && HAN
 ok(claimAt > labelAt && claimAt > keyAt && claimAt > completeAt && claimAt < geoAt, '2d and it does so AFTER every validation and both entitlement refusals, and BEFORE the geocoder: an invalid or spent request consumes nothing, and a limited one costs the geocoder nothing');
 ok(/if \(trial\) \{\s*const verdict = await deps\.rateClaim\(trial\.userId\);/.test(HANDLER), '2e the claim is made only for a signed-in member, with the member\'s auth user id (never an email, an address or the key)');
 const listAt = HANDLER.indexOf("b.action !== undefined");
-const listEnd = HANDLER.indexOf('// a trial whose 20 free reports') >= 0 ? HANDLER.indexOf('// a trial whose 20 free reports') : HANDLER.indexOf("if (trial && trial.complete && !paid)");
+const listEnd = HANDLER.indexOf('// a trial whose 10 free reports') >= 0 ? HANDLER.indexOf('// a trial whose 10 free reports') : HANDLER.indexOf("if (trial && trial.complete && !paid)");
 ok(listAt > 0 && listEnd > listAt && claimAt > listEnd && !HANDLER.slice(listAt, listEnd).includes('rateClaim'), '2f the list and open actions (reads of what is stored) are decided before the claim and never make one');
 const refusal = HANDLER.slice(claimAt, claimAt + 700);
 ok(/reply\(req, \{\s*error: 'rate_limited', retry_after_seconds: verdict\.retryAfterSeconds, limited_by: verdict\.limitedBy, \.\.\.trialInfo,\s*\}, 429\)/.test(refusal) && /\.headers\.set\('Retry-After', String\(verdict\.retryAfterSeconds\)\)/.test(refusal),

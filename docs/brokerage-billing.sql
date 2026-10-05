@@ -2,7 +2,7 @@
 -- BROKERAGE BILLING  (Development Activity build step 11, Order M — 2026-10-04)
 -- SQL OF RECORD. Additive. Applied through the approved runner (db-sql.yml), never as a rolled-back dry run (CLAUDE.md §7.11).
 -- The database layer of the $79 a month plan: 100 new reports a month for a brokerage, on top of (and never counted against) the
--- 20 free reports of its evaluation. Nothing here talks to the payment processor; the processor's events arrive through
+-- 10 free reports of its evaluation. Nothing here talks to the payment processor; the processor's events arrive through
 -- supabase/functions/development-activity-billing-webhook and are recorded by the ledger that already exists.
 --
 -- WHAT IT ADDS
@@ -37,7 +37,7 @@
 --     which allotment a report uses ............ brokerage_report_issue.
 --     whether a report may be stored ........... report_snapshot_issue and the private-context containment trigger. Called, not repeated.
 --     whose a report is ........................ evaluation_credit_all.
---     the numbers 20 and 100 ................... evaluation_report_limit() (unchanged) and billing_report_limit() (here). Written once each.
+--     the numbers 10 and 100 ................... evaluation_report_limit() (unchanged) and billing_report_limit() (here). Written once each.
 --
 -- THE RULES THIS ENCODES (each pinned by test/brokerage_billing_pg/suite.sql and run.sh)
 --   1. PAID ONLY FROM A SERVER-VERIFIED EVENT. A brokerage is paid exactly when the latest LIVE-mode event of its current LIVE binding maps to
@@ -45,7 +45,7 @@
 --   2. TEST NEVER GRANTS. A test-mode event is recorded and bound (so the founder's test payment can be checked) but the state is
 --      'test_only' and no report is ever charged to it.
 --   3. THE FREE REPORTS DO NOT COUNT TOWARD THE PLAN (founder, 2026-10-02). The two ledgers are separate; the paid month's 100 is never
---      reduced by the 20, and a free report is never taken from the paid month. Reports are numbered 1 to 20 (free) and 21 onward (paid):
+--      reduced by the 10, and a free report is never taken from the paid month. Reports are numbered 1 to 10 (free) and 11 onward (paid):
 --      a number names one report forever and is never reused.
 --   4. THE MONTH IS COUNTED FROM THE DAY THE SUBSCRIPTION WAS BOUND, in whole calendar months (billing_period_index). It is derived, never
 --      stored, and it does not follow a paused or shifted billing date (default D-11-3).
@@ -66,7 +66,7 @@
 --   D-11-3  a paid month runs from the day the subscription was bound; the allotment resets on that day each month.
 --   D-11-4  once the plan is paid, every new report uses the paid allotment; the unused free reports are neither used nor lost.
 --   D-11-5  at the 101st report in a month the answer is ALLOTMENT_COMPLETE; there is no overage, no pack and no extra purchase.
---   D-11-6  paid reports are numbered from 21.
+--   D-11-6  paid reports are numbered from 11.
 --   D-11-7  a brokerage that subscribes again after cancelling gets a new binding and a new first month.
 --
 -- ERRORS (message, SQLSTATE): the handler maps on the message.
@@ -137,7 +137,7 @@ create index if not exists brokerage_subscription_by_brokerage on public.brokera
 
 -- ---- 3. THE PAID CREDIT LEDGER (append-only; the cap is a constraint) -----------------------------------
 -- period_index counts whole months from the binding's bound_at (0 = the first month). It is STAMPED by the trigger below, so a writer cannot
--- choose the month. number is the report's number for the brokerage, from 21; unique, so no two reports ever share one.
+-- choose the month. number is the report's number for the brokerage, from 11; unique, so no two reports ever share one.
 create table if not exists public.brokerage_paid_credit (
   binding_id      uuid        not null,
   brokerage_id    uuid        not null,

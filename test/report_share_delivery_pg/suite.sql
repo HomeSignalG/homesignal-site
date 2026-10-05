@@ -183,7 +183,7 @@ select pg_temp._run('own echo',  $$select pg_temp._own('echo', 7)$$);
 select pg_temp._run('own fox',   $$select pg_temp._own('fox', 8)$$);
 -- person 4 belongs to no brokerage at all
 
--- Alpha: a1 (with a private context), a2 (without; the cap target), a3. Beta: b1. Gamma: g1. Delta: d1. Echo: e1. Fox: twenty.
+-- Alpha: a1 (with a private context), a2 (without; the cap target), a3. Beta: b1. Gamma: g1. Delta: d1. Echo: e1. Fox: ten.
 select pg_temp._run('issue alpha', $x$do $d$ begin
   perform pg_temp._iss('a1', 1, 1, (select j from _pv where name = 'p0'));
   perform pg_temp._iss('a2', 2, 2);
@@ -193,7 +193,7 @@ select pg_temp._run('issue alpha', $x$do $d$ begin
   perform pg_temp._iss('d1', 6, 6);
   perform pg_temp._iss('e1', 7, 7);
 end $d$$x$);
-select pg_temp._run('issue fox', $x$do $d$ begin for n in 1..20 loop perform pg_temp._iss('f' || n, 8, 100 + n); end loop; end $d$$x$);
+select pg_temp._run('issue fox', $x$do $d$ begin for n in 1..10 loop perform pg_temp._iss('f' || n, 8, 100 + n); end loop; end $d$$x$);
 
 create temp table _base (untouched text);
 insert into _base select pg_temp._untouched();
@@ -454,7 +454,7 @@ select pg_temp._ck('E04 a SUSPENDED brokerage''s link opens zero rows (a link do
 
 -- Fox: the twentieth report makes the evaluation COMPLETE. Complete is a finished evaluation with standing: it still shares, and its links still open.
 select pg_temp._cr('f1', pg_temp._u(8), pg_temp._rp('f1'), pg_temp._h('fox-1'));
-select pg_temp._ck('E05 a COMPLETE evaluation (all twenty reports used) keeps its standing: it can make a link and the link opens',
+select pg_temp._ck('E05 a COMPLETE evaluation (all ten reports used) keeps its standing: it can make a link and the link opens',
   (select status = 'complete' from public.evaluation where evaluation_id = pg_temp._ev('fox'))
   and (select err is null from _c where label = 'f1')
   and (select count(*) = 1 and bool_and(brokerage_name = 'Fox Company') from public.report_share_open(pg_temp._h('fox-1'))),
@@ -484,7 +484,7 @@ select pg_temp._ck('V03 no share tables hold an agent: no share and no event row
 select pg_temp._ck('S01 every setup step in this suite ran without raising (a step that raises is a regression in the code under test, reported here instead of ending the run)',
   not exists (select 1 from _setup where result <> 'ok')
   and (select count(*) = 7 from _i where report_id is not null and label in ('a1', 'a2', 'a3', 'b1', 'g1', 'd1', 'e1'))
-  and (select count(*) = 20 from _i where report_id is not null and label ~ '^f[0-9]+$'),
+  and (select count(*) = 10 from _i where report_id is not null and label ~ '^f[0-9]+$'),
   (select string_agg(step || '=' || result, '; ') from _setup where result <> 'ok'));
 
 alter role service_role nobypassrls;

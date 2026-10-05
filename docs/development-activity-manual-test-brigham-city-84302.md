@@ -73,7 +73,7 @@ You need to be signed in as an admin. An admin report is never charged and nothi
 
 ## Part B — the customer page as the invited owner (optional; creates a real test brokerage)
 
-**Read this before doing it.** Creating a trial makes a real brokerage and a real 20-report trial in the production database. The page has no way to remove or revoke it yet (`evaluation_revoke` has no caller). It costs nothing and, with no source cleared, every report it makes is "No data ingested" (free, never stored). If you do not want a leftover test brokerage, skip Part B.
+**Read this before doing it.** Creating a trial makes a real brokerage and a real 10-report trial in the production database (20 until 2026-10-05; see `docs/free-report-limit-10.sql`). The page has no way to remove or revoke it yet (`evaluation_revoke` has no caller). It costs nothing and, with no source cleared, every report it makes is "No data ingested" (free, never stored). If you do not want a leftover test brokerage, skip Part B.
 
 1. On the admin review page, create a trial for a test brokerage named:
 
@@ -83,7 +83,7 @@ You need to be signed in as an admin. An admin report is never charged and nothi
 
 2. Open the owner invite link it gives you in a private window, sign in, and accept the invite.
 3. On `https://homesignal.net/development-activity-reports.html`, paste the Brigham City address and press **Make report**.
-4. Expected: the same "No data ingested" page as Part A, and the panel still says **20 free reports left** (a "No data ingested" report uses none).
+4. Expected: the same "No data ingested" page as Part A, and the panel still says **10 free reports left** (it said 20 when this was first run on 2026-10-04, before the allowance was cut) (a "No data ingested" report uses none).
 
 **Result, 2026-10-04 (before R7): PASS for what Part B tests — the free-report accounting.** Seen by the founder, signed in as a non-admin test owner (the `CT2010` account): the panel read **"20 free reports left"**; after one report the line under the button read **"Report ready: No data ingested for this address. It is not a finding that there is no development nearby."** and the note read **"This report did not use a free report: No data ingested."** Read-only database check the same minute: `report_snapshot` 0 rows, 0 credits used on the trial, and the rate limiter held exactly 6 rows (person and brokerage, three windows), each used = 1, i.e. one request counted. **Two things went differently from the steps above, both recorded rather than tidied:** (1) the first owner link was opened in the founder's admin window, so the admin account became owner of "Brigham City Test Realty" and its link was used up; a second trial, "Brigham City Test Realty 2", was made and its link opened in a private window as the non-admin owner. Both trials still exist (the page cannot remove them); (2) the page drew the Share and Watch boxes under an unsaved report and drew Billing, "Invite an agent" and "Saved reports" for a signed-out visitor. That was a display defect, not a stored report (launch record section 13). **Why the report was empty is not a fault:** the 9 records the map shows within half a mile are all `udot-active-projects-lines`, and nothing was on the paid-report list (launch record, section 14, and R7).
 

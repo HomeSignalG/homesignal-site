@@ -3,7 +3,7 @@
 # It stands on the REAL account spine, private context, snapshot, evaluation entitlement, saved reports, share links, property watch, payment-event
 # ledger, report header and brokerage billing, applied unmutated, in the order production applied them.
 #  1. applying the file changes NOTHING it stands on: a fingerprint of every other function, column, constraint, trigger and privilege in the public schema is
-#     identical before and after (the credit ledgers, the 20 and the 100 and their triggers are not touched);
+#     identical before and after (the credit ledgers, the 10 and the 100 and their triggers are not touched);
 #  2. the shipped SQL passes every check of suite.sql;
 #  3. REAL concurrent sessions: eight sessions racing one person's minute admit EXACTLY ten; sixteen sessions across four people of one brokerage race the
 #     brokerage's minute and admit EXACTLY thirty; a claim above READ COMMITTED is refused (55000) and writes nothing; the API roles are refused by the database;
@@ -174,7 +174,7 @@ if [ "${MUTANT:-0}" = "0" ]; then
   P -f "$here/.rb.sql" >/dev/null 2>&1 || true
   ok "$([ "$(n_mine)" = "0" ] && echo 1 || echo 0)" "B1 the rollback removes every function and the table it created" "$(n_mine)"
   ok "$([ "$(fp_deps)" = "$dep_before" ] && echo 1 || echo 0)" "B2 and nothing else: the entitlement, the billing layer and everything under them are exactly as before the file was applied"
-  ok "$([ "$(P -tA -c 'select public.evaluation_report_limit() || chr(47) || public.billing_report_limit()')" = "20/100" ] && echo 1 || echo 0)" "B3 the founder's 20 free and 100 paid are still 20 and 100 after the rollback"
+  ok "$([ "$(P -tA -c 'select public.evaluation_report_limit() || chr(47) || public.billing_report_limit()')" = "10/100" ] && echo 1 || echo 0)" "B3 the founder's 10 free and 100 paid are still 10 and 100 after the rollback"
   P -f "$here/.rb.sql" >/dev/null 2>&1 && ok 1 "B4 the rollback is repeatable (if exists)" || ok 0 "B4 the rollback is repeatable (if exists)"
   rm -f "$here/.rb.sql"
   P -f "$SQL" >/dev/null 2>&1 || true

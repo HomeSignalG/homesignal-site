@@ -62,7 +62,7 @@ name: report-snapshot-suite
 #      when a layer or a splice anchor is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run).
 #  10. THE LAUNCH GATE (test/launch_gate_pg; Development Activity build step 13), in its own job: the plan's end-to-end sequence as ONE scenario, through the
 #      real handlers and data layers of development-activity-trial, get-development-activity-report, manage-billing and development-activity-billing-webhook,
-#      against the SHIPPED SQL of every layer the product stands on: sign-up (admin creates the trial, owner joins, owner invites an agent), twenty free
+#      against the SHIPPED SQL of every layer the product stands on: sign-up (admin creates the trial, owner joins, owner invites an agent), ten free
 #      reports, the end of the trial, the owner's checkout, the processor's test payment (which grants nothing) and live payment (which binds the subscription
 #      to the brokerage and opens a month of 100), a hundred paid reports, the 101st refused, saved reports across both ledgers, another brokerage unable to
 #      read or take any of it, and a cancellation that ends new reports and deletes nothing. The payment processor is a stand-in that records what it was sent:
@@ -75,7 +75,7 @@ name: report-snapshot-suite
 #      window, no email/address/IP stored, system-only), EIGHT real sessions racing one person's minute admit exactly ten and SIXTEEN real sessions across four
 #      people of one brokerage admit exactly thirty, a claim above READ COMMITTED refused, the API roles refused by the database, a second apply, an exact
 #      rollback, the refusal when a layer is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run). The launch
-#      gate's section 15 then proves the same limit end to end through the real report handler. It touches neither the 20 free reports nor the 100 paid ones.
+#      gate's section 15 then proves the same limit end to end through the real report handler. It touches neither the 10 free reports nor the 100 paid ones.
 # The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
 # test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
 # test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
@@ -516,7 +516,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: The launch gate - sign-up, twenty free reports, the end of the trial, checkout, payment, a hundred paid reports, the 101st refused, cancellation - through the real handlers and the shipped SQL
+      - name: The launch gate - sign-up, ten free reports, the end of the trial, checkout, payment, a hundred paid reports, the 101st refused, cancellation - through the real handlers and the shipped SQL
         env:
           PGHOST: localhost
           PGPORT: '5432'
