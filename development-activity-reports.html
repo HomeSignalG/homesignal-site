@@ -141,6 +141,18 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #share-list button:disabled{opacity:.6;cursor:default}
 #share-status{margin:0;font-size:14px;min-height:1.5em}
 #share-status.err{color:var(--red);font-weight:600}
+/* The report's own "Share report" button opens this popup (build step 8 follow-up, founder 2026-10-04). It makes the private client link and offers it where
+   the person is: Copy, the phone's share sheet, text message, email, WhatsApp. No public networks: this is a private link. The card above stays for the list
+   of links and for withdrawing one. */
+#share-pop{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(22,33,28,.45)}
+#share-pop .box{background:var(--panel);border-radius:14px;max-width:440px;width:100%;max-height:calc(100vh - 32px);overflow:auto;padding:20px;display:grid;gap:12px;box-shadow:0 16px 44px rgba(0,0,0,.25)}
+#share-pop h2{margin:0;font-size:17px}
+#share-pop-body{display:grid;gap:12px}
+#share-pop-msg{min-height:1.4em;font-size:14px}
+#share-pop-msg.err{color:var(--red);font-weight:600}
+#share-pop-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+#share-pop a.go{display:inline-flex;align-items:center;text-decoration:none}
+@media(max-width:620px){#share-pop{align-items:flex-end;padding:0}#share-pop .box{max-width:none;border-radius:14px 14px 0 0}}
 #watch{display:grid;gap:10px}
 #watch h2{margin:0;font-size:17px}
 #watch .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
@@ -161,7 +173,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
    own stylesheet (lib/da-report-view.js) takes care of the report. */
 @media print{
   body{background:#fff}
-  header.top,.card,#status,#creditnote,.auth-overlay{display:none!important}
+  header.top,.card,#status,#creditnote,.auth-overlay,#share-pop{display:none!important}
   .wrap{max-width:none;padding:0;display:block}
 }
 .auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
@@ -277,6 +289,26 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     <p id="watch-state"></p>
     <p id="watch-status" role="status" aria-live="polite"></p>
   </section>
+  <div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>
+    <div class="box">
+      <h2 id="share-pop-title">Share this report with your client</h2>
+      <p class="hint" id="share-pop-msg" role="status" aria-live="polite"></p>
+      <div id="share-pop-body" hidden>
+        <label>Client link<input type="text" id="share-pop-link" readonly></label>
+        <div class="row">
+          <button type="button" class="go" id="share-pop-copy">Copy link</button>
+          <button type="button" class="go ghost" id="share-pop-native" hidden>Share&hellip;</button>
+        </div>
+        <div class="row">
+          <a class="go ghost" id="share-pop-sms" href="#">Text message</a>
+          <a class="go ghost" id="share-pop-mail" href="#">Email</a>
+          <a class="go ghost" id="share-pop-wa" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        </div>
+        <p class="hint" id="share-pop-note"></p>
+      </div>
+      <button type="button" class="go ghost" id="share-pop-close">Close</button>
+    </div>
+  </div>
   <div id="report"></div>
 </main>
 
@@ -734,7 +766,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var canShare = r.status === 200 && body.status === 'OK' && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
     if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, {
       subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
-      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['pdf']
+      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']
     })) {
       if (canShare) { showShare(body.report_id); showWatch(body.report_id); }
       savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
@@ -750,6 +782,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function hideShare(){
     shareFor = null; sharing = false;
     $('share').hidden = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    $('share-pop').hidden = true; $('share-pop-body').hidden = true; $('share-pop-link').value = ''; sharePopFrom = null;
     $('share-list').textContent = ''; shareSay('', false);
     $('share-make').disabled = false; $('share-make').textContent = 'Make a client link';
   }
@@ -799,13 +832,13 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     else if ($('share-status').className !== 'err') shareSay('', false);
   }
   async function makeShare(){
-    if (sharing || !session || !session.user || !shareFor) return;
+    if (sharing || !session || !session.user || !shareFor) return false;
     var forUser = session.user.id, forReport = shareFor;
     sharing = true; $('share-make').disabled = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
     shareSay('Making the link\u2026', false);
     var r = await post(SHARE_FN, { action: 'create', report_id: forReport });
     sharing = false;
-    if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return;
+    if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return false;
     $('share-make').disabled = false;
     var body = r.body || {};
     var link = typeof body.link === 'string' ? body.link : '';
@@ -817,10 +850,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       $('share-copy').textContent = 'Copy link';
       $('share-new').hidden = false;
       refreshShares();
-      return;
+      return true;
     }
     if (r.status === 401) { session = null; openAuth(); }
     shareSay(shareMessage(r.status, body), true);
+    return false;
   }
   async function withdrawShare(shareId, button){
     if (!session || !session.user || !shareFor) return;
@@ -842,6 +876,71 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('share-copy').textContent = 'Copied'; }, select);
       else select();
     } catch (e) { select(); }
+  }
+  // ---- the "Share report" popup (follow-up to build step 8) ----------------------------------------------------------------------
+  // It decides nothing: the link is made by makeShare (the share function's `create`), and what the client sees is the database's. The popup only
+  // offers the one validated link (SHARE_LINK) to the person's own apps. Private link: no public networks. The message text names no address.
+  var sharePopFrom = null; // the button that opened it, to give focus back
+  function sharePopSay(text, isError){ var m = $('share-pop-msg'); m.textContent = text || ''; m.className = 'hint' + (isError ? ' err' : ''); }
+  function openSharePop(opener){ sharePopFrom = opener || null; $('share-pop').hidden = false; $('share-pop-close').focus(); }
+  function closeSharePop(){
+    if ($('share-pop').hidden) return;
+    $('share-pop').hidden = true;
+    var f = sharePopFrom; sharePopFrom = null;
+    if (f && f.focus && document.body.contains(f)) f.focus();
+  }
+  function fillSharePop(link){
+    var text = 'A private development activity report prepared for you: ' + link, t = encodeURIComponent(text);
+    $('share-pop-link').value = link;
+    $('share-pop-sms').href = 'sms:?&body=' + t;
+    $('share-pop-mail').href = 'mailto:?subject=' + encodeURIComponent('Development activity report') + '&body=' + t;
+    $('share-pop-wa').href = 'https://wa.me/?text=' + t;
+    $('share-pop-native').hidden = !(typeof navigator.share === 'function');
+    $('share-pop-copy').textContent = 'Copy link';
+    $('share-pop-note').textContent = $('share-note').textContent;
+    $('share-pop-body').hidden = false;
+  }
+  async function shareFromReport(opener){
+    if (!shareFor || !session || !session.user) {
+      $('share-pop-body').hidden = true;
+      sharePopSay("This report was not saved, so it can't be shared with a client. Open a saved report from Saved reports, or run the report again, then press Share report.", false);
+      openSharePop(opener);
+      return;
+    }
+    if (sharing) return;
+    var existing = $('share-link').value;
+    if (existing && SHARE_LINK.test(existing) && !$('share-new').hidden) { fillSharePop(existing); sharePopSay('Your client link is ready.', false); openSharePop(opener); $('share-pop-copy').focus(); return; }
+    var forReport = shareFor;
+    $('share-pop-body').hidden = true; sharePopSay('Making your client link\u2026', false); openSharePop(opener);
+    var made = await makeShare();
+    if (shareFor !== forReport) { closeSharePop(); return; }
+    if ($('share-pop').hidden) return; // closed while the link was being made: it is in the card above
+    if (made && SHARE_LINK.test($('share-link').value)) { fillSharePop($('share-link').value); sharePopSay('Your client link is ready.', false); $('share-pop-copy').focus(); }
+    else sharePopSay($('share-status').textContent || 'That could not be done. Try again.', true);
+  }
+  function copyPop(){
+    var v = $('share-pop-link').value;
+    if (!v) return;
+    function select(){ $('share-pop-link').focus(); $('share-pop-link').select(); $('share-pop-copy').textContent = 'Selected: press Ctrl+C or \u2318C'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('share-pop-copy').textContent = 'Copied'; }, select);
+      else select();
+    } catch (e) { select(); }
+  }
+  function nativePop(){
+    var v = $('share-pop-link').value;
+    if (!v || typeof navigator.share !== 'function') return;
+    try { navigator.share({ title: 'Development activity report', text: 'A private development activity report prepared for you.', url: v }).catch(function(){}); } catch (e) { /* cancelled or unsupported */ }
+  }
+  function sharePopKeys(e){
+    if ($('share-pop').hidden) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeSharePop(); return; }
+    if (e.key !== 'Tab') return;
+    var f = Array.prototype.filter.call($('share-pop').querySelectorAll('button, a[href], input'), function(el){ return !el.disabled && el.getClientRects().length > 0; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1], at = document.activeElement;
+    if (e.shiftKey && (at === first || !$('share-pop').contains(at))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (at === last || !$('share-pop').contains(at))) { e.preventDefault(); first.focus(); }
   }
   /** "Download PDF" is the browser's own print window: the person chooses "Save as PDF" there. The print stylesheet leaves only the report. */
   function printReport(){ window.print(); }
@@ -1111,7 +1210,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var hd = headerOf(body);
     // only a report that was saved (it has a permanent id) can be shared with a client; any report on screen can be printed
     var shareable = body.stored === true && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
-    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['pdf'] })) { say('The report came back but could not be shown.', true); return; }
+    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf'] })) { say('The report came back but could not be shown.', true); return; }
     if (shareable) { showShare(body.report_id); showWatch(body.report_id); }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
@@ -1141,6 +1240,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('copy-invite').addEventListener('click', copyInvite);
     $('share-make').addEventListener('click', makeShare);
     $('share-copy').addEventListener('click', copyShare);
+    $('share-pop-copy').addEventListener('click', copyPop);
+    $('share-pop-native').addEventListener('click', nativePop);
+    $('share-pop-close').addEventListener('click', closeSharePop);
+    $('share-pop').addEventListener('click', function(e){ if (e.target === $('share-pop')) closeSharePop(); });
+    document.addEventListener('keydown', sharePopKeys);
     $('share-pdf').addEventListener('click', printReport);
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
@@ -1151,7 +1255,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (!b) return;
       var act = b.getAttribute('data-da-action');
       if (act === 'pdf') printReport();
-      else if (act === 'share' && !$('share').hidden) { $('share').scrollIntoView(); $('share-make').focus(); }
+      else if (act === 'share') shareFromReport(b);
       else if (act === 'compare' && !$('compare').hidden) chooseForCompare(shareFor);
       else if (act === 'watch' && !$('watch').hidden) { $('watch').scrollIntoView(); var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : null); if (wb) wb.focus(); }
     });
