@@ -505,6 +505,38 @@ changes (the view renders from the stored report, so a reopened or shared report
      number) and the stage heading; the cards show them once their detail is open. Pins 2f and 3a say so.
    - Each record's official link now appears twice (its row and its card), so a keyboard user has one more stop per record. The cards inside a closed detail are
      not tab stops, and Enter on "Full official detail" opens them.
+16. **Realtor value review, second pass (founder: "complete steps for what is partly done, then what is not done", 2026-10-05).** In review; struck through
+    once merged and read back live. Page one is now the header, the briefing, the headline numbers and the map; the nearest records follow the map.
+   - **Done (view only, no new data):**
+     - The briefing paragraph has its own heading, "Client Briefing: Nearby Activity", and names the nearest listed record with its distance and compass
+       direction ("… about 0.1 miles to the north"). The direction comes from the bearing the response carries; a reopened or shared report has none, so it
+       says no direction. This replaces step 14's "names no project" rule: the one record it names is the nearest, by its official title.
+     - A Direction column in each stage table, and "0.1 mi north" in Things to Review. The map shows E, S and W as well as N.
+     - Wording: "Agent action:" for "Review:", "Official agency status" for "Publisher status", "Official agency stage" for "Publisher stage", "Agency stage"
+       for the column.
+     - A corridor note above a stage's table when two or more records of one stage, one agency attribution and one road number (SR-13, US-89 …) share a
+       road: "SR-13 corridor: 3 official records on this road … They are listed separately below and may or may not be one program." It groups nothing, merges
+       nothing, and never says they are one project.
+     - The Official evidence & coverage section now also says which agencies the report drew on, the search area, what each stage means, and to refresh before
+       a listing launch, open house, offer, inspection or closing. It starts its own printed page.
+     - Print: filters are not printed; the methodology begins a new page. A column heading is never broken inside a word (a real print-to-PDF showed
+       "DISTAN / CE" once the Direction column was added; fixed and pinned).
+   - **Declined, with the reason (nothing was lost by not doing them):**
+     - **"Active construction"** for Permitted / Under Construction: a permit-issued record is not yet construction. The stage titles are the plan's (ruling 3).
+     - **"View official agency record":** for sources whose link is the dataset, not the record, that wording is untrue. The link keeps "Official source".
+     - **"No newly identified records in the last 90 days":** the number counts records with a publisher event or a detected change in the window, which is not
+       "newly identified". Kept as step 14 has it.
+     - **"Added to HomeSignal monitoring on [date]":** untrue for the 921,285 baseline records (see #1635).
+   - **Not built, and what each needs first:**
+     - **Start and end dates, phase, closures, work hours, contacts, plain-English scope.** `app_projects` has `start_date`, `end_date` and `scope_text`, and the
+       report reads none of them. Measured 2026-10-05 over 2,911,791 development records: 5 carry them, and 0 of the 41 UDOT records at 84302. UDOT's source
+       publishes an estimated completion date (mapped to `decision_date` in the registry) that is not saved to `end_date`. First: read what the source publishes,
+       save it (a change to `app_refresh_zip` and the report snapshot), then show it. Closures, work hours and contacts have no column at all.
+     - **MLS number and parcel ID:** property identifiers; per the private-context contract they live only in the deletable layer, which needs a column and an
+       edge function change. Not added to the header.
+     - **QR code / interactive map link:** the report has no interactive map to link to.
+     - **Street names and a corridor line on the map:** no basemap is cleared for paid use, and a road is not a point.
+     - **Branded cover page, private agent notes, more alert types:** a design pass, a new private table, and the data above, in that order.
 
 ## Founder actions, and when
 

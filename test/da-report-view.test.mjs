@@ -76,15 +76,15 @@ const htmlLife = viewLife(W);
 
 // ---- 1. section order: the 100526 plan's (ruling 3) ----------------------------------------------------------------------------------------------
 {
-  const FULL = 'changed,activity,review,filters,map,approved,proposed,permitted,history,evidence';
-  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Things to Review, Type and stage, the map, the three stages, Change History, Evidence', keysOf(html));
-  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Things to Review With Your Client | Type and stage | Development Activity Map | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
+  const FULL = 'changed,activity,filters,map,review,approved,proposed,permitted,history,evidence';
+  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Type and stage, the map, Things to Review, the three stages, Change History, Evidence', keysOf(html));
+  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Type and stage | Development Activity Map | Things to Review With Your Client | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
     '1b the section titles are the plan\'s (ruling 3 and the visual layout contract)', sections(html).map((s) => s.label));
   ok(keysOf(htmlNone) === 'outcome,evidence', '1c an empty report renders only its outcome and Official evidence & coverage', keysOf(htmlNone));
-  ok(keysOf(htmlCold) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
+  ok(keysOf(htmlCold) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
   const quiet = { rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01', name: 'Quiet Approved Plat' })], ledger: [], events: [], health: [] };
   const hq = view(await wire(quiet));
-  ok(keysOf(hq) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence' && /da-rv-hero/.test(sec(hq, 'activity').cls) && metricsOf(sec(hq, 'activity')).join() === 'Records with official activity in the last 90 days=0',
+  ok(keysOf(hq) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence' && /da-rv-hero/.test(sec(hq, 'activity').cls) && metricsOf(sec(hq, 'activity')).join() === 'Records with official activity in the last 90 days=0',
     '1e only an approved record with no recent event: the hero is a measured zero over this report\'s records, then the full layout', keysOf(hq));
   const prop = { rows: [row('p1', 0.4, FAM_B)], projects: [proj('p1', FAM_B, { status: 'Proposed', date_kind: 'scheduled', submitted_at: '2027-02-01', name: 'Planned Retail' })], ledger: [], events: [], health: [] };
   const hp = view(await wire(prop));
@@ -96,13 +96,15 @@ const htmlLife = viewLife(W);
   ok(/Things to Review With Your Client/.test(all) && /Permitted \/ Under Construction/.test(all) && /Development Activity Map/.test(all) && /Compare property/.test(html),
     '1g2 the sections the 100526 plan adds are present: Things to Review, Permitted / Under Construction, the map and the action bar');
   const idx = (t) => html.indexOf('aria-label="' + t + '"');
-  const order = ['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review',
+  const order = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Development Activity Map', 'Things to Review With Your Client', 'Approved / Coming', 'Proposed / Under Review',
     'Permitted / Under Construction', 'Change History', 'Official evidence &amp; coverage', 'Report actions'];
   ok(order.every((t, i) => idx(t) > 0 && (i === 0 || idx(t) > idx(order[i - 1]))), '1h the same order, read straight off the markup positions, ending with the action bar', order.map(idx));
   // the filters control the map and the three stage sections, so they sit directly above the map (founder, 2026-10-04); nothing sits between them
   const between = html.slice(html.indexOf('aria-label="Type and stage"'), html.indexOf('aria-label="Development Activity Map"'));
-  ok(idx('Type and stage') > idx('Things to Review With Your Client') && idx('Type and stage') < idx('Development Activity Map') && (between.match(/<section /g) || []).length === 1,
-    '1h2 the Type and Stage filters come directly above the map: after Things to Review, before the map, with no other section between them', (between.match(/<section /g) || []).length);
+  ok(idx('Type and stage') > idx('Recent Official Activity') && idx('Type and stage') < idx('Development Activity Map') && (between.match(/<section /g) || []).length === 1,
+    '1h2 the Type and Stage filters come directly above the map: after the headline numbers, before the map, with no other section between them', (between.match(/<section /g) || []).length);
+  ok(idx('Development Activity Map') < idx('Things to Review With Your Client') && html.indexOf('data-da-briefing') < idx('Development Activity Map'),
+    '1h3 page one is the header, the briefing, the headline numbers and the map; the nearest records with their agent action follow the map (the realtor value review)');
   ok(html.startsWith('<article class="da-rv') && html.indexOf('<header') < html.indexOf('<section'), '1i the property / address header comes before every section');
 }
 
@@ -169,8 +171,8 @@ const htmlLife = viewLife(W);
   ok(/coming/i.test(textOf(html)) && !/coming/i.test(textOf(html).replace(/Approved \/ Coming/gi, '')), '3g "coming" appears nowhere except in the stage name Approved / Coming (and it does appear there: control)', textOf(html).replace(/Approved \/ Coming/gi, '').match(/.{20}coming.{20}/i));
   ok(cardsOf(sec(html, 'proposed').html).map(cardTitle).join() === 'Oak Grove Townhomes,Lakeline Medical Office,Riverside Retail Center,Planned Bridge Replacement',
     '3h Decided is in the Proposed section as the engine put it (lifecycle proposed), and the cards follow the engine\'s order');
-  ok(/Publisher status:<\/span> Decided/.test(byTitle['Oak Grove Townhomes']), '3i the publisher\'s own word "Decided" is shown verbatim beside the lifecycle');
-  ok(/Publisher status:<\/span> On file/.test(byTitle['Fire Station 12']), '3j an unknown-lifecycle record shows "Lifecycle unknown" and the publisher\'s own status, never a guessed stage');
+  ok(/Official agency status:<\/span> Decided/.test(byTitle['Oak Grove Townhomes']), '3i the publisher\'s own word "Decided" is shown verbatim beside the lifecycle');
+  ok(/Official agency status:<\/span> On file/.test(byTitle['Fire Station 12']), '3j an unknown-lifecycle record shows "Lifecycle unknown" and the publisher\'s own status, never a guessed stage');
   ok(!cardsOf(sec(html, 'approved').html).some((c) => /Highway 99|Fire Station/.test(c)) && !cardsOf(sec(html, 'proposed').html).some((c) => /Highway 99|Fire Station/.test(c)),
     '3k operating and unknown records are in NO stage section (the default for open decision 3)');
   ok(/Highway 99 Widening/.test(sec(html, 'activity').html) && /Fire Station 12/.test(sec(html, 'activity').html), '3l they are named in Recent Official Activity instead, where their recent event is');
@@ -192,7 +194,7 @@ const htmlLife = viewLife(W);
   const doctored = clone(W);
   doctored.report.projects.find((p) => p.project_id === 'k-approved').lifecycle = { key: 'unknown', label: 'Lifecycle unknown' };
   const dc = Object.fromEntries(cardsOf(viewLife(doctored)).map((c) => [cardTitle(c), c]));
-  ok(/HomeSignal lifecycle:<\/span> Lifecycle unknown/.test(dc['Menchaca Apartments']) && /Publisher status:<\/span> Approved/.test(dc['Menchaca Apartments']), '3n a card shows the lifecycle the engine sent even when the publisher status says otherwise: the view re-derives nothing');
+  ok(/HomeSignal lifecycle:<\/span> Lifecycle unknown/.test(dc['Menchaca Apartments']) && /Official agency status:<\/span> Approved/.test(dc['Menchaca Apartments']), '3n a card shows the lifecycle the engine sent even when the publisher status says otherwise: the view re-derives nothing');
   const odd = clone(W);
   odd.report.projects.find((p) => p.project_id === 'k-approved').lifecycle = { key: 'weird" onmouseover="x', label: '' };
   const oh = viewLife(odd);
@@ -424,12 +426,12 @@ const htmlLife = viewLife(W);
   const hp = V.html(WP, { subject: '20 N Main St, Brigham City, UT 84302', label: 'Smith buyers', brokerage: 'ABC Realty', agent: 'Pat Agent' });
   ok(JSON.stringify(WP.report.sections.by_stage) === JSON.stringify({ approved: ['u3'], proposed: ['u4'], permitted: ['u1', 'u2'] }), '10a (engine) the two Under Construction records are Permitted; the plat is Approved; the closed-out record is in no stage', WP.report.sections.by_stage);
   const pc = cardsOf(sec(hp, 'permitted').html);
-  ok(pc.length === 2 && pc.every((c) => /data-stage="permitted"/.test(c) && /Permitted \/ Under Construction<\/span>/.test(c) && !/HomeSignal lifecycle/.test(c) && /Publisher stage:<\/span> Under Construction/.test(c)
+  ok(pc.length === 2 && pc.every((c) => /data-stage="permitted"/.test(c) && /Permitted \/ Under Construction<\/span>/.test(c) && !/HomeSignal lifecycle/.test(c) && /Official agency stage:<\/span> Under Construction/.test(c)
     && /Why it is in this section:<\/span> The publisher&#39;s stage says under construction\./.test(c)),
     '10b a Permitted card shows the stage first (text and shape), the publisher\'s own stage and why it is in the section, and NO "HomeSignal lifecycle" line in the customer view (it reads as a contradiction beside "Under Construction")');
   const hpL = V.html(WP, { subject: '20 N Main St, Brigham City, UT 84302', showLifecycle: true });
   const pcL = cardsOf(sec(hpL, 'permitted').html);
-  ok(pcL.length === 2 && pcL.every((c) => /HomeSignal lifecycle:<\/span> Approved/.test(c) && /Publisher stage:<\/span> Under Construction/.test(c)) && !/HomeSignal lifecycle/.test(hp) && /HomeSignal lifecycle/.test(hpL),
+  ok(pcL.length === 2 && pcL.every((c) => /HomeSignal lifecycle:<\/span> Approved/.test(c) && /Official agency stage:<\/span> Under Construction/.test(c)) && !/HomeSignal lifecycle/.test(hp) && /HomeSignal lifecycle/.test(hpL),
     '10b2 (control) the internal view (opts.showLifecycle) still shows the canonical lifecycle, still Approved, beside the publisher\'s stage; the engine\'s value is unchanged and only the customer view leaves the line out');
   ok(!/Closed-out paving/.test(hp), '10c the closed-out record (operating, no recent event) is on no part of the page (ruling 3: no standing inventory)');
   const shapeOfStage = (k) => (new RegExp('data-stage="' + k + '"><svg class="da-rv-shape"[^>]*>(.*?)</svg>').exec(hp) || [, ''])[1];
@@ -458,8 +460,8 @@ const htmlLife = viewLife(W);
   const items = rv.split('<li class="da-rv-rev">').slice(1);
   ok(items.length === 3 && WP.render.review.join() === 'u1,u2,u3' && items.map((i) => decode(/<h3 class="da-rv-title">([^<]*)<\/h3>/.exec(i)[1])).join('|') === 'SR-13 (Main St) & 100 North|SR-13 (Main St) & 100 South|Townhome plat',
     '10i Things to Review lists the engine\'s three, in its order (nearest first); the view ranks nothing', WP.render.review);
-  ok(textOf(items[0]).startsWith('0.1 mi · Roads & infrastructure · PERMITTED / UNDER CONSTRUCTION SR-13 (Main St) & 100 North Publisher stage: Under Construction. Review: Verify the official schedule and project details at the source.')
-    && /Review:<\/span> Verify the published project details and the official construction timing\./.test(items[2]), '10j each item: distance, Type and stage, the publisher\'s own words, a review line in the plan\'s wording, and the official source', textOf(items[0]));
+  ok(textOf(items[0]).startsWith('0.1 mi north · Roads & infrastructure · PERMITTED / UNDER CONSTRUCTION SR-13 (Main St) & 100 North Official agency stage: Under Construction. Agent action: Verify the official schedule and project details at the source.')
+    && /Agent action:<\/span> Verify the published project details and the official construction timing\./.test(items[2]), '10j each item: distance and direction, Type and stage, the agency\'s own words, an agent-action line, and the official agency record', textOf(items[0]));
   ok(/not a prediction of any effect on the property/.test(rv) && !/(value|traffic|noise|appreciat|desirab|impact on)/i.test(textOf(rv)), '10k "Review" is said to be a prompt to read the record, never a predicted effect (no value, traffic or desirability claim)');
   const noRev = clone(WP); delete noRev.render.review;
   ok(!sec(V.html(noRev, {}), 'review'), '10l a response with no review list (a reopened report has no distances) shows no Things to Review rather than guessing an order');
@@ -534,13 +536,13 @@ const htmlLife = viewLife(W);
   const asOf = V.util.day(WB.report.as_of);
   ok(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(asOf), '11a (control) the report carries an as-of day to quote: ' + asOf);
   const TAIL = ' Check the published schedule and project details at the official source before a listing, showing or offer.';
-  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The first item under “Things to Review With Your Client” is about 0.1 miles away.' + TAIL,
-    '11b the Brigham City shape: the briefing says how many, in which stages, that this REPORT lists nothing future-stage (not that the area has none), how far the first review item is, and one neutral check-the-source line', brief(hb));
+  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The nearest listed record is “SR-13 (Main St) & 100 North”, about 0.1 miles to the north.' + TAIL,
+    '11b the Brigham City shape: the briefing says how many, in which stages, that this REPORT lists nothing future-stage (not that the area has none), the nearest record, how far and in which direction, and one neutral check-the-source line', brief(hb));
   ok(hb.indexOf('</header>') > -1 && hb.indexOf('</header>') < hb.indexOf('data-da-briefing') && hb.indexOf('data-da-briefing') < hb.indexOf('<section'), '11c the briefing is a paragraph directly under the header and before the first section; it is not a section, so the plan\'s section order is untouched');
-  ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,review,filters,map,approved,proposed,permitted,history,evidence', '11d it adds no heading and no section key');
+  ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence' && /<p class="da-rv-brieflab">Client Briefing: Nearby Activity<\/p><p class="da-rv-brief" data-da-briefing>/.test(hb), '11d it adds no section key; its heading is the paragraph\'s own label, "Client Briefing: Nearby Activity"');
   const b = brief(hb);
-  ok(!/SR-13|Main St|20 N|Brigham|84302|Smith|ABC Realty|Pat Agent/.test(b) && !/(value|traffic|noise|appreciat|desirab|impact|disrupt|nearest|closest)/i.test(b) && /coming/i.test(b.replace(/approved \/ coming/gi, '')) === false,
-    '11e it names no address, project, label, brokerage or agent, makes no claim about value, traffic or effect, and keeps "coming" to the stage name', b);
+  ok(!/20 N|Brigham|84302|Smith|ABC Realty|Pat Agent/.test(b) && !/(value|traffic|noise|appreciat|desirab|impact|disrupt)/i.test(b) && /coming/i.test(b.replace(/approved \/ coming/gi, '')) === false,
+    '11e it names no address, label, brokerage or agent (the one record it names is the nearest, by its official title), makes no claim about value, traffic or effect, and keeps "coming" to the stage name', b);
   const counts = ['permitted', 'approved', 'proposed'].map((k) => cardsOf(sec(hb, k).html).length);
   ok(counts.join() === '3,0,0' && /: 3 permitted \/ under construction\./.test(b), '11f its counts are the counts of the cards in the stage sections below (one read(), no second count)', counts);
   // singular, mixed, no distance, no records
@@ -574,7 +576,7 @@ const htmlLife = viewLife(W);
 
   // the verify lines, by stage, and the unchanged disclaimer
   const rvm = sec(mixed, 'review').html;
-  ok(/Review:<\/span> Verify the official schedule and project details at the source\./.test(rvm) && /Review:<\/span> Verify the published project details and the official construction timing\./.test(rvm) && /Review:<\/span> Verify the application status and the agency&#39;s schedule\./.test(rvm)
+  ok(/Agent action:<\/span> Verify the official schedule and project details at the source\./.test(rvm) && /Agent action:<\/span> Verify the published project details and the official construction timing\./.test(rvm) && /Agent action:<\/span> Verify the application status and the agency&#39;s schedule\./.test(rvm)
     && /not a prediction of any effect on the property/.test(rvm) && !/(value|traffic|noise|appreciat|desirab|impact|disrupt)/i.test(textOf(rvm)),
     '11n each stage has its own verify line (permitted, approved, proposed), the "not a prediction" note stays, and nothing claims an effect or a condition the report cannot know', textOf(rvm));
 
@@ -598,10 +600,10 @@ const htmlLife = viewLife(W);
   const none = sec(html, 'permitted');
   ok(!/<table|<details/.test(none.html) && /No projects at this stage in this report\./.test(none.html), '12c an empty stage has no table and no detail, only its honest empty line');
   const ph = heads(tableOf(sec(html, 'proposed').html));
-  ok(ph.join('|') === 'Map|Record|Distance|Type|Official source', '12d the columns, in order, for records that state a distance, a Type and a link but no publisher stage: Map, Record, Distance, Type, Official source', ph);
+  ok(ph.join('|') === 'Map|Record|Distance|Direction|Type|Official source', '12d the columns, in order, for records that state a distance, a direction, a Type and a link but no agency stage: Map, Record, Distance, Direction, Type, Official source', ph);
   const stagedW = await wire({ rows: [row('s1', 0.12, FAM_A)], projects: [proj('s1', FAM_A, { name: 'Staged', type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })], ledger: [], events: [], health: [] });
-  ok(heads(tableOf(sec(V.html(stagedW, {}), 'permitted').html)).join('|') === 'Map|Record|Distance|Type|Publisher stage|Official source' && /Under Construction/.test(textOf(tableOf(sec(V.html(stagedW, {}), 'permitted').html))),
-    '12d2 a record that states a publisher stage adds the Publisher stage column, in the publisher\'s own words');
+  ok(heads(tableOf(sec(V.html(stagedW, {}), 'permitted').html)).join('|') === 'Map|Record|Distance|Direction|Type|Agency stage|Official source' && /Under Construction/.test(textOf(tableOf(sec(V.html(stagedW, {}), 'permitted').html))),
+    '12d2 a record that states an agency stage adds the Agency stage column, in the agency\'s own words');
   // an absent field stays absent: a column no record has a value for is not drawn, and a cell is never a placeholder
   const bare = clone(W); delete bare.render; bare.report.projects.forEach((p) => { p.source = { url: '', attribution: '' }; p.publisher_stage = null; });
   const hb2 = V.html(bare, {});
@@ -664,6 +666,61 @@ const htmlLife = viewLife(W);
   ok(!/Ledger first read/.test(textOf(cust)), '13l the customer view never prints the ledger first read');
   const noObs2 = quiet(); noObs2.report.projects.forEach((p) => { delete p.homesignal_observation; });
   ok(!/Ledger first read/.test(textOf(V.html(noObs2, { showLifecycle: true }))), '13m with no observation the internal line is absent, not a placeholder');
+}
+
+// ---- 14. the realtor value review (2026-10-04): direction, the corridor note, how the report was made, the map's four compass letters -------------
+{
+  const SUBJ = { lat: 44.04612, lng: -122.98123 };
+  const tableOf = (h) => (/<table[\s\S]*?<\/table>/.exec(h) || [''])[0];
+  const base = (id, d, o) => [row(id, d, FAM_A), proj(id, FAM_A, Object.assign({ type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' }, o))];
+  const trio = [base('c1', 0.1, { name: 'SR-13 (Main St) & 100 North' }), base('c2', 0.2, { name: 'SR-13 (Main St) & 100 South' }), base('c3', 0.3, { name: 'SR-9 intersection', stage: 'Advertised' })];
+  const WB = await wire({ rows: trio.map((x) => x[0]), projects: trio.map((x) => x[1]), ledger: [], events: [], health: [] });
+  const WP = WB;
+  // a record due east / south / west / southwest of the subject, 0.2 miles out (the engine turns the marker position into a bearing)
+  const at = (id, dLat, dLng) => [row(id, 0.2, FAM_A, { marker_lat: SUBJ.lat + dLat, marker_lng: SUBJ.lng + dLng }),
+    proj(id, FAM_A, { name: 'Rec ' + id, type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })];
+  const mi = 0.2 / 69.05, lngMi = mi / Math.cos(SUBJ.lat * Math.PI / 180);
+  const dirOf = async (dLat, dLng) => {
+    const x = at('d1', dLat, dLng);
+    const h = V.html(await wire({ rows: [x[0]], projects: [x[1]], ledger: [], events: [], health: [] }), {});
+    return /<p class="da-rv-brief" data-da-briefing>[^<]*to the ([a-z]+)\./.exec(h);
+  };
+  const east = await dirOf(0, lngMi), south = await dirOf(-mi, 0), west = await dirOf(0, -lngMi), sw = await dirOf(-mi / 1.4142, -lngMi / 1.4142);
+  ok(east && east[1] === 'east' && south && south[1] === 'south' && west && west[1] === 'west' && sw && sw[1] === 'southwest',
+    '14a the briefing names the compass direction of the nearest record, from the bearing the response carries (east, south, west, southwest)', [east && east[1], south && south[1], west && west[1], sw && sw[1]]);
+  // no bearing in the response (a reopened or shared report): no direction word anywhere, and the distance is still said
+  const reopened = clone(WB); delete reopened.render.bearings_deg;
+  const hr = V.html(reopened, {});
+  ok(!/\bto the (north|south|east|west)/.test(textOf(sec(hr, 'review').html)) && !/<th[^>]*>Direction<\/th>/.test(hr) && !/\bto the (north|south|east|west)/.test(textOf(hr.slice(hr.indexOf('data-da-briefing'), hr.indexOf('<section')))),
+    '14b with no bearing in the response there is no direction anywhere: not in the briefing, the review list or a table column');
+  // the table column and the review line
+  const hd = V.html(WP, {});
+  const th = [...tableOf(sec(hd, 'permitted').html).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => decode(m[1]));
+  ok(th.includes('Direction') && /<td[^>]*da-rv-td--dir[^>]*><span class="da-rv-lab">Direction: <\/span>North<\/td>/.test(sec(hd, 'permitted').html), '14c a table with bearings has a Direction column, in capitals-first words', th);
+  ok(/0\.1 mi north/.test(textOf(sec(hd, 'review').html)), '14d the review list gives distance and direction together');
+  // the map's four letters
+  ok(['N', 'E', 'S', 'W'].every((l) => new RegExp('class="da-rv-ringlab">' + l + '</text>').test(hd)), '14e the map carries all four compass letters, not only N');
+  // the corridor note: two or more records of one stage, one agency attribution and one road number
+  const corr = V.html(WB, {});
+  const cn = [...corr.matchAll(/<p class="da-rv-p da-rv-corridor" data-da-corridor>([^<]*)<\/p>/g)].map((m) => decode(m[1]));
+  ok(cn.length === 1 && cn[0] === 'SR-13 corridor: 2 official records on this road, all in this section. They are 0.1 to 0.2 miles from the property. They are listed separately below and may or may not be one program.',
+    '14f two records of one stage and one agency that name SR-13 get one corridor note, with the distance range, saying they may or may not be one program', cn);
+  ok(cardsOf(sec(corr, 'permitted').html).length === 2, '14g the note groups nothing: every record is still its own row and card');
+  ok(!/data-da-corridor/.test(sec(corr, 'approved').html) && /SR-9/.test(sec(corr, 'approved').html), '14h one record on a road (SR-9, alone in its stage) is not a corridor');
+  const nameless = clone(WB); nameless.report.projects.forEach((p) => { p.source = Object.assign({}, p.source, { attribution: '' }); });
+  ok(!/data-da-corridor/.test(V.html(nameless, {})), '14i with no agency attribution there is no corridor note (an unnamed source is never grouped)');
+  const hostile = clone(WB); hostile.report.projects.forEach((p) => { p.name = 'SR-13 <img src=x onerror=alert(1)>'; });
+  ok(!/<img/.test(V.html(hostile, {})), '14j a hostile record name is escaped in the corridor note and the briefing');
+  // how the report was made
+  const mt = /<div class="da-rv-method" data-da-method>([\s\S]*?)<\/div>/.exec(corr);
+  const mtx = mt ? textOf(mt[1]) : '';
+  ok(/Official agency data in this report: Data: WSDOT/.test(mtx) && /Search area: Records within 0\.5 miles of the property\./.test(mtx)
+    && /Stages: Permitted \/ Under Construction: the agency's own stage says a permit was issued or construction is under way\./.test(mtx)
+    && /Before you rely on it: Refresh this report before a listing launch, an open house, an offer, an inspection or a closing when nearby construction matters\./.test(mtx),
+    '14k the methodology lists the agencies, the search area, the stage meanings and the refresh advice', mtx);
+  ok(mt && !/(no |not any|nothing|none|zero)/i.test(mtx.replace(/not yet approved|a road or an area record/ig, '').replace(/Refresh this report[^.]*\./, '')), '14l the methodology says nothing about what is NOT there');
+  const emptyM = V.html(WNONE, {});
+  ok(/data-da-method/.test(emptyM) && !/Official agency data in this report/.test(emptyM), '14m an empty report still carries the method, without an agencies line');
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);

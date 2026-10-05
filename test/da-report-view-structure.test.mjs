@@ -76,8 +76,8 @@ const C = code(SRC);
   ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|address|feature_id)\b/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, address, dates, raw type, ids)');
   ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
   ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
-  ok((C.match(/publisher_status/g) || []).length === 2 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\('Publisher status', status\)/g) || []).length === 2,
-    '2e the publisher\'s status word is read in the two card builders, and only to be printed under its own label');
+  ok((C.match(/publisher_status/g) || []).length === 2 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\('Official agency status', status\)/g) || []).length === 2,
+    '2e the agency\'s status word is read in the two card builders, and only to be printed under its own label');
   ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 5
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
     '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker and the table row); lifecycle only as the engine\'s key and label');
@@ -100,7 +100,7 @@ const C = code(SRC);
   ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),
     '3c the module owns no change rule and no window: it does not decide what changed or what is recent (and carries no day-count of its own)');
   ok(!/validateRights|report-rights|cleared\b|attribution\s*[:=]\s*['"]/.test(C) && !/rights/i.test(C), '3d it owns no rights rule: it cannot say whether a source may appear, and invents no attribution');
-  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|nearest|closest)\b/i.test(C) && /response\.render\.review/.test(C), '3e it ranks nothing: Things to Review is the engine\'s own list (render.review), shown in the engine\'s order');
+  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|closest)\b/i.test(C) && !/\.sort\(/.test(C) && /response\.render\.review/.test(C) && (C.match(/nearest/gi) || []).length === 1 && /m\.review\[0\]/.test(C), '3e it ranks nothing: Things to Review is the engine\'s own list (render.review), shown in the engine\'s order; the word "nearest" appears only to introduce that list\'s first record in the briefing (read from m.review[0], never sorted here)');
   ok(/Things to Review With Your Client/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
     '3f the 100526 sections are written (Things to Review, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
   ok((C.match(/aria-disabled="true"/g) || []).length === 1 && !/addEventListener\('click'[\s\S]{0,200}da-rv-act/.test(C), '3f2 the action bar\'s buttons are switched off, and nothing listens to them');
@@ -220,5 +220,6 @@ const C = code(SRC);
     'javascript_url_accepted', 'distance_without_render', 'adds_a_fetch', 'address_in_href'].every((x) => names.includes(x)), '7e and every mutation the audit named is in it');
 }
 
+ok(/\.da-rv-table thead th\{overflow-wrap:normal;word-break:normal;hyphens:none;white-space:nowrap\}/.test(SRC), '5a a table column heading is never broken inside a word (the page-wide overflow-wrap:anywhere let a narrow print table squeeze "DISTANCE" into "DISTAN / CE" once a Direction column was added)');
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
