@@ -35,7 +35,13 @@ const fn = (name) => (code.match(new RegExp('(?:async )?function ' + name + '\\(
 // ---- 1. reached only by invite until launch ------------------------------------------------------------------------------------------------
 ok(/<meta name="robots" content="noindex, nofollow">/.test(page), '1a noindex, nofollow');
 ok(/^Disallow: \/development-activity-reports\.html$/m.test(read('robots.txt')), '1b disallowed in robots.txt');
-ok(!/development-activity-reports/.test(read('partials/shell.html')) && !/development-activity-reports/.test(read('shell.js')), '1c not in the resident app shell or its navigation');
+// Founder, 2026-10-05: an agent had no way back to this page, so the header's Enterprise dropdown has one entry, "My reports".
+// It is the ONLY place in the shell that names it, and it is not a primary nav item (no data-nav), so it lights nothing.
+const shellNoComments = read('partials/shell.html').replace(/<!--[\s\S]*?-->/g, '');
+const shellMine = shellNoComments.match(/<a href="development-activity-reports\.html"[^>]*>[^<]*<\/a>/g) || [];
+ok(shellMine.length === 1 && /data-sub="reports"/.test(shellMine[0]) && !/data-nav=/.test(shellMine[0]) && />My reports</.test(shellMine[0])
+   && (shellNoComments.match(/development-activity-reports/g) || []).length === 1 && !/development-activity-reports/.test(read('shell.js')),
+  '1c the shell names it once, as "My reports" in the Enterprise dropdown, and is otherwise not in the app shell or its navigation', shellMine);
 ok(/'development-activity-reports\.html',/.test(read('scripts/stage_site.py')), '1d staged on purpose (named in the artifact contract, not shipped by accident)');
 ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-activity-reports/.test(read('scripts/gen_sitemap.py')), '1e not in the sitemap or its generator');
 ok(!/development-activity-reports/.test(read('development-activity.html')), '1f the public landing page does not link it yet (its buttons go live at launch, build step 13)');
