@@ -43,7 +43,7 @@ const text = markup.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+
 
 console.log('--- 1. the shared shell, unchanged ---');
 ok(/<template id="hs-content">/.test(src) && /<\/template>/.test(src), 'content lives in <template id="hs-content"> like every shell page');
-ok(/<body data-nav="enterprise">/.test(src), 'v3 declares the Enterprise identity, so its sidebar item lights here');
+ok(/<body data-nav="enterprise"( data-enterprise="overview")?>/.test(src), 'v3 declares the Enterprise identity, so its sidebar item lights here');
 const scripts = (h) => (h.match(/<script[^>]*\ssrc="[^"]+"/g) || []).map((s) => s.match(/src="([^"]+)"/)[1]);
 ok(JSON.stringify(scripts(src)) === JSON.stringify(scripts(contact)),
   'loads exactly the same script set, in the same order, with the same cache keys as contact.html', { page: scripts(src), contact: scripts(contact) });
@@ -189,9 +189,12 @@ const homeSrc = read('index.html').replace(/<!--[\s\S]*?-->/g, '');
 const homeLinks = homeSrc.match(/<a\b[^>]*href="development-activity\.html"[^>]*>[\s\S]*?<\/a>/g) || [];
 ok(homeLinks.length === 1 && /id="homeEnterpriseCta"/.test(homeLinks[0]) && />Explore Enterprise →<\/a>$/.test(homeLinks[0]),
   'the homepage links it exactly once: the Enterprise card\'s "Explore Enterprise →" (no bottom banner)', homeLinks);
-ok(shellLinks.length === 1 && /data-nav="enterprise"/.test(shellLinks[0])
+// The Enterprise dropdown (founder, 2026-10-05) adds one more link to it, the "Enterprise overview" entry.
+const shellPrimary = shellLinks.filter((l) => /data-nav="enterprise"/.test(l));
+const shellSub = shellLinks.filter((l) => /data-sub="overview"/.test(l));
+ok(shellLinks.length === 2 && shellPrimary.length === 1 && shellSub.length === 1
    && /<a\s+href="development-activity\.html"[^>]*>[\s\S]{0,80}?Enterprise<\/a>/.test(shellSrc),
-  'v3 the shell links it exactly once, as the "Enterprise" primary item', shellLinks);
+  'v3 the shell links it twice: the "Enterprise" primary item and the dropdown\'s "Enterprise overview"', shellLinks);
 ok(inSitemap, 'LISTED: the page is in the sitemap generator\'s static list (scripts/gen_sitemap.py STATIC)', { inSitemap });
 ok(!/data-commerce[^>]*>[\s\S]*?id="daEnterprise"[\s\S]*?<\/div>/.test(markup.replace(/<div data-commerce[^>]*>[\s\S]*?<\/span>\s*<\/div>/g, '')),
   'the working action, Contact us for Enterprise Pricing, is not inside a commerce wrapper (the browser test checks it is visible)');

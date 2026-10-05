@@ -154,7 +154,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(h.footers === 1 && JSON.stringify(h.footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms=privacy.html#terms']),
     '1 exactly one footer: How It Works / About / Contact / Privacy / Terms', h);
   ok(!!h.footerBelowSlot, '1 the footer renders below the page content');
-  ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Explore Enterprise →']), '1 the Enterprise message appears once (header item + hero card; no bottom banner)', h.enterpriseLinks);
+  ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Enterprise overview', 'Explore Enterprise →']), '1 the Enterprise message appears once (header item, its dropdown\'s overview entry + hero card; no bottom banner)', h.enterpriseLinks);
   ok(h.h1 === 'See what’s changing around a property.' && h.h1Lines === 2, '1 H1 copy, in two lines at 1440px', h);
   ok(h.searchRow && h.btnW === 136, '1 input and 136px Search button on one row', h);
   ok(/home-development-activity-report-preview\.webp\|true\|1448$/.test(h.img || ''), '1 the approved report preview loads (1448px wide)', h.img);
@@ -252,8 +252,8 @@ for (const [w, h] of [[390, 844], [768, 1024]]) {
   ok(c0.logo && c0.share && c0.signin && c0.menu && c0.menuSize === '44x44' && c0.nav.length === 0, '7 ' + w + 'px: logo, Share, Sign in and a 44×44 Menu; nav closed', c0);
   await page.click('#hs-menubtn');
   const c1 = await vis();
-  ok(JSON.stringify(c1.nav) === JSON.stringify(['Explore', 'Quality of Life Impact', 'Development Map', 'Activity', 'My Places', 'Enterprise']) && c1.expanded === 'true' && c1.linkH >= 44,
-    '7 ' + w + 'px: the panel holds Explore (with its three pages under it), My Places, Enterprise (44px targets)', c1);
+  ok(JSON.stringify(c1.nav) === JSON.stringify(['Explore', 'Quality of Life Impact', 'Development Map', 'Activity', 'My Places', 'Enterprise', 'Enterprise overview', 'My reports']) && c1.expanded === 'true' && c1.linkH >= 44,
+    '7 ' + w + 'px: the panel holds Explore (with its three pages under it), My Places, Enterprise (with its two pages under it) (44px targets)', c1);
   await page.keyboard.press('Escape');
   const c2 = await vis();
   ok(c2.nav.length === 0 && c2.expanded === 'false', '7 ' + w + 'px: Escape closes it', c2);
