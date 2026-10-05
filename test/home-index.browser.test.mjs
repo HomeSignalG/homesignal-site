@@ -154,7 +154,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(h.footers === 1 && JSON.stringify(h.footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms=privacy.html#terms']),
     '1 exactly one footer: How It Works / About / Contact / Privacy / Terms', h);
   ok(!!h.footerBelowSlot, '1 the footer renders below the page content');
-  ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Explore Enterprise →']), '1 the Enterprise message appears once (header item + hero card; no bottom banner)', h.enterpriseLinks);
+  ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Enterprise overview', 'Explore Enterprise →']), '1 the Enterprise message appears once (header item, its dropdown\'s overview entry + hero card; no bottom banner)', h.enterpriseLinks);
   ok(h.h1 === 'See what’s changing around a property.' && h.h1Lines === 2, '1 H1 copy, in two lines at 1440px', h);
   ok(h.searchRow && h.btnW === 136, '1 input and 136px Search button on one row', h);
   ok(/home-development-activity-report-preview\.webp\|true\|1448$/.test(h.img || ''), '1 the approved report preview loads (1448px wide)', h.img);
