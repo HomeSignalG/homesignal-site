@@ -1,6 +1,6 @@
 // EVALUATION ENTITLEMENT — the structural half (the executable half is test/evaluation_entitlement_pg).
 //
-// Order L1 adds the database layer of the 20-report brokerage evaluation: four tables (the entitlement, the hashed invite, the
+// Order L1 adds the database layer of the 10-report brokerage evaluation: four tables (the entitlement, the hashed invite, the
 // append-only credit ledger, the append-only event log) and the functions that mint, redeem and revoke an invite and issue a report
 // against the shared pool. A PostgreSQL suite proves that BEHAVES, with real concurrent sessions. What it cannot see is a column that
 // would hold an address, a hash of one, a client or an email; a second account or member table; a counter standing in for the ledger;
@@ -183,12 +183,17 @@ const watchCode = code(WATCH_SQL);
 const BILLING_SQL = 'docs/brokerage-billing.sql';
 const billingCode = code(BILLING_SQL);
 // docs/report-rate-limit.sql is a sixth SQL file that names this layer, ONLY to read the free-report number: its post-condition refuses to apply if
-// public.evaluation_report_limit() is not 20, so that file can never be the reason the founder's number moved. It writes no row of this layer (its one table is
+// public.evaluation_report_limit() is not 10, so that file can never be the reason the founder's number moved. It writes no row of this layer (its one table is
 // report_rate_window) and calls nothing else here. test/report_rate_limit_pg proves that; test/report-rate-limit-structure.test.mjs pins its structure.
 const RATE_SQL = 'docs/report-rate-limit.sql';
 const rateCode = code(RATE_SQL);
+// docs/free-report-limit-10.sql (founder, 2026-10-05) is the migration that moved the number 20 -> 10. It names this layer because it redefines the limit function
+// and splices two readers; its ONE data write is flipping an evaluation that had already used 10 reports to complete (status + the completed event), never a ledger row.
+const LIMIT_MIGRATION = 'docs/free-report-limit-10.sql';
+const limitMigrationCode = code(LIMIT_MIGRATION);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, EVAL_READS].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS].sort())
+   && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigrationCode)
    && [...new Set(rateCode.match(new RegExp(OURS.source, 'g')) || [])].join() === 'evaluation_report_limit' && dmlTargets(rateCode).length >= 1 && dmlTargets(rateCode).every((t) => t === 'report_rate_window')
    && dmlTargets(billingCode).length >= 2 && dmlTargets(billingCode).every((t) => /^brokerage_(subscription|paid_credit)$/.test(t))
    && !/\bexecute\b[^;]*\b(insert|update|delete)\b[^;]*\bevaluation(_credit)?\b/i.test(billingCode)
@@ -259,14 +264,14 @@ ok(DEFINERS.every((f) => /security definer set search_path = public, pg_temp/.te
   '5f: exactly eight functions are security definer — the eight a caller may run — and every function that touches a table pins its search_path; the trigger functions and the limit are not definers');
 
 // ── 6. the invariants, in the code ───────────────────────────────────────────────────────────────────────────────────────
-ok(/language sql immutable as \$\$ select 20 \$\$;/.test(SQL) && (SQL.match(/\b20\b/g) || []).length === 1,
-  '6: the number of free reports is defined ONCE (evaluation_report_limit() = 20); no other statement writes the number, so changing it is one edit and a second copy cannot drift');
+ok(/language sql immutable as \$\$ select 10 \$\$;/.test(SQL) && (SQL.match(/\b10\b/g) || []).length === 1,
+  '6: the number of free reports is defined ONCE (evaluation_report_limit() = 10); no other statement writes the number, so changing it is one edit and a second copy cannot drift');
 ok(/constraint evaluation_credit_pkey\s+primary key \(evaluation_id, ordinal\)/.test(BODY.evaluation_credit)
    && /constraint evaluation_credit_ordinal\s+check \(ordinal between 1 and public\.evaluation_report_limit\(\)\)/.test(BODY.evaluation_credit)
    && /constraint evaluation_credit_key_unique\s+unique \(evaluation_id, idempotency_key\)/.test(BODY.evaluation_credit)
    && /constraint evaluation_credit_report_unique unique \(report_id\)/.test(BODY.evaluation_credit)
    && /report_id\s+uuid\s+not null references public\.report_snapshot \(report_id\)/.test(BODY.evaluation_credit) && /ordinal\s+integer\s+not null/.test(BODY.evaluation_credit),
-  '6b: THE CAP IS A CONSTRAINT: the ledger\'s primary key is (evaluation, ordinal) and the ordinal is checked between 1 and the limit, so at most twenty rows can exist per evaluation at ANY isolation level and for ANY writer; a retried key and a report are each unique; every row links a stored report');
+  '6b: THE CAP IS A CONSTRAINT: the ledger\'s primary key is (evaluation, ordinal) and the ordinal is checked between 1 and the limit, so at most ten rows can exist per evaluation at ANY isolation level and for ANY writer; a retried key and a report are each unique; every row links a stored report');
 ok(/create or replace trigger evaluation_credit_complete_trg\s+after insert on public\.evaluation_credit\s+for each row execute function public\.evaluation_credit_after_insert\(\);/.test(SQL)
    && /new\.ordinal = public\.evaluation_report_limit\(\)/.test(AFTER) && /set status = 'complete'/.test(AFTER) && /'completed'/.test(AFTER),
   '6c: the status flips to complete in an AFTER INSERT trigger on the ledger row that uses the last credit, whoever wrote it, and writes one completed event: the flip cannot be skipped');
@@ -372,7 +377,7 @@ const fileMutNames = [...MUT.matchAll(/^    '([a-z_0-9]+)': \(/gm)].map((m) => m
 ok(checkIds.size >= 75, '10: the executable suite carries at least 75 checks', checkIds.size);
 ok(sqlMutNames.length >= 190 && new Set(sqlMutNames).size === sqlMutNames.length && fileMutNames.length >= 30 && new Set([...sqlMutNames, ...fileMutNames]).size === sqlMutNames.length + fileMutNames.length,
   '10b: the harness carries at least 190 distinct prohibited mutations of the SQL (and the structural-only ones beside them) and 30 of the files around it', sqlMutNames.length + ' + ' + fileMutNames.length);
-ok(['limit_is_21', 'ordinal_check_unbounded', 'ordinal_not_unique_per_evaluation', 'key_unique_dropped', 'report_unique_dropped', 'complete_trigger_removed', 'append_only_credit_trigger_removed',
+ok(['limit_is_11', 'ordinal_check_unbounded', 'ordinal_not_unique_per_evaluation', 'key_unique_dropped', 'report_unique_dropped', 'complete_trigger_removed', 'append_only_credit_trigger_removed',
     'issue_without_the_evaluation_lock', 'issue_not_rechecked_after_the_lock', 'issue_replay_lookup_removed', 'issue_replay_key_is_global', 'issue_ignores_the_ledger_count', 'issue_swallows_a_snapshot_refusal',
     'issue_isolation_check_removed', 'redeem_without_any_lock', 'redeem_replay_for_any_user', 'redeem_skips_the_seat_limit', 'redeem_skips_the_one_membership_check', 'token_stored_raw', 'token_hash_is_md5',
     'credit_has_address_hash_column', 'credit_has_user_column', 'event_has_free_text_column', 'evaluation_has_used_counter', 'mint_foreign_actor_allowed', 'functions_unlocked', 'sequence_loop_removed',
@@ -384,7 +389,7 @@ ok(['limit_is_21', 'ordinal_check_unbounded', 'ordinal_not_unique_per_evaluation
 ok(/\*disposable\*/.test(RUN) && /python3 "\$MUTS" --sql/.test(RUN) && /SURVIVED/.test(RUN) && /APPLIED TWICE/.test(RUN) && /pg_sleep/.test(RUN) && /poison/i.test(RUN)
    && ['race_next', 'race_last', 'race_same_key', 'race_storm', 'race_redeem_token', 'race_redeem_seat', 'race_redeem_person', 'race_removed_while_waiting', 'race_mint_while_revoking'].every((r) => RUN.includes(r + '() {') && (RUN.match(/for name in ([^;]*); do/) || ['', ''])[1].split(' ').includes(r))
    && /race_constraint "repeatable read"/.test(RUN) && /race_constraint "serializable"/.test(RUN) && /isolation level \$lvl/.test(RUN) && /sha256sum/.test(RUN) && /rollback_exact/.test(RUN),
-  '10d: the harness refuses a non-disposable database, fails on any surviving mutation, proves a second apply changes nothing, races real sessions (two issues, the last credit, one key, thirty callers for twenty credits, one token, one seat, one person, a member removed while waiting, a mint during a revocation), proves the cap at REPEATABLE READ and SERIALIZABLE, checks the hash against sha256sum, proves a poisoned state stops the apply, and proves the rollback exact');
+  '10d: the harness refuses a non-disposable database, fails on any surviving mutation, proves a second apply changes nothing, races real sessions (two issues, the last credit, one key, thirty callers for ten credits, one token, one seat, one person, a member removed while waiting, a mint during a revocation), proves the cap at REPEATABLE READ and SERIALIZABLE, checks the hash against sha256sum, proves a poisoned state stops the apply, and proves the rollback exact');
 ok(/set client_min_messages = warning;/.test(SUITE) && /create function pg_temp\._do\(/.test(SUITE) && /S01/.test(SUITE) && /alter role service_role nobypassrls/.test(SUITE),
   '10e: the suite\'s setup steps are crash-proof (a regression becomes a failed check), and it reads as service_role WITHOUT row-level-security bypass so the posture is what refuses, not a missing privilege alone');
 ok(/create table auth\.users/.test(FIXTURE) && /alter default privileges in schema public grant all on tables\s+to anon, authenticated, service_role/.test(FIXTURE)
@@ -393,8 +398,8 @@ ok(/create table auth\.users/.test(FIXTURE) && /alter default privileges in sche
 const wfPaths = (p) => (WF.match(new RegExp("^      - '" + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "'$", 'gm')) || []).length;
 ok(/bash test\/evaluation_entitlement_pg\/run\.sh/.test(WF) && wfPaths('docs/evaluation-entitlement.sql') === 2 && wfPaths('test/evaluation_entitlement_pg/**') === 2 && wfPaths('test/evaluation_entitlement_mutants.py') === 2
    && wfPaths('docs/brokerage-account-spine.sql') === 2 && wfPaths('docs/report-snapshot.sql') === 2 && wfPaths('docs/report-private-context.sql') === 2 && wfPaths('.github/workflows/brokerage-account-suite.yml') === 2
-   && /bash test\/brokerage_account_pg\/run\.sh/.test(WF) && (WF.match(/Refuse to run if any Supabase credential is present/g) || []).length === 2
-   && !/secrets\./.test(WF) && !/SUPABASE_[A-Z_]+:\s*\$\{\{/.test(WF) && (WF.match(/postgres:17/g) || []).length === 2 && /POSTGRES_DB: evaluation_disposable/.test(WF),
+   && /bash test\/brokerage_account_pg\/run\.sh/.test(WF) && (WF.match(/Refuse to run if any Supabase credential is present/g) || []).length === 3 && /bash test\/free_report_limit_pg\/run\.sh/.test(WF) && wfPaths('docs/free-report-limit-10.sql') === 2 && wfPaths('test/free_report_limit_pg/**') === 2
+   && !/secrets\./.test(WF) && !/SUPABASE_[A-Z_]+:\s*\$\{\{/.test(WF) && (WF.match(/postgres:17/g) || []).length === 3 && /POSTGRES_DB: evaluation_disposable/.test(WF),
   '10g: the workflow runs the evaluation harness against its own disposable container beside the spine\'s, is triggered (pull request AND push to main) by changes to this SQL, the three files it stands on, the suite, the harness and itself, holds no secret and refuses to run if one is present');
 ok(!/\bschedule\s*:/.test(WF) && /pull_request:/.test(WF) && /push:/.test(WF) && /workflow_dispatch/.test(WF), '10h: the workflow has no schedule');
 const NEW_FILES = { SQL: RAW, SUITE, FIXTURE, RUN, MUT, WF, DOC };

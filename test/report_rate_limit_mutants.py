@@ -99,7 +99,7 @@ m('another_function_claims', MBH, "import { DataUnavailable } from '../_shared/s
 m('sql_grants_the_claim_to_a_resident_role', SQL, "grant execute on function public.report_rate_claim(uuid)                 to service_role;\n",
   "grant execute on function public.report_rate_claim(uuid)                 to service_role;\ngrant execute on function public.report_rate_claim(uuid) to authenticated;\n")
 m('sql_table_keeps_an_email', SQL, "  used          integer     not null,\n", "  used          integer     not null,\n  email         text,\n")
-m('sql_no_longer_checks_the_free_number', SQL, "  if public.evaluation_report_limit() <> 20 then raise exception 'report_rate_limit: the free report limit is not 20 (founder-set; this file must not change it)'; end if;\n", "")
+m('sql_no_longer_checks_the_free_number', SQL, "  if public.evaluation_report_limit() <> 10 then raise exception 'report_rate_limit: the free report limit is not 10 (founder-set; this file must not change it)'; end if;\n", "")
 m('sql_writes_the_free_ledger', SQL, "-- ROLLBACK (this file only", "update public.evaluation set status = status;\n-- ROLLBACK (this file only")
 m('sql_loses_its_rollback_drops', SQL, "-- drop function if exists public.report_rate_check();\n", "")
 # ---- the page --------------------------------------------------------------------------------------------------------------------------------------------

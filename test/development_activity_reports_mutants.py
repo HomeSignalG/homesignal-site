@@ -67,7 +67,7 @@ m('count_not_updated_after_a_report', "      showTrial(body.trial.status === 'co
 m('charge_decided_on_the_page', '    if (body.charged === true) return', '    if (body.report && body.report.projects && body.report.projects.length > 0) return')
 m('no_data_ingested_unexplained', "    if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use ' + oneOf() + ': No data ingested.';\n", '', [BRO])
 m('replay_called_a_new_charge', "    if (body.replayed === true) return 'This is the report you already made for this address. It did not use another ' + (paid ? 'report' : 'free report') + '.';\n", '', [BRO])
-m('trial_used_up_unexplained', "    if (httpStatus === 403 && body.error === 'evaluation_complete') return \"All 20 of your brokerage's free reports are used.\";\n", '', [SRC])
+m('trial_used_up_unexplained', "    if (httpStatus === 403 && body.error === 'evaluation_complete') return freeLimit === null ? \"All of your brokerage's free reports are used.\" : \"All \" + freeLimit + \" of your brokerage's free reports are used.\";\n", '', [SRC])
 m('prints_the_raw_code', '    if (!ok) { say(messageFor(r.status, body), true); return; }',
   '    if (!ok) { say(String(body.error || body.status || r.status), true); return; }')
 

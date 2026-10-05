@@ -78,8 +78,8 @@ MUTATIONS = {
     "claim_open_to_a_resident_role_at_apply": ("postcondition", [("grant execute on function public.report_rate_check()                     to service_role;\n",
                                                                     "grant execute on function public.report_rate_check()                     to service_role;\ngrant execute on function public.report_rate_claim(uuid) to authenticated;\n", 1)]),
     # ---- the founder's numbers and the credit path
-    "free_limit_moved_before_the_postcondition": ("postcondition", before_post("create or replace function public.evaluation_report_limit() returns integer language sql immutable as $$ select 21 $$;")),
-    "free_limit_moved_after": ("suite", append("create or replace function public.evaluation_report_limit() returns integer language sql immutable as $$ select 21 $$;")),
+    "free_limit_moved_before_the_postcondition": ("postcondition", before_post("create or replace function public.evaluation_report_limit() returns integer language sql immutable as $$ select 11 $$;")),
+    "free_limit_moved_after": ("suite", append("create or replace function public.evaluation_report_limit() returns integer language sql immutable as $$ select 11 $$;")),
     "paid_limit_moved_after": ("suite", append("create or replace function public.billing_report_limit() returns integer language sql immutable as $$ select 101 $$;")),
     "credit_path_calls_the_limiter": ("suite", append("create or replace function public.billing_credit_hook() returns integer language sql as $$ select count(*)::integer from public.report_rate_window /* report_rate */ $$;")),
     # ---- the audit

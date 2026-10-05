@@ -71,7 +71,7 @@ def lockdown(*ops):
 
 
 # ---- anchors (verbatim from the SQL of record) ---------------------------------------------------------------------------
-LIMIT_FN = "language sql immutable as $$ select 20 $$;"
+LIMIT_FN = "language sql immutable as $$ select 10 $$;"
 
 EVAL_ONE = "  constraint evaluation_one_per_brokerage unique (brokerage_id),\n"
 EVAL_STATUS = "  constraint evaluation_status            check (status in ('active', 'complete', 'revoked')),\n"
@@ -219,9 +219,9 @@ I_FULL = "  if ev.status <> 'active' or v_used >= public.evaluation_report_limit
 I_SNAP = "  select s.* into v_snap from public.report_snapshot_issue(p_body, p_content_hash, p_report_version, p_engine_inputs, p_private) s;"
 I_STATE = "  select e.status into v_state from public.evaluation e where e.evaluation_id = ev.evaluation_id;"
 I_REMAIN = "                      public.evaluation_report_limit() - (v_used + 1), v_state;"
-I_REPLAY_RETURN = "             public.evaluation_report_limit() - v_used, ev.status\n        from public.report_snapshot s where s.report_id = v_prior.report_id;"
+I_REPLAY_RETURN = "             greatest(public.evaluation_report_limit() - v_used, 0), ev.status\n        from public.report_snapshot s where s.report_id = v_prior.report_id;"
 
-US_REMAIN = "u.n, public.evaluation_report_limit() - u.n,"
+US_REMAIN = "u.n, greatest(public.evaluation_report_limit() - u.n, 0),"
 
 C_COMPLETE = ("  union all select 'complete_without_a_full_ledger', 'invariant', count(*) from public.evaluation e\n    where e.status = 'complete'\n"
               "      and (select count(*) from public.evaluation_credit c where c.evaluation_id = e.evaluation_id) <> public.evaluation_report_limit()\n")
@@ -282,8 +282,8 @@ def drop_trigger(anchor):
 
 MUTATIONS = {
     # ---- the cap is a CONSTRAINT: the number, the ordinal, the keys ------------------------------------------------------------
-    'limit_is_21': [(LIMIT_FN, LIMIT_FN.replace('20', '21'), 1)],
-    'limit_is_19': [(LIMIT_FN, LIMIT_FN.replace('20', '19'), 1)],
+    'limit_is_11': [(LIMIT_FN, LIMIT_FN.replace('10', '11'), 1)],
+    'limit_is_9': [(LIMIT_FN, LIMIT_FN.replace('10', '9'), 1)],
     'ordinal_check_allows_zero': [(CRED_ORD, CRED_ORD.replace('between 1 and', 'between 0 and'), 1)],
     'ordinal_check_unbounded': [(CRED_ORD, "  constraint evaluation_credit_ordinal       check (ordinal >= 1),\n", 1)],
     'ordinal_check_dropped': [(CRED_ORD, "", 1)],
@@ -433,7 +433,7 @@ MUTATIONS = {
     'issue_replay_lookup_removed': [(I_REPLAY, "  select 1 into v_prior from public.evaluation_credit c where false;\n  if found then", 1)],
     'issue_replay_ignores_the_key': [(I_REPLAY, I_REPLAY.replace(" and c.idempotency_key = p_idempotency_key", ""), 1)],
     'issue_replay_key_is_global': [(I_REPLAY, I_REPLAY.replace("c.evaluation_id = ev.evaluation_id and ", ""), 1)],
-    'issue_replay_remaining_wrong': [(I_REPLAY_RETURN, I_REPLAY_RETURN.replace("public.evaluation_report_limit() - v_used", "public.evaluation_report_limit() - v_used - 1"), 1)],
+    'issue_replay_remaining_wrong': [(I_REPLAY_RETURN, I_REPLAY_RETURN.replace("public.evaluation_report_limit() - v_used, 0", "public.evaluation_report_limit() - v_used - 1, 0"), 1)],
     'issue_ignores_a_revoked_evaluation': [(I_RECHECK, I_RECHECK.replace("ev.status = 'revoked' or ", ""), 1)],
     'issue_ignores_evaluation_expiry': [(I_RECHECK, I_RECHECK.replace(" or (ev.expires_at is not null and ev.expires_at <= now())", ""), 1)],
     'issue_ignores_the_ledger_count': [(I_FULL, "  if ev.status <> 'active' then", 1)],
@@ -447,6 +447,8 @@ MUTATIONS = {
     'issue_security_invoker': [(I_HEAD, I_HEAD.replace(" security definer", ""), 1)],
     'issue_search_path_unpinned': [(I_HEAD, I_HEAD.replace(" set search_path = public, pg_temp", ""), 1)],
     'usage_remaining_wrong': [(US_REMAIN, "u.n, public.evaluation_report_limit(),", 1)],
+    'usage_remaining_can_go_negative': [(US_REMAIN, "u.n, public.evaluation_report_limit() - u.n,", 1)],
+    'issue_replay_remaining_can_go_negative': [(I_REPLAY_RETURN, I_REPLAY_RETURN.replace("greatest(public.evaluation_report_limit() - v_used, 0)", "public.evaluation_report_limit() - v_used"), 1)],
     # ---- the audit: every invariant, beside a control ----------------------------------------------------------------------------------
     'check_drops_complete_without_a_full_ledger': [(C_COMPLETE, "", 1)],
     'check_drops_active_with_a_full_ledger': [(C_ACTIVE, "", 1)],
@@ -500,7 +502,7 @@ STRUCT_ONLY = {
     'token_predictable_from_the_clock': [(TOKEN_LINE, "  v_token := 'hse1_' || md5(clock_timestamp()::text) || md5(clock_timestamp()::text);", 1)],
     'lock_loop_unqualified': [(LOOP_FMT, "  for f in select format('%I(%s)', p.proname, pg_get_function_identity_arguments(p.oid)) as sig,", 1)],
     'sequence_loop_unqualified': [(SEQ_FMT, "  for s in select format('%I', c.relname) as sig", 1)],
-    'limit_number_written_twice': [(CRED_ORD, CRED_ORD.replace("public.evaluation_report_limit()", "20"), 1)],
+    'limit_number_written_twice': [(CRED_ORD, CRED_ORD.replace("public.evaluation_report_limit()", "10"), 1)],
     'file_names_subscriptions': [(PRE_ROLLBACK, "\nselect 1 from public.subscriptions;" + PRE_ROLLBACK, 1)],
     'file_updates_a_membership': [(PRE_ROLLBACK, "\nupdate public.brokerage_member set role = role;" + PRE_ROLLBACK, 1)],
     'file_deletes_a_membership': [(PRE_ROLLBACK, "\ndelete from public.brokerage_member where false;" + PRE_ROLLBACK, 1)],
@@ -514,7 +516,7 @@ STRUCT_ONLY = {
     'file_deletes_a_ledger_row': [(PRE_ROLLBACK, "\ndelete from public.evaluation_credit where false;" + PRE_ROLLBACK, 1)],
     'file_issue_calls_the_snapshot_twice': [(I_SNAP, I_SNAP + "\n  " + I_SNAP.strip(), 1)],
     'file_matches_an_email': [(PRE_ROLLBACK, "\nselect 1 from auth.users where email like '%@%';" + PRE_ROLLBACK, 1)],
-    'file_hardcodes_a_limit_in_the_issue': [(I_FULL, "  if ev.status <> 'active' or v_used >= 20 then", 1)],
+    'file_hardcodes_a_limit_in_the_issue': [(I_FULL, "  if ev.status <> 'active' or v_used >= 10 then", 1)],
     'file_issue_uses_md5': [(I_SNAP, I_SNAP + "\n  perform md5(p_body);", 1)],
 }
 
@@ -535,6 +537,7 @@ PG_ONLY = {
     'evaluation_revoke_does_nothing', 'evaluation_revoke_not_idempotent', 'evaluation_revoke_writes_no_event',
     'issue_replay_key_is_global', 'issue_replay_remaining_wrong', 'issue_ignores_the_ledger_count', 'issue_ignores_the_status',
     'issue_null_key_allowed', 'issue_remaining_wrong', 'issue_returns_a_stale_status', 'usage_remaining_wrong',
+    'usage_remaining_can_go_negative', 'issue_replay_remaining_can_go_negative',
     'check_drops_complete_without_a_full_ledger', 'check_drops_active_with_a_full_ledger', 'check_drops_ledger_with_gaps',
     'check_drops_ledger_beyond_the_limit', 'check_drops_the_controls',
 }

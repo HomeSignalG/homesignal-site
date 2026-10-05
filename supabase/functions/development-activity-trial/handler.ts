@@ -1,4 +1,4 @@
-// development-activity-trial — joining a brokerage's 20-report trial, reading one's own trial (Development Activity build step 5c),
+// development-activity-trial — joining a brokerage's 10-report trial, reading one's own trial (Development Activity build step 5c),
 // creating a trial (step 5d) and an owner inviting agents (step 5e; docs/development-activity-build-steps-100526.md).
 //
 // FOUR ACTIONS:

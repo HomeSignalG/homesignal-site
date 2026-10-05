@@ -30,7 +30,7 @@
 --   2. Every member of a brokerage sees all of its reports (D-6-2). The ledger holds no user id by design (evaluation-entitlement
 --      header: retaining an agent identity in a permanent trail is an open founder question), so "whose report" is not recorded.
 --   3. Standing is the one the report function uses (_shared/admin-gate.ts trialStanding): an ACTIVE, unexpired evaluation, or a
---      COMPLETE one (its 20 reports are used; they stay readable). A revoked or expired evaluation shows nothing (D-6-3).
+--      COMPLETE one (its 10 reports are used; they stay readable). A revoked or expired evaluation shows nothing (D-6-3).
 --   4. Reopening never charges and never writes: both functions are STABLE and read only.
 --   5. The listing is bounded: at most evaluation_report_limit() rows exist per evaluation (the ledger's ordinal CHECK).
 --   6. Nothing here is readable by anon or authenticated; both functions are executable by service_role alone.

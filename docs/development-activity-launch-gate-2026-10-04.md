@@ -1,5 +1,7 @@
 # Development Activity — the launch gate (build step 13), 2026-10-04
 
+> **2026-10-05 — the free allowance is now 10, not 20 (founder).** The scenario below is described at its current numbers (10 free, then 100 paid a month; paid reports 11 to 110; 110 stored); section 15's brokerage is bound to a paid plan first, because a free trial of ten can never reach the person's ten-a-minute ceiling. Receipts dated 2026-10-04 further down are left as they were measured, under the old 20. The change is recorded in `docs/free-report-limit-10.sql`.
+
 The plan's step 13, in the founder's words: **"End-to-end launch test, then the Enterprise page buttons go live. A test brokerage runs sign-up, 20 reports,
 the end of the trial, payment and a 100-report month."**
 
@@ -25,24 +27,24 @@ it) and the processor.
 
 1. **Sign-up.** An admin creates the test brokerage's trial; the owner opens the invite link; the owner invites an agent; the agent joins.
 2. **Before payment.** The plan reads "none"; an owner is offered a checkout, an agent is told to ask the owner, a person with no brokerage gets nothing.
-3. **Twenty free reports**, made by the owner and the agent in turn. The twentieth ends the trial. The free ledger is 1 to 20 with no gap; no paid credit exists.
-4. **The end of the trial.** The 21st report is refused (403 `evaluation_complete`) *before* any work: the issue function is never asked, nothing is stored, nothing charged.
+3. **Ten free reports**, made by the owner and the agent in turn. The tenth ends the trial. The free ledger is 1 to 10 with no gap; no paid credit exists.
+4. **The end of the trial.** The 11th report is refused (403 `evaluation_complete`) *before* any work: the issue function is never asked, nothing is stored, nothing charged.
 5. **Checkout.** Only the owner; refused with the processor never contacted for an agent, an outsider or an unconfigured server; a processor outage is
    a plain 502. The request the processor is sent is read byte for byte: its endpoint, the store and the $79 variant, a live checkout, the brokerage's
    id **with a signature only this server's secret can make**, a return address that only brings the person back, and no email. Asking changes nothing in the database.
-6. **A test-mode payment** (the founder's own test) is recorded and **grants nothing**: the plan reads "test only", the 21st report is still refused, no paid credit exists.
+6. **A test-mode payment** (the founder's own test) is recorded and **grants nothing**: the plan reads "test only", the 11th report is still refused, no paid credit exists.
 7. **The webhook refuses what it cannot trust.** No signature, a wrong secret and a made-up signature are 401 and record nothing. A correctly signed event that
    names another brokerage with this brokerage's signature, one with no binding, one for another product's variant, an order event: none is acted on. A malformed
    signed event is refused loudly (422), never guessed at.
-8. **The live payment.** The subscription is bound to the brokerage and the plan becomes paid: a month of 100, none used (the 20 free reports do not count toward
+8. **The live payment.** The subscription is bound to the brokerage and the plan becomes paid: a month of 100, none used (the 10 free reports do not count toward
    it). The processor retrying the delivery is a duplicate. A second checkout is refused (409) with the processor not contacted: nobody is billed twice.
-9. **A hundred paid reports** (21 to 120), by the owner and the agent in turn, each reported as a paid one with the month's figures and the free trial untouched. A retry of the same request returns the same report and charges nothing. The paid ledger is 1 to 100 with no gap and the reports are numbered 21 to 120.
+9. **A hundred paid reports** (11 to 110), by the owner and the agent in turn, each reported as a paid one with the month's figures and the free trial untouched. A retry of the same request returns the same report and charges nothing. The paid ledger is 1 to 100 with no gap and the reports are numbered 11 to 110.
 10. **The 101st** is refused before any work (403 `allotment_complete`); asked directly, the *database* refuses it too; a 101st ledger row cannot be written by any path (the cap is a constraint, named in the refusal). There is no overage and no extra purchase.
-11. **Saved reports.** All 120 list in one list (newest first) and open without charging, for the owner and the agent; the other brokerage sees none and cannot open one.
+11. **Saved reports.** All 110 list in one list (newest first) and open without charging, for the owner and the agent; the other brokerage sees none and cannot open one.
 12. **Isolation.** The other brokerage's plan is untouched, its checkout names only itself, and an event naming its brokerage for this brokerage's subscription is refused (409) and recorded nowhere.
-13. **Cancellation.** The allotment ends at once (D-11-1); all 120 stored reports still list and open; nothing is deleted; a new checkout is available; an older event arriving late does not undo the cancellation.
+13. **Cancellation.** The allotment ends at once (D-11-1); all 110 stored reports still list and open; nothing is deleted; a new checkout is available; an older event arriving late does not undo the cancellation.
 14. **The audit.** Every billing invariant reads zero beside controls that are not zero; the processor's key, the signing secret, the checkout address and the owner's email are written in no table of the public schema; no resident role can run a billing function.
-15. **The report rate limit** *(added with `docs/report-rate-limit.sql`; sections 1-14 are unchanged)*. A second brokerage, on the real clock and the real wrapper: a member asking quickly is let through up to the person's ceiling and then refused with 429 and the wait in the body and in `Retry-After`; the refusal carries no report, no charge, no address and no brokerage id; the geocoder and the issuing function are asked once per report let through and **never** for the refused one; four more refused requests consume nothing; the agent of the same brokerage is still served; the limited person can still list saved reports; the free and paid numbers are still 20 and 100; once the minute has passed the person is served again; with the limiter unreadable the request is a 502 and the geocoder is never reached (fails closed). *Sections 1-14 clear the limiter's counters before each request* (they make ~140 reports in about a minute to test the **entitlement**, far above the ceiling by design); section 15 does not.
+15. **The report rate limit** *(added with `docs/report-rate-limit.sql`; sections 1-14 are unchanged)*. A second brokerage, on the real clock and the real wrapper: a member asking quickly is let through up to the person's ceiling and then refused with 429 and the wait in the body and in `Retry-After`; the refusal carries no report, no charge, no address and no brokerage id; the geocoder and the issuing function are asked once per report let through and **never** for the refused one; four more refused requests consume nothing; the agent of the same brokerage is still served; the limited person can still list saved reports; the free and paid numbers are still 10 and 100; once the minute has passed the person is served again; with the limiter unreadable the request is a 502 and the geocoder is never reached (fails closed). *Sections 1-14 clear the limiter's counters before each request* (they make ~140 reports in about a minute to test the **entitlement**, far above the ceiling by design); section 15 does not.
 
 Run it: `bash test/launch_gate_pg/run.sh` with `PGHOST`/`PGDATABASE` pointing at a disposable Postgres (the script refuses any database whose name does not contain
 "disposable" and refuses to run if any Supabase credential is present). About 90 seconds (section 15 begins early in a wall-clock minute, which can add up to half a minute of waiting). In CI it is the `launch-gate` job of `report-snapshot-suite.yml`.
@@ -57,7 +59,7 @@ Stated plainly, because a green gate reads like more than it is.
   system behaves correctly *given those shapes*. **The founder's test payment is what confirms the shapes**; until it is made, "payment works" is not a statement anyone can make.
 - **No payment has been made.** Not a test one, not a live one.
 - **The reports are fixture reports.** The gate gives the engine a cleared source and a fixed project record. In production `supabase/functions/_shared/report-rights.json`
-  lists no cleared source (`cleared: []`), so a real customer report is "No data ingested" (free, never stored) and cannot be charged. The 20-report trial and the paid
+  lists no cleared source (`cleared: []`), so a real customer report is "No data ingested" (free, never stored) and cannot be charged. The 10-report trial and the paid
   month cannot yet be exercised on real data, only on test data (step 12).
 - **A second month is not here.** The scenario stays inside the first month. The month rolling over (a binding 35 days old has a month 1, with its own 100) is exercised
   by the billing SQL suite (`test/brokerage_billing_pg`), not by this gate.
@@ -96,7 +98,7 @@ The plan says the buttons go live after the test. These are what has to be true 
 | 1 | The end-to-end test is green | **Done** (this step). |
 | 2 | **The $79 product exists in Lemon Squeezy, a second webhook points at `development-activity-billing-webhook`, the four secrets are set, and ONE test payment has been made and its ledger rows checked.** | **Founder action, not done.** Steps: `docs/development-activity-billing-2026-10-04.md` section 5. Until the secrets are set, `manage-billing` answers 503 and the webhook 503: everything fails closed. |
 | 3 | **At least one source is cleared for paying customers**, so a report can show projects. | **Founder action, not done.** The Utah requests are drafted and send-ready (`docs/utah-source-requests-send-ready-2026-10-04.md`) and have **not been sent**. Nothing is "pending" until a person sends them. |
-| 4 | **What the public "Start with 20 free reports" and "Join for $79/month" buttons DO.** | **A product decision, not made.** See below. |
+| 4 | **What the public "Start with 10 free reports" and "Join for $79/month" buttons DO.** | **A product decision, not made.** See below. |
 | 5 | The items the checklist carries as "open before step 13" (kept explicit; the full table with evidence is section 10): **(a) the free-report rate limit — APPLIED and DEPLOYED 2026-10-04 on the founder's go (section 9);** **(b) there is no billing-portal link, so a customer cannot change a card or cancel from the page — OPEN, not built;** (c) the public client link endpoint is not rate-limited — OPEN; (d) an owner cannot list or withdraw invite links or remove an agent — OPEN; (e) `run-property-watch` has no rate limit beyond its private secret — OPEN; (f) an ended or failing watch is not emailed to the agent — OPEN. | **(a) live. (b)-(f) open.** (a) and (b) bear most directly on opening the door to the public: the limiter is live, and there is still no self-service card update or cancellation. |
 
 ### The decision the buttons need (D-13-1) — not made here
@@ -107,10 +109,10 @@ The commerce buttons are drawn, inert and hidden in four places on the page (fou
 - A trial is **created by an admin** (`development-activity-trial`, action `create`, admin only) and **joined by an invite link** the admin or the owner sends.
 - A checkout is started by the **owner of an existing brokerage** (`manage-billing`); a person with no brokerage gets 403.
 
-So a stranger who presses "Start with 20 free reports" has no function to reach that would give them a trial, and a stranger who presses "Join for $79/month" has no
+So a stranger who presses "Start with 10 free reports" has no function to reach that would give them a trial, and a stranger who presses "Join for $79/month" has no
 brokerage to pay for. Making the buttons live therefore means choosing, which is the founder's call:
 
-- **A. Request-and-invite (needs no new code on the server).** "Start with 20 free reports" opens a request form; the founder creates the trial and sends the owner link, exactly as now.
+- **A. Request-and-invite (needs no new code on the server).** "Start with 10 free reports" opens a request form; the founder creates the trial and sends the owner link, exactly as now.
   "Join for $79/month" takes a signed-in owner to the Billing card. Manual: the founder is the gate on who gets a trial.
 - **B. Self-serve trial creation.** A new function lets a signed-in person create their own brokerage and trial. That is new code and a new abuse surface. The report rate limit (section 9) is a prerequisite and is now built, but it is **not enough on its own**: section 11 lists what else would have to exist first, and none of it is built.
 
@@ -160,7 +162,7 @@ quoted by the manual test (`docs/development-activity-manual-test-brigham-city-8
 
 ## 9. The free-report rate limit — applied and deployed 2026-10-04
 
-**Why it was needed.** The entitlement limits what is *stored and charged* (20 free, 100 paid a month). It does not limit what is *asked*, and a request the credit rule does not charge — "No data ingested" (today **every** request), an address that cannot be found, an address outside coverage — is free work for the geocoder and the spatial reads. Behind an admin-created trial that is bounded by who was invited; before any self-serve trial it is not.
+**Why it was needed.** The entitlement limits what is *stored and charged* (10 free, 100 paid a month). It does not limit what is *asked*, and a request the credit rule does not charge — "No data ingested" (today **every** request), an address that cannot be found, an address outside coverage — is free work for the geocoder and the spatial reads. Behind an admin-created trial that is bounded by who was invited; before any self-serve trial it is not.
 
 **What it is.** `docs/report-rate-limit.sql`: fixed windows of a minute, an hour and a day, per signed-in person and per brokerage, counted by the database (advisory locks, so two requests cannot both take the last slot). A request is allowed only if **every** window has room, and only then are all of them incremented, together; **a refused attempt consumes nothing**. The report function claims after the request is validated and **before the geocoder**, for members only (not admins, not the list/open reads, not a request already refused as invalid or because the trial or month is spent). A full window answers **429** `rate_limited` with the wait in the body and in `Retry-After`; the page says, in plain words, "You have asked for a lot of reports in a short time. Try again in 30 seconds. This did not use a free report." A claim that cannot be made is a 502 and the geocoder is **never** asked (fails closed). It stores only a person's id or a brokerage's id and counters: no email, address or IP. It touches neither the 20 nor the 100 (its post-condition refuses to apply if either is anything else, and a fingerprint of everything else in the schema is identical before and after applying it).
 
@@ -171,7 +173,7 @@ quoted by the manual test (`docs/development-activity-manual-test-brigham-city-8
 | a person | 10 | 60 | 200 |
 | a brokerage | 30 | 200 | 1,000 |
 
-They are chosen to sit well above a person working through addresses by hand and well below a script. **Nothing in the plan or the rulings names a request ceiling** (the 20 and the 100 are the only founder numbers and they are untouched), so these are mine; say if you want different ones. Changing them is a one-function edit and a re-apply.
+They are chosen to sit well above a person working through addresses by hand and well below a script. **Nothing in the plan or the rulings names a request ceiling** (the 10 and the 100 are the only founder numbers and they are untouched), so these are mine; say if you want different ones. Changing them is a one-function edit and a re-apply.
 
 **Proof.**
 - `test/report_rate_limit_pg` against a real Postgres: 71 checks. Fixed instants for every window boundary (the longer wait is the one reported; an old clock cannot reopen a window); **eight real concurrent sessions racing one person's minute admit exactly ten of their 160 requests; sixteen real sessions across four people of one brokerage admit exactly thirty** (the brokerage's ceiling, not the sum of the people's); a claim above READ COMMITTED refused; the API roles refused by the database itself; applying changes nothing the entitlement owns; a second apply; an exact rollback; the refusal when a layer is absent. **29 prohibited mutations of the SQL, all killed by a named check** (`mutate_all.sh`; a crash does not count).
@@ -198,7 +200,7 @@ Each row says what exists **today** and the evidence. "NOT COVERED" means no rat
 
 | Surface | Who can reach it | What a flood or abuse costs | Control today | Status |
 |---|---|---|---|---|
-| **Report generation** (`get-development-activity-report`) | a signed-in trial or paid member | a geocoder call + spatial reads per request; "No data ingested", not-found and outside-coverage requests are free of charge and unlimited | the 20 / 100 entitlement (database-enforced) for what is *charged*; **the new rate limit for what is *asked*** | **Covered, live since 2026-10-04** |
+| **Report generation** (`get-development-activity-report`) | a signed-in trial or paid member | a geocoder call + spatial reads per request; "No data ingested", not-found and outside-coverage requests are free of charge and unlimited | the 10 / 100 entitlement (database-enforced) for what is *charged*; **the new rate limit for what is *asked*** | **Covered, live since 2026-10-04** |
 | Report **admin** use | an admin | same as above | none, by design: the founder's own tool (`dashboard_admins`) | NOT COVERED, accepted |
 | **Saved-report list and open** | a member, for their own brokerage | indexed database reads of the caller's own rows; no geocoder, no charge | membership resolver; no request ceiling | NOT COVERED — low risk; open |
 | **Trial creation** | an admin only | one brokerage row + one invite per call | `development-activity-trial` `create` answers 403 to anyone else *before any field is read* (`test/development-activity-trial-function.test.mjs` 6a, 6b). **No public or self-serve path exists** | Not abusable from outside today. **A self-serve path does not exist, and must not until section 11 is done** |
@@ -216,7 +218,7 @@ Each row says what exists **today** and the evidence. "NOT COVERED" means no rat
 
 **Today's operating model, unchanged: an admin creates the trial, the owner joins by invite link.** The admin does it from `development-activity-review.html`; the owner receives a link by hand.
 
-**Nothing public was added.** The "Start with 20 free reports" and "Join for $79/month" buttons remain inside `<div data-commerce hidden>`, inert, with no destination. Evidence that the landing tests would fail if one became visible: in a copy of the page, un-hiding **each of the four wrappers on its own**, un-hiding all of them, making a button clickable, adding a new visible "Start with 20 free reports" outside a wrapper, and replacing "Join for $79/month" with a live link **each fail both** `development-activity-landing.test.mjs` and its browser test, by name. (One try first reported a survivor: it had changed the *comment* that quotes the wrapper, not a wrapper — a harness error, corrected by editing the four real wrappers separately.)
+**Nothing public was added.** The "Start with 10 free reports" and "Join for $79/month" buttons remain inside `<div data-commerce hidden>`, inert, with no destination. Evidence that the landing tests would fail if one became visible: in a copy of the page, un-hiding **each of the four wrappers on its own**, un-hiding all of them, making a button clickable, adding a new visible "Start with 10 free reports" outside a wrapper, and replacing "Join for $79/month" with a live link **each fail both** `development-activity-landing.test.mjs` and its browser test, by name. (One try first reported a survivor: it had changed the *comment* that quotes the wrapper, not a wrapper — a harness error, corrected by editing the four real wrappers separately.)
 
 **Why a request-access path was not built.** It needs a real destination, and every candidate for one is a decision that is yours, not mine: **D-RA-1** where a request goes (the founder's inbox by a mailto to an address you name, or a form that stores a row and tells you) · **D-RA-2** if it stores an email address or name, that is subscriber data/PII and needs consent wording, which is a legal/consent change · **D-RA-3** what happens to the request (who creates the trial, in what time). A page button with no real destination is exactly what you said not to expose, so none was added.
 

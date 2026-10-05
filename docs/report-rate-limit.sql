@@ -2,9 +2,9 @@
 -- DEVELOPMENT ACTIVITY — THE REPORT RATE LIMIT (launch-readiness; the carried open item "free-report rate limit", docs/development-activity-launch-gate-2026-10-04.md)
 --
 -- WHAT THIS IS. A per-person and per-brokerage ceiling on how many report REQUESTS may reach the expensive part of the report function (the geocoder and
--- the canonical spatial reads). It sits BESIDE the entitlement and touches none of it: the 20 free reports (public.evaluation_report_limit) and the 100 paid
+-- the canonical spatial reads). It sits BESIDE the entitlement and touches none of it: the 10 free reports (public.evaluation_report_limit) and the 100 paid
 -- reports a month (public.billing_report_limit) and the constraints and triggers that enforce them are not read, written or changed here, and the
--- post-condition at the foot of this file refuses to apply if either number is anything but 20 and 100.
+-- post-condition at the foot of this file refuses to apply if either number is anything but 10 and 100.
 --
 -- WHY IT IS NEEDED. The entitlement limits what is STORED AND CHARGED. It does not limit what is ASKED. A request that is not charged is unlimited work:
 -- "No data ingested" (today every request, because no source is cleared), an address that cannot be found, an address outside coverage, and a report the
@@ -17,7 +17,7 @@
 -- seconds until the longest-blocked window ends and which subject and window refused.
 --
 -- THE NUMBERS (public.report_rate_limits(), the ONE definition). THEY ARE PROPOSED, NOT FOUNDER-SET: nothing in the plan or the founder rulings names a
--- request ceiling (the 20 and the 100 are the only founder numbers and they are untouched). They are chosen to sit well above a person working through
+-- request ceiling (the 10 and the 100 are the only founder numbers and they are untouched). They are chosen to sit well above a person working through
 -- addresses by hand and well below a script, and they are changed in this one function. Decision D-RL-1 (docs/development-activity-launch-gate-2026-10-04.md)
 -- records that the founder may set them.
 --     person       10 a minute      60 an hour     200 a day
@@ -185,7 +185,7 @@ grant execute on function public.report_rate_check()                     to serv
 
 -- ---- 7. POST-CONDITION ----------------------------------------------------------------------------------------------------------------------
 -- Computed over every function and relation this file owns, so one added later that is open to a resident role fails here. It also refuses to leave
--- the entitlement numbers anything but the founder's (20 free, 100 paid): this file must never be the reason either changed.
+-- the entitlement numbers anything but the founder's (10 free, 100 paid): this file must never be the reason either changed.
 do $post$
 declare
   f record;
@@ -209,7 +209,7 @@ begin
   end loop;
   if (select count(*) from public.report_rate_limits()) <> 6 then raise exception 'report_rate_limit: the limits are not the six this file defines'; end if;
   if exists (select 1 from public.report_rate_check() where kind = 'invariant' and n <> 0) then raise exception 'report_rate_limit: an invariant is not zero'; end if;
-  if public.evaluation_report_limit() <> 20 then raise exception 'report_rate_limit: the free report limit is not 20 (founder-set; this file must not change it)'; end if;
+  if public.evaluation_report_limit() <> 10 then raise exception 'report_rate_limit: the free report limit is not 10 (founder-set; this file must not change it)'; end if;
   if public.billing_report_limit() <> 100 then raise exception 'report_rate_limit: the paid monthly limit is not 100 (founder-set; this file must not change it)'; end if;
 end
 $post$;

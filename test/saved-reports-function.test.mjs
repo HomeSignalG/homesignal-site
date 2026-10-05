@@ -21,8 +21,8 @@ const { DataUnavailable } = await import('../supabase/functions/_shared/service-
 const UID = 'a1111111-1111-4111-8111-111111111111';
 const R1 = 'c0000000-0000-4000-8000-000000000001', R2 = 'c0000000-0000-4000-8000-000000000002';
 const CTX1 = 'd0000000-0000-4000-8000-000000000001', CTX2 = 'd0000000-0000-4000-8000-000000000002';
-const ACTIVE = { status: 'active', credits_used: 2, credits_remaining: 18, expired: false };
-const COMPLETE = { status: 'complete', credits_used: 20, credits_remaining: 0, expired: false };
+const ACTIVE = { status: 'active', credits_used: 2, credits_remaining: 8, expired: false };
+const COMPLETE = { status: 'complete', credits_used: 10, credits_remaining: 0, expired: false };
 const STORED = { coverage: { state: 'COVERED' }, activity: { outcome: 'DEVELOPMENT_SHOWN' }, projects: [], sections: {} };
 const ROWS = [
   { report_id: R2, number: 2, generated_at: '2026-10-02T13:00:00+00:00', private_context_id: CTX2 },
@@ -73,11 +73,11 @@ let r = await ask(f.deps, { action: 'list' });
 ok(r.status === 200 && r.json.status === 'OK' && r.json.reports.length === 2, '1a an active trial member lists their brokerage\'s reports', r.json);
 f = fakes({ trialOf: async () => COMPLETE });
 r = await ask(f.deps, { action: 'list' });
-ok(r.status === 200 && r.json.reports.length === 2 && r.json.trial.status === 'complete', '1b a member of a COMPLETE trial (all 20 used) can still list them', r.json);
+ok(r.status === 200 && r.json.reports.length === 2 && r.json.trial.status === 'complete', '1b a member of a COMPLETE trial (all 10 used) can still list them', r.json);
 f = fakes({ trialOf: async () => COMPLETE });
 r = await ask(f.deps, { action: 'open', report_id: R1 });
 ok(r.status === 200 && r.json.reopened === true, '1c and open one');
-for (const [label, trial] of [['revoked', { status: 'revoked', credits_used: 3, credits_remaining: 17, expired: false }], ['expired', { status: 'active', credits_used: 3, credits_remaining: 17, expired: true }], ['none', null]]) {
+for (const [label, trial] of [['revoked', { status: 'revoked', credits_used: 3, credits_remaining: 7, expired: false }], ['expired', { status: 'active', credits_used: 3, credits_remaining: 7, expired: true }], ['none', null]]) {
   f = fakes({ trialOf: async () => trial });
   r = await ask(f.deps, { action: 'list' });
   ok(r.status === 403 && !names(f.calls).includes('savedReports'), '1d a member with a ' + label + ' trial is refused (403) and the stored reports are not read', r.json);

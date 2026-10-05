@@ -1,12 +1,12 @@
 // THE LAUNCH GATE — the structural half (Development Activity build step 13). The executable half is test/launch_gate_pg: the plan's own sequence
-// (sign-up, 20 free reports, the end of the trial, checkout, payment, a 100-report month) as ONE scenario through the real handlers and the shipped SQL.
+// (sign-up, 10 free reports, the end of the trial, checkout, payment, a 100-report month) as ONE scenario through the real handlers and the shipped SQL.
 // What it cannot see is whether it is still that: a gate that quietly stops standing on the real layers, that is answered by a stand-in for the thing it is
 // meant to test, that no longer runs in CI, or that has been made to hold a real credential would go on printing PASS. Pinned here, on COMMENT-STRIPPED
 // text and each with a positive control so a scan that matched nothing cannot pass:
 //   * the setup: refuses a database not named disposable and any credential, and applies EVERY layer the product stands on, in production order;
 //   * the round trip: imports the four REAL handlers and data layers (never a copy), answers the database only through an ALLOWLIST of functions that
 //     does not include the free evaluation's own issue function, reads no environment variable, and reaches no host but the processor's stand-in;
-//   * the scenario: the numbers the plan names (20, 100, 120, the 21st and the 101st refused) and each rule the founder's sequence rests on are asserted;
+//   * the scenario: the numbers the plan names (10, 100, 110, the 11th and the 101st refused) and each rule the founder's sequence rests on are asserted;
 //   * the wiring: it runs in CI in its own job, on node 22, against the disposable container, on every path it stands on;
 //   * the record: it says plainly what the gate does NOT prove, and the landing page's buttons are still inert.
 // Run: node test/launch-gate-structure.test.mjs
@@ -69,17 +69,17 @@ ok(/u\.origin === 'https:\/\/api\.lemonsqueezy\.com'\) return lemonStandIn\(/.te
 const LABELS = (RTRAW.match(/'(\d+[a-z]?\d?) /g) || []).map((x) => x.slice(1, -1));
 ok(LABELS.length >= 60, '3a the scenario asserts at least sixty named checks (positive control)', LABELS.length);
 const must = {
-  '3b': /twentieth report[^']*ends the trial/, '4a': /21st report is refused \(403 evaluation_complete\) and the issue function is never asked/, '5a': /agent cannot start a checkout/,
+  '3b': /tenth report[^']*ends the trial/, '4a': /11th report is refused \(403 evaluation_complete\) and the issue function is never asked/, '5a': /agent cannot start a checkout/,
   '5g': /checkout names THIS brokerage with a signature/, '6c': /test payment lets no report through/, '7a': /event with no signature is refused/, '7e': /binding cannot be borrowed/,
-  '8b': /retrying the same delivery is a duplicate/, '8e': /nobody is billed twice/, '9c': /one hundred paid reports/, '9e': /ordinals 1 to 100 with no gap, and the reports are numbered 21 to 120/,
-  '10a': /101st report is refused \(403 allotment_complete\)/, '10b': /the DATABASE refuses the 101st/, '10c': /the cap is a CONSTRAINT/, '11a': /all 120 reports/,
+  '8b': /retrying the same delivery is a duplicate/, '8e': /nobody is billed twice/, '9c': /one hundred paid reports/, '9e': /ordinals 1 to 100 with no gap, and the reports are numbered 11 to 110/,
+  '10a': /101st report is refused \(403 allotment_complete\)/, '10b': /the DATABASE refuses the 101st/, '10c': /the cap is a CONSTRAINT/, '11a': /all 110 reports/,
   '11d': /other brokerage sees none of them/, '12c': /binding_conflict/, '13b': /plan reads "canceled"/, '13d': /nothing was deleted/, '13e': /OLDER event arriving late/,
   '2d': /CARRY a plan/, '7h2': /payment notice/,
   '14a': /every billing invariant reads zero/, '14b': /controls that are not zero/, '14d': /NO table of the public schema/,
 };
 for (const [id, re] of Object.entries(must)) ok(new RegExp("'" + id + ' ').test(RTRAW) && re.test(RTRAW), '3c check ' + id + ' is present and says what the sequence needs');
-ok(/for \(let i = 2; i <= 20; i\+\+\)/.test(RT) && /for \(let i = 22; i <= 120; i\+\+\)/.test(RT) && /made === 100/.test(RT) && /count\('report_snapshot'\) === 120/.test(RT),
-  '3d the loops are the plan\'s numbers: reports 1-20 free, 21-120 paid, one hundred made, 120 stored');
+ok(/for \(let i = 2; i <= 10; i\+\+\)/.test(RT) && /for \(let i = 12; i <= 110; i\+\+\)/.test(RT) && /made === 100/.test(RT) && /count\('report_snapshot'\) === 110/.test(RT),
+  '3d the loops are the plan\'s numbers: reports 1-10 free, 11-110 paid, one hundred made, 110 stored');
 ok(/credits_remaining === 0/.test(RT) && /allotment_complete/.test(RT) && /evaluation_complete/.test(RT), '3e and both refusals (the spent trial, the spent month) are asserted');
 ok(/process\.exit\(bad \? 1 : 0\)/.test(RT) && /\(n - bad\) \+ ' passed, '/.test(RT), '3f the run exits non-zero on any failed check and prints its own summary');
 ok(/process\.on\('uncaughtException'/.test(RT) && /FAIL — the scenario stopped: /.test(RTRAW), '3g a check that throws still ends as a named failure with the summary, never a bare stack trace');
@@ -107,7 +107,7 @@ const DOC = read('docs/development-activity-launch-gate-2026-10-04.md');
 ok(DOC.length > 3000, '5a the written record exists (positive control)', DOC.length);
 ok(/NOT LIVE/.test(DOC) && /stand-in/i.test(DOC) && /(ever|never) reached Lemon Squeezy/i.test(DOC) && /No payment has been made|no payment has been made/.test(DOC),
   '5b it says plainly that the buttons are not live, the processor was a stand-in, and no payment has been made');
-ok(/field names/i.test(DOC) && /test payment/i.test(DOC) && /clearance|cleared/i.test(DOC) && /Start with 20 free reports/.test(DOC), '5c it lists what is still owed: the processor\'s field names, the founder\'s test payment, a cleared source, and what the Start button does');
+ok(/field names/i.test(DOC) && /test payment/i.test(DOC) && /clearance|cleared/i.test(DOC) && /Start with 10 free reports/.test(DOC), '5c it lists what is still owed: the processor\'s field names, the founder\'s test payment, a cleared source, and what the Start button does');
 const CHECKLIST = read('docs/development-activity-build-steps-100526.md');
 const step13 = (/\*\*End-to-end launch test[\s\S]*?(?=\n\n|\n- |\n##)/.exec(CHECKLIST) || [''])[0];
 ok(step13.length > 100 && !/^~~\*\*End-to-end/m.test(CHECKLIST), '5d step 13 is in the checklist and is NOT struck: the buttons are not live');
@@ -121,7 +121,7 @@ ok(!existsSync(join(ROOT, 'supabase/functions/lemonsqueezy-webhook')), '5f the m
 // of the section-15 marker, with a positive control that the marker was found and that section 15 has checks of its own.
 const S15 = RTRAW.indexOf('// ---- 15. THE REPORT RATE LIMIT');
 const checksIn = (t) => (stripJs(t).match(/(^|[^\w.])ok\(/g) || []).length;
-ok(S15 > 0 && checksIn(RTRAW.slice(S15)) === 13, '6a (control) section 15 is found and carries 13 checks of its own', [S15, S15 > 0 && checksIn(RTRAW.slice(S15))]);
+ok(S15 > 0 && checksIn(RTRAW.slice(S15)) === 14, '6a (control) section 15 is found and carries 14 checks of its own', [S15, S15 > 0 && checksIn(RTRAW.slice(S15))]);
 ok(S15 > 0 && checksIn(RTRAW.slice(0, S15)) === 73, '6b the original scenario, sections 1-14, is still exactly 73 checks: none was removed, merged or weakened to make room', S15 > 0 && checksIn(RTRAW.slice(0, S15)));
 ok(/report_rate_claim: \(a\) => \[asJson\("public\.report_rate_claim\(:'u'::uuid\)"\)/.test(RT) && !/report_rate_claim_at/.test(RT), '6c the round trip lets the handler reach the claim WRAPPER only: the clocked variant is not on the allowlist');
 ok(/async function ask\(userId, body, \{ limited = false \} = \{\}\) \{\s*if \(!limited\) one\('truncate public\.report_rate_window'\);/.test(RT), '6d sections 1-14 clear the limiter\'s counters before each request (they test the entitlement, far above the ceiling by design), and the clearing is opt-out');

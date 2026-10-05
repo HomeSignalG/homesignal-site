@@ -1,7 +1,7 @@
 // THE BROKERAGE TRIAL, as the edge functions reach it (Development Activity build steps 5b, 5c, 5d and 5e).
 //
 // The database owns every decision here (docs/evaluation-entitlement.sql, Order L1, and docs/brokerage-account-spine.sql, Order K0):
-// who is a member and in what role, of which evaluation, how many of the 20 reports are used, whether an invite may be redeemed, and
+// who is a member and in what role, of which evaluation, how many of the 10 reports are used, whether an invite may be redeemed, and
 // who may make one. This file only calls those functions, checks the shape of what comes back, and turns the database's refusal
 // messages into named errors. It is the ONE place an edge function names them, so the report function and the trial function cannot
 // read a trial two different ways. It also holds the one form of an invite link (5d).
@@ -145,7 +145,7 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
 
     /**
      * The brokerage's stored reports, newest first (build step 6): public.evaluation_reports_of, which reads the caller's own brokerage's
-     * ledger through the one membership resolver. A person with no standing gets an empty list. At most the evaluation's 20 reports exist.
+     * ledger through the one membership resolver. A person with no standing gets an empty list. At most the evaluation's 10 reports exist.
      */
     async savedReports(userId: string): Promise<SavedReport[]> {
       const { data, error } = await rpc('evaluation_reports_of', { p_user_id: userId });

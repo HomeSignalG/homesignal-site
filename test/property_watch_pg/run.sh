@@ -47,29 +47,31 @@ fp_deps() { P -tA -c "select md5(
 n_mine() { P -tA -c "select (select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace and $FN) + (select count(*) from pg_class where relnamespace = 'public'::regnamespace and relname like 'property\\_watch%' and relkind = 'r')"; }
 
 # ---- the real-session scenarios (they build their own population) ---------------------------------------------------------
-U8='a0000000-0000-4000-8000-000000000008'; U9='a0000000-0000-4000-8000-000000000009'
+U8='a0000000-0000-4000-8000-000000000008'; U9='a0000000-0000-4000-8000-000000000009'; U12='a0000000-0000-4000-8000-000000000012'
 fox_report() { P -tA -c "select c.report_id from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Fox Company' and c.ordinal = $1"; }
 scenarios() {
   P -c "delete from public.property_watch" >/dev/null
-  # Fox: the owner watches 20 reports, the agent 4: 24 of the 25 places are taken
+  # Fox: the owner watches 10 reports, one agent 10 and a second agent 4: 24 of the 25 places are taken
   P -c "do \$\$ declare n int; r uuid; begin
-          for n in 1..20 loop select c.report_id into r from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Fox Company' and c.ordinal = n;
+          for n in 1..10 loop select c.report_id into r from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Fox Company' and c.ordinal = n;
             perform public.evaluation_property_watch_start('$U8', r); end loop;
+          for n in 1..10 loop select c.report_id into r from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Fox Company' and c.ordinal = n;
+            perform public.evaluation_property_watch_start('$U9', r); end loop;
           for n in 1..4 loop select c.report_id into r from public.evaluation_credit c join public.evaluation e on e.evaluation_id = c.evaluation_id join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Fox Company' and c.ordinal = n;
-            perform public.evaluation_property_watch_start('$U9', r); end loop; end \$\$" >/dev/null
+            perform public.evaluation_property_watch_start('$U12', r); end loop; end \$\$" >/dev/null
   local r5 r6 r7 r8; r5="$(fox_report 5)"; r6="$(fox_report 6)"; r7="$(fox_report 7)"; r8="$(fox_report 8)"
   local o1 o2; o1="$(mktemp)"; o2="$(mktemp)"
   # session 1 takes the 25th place and holds its transaction open; session 2 asks for a different report while that is uncommitted
   ( P -tA -f - >"$o1" 2>&1 <<SQL
 begin;
-select 'won' from public.evaluation_property_watch_start('$U9', '$r5');
+select 'won' from public.evaluation_property_watch_start('$U12', '$r5');
 select pg_sleep(2.5);
 commit;
 SQL
   ) &
   local bg=$!
   sleep 0.8
-  P -tA -c "select 'won' from public.evaluation_property_watch_start('$U9', '$r6')" >"$o2" 2>&1 || true
+  P -tA -c "select 'won' from public.evaluation_property_watch_start('$U12', '$r6')" >"$o2" 2>&1 || true
   wait "$bg" || true
   local total w1 w2; total="$(P -tA -c "select count(*) from public.property_watch")"
   w1="$(grep -c '^won$' "$o1" || true)"; w2="$(grep -c '^won$' "$o2" || true)"
@@ -80,20 +82,20 @@ SQL
   fi
   rm -f "$o1" "$o2"
   # make room for one, then two sessions start the SAME watch at once: there is ONE row, and the second is told it was already watching
-  P -c "select public.evaluation_property_watch_stop('$U9', (select watch_id from public.property_watch where user_id = '$U9' and report_id = '$r5'))" >/dev/null
+  P -c "select public.evaluation_property_watch_stop('$U12', (select watch_id from public.property_watch where user_id = '$U12' and report_id = '$r5'))" >/dev/null
   o1="$(mktemp)"; o2="$(mktemp)"
   ( P -tA -f - >"$o1" 2>&1 <<SQL
 begin;
-select 'started=' || started from public.evaluation_property_watch_start('$U9', '$r7');
+select 'started=' || started from public.evaluation_property_watch_start('$U12', '$r7');
 select pg_sleep(2.5);
 commit;
 SQL
   ) &
   bg=$!
   sleep 0.8
-  P -tA -c "select 'started=' || started from public.evaluation_property_watch_start('$U9', '$r7')" >"$o2" 2>&1 || true
+  P -tA -c "select 'started=' || started from public.evaluation_property_watch_start('$U12', '$r7')" >"$o2" 2>&1 || true
   wait "$bg" || true
-  local rows; rows="$(P -tA -c "select count(*) from public.property_watch where user_id = '$U9' and report_id = '$r7'")"
+  local rows; rows="$(P -tA -c "select count(*) from public.property_watch where user_id = '$U12' and report_id = '$r7'")"
   if grep -q '^started=true$' "$o1" && grep -q '^started=false$' "$o2" && [ "$rows" = "1" ]; then
     echo "SAME_WATCH|t|two sessions started the same watch at once: one made it, the other was told it was already watching, and there is one row"
   else
@@ -104,7 +106,7 @@ SQL
   local before rc after; before="$(P -tA -c "select count(*) from public.property_watch")"
   rc="$(psql -X -q -v ON_ERROR_STOP=0 -v VERBOSITY=verbose -tA 2>&1 <<SQL
 begin isolation level repeatable read;
-select * from public.evaluation_property_watch_start('$U9', '$r8');
+select * from public.evaluation_property_watch_start('$U12', '$r8');
 rollback;
 SQL
 )"

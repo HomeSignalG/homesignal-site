@@ -22,7 +22,7 @@
 --
 -- THE INVARIANTS, by constraint and trigger (not by convention)
 --   * A user holds at most ONE ACTIVE membership (partial unique index). An invite therefore cannot mint a
---     second 20-report pool for the same person (plan Hard Rules 38-39). A deactivated row does not block
+--     second 10-report pool for the same person (plan Hard Rules 38-39). A deactivated row does not block
 --     re-joining, here or elsewhere. (Default D-K1.)
 --   * role is exactly owner | agent; membership status is exactly active | deactivated; brokerage status is
 --     exactly active | suspended | closed. (D-K2, D-K6.)

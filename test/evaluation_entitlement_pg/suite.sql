@@ -1,16 +1,16 @@
 -- =====================================================================================
 -- EVALUATION ENTITLEMENT — EXECUTABLE ADVERSARIAL SUITE  (docs/evaluation-entitlement.sql)
 --
--- Order L1 of the Development Activity plan: the database layer of the 20-report brokerage evaluation. Four tables
+-- Order L1 of the Development Activity plan: the database layer of the 10-report brokerage evaluation. Four tables
 -- (evaluation, evaluation_invite, evaluation_credit, evaluation_event) and the functions that mint, redeem and revoke a hashed invite
--- and issue a report atomically against a 20-credit pool shared by the members of one brokerage account (public.brokerage_account,
+-- and issue a report atomically against a 10-credit pool shared by the members of one brokerage account (public.brokerage_account,
 -- Order K0). This suite stands on the REAL account spine, the REAL private-context layer and the REAL snapshot writer, applied unmutated.
 -- It proves the posture (empty, unreadable by anon, authenticated and service_role, reached only through system-only functions), the
 -- invite (only a hash is stored; one-time; bound to a user id; one generic refusal), the pool (shared by every member, never changed by
--- a member or an invite), the quota (the 21st report is refused, by function AND by constraint), idempotency (a retried key returns
+-- a member or an invite), the quota (the 11th report is refused, by function AND by constraint), idempotency (a retried key returns
 -- the stored report and charges nothing), atomicity (a refusal by the snapshot costs no credit), isolation (non-members, removed
 -- members and ended evaluations are refused identically) and privacy (nothing an agent typed reaches any new table).
--- What only two real sessions can prove (the 20th credit, the same key, one token, one seat, REPEATABLE READ) is in run.sh.
+-- What only two real sessions can prove (the 10th credit, the same key, one token, one seat, REPEATABLE READ) is in run.sh.
 -- Every expected answer is a HARD-CODED constant, never computed by the code under test. The suite runs as the table owner; refusals for
 -- the API roles are asked AS those roles (SET ROLE).
 -- Output: one row per check (check, pass, detail); a NULL pass is stored as FALSE.
@@ -226,7 +226,7 @@ evaluation_one_per_brokerage=UNIQUE (brokerage_id)
 evaluation_revoked=CHECK (((status = 'revoked'::text) = (revoked_at IS NOT NULL)))
 evaluation_status=CHECK ((status = ANY (ARRAY['active'::text, 'complete'::text, 'revoked'::text])))$e$,
   null);
-select pg_temp._ck('Z04 exactly seven triggers exist on the four tables: the ledger and the log are append-only for row and truncate; the evaluation and the invite have a guard; the 20th ledger row flips the status AFTER INSERT',
+select pg_temp._ck('Z04 exactly seven triggers exist on the four tables: the ledger and the log are append-only for row and truncate; the evaluation and the invite have a guard; the 10th ledger row flips the status AFTER INSERT',
   (select string_agg(t.tgname || ':' || c.relname || ':' || case when (t.tgtype & 2) = 2 then 'before' else 'after' end || ':' ||
                      case when (t.tgtype & 1) = 1 then 'row' else 'statement' end || ':' ||
                      concat_ws('+', case when (t.tgtype & 4) = 4 then 'insert' end, case when (t.tgtype & 8) = 8 then 'delete' end,
@@ -485,72 +485,72 @@ select pg_temp._run('alpha and beta issue', $x$do $d$ begin
   perform pg_temp._iss('a6', 3, 6);
   perform pg_temp._iss('b1', 4, 1); perform pg_temp._iss('b2', 5, 2);
 end $d$$x$);
-select pg_temp._ck('L03a the owner and two agents of ONE brokerage share ONE pool: Alpha issued 6 reports between its three people with ordinals 1..6 in order and credits used 1..6 (remaining 19..14), and each of the three reads the same evaluation with the same 6 used, 14 remaining, limit 20',
+select pg_temp._ck('L03a the owner and two agents of ONE brokerage share ONE pool: Alpha issued 6 reports between its three people with ordinals 1..6 in order and credits used 1..6 (remaining 9..4), and each of the three reads the same evaluation with the same 6 used, 4 remaining, limit 10',
   (select count(*) = 6 and pg_temp.all_t(err is null and not replayed)
           and string_agg(ord::text, ',' order by label) = '1,2,3,4,5,6' and string_agg(used::text, ',' order by label) = '1,2,3,4,5,6'
-          and string_agg(remaining::text, ',' order by label) = '19,18,17,16,15,14' from _i where label ~ '^a[1-6]$')
+          and string_agg(remaining::text, ',' order by label) = '9,8,7,6,5,4' from _i where label ~ '^a[1-6]$')
   and (select count(*) = 6 from public.evaluation_credit where evaluation_id = pg_temp._ev('alpha'))
   and (select count(*) = 3 and count(distinct u.evaluation_id) = 1 and min(u.credits_used) = 6 and max(u.credits_used) = 6
-          and min(u.credits_remaining) = 14 and max(u.credits_remaining) = 14 and min(u.credit_limit) = 20 and max(u.credit_limit) = 20 and min(u.status) = 'active' and max(u.status) = 'active'
+          and min(u.credits_remaining) = 4 and max(u.credits_remaining) = 4 and min(u.credit_limit) = 10 and max(u.credit_limit) = 10 and min(u.status) = 'active' and max(u.status) = 'active'
         from generate_series(1, 3) n cross join lateral public.evaluation_usage(pg_temp._u(n)) u),
   (select string_agg(label || '=' || coalesce(err, ord::text), '; ' order by label) from _i where label ~ '^a[1-6]$'));
 select pg_temp._run('alpha extras', $$select pg_temp._mintv('a-x1', 'alpha', 'agent', 1)$$);
 select pg_temp._run('alpha extras 2', $$select pg_temp._mintv('a-x2', 'alpha', 'agent', 1)$$);
 select pg_temp._run('alpha extras 3', $$select pg_temp._mintv('a-x3', 'alpha', 'owner')$$);
 select pg_temp._run('alpha extra member', $$select pg_temp._rdm('a-j23', (select token from _v where label = 'a-x1'), 23)$$);
-select pg_temp._ck('L03b a FOURTH member and three more invites change NOTHING about the pool: still 6 ledger rows, still ONE evaluation for the brokerage, the new member reads the same 6 used / 14 remaining / limit 20, and no credit row was created by a mint or a redeem',
+select pg_temp._ck('L03b a FOURTH member and three more invites change NOTHING about the pool: still 6 ledger rows, still ONE evaluation for the brokerage, the new member reads the same 6 used / 4 remaining / limit 10, and no credit row was created by a mint or a redeem',
   (select count(*) = 6 from public.evaluation_credit where evaluation_id = pg_temp._ev('alpha'))
   and (select count(*) = 1 from public.evaluation where brokerage_id = pg_temp._bk('alpha'))
   and (select count(*) = 4 from public.brokerage_member where brokerage_id = pg_temp._bk('alpha') and status = 'active')
   and (select err is null and role = 'agent' from _rd where label = 'a-j23')
-  and (select credits_used = 6 and credits_remaining = 14 and credit_limit = 20 and evaluation_id = pg_temp._ev('alpha') from public.evaluation_usage(pg_temp._u(23))),
+  and (select credits_used = 6 and credits_remaining = 4 and credit_limit = 10 and evaluation_id = pg_temp._ev('alpha') from public.evaluation_usage(pg_temp._u(23))),
   (select err from _rd where label = 'a-j23'));
 select pg_temp._ck('L03c two brokerages do not share a pool: Beta used 2 while Alpha used 6, each ledger row carries only its own evaluation, and a person who is nobody sees no evaluation at all',
   (select count(*) = 2 and pg_temp.all_t(used between 1 and 2) from _i where label in ('b1', 'b2'))
   and (select count(*) = 2 from public.evaluation_credit where evaluation_id = pg_temp._ev('beta'))
-  and (select credits_used = 2 and credits_remaining = 18 from public.evaluation_usage(pg_temp._u(4)))
+  and (select credits_used = 2 and credits_remaining = 8 from public.evaluation_usage(pg_temp._u(4)))
   and (select credits_used = 2 from public.evaluation_usage(pg_temp._u(5)))
   and (select count(*) = 0 from public.evaluation_usage(pg_temp._u(10)))
   and (select count(*) = 0 from public.evaluation_usage(null)),
   null);
 
--- ---- L04  the quota: twenty, and the 21st is refused ---------------------------------------------------------------------------------
-select pg_temp._run('quota 20', $x$do $d$ begin for n in 1..20 loop perform pg_temp._iss('q' || n, 9, 100 + n); end loop; end $d$$x$);
-select pg_temp._run('before the 21st', $$create temp table _q0 as select (select count(*) from public.report_snapshot) as snaps,
+-- ---- L04  the quota: ten, and the 11th is refused ---------------------------------------------------------------------------------
+select pg_temp._run('quota 10', $x$do $d$ begin for n in 1..10 loop perform pg_temp._iss('q' || n, 9, 100 + n); end loop; end $d$$x$);
+select pg_temp._run('before the 11th', $$create temp table _q0 as select (select count(*) from public.report_snapshot) as snaps,
   (select count(*) from public.report_private_context) as ctxs, (select count(*) from public.evaluation_event where evaluation_id = pg_temp._ev('quota')) as evs$$);
-select pg_temp._run('quota 21', $$select pg_temp._iss('q21', 9, 121)$$);
-select pg_temp._ck('L04a twenty DISTINCT keys all succeed: ordinals 1..20 in order, credits used 1..20, remaining 19..0, twenty different reports',
-  (select count(*) = 20 and pg_temp.all_t(err is null and not replayed) and count(distinct report_id) = 20
-          and string_agg(ord::text, ',' order by substring(label from 2)::int) = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20'
-          and string_agg(remaining::text, ',' order by substring(label from 2)::int) = '19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0'
-     from _i where label ~ '^q([1-9]|1[0-9]|20)$'),
-  (select string_agg(label || '=' || coalesce(err, ord::text), '; ') from _i where label ~ '^q([1-9]|1[0-9]|20)$' and err is not null));
-select pg_temp._ck('L04b the 21st key is REFUSED with EVALUATION_COMPLETE (EV002) and costs nothing: 20 ledger rows, no 21st snapshot, no new private context, no new event; the reader says complete, 20 used, 0 remaining',
-  (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'q21')
-  and (select count(*) = 20 from public.evaluation_credit where evaluation_id = pg_temp._ev('quota'))
+select pg_temp._run('quota 11', $$select pg_temp._iss('q11', 9, 121)$$);
+select pg_temp._ck('L04a ten DISTINCT keys all succeed: ordinals 1..10 in order, credits used 1..10, remaining 9..0, ten different reports',
+  (select count(*) = 10 and pg_temp.all_t(err is null and not replayed) and count(distinct report_id) = 10
+          and string_agg(ord::text, ',' order by substring(label from 2)::int) = '1,2,3,4,5,6,7,8,9,10'
+          and string_agg(remaining::text, ',' order by substring(label from 2)::int) = '9,8,7,6,5,4,3,2,1,0'
+     from _i where label ~ '^q([1-9]|10)$'),
+  (select string_agg(label || '=' || coalesce(err, ord::text), '; ') from _i where label ~ '^q([1-9]|10)$' and err is not null));
+select pg_temp._ck('L04b the 11th key is REFUSED with EVALUATION_COMPLETE (EV002) and costs nothing: 10 ledger rows, no 11th snapshot, no new private context, no new event; the reader says complete, 10 used, 0 remaining',
+  (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'q11')
+  and (select count(*) = 10 from public.evaluation_credit where evaluation_id = pg_temp._ev('quota'))
   and (select snaps = (select count(*) from public.report_snapshot) and ctxs = (select count(*) from public.report_private_context)
              and evs = (select count(*) from public.evaluation_event where evaluation_id = pg_temp._ev('quota')) from _q0)
-  and (select status = 'complete' and credits_used = 20 and credits_remaining = 0 and credit_limit = 20 from public.evaluation_usage(pg_temp._u(9))),
-  (select err from _i where label = 'q21'));
-select pg_temp._ck('L04c the status flips to complete at the 20th credit and not before: active on the first nineteen results, complete on the twentieth, and exactly ONE completed event was written',
-  (select count(*) = 19 and pg_temp.all_t(st = 'active') from _i where label ~ '^q([1-9]|1[0-9])$')
-  and (select st = 'complete' from _i where label = 'q20')
+  and (select status = 'complete' and credits_used = 10 and credits_remaining = 0 and credit_limit = 10 from public.evaluation_usage(pg_temp._u(9))),
+  (select err from _i where label = 'q11'));
+select pg_temp._ck('L04c the status flips to complete at the 10th credit and not before: active on the first nine results, complete on the tenth, and exactly ONE completed event was written',
+  (select count(*) = 9 and pg_temp.all_t(st = 'active') from _i where label ~ '^q[1-9]$')
+  and (select st = 'complete' from _i where label = 'q10')
   and (select status = 'complete' from public.evaluation where evaluation_id = pg_temp._ev('quota'))
   and (select count(*) = 1 from public.evaluation_event where evaluation_id = pg_temp._ev('quota') and kind = 'completed'),
-  (select string_agg(label || '=' || st, ',' order by substring(label from 2)::int) from _i where label ~ '^q([1-9]|1[0-9]|20)$'));
-select pg_temp._do('d-21',  format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 21, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(900), pg_temp._snap()));
-select pg_temp._do('d-20',  format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 20, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(901), pg_temp._snap()));
+  (select string_agg(label || '=' || st, ',' order by substring(label from 2)::int) from _i where label ~ '^q([1-9]|10)$'));
+select pg_temp._do('d-11',  format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 11, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(900), pg_temp._snap()));
+select pg_temp._do('d-10',  format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 10, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(901), pg_temp._snap()));
 select pg_temp._do('d-0',   format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 0, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(902), pg_temp._snap()));
 select pg_temp._do('d-neg', format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, -1, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(903), pg_temp._snap()));
 select pg_temp._do('d-100', format($$insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (%L, 100, %L, %L)$$, pg_temp._ev('quota'), pg_temp._k(904), pg_temp._snap()));
-select pg_temp._ck('L04d the cap holds BY CONSTRAINT, for a writer that bypasses the function: a 21st ordinal, ordinal 0, a negative one and 100 are refused by the ordinal CHECK, a second row for ordinal 20 by the primary key, and the ledger still has 20 rows',
-  (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-21') and (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-0')
+select pg_temp._ck('L04d the cap holds BY CONSTRAINT, for a writer that bypasses the function: an 11th ordinal, ordinal 0, a negative one and 100 are refused by the ordinal CHECK, a second row for ordinal 10 by the primary key, and the ledger still has 10 rows',
+  (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-11') and (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-0')
   and (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-neg') and (select result like '23514:%evaluation_credit_ordinal%' from _w where label = 'd-100')
-  and (select result like '23505:%evaluation_credit_pkey%' from _w where label = 'd-20')
-  and (select count(*) = 20 from public.evaluation_credit where evaluation_id = pg_temp._ev('quota')),
+  and (select result like '23505:%evaluation_credit_pkey%' from _w where label = 'd-10')
+  and (select count(*) = 10 from public.evaluation_credit where evaluation_id = pg_temp._ev('quota')),
   (select string_agg(label || '=' || result, '; ') from _w where label like 'd-%'));
-select pg_temp._ck('L04e the number is defined ONCE: evaluation_report_limit() is 20, and the ledger''s ordinal CHECK is written in terms of it',
-  public.evaluation_report_limit() = 20
+select pg_temp._ck('L04e the number is defined ONCE: evaluation_report_limit() is 10, and the ledger''s ordinal CHECK is written in terms of it',
+  public.evaluation_report_limit() = 10
   and (select pg_get_constraintdef(oid) from pg_constraint where conname = 'evaluation_credit_ordinal') like '%evaluation_report_limit()%'
   and (select pg_get_constraintdef(oid) from pg_constraint where conname = 'evaluation_credit_ordinal') like '%ordinal >= 1%',
   (select pg_get_constraintdef(oid) from pg_constraint where conname = 'evaluation_credit_ordinal'));
@@ -563,23 +563,23 @@ select pg_temp._run('replays', $x$do $d$ begin
   perform pg_temp._iss('a1-again', 1, 1);                 -- the same person retries
   perform pg_temp._iss('a1-by-2', 2, 1);                  -- another member of the same evaluation presents the same key
   perform pg_temp._iss('b1-again', 4, 1);                 -- Beta used the SAME uuid as Alpha for its own first report
-  perform pg_temp._iss('q20-again', 9, 120);              -- the 20th, after the evaluation is complete
+  perform pg_temp._iss('q10-again', 9, 110);              -- the 10th, after the evaluation is complete
   perform pg_temp._iss('q1-again', 9, 101);
-  perform pg_temp._iss('q22', 9, 122);                    -- a NEW key on a complete evaluation
+  perform pg_temp._iss('q12', 9, 122);                    -- a NEW key on a complete evaluation
   perform pg_temp._iss('a1-diff', 1, 1, '{"address":"999 Other Road"}'::jsonb, '{"different":true}');   -- same key, different content
 end $d$$x$);
 select pg_temp._ck('L05a the same key twice returns the SAME report: replayed = true, the same report_id and ordinal, and nothing was charged or stored: still 6 ledger rows for Alpha, no new snapshot, no new private context, no new event',
-  (select err is null and replayed and report_id = (select report_id from _i where label = 'a1') and ord = 1 and used = 6 and remaining = 14 from _i where label = 'a1-again')
+  (select err is null and replayed and report_id = (select report_id from _i where label = 'a1') and ord = 1 and used = 6 and remaining = 4 from _i where label = 'a1-again')
   and (select count(*) = 6 from public.evaluation_credit where evaluation_id = pg_temp._ev('alpha'))
   and (select count(*) = 1 from public.evaluation_credit where evaluation_id = pg_temp._ev('alpha') and idempotency_key = pg_temp._k(1))
   and (select snaps = (select count(*) from public.report_snapshot) and ctxs = (select count(*) from public.report_private_context)
              and credits = (select count(*) from public.evaluation_credit) and evs = (select count(*) from public.evaluation_event) from _s0),
   (select coalesce(err, 'replayed=' || replayed || ' used=' || used) from _i where label = 'a1-again'));
-select pg_temp._ck('L05b a retry still works on a COMPLETE evaluation: the 20th key and the 1st key return their stored reports (replayed, status complete, 0 remaining), while a NEW key is refused EVALUATION_COMPLETE',
-  (select err is null and replayed and report_id = (select report_id from _i where label = 'q20') and ord = 20 and used = 20 and remaining = 0 and st = 'complete' from _i where label = 'q20-again')
+select pg_temp._ck('L05b a retry still works on a COMPLETE evaluation: the 10th key and the 1st key return their stored reports (replayed, status complete, 0 remaining), while a NEW key is refused EVALUATION_COMPLETE',
+  (select err is null and replayed and report_id = (select report_id from _i where label = 'q10') and ord = 10 and used = 10 and remaining = 0 and st = 'complete' from _i where label = 'q10-again')
   and (select err is null and replayed and report_id = (select report_id from _i where label = 'q1') and ord = 1 from _i where label = 'q1-again')
-  and (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'q22'),
-  (select string_agg(label || '=' || coalesce(err, 'ok'), '; ') from _i where label in ('q20-again', 'q1-again', 'q22')));
+  and (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'q12'),
+  (select string_agg(label || '=' || coalesce(err, 'ok'), '; ') from _i where label in ('q10-again', 'q1-again', 'q12')));
 select pg_temp._ck('L05c a key is bound to ONE evaluation: Alpha and Beta both used the same uuid for their first report and got two different reports and two different credits; Beta presenting it again gets BETA''s report, never Alpha''s',
   (select report_id is not null from _i where label = 'a1') and (select report_id is not null from _i where label = 'b1')
   and (select report_id <> (select report_id from _i where label = 'b1') from _i where label = 'a1')
@@ -623,7 +623,7 @@ select pg_temp._ck('L06a a snapshot REFUSED by the containment trigger (the addr
   and (select credits = (select count(*) from public.evaluation_credit) and snaps = (select count(*) from public.report_snapshot)
              and ctxs = (select count(*) from public.report_private_context) and evs = (select count(*) from public.evaluation_event)
              and needs = (select count(*) from public.report_private_context_need) from _a0)
-  and (select credits_used = 6 and credits_remaining = 14 from public.evaluation_usage(pg_temp._u(1))),
+  and (select credits_used = 6 and credits_remaining = 4 from public.evaluation_usage(pg_temp._u(1))),
   (select err from _i where label = 'leak'));
 select pg_temp._ck('L06b every other refusal by the snapshot layer is atomic too: a wrong content hash (23514, the hash CHECK), an unknown private field (22023) and a context with no address (23514) each leave no ledger row, no snapshot, no context',
   (select err like '23514:%report_snapshot_hash_matches_body%' from _i where label = 'badhash')
@@ -633,8 +633,8 @@ select pg_temp._ck('L06b every other refusal by the snapshot layer is atomic too
              and ctxs = (select count(*) from public.report_private_context) from _a0),
   (select string_agg(label || '=' || coalesce(err, 'ok'), '; ') from _i where label in ('badhash', 'badctx', 'noaddr')));
 select pg_temp._run('retry after refusal', $$select pg_temp._iss('leak-retry', 1, 90)$$);
-select pg_temp._ck('L06c the credit was NOT lost: the key of the refused call is not burned, so the same key with a clean body succeeds as ordinal 7 (credits used 7, remaining 13), not replayed',
-  (select err is null and not replayed and ord = 7 and used = 7 and remaining = 13 from _i where label = 'leak-retry'),
+select pg_temp._ck('L06c the credit was NOT lost: the key of the refused call is not burned, so the same key with a clean body succeeds as ordinal 7 (credits used 7, remaining 3), not replayed',
+  (select err is null and not replayed and ord = 7 and used = 7 and remaining = 3 from _i where label = 'leak-retry'),
   (select coalesce(err, 'ord=' || ord) from _i where label = 'leak-retry'));
 select pg_temp._ck('L06d every stored snapshot is a credit: across all the refusals and replays above, the snapshots the suite did not write directly equal the ledger rows (control: the suite did write some directly)',
   (select count(*) > 0 from _direct)
@@ -694,7 +694,7 @@ select pg_temp._ck('L08d a REVOKED evaluation is refused for everyone: a new key
   and (select status = 'revoked' and revoked_at is not null and revoked_at <= now() from public.evaluation where evaluation_id = pg_temp._ev('delta'))
   and (select count(*) = 1 from public.evaluation_event where evaluation_id = pg_temp._ev('delta') and kind = 'revoked')
   and (select count(*) = 1 from public.evaluation_credit where evaluation_id = pg_temp._ev('delta'))
-  and (select status = 'revoked' and credits_used = 1 and credits_remaining = 19 from public.evaluation_usage(pg_temp._u(11)))
+  and (select status = 'revoked' and credits_used = 1 and credits_remaining = 9 from public.evaluation_usage(pg_temp._u(11)))
   and (select result like '55000:%' from _w where label = 'delta to active') and (select result like '55000:%' from _w where label = 'delta to complete')
   and (select result = 'EV003: NOT_ENTITLED' from _w where label = 'delta revoke unknown'),
   (select string_agg(label || '=' || val, '; ') from _b where label like 'delta%'));
@@ -839,7 +839,7 @@ select pg_temp._do('g-rekey', format($$update public.evaluation set brokerage_id
 select pg_temp._do('g-redate', format($$update public.evaluation set created_at = now() - interval '1 year' where evaluation_id = %L$$, pg_temp._ev('alpha')));
 select pg_temp._do('g-delete', format($$delete from public.evaluation where evaluation_id = %L$$, pg_temp._ev('alpha')));
 select pg_temp._do('g-stamp', format($$update public.evaluation set status = 'revoked', revoked_at = now() - interval '3 years' where evaluation_id = %L$$, pg_temp._ev('scratch4')));
-select pg_temp._ck('L04f the evaluation is a state machine the table enforces: a complete one cannot become active, an active one with fewer than 20 credits cannot be marked complete (complete means every credit is used), its identity cannot change, it is never deleted (all 55000); and a revoked_at a caller supplies is overwritten by the database clock',
+select pg_temp._ck('L04f the evaluation is a state machine the table enforces: a complete one cannot become active, an active one with fewer than 10 credits cannot be marked complete (complete means every credit is used), its identity cannot change, it is never deleted (all 55000); and a revoked_at a caller supplies is overwritten by the database clock',
   (select count(*) = 5 and pg_temp.all_t(result like '55000:%') from _w where label in ('g-reactivate', 'g-early-complete', 'g-rekey', 'g-redate', 'g-delete'))
   and (select result = 'ok' from _w where label = 'g-stamp')
   and (select status = 'revoked' and revoked_at > now() - interval '1 minute' from public.evaluation where evaluation_id = pg_temp._ev('scratch4'))
@@ -919,13 +919,13 @@ select pg_temp._ck('L11a no column is a counter: the only integer columns are th
   and (select count(*) = 0 from information_schema.columns where table_schema = 'public' and table_name like 'evaluation%'
          and column_name ~* '(used|remain|balance|counter|count|total|quota|credits|spent|left)'),
   null);
-select pg_temp._ck('L11b the reader answers from the ledger, after replays and refusals: for EVERY active member, credits used = the ledger rows of their evaluation and remaining = 20 minus that; and the hard-coded figures hold: Alpha 7, Beta 4, Gamma 2, Quota 20, Delta 1 (revoked), Foxtrot 2, Hotel 2',
-  (select count(*) > 8 and pg_temp.all_t(u.credits_used = (select count(*) from public.evaluation_credit c where c.evaluation_id = u.evaluation_id) and u.credits_remaining = 20 - u.credits_used)
+select pg_temp._ck('L11b the reader answers from the ledger, after replays and refusals: for EVERY active member, credits used = the ledger rows of their evaluation and remaining = 10 minus that; and the hard-coded figures hold: Alpha 7, Beta 4, Gamma 2, Quota 10, Delta 1 (revoked), Foxtrot 2, Hotel 2',
+  (select count(*) > 8 and pg_temp.all_t(u.credits_used = (select count(*) from public.evaluation_credit c where c.evaluation_id = u.evaluation_id) and u.credits_remaining = 10 - u.credits_used)
      from public.brokerage_member m cross join lateral public.evaluation_usage(m.user_id) u where m.status = 'active')
-  and (select credits_used = 7 and credits_remaining = 13 from public.evaluation_usage(pg_temp._u(1)))
+  and (select credits_used = 7 and credits_remaining = 3 from public.evaluation_usage(pg_temp._u(1)))
   and (select credits_used = 4 from public.evaluation_usage(pg_temp._u(4)))
   and (select credits_used = 2 from public.evaluation_usage(pg_temp._u(6)))
-  and (select credits_used = 20 and credits_remaining = 0 from public.evaluation_usage(pg_temp._u(9)))
+  and (select credits_used = 10 and credits_remaining = 0 from public.evaluation_usage(pg_temp._u(9)))
   and (select credits_used = 1 and status = 'revoked' from public.evaluation_usage(pg_temp._u(11)))
   and (select credits_used = 2 from public.evaluation_usage(pg_temp._u(13)))
   and (select count(*) = 2 from public.evaluation_credit where evaluation_id = pg_temp._ev('hotel')),
@@ -1020,7 +1020,7 @@ select pg_temp._run('dirty complete b', format($$update public.evaluation set st
 select pg_temp._run('dirty complete c', $$alter table public.evaluation enable trigger evaluation_guard_trg$$);
 select pg_temp._run('dirty full a', $$alter table public.evaluation_credit disable trigger evaluation_credit_complete_trg$$);
 select pg_temp._run('dirty full b', $x$do $d$ begin
-  for n in 1..20 loop
+  for n in 1..10 loop
     insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values (pg_temp._ev('scratch1'), n, pg_temp._k(960 + n), pg_temp._snap());
   end loop;
 end $d$$x$);
@@ -1035,13 +1035,33 @@ select pg_temp._ck('L11d the audit DETECTS what it is for: an evaluation marked 
 select pg_temp._run('dirty issues', $x$do $d$ begin perform pg_temp._iss('dirty-full', 20, 990); perform pg_temp._iss('dirty-complete', 22, 991); end $d$$x$);
 select pg_temp._ck('L04i the function reads the LEDGER and the STATUS, each on its own: an evaluation whose ledger is full but whose status still says active (scratch1), and one whose status says complete with an empty ledger (scratch3), are BOTH refused EVALUATION_COMPLETE and charge nothing',
   (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'dirty-full') and (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'dirty-complete')
-  and (select count(*) = 20 from public.evaluation_credit where evaluation_id = pg_temp._ev('scratch1'))
+  and (select count(*) = 10 from public.evaluation_credit where evaluation_id = pg_temp._ev('scratch1'))
   and (select count(*) = 0 from public.evaluation_credit where evaluation_id = pg_temp._ev('scratch3')),
   (select string_agg(label || '=' || coalesce(err, 'ok'), '; ') from _i where label like 'dirty-%'));
-select pg_temp._ck('L04h the status flip is a TRIGGER on the 20th ledger row, whoever writes it: with the trigger switched off the 20th row left the evaluation active (the audit sees it, L11d), and with it on (everywhere else in this suite) the same row completed it',
-  (select status = 'active' and (select count(*) = 20 from public.evaluation_credit c where c.evaluation_id = e.evaluation_id) from public.evaluation e where e.evaluation_id = pg_temp._ev('scratch1'))
+select pg_temp._ck('L04h the status flip is a TRIGGER on the 10th ledger row, whoever writes it: with the trigger switched off the 10th row left the evaluation active (the audit sees it, L11d), and with it on (everywhere else in this suite) the same row completed it',
+  (select status = 'active' and (select count(*) = 10 from public.evaluation_credit c where c.evaluation_id = e.evaluation_id) from public.evaluation e where e.evaluation_id = pg_temp._ev('scratch1'))
   and (select count(*) = 1 from pg_trigger where tgname = 'evaluation_credit_complete_trg' and tgenabled = 'O'),
   null);
+
+-- ---- L13  USAGE ALREADY MADE UNDER THE OLD LIMIT IS PRESERVED, AND REMAINING NEVER GOES BELOW ZERO (founder, 2026-10-05: 20 -> 10) --------------------
+-- The only way to hold more than ten ledger rows is to have made them while the limit was higher, so that is exactly what this builds: the limit is
+-- put back to 20 for twelve reports and then set to 10 again. No row is edited; the ledger is only ever appended to.
+select pg_temp._run('mk legacy', $$select pg_temp._mk('legacy', 'Legacy Brokerage')$$);
+select pg_temp._run('legacy owner', $$select pg_temp._rdm('lg-own', (select token from _t where label = 'legacy'), 25)$$);
+select pg_temp._run('legacy limit 20', $q$create or replace function public.evaluation_report_limit() returns integer language sql immutable as $f$ select 20 $f$$q$);
+select pg_temp._run('legacy issues', $x$do $d$ begin for n in 1..12 loop perform pg_temp._iss('lg' || n, 25, 1000 + n); end loop; end $d$$x$);
+select pg_temp._run('legacy limit 10', $q$create or replace function public.evaluation_report_limit() returns integer language sql immutable as $f$ select 10 $f$$q$);
+select pg_temp._run('legacy after', $x$do $d$ begin
+  perform pg_temp._iss('lg13', 25, 1013);                 -- a NEW key: no free report is granted past the limit
+  perform pg_temp._iss('lg5-again', 25, 1005);            -- a retried key still returns its stored report
+end $d$$x$);
+select pg_temp._ck('L13a a brokerage that had already used 12 under the old limit keeps all 12 (nothing edited or deleted) and reads 0 remaining, never -2; a NEW report is refused EVALUATION_COMPLETE and no free report is granted; a retried key still returns its stored report, also with 0 remaining',
+  (select count(*) = 12 from public.evaluation_credit where evaluation_id = pg_temp._ev('legacy'))
+  and (select credits_used = 12 and credits_remaining = 0 and credit_limit = 10 from public.evaluation_usage(pg_temp._u(25)))
+  and (select err = 'EV002: EVALUATION_COMPLETE' from _i where label = 'lg13')
+  and (select err is null and replayed and used = 12 and remaining = 0 from _i where label = 'lg5-again')
+  and (select count(*) = 12 from public.evaluation_credit where evaluation_id = pg_temp._ev('legacy')),
+  (select string_agg(label || '=' || coalesce(err, 'used ' || used || ' remaining ' || remaining), '; ') from _i where label in ('lg13', 'lg5-again')));
 
 select pg_temp._ck('S01 every setup step in this suite ran without raising (a step that raises is a regression in the code under test, reported here instead of ending the run)',
   not exists (select 1 from _setup where result <> 'ok') and (select count(*) >= 60 from _setup),

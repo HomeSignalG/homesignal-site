@@ -14,7 +14,7 @@
    DEVELOPMENT ACTIVITY — THE CUSTOMER PAGE (build step 5c of
    docs/development-activity-build-steps-100526.md).
 
-   For people a brokerage has invited to its 20-report trial. Not in navigation,
+   For people a brokerage has invited to its free trial (the size of the allowance is the database's, not this page's). Not in navigation,
    not in the sitemap, noindex, disallowed in robots.txt: it is reached from an
    invite link (development-activity-reports.html#invite=hse1_…), and the token
    rides in the URL FRAGMENT, which the browser never sends to any server. The
@@ -318,6 +318,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
   var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
+  // the size of the free allowance, as the database reports it: used + remaining, from the trial answer. This page holds no number of its own, so the
+  // allowance can change in ONE place (the database's free-report limit) and the words follow. Unknown until the first trial answer arrives.
+  var freeLimit = null;
+  function freeLimitFrom(trial){ if (trial && typeof trial.credits_used === 'number' && typeof trial.credits_remaining === 'number') freeLimit = trial.credits_used + trial.credits_remaining; }
+  function freeWords(){ return freeLimit === null ? 'free reports' : freeLimit + ' free reports'; }
   var plan = null, checkoutState = null, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
@@ -406,17 +411,18 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function oneOf(){ return isPaid() ? 'one of your reports' : 'a free report'; }
   function showTrial(a, trial, note){
     access = a;
+    freeLimitFrom(trial);
     var count = $('trial-count'), sub = $('trial-sub');
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
       count.textContent = left === 1 ? '1 free report left' : left + ' free reports left';
-      sub.textContent = "Your brokerage's trial includes 20 reports, shared by everyone on it. A report with no development data for its area (“No data ingested”) does not use one.";
+      sub.textContent = "Your brokerage's trial includes " + (freeLimit === null ? 'a set number of' : freeLimit) + " reports, shared by everyone on it. A report with no development data for its area (“No data ingested”) does not use one.";
     } else if (a === 'admin') {
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
     } else if (a === 'complete') {
-      count.textContent = 'All 20 free reports are used'; count.className = 'count out';
+      count.textContent = 'All ' + freeWords() + ' are used'; count.className = 'count out';
       sub.textContent = "Your brokerage's free trial is complete.";
     } else if (a === 'ended') {
       count.textContent = 'This trial has ended'; count.className = 'count out';
@@ -467,12 +473,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (plan.state === 'paid') {
       var end = monthEndWords();
       p.textContent = '$79/month plan: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
-      sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your brokerage's 20 free reports, which are kept as they were.";
+      sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your brokerage's " + freeWords() + ", which are kept as they were.";
       return;
     }
     if (plan.state === 'none' || plan.state === 'test_only') {
       p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : 'Free trial used');
-      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : "Your brokerage's 20 free reports are separate from the plan.") + offer + who + closed;
+      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : "Your brokerage's " + freeWords() + " are separate from the plan.") + offer + who + closed;
     } else if (plan.state === 'canceled') {
       p.className = 'plan out'; p.textContent = 'Your subscription has ended';
       sub.textContent = 'Your saved reports stay available. Subscribe again for 100 new reports each month.' + who + closed;
@@ -1056,7 +1062,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       return (body.limited_by === 'brokerage' ? 'Your brokerage has asked for a lot of reports in a short time.' : 'You have asked for a lot of reports in a short time.')
         + ' Try again in ' + waitWords(body.retry_after_seconds) + '. This did not use ' + oneOf() + '.';
     }
-    if (httpStatus === 403 && body.error === 'evaluation_complete') return "All 20 of your brokerage's free reports are used.";
+    if (httpStatus === 403 && body.error === 'evaluation_complete') return freeLimit === null ? "All of your brokerage's free reports are used." : "All " + freeLimit + " of your brokerage's free reports are used.";
     if (httpStatus === 403 && body.error === 'allotment_complete') return "All 100 of your brokerage's reports for this month are used.";
     if (httpStatus === 403) return 'This account cannot make reports right now.';
     if (httpStatus === 409) return 'That report could not be made. Try again.';

@@ -193,7 +193,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await page.check('input[name="view"][value="customer"]');
   await make(page);
   await settle(page);
-  ok(W_CLEARED.credit.uses_report === true && (await page.textContent('#creditnote')) === 'For a trial customer, this report would use one of the 20 free reports (development shown).'
+  ok(W_CLEARED.credit.uses_report === true && (await page.textContent('#creditnote')) === 'For a trial customer, this report would use one of the free reports (development shown).'
     && !(await sections(page)).includes('No data ingested'), '3d once a source is cleared, a report that shows development would use one free report, and has no outcome notice', await page.textContent('#creditnote'));
   await ctx.close();
 }

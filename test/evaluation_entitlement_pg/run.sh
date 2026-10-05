@@ -2,8 +2,8 @@
 # Executable suite for the evaluation entitlement (docs/evaluation-entitlement.sql) against a DISPOSABLE Postgres (never production).
 # 1. the shipped SQL passes every check of the suite, standing on the REAL account spine, private-context layer and snapshot writer;
 # 2. REAL concurrent sessions: two issues serialise and both succeed; the last credit goes to exactly one of two callers; the same key
-#    from two callers is one credit; a member removed while their call waits is refused; thirty callers race for twenty credits and exactly twenty win; one token and one seat go to one person;
-#    and at REPEATABLE READ and SERIALIZABLE a writer that BYPASSES the functions still cannot put a 21st row in the ledger (the cap is a
+#    from two callers is one credit; a member removed while their call waits is refused; thirty callers race for ten credits and exactly ten win; one token and one seat go to one person;
+#    and at REPEATABLE READ and SERIALIZABLE a writer that BYPASSES the functions still cannot put an 11th row in the ledger (the cap is a
 #    constraint, not a lock);
 # 3. the token hash stored is the SHA-256 that an independent tool (sha256sum) computes from the token;
 # 4. it applies twice with an identical result;
@@ -75,13 +75,13 @@ race_next() {
 race_last() {
   local u e t k1 k2 s0
   u="$(uid 2 1)"; add_user "$u"; read -r e t <<<"$(mk_eval 'Race Last')"; join_owner "$u" "$t"
-  P -c "do \$\$ begin for n in 1..19 loop perform public.evaluation_report_issue('$u', md5('rl' || n)::uuid, '{\"n\":1}', encode(sha256(convert_to('{\"n\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null); end loop; end \$\$" >/dev/null
+  P -c "do \$\$ begin for n in 1..9 loop perform public.evaluation_report_issue('$u', md5('rl' || n)::uuid, '{\"n\":1}', encode(sha256(convert_to('{\"n\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null); end loop; end \$\$" >/dev/null
   k1="$(uid 2 101)"; k2="$(uid 2 102)"; s0="$(snaps)"
   holder s1 "$(issue_sql "$u" "$k1" 1)"
   wait_hold s1 || { wait; echo "    the holding session never reached its sleep"; return 1; }
   P -tA -c "$(issue_sql "$u" "$k2" 2)" >"$tmp/s2.out" 2>&1 || true
   wait
-  if grep -q '^20,20,complete,false,' "$tmp/s1.out" && grep -q 'EVALUATION_COMPLETE' "$tmp/s2.out" && [ "$(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'")" = "20" ] \
+  if grep -q '^10,10,complete,false,' "$tmp/s1.out" && grep -q 'EVALUATION_COMPLETE' "$tmp/s2.out" && [ "$(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'")" = "10" ] \
      && [ "$(status_of "$e")" = "complete" ] && [ "$(( $(snaps) - s0 ))" = "1" ]; then return 0; fi
   echo "    the last credit should go to exactly one caller; ledger $(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'") rows, status $(status_of "$e"); s1: $(grep -v -e BEGIN -e COMMIT "$tmp/s1.out" | head -c 120); s2: $(head -c 200 "$tmp/s2.out")"; return 1
 }
@@ -98,7 +98,7 @@ race_same_key() {
   if [ -n "$r1" ] && [ "$r1" = "$r2" ] && [ "$(ords "$e")" = "1" ] && [ "$(( $(snaps) - s0 ))" = "1" ]; then return 0; fi
   echo "    the same key twice should be one credit and one report; ledger '$(ords "$e")'; s1: $(grep -v -e BEGIN -e COMMIT "$tmp/s1.out" | head -c 120); s2: $(head -c 200 "$tmp/s2.out")"; return 1
 }
-# 4. a storm: thirty callers, twenty credits. Exactly twenty win, ten are told EVALUATION_COMPLETE, the ledger is 1..20, and no refused call stored a snapshot
+# 4. a storm: thirty callers, ten credits. Exactly ten win, twenty are told EVALUATION_COMPLETE, the ledger is 1..10, and no refused call stored a snapshot
 race_storm() {
   local u e t s0 n won full
   u="$(uid 4 1)"; add_user "$u"; read -r e t <<<"$(mk_eval 'Race Storm')"; join_owner "$u" "$t"; s0="$(snaps)"
@@ -107,8 +107,8 @@ race_storm() {
   done
   wait
   won="$(grep -lE '^[0-9]+,[0-9]+,(active|complete),(true|false),' "$tmp"/st*.out | wc -l)"; full="$(grep -l 'EVALUATION_COMPLETE' "$tmp"/st*.out | wc -l)"
-  if [ "$won" = "20" ] && [ "$full" = "10" ] && [ "$(ords "$e")" = "$(seq -s, 1 20)" ] && [ "$(status_of "$e")" = "complete" ] && [ "$(( $(snaps) - s0 ))" = "20" ]; then return 0; fi
-  echo "    30 callers for 20 credits: $won won, $full refused as complete, ledger '$(ords "$e")', status $(status_of "$e"), snapshots +$(( $(snaps) - s0 )); a sample refusal: $(grep -h -v -E '^[0-9]+,[0-9]+,' "$tmp"/st*.out | sort | uniq -c | head -3 | tr '\n' ' ')"; return 1
+  if [ "$won" = "10" ] && [ "$full" = "20" ] && [ "$(ords "$e")" = "$(seq -s, 1 10)" ] && [ "$(status_of "$e")" = "complete" ] && [ "$(( $(snaps) - s0 ))" = "10" ]; then return 0; fi
+  echo "    30 callers for 10 credits: $won won, $full refused as complete, ledger '$(ords "$e")', status $(status_of "$e"), snapshots +$(( $(snaps) - s0 )); a sample refusal: $(grep -h -v -E '^[0-9]+,[0-9]+,' "$tmp"/st*.out | sort | uniq -c | head -3 | tr '\n' ' ')"; return 1
 }
 # 5. ONE token, two people: the second waits, then is told it cannot be used
 race_redeem_token() {
@@ -173,35 +173,35 @@ race_mint_while_revoking() {
   echo "    a mint during a revocation must wait and then be refused; invites now $(P -tA -c "select count(*) from public.evaluation_invite where evaluation_id = '$e'"); s2: $(head -c 200 "$tmp/s2.out")"; return 1
 }
 # 8. the cap is a CONSTRAINT: at REPEATABLE READ and SERIALIZABLE, writers that BYPASS the function (their count of the ledger is stale by construction)
-#    still cannot make a 21st row, nor two rows of one ordinal
+#    still cannot make an 11th row, nor two rows of one ordinal
 race_constraint() {
   local lvl="$1" u e t s1 s2 s3 out2 out3 n
   n=$([ "$lvl" = "repeatable read" ] && echo 8 || echo 9)
   u="$(uid $n 1)"; add_user "$u"; read -r e t <<<"$(mk_eval "Race Constraint $lvl")"; join_owner "$u" "$t"
-  P -c "do \$\$ begin for n in 1..19 loop perform public.evaluation_report_issue('$u', md5('rc$lvl' || n)::uuid, '{\"n\":1}', encode(sha256(convert_to('{\"n\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null); end loop; end \$\$" >/dev/null
+  P -c "do \$\$ begin for n in 1..9 loop perform public.evaluation_report_issue('$u', md5('rc$lvl' || n)::uuid, '{\"n\":1}', encode(sha256(convert_to('{\"n\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null); end loop; end \$\$" >/dev/null
   s1="$(P -tA -c "select report_id from public.report_snapshot_issue('{\"d\":1}', encode(sha256(convert_to('{\"d\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null)")"
   s2="$(P -tA -c "select report_id from public.report_snapshot_issue('{\"d\":2}', encode(sha256(convert_to('{\"d\":2}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null)")"
   s3="$(P -tA -c "select report_id from public.report_snapshot_issue('{\"d\":3}', encode(sha256(convert_to('{\"d\":3}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null)")"
-  holder s1 "select count(*) from public.evaluation_credit where evaluation_id = '$e'; insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 20, md5('first')::uuid, '$s1')" "$lvl"
+  holder s1 "select count(*) from public.evaluation_credit where evaluation_id = '$e'; insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 10, md5('first')::uuid, '$s1')" "$lvl"
   wait_hold s1 || { wait; echo "    the holding session never reached its sleep"; return 1; }
-  out2="$(psql -X -q -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -tA -c "begin isolation level $lvl; select count(*) from public.evaluation_credit where evaluation_id = '$e'; select pg_sleep(1.2); insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 20, md5('second')::uuid, '$s2'); commit" 2>&1 || true)"
+  out2="$(psql -X -q -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -tA -c "begin isolation level $lvl; select count(*) from public.evaluation_credit where evaluation_id = '$e'; select pg_sleep(1.2); insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 10, md5('second')::uuid, '$s2'); commit" 2>&1 || true)"
   wait
-  out3="$(psql -X -q -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -tA -c "begin isolation level $lvl; insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 21, md5('third')::uuid, '$s3'); commit" 2>&1 || true)"
-  if [ "$(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'")" = "20" ] && [ "$(ords "$e")" = "$(seq -s, 1 20)" ] && [ "$(status_of "$e")" = "complete" ] \
+  out3="$(psql -X -q -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -tA -c "begin isolation level $lvl; insert into public.evaluation_credit (evaluation_id, ordinal, idempotency_key, report_id) values ('$e', 11, md5('third')::uuid, '$s3'); commit" 2>&1 || true)"
+  if [ "$(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'")" = "10" ] && [ "$(ords "$e")" = "$(seq -s, 1 10)" ] && [ "$(status_of "$e")" = "complete" ] \
      && grep -qE '23505|40001' <<<"$out2" && grep -q '23514' <<<"$out3" && grep -q 'evaluation_credit_ordinal' <<<"$out3"; then return 0; fi
-  echo "    at $lvl: ledger $(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'") rows, status $(status_of "$e"); the second writer: $(head -c 200 <<<"$out2"); the 21st: $(head -c 200 <<<"$out3")"; return 1
+  echo "    at $lvl: ledger $(P -tA -c "select count(*) from public.evaluation_credit where evaluation_id = '$e'") rows, status $(status_of "$e"); the second writer: $(head -c 200 <<<"$out2"); the 11th: $(head -c 200 <<<"$out3")"; return 1
 }
-# 9. what holding the evaluation lock costs: one call through the REAL writer, 20 times
+# 9. what holding the evaluation lock costs: one call through the REAL writer, 10 times
 lock_hold() {
   local u e t out mx
   u="$(uid 10 1)"; add_user "$u"; read -r e t <<<"$(mk_eval 'Lock Hold')"; join_owner "$u" "$t"
   out="$(P -c "do \$\$ declare t0 timestamptz; mx numeric := 0; tot numeric := 0; d numeric; begin
-      for n in 1..20 loop
+      for n in 1..10 loop
         t0 := clock_timestamp();
         perform public.evaluation_report_issue('$u', md5('lh' || n)::uuid, '{\"n\":1}', encode(sha256(convert_to('{\"n\":1}', 'UTF8')), 'hex'), 'engine-v1', '{}'::jsonb, null);
         d := extract(epoch from clock_timestamp() - t0) * 1000; tot := tot + d; if d > mx then mx := d; end if;
       end loop;
-      raise notice 'LOCK-HOLD max_ms=% avg_ms=%', round(mx, 2), round(tot / 20, 2);
+      raise notice 'LOCK-HOLD max_ms=% avg_ms=%', round(mx, 2), round(tot / 10, 2);
     end \$\$" 2>&1 || true)"
   mx="$(sed -n 's/.*max_ms=\([0-9.]*\) .*/\1/p' <<<"$out" | head -1)"
   [ -n "$mx" ] || { echo "    could not measure the lock hold: $out"; return 1; }
@@ -302,8 +302,8 @@ n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
 if [ "$n_all" -lt 75 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped evaluation entitlement does not pass"; exit 1; fi
 if ! races; then echo "FAIL — a concurrent scenario did not give the promised answer"; exit 1; fi
-echo "CONCURRENT: two issues serialise (ordinals 1 and 2); the last credit goes to one caller; one key is one credit; 30 callers win exactly 20 credits; one token and one seat go to one person; a member removed while waiting is refused; a mint during a revocation waits and is refused"
-echo "ISOLATION: at REPEATABLE READ and SERIALIZABLE a writer that bypasses the functions still cannot add a 21st ledger row or repeat an ordinal (the cap is a constraint)"
+echo "CONCURRENT: two issues serialise (ordinals 1 and 2); the last credit goes to one caller; one key is one credit; 30 callers win exactly 10 credits; one token and one seat go to one person; a member removed while waiting is refused; a mint during a revocation waits and is refused"
+echo "ISOLATION: at REPEATABLE READ and SERIALIZABLE a writer that bypasses the functions still cannot add an 11th ledger row or repeat an ordinal (the cap is a constraint)"
 if ! lock_hold; then echo "FAIL — the evaluation lock is held too long (or could not be measured)"; exit 1; fi
 if ! hash_check; then echo "FAIL — the stored hash is not the SHA-256 of the token"; exit 1; fi
 echo "TOKEN HASH: the hash stored for a minted token equals what sha256sum computes from it, and the token is 69 characters of hse1_ and hex"

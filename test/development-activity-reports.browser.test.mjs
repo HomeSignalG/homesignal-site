@@ -84,7 +84,7 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
   const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
     watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false };
-  const state = () => (w.trial === null ? null : { status: w.used >= 20 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 20 - w.used, expired: false });
+  const state = () => (w.trial === null ? null : { status: w.used >= 10 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 10 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
     ...gate,
@@ -161,9 +161,9 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     },
     addressOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return m ? m.address : null; },
   });
-  const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 20 - w.used, evaluation_status: w.used >= 20 ? 'complete' : 'active', allotment: 'trial', period_ends_at: null });
+  const credit = () => ({ ordinal: w.used, credits_used: w.used, credits_remaining: 10 - w.used, evaluation_status: w.used >= 10 ? 'complete' : 'active', allotment: 'trial', period_ends_at: null });
   const PAID_END = '2026-11-04T12:00:00+00:00';
-  const paidCredit = () => ({ ordinal: 20 + w.paidUsed, credits_used: w.paidUsed, credits_remaining: 100 - w.paidUsed, evaluation_status: 'paid', allotment: 'paid', period_ends_at: PAID_END });
+  const paidCredit = () => ({ ordinal: 10 + w.paidUsed, credits_used: w.paidUsed, credits_remaining: 100 - w.paidUsed, evaluation_status: 'paid', allotment: 'paid', period_ends_at: PAID_END });
   // the plan, as public.billing_usage answers it for this brokerage (null when the person belongs to none)
   const usage = () => (w.trial === null ? null : { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: w.role, state: w.plan, credit_limit: 100,
     credits_used: w.plan === 'paid' ? w.paidUsed : 0, credits_remaining: w.plan === 'paid' ? 100 - w.paidUsed : 0, period_ends_at: w.plan === 'paid' ? PAID_END : null });
@@ -196,12 +196,12 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     storedReport: async (id) => { for (const m of w.made.values()) if (m.id === id) return JSON.stringify(m.report); return null; },
     // saved reports (build step 6): the stored reports of this brokerage, newest first; the database shows nothing without standing
     savedReports: async () => {
-      if (w.trial !== 'active' && w.used < 20) return [];
+      if (w.trial !== 'active' && w.used < 10) return [];
       const rows = [...w.made.entries()].map(([key, m], i) => ({ report_id: m.id, number: i + 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key }));
       return w.listFails ? (() => { throw new RH.DataUnavailable('x'); })() : rows.reverse();
     },
     openSavedReport: async (_u, id) => {
-      if (w.trial !== 'active' && w.used < 20) return null;
+      if (w.trial !== 'active' && w.used < 10) return null;
       let n = 0;
       for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { report_id: m.id, number: n, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key, body: JSON.stringify(m.report) }; }
       return null;
@@ -321,8 +321,8 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await waitCount(page, /free reports left/);
   ok(trials.length === 1 && trials[0].body.action === 'redeem' && trials[0].body.token === TOKEN && trials[0].auth === 'Bearer user-token',
     '1d after sign-in the page redeems the invite once, with the person\'s own token', trials.map((t) => t.body));
-  ok(w.redeemed === 1 && /^20 free reports left$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
-    '1e the panel says the person joined and has 20 free reports left', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
+  ok(w.redeemed === 1 && /^10 free reports left$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
+    '1e the panel says the person joined and has 10 free reports left', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   ok((await page.evaluate(() => sessionStorage.getItem('hs-da-invite'))) === null, '1f the per-tab invite slot is emptied once the invite has been used');
   ok(!(await page.$eval('#go', (b) => b.disabled)), '1g "Make report" is offered');
   ok(errors.length === 0 && foreign.length === 0, '1h no page error, and nothing fetched but the page, its libraries, the sign-in stand-in and the two functions', { errors, foreign });
@@ -333,8 +333,8 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world({ used: 3 });
   const { ctx, page, errors, reports, foreign } = await open({ w });
-  await waitCount(page, /^17 free reports left$/);
-  ok(/^17 free reports left$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 17 left');
+  await waitCount(page, /^7 free reports left$/);
+  ok(/^7 free reports left$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 7 left');
   await page.waitForTimeout(200);
   ok(trialsOf(page).length === 1, '2a2 the trial is read once, though the sign-in library reports the session twice on load (getSession and INITIAL_SESSION)', trialsOf(page).length);
   await make(page);
@@ -343,14 +343,14 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '2b one request, with the person\'s token, the customer view and a random v4 key, and nothing else', reports.map((r) => r.body));
   ok(w.used === 4 && (await page.$$('#report .da-rv-sec')).length > 0 && /used 1 of your brokerage/.test(await text(page, '#creditnote')),
     '2c a report that shows development is drawn and says it used one free report', await text(page, '#creditnote'));
-  ok(/^16 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 16 left, from the report function\'s own count');
+  ok(/^6 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
   // a fresh world with nothing cleared: a "No data ingested" report
   await ctx.close();
   const w2 = world({ used: 4, rights: RIGHTS_NONE });
   const o2 = await open({ w: w2 });
-  await waitCount(o2.page, /^16 free reports left$/);
+  await waitCount(o2.page, /^6 free reports left$/);
   await make(o2.page);
-  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^16 free reports left$/.test(await text(o2.page, '#trial-count')),
+  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^6 free reports left$/.test(await text(o2.page, '#trial-count')),
     '2e a "No data ingested" report says it used nothing, and the count stays', [await text(o2.page, '#creditnote'), await text(o2.page, '#trial-count')]);
   // the empty-source state on the launch test location (Brigham City, UT 84302), read off the page the way a person sees it: a plain answer, not a failure
   const hero = await o2.page.$eval('#report .da-rv-sec--outcome', (e) => ({ title: e.querySelector('.da-rv-h2').textContent.trim(), body: e.querySelector('.da-rv-outcome-p').textContent.trim() })).catch(() => null);
@@ -390,7 +390,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const w = world({ used: 0 });
   let lost = 0;
   const { ctx, page, reports } = await open({ w, lose: () => lost++ === 0 }); // the server charges the first request, but its answer never arrives
-  await waitCount(page, /^20 free reports left$/);
+  await waitCount(page, /^10 free reports left$/);
   await make(page);
   ok(/could not be reached/.test(await text(page, '#status')) && /will not use a second free report/.test(await text(page, '#status')),
     '3a a lost answer says so, and says pressing again will not use a second free report');
@@ -398,8 +398,8 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
   ok(reports.length === 2 && reports[0].body.idempotency_key === reports[1].body.idempotency_key, '3b pressing again for the same address resends the SAME key', reports.map((r) => r.body.idempotency_key));
   ok(w.used === 1 && /the report you already made for this address/.test(await text(page, '#creditnote')) && /did not use another/.test(await text(page, '#creditnote'))
-     && /^19 free reports left$/.test(await text(page, '#trial-count')),
-    '3c the server had already charged the first request: the retry gets that same report, says it used no second one, and 19 are left', [w.used, await text(page, '#creditnote')]);
+     && /^9 free reports left$/.test(await text(page, '#trial-count')),
+    '3c the server had already charged the first request: the retry gets that same report, says it used no second one, and 9 are left', [w.used, await text(page, '#creditnote')]);
   await make(page, OTHER);
   ok(reports.length === 3 && reports[2].body.idempotency_key !== reports[1].body.idempotency_key && V4.test(reports[2].body.idempotency_key) && w.used === 2,
     '3d a new address gets a new key, and is a new report');
@@ -420,12 +420,12 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   for (const [rate, re, what] of cases) {
     const w = world({ used: 4 });
     const { ctx, page, reports, errors, foreign } = await open({ w });
-    await waitCount(page, /^16 free reports left$/);
+    await waitCount(page, /^6 free reports left$/);
     w.rate = rate;
     await make(page);
     const st = await page.$eval('#status', (e) => ({ text: e.textContent.trim(), err: e.classList.contains('err') }));
     ok(re.test(st.text) && st.err, '3x ' + what + ': the page says so in plain words and shows it as a refusal', st);
-    ok(w.used === 4 && /^16 free reports left$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 16 free reports left', [w.used, await text(page, '#trial-count')]);
+    ok(w.used === 4 && /^6 free reports left$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 6 free reports left', [w.used, await text(page, '#trial-count')]);
     ok(reports.length === 1 && (await page.$$('#report .da-rv-sec')).length === 0, '3x ' + what + ': one request was sent and no report is drawn', [reports.length, (await page.$$('#report .da-rv-sec')).length]);
     const shown = await text(page, 'main');
     ok(!/\b429\b|rate_limited|retry_after/.test(shown), '3x ' + what + ': no status code, error code or field name is shown to the person', shown.slice(0, 200));
@@ -436,19 +436,19 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // when the window has passed, the very same page makes the report
   const w = world({ used: 4 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^16 free reports left$/);
+  await waitCount(page, /^6 free reports left$/);
   w.rate = { retryAfterSeconds: 5, limitedBy: 'user', windowSeconds: 60 };
   await make(page);
   w.rate = null;
   await page.click('#go');
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
-  ok(w.used === 5 && /^15 free reports left$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 15 left', [w.used]);
+  ok(w.used === 5 && /^5 free reports left$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 5 left', [w.used]);
   await ctx.close();
 }
 
 // ---- 4. who may make reports, in plain words -----------------------------------------------------------------------------------------------
 for (const [label, w, count, disabled] of [
-  ['a used-up trial', world({ used: 20 }), /All 20 free reports are used/, true],
+  ['a used-up trial', world({ used: 10 }), /All 10 free reports are used/, true],
   ['no trial', world({ trial: null }), /not part of a trial/, true],
   ['a revoked trial', world({ trial: 'revoked' }), /trial has ended/, true],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/, false],
@@ -479,11 +479,11 @@ for (const [label, w, count, disabled] of [
   await ctx.close();
 }
 {
-  const w = world({ used: 19 });
+  const w = world({ used: 9 });
   const { ctx, page } = await open({ w });
   await waitCount(page, /^1 free report left$/);
   await make(page);
-  ok(w.used === 20 && /All 20 free reports are used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
+  ok(w.used === 10 && /All 10 free reports are used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
     '4h the twentieth report is shown, and the panel then says the trial is complete and stops offering reports');
   await ctx.close();
 }
@@ -505,7 +505,7 @@ for (const [label, w, count] of [
   ['an agent', world({ role: 'agent' }), /free reports left/],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/],
   ['a person with no trial', world({ trial: null, role: 'owner' }), /not part of a trial/],
-  ['an owner of a used-up trial', world({ role: 'owner', used: 20 }), /All 20 free reports are used/],
+  ['an owner of a used-up trial', world({ role: 'owner', used: 10 }), /All 10 free reports are used/],
   ['an owner of a revoked trial', world({ role: 'owner', trial: 'revoked' }), /trial has ended/],
 ]) {
   const { ctx, page, errors } = await open({ w });
@@ -516,7 +516,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner', used: 2 });
   const { ctx, page, trials, errors, foreign } = await open({ w });
-  await waitCount(page, /^18 free reports left$/);
+  await waitCount(page, /^8 free reports left$/);
   ok(await teamShown(page) && /Invite an agent/.test(await text(page, '#team-title')) && (await page.$eval('#minted', (e) => e.hidden)),
     '6b an owner of an active trial sees "Invite an agent", with no link yet');
   await page.click('#mint');
@@ -586,12 +586,12 @@ for (const [label, w, count] of [
   await ctx.close();
 }
 {
-  const w = world({ role: 'owner', used: 19 });
+  const w = world({ role: 'owner', used: 9 });
   const { ctx, page } = await open({ w });
   await waitCount(page, /^1 free report left$/);
   ok(await teamShown(page), '6n an owner with one report left is offered the card');
   await make(page);
-  ok(w.used === 20 && !(await teamShown(page)), '6o using the last free report takes the card away (no agent could make a report)');
+  ok(w.used === 10 && !(await teamShown(page)), '6o using the last free report takes the card away (no agent could make a report)');
   await ctx.close();
 }
 {
@@ -670,17 +670,17 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   }
 }
 {
-  // a trial whose 20 reports are used: the card stays, the stored reports reopen, and the page makes no new one
-  const w = world({ used: 19 });
+  // a trial whose 10 reports are used: the card stays, the stored reports reopen, and the page makes no new one
+  const w = world({ used: 9 });
   const { ctx, page, reports } = await open({ w });
   await waitCount(page, /^1 free report left$/);
   await make(page);
   await waitCount(page, /0 free reports left|used/);
   await waitRows(page, 1);
-  ok(w.used === 20 && await savedShown(page), '7n after the 20th report the card is still offered', w.used);
+  ok(w.used === 10 && await savedShown(page), '7n after the 10th report the card is still offered', w.used);
   await page.click('#saved-list button');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
-  ok(/Saved report 1/.test(await text(page, '#saved-status')) && reports.length === 1 && w.used === 20, '7o a complete trial reopens a saved report and uses nothing', await text(page, '#saved-status'));
+  ok(/Saved report 1/.test(await text(page, '#saved-status')) && reports.length === 1 && w.used === 10, '7o a complete trial reopens a saved report and uses nothing', await text(page, '#saved-status'));
   await ctx.close();
 }
 {
@@ -1228,7 +1228,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCompared(page);
   const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
   ok(opens.length === 3 && opens.every((c) => c.auth === 'Bearer user-token' && Object.keys(c.body).sort().join() === 'action,report_id' && /^[0-9a-f-]{36}$/.test(c.body.report_id)), '11h comparing opens exactly the three chosen saved reports, each with the person\'s own token and nothing in the request but the action and the report id', opens.map((c) => c.body));
-  ok(reports.length === madeBefore && w.used === usedBefore && /^17 free reports left$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 17', [reports.length, w.used, await text(page, '#trial-count')]);
+  ok(reports.length === madeBefore && w.used === usedBefore && /^7 free reports left$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 7', [reports.length, w.used, await text(page, '#trial-count')]);
   ok(/Compared 3 saved reports\. Opening them did not use a free report\./.test(await text(page, '#compare-status')), '11j the card says it compared three and that opening them used no free report');
   const t = await tableOf(page);
   ok(t.heads.join() === 'Report 3,Report 2,Report 1', '11k the columns are in the saved list\'s order, newest first, not the order they were ticked', t.heads);
@@ -1463,7 +1463,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page, errors, foreign, billingCalls, checkouts } = await open({ w });
   await waitBilling(page, /Free trial/);
   const t = await billingText(page);
-  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(t) && /20 free reports are separate from the plan/.test(t),
+  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(t) && /10 free reports are separate from the plan/.test(t),
     '12a an owner with no plan sees the Billing card: the free trial, and the $79/month offer in the landing page\'s own words (100 new reports each month, cancel anytime)', t);
   ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
     '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
@@ -1523,7 +1523,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 }
 {
   // 12i-12m. a paid brokerage: the month's reports, whose number the page shows and never works out
-  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 3 });
+  const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 3 });
   const { ctx, page, reports, errors, foreign } = await open({ w });
   await waitCount(page, /reports left this month/);
   ok(/^97 reports left this month$/.test(await text(page, '#trial-count')) && /100 new reports each month/.test(await text(page, '#trial-sub')) && /this month ends November 4, 2026/.test(await text(page, '#trial-sub')),
@@ -1533,8 +1533,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
   await make(page);
   ok(reports.length === 1 && V4.test(reports[0].body.idempotency_key), '12k2 a report made on the paid plan carries a random key, like every member report', reports.map((r) => r.body));
-  ok(w.paidUsed === 4 && w.used === 20 && /^96 reports left this month$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
-    '12l the report used one of the MONTH\'s (4 used, 96 left), the 20 free ones are untouched, and the page says which it used', [w.paidUsed, w.used, await text(page, '#trial-count'), await text(page, '#creditnote')]);
+  ok(w.paidUsed === 4 && w.used === 10 && /^96 reports left this month$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
+    '12l the report used one of the MONTH\'s (4 used, 96 left), the 10 free ones are untouched, and the page says which it used', [w.paidUsed, w.used, await text(page, '#trial-count'), await text(page, '#creditnote')]);
   ok(/\$79\/month plan: 4 of 100 reports used this month/.test(await billingText(page)), '12l2 the Billing card follows the report, from the database\'s own answer');
   // a retry of a finished paid report
   ok(foreign.length === 0 && errors.length === 0, '12m nothing else was fetched and the page raised no error', [foreign, errors]);
@@ -1542,7 +1542,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 }
 {
   // 12n-12o. a paid month that is used up
-  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 100 });
+  const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 100 });
   const { ctx, page, reports } = await open({ w });
   await waitCount(page, /All 100 reports for this month are used/);
   ok(/All 100 reports for this month are used/.test(await text(page, '#trial-count')) && await page.$eval('#trial-count', (e) => e.className === 'count out') && /November 4, 2026/.test(await text(page, '#trial-sub')),
@@ -1558,14 +1558,14 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12p-12s. a plan that is not paid never opens a used-up trial, and says what is wrong in plain words
   for (const [state, card, buy] of [['past_due', /Your subscription needs attention/, false], ['canceled', /Your subscription has ended/, true], ['unknown', /Your subscription status is not clear/, false],
     ['trialing', /Your subscription status is not clear/, false], ['test_only', /Test subscription only/, true]]) {
-    const w = world({ role: 'owner', used: 20, plan: state });
+    const w = world({ role: 'owner', used: 10, plan: state });
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
-    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /All 20 free reports are used/.test(await text(page, '#trial-count')) && reports.length === 0,
+    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /All 10 free reports are used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
   }
-  const w = world({ role: 'owner', used: 20, plan: 'canceled' });
+  const w = world({ role: 'owner', used: 10, plan: 'canceled' });
   const { ctx, page } = await open({ w });
   await waitBilling(page, /ended/);
   ok(await page.$eval('#subscribe', (e) => /^Subscribe again for \$79\/month$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again for $79/month"');
@@ -1583,7 +1583,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await waitBilling(page, /Free trial/);
   ok(/Free trial/.test(await billingText(page)) && await page.$eval('#subscribe', (e) => !e.hidden), '12u "Check again" asks again and the card follows', billingCalls.map((c) => c.body));
   // the provider has confirmed a payment: the page learns it only by asking
-  w.plan = 'paid'; w.paidUsed = 0; w.used = 20;
+  w.plan = 'paid'; w.paidUsed = 0; w.used = 10;
   await page.click('#billing-refresh');
   await waitBilling(page, /\$79\/month plan/);
   ok(/\$79\/month plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^100 reports left this month$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
@@ -1607,7 +1607,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 }
 {
   // 12v2. a different person signing in on the same tab: the first person's plan is gone in the same moment
-  const w = world({ role: 'owner', used: 20, plan: 'paid', paidUsed: 3 });
+  const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 3 });
   const { ctx, page } = await open({ w });
   await waitBilling(page, /\$79\/month plan/);
   const swap = await page.evaluate(() => {

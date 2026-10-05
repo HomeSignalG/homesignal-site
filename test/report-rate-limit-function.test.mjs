@@ -51,11 +51,11 @@ function build(over = {}) {
     zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
     hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
-    trialOf: async () => ({ status: 'active', credits_used: 3, credits_remaining: 17, expired: false }),
+    trialOf: async () => ({ status: 'active', credits_used: 3, credits_remaining: 7, expired: false }),
     planOf: async () => PLAN(),
     rateClaim: ALLOW,
     issue: async () => ({ replayed: false, report_id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', content_hash: 'h', report_version: M.REPORT_VERSION, generated_at: NOW.toISOString(),
-      private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', report: { stored: 'body' }, credit: { ordinal: 4, credits_used: 4, credits_remaining: 16, evaluation_status: 'active', allotment: 'trial', period_ends_at: null } }),
+      private_context_id: 'cccccccc-dddd-4eee-8fff-000000000000', report: { stored: 'body' }, credit: { ordinal: 4, credits_used: 4, credits_remaining: 6, evaluation_status: 'active', allotment: 'trial', period_ends_at: null } }),
     storedReport: async () => JSON.stringify({ stored: 'first', coverage: { state: 'REPORT_READY' } }),
     contextMatches: async () => 'match',
     savedReports: async () => [], openSavedReport: async () => null, subjectOf: async () => ({ address: null, label: null }),
@@ -99,7 +99,7 @@ const didWork = (calls) => WORK.filter((w) => calls.includes(w));
     '2c no work was done for it: no geocoder, no ZIP check, no canonical read, no header read, nothing issued', didWork(f.calls));
   ok(r.json?.report === undefined && r.json?.credit === undefined && r.json?.charged === undefined && r.json?.stored === undefined,
     '2d the refusal carries no report and no credit decision: a refused request is not a report', Object.keys(r.json || {}));
-  ok(r.json?.trial?.credits_used === 3 && r.json?.trial?.credits_remaining === 17 && r.json?.plan?.state === 'none', '2e it still carries the trial figures and the plan summary, so the page can keep showing them');
+  ok(r.json?.trial?.credits_used === 3 && r.json?.trial?.credits_remaining === 7 && r.json?.plan?.state === 'none', '2e it still carries the trial figures and the plan summary, so the page can keep showing them');
   ok(!r.text.includes(BKID) && !r.text.includes('Main St') && !r.text.includes('84302') && !r.text.includes('agent@example.test') && !r.text.includes(KEY),
     '2f and it names no brokerage id, no address, no ZIP, no email and no key', r.text.slice(0, 200));
   ok(r.headers.get('cache-control') === 'no-store', '2g and it is never cacheable (like every answer of this function)', r.headers.get('cache-control'));
@@ -160,7 +160,7 @@ const didWork = (calls) => WORK.filter((w) => calls.includes(w));
     r = await ask(f.deps, body);
     ok(r.status >= 400 && r.status < 500 && !f.calls.includes('rateClaim'), '4d ' + what + ' is refused before the limiter: an invalid request consumes nothing', [r.status, f.calls.includes('rateClaim')]);
   }
-  f = build({ trialOf: async () => ({ status: 'complete', credits_used: 20, credits_remaining: 0, expired: false }) });
+  f = build({ trialOf: async () => ({ status: 'complete', credits_used: 10, credits_remaining: 0, expired: false }) });
   r = await ask(f.deps, REQ);
   ok(r.status === 403 && r.json?.error === 'evaluation_complete' && !f.calls.includes('rateClaim'), '4e a spent trial is refused (403) before the limiter, so the refusal that matters is the one the person sees', [r.status, r.json?.error]);
   f = build({ planOf: async () => PLAN({ state: 'paid', credits_used: 100, credits_remaining: 0 }) });
@@ -176,7 +176,7 @@ const didWork = (calls) => WORK.filter((w) => calls.includes(w));
   const f = build();
   const r = await ask(f.deps, REQ);
   const cr = r.json?.credit;
-  ok(cr?.uses_report === true && r.json?.allotment === 'trial' && r.json?.trial?.credits_used === 4 && r.json?.trial?.credits_remaining === 16, '5a an allowed request is charged exactly as before: the free allotment, one used', r.json?.trial);
+  ok(cr?.uses_report === true && r.json?.allotment === 'trial' && r.json?.trial?.credits_used === 4 && r.json?.trial?.credits_remaining === 6, '5a an allowed request is charged exactly as before: the free allotment, one used', r.json?.trial);
   const none = build({ rights: { version: 1, cleared: [] } });
   const rn = await ask(none.deps, REQ);
   ok(rn.status === 200 && rn.json?.report?.activity?.outcome === 'NO_DATA_INGESTED' && rn.json?.charged === false && !none.calls.includes('issue') && none.calls.filter((c) => c === 'rateClaim').length === 1,
@@ -249,7 +249,7 @@ const verdict = async (data, error) => { try { return await R.makeRateReads(rpcO
   const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', rights: RIGHTS, now: () => NOW }, fetchFn);
   const handler = H.makeHandler({ ...real,
     authenticate: async () => ({ email: 'agent@example.test', id: USER }), isAdmin: async () => false,
-    trialOf: async () => ({ status: 'active', credits_used: 0, credits_remaining: 20, expired: false }), planOf: async () => PLAN() });
+    trialOf: async () => ({ status: 'active', credits_used: 0, credits_remaining: 10, expired: false }), planOf: async () => PLAN() });
   const res = await handler(new Request('https://x/functions/v1/get-development-activity-report', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(REQ) }));
   const body = await res.json().catch(() => null);
   ok(res.status === 429 && body?.error === 'rate_limited' && body?.limited_by === 'brokerage' && seen2.length === 1 && seen2[0] === '/rest/v1/rpc/report_rate_claim',

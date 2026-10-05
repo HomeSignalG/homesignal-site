@@ -1,5 +1,7 @@
 # Development Activity — build step 11: the $79 a month plan (2026-10-04)
 
+> **2026-10-05 — the free allowance is now 10, not 20 (founder).** This document records the design and the build as they were written, under 20; the number now lives in `public.evaluation_report_limit()` as 10, moved by `docs/free-report-limit-10.sql`. Read every "20" below that means the free allowance as 10, and the paid numbers (from 21) as from 11.
+
 The founder's line, unchanged: **"$79/month checkout on the existing Lemon Squeezy connection: 100 reports a month, Billing tab. Founder action:
 create the $79 product in Lemon Squeezy and make one test payment."**
 

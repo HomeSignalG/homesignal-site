@@ -203,14 +203,14 @@ export async function issueSnapshot(
 // caller decides WHETHER to call it (_shared/credit-rule.ts, founder ruling R5); this module only prepares the body exactly as issueSnapshot
 // does and reads the answer back. It names no allotment rule: the database's answer says which one was used.
 
-/** The trial's 20 reports are used up (EV002). Nothing was stored and nothing was charged. */
+/** The trial's 10 reports are used up (EV002). Nothing was stored and nothing was charged. */
 export class EvaluationComplete extends Error {}
 /** The paid month's 100 reports are used (EV010). Nothing was stored and nothing was charged. */
 export class AllotmentComplete extends Error {}
 /** The person is not an active member of an active, unexpired evaluation (EV003). Nothing was stored and nothing was charged. */
 export class NotEntitled extends Error {}
 
-/** Which allotment a report used: the free evaluation's 20 or the paid month's 100. The database says; nothing here chooses. */
+/** Which allotment a report used: the free evaluation's 10 or the paid month's 100. The database says; nothing here chooses. */
 export type Allotment = 'trial' | 'paid';
 export type EvaluationCredit = {
   ordinal: number; credits_used: number; credits_remaining: number; evaluation_status: string;

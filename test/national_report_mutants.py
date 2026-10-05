@@ -194,7 +194,7 @@ m('gate_lets_a_complete_trial_in', GATE, "  if (standing === 'complete') return 
 m('gate_ignores_expiry', GATE, "  if (t.status === 'active' && !t.expired) return 'active';", "  if (t.status === 'active') return 'active';")
 m('gate_ignores_status', GATE, "  if (t.status === 'active' && !t.expired) return 'active';", "  if (!t.expired) return 'active';")
 m('gate_trial_read_failure_admits', GATE, "  try { trial = await deps.trialOf(who.user.id); } catch { return reply(req, { error: 'unavailable' }, 502); }",
-  "  try { trial = await deps.trialOf(who.user.id); } catch { trial = { status: 'active', credits_used: 0, credits_remaining: 20, expired: false }; }")
+  "  try { trial = await deps.trialOf(who.user.id); } catch { trial = { status: 'active', credits_used: 0, credits_remaining: 10, expired: false }; }")
 m('gate_admin_check_skipped', GATE, "  if (who.admin) return { kind: 'admin' };\n", "")
 m('gate_reports_ids', GATE, "  return { status: t.status, credits_used: t.credits_used, credits_remaining: t.credits_remaining };", "  return t;")
 # build step 5c: the trial read moved to _shared/evaluation-reads.ts and the database-call helper to _shared/service-rest.ts

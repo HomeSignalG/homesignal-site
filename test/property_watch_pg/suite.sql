@@ -158,6 +158,8 @@ select pg_temp._run('own delta', $$select pg_temp._own('delta', 6)$$);
 select pg_temp._run('own echo',  $$select pg_temp._own('echo', 7)$$);
 select pg_temp._run('own fox',   $$select pg_temp._own('fox', 8)$$);
 select pg_temp._run('agent fox', $$select pg_temp._agent('fox', 9)$$);
+-- a SECOND agent: with the free allowance at ten reports, two people can hold at most twenty watches between them, so the 25-watch limit needs a third
+select pg_temp._run('agent fox 2', $$select pg_temp._agent('fox', 12)$$);
 select pg_temp._run('own hotel', $$select pg_temp._own('hotel', 10)$$);
 select pg_temp._run('agent hotel', $$select pg_temp._agent('hotel', 11)$$);
 -- person 4 belongs to no brokerage at all
@@ -179,7 +181,7 @@ select pg_temp._run('issue hotel', $x$do $d$ begin
   perform pg_temp._iss('h4', 11, 204, '{"address":"4 Hotel Row, Reno, NV 89501","latitude":39.5299,"longitude":-119.8141}');
   perform pg_temp._iss('h5', 10, 205);   -- a report with NO private context, in the same brokerage
 end $d$$x$);
-select pg_temp._run('issue fox', $x$do $d$ begin for n in 1..20 loop
+select pg_temp._run('issue fox', $x$do $d$ begin for n in 1..10 loop
   perform pg_temp._iss('f' || n, 8, 100 + n, jsonb_build_object('address', n || ' Fox Road, Boise, ID 83702', 'latitude', 43.6 + n / 1000.0, 'longitude', -116.2));
 end loop; end $d$$x$);
 
@@ -437,24 +439,26 @@ select pg_temp._ck('S03 and stoppable: the suspended brokerage''s agent stops it
   (select res = 'true' from _t where label = 't9') and pg_temp._open_follow(pg_temp._cx('e1'), pg_temp._wid('r4')::text) = 0, (select res from _t where label = 't9'));
 
 -- ---- M  the per-brokerage limit -------------------------------------------------------------------------------
-select pg_temp._run('fox 20 by owner', $x$do $d$ declare n int; begin for n in 1..20 loop perform pg_temp._st('fx' || n, pg_temp._u(8), pg_temp._rp('f' || n)); end loop; end $d$$x$);
-select pg_temp._run('fox 5 by agent', $x$do $d$ declare n int; begin for n in 1..5 loop perform pg_temp._st('fy' || n, pg_temp._u(9), pg_temp._rp('f' || n)); end loop; end $d$$x$);
-select pg_temp._st('fy6', pg_temp._u(9), pg_temp._rp('f6'));      -- the 26th
+select pg_temp._run('fox 10 by owner', $x$do $d$ declare n int; begin for n in 1..10 loop perform pg_temp._st('fx' || n, pg_temp._u(8), pg_temp._rp('f' || n)); end loop; end $d$$x$);
+select pg_temp._run('fox 10 by agent', $x$do $d$ declare n int; begin for n in 1..10 loop perform pg_temp._st('fy' || n, pg_temp._u(9), pg_temp._rp('f' || n)); end loop; end $d$$x$);
+select pg_temp._run('fox 5 by agent 2', $x$do $d$ declare n int; begin for n in 1..5 loop perform pg_temp._st('fz' || n, pg_temp._u(12), pg_temp._rp('f' || n)); end loop; end $d$$x$);
+select pg_temp._st('fz6', pg_temp._u(12), pg_temp._rp('f6'));      -- the 26th
 select pg_temp._st('fx1b', pg_temp._u(8), pg_temp._rp('f1'));     -- an existing watch, repeated AT the limit
-select pg_temp._ck('M01 a brokerage holds at most 25 watches: the 25th (counting both members) is made, the 26th is refused WATCH_LIMIT_REACHED (EV008) and stores nothing',
-  (select count(*) = 20 from _w where label ~ '^fx[0-9]+$' and err is null and started)
-  and (select count(*) = 5 from _w where label ~ '^fy[0-9]$' and err is null and started)
-  and (select err = 'EV008: WATCH_LIMIT_REACHED' from _w where label = 'fy6')
-  and (select count(*) = 25 from public.property_watch where user_id in (pg_temp._u(8), pg_temp._u(9)))
-  and not exists (select 1 from public.property_watch where user_id = pg_temp._u(9) and report_id = pg_temp._rp('f6')),
-  (select string_agg(label || '=' || coalesce(err, 'ok'), '; ' order by label) from _w where label in ('fy5', 'fy6')));
+select pg_temp._ck('M01 a brokerage holds at most 25 watches: the 25th (counting all three members) is made, the 26th is refused WATCH_LIMIT_REACHED (EV008) and stores nothing',
+  (select count(*) = 10 from _w where label ~ '^fx[0-9]+$' and err is null and started)
+  and (select count(*) = 10 from _w where label ~ '^fy[0-9]+$' and err is null and started)
+  and (select count(*) = 5 from _w where label ~ '^fz[0-9]$' and err is null and started)
+  and (select err = 'EV008: WATCH_LIMIT_REACHED' from _w where label = 'fz6')
+  and (select count(*) = 25 from public.property_watch where user_id in (pg_temp._u(8), pg_temp._u(9), pg_temp._u(12)))
+  and not exists (select 1 from public.property_watch where user_id = pg_temp._u(12) and report_id = pg_temp._rp('f6')),
+  (select string_agg(label || '=' || coalesce(err, 'ok'), '; ' order by label) from _w where label in ('fz5', 'fz6')));
 select pg_temp._ck('M02 repeating an EXISTING watch at the limit is still fine (idempotent: it adds nothing, so it does not count)',
   (select err is null and not started and watch_id = pg_temp._wid('fx1') from _w where label = 'fx1b'), (select coalesce(err, 'ok') from _w where label = 'fx1b'));
-select pg_temp._run('fox stops one', format($$select public.evaluation_property_watch_stop(%L, %L)$$, pg_temp._u(8), pg_temp._wid('fx20')));
-select pg_temp._st('fy6b', pg_temp._u(9), pg_temp._rp('f6'));
-select pg_temp._ck('M03 stopping a watch frees its place: after the owner stops one, the agent''s 26th attempt (now the 25th) is made',
-  (select err is null and started from _w where label = 'fy6b') and (select count(*) = 25 from public.property_watch where user_id in (pg_temp._u(8), pg_temp._u(9))),
-  (select coalesce(err, 'ok') from _w where label = 'fy6b'));
+select pg_temp._run('fox stops one', format($$select public.evaluation_property_watch_stop(%L, %L)$$, pg_temp._u(8), pg_temp._wid('fx10')));
+select pg_temp._st('fz6b', pg_temp._u(12), pg_temp._rp('f6'));
+select pg_temp._ck('M03 stopping a watch frees its place: after the owner stops one, the third member''s 26th attempt (now the 25th) is made',
+  (select err is null and started from _w where label = 'fz6b') and (select count(*) = 25 from public.property_watch where user_id in (pg_temp._u(8), pg_temp._u(9), pg_temp._u(12))),
+  (select coalesce(err, 'ok') from _w where label = 'fz6b'));
 
 -- the limit counts watches whose agent is CURRENTLY a member of the brokerage. Shown with the limit lowered to 3 (restored below, and Z05 checks it is
 -- byte-for-byte what the file defines): an agent who leaves keeps their rows until the job ends them, but they no longer hold the brokerage's places.
@@ -640,8 +644,8 @@ select pg_temp._ck('F05 a failure that is not a failure is refused (22023): unkn
 
 -- ---- E  end ---------------------------------------------------------------------------------------------------
 select pg_temp._run('e setup', $x$do $d$ begin
-  perform pg_temp._st('en1', pg_temp._u(8), pg_temp._rp('f10'));
-  perform pg_temp._st('en2', pg_temp._u(8), pg_temp._rp('f11'));
+  perform pg_temp._st('en1', pg_temp._u(8), pg_temp._rp('f4'));
+  perform pg_temp._st('en2', pg_temp._u(8), pg_temp._rp('f5'));
 end $d$$x$);
 create function pg_temp._en(p_label text, p_watch uuid, p_reason text) returns void language plpgsql as $$
 begin
@@ -658,14 +662,14 @@ select pg_temp._ck('E01 ending a watch removes it and closes its need (true); en
   (select res = 'true' from _x where label = 'e1') and (select res = 'false' from _x where label = 'e2')
   and (select res like '22023:%' from _x where label = 'e3') and (select res like '22023:%' from _x where label = 'e4') and (select res = 'true' from _x where label = 'e5')
   and not exists (select 1 from public.property_watch where watch_id in (pg_temp._wid('en1'), pg_temp._wid('en2')))
-  and pg_temp._open_follow(pg_temp._cx('f10'), pg_temp._wid('en1')::text) = 0 and pg_temp._open_follow(pg_temp._cx('f11'), pg_temp._wid('en2')::text) = 0,
+  and pg_temp._open_follow(pg_temp._cx('f4'), pg_temp._wid('en1')::text) = 0 and pg_temp._open_follow(pg_temp._cx('f5'), pg_temp._wid('en2')::text) = 0,
   (select string_agg(label || '=' || res, '; ' order by label) from _x where label like 'e%'));
 
 -- a batch smaller than the backlog works on the watch that has waited longest
 select pg_temp._run('c6 setup', $x$do $d$ begin
-  perform pg_temp._st('c6a', pg_temp._u(8), pg_temp._rp('f12'));
-  perform pg_temp._st('c6b', pg_temp._u(8), pg_temp._rp('f13'));
-  perform pg_temp._st('c6c', pg_temp._u(8), pg_temp._rp('f14'));
+  perform pg_temp._st('c6a', pg_temp._u(8), pg_temp._rp('f6'));
+  perform pg_temp._st('c6b', pg_temp._u(8), pg_temp._rp('f7'));
+  perform pg_temp._st('c6c', pg_temp._u(8), pg_temp._rp('f8'));
 end $d$$x$);
 select pg_temp._run('c6 schedule', format($$update public.property_watch set next_due_at = now() - interval '2 hours' where watch_id = %L;
   update public.property_watch set next_due_at = now() - interval '3 hours' where watch_id = %L;
@@ -714,7 +718,7 @@ select pg_temp._ck('V01 nothing of the private values appears in anything the wa
 select pg_temp._ck('V02 the watch layer changed no snapshot and no private VALUE: every snapshot row is byte-identical to what it was before the first watch, every context that is still active holds exactly the address, coordinates, keys and label it held, and the ONLY contexts purged are the two this suite purged on purpose (a watch never purges or edits anything)',
   (select untouched from _base) = pg_temp._untouched()
   and not exists (select 1 from public.report_private_context c join _basectx b using (context_id) where c.state = 'active' and pg_temp._ctxhash(c) <> b.h)
-  and (select count(*) = 29 from public.report_private_context c join _basectx b using (context_id) where c.state = 'active')
+  and (select count(*) = 19 from public.report_private_context c join _basectx b using (context_id) where c.state = 'active')
   and (select count(*) = 2 from public.report_private_context where state = 'purged'),
   (select count(*)::text from public.report_private_context where state = 'purged'));
 select pg_temp._ck('V03 every need the watch layer wrote is a `follow` need whose ref is a random watch id (36 characters, a uuid): no ref is, or contains, an address, a label, a name or an email',
@@ -729,7 +733,7 @@ select pg_temp._ck('V04 the private layer''s audit log still carries only kinds:
 select pg_temp._ck('S99 every setup step in this suite ran without raising (a step that raises is a regression in the code under test, reported here instead of ending the run)',
   not exists (select 1 from _setup where result <> 'ok')
   and (select count(*) = 12 from _i where report_id is not null and label in ('a1', 'a2', 'a3', 'a4', 'b1', 'g1', 'd1', 'e1', 'h1', 'h2', 'h3', 'h4'))
-  and (select count(*) = 20 from _i where report_id is not null and label ~ '^f[0-9]+$'),
+  and (select count(*) = 10 from _i where report_id is not null and label ~ '^f[0-9]+$'),
   (select string_agg(step || '=' || result, '; ') from _setup where result <> 'ok'));
 
 alter role service_role nobypassrls;

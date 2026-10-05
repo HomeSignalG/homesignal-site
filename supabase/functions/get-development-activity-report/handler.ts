@@ -13,7 +13,7 @@
 // WHETHER A REPORT USES A REPORT FROM THE ALLOTMENT is _shared/credit-rule.ts (`creditDecision`, founder ruling R5), the one owner. Every answer
 // that is a report or says why there is none carries its decision as `credit`. Only a member's report the rule charges is stored, and only
 // through public.brokerage_report_issue (via _shared/report-snapshot.ts `issueBrokerageReport`), which stores the snapshot and the credit in ONE
-// transaction, in the free evaluation's 20 or, when the brokerage's plan is paid, in the month's 100 (docs/brokerage-billing.sql: the database
+// transaction, in the free evaluation's 10 or, when the brokerage's plan is paid, in the month's 100 (docs/brokerage-billing.sql: the database
 // decides which; this file asks and reports). This function never calls the plain snapshot writer (`issueSnapshot`), so no report is stored
 // without a credit; a structural test fails if it does. A retried key returns the first report, and only if it is about the same property (D-L6).
 //
@@ -25,7 +25,7 @@
 // rule does not charge ("No data ingested", an address that cannot be found, an address outside coverage) is free work for the geocoder and the spatial
 // reads. So a signed-in member's report request takes one from the person's and the brokerage's windows (`deps.rateClaim`, the database's decision) AFTER
 // the request is validated and BEFORE the geocoder is asked, and a full window answers 429 `rate_limited` with how long to wait. A refused request consumed
-// nothing. A claim that cannot be made answers 502 and never goes on to the geocoder (fails closed). It does not touch the 20 free or the 100 paid, and it
+// nothing. A claim that cannot be made answers 502 and never goes on to the geocoder (fails closed). It does not touch the 10 free or the 100 paid, and it
 // is not applied to an admin, to the list/open reads, or to a request refused earlier (an invalid body, a spent trial).
 //
 // SAVED REPORTS (build step 6). A trial member may also LIST their brokerage's stored reports (`{ action: 'list' }`) and REOPEN one by its
@@ -175,7 +175,7 @@ export function makeHandler(deps: Deps) {
         return reply(req, { error: 'internal' }, 500);
       }
     }
-    // a trial whose 20 free reports are used can make no more unless the brokerage has paid, and a paid month whose 100 are used can make no
+    // a trial whose 10 free reports are used can make no more unless the brokerage has paid, and a paid month whose 100 are used can make no
     // more: refused here, before anything is read, geocoded or charged
     if (trial && trial.complete && !paid) return reply(req, { error: 'evaluation_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);
     if (trial && paid && plan!.credits_remaining <= 0) return reply(req, { error: 'allotment_complete', trial: trialSummary(trial.trial), ...planInfo }, 403);

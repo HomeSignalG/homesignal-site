@@ -27,7 +27,7 @@ const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++
 
 const UID = 'a1111111-1111-4111-8111-111111111111';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
-const ACTIVE = { status: 'active', credits_used: 3, credits_remaining: 17, expired: false };
+const ACTIVE = { status: 'active', credits_used: 3, credits_remaining: 7, expired: false };
 const NOW = new Date('2026-10-02T12:00:00Z');
 const calls = [];
 function deps(over = {}) {
@@ -85,21 +85,21 @@ ok(r.cache === 'no-store', '1l no answer is cacheable');
 // ---- 2. status ------------------------------------------------------------------------------------------------------------------------------------
 const statusFor = async (trial, admin = false) => (await ask(deps({ trialOf: async () => trial, isAdmin: async () => admin }), { action: 'status' })).json;
 let j = await statusFor(ACTIVE);
-ok(j.status === 'OK' && j.access === 'trial' && j.trial.credits_remaining === 17 && j.trial.credits_used === 3 && j.trial.status === 'active',
+ok(j.status === 'OK' && j.access === 'trial' && j.trial.credits_remaining === 7 && j.trial.credits_used === 3 && j.trial.status === 'active',
   '2a an active trial: access "trial", with its counts', j);
 ok(JSON.stringify(Object.keys(j.trial).sort()) === '["credits_remaining","credits_used","status"]', '2b the trial is described by status and counts only (no id, no expiry date)', j.trial);
-j = await statusFor({ status: 'complete', credits_used: 20, credits_remaining: 0, expired: false });
+j = await statusFor({ status: 'complete', credits_used: 10, credits_remaining: 0, expired: false });
 ok(j.access === 'complete' && j.trial.credits_remaining === 0, '2c a used-up trial: access "complete"', j);
-j = await statusFor({ status: 'revoked', credits_used: 4, credits_remaining: 16, expired: false });
+j = await statusFor({ status: 'revoked', credits_used: 4, credits_remaining: 6, expired: false });
 ok(j.access === 'ended', '2d a revoked trial: access "ended"', j);
-j = await statusFor({ status: 'active', credits_used: 4, credits_remaining: 16, expired: true });
+j = await statusFor({ status: 'active', credits_used: 4, credits_remaining: 6, expired: true });
 ok(j.access === 'ended', '2e an expired trial: access "ended"', j);
 j = await statusFor(null);
 ok(j.access === 'none' && j.trial === null, '2f no trial: access "none"', j);
 j = await statusFor(null, true);
 ok(j.access === 'admin' && j.trial === null, '2g an admin with no trial: access "admin" (the report function serves them as an admin)', j);
 j = await statusFor(ACTIVE, true);
-ok(j.access === 'admin' && j.trial.credits_remaining === 17, '2h an admin who is also a trial member is served as an admin (D-5b-2), and still sees the counts', j);
+ok(j.access === 'admin' && j.trial.credits_remaining === 7, '2h an admin who is also a trial member is served as an admin (D-5b-2), and still sees the counts', j);
 r = await ask(deps({ trialOf: async () => { throw new H.DataUnavailable('x'); } }), { action: 'status' });
 ok(r.status === 502 && r.json.error === 'data_unavailable', '2i the trial unreadable: 502, never "no trial"');
 r = await ask(deps({ roleOf: async () => 'owner' }), { action: 'status' });
@@ -114,7 +114,7 @@ ok(r.status === 500 && r.json.error === 'internal' && !/boom/.test(r.text), '2j 
 
 // ---- 3. redeem ------------------------------------------------------------------------------------------------------------------------------------
 r = await ask(deps(), { action: 'redeem', token: TOKEN });
-ok(r.status === 200 && r.json.role === 'agent' && r.json.replayed === false && r.json.access === 'trial' && r.json.trial.credits_remaining === 17,
+ok(r.status === 200 && r.json.role === 'agent' && r.json.replayed === false && r.json.access === 'trial' && r.json.trial.credits_remaining === 7,
   '3a a redeemed invite: the role, not a replay, and the trial as status reports it', r.json);
 ok(JSON.stringify(named('redeemInvite').map((c) => c.slice(1))) === JSON.stringify([[TOKEN, UID]]), '3b redeemed for the signed-in person\'s own id, with the token they sent');
 ok(named('trialOf').length === 1 && calls.findIndex((c) => c[0] === 'redeemInvite') < calls.findIndex((c) => c[0] === 'trialOf'), '3c the trial is read AFTER joining, so the counts are the ones the person now has');
@@ -147,7 +147,7 @@ function stubFetch(routes) {
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
 const USER = [/\/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test' })];
 const NOT_ADMIN = [/dashboard_admins/, () => json([])];
-const USAGE = [/\/rest\/v1\/rpc\/evaluation_usage$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', status: 'active', credit_limit: 20, credits_used: 5, credits_remaining: 15, expires_at: null, expired: false }])];
+const USAGE = [/\/rest\/v1\/rpc\/evaluation_usage$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', status: 'active', credit_limit: 10, credits_used: 5, credits_remaining: 5, expires_at: null, expired: false }])];
 const MEMBER = (role = 'agent') => [/\/rest\/v1\/rpc\/brokerage_membership_of$/, () => json([{ brokerage_id: 'b0000000-0000-4000-8000-000000000002', role }])];
 async function real(routes, body) {
   seen.length = 0;
@@ -156,7 +156,7 @@ async function real(routes, body) {
   return { status: res.status, json: JSON.parse(await res.text()) };
 }
 r = await real([USER, NOT_ADMIN, USAGE, MEMBER('owner')], { action: 'status' });
-ok(r.status === 200 && r.json.access === 'trial' && r.json.trial.credits_remaining === 15 && r.json.role === 'owner', '4a status through the real data layer, with the role', r.json);
+ok(r.status === 200 && r.json.access === 'trial' && r.json.trial.credits_remaining === 5 && r.json.role === 'owner', '4a status through the real data layer, with the role', r.json);
 ok(JSON.stringify(seen.map((s) => s.method + ' ' + s.path.split('?')[0])) === JSON.stringify(['GET /auth/v1/user', 'GET /rest/v1/dashboard_admins', 'POST /rest/v1/rpc/evaluation_usage', 'POST /rest/v1/rpc/brokerage_membership_of']),
   '4b exactly four requests: who the token belongs to, the allow-list, evaluation_usage, and the membership resolver for the role', seen.map((s) => s.path));
 ok(seen[0].headers.Authorization === 'Bearer user-token' && seen[2].headers.Authorization === 'Bearer svc-key' && JSON.stringify(seen[2].body) === JSON.stringify({ p_user_id: UID })
@@ -206,7 +206,7 @@ ok(r.status === 200 && r.json.role === null, '4p the resolver answering no membe
 }
 
 // ---- 5. trialStanding --------------------------------------------------------------------------------------------------------------------------------
-const S = (status, expired) => G.trialStanding({ status, credits_used: 0, credits_remaining: 20, expired });
+const S = (status, expired) => G.trialStanding({ status, credits_used: 0, credits_remaining: 10, expired });
 ok(S('active', false) === 'active' && S('active', true) === 'ended' && S('complete', false) === 'complete' && S('complete', true) === 'complete'
    && S('revoked', false) === 'ended' && S('paid', false) === 'ended' && S('', false) === 'ended',
   '5a trialStanding: active only when the status says active and it has not expired; a used-up trial is complete; anything else, including a status this code does not know, has ended');
@@ -310,8 +310,8 @@ ok(/action: "create"/.test(H.CAPABILITY.method) && /admin/.test(H.CAPABILITY.acc
 // ---- 7. invite (build step 5e): a trial owner invites an agent ------------------------------------------------------------------------------------
 r = await ask(deps({ trialOf: async () => null }), { action: 'invite' });
 ok(r.status === 403 && r.json.error === 'forbidden' && named('inviteAgent').length === 0, '7a a person with no trial cannot invite: 403, and no invite is asked for', r.json);
-for (const [label, trial] of [['used up', { status: 'complete', credits_used: 20, credits_remaining: 0, expired: false }],
-  ['revoked', { status: 'revoked', credits_used: 2, credits_remaining: 18, expired: false }], ['expired', { status: 'active', credits_used: 2, credits_remaining: 18, expired: true }]]) {
+for (const [label, trial] of [['used up', { status: 'complete', credits_used: 10, credits_remaining: 0, expired: false }],
+  ['revoked', { status: 'revoked', credits_used: 2, credits_remaining: 8, expired: false }], ['expired', { status: 'active', credits_used: 2, credits_remaining: 8, expired: true }]]) {
   r = await ask(deps({ trialOf: async () => trial }), { action: 'invite' });
   ok(r.status === 409 && r.json.error === 'trial_not_active' && named('inviteAgent').length === 0, '7b a ' + label + ' trial: 409 trial_not_active, and no invite is asked for (an agent joining it could make no report)', r.json);
 }
