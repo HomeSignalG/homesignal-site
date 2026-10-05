@@ -117,7 +117,13 @@ async function searchAndCatch(typed, how) {
   const { page } = o;
   let hit = null;
   await page.route('**/homesignalmap.html*', (route) => {
-    const u = new URL(route.request().url());
+    // Only the TAB leaving the homepage counts. The homepage's own sample map is an iframe on this same URL
+    // (homesignalmap.html?embed=1&preview=1&zip=...); on a slow runner its request can arrive after this route is
+    // installed, and answering it with the blank page below read as "the page navigated" (hit set, page errors from
+    // a map with no scripts), which failed the refusal checks intermittently on CI. Let that request through untouched.
+    const req = route.request();
+    if (!req.isNavigationRequest() || req.frame() !== page.mainFrame()) return route.fallback();
+    const u = new URL(req.url());
     hit = { path: u.pathname, search: u.search, href: u.href };
     return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' });
   });
