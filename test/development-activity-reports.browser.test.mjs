@@ -1569,8 +1569,11 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 
   o = await open({ w: world({ role: 'owner', configured: false }) });
   await waitBilling(o.page, /Free trial/);
-  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && /Subscribing is not open yet\./.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
-    '12f with the processor not set up the owner is told subscribing is not open yet and is offered no button (and the free trial still works)');
+  ok(await o.page.$eval('#subscribe', (e) => !e.hidden && e.disabled && /^Subscribe for \$79\/month$/.test(e.textContent.trim())) && /Subscribing is not open yet\./.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
+    '12f with the processor not set up the owner SEES the Subscribe button, disabled, beside "Subscribing is not open yet" (and the free trial still works)');
+  await o.page.evaluate(() => document.getElementById('subscribe').click()); // a script presses the disabled button anyway
+  await settled(o.page);
+  ok(o.checkouts.length === 0 && o.billingCalls.length === 1, '12f2 pressing it asks for nothing: no checkout is requested while the processor is not set up');
   await o.ctx.close();
 
   const w = world({ role: 'owner' });

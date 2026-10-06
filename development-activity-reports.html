@@ -521,7 +521,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       p.className = 'plan out'; p.textContent = 'Your subscription status is not clear';
       sub.textContent = 'New reports are paused until it is. Your saved reports stay available.';
     }
-    if (checkoutState === 'available') { buy.textContent = plan.state === 'canceled' ? 'Subscribe again for $79/month' : 'Subscribe for $79/month'; buy.hidden = false; }
+    // The owner always SEES the button where a new subscription would be possible. Before the payment provider is set up it is shown disabled
+    // (checkout 'not_set_up'): it cannot be pressed, and subscribe() refuses anything but 'available' regardless. Every other reader sees none.
+    var shown = owner && (checkoutState === 'available' || checkoutState === 'not_set_up');
+    if (shown) { buy.textContent = plan.state === 'canceled' ? 'Subscribe again for $79/month' : 'Subscribe for $79/month'; buy.disabled = checkoutState !== 'available'; buy.hidden = false; }
     $('billing-hint').hidden = false;
   }
   /** Ask the billing function for the plan. A failure leaves no plan (never "paid"), and the card says it could not be read. */
