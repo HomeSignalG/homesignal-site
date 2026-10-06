@@ -2246,6 +2246,23 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     Proven on a disposable Postgres through the real orchestrator (`run_lifecycle.py` E17-E24:
     two unattended ticks build and switch two generations; the one two back loses its rows and
     capture; the predecessor and the protected legacy capture are untouched); 4 of 4 breaks fail it.
+  - 🔴 **THE RETIRE STEP STOPPED THE DAILY BUILD FOR 4 DAYS (2026-10-02 → 10-06) — FIXED 2026-10-06.**
+    Every tick died at `STOP: SQL retire candidates failed HTTP 400 … 57014 statement timeout`,
+    before it could open `n5-national-<date>`; `n5_map1_build` paged at 02:10Z on 10-06
+    ("serving map captured 83.6h ago"). Measured: the candidate query carried the two "still has
+    rows" probes as **correlated** `EXISTS` subqueries, so the planner priced an average-sized
+    generation and chose a sequential scan of `geo.zip_authoritative_membership` (1.8 GB) and
+    `preservation.app_project_identity` (5.7 GB) per candidate. An already-retired generation has
+    no rows, so its probe read the whole table and found nothing: four retired candidates
+    (09-25, 09-27, 09-29, 09-30) exceeded the 120 s limit, on every tick, from at least
+    2026-10-05 09:45Z. With a **literal** id the same probe is an index-only scan (cost ~1.7;
+    all eight probes together 5.7 ms, `Heap Fetches: 0`). The candidate list now reads only
+    `geo.n5_generation`; `_has_rows_sql` / `_has_snapshot_sql` probe each candidate separately.
+    ⚠️ **It only appears once a retired generation exists** — the first ticks with candidates
+    that still held rows were cheap, which is why #1476's tests and first run did not see it.
+    Pinned by `scripts/test_n5_auto_lifecycle.py` §8b (6 checks fail on the old code).
+    ⚠️ **Separate, transient, the same morning:** one tick at 07:47Z failed `FGA Authentication
+    Error. Unauthorized` (HTTP 500) from the Supabase management API; the next hour's did not.
   - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
     build with no progress for 6 h, on no build running while the serving map was captured
     > 72 h ago, and on two builds in flight at once.

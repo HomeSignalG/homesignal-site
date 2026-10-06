@@ -195,6 +195,54 @@ check("the discard and the snapshot delete both go through heavy(..., verify=)",
       'heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",\n                  verify=' in src
       and '"retire snapshot", verify=' in src)
 
+# 8b. the candidate list reads ONLY the catalog table. The two "still has rows" probes used to be
+# correlated EXISTS subqueries in it; the planner priced them as sequential scans of the 1.8 GB and
+# 5.7 GB tables, and for an already-retired generation (no rows) each scan read the whole table.
+# Four retired candidates blew the 120 s statement timeout on every tick from 2026-10-05, so no
+# Map 1 generation opened for 4 days. The probes are per candidate, with a LITERAL id.
+check("candidate list does not touch zip_authoritative_membership (the 2026-10-06 timeout)",
+      "zip_authoritative_membership" not in rsql)
+check("candidate list does not touch app_project_identity (the 2026-10-06 timeout)",
+      "app_project_identity" not in rsql)
+check("candidate list reads only the catalog table", "geo.n5_generation g" in rsql)
+import importlib  # noqa: E402
+
+o = importlib.reload(o)  # world() above replaced o.retire_superseded with a stub: test the real one
+orig = (o.sql, o.heavy, o.say)
+rlog, heavy_calls = [], []
+
+
+def retire_sql(query, tag="", **kw):
+    rlog.append((tag, query))
+    if tag == "retire candidates":
+        return [{"generation_id": "g-old1", "snapshot_id": "s-old1"},
+                {"generation_id": "g-old2", "snapshot_id": "s-old2"},
+                {"generation_id": "g-live", "snapshot_id": "s-live"}]
+    if tag == "retire probe rows":
+        return [{"ok": "g-live" in query}]
+    if tag == "retire probe snapshot":
+        return [{"ok": "s-live" in query}]
+    raise AssertionError(f"unexpected query tag {tag!r}")
+
+
+o.sql = retire_sql
+o.heavy = lambda query, tag, verify=None: heavy_calls.append((tag, query))
+o.say = lambda *a, **k: None
+retired = o.retire_superseded()
+o.sql, o.heavy, o.say = orig
+probes = [(t, q) for t, q in rlog if t.startswith("retire probe")]
+check("already-retired candidates cost only their probes: no discard, no delete for them",
+      not any("g-old" in q or "s-old" in q for t, q in heavy_calls))
+check("a candidate that still holds rows and a capture IS retired (discard, then snapshot)",
+      [t for t, q in heavy_calls] == ["discard", "retire snapshot"]
+      and all("g-live" in q or "s-live" in q for t, q in heavy_calls))
+check("retire_superseded counts only the generations it actually retired", retired == 1)
+check("each candidate is probed once for rows and once for its snapshot (6 probes for 3)",
+      len(probes) == 6)
+check("every probe keys on a literal id, never on a correlated column",
+      all("g.generation_id" not in q and "g.snapshot_id" not in q for t, q in probes)
+      and any("'g-old1'" in q for t, q in probes) and any("'s-old2'" in q for t, q in probes))
+
 # 9. publishing refreshes table statistics first and then every ANALYZE_EVERY_PREFIXES prefixes
 import importlib, types  # noqa: E402
 o = importlib.reload(o)
