@@ -768,7 +768,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (r.status === 401) { session = null; openAuth(); compareSay(compareMessage(401), true); return; }
       if (r.status !== 200 || body.status !== 'OK' || body.reopened !== true || !V.renderable(body)) { compareSay(compareMessage(r.status), true); return; }
       entries.push({ number: typeof body.number === 'number' ? body.number : chosen[i].number, address: typeof body.address === 'string' ? body.address : '',
-        label: typeof body.client_label === 'string' ? body.client_label : '', generated_at: body.generated_at, response: body });
+        label: typeof body.client_label === 'string' ? body.client_label : '', generated_at: localDay(body.generated_at), response: body });
     }
     var built = C.mount($('compare-result'), entries);
     if (!built.ok) { compareSay(C.message(built.reason), true); return; }
@@ -1070,6 +1070,14 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     watchSay(watchMessage(r.status, body), true);
   }
 
+  /** The calendar day an ISO moment fell on for THIS person, as 'YYYY-MM-DD'. The saved-reports list shows the person's own day (dateWords); the comparison
+   *  lib reads only the day text of a string and never a clock, so the page hands it the same local day. Not a date: ''. */
+  function localDay(iso){
+    var d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d)) return typeof iso === 'string' ? iso : '';
+    function two(n){ return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+  }
   function dateWords(iso){
     var d = iso ? new Date(iso) : null;
     return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
