@@ -362,6 +362,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
   var attempt = null; // { key, address }
   var invite = null;
+  // Arriving on #billing (the landing page's "Join for $79/month" link, and the payment page's return address) means "take me to the plan card":
+  // a signed-out visitor is asked to sign in, and a signed-in member is scrolled to the card. This never presses Subscribe: starting a checkout is
+  // the owner's own click, and the checkout itself is still made by manage-billing (the one signed path).
+  var wantBilling = (location.hash || '') === '#billing', billingAsked = false;
   function $(id){ return document.getElementById(id); }
 
   // ---- the invite: read from the fragment, then removed from the address bar ----------------------------------------------
@@ -543,6 +547,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way: show them nothing of it
     showTrial(a, trial, note);
     showBilling(member);
+    if (wantBilling) {
+      wantBilling = false;
+      if (member) { $('billing').scrollIntoView(); }
+      else {
+        var ts = $('trial-sub');
+        ts.textContent = 'This email is not on a brokerage account. HomeSignal sets brokerage accounts up, and only a brokerage’s owner can subscribe. ';
+        var ca = document.createElement('a'); ca.href = 'contact.html'; ca.textContent = 'Contact HomeSignal'; ts.appendChild(ca);
+      }
+    }
   }
   function billingMessage(httpStatus, body){
     body = body || {};
@@ -1128,7 +1141,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';
-      $('trial-sub').textContent = invite ? 'Use the email address the invite was sent to.' : '';
+      $('trial-sub').textContent = invite ? 'Use the email address the invite was sent to.' : (wantBilling ? "To subscribe, sign in with your brokerage owner's email." : '');
+      if (wantBilling && !invite && !billingAsked) { billingAsked = true; openAuth(); }
       $('go').disabled = false;
       var b = document.createElement('button'); b.type = 'button'; b.id = 'signin'; b.textContent = 'Sign in';
       b.addEventListener('click', openAuth);

@@ -1715,6 +1715,59 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await ctx.close();
 }
 
+// ---- 13. founder, 2026-10-06: the landing page's "Join for $79/month" link lands on #billing -----------------------------------------------------
+// The landing page links development-activity-reports.html#billing. On arrival a signed-out visitor is asked to sign in, a signed-in member is
+// scrolled to the plan card, and a signed-in person with no brokerage is told who can subscribe. NOTHING here starts a checkout: that is the
+// owner's own click on Subscribe, and the signed checkout is made by manage-billing.
+{
+  // 13a. signed out, arriving on #billing: the sign-in opens by itself, once, and nothing is asked of the billing function
+  const { ctx, page, billingCalls, checkouts, errors } = await open({ w: world({ role: 'owner', used: 3 }), signedIn: false, hash: '#billing' });
+  await page.waitForFunction(() => document.getElementById('auth-overlay').style.display === 'flex', null, { timeout: 8000 }).catch(() => {});
+  ok(await page.evaluate(() => document.getElementById('auth-overlay').style.display === 'flex'), '13a a signed-out visitor arriving on #billing is asked to sign in');
+  ok(/To subscribe, sign in with your brokerage owner's email\./.test(await page.$eval('#trial-sub', (e) => e.textContent)), '13a2 and told whose email to use', await page.$eval('#trial-sub', (e) => e.textContent));
+  ok(billingCalls.length === 0 && checkouts.length === 0, '13a3 nothing was asked of the billing function and no checkout was made while signed out', billingCalls.map((c) => c.body));
+  // 13b. signing in from that prompt brings the person to the plan card, with the Subscribe button available but NOT pressed
+  await page.fill('#auth-email', 'agent@example.test'); await page.click('#auth-submit');
+  await page.waitForSelector('#auth-code', { state: 'visible', timeout: 8000 });
+  await page.fill('#auth-code', '123456'); await page.click('#auth-submit');
+  await waitBilling(page, /Free trial/);
+  await page.waitForTimeout(500); // long enough for a page that wrongly pressed Subscribe to have been sent to the provider
+  const stayed = page.url().startsWith(base + PAGE);
+  ok(stayed && checkouts.length === 0 && billingCalls.every((c) => c.body.action === 'status'),
+    '13b3 the page stayed put and only status reads were made: pressing Subscribe is the owner\'s own click, never the page\'s', { url: page.url(), checkouts, calls: billingCalls.map((c) => c.body) });
+  if (stayed) {
+    ok(await billingShown(page) && await page.$eval('#subscribe', (e) => !e.hidden && !e.disabled), '13b after signing in the owner is shown the Billing card with Subscribe available');
+    ok(await page.evaluate(() => { const r = document.getElementById('billing').getBoundingClientRect(); return scrollY > 0 && r.top > -2 && r.top < innerHeight / 2; }), '13b2 and the page scrolled so the card is at the top of the screen', await page.evaluate(() => ({ top: document.getElementById('billing').getBoundingClientRect().top, sy: scrollY, h: innerHeight })));
+    ok(errors.length === 0, '13b4 no page error', errors);
+  }
+  await ctx.close();
+}
+{
+  // 13c. control: the same signed-out visit WITHOUT #billing does not open the sign-in by itself
+  const { ctx, page } = await open({ w: world({ role: 'owner' }), signedIn: false });
+  await page.waitForTimeout(400);
+  ok(await page.evaluate(() => document.getElementById('auth-overlay').style.display !== 'flex'), '13c control: without #billing the page does not open the sign-in by itself');
+  await ctx.close();
+}
+{
+  // 13d. signed in, not on any brokerage: no plan card, and a plain way to ask HomeSignal for a brokerage account
+  const { ctx, page, billingCalls, checkouts } = await open({ w: world({ trial: null }), hash: '#billing' });
+  await page.waitForFunction(() => /not on a brokerage account/.test(document.getElementById('trial-sub').textContent), null, { timeout: 8000 }).catch(() => {});
+  const sub = await page.$eval('#trial-sub', (e) => e.textContent);
+  ok(/This email is not on a brokerage account\./.test(sub) && /only a brokerage’s owner can subscribe/.test(sub), '13d a person with no brokerage is told so, and who can subscribe', sub);
+  ok(await page.$eval('#trial-sub a', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal'), '13d2 with a link to HomeSignal\'s contact page');
+  ok(!(await billingShown(page)) && billingCalls.length === 0 && checkouts.length === 0, '13d3 no Billing card, no billing call and no checkout for them', billingCalls.map((c) => c.body));
+  await ctx.close();
+}
+{
+  // 13e. an AGENT (not the owner) arriving on #billing sees the card and is told only the owner can subscribe: no Subscribe button
+  const { ctx, page, checkouts } = await open({ w: world({ role: 'agent', used: 3 }), hash: '#billing' });
+  await waitBilling(page, /Free trial/);
+  ok(await billingShown(page) && /Only your brokerage's owner can subscribe\./.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden) && checkouts.length === 0,
+    '13e an agent on #billing sees the card, is told only the owner can subscribe, and has no Subscribe button');
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);
