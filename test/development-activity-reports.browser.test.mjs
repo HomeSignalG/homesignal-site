@@ -197,13 +197,13 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     // saved reports (build step 6): the stored reports of this brokerage, newest first; the database shows nothing without standing
     savedReports: async () => {
       if (w.trial !== 'active' && w.used < 10) return [];
-      const rows = [...w.made.entries()].map(([key, m], i) => ({ report_id: m.id, number: i + 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key }));
+      const rows = [...w.made.entries()].map(([key, m], i) => ({ report_id: m.id, number: i + 1, generated_at: w.generatedAt || '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key }));
       return w.listFails ? (() => { throw new RH.DataUnavailable('x'); })() : rows.reverse();
     },
     openSavedReport: async (_u, id) => {
       if (w.trial !== 'active' && w.used < 10) return null;
       let n = 0;
-      for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { report_id: m.id, number: n, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key, body: JSON.stringify(m.report) }; }
+      for (const [key, m] of w.made.entries()) { n++; if (m.id === id) return { report_id: m.id, number: n, generated_at: w.generatedAt || '2026-10-02T12:00:00+00:00', private_context_id: 'ctx-' + key, body: JSON.stringify(m.report) }; }
       return null;
     },
     subjectOf: async (ctx) => { const m = ctx && w.made.get(ctx.slice(4)); return { address: m ? m.address : null, label: m ? E.cleanDisplayName(m.label, 80) : null }; },
@@ -227,8 +227,8 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '' } = {}) {
-  const ctx = await browser.newContext({ viewport: { width, height } });
+async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '' } = {}) {
+  const ctx = await browser.newContext(tz ? { viewport: { width, height }, timezoneId: tz } : { viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
   await page.exposeFunction('__hsNameSaved', (v) => { w.header = { ...w.header, agent: E.cleanDisplayName(v, 80) }; }); // the server reads the saved name from the account
@@ -1322,6 +1322,23 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   ok(own.every((o2) => o2 && o2.join() === '0,2,4') && [0, 1, 2].every((i) => rowCells(t, 'Permitted / Under Construction')[i] === own[i][0] && rowCells(t, 'Approved / Coming')[i] === own[i][1] && rowCells(t, 'Proposed / Under Review')[i] === own[i][2]),
     '11m each column\'s stage counts are exactly what that report prints for itself when opened on its own (0 / 2 / 4)', [own, rowCells(t, 'Approved / Coming')]);
   ok(foreign.length === 0 && errors.length === 0, '11n no page error, and nothing fetched but the page, its libraries, the sign-in stand-in and the functions', { foreign, errors });
+  await ctx.close();
+}
+{
+  // 11p. the SAME day in the saved list and in the comparison: a report made at 8 PM Mountain on Oct 4 is 02:00 UTC on Oct 5, and the
+  // comparison used to say "Oct 5" while the list said "October 4"
+  const w = world(); w.generatedAt = '2026-10-05T02:00:00+00:00';
+  const { ctx, page } = await open({ w, tz: 'America/Denver' });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  const listed = await page.$$eval('#compare-list label', (els) => els.map((e) => e.textContent.trim()));
+  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  const t2 = await tableOf(page);
+  ok(listed.length === 2 && listed.every((x) => /October 4, 2026$/.test(x)) && t2.legend.length === 2 && t2.legend.every((x) => /Made Oct 4, 2026$/.test(x)),
+    '11p2 a report made on the evening of Oct 4 (Mountain) is Oct 4 in BOTH the saved list and the comparison\'s "Made" line', [listed, t2.legend]);
   await ctx.close();
 }
 {
