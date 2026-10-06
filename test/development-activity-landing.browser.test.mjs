@@ -225,21 +225,33 @@ const seen = await page.evaluate(() => {
     visibleSoon: soon.filter(vis).length,
     // Positive control for the visibility probe: the coverage button IS visible.
     control: vis(document.getElementById('daCoverBtn')),
-    enterpriseVisible: vis(document.getElementById('daEnterprise'))
+    enterpriseVisible: vis(document.getElementById('daEnterprise')),
+    finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
   };
 });
 ok(seen.control && seen.buttons === 4 && seen.visibleButtons === 0,
   'HIDDEN (founder, 2026-10-02): all four commerce buttons are on the page and none is visible (control: the coverage button is)', seen);
 ok(seen.soon === 4 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
-ok(seen.enterpriseVisible, 'Contact us for Enterprise Pricing → is visible: it is the page\'s working action', seen);
+ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
 // A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
 await page.$$eval('[data-cta]', (bs) => bs.forEach((b) => b.click()));
 const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
 ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
   'clicking any of the four commerce buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
 ok((await page.$$eval('[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
-ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us for Enterprise Pricing →'), 'Contact us for Enterprise Pricing → opens the existing contact page');
-ok(await page.$eval('#daHeroCheck', (a) => a.getAttribute('href') === '#coverage'), 'Check coverage → jumps to the coverage check near the hero');
+ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal →')
+   && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
+ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sample' && a.textContent === 'View a sample report →'), 'the hero\'s visible action is View a sample report →, and it jumps to the sample');
+// The plan's section order, measured on the rendered page (top of each block), and the coverage utility is not a hero or closing action.
+const geo = await page.evaluate(() => {
+  const top = (sel) => { const n = document.querySelector(sel); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
+  const h2 = (txt) => { const n = [...document.querySelectorAll('.da h2')].find((e) => e.textContent.includes(txt)); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
+  return { hero: top('#hero h1'), sample: top('#sample'), moments: h2('Walk into the conversation'), trust: h2('Show them the record'), coverage: top('#coverage'), pricing: top('#pricing'), final: h2('before your client asks'),
+    coverageLinks: document.querySelectorAll('a[href="#coverage"]').length, sampleVisibleAboveFold: document.getElementById('daReport').getBoundingClientRect().top < innerHeight };
+});
+const gseq = [geo.hero, geo.sample, geo.moments, geo.trust, geo.coverage, geo.pricing, geo.final];
+ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order: hero → sample → use cases → trust → coverage → pricing → final conversion', geo);
+ok(geo.coverageLinks === 0 && geo.sampleVisibleAboveFold, 'no hero/closing link to coverage, and the sample report starts within the first screen', geo);
 
 console.log('--- 7. coverage check: answers only what it can prove ---');
 async function ask(input, stubs) {
