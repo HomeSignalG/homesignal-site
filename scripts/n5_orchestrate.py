@@ -487,12 +487,18 @@ def auto_finish(gen):
 # A DELETE does not shrink the database; autovacuum makes the space reusable, and the next
 # build's inserts into the same tables reuse it, so measured size stops growing by a build a
 # day. The auto-open disk check stays on the measured figure, which errs on the safe side.
+# THE CANDIDATE LIST READS ONLY THE TINY CATALOG TABLE (2026-10-06). It used to carry the two
+# "does this generation still have rows" probes as correlated EXISTS subqueries, and with a
+# correlated parameter the planner prices an average-sized generation, so it chose a sequential
+# scan of geo.zip_authoritative_membership (1.8 GB) and preservation.app_project_identity
+# (5.7 GB) per candidate. A generation already retired has no rows, so its probe read the WHOLE
+# table and found nothing: four retired candidates blew the 120 s statement timeout, every tick
+# died here ("SQL retire candidates failed HTTP 400 ... 57014") before it could open the daily
+# build, and no Map 1 generation opened for 4 days. The probes now run one per candidate with
+# the id as a LITERAL (see _has_rows_sql / _has_snapshot_sql), which the planner prices from the
+# column's own statistics: an index-only scan, cost ~1.7 either way.
 RETIRE_CANDIDATES_SQL = """
-select g.generation_id, g.snapshot_id,
-       exists (select 1 from geo.zip_authoritative_membership m
-                where m.generation_id = g.generation_id) as has_rows,
-       exists (select 1 from preservation.app_project_identity i
-                where i.snapshot_id = g.snapshot_id) as has_snapshot
+select g.generation_id, g.snapshot_id
   from geo.n5_generation g
  where g.state = 'SUPERSEDED'
    and exists (select 1 from geo.n5_generation s where s.state = 'ACTIVE')
@@ -504,6 +510,20 @@ select g.generation_id, g.snapshot_id,
    and not exists (select 1 from geo.n5_generation o
                     where o.snapshot_id = g.snapshot_id and o.generation_id <> g.generation_id)
  order by g.opened_at;"""
+
+
+def _has_rows_sql(gen):
+    """Does this generation still hold build rows? A LITERAL id on purpose: it is priced from
+    the column statistics and served by zip_authoritative_membership_gen_source (see the note
+    on RETIRE_CANDIDATES_SQL for what the correlated form cost)."""
+    return (f"select exists (select 1 from geo.zip_authoritative_membership "
+            f"where generation_id={lit(gen)}) ok;")
+
+
+def _has_snapshot_sql(snap):
+    """Does this snapshot still hold its capture? Literal id, served by the primary key."""
+    return (f"select exists (select 1 from preservation.app_project_identity "
+            f"where snapshot_id={lit(snap)}) ok;")
 
 
 def _verify_discarded(gen):
@@ -524,13 +544,16 @@ def retire_superseded():
     done = 0
     for r in sql(RETIRE_CANDIDATES_SQL, "retire candidates", read_only=True):
         gen, snap = r["generation_id"], r["snapshot_id"]
-        if not (r["has_rows"] or r["has_snapshot"]):
+        has_rows = bool(sql(_has_rows_sql(gen), "retire probe rows", read_only=True)[0]["ok"])
+        has_snapshot = bool(sql(_has_snapshot_sql(snap), "retire probe snapshot",
+                                read_only=True)[0]["ok"])
+        if not (has_rows or has_snapshot):
             continue  # already retired on an earlier tick
-        if r["has_rows"]:
+        if has_rows:
             heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",
                   verify=_verify_discarded(gen))
             say("retired build rows", gen)
-        if r["has_snapshot"]:
+        if has_snapshot:
             heavy(f"delete from preservation.app_project_identity where snapshot_id={lit(snap)};",
                   "retire snapshot", verify=_verify_snapshot_gone(snap))
             say("retired snapshot", snap)
