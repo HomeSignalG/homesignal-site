@@ -246,12 +246,12 @@ ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sampl
 const geo = await page.evaluate(() => {
   const top = (sel) => { const n = document.querySelector(sel); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
   const h2 = (txt) => { const n = [...document.querySelectorAll('.da h2')].find((e) => e.textContent.includes(txt)); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
-  return { hero: top('#hero h1'), sample: top('#sample'), moments: h2('Walk into the conversation'), trust: h2('Show them the record'), coverage: top('#coverage'), pricing: top('#pricing'), final: h2('before your client asks'),
-    coverageLinks: document.querySelectorAll('a[href="#coverage"]').length, sampleVisibleAboveFold: document.getElementById('daReport').getBoundingClientRect().top < innerHeight };
+  return { hero: top('#hero h1'), pricing: top('#pricing'), sample: top('#sample'), moments: h2('Walk into the conversation'), trust: h2('Show them the record'), coverage: top('#coverage'), final: h2('before your client asks'),
+    coverageLinks: document.querySelectorAll('a[href="#coverage"]').length };
 });
-const gseq = [geo.hero, geo.sample, geo.moments, geo.trust, geo.coverage, geo.pricing, geo.final];
-ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order: hero → sample → use cases → trust → coverage → pricing → final conversion', geo);
-ok(geo.coverageLinks === 0 && geo.sampleVisibleAboveFold, 'no hero/closing link to coverage, and the sample report starts within the first screen', geo);
+const gseq = [geo.hero, geo.pricing, geo.sample, geo.moments, geo.trust, geo.coverage, geo.final];
+ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order (founder, 2026-10-06: pricing before the sample): hero → pricing → sample → use cases → trust → coverage → final conversion', geo);
+ok(geo.coverageLinks === 0, 'no hero/closing link to coverage', geo);
 
 console.log('--- 7. coverage check: answers only what it can prove ---');
 async function ask(input, stubs) {

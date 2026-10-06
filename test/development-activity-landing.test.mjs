@@ -128,12 +128,12 @@ console.log('--- 2c. information architecture (100726 revision plan) ---');
 // Order is asserted on the rendered markup, not on comments: hero → sample → use cases → trust → coverage → pricing → final.
 const at = (re) => { const m = re.exec(markup); return m ? m.index : -1; };
 const ORDER = [
-  ['hero', /id="hero"/], ['sample', /id="sample"/], ['transaction moments', /Walk into the conversation knowing more\./],
+  ['hero', /id="hero"/], ['pricing', /id="pricing"/], ['sample', /id="sample"/], ['transaction moments', /Walk into the conversation knowing more\./],
   ['trust', /Don’t give your client a rumor\. Show them the record\./], ['coverage', /id="coverage"/],
-  ['pricing', /id="pricing"/], ['final conversion', /Know what’s changing before your client asks\./]
+  ['final conversion', /Know what’s changing before your client asks\./]
 ].map(([k, re]) => [k, at(re)]);
 ok(ORDER.every(([, i], n) => i > -1 && (n === 0 || i > ORDER[n - 1][1])),
-  'hero → sample → use cases → trust → coverage → pricing → final conversion: coverage no longer interrupts hero → product proof, and pricing precedes the close', ORDER);
+  'hero → pricing → sample → use cases → trust → coverage → final conversion (founder, 2026-10-06: pricing before the sample; coverage still sits after the proof)', ORDER);
 ok(at(/id="daReport"/) > -1 && (markup.match(/id="daReport"/g) || []).length === 1, 'exactly one interactive sample report exists (it was moved, not rebuilt)');
 // Regression: the sections this revision removed or merged must not quietly return.
 const REMOVED = [
@@ -156,7 +156,8 @@ ok((text.match(/\$\d+/g) || []).every((p) => p === '$79') && (text.match(/\$\d+/
 ok(/<h3[^>]*>Before a buyer tour<\/h3>/.test(markup) && /<h3[^>]*>Before a listing presentation<\/h3>/.test(markup), 'use cases are concrete transaction moments');
 ok(['Free', 'Professional', 'Brokerage / Enterprise'].every((b) => new RegExp('<p class="da-band">' + b.replace('/', '\\/') + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
-ok((markup.slice(coverageAt, pricingAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
+const finalAt = at(/class="da-final"/);
+ok((markup.slice(coverageAt, finalAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
 ok(!/href="#coverage"/.test(markup), 'nothing links to the coverage section from the hero or the close: it is an availability utility, not a call to action');
 ok(/href="#sample"/.test(markup) && /id="sample"/.test(markup), 'the hero\'s sample link has a real target');
 const bodyWords = text.replace(/\s+/g, ' ').split(' ').length;
