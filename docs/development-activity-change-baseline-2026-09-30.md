@@ -585,7 +585,7 @@ the pilot's 0.5 to 0.7. One call is one sample: its ZIPs are the next-oldest obs
 At 1.07 ms a row the national read of 2,925,376 rows is **about 52 minutes of work** (the pilot projected 25 to 35), and an average
 200-ZIP call is **about 49 s**, inside the 60 s cap with a thin margin. A call that holds large ZIPs will stop on `time` with fewer than 200
 observed. The window has 72 calls against the 64 a pass needs, so 8 calls (12.5%) of slack, and each `time` stop spends some of it. **The
-schedule is not changed on one sample.** The first full pass, from 02:00Z on 2026-10-02, is the measurement: read that day's run row
+schedule is not changed on one sample.** *(UPDATE 2026-10-07: the measurement came in. About 19 of 72 calls a night stop on the 60 s cap, the night averages ~171 ZIPs a call, so ~12,300 ZIPs are observed against 12,722 and ~400 slip a night. The window was widened to `*/5 2-8 * * *`, 84 calls, ~14,300 ZIPs at 171 a call; the 48-hour alarm threshold is unchanged.)* The first full pass, from 02:00Z on 2026-10-02, is the measurement: read that day's run row
 (`zips_observed` against `ticks`, and `finished_at` and `detail->'completed'`). If the calls routinely stop on time, the options are a
 later end to the window or a higher time cap, decided on that reading. The 48-hour alarm is what reports a pass that did not finish. WAL
 for this call was **not** measured.

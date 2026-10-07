@@ -319,7 +319,7 @@ select pg_temp._ck('W10 no role but service_role can run the wrapper or read the
 
 -- W11 the job
 select pg_temp._ck('W11 exactly ONE job, named dev-change-observe, active, every 5 minutes in the 02:00–07:59 UTC window, calling only the wrapper',
-  (select count(*) = 1 and bool_and(schedule = '*/5 2-7 * * *' and command = 'select public.dev_change_observe_scheduled()' and active)
+  (select count(*) = 1 and bool_and(schedule = '*/5 2-8 * * *' and command = 'select public.dev_change_observe_scheduled()' and active)
      from cron.job where jobname = 'dev-change-observe'),
   (select schedule || ' | ' || command from cron.job where jobname = 'dev-change-observe'));
 

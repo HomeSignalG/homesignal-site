@@ -65,7 +65,7 @@ checks() {
   tf 'A03 re-applying the file RE-ARMS a job someone deactivated (arming is the job of this file, so a stale off-switch cannot outlive it)' "$(Q "select active from cron.job where jobname = 'dev-change-observe'")" 't'
   Q "update cron.job set schedule = '* * * * *', command = 'select 1' where jobname = 'dev-change-observe'" >/dev/null
   apply_file "$f" || true
-  tf 'A04 re-applying the file puts a tampered schedule and command back' "$(Q "select schedule || '|' || command from cron.job where jobname = 'dev-change-observe'")" '*/5 2-7 * * *|select public.dev_change_observe_scheduled()'
+  tf 'A04 re-applying the file puts a tampered schedule and command back' "$(Q "select schedule || '|' || command from cron.job where jobname = 'dev-change-observe'")" '*/5 2-8 * * *|select public.dev_change_observe_scheduled()'
 
   # a wrapper run leaves ledger rows; the rollback must not touch one
   P -c "insert into public.canonical_zip_registry (zip) values ('92001'); insert into public.app_community_meta (zip) values ('92001');
