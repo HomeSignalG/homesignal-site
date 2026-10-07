@@ -687,6 +687,17 @@ def ready(gen):
     return 0
 
 
+def announce_serving_change(gen):
+    """Tell the workflow that WHICH generation Map 1 serves just changed. Rule D scores the
+    serving membership, so its published plane is stale from this moment; the workflow uses
+    this to ask the plane's own refresh (homesignal-ingest) to run now instead of tomorrow.
+    Nothing is decided here: no ZIP is named and no page is judged."""
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as f:
+            f.write(f"n5_serving_changed={gen}\n")
+
+
 def mode_activate():
     return activate(require_generation())
 
@@ -696,6 +707,7 @@ def activate(gen):
     heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate",
           verify=_verify_state(gen, "ACTIVE"))
     say("generation", f"{gen} -> ACTIVE")
+    announce_serving_change(gen)
     return 0
 
 
@@ -709,6 +721,7 @@ def mode_rollback():
     gen = require_generation()
     sql(f"select geo.n5_generation_rollback({lit(gen)}, {lit(require_reason())});", "rollback")
     say("generation", f"{gen} restored as the serving generation")
+    announce_serving_change(gen)
     return 0
 
 

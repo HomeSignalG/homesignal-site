@@ -29,6 +29,11 @@ absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
+# Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
+# on sys.path; the sibling module is the page-semantics authority and is imported by name.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import page_semantics as ps  # noqa: E402
+
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = "https://homesignal.net"
 STEP = 1000
@@ -689,8 +694,11 @@ def assemble(d, now_iso):
         pages[z]["um"] = meetings_for(z)
 
     for p in pages.values():
-        p["ln"].sort(key=lambda x: (x["date"], x["title"]), reverse=True)
-        p["gn"].sort(key=lambda x: (x["date"], x["title"]), reverse=True)
+        # The url is the final tie-break. app_changes is deleted and reinserted on every ZIP
+        # refresh, so two rows with the same day and title (two NWS "Flood Warning"s) can come back
+        # in the other order; without a total order the page would "change" with no change.
+        p["ln"].sort(key=lambda x: (x["date"], x["title"], x["url"] or ""), reverse=True)
+        p["gn"].sort(key=lambda x: (x["date"], x["title"], x["url"] or ""), reverse=True)
         journalism = [x for x in p["ln"] if not x["weather"]]
         p["n_ln_journalism"], p["n_gn"] = len(journalism), len(p["gn"])
         p["n_um"] = min(len(p["um"]), UM_CAP)
@@ -1111,7 +1119,7 @@ def render_city(c, pages, built):
         f'<body data-nav="city">\n{body}\n</body>\n</html>\n')
 
 
-def build_cities(cities, pages, out_dir, built):
+def build_cities(cities, pages, out_dir, built, state=None):
     written = 0
     for key in sorted(cities):
         c = cities[key]
@@ -1122,7 +1130,10 @@ def build_cities(cities, pages, out_dir, built):
             sys.exit(f"ERROR: city {key} names non-canonical ZIPs {missing[:5]}")
         d = os.path.join(out_dir, "city", c["state"].lower(), c["slug"])
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "index.html"), "wb").write(render_city(c, pages, built).encode("utf-8"))
+        doc = render_city(c, pages, ps.BUILD_DAY_TOKEN)
+        if state is not None:
+            state.add(city_path(c), doc)
+        open(os.path.join(d, "index.html"), "wb").write(doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8"))
         written += 1
     return written
 
@@ -1374,7 +1385,7 @@ def render_project_list(z, keys, projects, pages):
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
 
-def build_projects(projects, pages, out_dir, built):
+def build_projects(projects, pages, out_dir, built, state=None):
     written, nbytes = 0, 0
     for key in sorted(projects):
         pr = projects[key]
@@ -1385,7 +1396,16 @@ def build_projects(projects, pages, out_dir, built):
             sys.exit(f"ERROR: project {key!r} names no canonical ZIP ({missing[:5]})")
         d = os.path.join(out_dir, *pr["path"].strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
-        h = render_project(pr, pages, built, projects).encode("utf-8")
+        doc = render_project(pr, pages, ps.BUILD_DAY_TOKEN, projects)
+        if state is not None:
+            # changed_on is the project page's own modification day (the existing authority for
+            # its sitemap lastmod); it is also the only source-derived time that can seed it.
+            # A tracked project's as_of advances daily and is bookkeeping, not a fact (see
+            # page_semantics.NEUTRAL_AS_OF): its fingerprint reads the page rendered with it held.
+            sem = (render_project({**pr, "as_of": ps.NEUTRAL_AS_OF}, pages, ps.BUILD_DAY_TOKEN, projects)
+                   if pr["tracked"] and pr["as_of"] else None)
+            state.add(pr["path"], doc, pr.get("changed_on") or None, sem)
+        h = doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
@@ -1539,13 +1559,15 @@ def render_guide_check(projects, pages, built):
                  GUIDE_CHECK, body, built)
 
 
-def build_guides(cities, projects, pages, out_dir, built):
+def build_guides(cities, projects, pages, out_dir, built, state=None):
     written = []
-    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, built)),
-                        (GUIDE_CHECK, render_guide_check(projects, pages, built))):
+    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
+                        (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))):
         d = os.path.join(out_dir, *path.strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "index.html"), "wb").write(html_.encode("utf-8"))
+        if state is not None:
+            state.add(path, html_)
+        open(os.path.join(d, "index.html"), "wb").write(html_.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8"))
         written.append(path)
     return written
 
@@ -1571,9 +1593,11 @@ SITEMAP_DEV_RE = re.compile(
 
 
 def _url_el(loc, lastmod=None):
-    """lastmod is the day the page's facts last changed, never the build day: a lastmod
-    that moves every day tells Google nothing, and it learns to ignore it."""
-    lm = f"    <lastmod>{lastmod}</lastmod>\n" if lastmod and DAY_RE.match(lastmod) else ""
+    """lastmod is when the page's semantic content last changed (a day, or a UTC instant),
+    never the build day: a lastmod that moves every day tells a crawler nothing, and it learns
+    to ignore it. None means no truthful time is known, and the element is omitted."""
+    lm = (f"    <lastmod>{lastmod}</lastmod>\n"
+          if lastmod and (DAY_RE.fullmatch(lastmod) or ps.STAMP_RE.fullmatch(lastmod)) else "")
     return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n{lm}"
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
@@ -1620,19 +1644,22 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     """
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
-    block = "\n".join(_url_el(f"{BASE}/community/{z}/") for z in zips)
+    # lastmod comes from page_semantics.finalize for EVERY family: it moves only when the page's
+    # semantic fingerprint moved, and is omitted where no truthful time is known.
+    lm = lastmod or {}
+    block = "\n".join(_url_el(f"{BASE}/community/{z}/", lm.get(f"/community/{z}/")) for z in zips)
     # City pages (plan step 9) exist only when they qualify, so every one is indexable.
     cps = sorted(city_paths)
     if cps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{cp}") for cp in cps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{cp}", lm.get(cp)) for cp in cps)
     # Project pages (plan step 12) are written only for featured, durable projects: every
     # one is indexable.
     pps = sorted(project_paths)
     if pps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", (lastmod or {}).get(pp)) for pp in pps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", lm.get(pp)) for pp in pps)
     gps = sorted(guide_paths)
     if gps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{gp}") for gp in gps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{gp}", lm.get(gp)) for gp in gps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1706,7 +1733,7 @@ def write_family_sitemaps(out_dir, families, lastmod=None):
 
 
 # ---------------------------------------------------------------- build + gates
-def build(pages, out_dir, canonical, built):
+def build(pages, out_dir, canonical, built, state=None):
     canon = set(canonical)
     written, total, mx, mxz = 0, 0, 0, None
     for z in sorted(pages):
@@ -1718,7 +1745,10 @@ def build(pages, out_dir, canonical, built):
         if os.path.abspath(d) != os.path.normpath(os.path.abspath(d)) or ".." in z:
             sys.exit(f"ERROR: path traversal refused: {z!r}")
         os.makedirs(d, exist_ok=True)
-        h = render(pages[z], built).encode("utf-8")
+        doc = render(pages[z], ps.BUILD_DAY_TOKEN)
+        if state is not None:
+            state.add(f"/community/{z}/", doc)
+        h = doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         total += len(h)
@@ -1726,6 +1756,19 @@ def build(pages, out_dir, canonical, built):
             mx, mxz = len(h), z
     return {"documents": written, "bytes": total, "avg": total // max(written, 1),
             "max": mx, "max_zip": mxz}
+
+
+def load_page_state_baseline(path, reseed):
+    """The previous live state, or None. None is ONLY for 'there is none' (no path, no file) or an
+    explicit reseed. A file that exists but does not validate is a hard error: treating a corrupt
+    baseline as 'first run' would swallow a real delta and re-seed over it."""
+    if reseed or not path or not os.path.exists(path):
+        return None
+    try:
+        return ps.load_baseline(open(path, encoding="utf-8").read())
+    except ps.BaselineError as e:
+        sys.exit(f"ERROR: previous page-state baseline is unusable ({e}); dispatch pages with "
+                 f"reseed=true after checking https://homesignal.net/sitemaps/page-state.json")
 
 
 def main():
@@ -1747,6 +1790,16 @@ def main():
     ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
                     help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
                          "this at a fixture model; production always uses the committed one.")
+    ap.add_argument("--baseline", default=None,
+                    help="the PREVIOUS LIVE sitemaps/page-state.json, captured before this build. "
+                         "A missing file seeds the state (nothing is notified); a file that does "
+                         "not validate fails the build.")
+    ap.add_argument("--reseed", action="store_true",
+                    help="ignore the baseline: publish this state as the new baseline, notify nothing")
+    ap.add_argument("--delta-out", default=None,
+                    help="write the semantic delta (IndexNow notification set) here, outside the artifact")
+    ap.add_argument("--build-id", default=os.environ.get("HS_BUILD_ID", ""))
+    ap.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     ap.add_argument("--allow-missing-dev-plane", action="store_true",
                     help="fixture-only: a missing plane is {} (no Rule D). "
                          "Refused in production.")
@@ -1800,6 +1853,8 @@ def main():
                                      cities_path=cities_path, projects_out=projects,
                                      projects_path=projects_path)
 
+    ps.assert_token_absent(json.dumps(d, default=str) + json.dumps(cities, default=str)
+                           + json.dumps(projects, default=str))
     zips = d["zips"]
     if len(zips) != len(set(zips)):
         sys.exit(f"ERROR: duplicate ZIPs in canonical registry: {len(zips)} rows, {len(set(zips))} distinct")
@@ -1861,21 +1916,45 @@ def main():
     linked = link_projects(pages, cities, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
     ndpass = sum(1 for p in pages.values() if p.get("rule_d"))
-    stats = build(pages, a.out, zips, now_iso[:10])
+    # The semantic state is collected by the SAME render calls that write the documents: one
+    # page-semantics authority (scripts/page_semantics.py), no second pass over the content.
+    state = ps.PageState(now_iso[:10])
+    stats = build(pages, a.out, zips, now_iso[:10], state)
     indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
-    ncity = build_cities(cities, pages, a.out, now_iso[:10])
+    ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
-    nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10])
+    nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
     project_paths = sorted(pr["path"] for pr in projects.values())
-    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10])
+    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
+
+    baseline = load_page_state_baseline(a.baseline, a.reseed)
+    now_stamp = datetime.fromisoformat(now_iso).strftime("%Y-%m-%dT%H:%M:%SZ")
+    page_state = ps.finalize(state, baseline, now_stamp, override_lastmod=project_lastmod)
+    delta = ps.compute_delta(baseline, page_state)
+    # The notification policy reads robots out of each document; the sitemap is built from the
+    # Rule F / Rule D sets. They are two views of one decision and must be the same set.
+    zip_idx = {p for p, e in page_state.items() if e["i"] and ps.family_of(p) == "zip"}
+    if zip_idx != {f"/community/{z}/" for z in indexable}:
+        sys.exit("ERROR: robots-derived index-eligible set != the sitemap's indexable set")
+    for p, e in page_state.items():
+        if ps.family_of(p) in ("city", "project", "guide") and not e["i"]:
+            sys.exit(f"ERROR: {p} is advertised in the sitemap but its document says noindex")
+    lastmod_map = {p: e["l"] for p, e in page_state.items() if e["l"]}
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
-                           lastmod=project_lastmod)
+                           lastmod=lastmod_map)
     fam = write_family_sitemaps(a.out, {
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
         "city": city_paths, "project": project_paths, "guide": guide_paths},
-        lastmod=project_lastmod)
+        lastmod=lastmod_map)
+    state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
+    open(os.path.join(a.out, "sitemaps", "page-state.json"), "w", encoding="utf-8").write(
+        json.dumps(state_doc, separators=(",", ":"), sort_keys=True))
+    delta["verify"] = ps.verification_sample(state, delta)
+    if a.delta_out:
+        delta["build_id"], delta["commit"], delta["built_at"] = a.build_id, a.commit, now_stamp
+        json.dump(delta, open(a.delta_out, "w", encoding="utf-8"), indent=1, sort_keys=True)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
@@ -1895,6 +1974,11 @@ def main():
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs")
     print("family sitemaps : " + ", ".join(f"{k} {v}" for k, v in fam.items()))
+    print(f"page state     : {len(page_state)} tracked pages, state_hash {state_doc['state_hash']}, "
+          f"{'SEED (' + delta['seed_reason'] + ')' if delta['seed'] else 'vs baseline ' + str(delta['baseline_state_hash'])}")
+    print(f"semantic delta : +{len(delta['added'])} added, ~{len(delta['changed'])} changed, "
+          f"{len(delta['indexability_changed'])} indexability flips, -{len(delta['removed'])} removed "
+          f"=> {len(delta['submit'])} URLs to notify")
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
@@ -1919,7 +2003,8 @@ def main():
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
-               "family_sitemaps": fam},
+               "family_sitemaps": fam,
+               "page_state_hash": state_doc["state_hash"], "page_state_pages": len(page_state)},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

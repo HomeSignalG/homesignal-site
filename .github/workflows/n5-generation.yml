@@ -78,6 +78,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Orchestrate
+        id: orchestrate
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           MODE: ${{ github.event.inputs.mode || 'work' }}
@@ -98,3 +99,29 @@ jobs:
           DISK_TOTAL_MB: '36352'
           WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
         run: python scripts/n5_orchestrate.py
+
+      # SEO FRESHNESS (2026-10-07). Activating or rolling back a generation changes which projects
+      # Map 1 serves, and the Development SEO (Rule D) plane scores exactly that membership - so
+      # the published plane is stale from this moment. Ask the plane's OWN refresh workflow in
+      # homesignal-ingest to run now; it publishes the plane and then asks pages for a freshness
+      # build. Nothing is re-scored here. Needs a fine-grained token with Actions: write on
+      # HomeSignalG/homesignal-ingest as the INGEST_DISPATCH_TOKEN secret; without it the plane
+      # simply refreshes at its daily 05:30 UTC run, as before. Never fails the orchestration.
+      - name: Ask homesignal-ingest to refresh the Rule D plane
+        if: ${{ steps.orchestrate.outputs.n5_serving_changed != '' }}
+        continue-on-error: true
+        env:
+          INGEST_DISPATCH_TOKEN: ${{ secrets.INGEST_DISPATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${INGEST_DISPATCH_TOKEN:-}" ]; then
+            echo "INGEST_DISPATCH_TOKEN is not configured: the Rule D plane will refresh at its daily run."
+            exit 0
+          fi
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            "https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/refresh-development-seo-plane.yml/dispatches" \
+            -H "Authorization: Bearer $INGEST_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d '{"ref":"main","inputs":{"live":"true","publish":"true"}}') || CODE=000
+          echo "refresh-development-seo-plane dispatch: HTTP $CODE"
+          test "$CODE" = "204"
