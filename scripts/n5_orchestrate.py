@@ -687,10 +687,6 @@ def ready(gen):
     return 0
 
 
-def mode_activate():
-    return activate(require_generation())
-
-
 def announce_serving_change(gen):
     """Tell the workflow that WHICH generation Map 1 serves just changed. Rule D scores the
     serving membership, so its published plane is stale from this moment; the workflow uses
@@ -700,6 +696,10 @@ def announce_serving_change(gen):
     if out:
         with open(out, "a", encoding="utf-8") as f:
             f.write(f"n5_serving_changed={gen}\n")
+
+
+def mode_activate():
+    return activate(require_generation())
 
 
 def activate(gen):
