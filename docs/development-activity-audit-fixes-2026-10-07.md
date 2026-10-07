@@ -6,7 +6,7 @@ Each step is one small change, squash-merged after CI is green. A struck-through
 
 ## Steps I can do in code
 
-1. [x] ~~**Decided is its own label.** A denied or withdrawn application stops reading as "Proposed / Under Review". It gets its own plain label and a warning, in the table, the briefing and the card.~~ DONE: badge, card warning, review prompt, briefing and "On the record" counts, and the comparison table (its own row) all treat it separately. 224 view checks, 75 compare checks, 291 browser checks pass; reverting the fix fails 6.
+1. [x] ~~**Decided is its own label.** A denied or withdrawn application stops reading as "Proposed / Under Review". It gets its own plain label and a warning, in the table, the briefing and the card.~~ DONE (merged as #1702): badge, card warning, review prompt, briefing and "On the record" counts, and the comparison table (its own row) all treat it separately. 224 view checks, 75 compare checks, 291 browser checks pass; reverting the fix fails 6.
 2. [ ] **Every record shows its filing date, and old ones are flagged.** The engine carries the date and its meaning; the page shows it on the record and says when it is more than a year old.
 3. [ ] **A coverage line on every report.** It says which kinds of agency records this report drew from and says plainly that other agencies were not checked. "No approved or proposed records" no longer reads as "nothing is planned".
 4. [ ] **Address-match check is word-aware.** `742 Evergreen` no longer matches `1742 Evergreen`.

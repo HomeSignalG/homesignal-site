@@ -295,6 +295,24 @@ export function recentPublisherEvent(p: Pick<ProjectRow, 'date_kind' | 'submitte
   return { kind, label: EVENT_KINDS[kind], date };
 }
 
+/** An official date older than this many days is flagged as old on the report (audit 2026-10-07, finding 2). Plain days, not a rule about the project. */
+export const OLD_RECORD_DAYS = 365;
+/** The stored date column also carries sentinels (1900-01-01, 1969-12-31: see EVENT_KINDS). Nothing before this is shown as a real filing date. */
+export const RECORD_DATE_FLOOR = '1990-01-01';
+/**
+ * The date the publisher gave the record, of any age, with what it was (filed, issued, decided ...). `publisher_event` only carries one inside the last
+ * RECENT_DAYS, so an Approved or Proposed record from years ago showed no date at all and read like last month's. This is the date and its meaning, and whether
+ * it is more than a year old; it is never a status and never a change. Null when the kind is a plan, the date is not a real past day, or it is a sentinel.
+ */
+export function recordDate(p: Pick<ProjectRow, 'date_kind' | 'submitted_at'>, today: string) {
+  const kind = p.date_kind ?? '';
+  if (!Object.prototype.hasOwnProperty.call(EVENT_KINDS, kind)) return null;
+  if (!validDay(p.submitted_at)) return null;
+  const date = p.submitted_at;
+  if (date > today || date < RECORD_DATE_FLOOR) return null;
+  return { kind, label: EVENT_KINDS[kind], date, older_than_a_year: date < addDays(today, -OLD_RECORD_DAYS) };
+}
+
 // ── the boundary ─────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -482,6 +500,7 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_status: p.status,
       publisher_stage: p.stage,
       publisher_event: ev,
+      record_date: recordDate(p, today),
       developer: p.developer, size: p.size, investment: p.investment,
       source: { url: p.source_ref, attribution: grant ? (grant.attribution || null) : null },
       homesignal_observation: led

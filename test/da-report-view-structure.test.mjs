@@ -49,9 +49,9 @@ const C = code(SRC);
 // ---- 2. it reads a CLOSED set of response keys, and none of the internal ones -------------------------------------------------------------
 {
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
-  const EXPECT = ['as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'project_id',
-    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'what_changed_recently'];
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these nineteen (a new one must be added here on purpose)', snake);
+  const EXPECT = ['as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
+    'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'what_changed_recently'];
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these twenty-one (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
