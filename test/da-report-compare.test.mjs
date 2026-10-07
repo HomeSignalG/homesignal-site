@@ -162,7 +162,7 @@ const html3 = cmp(E3);
   ok(C.NOT_A_SCORE === 'This sets facts from official records side by side. It is not a score or a recommendation, and HomeSignal does not rank properties.' && textOf(html3).includes(C.NOT_A_SCORE), '4f the page says in one fixed sentence that it is not a score or a recommendation');
   // the rows are the plan's factual items, nothing else
   ok(groupsOf(html3).join(' | ') === 'What changed | By stage | By type | Timeline | Coverage and freshness', '4g the groups are the plan\'s factual items: recent changes, stages, Types, timeline, coverage and freshness', groupsOf(html3));
-  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Most recent change HomeSignal detected | Most recent official record | Report as of | What "recent" means | Limits the report states',
+  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Most recent change HomeSignal detected | Most recent official record | Report as of (UTC day) | What "recent" means | Limits the report states',
     '4h the rows, in order', rowsOf(html3).map((r) => r.label));
 }
 
@@ -205,12 +205,12 @@ const html3 = cmp(E3);
 // ---- 8. the reading aids: the list of reports, the dates, the coverage rows ------------------------------------------------------------------------------------
 {
   ok(/<li><span class="da-cmp-n">Report 2<\/span> <span class="da-cmp-addr">2 Cold Ct<\/span> <span class="da-cmp-lab">Smith buyers<\/span> <span class="da-cmp-made">Made Sep 29, 2026<\/span><\/li>/.test(html3), '8a the list says each report\'s number, address, the agent\'s label and the day it was made');
-  ok(rowOf(html3, 'Report as of').join('|') === 'Sep 29, 2026|Sep 29, 2026|Sep 29, 2026' && rowOf(html3, 'What "recent" means').every((c) => c === 'The last 90 days'), '8b each report says the day it is as of and what "recent" meant for it');
+  ok(rowOf(html3, 'Report as of (UTC day)').join('|') === 'Sep 29, 2026|Sep 29, 2026|Sep 29, 2026' && rowOf(html3, 'What "recent" means').every((c) => c === 'The last 90 days'), '8b each report says the day it is as of and what "recent" meant for it');
   const WNOAS = clone(W); delete WNOAS.report.as_of; delete WNOAS.report.recent_days;
   const noas = cmp([entry(2, WNOAS), entry(1, W)]);
-  ok(rowOf(noas, 'Report as of').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
+  ok(rowOf(noas, 'Report as of (UTC day)').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
   const lims = rowOf(html3, 'Limits the report states');
-  ok(lims[0] === 'None stated' && /No official development source for this area is included in this report/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
+  ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /No official development source for this area is included in this report/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
   ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Status changed, detected Sep 27, 2026'),
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');

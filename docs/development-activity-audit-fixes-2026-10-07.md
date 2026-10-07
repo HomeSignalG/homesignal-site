@@ -2,12 +2,12 @@
 
 Source: the competitor-CTO audit of 2026-10-07 (trust and accuracy, security, engineering and usability).
 Founder instruction: "do them all step by step ... cross off as each step is completed."
-Each step is one small change, squash-merged after CI is green. A struck-through step is done and has a receipt.
+Each pull request is squash-merged after CI is green. Steps 3 to 7 (report wording and content) ship together in one pull request, and steps 8 to 11 (page safety) in another, because each pull request takes about 20 minutes of checks. A struck-through step is done and has a receipt.
 
 ## Steps I can do in code
 
 1. [x] ~~**Decided is its own label.** A denied or withdrawn application stops reading as "Proposed / Under Review". It gets its own plain label and a warning, in the table, the briefing and the card.~~ DONE (merged as #1702): badge, card warning, review prompt, briefing and "On the record" counts, and the comparison table (its own row) all treat it separately. 224 view checks, 75 compare checks, 291 browser checks pass; reverting the fix fails 6.
-2. [ ] **Every record shows its filing date, and old ones are flagged.** The engine carries the date and its meaning; the page shows it on the record and says when it is more than a year old.
+2. [x] ~~**Every record shows its filing date, and old ones are flagged.** The engine carries the date and its meaning; the page shows it on the record and says when it is more than a year old.~~ DONE (merged as #1703): the engine carries `record_date`; the card, the review list and the briefing show it; dates before 1990, future dates and plans are never shown.
 3. [ ] **A coverage line on every report.** It says which kinds of agency records this report drew from and says plainly that other agencies were not checked. "No approved or proposed records" no longer reads as "nothing is planned".
 4. [ ] **Address-match check is word-aware.** `742 Evergreen` no longer matches `1742 Evergreen`.
 5. [ ] **Records with no stage no longer vanish.** They are listed under a visible "Stage not stated" group.
