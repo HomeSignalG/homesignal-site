@@ -285,6 +285,12 @@ const FIELD = {
     ok(!/evergreen|homer|44\.046|springfield/i.test(f.join(' ')), '7c and the finding does not repeat the private value: ' + want, f);
   }
   ok(F({ ...clean, note: 'ZIP 97477 area, 44.0 lat' }).length === 0, '7d a ZIP and a coarse (fewer than five decimals) number are not findings');
+  // audit 2026-10-07: a match inside a longer house number or street name is a different address, not a leak (and was withheld, uncharged, as one)
+  ok(F({ ...clean, note: 'near 1742 Evergreen' }).length === 0 && F({ ...clean, note: 'at 742 Evergreenway' }).length === 0, '7e2 "742 Evergreen" is not found inside "1742 Evergreen" or "742 Evergreenway"');
+  ok(F({ ...clean, note: '"742 Evergreen"' }).includes('ADDRESS_FRAGMENT_IN_BODY:house_number_and_street') && F({ ...clean, note: '(742 Evergreen)' }).length > 0 && F({ ...clean, note: 'at 742 EVERGREEN, OR' }).length > 0,
+    '7e3 the real thing is still found between quotes, brackets, commas and in capitals');
+  ok(M.containsBounded('a 742 evergreen b', '742 evergreen') && !M.containsBounded('a 1742 evergreen b', '742 evergreen') && M.containsBounded('1742 evergreen 742 evergreen', '742 evergreen') && !M.containsBounded('', 'x') && !M.containsBounded('abc', ''),
+    '7e4 containsBounded: whole, inside a longer token, a later whole occurrence after an inner one, and the empty cases');
   ok(M.boundaryFindings({ zip: '97477', note: '742 Evergreen' }, null).length === 0, '7e with no private context there is nothing to leak (subject-relative keys are still checked)');
   ok(M.boundaryFindings({ zip: '97477', distance_mi: 1 }, null).length === 1, '7e including with no context');
   const fr = M.addressFragments('742 Evergreen Terrace, Springfield, OR 97477');
