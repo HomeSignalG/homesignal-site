@@ -4989,6 +4989,30 @@ attribute preserved — that event architecture is a separate unit and is not bu
 - Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
   `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
+## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
+
+**Notify a search engine only when a public page meaningfully changed, only after the new bytes are
+live.** Full record: `docs/indexnow-seo-freshness.md`. The rules that must not be re-derived:
+
+- **ONE authority: `scripts/page_semantics.py`.** `gen_zip_pages.py` hands every document it renders to
+  `PageState`; the fingerprint is taken from the SAME string that is written. Never add a second
+  "which page changed?" path, a per-source IndexNow call, or a hand-kept URL list.
+- **Not content, therefore not in the fingerprint:** the build day (the renderer gets `BUILD_DAY_TOKEN`,
+  replaced only at write time), a TRACKED project's `as_of` (the plane producer sets it to today daily and
+  calls it bookkeeping), script/stylesheet `?v=` keys, CSP/base/viewport. Moving any of these
+  re-announcing ~28,000 pages is the failure this prevents. `S`, `G`, `X0` in `test/indexnow-delta.test.mjs`.
+- **The baseline is the previous LIVE state, read before the build** (`page_semantics.py fetch-baseline`,
+  cache-busted, validated). 404 = seed = notify nothing; any other failure FAILS the build (an unreadable
+  baseline is not a first run). After the deploy the live file is the new state, so it cannot be read then.
+- **Order: baseline → build → gates → deploy → prove live → notify.** `indexnow` is its own job
+  (`needs: deploy`); a failure there cannot touch the deployment. `deploy` must never mention IndexNow.
+- **`indexnow.txt` is the ONLY new permitted root artifact**; the key is written on main builds only and
+  must appear in no other file. No `INDEXNOW_KEY` = skip, never fail the deploy.
+- **A freshness run may skip the deploy only if the semantic state is unchanged AND the live build is this
+  commit** (`decide()`): a freshness run can replace a pending push-build in the concurrency group.
+- **`lastmod` moves only when the fingerprint moves, and is omitted when unknown** — never the build day.
+- Query-string map URLs (`homesignalmap.html?zip=`) and `community.html?zip=` are never submitted.
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
