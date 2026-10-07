@@ -345,7 +345,7 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
 {
   const T = 'W'.repeat(43);
   const { f, reqs } = stub([
-    [/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test' })],
+    [/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test', email_confirmed_at: '2026-10-01T00:00:00Z' })],
     [/dashboard_admins/, () => json([])],
     [/rpc\/evaluation_report_share_create$/, () => json([{ share_id: SHARE, expires_at: '2027-04-03T12:00:00+00:00' }])],
     [/rpc\/evaluation_report_shares_of$/, () => json([])],

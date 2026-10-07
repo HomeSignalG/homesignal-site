@@ -147,14 +147,17 @@ noscript p{margin:16px;font-weight:600}
     if (!token) { missing(); return; }
     state('loading'); say('Loading the report…', false);
     var res;
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function(){ ctl.abort(); }, 20000) : null; // a stalled connection ends in the "could not load" message, never a page that says Loading forever
     try {
       res = await fetch(FN, {
-        method: 'POST', cache: 'no-store', referrerPolicy: 'no-referrer',
+        method: 'POST', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined,
         headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON },
         body: JSON.stringify({ token: token })
       });
-    } catch (e) { unavailable(); return; }
+    } catch (e) { if (timer) clearTimeout(timer); unavailable(); return; }
     var body = null; try { body = await res.json(); } catch (e) { body = null; }
+    if (timer) clearTimeout(timer);
     if (res.status === 200 && body && body.status === 'OK') { show(body); return; }
     if (res.status === 404) { dead(); return; }
     unavailable();

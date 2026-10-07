@@ -570,7 +570,7 @@ function stub(routes) {
 const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
 {
   const { f, reqs } = stub([
-    [/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test' })],
+    [/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test', email_confirmed_at: '2026-10-01T00:00:00Z' })],
     [/dashboard_admins/, () => json([])],
     [/rpc\/evaluation_property_watch_start$/, () => json([{ watch_id: WATCH, created_at: '2026-10-01T09:00:00+00:00', started: true }])],
     [/rpc\/evaluation_property_watches_of$/, () => json([WROW])],

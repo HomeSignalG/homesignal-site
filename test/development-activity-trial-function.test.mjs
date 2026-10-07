@@ -145,7 +145,7 @@ function stubFetch(routes) {
   };
 }
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
-const USER = [/\/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test' })];
+const USER = [/\/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.test', email_confirmed_at: '2026-10-01T00:00:00Z' })];
 const NOT_ADMIN = [/dashboard_admins/, () => json([])];
 const USAGE = [/\/rest\/v1\/rpc\/evaluation_usage$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', status: 'active', credit_limit: 10, credits_used: 5, credits_remaining: 5, expires_at: null, expired: false }])];
 const MEMBER = (role = 'agent') => [/\/rest\/v1\/rpc\/brokerage_membership_of$/, () => json([{ brokerage_id: 'b0000000-0000-4000-8000-000000000002', role }])];

@@ -191,7 +191,9 @@ const C = code(SRC);
     // build step 10: the side-by-side comparison READS the view's functions (read, typeCounts, outcomeText, describe...) so its counts are the report's own;
     // it is a module, not a page, and the customer page loads it beside the view. Its tests, its mutation harness and its record are listed with it.
     'lib/da-report-compare.js', 'test/da-report-compare.test.mjs', 'test/da-report-compare-structure.test.mjs',
-    'test/da_report_compare_mutants.py', 'docs/development-activity-compare-2026-10-03.md']);
+    'test/da_report_compare_mutants.py', 'docs/development-activity-compare-2026-10-03.md',
+    // audit fix 10 (2026-10-07): the CI job that runs the mutation loops names them (and so the file they edit)
+    '.github/workflows/da-report-mutants.yml']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

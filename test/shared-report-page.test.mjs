@@ -105,5 +105,9 @@ ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript\{displa
 ok(/id="pdf" hidden/.test(page) && /\$\('pdf'\)\.hidden = false/.test(sh), '7c the button appears only when there is a report to print');
 ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" content="width=device-width,initial-scale=1"/.test(page) && /id="status" role="status" aria-live="polite"/.test(page), '7d a page without JavaScript says so, the status line is announced, and the page scales to a phone');
 
+// ---- audit fix 8 (2026-10-07): a stalled connection ends in the "could not load" message ------------------------------------------------
+ok(/new AbortController\(\)/.test(code) && /signal: ctl \? ctl\.signal : undefined/.test(code) && /setTimeout\(function\(\)\{ ctl\.abort\(\); \}, 20000\)/.test(code) && (code.match(/clearTimeout\(timer\)/g) || []).length === 2,
+  'T1 the report request is aborted after 20 seconds and the timer is cleared on both the failure and the answer');
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

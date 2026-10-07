@@ -28,7 +28,7 @@ def m(name, old, new, tests=(SRC, BRO)):
 
 m('indexable', '<meta name="robots" content="noindex, nofollow">', '<meta name="robots" content="index, follow">')
 m('creates_accounts', 'shouldCreateUser:false', 'shouldCreateUser:true')
-m('anon_key_only_no_user_token', "'Authorization': 'Bearer ' + session.access_token", "'Authorization': 'Bearer ' + SB_ANON")
+m('anon_key_only_no_user_token', "var res = await fetch(FN, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token,", "var res = await fetch(FN, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SB_ANON,")  # re-anchored 2026-10-07 (audit fix 10): the same header is written twice now, so the report call is named
 m('sends_a_radius', 'body: JSON.stringify({ address: address, view: view })', 'body: JSON.stringify({ address: address, view: view, radius_mi: 1 })')
 m('sends_the_label', 'body: JSON.stringify({ address: address, view: view })', "body: JSON.stringify({ address: address, view: view, label: field('label') })")
 m('remembers_the_address', "    var view = viewChoice();\n", "    var view = viewChoice(); try { localStorage.setItem('da-addr', address); } catch (e) {}\n")
@@ -41,8 +41,9 @@ m('admin_refusal_unexplained', "    if (httpStatus === 403) return 'This account
 m('zip_not_named', "'That address is in ZIP ' + (typeof body.zip === 'string' && /^\\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet.'",
   "'That address is not covered yet.'", [BRO])
 m('no_page_side_address_check', "    if (address.length < 8 || address.indexOf(' ') < 0) { say('Enter a full street address with the city and state.', true); $('addr').focus(); return; }\n", '', [BRO])
-m('header_fields_dropped', "    var opts = { subject: address, label: field('label'), brokerage: field('brokerage'), agent: field('agent') };",
-  "    var opts = { subject: address };", [BRO])
+m('header_fields_dropped',
+  "    var opts = { subject: address, label: field('label'), brokerage: field('brokerage'), agent: field('agent'), showLifecycle: true };",
+  "    var opts = { subject: address, showLifecycle: true };", [BRO])  # re-anchored 2026-10-07 (audit fix 10)
 m('report_not_drawn_by_the_view', "    if (!V || !V.mount($('report'), body, opts))", "    if (!V || !($('report').textContent = JSON.stringify(body.report.sections)))")
 m('wrong_view_sent', "  function viewChoice(){ var v=document.querySelector('input[name=\"view\"]:checked'); return v ? v.value : 'internal'; }",
   "  function viewChoice(){ return 'internal'; }", [BRO])
