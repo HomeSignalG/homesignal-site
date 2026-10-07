@@ -52,6 +52,13 @@ ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-ac
     '1f the public landing page links this page exactly once, to its Billing card (#billing): the Join for $79/month link', links);
 }
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
+// 1h. the way back OUT (founder, 2026-10-05 asked for the way in; the page had no way off it). Two plain same-site links, inside header.top so the print rule hides them.
+const headerTop = (page.match(/<header class="top">[\s\S]*?<\/header>/) || [''])[0];
+const siteNav = (headerTop.match(/<nav class="sitenav" aria-label="HomeSignal site">([\s\S]*?)<\/nav>/) || [])[1] || '';
+ok(JSON.stringify([...siteNav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].map((m) => m[2] + '=' + m[1])) === JSON.stringify(['HomeSignal=index.html', 'Enterprise=development-activity.html']),
+  '1h the header carries exactly two links off the page: HomeSignal (index.html) and Enterprise (development-activity.html)', siteNav);
+ok(!/https?:\/\//.test(siteNav) && !/target=|rel=|onclick/.test(siteNav), '1i ...both plain same-site links: no address of another site, no new window, no script');
+ok(/header\.top\s*\{display:none!important\}|header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides header.top is still there, so the links never print');
 
 // ---- 2. keys and sign-in ----------------------------------------------------------------------------------------------------------------------
 const jwts = [...page.matchAll(/eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+/g)].map((m) => JSON.parse(Buffer.from(m[1], 'base64url').toString('utf8')));
