@@ -210,9 +210,12 @@ ok(/<meta name="robots" content="noindex, nofollow">/.test(cust) && /<meta name=
   'P6b the customer page is noindex, nofollow, and sends no referrer');
 ok(new RegExp('^Disallow: /' + CUSTOMER_PAGE.replace('.', '\\.') + '$', 'm').test(robots), 'P6c the staged robots.txt Disallows the customer page');
 const linkingCust = [...content].filter(([f, body]) => f !== CUSTOMER_PAGE && f !== 'robots.txt' && body.includes(CUSTOMER_PAGE)).map(([f]) => f);
-// Founder, 2026-10-05: the header's Enterprise dropdown carries "My reports" so an agent can get back. That is the shell's one link.
-ok(JSON.stringify(linkingCust) === JSON.stringify(['partials/shell.html']),
-  'P6d the only staged file naming the customer page is the shell\'s "My reports" entry; the landing page links it at launch (build step 13)', linkingCust);
+// Founder, 2026-10-05: the header's Enterprise dropdown carries "My reports" so an agent can get back. That is the shell's link.
+// Founder, 2026-10-06: the landing page's "Join for $79/month" links the customer page's Billing card (#billing), and that is its one link.
+ok(JSON.stringify(linkingCust) === JSON.stringify(['development-activity.html', 'partials/shell.html']),
+  'P6d the only staged files naming the customer page are the shell\'s "My reports" entry and the landing page\'s Join for $79/month link', linkingCust);
+const landingLinks = (content.get('development-activity.html') || '').replace(/<!--[\s\S]*?-->/g, '').match(new RegExp(CUSTOMER_PAGE.replace('.', '\\.') + '[^"\'\\s<]*', 'g')) || [];
+ok(landingLinks.length === 1 && landingLinks[0] === CUSTOMER_PAGE + '#billing', 'P6e the landing page names the customer page exactly once, as its Billing card (#billing)', landingLinks);
 ok(robots.includes(CUSTOMER_PAGE) && readRepo('scripts/stage_site.py').includes("'" + CUSTOMER_PAGE + "'"), 'P6e control: the same detector finds the page name where it really is');
 ok(!/service_role|SERVICE_ROLE/.test(cust) && /view: 'customer'/.test(cust) && !/'internal'/.test(cust),
   'P6f the customer page carries no service-role key and only ever asks for the customer view');

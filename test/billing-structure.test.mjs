@@ -200,8 +200,8 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   ok(!/credits_remaining\s*[-+]\s*1|credits_used\s*\+\s*1|plan\.credits_(used|remaining)\s*(\+\+|--|[-+]=)/.test(js),
     '4d the page never works out a count: every figure it shows is the one the database gave');
   const landing = read('development-activity.html');
-  ok(!/manage-billing|lemonsqueezy|checkout/i.test(stripJs(landing.replace(/<!--[\s\S]*?-->/g, ''))) && /data-cta="join" aria-disabled="true">Join for \$79\/month/.test(landing),
-    '4e the landing page still has NO checkout: its buttons stay inert (they go live in build step 13, after the end-to-end test)');
+  ok(!/manage-billing|lemonsqueezy|checkout/i.test(stripJs(landing.replace(/<!--[\s\S]*?-->/g, ''))) && /<a class="mbtn da-join" href="development-activity-reports\.html#billing" id="daJoin" data-cta="join">Join for \$79\/month<\/a>/.test(landing),
+    '4e the landing page still makes NO checkout and calls no billing function or processor; its Join for $79/month (founder, 2026-10-06) is a plain link to the Reports page Billing card, where the owner presses Subscribe');
   const landingPrice = /\$79\/month/.test(landing) && /100 new Development Activity reports each month/.test(landing) && /Cancel anytime\./.test(landing);
   ok(landingPrice && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(page),
     '4f the page\'s offer says the same thing as the landing page: $79/month, 100 new reports each month, cancel anytime');

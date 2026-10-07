@@ -6,11 +6,13 @@
 <!-- LISTED, NOT LAUNCHED. Deployed 2026-09-29 noindex and unlinked; the founder's navigation plan
      v3 (2026-09-30) made it the shell's "Enterprise" item, linked once, from partials/shell.html.
      Founder, 2026-10-02 ("list it sooner, without checkout"): the page may be indexed and is in the
-     sitemap NOW, because its commerce buttons are HIDDEN. The free-evaluation entitlement and the
-     $79/month checkout still do not exist (100126 plan, section 25), so every button stays inert
-     (aria-disabled) and sits inside a <div data-commerce hidden>. To LAUNCH: make the buttons live,
-     then remove `hidden` from those four divs. test/development-activity-landing.test.mjs fails if
-     an inert button is visible on an indexable page, or if anything other than the shell's
+     sitemap NOW, because its commerce buttons are HIDDEN. The free-evaluation entitlement still does not
+     exist (100126 plan, section 25), so the three "Start free" buttons stay inert (aria-disabled) and sit inside
+     a <div data-commerce hidden>. To LAUNCH them: make them live, then remove `hidden` from those three divs.
+     Founder, 2026-10-06: "Join for $79/month" is a real link to the Reports page's Billing card
+     (development-activity-reports.html#billing), where an existing brokerage owner signs in and presses Subscribe.
+     The signed checkout is made by manage-billing, never by this page. test/development-activity-landing.test.mjs
+     fails if an inert button is visible on an indexable page, or if anything other than the shell's
      Enterprise item links here. -->
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://homesignal.net/development-activity.html">
@@ -125,6 +127,7 @@
   .da-price small{font-size:16px;font-weight:600;color:var(--ink-2);letter-spacing:0}
   .da-band{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green);margin:0 0 6px!important}
   .da-teach{margin:14px 0 0!important}
+  .da-join{display:inline-block;text-decoration:none}
   .da-contrast{margin:22px 0 0!important}
   .da-final{text-align:left}
   @media(max-width:900px){
@@ -184,10 +187,8 @@
             <li>Download or print existing reports.</li>
             <li>Cancel anytime.</li>
           </ul>
-          <div data-commerce hidden>
-            <button type="button" class="mbtn da-off" data-cta="join" aria-disabled="true">Join for $79/month</button>
-            <span class="da-soon">Opens at launch.</span>
-          </div>
+          <p><a class="mbtn da-join" href="development-activity-reports.html#billing" id="daJoin" data-cta="join">Join for $79/month</a></p>
+          <p class="da-muted">Subscribing is for brokerage owners. HomeSignal sets up brokerage accounts: <a class="da-link" href="contact.html">contact us</a> to get one.</p>
         </div>
         <div>
           <p class="da-band">Brokerage / Enterprise</p>
@@ -341,8 +342,8 @@
        the Type filter narrows the same list across all three Stage sections. Stage labels are display
        groupings only and create no lifecycle value (founder ruling R2). Every count is computed from
        the entries below, so the numbers on the page cannot disagree with the list.
-   The commerce buttons are inert (aria-disabled) and HIDDEN (founder, 2026-10-02): the 10-report entitlement
-   and the $79/month checkout are launch blockers (plan sections 18 and 25). */
+   The three Start free buttons are inert (aria-disabled) and HIDDEN (founder, 2026-10-02): the 10-report entitlement
+   entitlement is a launch blocker (plan sections 18 and 25); "Join for $79/month" is a link, not a button. */
 (function () {
   'use strict';
 

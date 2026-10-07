@@ -219,26 +219,29 @@ const seen = await page.evaluate(() => {
   const vis = (n) => n.offsetParent !== null && n.getClientRects().length > 0;
   const soon = [...document.querySelectorAll('.da-soon')];
   return {
-    buttons: document.querySelectorAll('[data-cta]').length,
-    visibleButtons: [...document.querySelectorAll('[data-cta]')].filter(vis).length,
+    buttons: document.querySelectorAll('button[data-cta]').length,
+    visibleButtons: [...document.querySelectorAll('button[data-cta]')].filter(vis).length,
     soon: soon.length,
     visibleSoon: soon.filter(vis).length,
     // Positive control for the visibility probe: the coverage button IS visible.
     control: vis(document.getElementById('daCoverBtn')),
+    joinVisible: vis(document.getElementById('daJoin')), joinHref: document.getElementById('daJoin').getAttribute('href'), joinText: document.getElementById('daJoin').textContent, joinTag: document.getElementById('daJoin').tagName,
     enterpriseVisible: vis(document.getElementById('daEnterprise')),
     finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
   };
 });
-ok(seen.control && seen.buttons === 4 && seen.visibleButtons === 0,
-  'HIDDEN (founder, 2026-10-02): all four commerce buttons are on the page and none is visible (control: the coverage button is)', seen);
-ok(seen.soon === 4 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
+ok(seen.control && seen.buttons === 3 && seen.visibleButtons === 0,
+  'HIDDEN (founder, 2026-10-02): the three Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
+ok(seen.soon === 3 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
+ok(seen.joinVisible && seen.joinHref === 'development-activity-reports.html#billing' && seen.joinText === 'Join for $79/month' && seen.joinTag === 'A',
+  'Join for $79/month is a VISIBLE link to the Reports page Billing card (founder, 2026-10-06), not a button', seen);
 ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
 // A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
-await page.$$eval('[data-cta]', (bs) => bs.forEach((b) => b.click()));
+await page.$$eval('button[data-cta]', (bs) => bs.forEach((b) => b.click()));
 const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
 ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
-  'clicking any of the four commerce buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
-ok((await page.$$eval('[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
+  'clicking any of the three Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
+ok((await page.$$eval('button[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
 ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal →')
    && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
 ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sample' && a.textContent === 'View a sample report →'), 'the hero\'s visible action is View a sample report →, and it jumps to the sample');

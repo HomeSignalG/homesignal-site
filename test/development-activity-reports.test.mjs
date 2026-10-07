@@ -44,7 +44,13 @@ ok(shellMine.length === 1 && /data-sub="reports"/.test(shellMine[0]) && !/data-n
   '1c the shell names it once, as "My reports" in the Enterprise dropdown, and is otherwise not in the app shell or its navigation', shellMine);
 ok(/'development-activity-reports\.html',/.test(read('scripts/stage_site.py')), '1d staged on purpose (named in the artifact contract, not shipped by accident)');
 ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-activity-reports/.test(read('scripts/gen_sitemap.py')), '1e not in the sitemap or its generator');
-ok(!/development-activity-reports/.test(read('development-activity.html')), '1f the public landing page does not link it yet (its buttons go live at launch, build step 13)');
+{
+  // Founder, 2026-10-06: the landing page's "Join for $79/month" is a real link to this page's Billing card, and nothing else on it links here.
+  const landing = read('development-activity.html').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+  const links = landing.match(/development-activity-reports[^"'\s<]*/g) || [];
+  ok(links.length === 1 && links[0] === 'development-activity-reports.html#billing',
+    '1f the public landing page links this page exactly once, to its Billing card (#billing): the Join for $79/month link', links);
+}
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
 
 // ---- 2. keys and sign-in ----------------------------------------------------------------------------------------------------------------------

@@ -180,13 +180,21 @@ const shipped = stage.includes("'" + PAGE + "'");
 const inSitemap = sitemap.includes('/' + PAGE);
 const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
-ok(cta.length === 4 && cta.filter((c) => c.cta === 'start-free').length === 3 && cta.filter((c) => c.cta === 'join').length === 1,
-  'the hero, pricing and closing "Start free — 10 reports" plus the "Join for $79/month" button are all present', cta.map((c) => c.cta));
+ok(cta.length === 3 && cta.every((c) => c.cta === 'start-free'),
+  'the hero, pricing and closing "Start free — 10 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
+// Founder, 2026-10-06: "Join for $79/month" is a REAL link, not an inert button. It goes to the Reports page's Billing card, where an existing brokerage
+// owner signs in and presses Subscribe; the signed checkout is made by manage-billing. It must stay a plain internal link: no processor address, no
+// handler, no checkout made from this page.
+const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)].map((m) => ({ tag: m[0], label: m[1] }));
+ok(joins.length === 1 && joins[0].label === 'Join for $79/month' && /\shref="development-activity-reports\.html#billing"/.test(joins[0].tag) && !/aria-disabled|onclick=/.test(joins[0].tag),
+  'Join for $79/month is one live link to the Reports page Billing card (development-activity-reports.html#billing)', joins);
+ok(/Subscribing is for brokerage owners\. HomeSignal sets up brokerage accounts:/.test(text), 'the Join link says plainly who can use it: brokerage owners, whose accounts HomeSignal sets up');
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
   'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-ok(!/href="[^"]*(checkout|lemonsqueezy|stripe|billing|subscribe)/i.test(markup) && !/lemonsqueezy|stripe|checkout/i.test(scriptCode),
-  'the page links to no checkout or payment processor and its code calls none');
+const hrefs = [...markup.matchAll(/\shref="([^"]*)"/g)].map((m) => m[1]);
+ok(!hrefs.some((h) => /checkout|lemonsqueezy|stripe|subscribe/i.test(h)) && hrefs.filter((h) => /billing/i.test(h)).every((h) => h === 'development-activity-reports.html#billing') && !/lemonsqueezy|stripe|checkout/i.test(scriptCode),
+  'the page links to no checkout or payment processor (its only billing link is the internal Reports-page Billing card) and its code calls none', hrefs.filter((h) => /checkout|lemonsqueezy|stripe|subscribe|billing/i.test(h)));
 ok(!/HS\.requireAuth|HS\.openAuth|signin=1/.test(noComments), 'the inert buttons are not wired to sign-in, which would imply an entitlement that is not there');
 const inert = cta.some((c) => /aria-disabled="true"/.test(c.tag));
 // sitemap.xml is not a link a visitor follows: it is judged by the sitemap tripwire below.
@@ -203,8 +211,8 @@ const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^
 // "Start free — 10 reports" borrow a hidden sibling's wrapper.
 const isInert = (tag) => /aria-disabled="true"/.test(tag);
 const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
-ok(wrappers.length === 4 && (markup.match(/data-commerce/g) || []).length === 4 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
-  'each of the four commerce buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
+ok(wrappers.length === 3 && (markup.match(/data-commerce/g) || []).length === 3 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
+  'each of the three inert Start free buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
 ok(wrappers.every((w) => w.hidden) && !visibleInert, 'HIDDEN (founder, 2026-10-02): every inert commerce button is inside a hidden wrapper', wrappers);
 ok(/\[hidden\]\{display:none!important\}/.test(cssBlock), 'the page CSS makes [hidden] win over any display rule, so a hidden wrapper cannot reappear');
 const indexable = /<meta name="robots" content="index, follow">/.test(src) && !/noindex/i.test(noComments);
