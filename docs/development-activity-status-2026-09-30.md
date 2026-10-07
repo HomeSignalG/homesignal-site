@@ -291,7 +291,7 @@ is **superseded by Order A–P above**. Those two files stay as dated receipts.
    Go given 2026-09-30; decision 10 (option (b)) is applied, so an ordinary run no longer announces disagreements
    between ZIP copies. **Built and APPLIED 2026-10-01 (#1512, applied 17:53Z by `db-sql` run `36902655576`; baseline doc §12 and its production receipt):**
    `docs/dev-change-observation-schedule.sql` adds one wrapper (one ordinary run per UTC day, one tick per call),
-   the pg_cron job `dev-change-observe` at `*/5 2-7 * * *` UTC, and an alertable monitor check. The schedule comes from
+   the pg_cron job `dev-change-observe` at `*/5 2-7 * * *` UTC (widened to `*/5 2-8 * * *` on 2026-10-07: the 72 calls measured ~3% short, see the baseline doc), and an alertable monitor check. The schedule comes from
    **a production pilot of the update path** (175 ZIPs through the real tick plus six named ZIPs): every one of the
    12,722 ZIPs is due every day, a pass is 64 calls of 200, and the window must hold at least that many calls (the first
    guess, `*/5 2-6`, held 60 and could never finish). **It keeps clear of the daily `verify-communities` run**, which starts

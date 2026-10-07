@@ -120,11 +120,14 @@ ok(h1 < 13,
   '7d: the window ENDS before 13:00 UTC, the earliest the daily verify-communities walk can start (13:17), so this job never runs beside it', SCHED);
 ok(Number(sMin.slice(2)) >= 5,
   '7e: a call every five minutes at the fastest (one call is bounded at 60 s, so the duty cycle is at most 20%)', SCHED);
-// the window must be able to FINISH a pass: 12,722 canonical ZIPs (the registry; CLAUDE.md "12,722 ZIP pages, fixed") at 200 a call
+// the window must be able to FINISH a pass: 12,722 canonical ZIPs (the registry; CLAUDE.md "12,722 ZIP pages, fixed").
+// Capacity is priced at the MEASURED average of ~171 ZIPs a call (2026-10-07: about 19 of 72 calls stop on the 60 s cap
+// on large ZIPs), NOT the nominal 200. At 200 a call the old 2-7 window looked sufficient and was ~3% short.
+const MEASURED_ZIPS_PER_CALL = 170;
 const CALLS_PER_DAY = (60 / Number(sMin.slice(2))) * (h1 - h0 + 1);
-ok(CALLS_PER_DAY * 200 >= Math.ceil(12722 * 1.1),
-  '7g: the window holds enough calls to walk the whole registry in a day with 10% headroom (a window that cannot reach "nothing due" would trip its own alarm)',
-  CALLS_PER_DAY + ' calls x 200 = ' + CALLS_PER_DAY * 200 + ' vs ' + Math.ceil(12722 * 1.1));
+ok(CALLS_PER_DAY * MEASURED_ZIPS_PER_CALL >= Math.ceil(12722 * 1.1),
+  '7g: the window holds enough calls to walk the whole registry in a day with 10% headroom at the measured ~170 ZIPs a call (a window that cannot reach "nothing due" would trip its own alarm)',
+  CALLS_PER_DAY + ' calls x ' + MEASURED_ZIPS_PER_CALL + ' = ' + CALLS_PER_DAY * MEASURED_ZIPS_PER_CALL + ' vs ' + Math.ceil(12722 * 1.1));
 ok(/raise notice 'pg_cron not installed here/.test(CRON), '7f: with no pg_cron the job is not scheduled and says so (a notice, not a failure)');
 
 // ── 8. the check: ONE reader, every threshold, fails as a failing row ─────────────────────────────

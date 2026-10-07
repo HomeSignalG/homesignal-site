@@ -2263,6 +2263,13 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     Pinned by `scripts/test_n5_auto_lifecycle.py` §8b (6 checks fail on the old code).
     ⚠️ **Separate, transient, the same morning:** one tick at 07:47Z failed `FGA Authentication
     Error. Unauthorized` (HTTP 500) from the Supabase management API; the next hour's did not.
+  - 🟠 **THE NIGHTLY CHANGE-OBSERVATION WINDOW WAS ~3% SHORT, AND THE ALARM WAS RIGHT (2026-10-07).** `dev_change_observation`
+    paged "no daily pass has reached 'nothing due' in 48 hours". Not a bug and not a bad alarm: pg_cron job 74
+    (`dev-change-observe`, `*/5 2-7`) holds 72 calls sized at 200 ZIPs, but about 19 of them a night stop on the 60 s cap on
+    large ZIPs, so the night averages ~171 and observes ~12,300 of 12,722; ~400 ZIPs slip to the next night.
+    **"completed" means some tick found nothing due, not that every ZIP was covered.** Fixed by widening the window to
+    `*/5 2-8` (84 calls, ~14,300 ZIPs, ends well before the 13:17 `verify-communities` run). **The 48-hour threshold is
+    unchanged (founder: "leave 48 hour")**; the structural pin now prices capacity at the measured ~170 a call, not 200.
   - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
     build with no progress for 6 h, on no build running while the serving map was captured
     > 72 h ago, and on two builds in flight at once.
