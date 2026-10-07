@@ -723,6 +723,28 @@ const htmlLife = viewLife(W);
   ok(/data-da-method/.test(emptyM) && !/Official agency data in this report/.test(emptyM), '14m an empty report still carries the method, without an agencies line');
 }
 
+// ---- 15: a Decided application is shown as denied or withdrawn, never as under review (audit 2026-10-07, finding 1) --------------------------
+{
+  const WD = await wire({ rows: [row('k-dec', 0.2, FAM_A), row('k-prop', 0.3, FAM_A)], projects: [
+    proj('k-dec', FAM_A, { name: 'Turned Down Tower', type: 'Residential', status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' }),
+    proj('k-prop', FAM_A, { name: 'Open Proposal Plaza', type: 'Commercial', status: 'Proposed' })], ledger: [], events: [], health: [] });
+  const hd = view(WD);
+  const cardOf = (name) => (hd.match(new RegExp('<article class="da-rv-card"[^>]*>(?:(?!</article>)[\\s\\S])*?' + name + '[\\s\\S]*?</article>')) || [''])[0];
+  const dc = cardOf('Turned Down Tower'), pc = cardOf('Open Proposal Plaza');
+  ok(/da-rv-decided/.test(dc) && /Decided \(denied or withdrawn\)/.test(dc), '15a a Decided record\'s badge says Decided (denied or withdrawn)');
+  ok(/This application was decided \(denied or withdrawn\)\. It is not open or under review/.test(dc), '15b its card carries the plain outcome warning');
+  ok(!/da-rv-decided/.test(pc) && !/decided \(denied/i.test(pc), '15c an ordinary Proposed record carries no Decided marking');
+  const bt = decode((hd.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(/1 proposed \/ under review/.test(bt) && /1 decided \(denied or withdrawn\)/.test(bt), '15d the briefing counts the open proposal and the decided one separately', bt);
+  const onrec = decode((hd.match(/class="da-rv-onrecord">([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(/1 proposed \/ under review · 1 decided \(denied or withdrawn\)\./.test(onrec), '15e the "On the record" line counts them separately', onrec);
+  const rv = sec(hd, 'review');
+  ok(rv && /Confirm the outcome at the official source before describing it to a client/.test(rv.html) && /Verify the application status/.test(rv.html), '15f the review list gives the decided record its own prompt and keeps the ordinary one for the other');
+  const WD1 = await wire({ rows: [row('k-dec', 0.2, FAM_A)], projects: [proj('k-dec', FAM_A, { name: 'Only Decided', type: 'Residential', status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' })], ledger: [], events: [], health: [] });
+  const bt1 = decode((view(WD1).match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(!/1 proposed \/ under review/.test(bt1) && /No approved \/ coming or proposed \/ under review records are listed/.test(bt1), '15g a report whose only record was decided says no proposal is under review', bt1);
+}
+
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

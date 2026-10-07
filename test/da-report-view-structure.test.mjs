@@ -76,8 +76,10 @@ const C = code(SRC);
   ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|address|feature_id)\b/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, address, dates, raw type, ids)');
   ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
   ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
-  ok((C.match(/publisher_status/g) || []).length === 2 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\('Official agency status', status\)/g) || []).length === 2,
-    '2e the agency\'s status word is read in the two card builders, and only to be printed under its own label');
+  // audit 2026-10-07 (finding 1): a third read, isDecided(), exists so a denied or withdrawn application is never labelled "under review".
+  ok((C.match(/publisher_status/g) || []).length === 3 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\('Official agency status', status\)/g) || []).length === 2
+    && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
+    '2e the agency\'s status word is read in the two card builders (printed under its own label) and in ONE function, isDecided, that only asks whether it is Decided');
   ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 5
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
     '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker and the table row); lifecycle only as the engine\'s key and label');
@@ -94,7 +96,9 @@ const C = code(SRC);
     '3a2 the Type authority\'s registry is read in ONE place, typeLabelFor (the Type filter and the comparison both use it), for its labels only (and a regulated facility is never offered as a Type, ruling 1)');
   const filt = (C.match(/function filtersSection\(current, stageFor\) \{[\s\S]*?\n  \}/) || [''])[0];
   ok(filt.length > 300 && !/CATEGORY_REGISTRY/.test(filt) && /typeLabelFor\(k, seen\)/.test(filt), '3a3 (control) the Type filter reaches the registry only through typeLabelFor, so there is no second read to drift');
-  ok(!/['"](decided|on file|built|active)['"]/i.test(C), '3b no publisher status word is mapped to anything: the code carries no status vocabulary at all');
+  // The one status word the view may name is 'decided' (denied or withdrawn, CLAUDE.md 7.05), once, inside isDecided, to LABEL it, never to place it in a stage.
+  ok(!/['"](on file|built|active)['"]/i.test(C) && (C.match(/['"]decided['"]/gi) || []).length === 1 && /isDecided\(p\) \{ return [^;]*=== 'decided'; \}/.test(C),
+    '3b no publisher status word is mapped to a lifecycle or a stage: the only one named is "decided", once, in isDecided, to label it');
   ok(/var SHAPES = \{\s*approved:[\s\S]*proposed:[\s\S]*operating:[\s\S]*unknown:[\s\S]*\};/.test(C) && /['"](decided|on file|built|active)['"]/i.test("x 'Decided' y"),
     '3b (control) the only lifecycle words in the code are the four keys of the shape table, and the status-word scan can see a status word');
   ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),

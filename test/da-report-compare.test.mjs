@@ -91,7 +91,7 @@ const html3 = cmp(E3);
 // ---- 2. THE SAME NUMBERS AS THE REPORT: each cell equals what that report prints for itself -------------------------------------------------------------
 {
   const own = (response) => V.html(response, { subject: 'x' });
-  const stageLine = (h) => { const m = /On the record within 0\.5 miles: (\d+) permitted \/ under construction · (\d+) approved \/ coming · (\d+) proposed \/ under review\./.exec(textOf(h)); return m ? [m[1], m[2], m[3]] : null; };
+  const stageLine = (h) => { const m = /On the record within 0\.5 miles: (\d+) permitted \/ under construction · (\d+) approved \/ coming · (\d+) proposed \/ under review(?: · \d+ decided \(denied or withdrawn\))?\./.exec(textOf(h)); return m ? [m[1], m[2], m[3]] : null; };
   const sectionHtml = (h, key) => { const m = new RegExp('<section class="da-rv-sec da-rv-sec--' + key + '[^"]*"[^>]*>([\\s\\S]*?)</section>').exec(h); return m ? m[1] : ''; };
   const metricSum = (h) => [...h.matchAll(/<div class="da-rv-metric"><b>(\d+)<\/b>/g)].reduce((a, m) => a + Number(m[1]), 0);
   const chips = (h) => Object.fromEntries([...h.matchAll(/data-da-filter="type" data-da-value="(\w+)" aria-pressed="false">([^<]*?) <span class="da-rv-chipn">(\d+)<\/span>/g)].map((m) => [decode(m[2]), m[3]]));
@@ -110,8 +110,10 @@ const html3 = cmp(E3);
   });
   // the report's own lists, through the shared read()
   const m = V.read(W);
-  ok(rowOf(two, 'Approved / Coming')[0] === String(m.staged.approved.length) && rowOf(two, 'Proposed / Under Review')[0] === String(m.staged.proposed.length)
+  ok(rowOf(two, 'Approved / Coming')[0] === String(m.staged.approved.length) && rowOf(two, 'Proposed / Under Review')[0] === String(V.util.openProposed(m.staged.proposed).length)
     && rowOf(two, 'Records with a change HomeSignal detected')[0] === String(m.changed.length), '2f the cells are the lengths of the view\'s own lists (read()), not a second derivation');
+  ok(rowOf(two, 'Decided (denied or withdrawn)')[0] === String(m.staged.proposed.length - V.util.openProposed(m.staged.proposed).length) && Number(rowOf(two, 'Decided (denied or withdrawn)')[0]) >= 1,
+    '2g a Decided application is counted on its own row, so "Proposed / Under Review" is only what is open (audit 2026-10-07)');
   ok(rowOf(two, 'Residential')[0] === '3' && rowOf(two, 'Commercial')[0] === '2' && rowOf(two, 'Roads & infrastructure')[0] === '1', '2g anchor: the rich fixture is 3 residential, 2 commercial, 1 roads & infrastructure', rowsOf(two).map((r) => r.label + '=' + r.cells[0]));
   // the labels of the three stages are the view's own titles
   ok(['Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'].every((l) => rowsOf(two).some((r) => r.label === l)) && V.TITLES.approved === 'Approved / Coming', '2h the stage rows carry the view\'s own titles');
@@ -160,7 +162,7 @@ const html3 = cmp(E3);
   ok(C.NOT_A_SCORE === 'This sets facts from official records side by side. It is not a score or a recommendation, and HomeSignal does not rank properties.' && textOf(html3).includes(C.NOT_A_SCORE), '4f the page says in one fixed sentence that it is not a score or a recommendation');
   // the rows are the plan's factual items, nothing else
   ok(groupsOf(html3).join(' | ') === 'What changed | By stage | By type | Timeline | Coverage and freshness', '4g the groups are the plan\'s factual items: recent changes, stages, Types, timeline, coverage and freshness', groupsOf(html3));
-  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Residential | Commercial | Roads & infrastructure | Most recent change HomeSignal detected | Most recent official record | Report as of | What "recent" means | Limits the report states',
+  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Most recent change HomeSignal detected | Most recent official record | Report as of | What "recent" means | Limits the report states',
     '4h the rows, in order', rowsOf(html3).map((r) => r.label));
 }
 
@@ -213,7 +215,7 @@ const html3 = cmp(E3);
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');
   ok(/<caption class="da-cmp-vh">Compare properties: 3 reports side by side<\/caption>/.test(html3) && /<th scope="col"><span class="da-cmp-vh">Fact<\/span><\/th>/.test(html3), '8f the table has a caption and a heading for its first column, for a screen reader');
-  ok(rowsOf(html3).every((r) => r.cells.length === 3) && (html3.match(/<td><span class="da-cmp-r">Report \d<\/span>/g) || []).length === 13 * 3, '8g every row has one cell per report, each starting with its report number (what a phone shows when the table stacks)');
+  ok(rowsOf(html3).every((r) => r.cells.length === 3) && (html3.match(/<td><span class="da-cmp-r">Report \d<\/span>/g) || []).length === 14 * 3, '8g every row has one cell per report, each starting with its report number (what a phone shows when the table stacks)');
 }
 
 // ---- 9. mount ----------------------------------------------------------------------------------------------------------------------------------------------
