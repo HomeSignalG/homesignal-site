@@ -435,5 +435,19 @@ const FIELD = {
     '11l the decision carries only whether, why and which rule');
 }
 
+// ---- 12: the official date of a record, of any age (audit 2026-10-07, finding 2) ----------------------------------------------------------
+{
+  const T = '2026-10-07', rd = (kind, day) => M.recordDate({ date_kind: kind, submitted_at: day }, T);
+  const a = rd('filed', '2016-03-04');
+  ok(a && a.kind === 'filed' && a.label === 'Filed' && a.date === '2016-03-04' && a.older_than_a_year === true, '12a an old filing keeps its date and kind and is flagged as more than a year old', a);
+  const b = rd('issued', '2026-09-20');
+  ok(b && b.label === 'Issued' && b.older_than_a_year === false, '12b a recent date is not flagged', b);
+  ok(rd('filed', '2025-10-07').older_than_a_year === false && rd('filed', '2025-10-06').older_than_a_year === true, '12c exactly 365 days old is not old; 366 is (the boundary is in whole days)');
+  ok(rd('filed', '1900-01-01') === null && rd('filed', '1969-12-31') === null && rd('filed', '1989-12-31') === null && rd('filed', '1990-01-01') !== null, '12d the epoch sentinels the column carries are never shown as a filing date; 1990-01-01 is the first real one');
+  ok(rd('filed', '2026-10-08') === null && rd('filed', '9999-09-09') === null && rd('filed', '2099-02-12') === null, '12e a date in the future is not a filing date');
+  ok(rd('scheduled', '2026-09-01') === null && rd('estimated', '2026-09-01') === null && rd('', '2026-09-01') === null && rd(null, '2026-09-01') === null, '12f a plan (scheduled, estimated) or an unknown kind is not an official record date');
+  ok(rd('filed', null) === null && rd('filed', 'not a day') === null && rd('filed', '2026-02-30') === null, '12g no date, an unparseable one, or an impossible one gives nothing');
+}
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

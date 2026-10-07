@@ -536,7 +536,7 @@ const htmlLife = viewLife(W);
   const asOf = V.util.day(WB.report.as_of);
   ok(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(asOf), '11a (control) the report carries an as-of day to quote: ' + asOf);
   const TAIL = ' Check the published schedule and project details at the official source before a listing, showing or offer.';
-  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The nearest listed record is “SR-13 (Main St) & 100 North”, about 0.1 miles to the north.' + TAIL,
+  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The nearest listed record is “SR-13 (Main St) & 100 North”, about 0.1 miles to the north. 3 of these records carry official dates more than a year old; confirm each is still active.' + TAIL,
     '11b the Brigham City shape: the briefing says how many, in which stages, that this REPORT lists nothing future-stage (not that the area has none), the nearest record, how far and in which direction, and one neutral check-the-source line', brief(hb));
   ok(hb.indexOf('</header>') > -1 && hb.indexOf('</header>') < hb.indexOf('data-da-briefing') && hb.indexOf('data-da-briefing') < hb.indexOf('<section'), '11c the briefing is a paragraph directly under the header and before the first section; it is not a section, so the plan\'s section order is untouched');
   ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence' && /<p class="da-rv-brieflab">Client Briefing: Nearby Activity<\/p><p class="da-rv-brief" data-da-briefing>/.test(hb), '11d it adds no section key; its heading is the paragraph\'s own label, "Client Briefing: Nearby Activity"');
@@ -743,6 +743,24 @@ const htmlLife = viewLife(W);
   const WD1 = await wire({ rows: [row('k-dec', 0.2, FAM_A)], projects: [proj('k-dec', FAM_A, { name: 'Only Decided', type: 'Residential', status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' })], ledger: [], events: [], health: [] });
   const bt1 = decode((view(WD1).match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
   ok(!/1 proposed \/ under review/.test(bt1) && /No approved \/ coming or proposed \/ under review records are listed/.test(bt1), '15g a report whose only record was decided says no proposal is under review', bt1);
+}
+
+// ---- 16: every record shows its official date, and an old one says so (audit 2026-10-07, finding 2) ----------------------------------------
+{
+  const WR = await wire({ rows: [row('k-old', 0.2, FAM_A), row('k-new', 0.3, FAM_A)], projects: [
+    proj('k-old', FAM_A, { name: 'Old Filing Flats', type: 'Residential', status: 'Proposed', date_kind: 'filed', submitted_at: '2016-03-04' }),
+    proj('k-new', FAM_A, { name: 'Fresh Filing Flats', type: 'Residential', status: 'Proposed', date_kind: 'filed', submitted_at: '2026-09-20' })], ledger: [], events: [], health: [] });
+  const hr = view(WR);
+  const cardOf2 = (name) => (hr.match(new RegExp('<article class="da-rv-card"[^>]*>(?:(?!</article>)[\\s\\S])*?' + name + '[\\s\\S]*?</article>')) || [''])[0];
+  const oc = decode(cardOf2('Old Filing Flats')), nc = decode(cardOf2('Fresh Filing Flats'));
+  ok(/Official record:<\/span> Filed · Mar 4, 2016 · more than a year old; confirm it is still active/.test(oc), '16a an old record shows its filing date and says it is more than a year old', oc.slice(0, 400));
+  ok(/Official record:<\/span> Filed · Sep 20, 2026/.test(nc) && !/more than a year old/.test(nc), '16b a recent record shows its date without the old note');
+  const b16 = decode((hr.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(/1 of these records carries an official date more than a year old/.test(b16), '16c the briefing counts the old records', b16);
+  const noRd = clone(WR);
+  for (const p of noRd.report.projects) delete p.record_date;
+  const hn = view(noRd);
+  ok(!/more than a year old/.test(hn), '16d a saved report made before the engine carried the date says nothing about it (no date is invented)');
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);
