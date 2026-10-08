@@ -41,6 +41,10 @@ function world({ address = ADDRESS, brokerage = 'Acme Realty' } = {}) {
       return { report_id: RID, generated_at: '2026-10-03T12:00:00+00:00', body: JSON.stringify(stored), private_context_id: 'ctx', brokerage_name: w.brokerage };
     },
     addressOf: async () => w.address,
+    // the client-link rate limit (audit item D): never in the way of these page tests
+    linkKey: async () => 'a'.repeat(64),
+    clientKey: async () => 'b'.repeat(64),
+    viewClaim: async () => ({ allowed: true }),
   });
   return w;
 }
