@@ -1,27 +1,33 @@
 // development-activity-trial — joining a brokerage's 10-report trial, reading one's own trial (Development Activity build step 5c),
 // creating a trial (step 5d) and an owner inviting agents (step 5e; docs/development-activity-build-steps-100526.md).
 //
-// FOUR ACTIONS:
+// SEVEN ACTIONS:
 //   status   whether this person can make reports here, how many free reports their brokerage's trial has left, and their role.
 //   redeem   join a trial with an invite token (the one in the invite link). The same person using their own invite again
 //            is told so and nothing changes.
 //   create   ADMIN ONLY (dashboard_admins): create a brokerage's trial and its owner invite. The invite link is in the answer,
 //            once; nothing else on HomeSignal can show it again.
 //   invite   a trial's OWNER makes an invite link for one agent, while the trial is active. The link is in the answer, once.
+//   team     an OWNER lists their own team: the agents (as masked labels, never an address) and the invite links still open.
+//   remove_member    an OWNER ends one agent's membership; the agent's saved reports, credits and ledger rows are untouched, only their access ends.
+//   withdraw_invite  an OWNER withdraws one open invite link. (team / remove_member / withdraw_invite: docs/da-owner-safeguards.sql part A, audit item D.)
 //
 // WHO DECIDES WHAT. The database decides membership and role, the count, whether an invite may be used and who may make one
 // (docs/evaluation-entitlement.sql, Order L1), through _shared/evaluation-reads.ts. Whether a trial may make reports now is
 // _shared/admin-gate.ts trialStanding, the same reading the report function's gate uses; an invite is offered only while it reads
 // active. Making and charging reports is get-development-activity-report, never this function.
 //
-// WHAT IT NEVER RETURNS: an evaluation id, a brokerage id, an invite id, or anything about another person. The secrets it returns
-// are invite links, each once, to the person who just made it: an admin creating a trial, or an owner inviting an agent.
+// WHAT IT NEVER RETURNS: an evaluation id, a brokerage id, or an email address. The secrets it returns are invite links, each once, to the person
+// who just made it: an admin creating a trial, or an owner inviting an agent. The team list carries opaque handles (a membership id, an invite id) and
+// masked labels, and ONLY to an owner of that very brokerage: both removal and withdrawal re-check the same ownership in the database, so a handle is
+// worth nothing to anyone else.
 //
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { authorizeSignedIn, corsFor, readBounded, reply, TOO_LARGE, trialStanding, trialSummary } from '../_shared/admin-gate.ts';
 import type { AdminGateDeps, TrialState } from '../_shared/admin-gate.ts';
 import { AlreadyAMember, InviteUnusable, NotEntitled, SeatLimitReached, TrialRejected } from '../_shared/evaluation-reads.ts';
-import type { CreatedInvite, CreatedTrial, NewTrial, Redeemed, Role } from '../_shared/evaluation-reads.ts';
+import type { CreatedInvite, CreatedTrial, NewTrial, Redeemed, Role, Team } from '../_shared/evaluation-reads.ts';
+import { UUID } from '../_shared/evaluation-reads.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
 export { DataUnavailable };
@@ -32,17 +38,25 @@ export type Deps = AdminGateDeps & {
   createTrial: (t: NewTrial) => Promise<CreatedTrial>;
   roleOf: (userId: string) => Promise<Role | null>;
   inviteAgent: (userId: string) => Promise<CreatedInvite>;
+  /** An owner's team (docs/da-owner-safeguards.sql part A): agents as masked labels, and open invites. NotEntitled for anyone who is not an owner. */
+  teamOf: (userId: string) => Promise<Team>;
+  /** An owner ends an agent's membership: true when this call did it, false when already ended. NotEntitled when it is not theirs to do. */
+  removeMember: (userId: string, memberRef: string) => Promise<boolean>;
+  /** An owner withdraws an open invite: true when this call did it, false when it was no longer open. NotEntitled when it is not theirs to do. */
+  withdrawInvite: (userId: string, inviteRef: string) => Promise<boolean>;
   now: () => Date;
 };
 
 export const CAPABILITY = {
   product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-  method: 'POST { action: "status" } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? } | { action: "invite" }',
-  access: 'signed-in user; answers only about their own trial. create: an internal admin (dashboard_admins) only. invite: an owner of an active trial only',
+  method: 'POST { action: "status" } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? } | { action: "invite" } | { action: "team" } | { action: "remove_member", member } | { action: "withdraw_invite", invite }',
+  access: 'signed-in user; answers only about their own trial. create: an internal admin (dashboard_admins) only. invite, team, remove_member, withdraw_invite: an owner of their own brokerage only',
   stores_reports: false,
   writes: ['a brokerage membership, when the signed-in person redeems an invite',
     'a brokerage account, its trial and its owner invite, when an admin creates a trial',
-    'an agent invite, when a trial owner invites an agent'],
+    'an agent invite, when a trial owner invites an agent',
+    'an agent\'s membership ends, when an owner removes them',
+    'an open invite is withdrawn, when an owner withdraws it'],
 };
 
 /** The longest brokerage name accepted, and the bounds of the two optional numbers. Input checks only: none is a product limit. */
@@ -143,8 +157,21 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
         }
         return reply(req, { status: 'OK', invite_link: made.invite_link, invite_expires_at: made.invite_expires_at });
       }
+      if (action === 'team') {
+        // an owner's act: the database says who is an owner and which brokerage is theirs. The answer is opaque handles and masked labels, never an address.
+        const team = await deps.teamOf(who.userId);
+        return reply(req, { status: 'OK', members: team.members, invites: team.invites });
+      }
+      if (action === 'remove_member' || action === 'withdraw_invite') {
+        const handle = (body as Record<string, unknown>)[action === 'remove_member' ? 'member' : 'invite'];
+        const extra = Object.keys(body as Record<string, unknown>).filter((k) => k !== 'action' && k !== (action === 'remove_member' ? 'member' : 'invite'));
+        if (typeof handle !== 'string' || !UUID.test(handle) || extra.length) return reply(req, { error: 'bad_request' }, 400);
+        const done = action === 'remove_member' ? await deps.removeMember(who.userId, handle) : await deps.withdrawInvite(who.userId, handle);
+        return reply(req, action === 'remove_member' ? { status: 'OK', removed: done } : { status: 'OK', withdrawn: done });
+      }
       return reply(req, { error: 'bad_request' }, 400);
     } catch (e) {
+      if (e instanceof NotEntitled) return reply(req, { error: 'not_allowed' }, 403);
       if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
       return reply(req, { error: 'internal' }, 500);
     }

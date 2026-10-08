@@ -281,7 +281,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="assets/acquisition-video-producer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================
 // Auth module (email OTP). Exposes hsClient / hsUser / hsToken /
@@ -1620,7 +1620,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
           p_reviewed_image_path: gr?(gr.image_bucket_path||''):null,
           p_reviewed_embed_uri: gr?((gr.embed&&gr.embed.uri)||''):null
         });
-        if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
+        // A REFUSAL IS SHOWN ONCE, THEN THE QUEUE IS RE-READ — NEVER RETRIED. A stale review
+        // ("re-read it before approving") means the row moved; refreshBluesky() rebuilds
+        // _bskyRows, so the NEXT click reviews the current revision. It does not call
+        // hs_approve_social_post: the founder must look again and approve again.
+        if(r.error){ alert('Approve failed: '+(r.error.message||'')); refreshBluesky(); return; }
       } else if(act==='skip'){
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
         if(r2.error){ alert('Skip failed: '+(r2.error.message||'')); return; }

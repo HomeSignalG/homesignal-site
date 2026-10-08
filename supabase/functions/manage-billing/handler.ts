@@ -17,11 +17,15 @@
 // A CHECKOUT IS OFFERED ONLY FOR A NEW SUBSCRIPTION: to a brokerage that never subscribed, whose subscription has ended, or that has only a test one.
 // Over a subscription that exists and may recover (paid, past due, paused, trialing, unclear) it is refused (409), so a brokerage is never billed twice.
 //
+// AND ONLY ONE CHECKOUT IS OPENED AT A TIME (audit item D, docs/da-owner-safeguards.sql part C). Before the processor is asked, the brokerage's single
+// checkout slot is claimed in the database. For the next ten minutes a second press (or a second tab) is answered 409 `checkout_in_progress` and the processor
+// is not asked again. The address of a checkout is never stored (the launch gate pins that no table holds one), so it cannot be handed back.
+//
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { authorizeSignedIn, corsFor, readBounded, reply, TOO_LARGE } from '../_shared/admin-gate.ts';
 import type { AdminGateDeps } from '../_shared/admin-gate.ts';
 import { planSummary } from '../_shared/billing-reads.ts';
-import type { BillingUsage } from '../_shared/billing-reads.ts';
+import type { BillingUsage, CheckoutSlot } from '../_shared/billing-reads.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
 export { DataUnavailable };
@@ -34,6 +38,9 @@ export type Deps = AdminGateDeps & {
   /** Whether the processor's settings are all present. A boolean: the values never leave the server. */
   configured: () => boolean;
   createCheckout: (brokerageId: string) => Promise<string>;
+  /** The brokerage's single checkout slot (docs/da-owner-safeguards.sql, part C): one open checkout at a time. */
+  checkoutClaim: (brokerageId: string) => Promise<CheckoutSlot>;
+  checkoutRelease: (brokerageId: string) => Promise<void>;
 };
 
 export const CAPABILITY = {
@@ -90,7 +97,17 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
       if (availability === 'already_paid') return reply(req, { error: 'already_paid' }, 409);
       if (availability === 'subscription_exists') return reply(req, { error: 'subscription_exists' }, 409);
       if (availability === 'not_set_up') return reply(req, { error: 'billing_not_set_up' }, 503);
-      const url = await deps.createCheckout(usage.brokerage_id);
+      // ONE CHECKOUT AT A TIME. The slot is claimed in the database BEFORE the processor is asked, so two presses (or two tabs) cannot make two
+      // checkouts: the second is told one was just opened. No slot, no checkout: a failed claim is a 502.
+      const slot = await deps.checkoutClaim(usage.brokerage_id);
+      if (slot.outcome === 'BUSY') return reply(req, { error: 'checkout_in_progress' }, 409);
+      let url: string;
+      try {
+        url = await deps.createCheckout(usage.brokerage_id);
+      } catch (e) {
+        await deps.checkoutRelease(usage.brokerage_id).catch(() => { /* the slot frees itself in two minutes */ });
+        throw e;
+      }
       return reply(req, { status: 'OK', url });
     } catch (e) {
       if (e instanceof CheckoutUnavailable) return reply(req, { error: 'checkout_unavailable' }, 502);

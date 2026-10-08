@@ -89,6 +89,27 @@ const refused = (message) => ({ data: null, error: { message } });
      && await go({ billing_event_apply: okRows([{ ...okRow, bound: 'yes' }]) }) === 'DataUnavailable', '1r a row of the wrong shape is a fault');
   ok(await go({}, 'not-a-uuid') === 'BrokerageUnknown', '1s a brokerage id that is not a UUID never reaches the database');
 }
+{
+  // the checkout slot (docs/da-owner-safeguards.sql part C)
+  const URL1 = 'https://homesignal.lemonsqueezy.com/checkout/custom/first';
+  const claim = async (script, brokerage = BK) => { try { return await B.makeBillingReads(rpcWith(script).rpc).checkoutClaim(brokerage); } catch (e) { return e.constructor.name; } };
+  ok(JSON.stringify(await claim({ billing_checkout_claim: okRows([{ outcome: 'CLAIMED' }]) })) === '{"outcome":"CLAIMED"}', '1t a free slot reads CLAIMED');
+  ok(JSON.stringify(await claim({ billing_checkout_claim: okRows([{ outcome: 'BUSY' }]) })) === '{"outcome":"BUSY"}', '1u a slot a recent request holds reads BUSY');
+  let f = 0;
+  for (const bad of [[{ outcome: 'OPEN', url: URL1 }], [{ outcome: 'CLAIMED', url: null }], [{ outcome: 'BUSY', url: URL1 }], [{ outcome: 'MAYBE' }], [{ outcome: 'CLAIMED', extra: 1 }], [], [{ outcome: 'CLAIMED' }, { outcome: 'CLAIMED' }], null, 'x']) {
+    if (await claim({ billing_checkout_claim: okRows(bad) }) === 'DataUnavailable') f++;
+  }
+  ok(f === 9, '1w any answer of the wrong shape or count, or one that carries an address, is a fault and is never handed on (the address is stored nowhere)', f);
+  ok(await claim({ billing_checkout_claim: refused('boom') }) === 'DataUnavailable' && await claim({}, 'not-a-uuid') === 'DataUnavailable', '1x a database error, or a brokerage id that is not a UUID, is DataUnavailable');
+  const { rpc, calls } = rpcWith({ billing_checkout_claim: okRows([{ outcome: 'CLAIMED' }]), billing_checkout_release: okRows(null) });
+  const reads = B.makeBillingReads(rpc);
+  await reads.checkoutClaim(BK); await reads.checkoutRelease(BK);
+  ok(calls.length === 2 && JSON.stringify(calls[0]) === JSON.stringify(['billing_checkout_claim', { p_brokerage: BK }])
+     && JSON.stringify(calls[1]) === JSON.stringify(['billing_checkout_release', { p_brokerage: BK }]), '1y each is ONE call with the brokerage and nothing else');
+  let e2 = 0;
+  try { await B.makeBillingReads(rpcWith({ billing_checkout_release: refused('x') }).rpc).checkoutRelease(BK); } catch (e) { if (e instanceof Svc.DataUnavailable) e2++; }
+  ok(e2 === 1, '1z a failed release is DataUnavailable (the caller decides it is best-effort)', e2);
+}
 
 // ---- 2. manage-billing ------------------------------------------------------------------------------------------------------------------------
 const mcalls = [];
@@ -100,6 +121,8 @@ function mdeps(over = {}) {
     usageOf: rec('usageOf', over.usageOf ?? (async () => usage())),
     configured: () => over.configured ?? true,
     createCheckout: rec('createCheckout', over.createCheckout ?? (async () => 'https://homesignal.lemonsqueezy.com/checkout/custom/abc')),
+    checkoutClaim: rec('checkoutClaim', over.checkoutClaim ?? (async () => ({ outcome: 'CLAIMED' }))),
+    checkoutRelease: rec('checkoutRelease', over.checkoutRelease ?? (async () => undefined)),
   };
 }
 async function ask(d, body, { method = 'POST', auth = 'Bearer t', raw } = {}) {
@@ -192,6 +215,29 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
   ok(blocked === 3, '2ab a checkout over a subscription that exists and may recover (past due, trialing, unclear) is refused 409 and the processor is never asked: a second subscription would bill twice', blocked);
   r = await ask(mdeps({ usageOf: async () => usage({ role: 'owner', state: 'canceled' }) }), { action: 'checkout' });
   ok(r.status === 200 && named('createCheckout').length === 1, '2ab2 a brokerage whose subscription has ended may subscribe again');
+  // ONE OPEN CHECKOUT AT A TIME (docs/da-owner-safeguards.sql part C)
+  r = await co({});
+  ok(named('checkoutClaim').length === 1 && named('checkoutClaim')[0][1] === BK && named('createCheckout').length === 1 && named('checkoutRelease').length === 0,
+    '2ad a first press claims the brokerage\'s slot and makes ONE checkout (the slot is for the brokerage read from the database); nothing is stored about the checkout');
+  r = await co({ checkoutClaim: async () => ({ outcome: 'BUSY' }) });
+  ok(r.status === 409 && r.json.error === 'checkout_in_progress' && named('createCheckout').length === 0 && !r.text.includes('http'),
+    '2af while a checkout was opened in the last few minutes the answer is 409 checkout_in_progress, no address is handed out and the processor is not asked');
+  r = await co({ checkoutClaim: async () => { throw new Svc.DataUnavailable('x'); } });
+  ok(r.status === 502 && r.json.error === 'data_unavailable' && named('createCheckout').length === 0,
+    '2ag a slot that cannot be claimed is 502 and NO checkout is made: a limiter that cannot be read is not an open door');
+  r = await co({ createCheckout: async () => { throw new MH.CheckoutUnavailable('http 500'); } });
+  ok(r.status === 502 && r.json.error === 'checkout_unavailable' && named('checkoutRelease').length === 1 && named('checkoutRelease')[0][1] === BK,
+    '2ah a processor that cannot give a checkout frees the slot at once, so the owner can try again');
+  r = await co({ createCheckout: async () => { throw new MH.CheckoutUnavailable('http 500'); }, checkoutRelease: async () => { throw new Svc.DataUnavailable('x'); } });
+  ok(r.status === 502 && r.json.error === 'checkout_unavailable', '2ai and a failed release does not hide the real answer (the slot frees itself in ten minutes)');
+  r = await co({});
+  ok(r.status === 200 && r.json.url === 'https://homesignal.lemonsqueezy.com/checkout/custom/abc' && JSON.stringify(Object.keys(r.json).sort()) === '["status","url"]', '2aj a made checkout is handed to the owner, as before');
+  r = await co({ checkoutClaim: async () => ({ outcome: 'BUSY' }), usageOf: async () => PAID });
+  ok(r.status === 409 && r.json.error === 'already_paid' && named('checkoutClaim').length === 0, '2ak a paid brokerage never reaches the slot at all (the plan check comes first)');
+  for (const [who, over] of [['an agent', { usageOf: async () => usage({ role: 'agent' }) }], ['processor not set up', { configured: false }]]) {
+    r = await co(over);
+    ok(named('checkoutClaim').length === 0, '2al ' + who + ' never claims the slot');
+  }
   ok(MH.checkoutAvailability(usage({ role: 'owner', state: 'paid' }), true) === 'already_paid' && MH.checkoutAvailability(usage({ role: 'agent', state: 'paid' }), true) === 'not_owner'
      && MH.checkoutAvailability(usage({ role: 'owner' }), false) === 'not_set_up' && MH.checkoutAvailability(usage({ role: 'owner' }), true) === 'available'
      && MH.checkoutAvailability(usage({ role: 'owner', state: 'past_due' }), true) === 'subscription_exists' && MH.checkoutAvailability(usage({ role: 'owner', state: 'canceled' }), false) === 'not_set_up',

@@ -221,15 +221,21 @@ const mnamed = (name) => mcalls.filter((c) => c[0] === name);
 
 // ---- 3. view-shared-report ----------------------------------------------------------------------------------------------------------------------------------
 const vcalls = [];
+const vclaims = [];   // the rate limit's calls are kept apart from the data reads, so every assertion about what the function READS stays about reads
+const CLIENT = 'c'.repeat(64);
 function vdeps(over = {}) {
   const rec = (name, f) => async (...a) => { vcalls.push([name, ...a]); return f(...a); };
+  const claimRec = (name, f) => async (...a) => { vclaims.push([name, ...a]); vcalls.push(['@' + name]); return f(...a); };
   return {
+    linkKey: claimRec('linkKey', over.linkKey ?? (async (t) => (typeof t === 'string' && /^[A-Za-z0-9_-]{43}$/.test(t) ? sha(t) : null))),
+    clientKey: claimRec('clientKey', over.clientKey ?? (async () => CLIENT)),
+    viewClaim: claimRec('viewClaim', over.viewClaim ?? (async () => ({ allowed: true }))),
     openShared: rec('openShared', over.openShared ?? (async () => ({ report_id: REPORT, generated_at: '2026-10-03T12:00:00+00:00', body: STORED, private_context_id: CTX, brokerage_name: 'Acme Realty' }))),
     addressOf: rec('addressOf', over.addressOf ?? (async () => '1 Centre Street, New York, NY 10007')),
   };
 }
 async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
-  vcalls.length = 0;
+  vcalls.length = 0; vclaims.length = 0;
   const init = { method, headers: { 'content-type': 'application/json', ...headers } };
   if (method === 'POST') init.body = raw !== undefined ? raw : JSON.stringify(body);
   const res = await VH.makeHandler(d)(new Request('https://x/functions/v1/view-shared-report', init));
@@ -245,7 +251,7 @@ async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
     '3b the answer has exactly seven fields', Object.keys(r.json));
   ok(r.json.status === 'OK' && r.json.coverage_state === 'covered' && r.json.report.n === 1 && r.json.brokerage === 'Acme Realty' && r.json.address === '1 Centre Street, New York, NY 10007'
      && r.json.report_id === REPORT && r.json.generated_at === '2026-10-03T12:00:00+00:00', '3c and they are the stored report as stored, the brokerage\'s name and the street address (founder: the client sees it)');
-  ok(JSON.stringify(vcalls) === JSON.stringify([['openShared', TOK], ['addressOf', CTX]]), '3d the token goes to ONE call, and the address is read for the report\'s own context handle only');
+  ok(JSON.stringify(vcalls.filter((c) => !c[0].startsWith('@'))) === JSON.stringify([['openShared', TOK], ['addressOf', CTX]]), '3d the token goes to ONE call, and the address is read for the report\'s own context handle only');
   ok(r.cache === 'no-store', '3e a shared report is never cached');
   ok(!/label|share_id|agent|user|evaluation|token/i.test(r.text.replace(/"product":"HomeSignal Development Activity"/, '')), '3f nothing in the answer names a label, a share id, an agent, a user, an evaluation or a token');
 }
@@ -255,7 +261,7 @@ async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
   await ask('T'.repeat(43)); await ask('unknown'); await ask(''); await ask(null); await ask(12345); await ask(['x']); await ask({ a: 1 });
   ok(new Set(same).size === 1 && same[0] === '404:{"error":"not_found"}', '3g a link that opens nothing - unknown, revoked, expired, withdrawn, malformed or not even a string - is ONE answer: 404 not_found, byte for byte', same);
   const r = await vask(vdeps({ openShared: async () => null }), { token: 'T'.repeat(43) });
-  ok(vcalls.length === 1 && vcalls[0][0] === 'openShared', '3h and nothing else is read for it: no address is looked up for a link that opens nothing');
+  ok(vcalls.filter((c) => !c[0].startsWith('@')).length === 1 && vcalls.filter((c) => !c[0].startsWith('@'))[0][0] === 'openShared', '3h and nothing else is read for it: no address is looked up for a link that opens nothing');
   ok(r.cache === 'no-store', '3i the refusal is not cached either');
 }
 {
@@ -269,7 +275,7 @@ async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
   }
   ok(all, '3j a request with an extra field, an array, null or a bare string is 400, and an object with no token is the generic 404');
   const extra = await vask(vdeps(), { token: 'T'.repeat(43), x: 1 });
-  ok(extra.status === 400 && vcalls.length === 0, '3k an extra field is refused before the database is asked');
+  ok(extra.status === 400 && vcalls.length === 0, '3k an extra field is refused before the database is asked (and before the rate limit: it is not a link request)');
   let r = await vask(vdeps(), null, { raw: 'x'.repeat(5000) });
   ok(r.status === 413 && vcalls.length === 0, '3l a body over the cap is 413');
   r = await vask(vdeps(), null, { raw: '{not json' });
@@ -277,7 +283,7 @@ async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
   r = await vask(vdeps(), null, { method: 'PUT' });
   ok(r.status === 405, '3n any method but GET, POST and OPTIONS is 405');
   r = await vask(vdeps(), null, { method: 'GET' });
-  ok(r.status === 200 && r.json.writes.length === 0 && vcalls.length === 0, '3o GET answers the capability and reads nothing');
+  ok(r.status === 200 && r.json.writes.length === 0 && vcalls.length === 0 && /rate limited/.test(r.json.rate_limit), '3o GET answers the capability (it names the rate limit) and reads nothing');
 }
 {
   let r = await vask(vdeps({ addressOf: async () => null }), { token: 'T'.repeat(43) });
@@ -298,6 +304,63 @@ async function vask(d, body, { method = 'POST', headers = {}, raw } = {}) {
   ok(r.acao === 'https://www.homesignal.net', '3w the site\'s own origins do');
 }
 
+// ---- 3x. THE RATE LIMIT (docs/da-owner-safeguards.sql part B) ---------------------------------------------------------------------------------------------------
+{
+  const TOK = 'T'.repeat(43);
+  let r = await vask(vdeps(), { token: TOK });
+  ok(r.status === 200 && vclaims.length === 3 && vclaims[2][0] === 'viewClaim' && vclaims[2][1] === CLIENT && vclaims[2][2] === sha(TOK),
+    '3x1 a request takes ONE claim: the caller\'s hashed key and the SHA-256 of the link\'s token, nothing else');
+  ok(vcalls[2][0] === '@viewClaim' && vcalls[3][0] === 'openShared', '3x2 the claim comes BEFORE the link is looked up');
+  r = await vask(vdeps({ openShared: async () => null }), { token: 'unknown' });
+  ok(r.status === 404 && vclaims[2][2] === null && vcalls.map((c) => c[0]).slice(0, 3).join() === '@linkKey,@clientKey,@viewClaim', '3x3 a malformed token still takes the caller\'s windows (link null) before anything else (the link reader itself sends nothing for it: 4f)');
+  r = await vask(vdeps({ openShared: async () => null }), { token: 12345 });
+  ok(r.status === 404 && vclaims[2][2] === null, '3x4 and so does a token that is not even a string');
+  const full = { allowed: false, retryAfterSeconds: 37, limitedBy: 'client', windowSeconds: 60 };
+  r = await vask(vdeps({ viewClaim: async () => full }), { token: TOK });
+  ok(r.status === 429 && r.json.error === 'rate_limited' && r.json.retry_after_seconds === 37 && JSON.stringify(Object.keys(r.json).sort()) === '["error","retry_after_seconds"]' && r.cache === 'no-store',
+    '3x5 a full window is 429 rate_limited with how long to wait - and nothing about who or which window');
+  ok(vcalls.every((c) => ['@linkKey', '@clientKey', '@viewClaim'].includes(c[0])), '3x6 a refused request opens nothing: no link lookup, no address read');
+  r = await vask(vdeps({ viewClaim: async () => { throw new Svc.DataUnavailable('x'); } }), { token: TOK });
+  ok(r.status === 502 && r.json.error === 'data_unavailable' && !vcalls.some((c) => c[0] === 'openShared'), '3x7 a limiter that cannot be read is 502 and the link is NOT opened (fails closed)');
+  r = await vask(vdeps({ clientKey: async () => { throw new Svc.DataUnavailable('x'); } }), { token: TOK });
+  ok(r.status === 502 && !vcalls.some((c) => c[0] === 'openShared'), '3x8 a caller key that cannot be made is 502 and the link is NOT opened');
+  let refused = 0;
+  for (const bad of [{ allowed: true }]) { const q = await vask(vdeps({ viewClaim: async () => bad }), { token: TOK }); if (q.status === 200) refused++; }
+  ok(refused === 1, '3x9 an allowed claim goes on to open the link');
+  r = await vask(vdeps({ viewClaim: async () => full }), { token: 'unknown' });
+  ok(r.status === 429, '3x10 a flood of unknown links is limited too: the claim does not depend on the link being real');
+}
+{
+  const R = await import('../supabase/functions/_shared/rate-reads.ts');
+  const h = (o) => new Headers(o);
+  ok(R.networkAddressOf(h({ 'cf-connecting-ip': '203.0.113.9', 'x-forwarded-for': '198.51.100.1, 10.0.0.1', 'x-real-ip': '192.0.2.5' })) === '203.0.113.9', '3y1 the edge\'s own header wins over the ones a caller could write');
+  ok(R.networkAddressOf(h({ 'x-real-ip': '192.0.2.5', 'x-forwarded-for': '198.51.100.1' })) === '192.0.2.5' && R.networkAddressOf(h({ 'x-forwarded-for': ' 198.51.100.1 , 10.0.0.1' })) === '198.51.100.1', '3y2 then x-real-ip, then the first x-forwarded-for entry');
+  ok(R.networkAddressOf(h({})) === 'unknown', '3y3 no address at all is one shared "unknown", limited together');
+  const k1 = await R.shareClientKey(h({ 'cf-connecting-ip': '203.0.113.9' }), 'secret-one');
+  const k2 = await R.shareClientKey(h({ 'cf-connecting-ip': '203.0.113.9' }), 'secret-one');
+  const k3 = await R.shareClientKey(h({ 'cf-connecting-ip': '203.0.113.10' }), 'secret-one');
+  const k4 = await R.shareClientKey(h({ 'cf-connecting-ip': '203.0.113.9' }), 'secret-two');
+  ok(/^[0-9a-f]{64}$/.test(k1) && k1 === k2 && k1 !== k3 && k1 !== k4, '3y4 the caller key is 64 hex digits, the same for the same address, different for another address and for another secret');
+  ok(!k1.includes('203') || !k1.includes('113'), '3y5 and it does not contain the address');
+  let e = 'none'; try { await R.shareClientKey(h({}), ''); } catch (x) { e = x.constructor.name; }
+  ok(e === 'DataUnavailable', '3y6 with no secret there is no key (an unsalted hash of an address is an address)', e);
+  const mk = (rows, err) => R.makeShareViewRateReads(async () => err ? { data: null, error: { message: 'x' } } : { data: rows, error: null });
+  ok(JSON.stringify(await mk([{ allowed: true, retry_after_seconds: 0, limited_by: null, limited_window_secs: null }]).claim(k1, sha('x'))) === '{"allowed":true}', '3y7 an allowed claim reads allowed');
+  const refusedV = await mk([{ allowed: false, retry_after_seconds: 12, limited_by: 'link', limited_window_secs: 3600 }]).claim(k1, null);
+  ok(refusedV.allowed === false && refusedV.retryAfterSeconds === 12 && refusedV.limitedBy === 'link' && refusedV.windowSeconds === 3600, '3y8 a refusal reads who, which window and how long');
+  let f = 0;
+  for (const bad of [[], [{ allowed: true }, { allowed: true }], [{ allowed: 'yes' }], [{ allowed: true, retry_after_seconds: 5, limited_by: null, limited_window_secs: null }], [{ allowed: false, retry_after_seconds: 0, limited_by: 'client', limited_window_secs: 60 }],
+    [{ allowed: false, retry_after_seconds: 5, limited_by: 'user', limited_window_secs: 60 }], [{ allowed: false, retry_after_seconds: 5, limited_by: 'client', limited_window_secs: 61 }], null, 'x']) {
+    try { await mk(bad).claim(k1, null); } catch (x) { if (x instanceof Svc.DataUnavailable) f++; }
+  }
+  ok(f === 9, '3y9 an answer of the wrong shape is a fault, never "allowed" (nine shapes)', f);
+  let g = 0;
+  try { await mk(null, true).claim(k1, null); } catch (x) { if (x instanceof Svc.DataUnavailable) g++; }
+  try { await mk([]).claim('nothex', null); } catch (x) { if (x instanceof Svc.DataUnavailable) g++; }
+  try { await mk([]).claim(k1, 'nothex'); } catch (x) { if (x instanceof Svc.DataUnavailable) g++; }
+  ok(g === 3, '3y10 a database error, or a subject that is not a hash, is a fault before anything is sent', g);
+}
+
 // ---- 4. the real data layers ----------------------------------------------------------------------------------------------------------------------------------
 function stub(routes) {
   const reqs = [];
@@ -313,14 +376,17 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
 {
   const T = 'V'.repeat(43);
   const { f, reqs } = stub([
+    [/rpc\/share_view_claim$/, () => json([{ allowed: true, retry_after_seconds: 0, limited_by: null, limited_window_secs: null }])],
     [/rpc\/report_share_open$/, () => json([{ report_id: REPORT, generated_at: '2026-10-03T12:00:00+00:00', body: STORED, private_context_id: CTX, brokerage_name: 'Acme Realty' }])],
     [/rpc\/report_private_context_read$/, () => json([{ state: 'active', address: '1 Centre Street, New York, NY 10007', label: 'Smith listing — difficult buyer', normalized_address: '1 CENTRE ST', latitude: 40.7, longitude: -74, property_keys: ['k'] }])],
   ]);
   const res = await VH.makeHandler(VD.makeDeps(CFG, f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: T }) }));
   const text = await res.text();
-  ok(res.status === 200 && reqs.length === 2 && reqs[0].url === 'https://proj.supabase.co/rest/v1/rpc/report_share_open' && reqs[1].url === 'https://proj.supabase.co/rest/v1/rpc/report_private_context_read',
-    '4a the real view function makes exactly two requests: the link\'s open, then the report\'s own private context', reqs.map((r) => r.url));
-  ok(reqs[0].body.p_token_sha256 === sha(T) && Object.keys(reqs[0].body).length === 1 && reqs[1].body.p_context === CTX && Object.keys(reqs[1].body).length === 1,
+  ok(res.status === 200 && reqs.length === 3 && reqs[0].url === 'https://proj.supabase.co/rest/v1/rpc/share_view_claim' && reqs[1].url === 'https://proj.supabase.co/rest/v1/rpc/report_share_open' && reqs[2].url === 'https://proj.supabase.co/rest/v1/rpc/report_private_context_read',
+    '4a the real view function makes exactly three requests: the rate-limit claim, the link\'s open, then the report\'s own private context', reqs.map((r) => r.url));
+  ok(/^[0-9a-f]{64}$/.test(reqs[0].body.p_client) && reqs[0].body.p_link === sha(T) && Object.keys(reqs[0].body).length === 2 && !JSON.stringify(reqs[0].body).includes(T),
+    '4a2 the claim carries a hashed caller key and the SHA-256 of the token and nothing else (no address, no token)');
+  ok(reqs[1].body.p_token_sha256 === sha(T) && Object.keys(reqs[1].body).length === 1 && reqs[2].body.p_context === CTX && Object.keys(reqs[2].body).length === 1,
     '4b the open carries the hash of the token and nothing else; the context read carries the context handle and nothing else');
   ok(reqs.every((r) => r.method === 'POST' && r.headers.apikey === KEY && r.headers.Authorization === 'Bearer ' + KEY) && !JSON.stringify(reqs).includes(T),
     '4c both are POSTs with the service key, and the token itself appears in no request');
@@ -329,16 +395,23 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
     '4d the address comes back; the label the agent typed, the normalized address, the coordinates and the keys do NOT, though the private layer returned all of them');
 }
 {
-  const { f, reqs } = stub([[/rpc\/report_share_open$/, () => json([])]]);
+  const OKCLAIM = [/rpc\/share_view_claim$/, () => json([{ allowed: true, retry_after_seconds: 0, limited_by: null, limited_window_secs: null }])];
+  const { f, reqs } = stub([OKCLAIM, [/rpc\/report_share_open$/, () => json([])]]);
   const res = await VH.makeHandler(VD.makeDeps(CFG, f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'V'.repeat(43) }) }));
-  ok(res.status === 404 && reqs.length === 1, '4e a link that opens nothing costs one request, and the private layer is not touched');
-  const none = stub([]);
+  ok(res.status === 404 && reqs.length === 2 && reqs[1].url.endsWith('report_share_open'), '4e a link that opens nothing costs the claim and the open, and the private layer is not touched');
+  const none = stub([OKCLAIM]);
   const res2 = await VH.makeHandler(VD.makeDeps(CFG, none.f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'short' }) }));
-  ok(res2.status === 404 && none.reqs.length === 0, '4f a malformed token makes NO request at all');
-  const down = stub([[/rpc\/report_share_open$/, () => json({ message: 'boom' }, 500)]]);
+  ok(res2.status === 404 && none.reqs.length === 1 && none.reqs[0].url.endsWith('share_view_claim') && none.reqs[0].body.p_link === null, '4f a malformed token makes ONE request, the claim (no link), and never reaches the link lookup');
+  const limited = stub([[/rpc\/share_view_claim$/, () => json([{ allowed: false, retry_after_seconds: 40, limited_by: 'client', limited_window_secs: 60 }])]]);
+  const res2b = await VH.makeHandler(VD.makeDeps(CFG, limited.f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'V'.repeat(43) }) }));
+  ok(res2b.status === 429 && limited.reqs.length === 1, '4f2 a full window is 429 after the claim alone: the link is never looked up');
+  const dead = stub([[/rpc\/share_view_claim$/, () => json({ message: 'boom' }, 500)]]);
+  const res2c = await VH.makeHandler(VD.makeDeps(CFG, dead.f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'V'.repeat(43) }) }));
+  ok(res2c.status === 502 && dead.reqs.length === 1, '4f3 a claim that cannot be made is 502 and nothing else is asked');
+  const down = stub([OKCLAIM, [/rpc\/report_share_open$/, () => json({ message: 'boom' }, 500)]]);
   const res3 = await VH.makeHandler(VD.makeDeps(CFG, down.f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'V'.repeat(43) }) }));
   ok(res3.status === 502, '4g a 5xx from the database is 502');
-  const refusing = stub([[/rpc\/report_share_open$/, () => json({ message: 'denied' }, 400)]]);
+  const refusing = stub([OKCLAIM, [/rpc\/report_share_open$/, () => json({ message: 'denied' }, 400)]]);
   const res4 = await VH.makeHandler(VD.makeDeps(CFG, refusing.f))(new Request('https://x/', { method: 'POST', body: JSON.stringify({ token: 'V'.repeat(43) }) }));
   ok(res4.status === 502, '4h a 4xx on the open is 502, never "not found": only the database answering with no row is "not found"');
 }

@@ -108,6 +108,14 @@ export function makeShareReads(rpc: ServiceRpc) {
      * withdrawn: the database returns no row for any of them, and so does a string that could never have been a token (no database call
      * is made for one). The token is hashed here and never sent.
      */
+    /**
+     * The link's subject for the client-link rate limit (docs/da-owner-safeguards.sql part B): the SHA-256 of a well-formed token (the form in which a
+     * token ever reaches the database), or null for anything else. The token module has ONE importer, this file, so the hashing stays here.
+     */
+    async linkHashOf(token: unknown): Promise<string | null> {
+      return isWellFormedToken(token) ? await hashShareToken(token) : null;
+    },
+
     async openShared(token: unknown): Promise<SharedReport | null> {
       if (!isWellFormedToken(token)) return null;
       const { data, error } = await rpc('report_share_open', { p_token_sha256: await hashShareToken(token) });

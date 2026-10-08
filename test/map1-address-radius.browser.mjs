@@ -13,7 +13,7 @@
 // Run: node test/map1-address-radius.browser.mjs
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 

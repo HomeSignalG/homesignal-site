@@ -191,8 +191,16 @@ const rateCode = code(RATE_SQL);
 // and splices two readers; its ONE data write is flipping an evaluation that had already used 10 reports to complete (status + the completed event), never a ledger row.
 const LIMIT_MIGRATION = 'docs/free-report-limit-10.sql';
 const limitMigrationCode = code(LIMIT_MIGRATION);
+// docs/da-owner-safeguards.sql (audit item D, 2026-10-08) is a seventh SQL file that names this layer: the owner's team list reads the invite table (open agent invites of
+// the asker's own brokerage) and joins the evaluation to find that brokerage; its preconditions check evaluation_invite_revoke exists (the owner's withdrawal IS that
+// function, called unchanged, with the owner as the actor) and its post-condition reads the free number (10). It writes no row of this layer: its writes are its own two
+// tables and ending an agent's membership. test/da_owner_safeguards_pg proves that; test/da-owner-safeguards-structure.test.mjs pins its structure.
+const DA_SQL = 'docs/da-owner-safeguards.sql';
+const daCode = code(DA_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS, DA_SQL].sort())
+   && dmlTargets(daCode).length >= 3 && dmlTargets(daCode).every((t) => /^(brokerage_member|share_view_window|billing_checkout_claim)$/.test(t)) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(?:public\.)?evaluation/i.test(daCode)
+   && (daCode.match(/\bpublic\.evaluation_invite_revoke\(/g) || []).length === 2 && !/\bfrom public\.evaluation_invite_revoke|\bperform public\.evaluation_invite_revoke/.test(daCode) && /to_regprocedure\('public\.evaluation_invite_revoke\(uuid,uuid\)'\)/.test(daCode)
    && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigrationCode)
    && [...new Set(rateCode.match(new RegExp(OURS.source, 'g')) || [])].join() === 'evaluation_report_limit' && dmlTargets(rateCode).length >= 1 && dmlTargets(rateCode).every((t) => t === 'report_rate_window')
    && dmlTargets(billingCode).length >= 2 && dmlTargets(billingCode).every((t) => /^brokerage_(subscription|paid_credit)$/.test(t))
@@ -202,7 +210,7 @@ ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DE
    && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(watchCode) && (watchCode.match(new RegExp(OURS.source, 'g')) || []).join() === 'evaluation_credit,evaluation_credit'
    && !/\b(insert\s+into|update|delete\s+from|truncate)\b/i.test(deliveryCode.replace(/'(?:[^']|'')*'/g, "''"))
    && /public\.evaluation_report_open\(p_user_id, p_report_id\)/.test(deliveryCode)
-   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '[]' && (code(SNAP_MOD).match(/rpc\('brokerage_report_issue'/g) || []).length === 1,
+   && JSON.stringify(namesIn(EVAL_READS)) === '["evaluation_create","evaluation_invite_mint","evaluation_invite_redeem","evaluation_invite_revoke","evaluation_usage"]' && JSON.stringify(namesIn(SNAP_MOD)) === '[]' && (code(SNAP_MOD).match(/rpc\('brokerage_report_issue'/g) || []).length === 1,
   '4: outside its SQL (and the billing SQL, build step 11, which calls the issue function unchanged and writes only its own two tables, and the read-only saved-reports SQL, build step 6, the share-delivery SQL, build step 8, and the property-watch SQL, build step 9, which write no row of this layer), exactly one file names this layer in code: the shared trial module reads a member\'s trial, redeems an invite, (build step 5d) creates a trial and (build step 5e) lets an owner mint an agent invite (evaluation_usage, evaluation_invite_redeem, evaluation_create, evaluation_invite_mint only), while the shared snapshot module names none of it and charges through brokerage_report_issue only (build step 11: the one entry, which calls evaluation_report_issue for the free allotment) — no page, function handler, script, workflow, data file or other SQL', namingOurs.join(','));
 {
   const ER = code(EVAL_READS);

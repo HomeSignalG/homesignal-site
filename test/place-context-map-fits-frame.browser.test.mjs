@@ -24,7 +24,7 @@
 // Run: node test/place-context-map-fits-frame.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

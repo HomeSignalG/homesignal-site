@@ -15,6 +15,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const evaluation = makeEvaluationReads(rpc);
   return {
     authenticate, isAdmin, trialOf: evaluation.trialOf, redeemInvite: evaluation.redeemInvite, createTrial: evaluation.createTrial,
-    roleOf: evaluation.roleOf, inviteAgent: evaluation.inviteAgent, now: () => new Date(),
+    roleOf: evaluation.roleOf, inviteAgent: evaluation.inviteAgent, teamOf: evaluation.teamOf, removeMember: evaluation.removeMember,
+    withdrawInvite: evaluation.withdrawInvite, now: () => new Date(),
   };
 }
