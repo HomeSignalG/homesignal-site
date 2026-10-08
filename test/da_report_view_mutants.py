@@ -54,7 +54,7 @@ m('most_recent_is_last', "var first = list[0], recent = recentOf(first);", "var 
 m('publisher_event_filed_as_change', "line('Official record', eventText(pe.label, pe.date))", "line('HomeSignal detected', eventText(pe.label, pe.date))")
 m('detected_date_is_publisher_date', "line('HomeSignal detected', eventText(eventLabel(dc.event_type), day(dc.detected_at)))",
   "line('HomeSignal detected', eventText(eventLabel(dc.event_type), day(dc.publisher_event && dc.publisher_event.date)))")
-m('card_shows_oldest_change', "dc = detected(p)[0];\n    if (pe) out +=", "dc = detected(p)[detected(p).length - 1];\n    if (pe) out +=")
+m('card_shows_oldest_change', 'dc = detected(p)[0];\n    var rd = recordDateOf(p);', 'dc = detected(p)[detected(p).length - 1];\n    var rd = recordDateOf(p);')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 # ---- lifecycle: text AND shape, the engine's own key and label ---------------------------------------------------------------------------
 m('proposed_labelled_coming',
   "function lifeLabel(p) { return (isObj(p.lifecycle) ? txt(p.lifecycle.label) : '') || 'Lifecycle unknown'; }",
@@ -68,7 +68,7 @@ m('lifecycle_key_unvalidated', "return typeof k === 'string' && has(SHAPES, k) ?
 m('type_chip_dropped', "if (t) out += '<span class=\"da-rv-tag da-rv-type\">'", "if (false) out += '<span class=\"da-rv-tag da-rv-type\">'")
 m('type_shown_as_key', "return isObj(p.type) ? txt(p.type.label) : ''; }", "return isObj(p.type) ? txt(p.type.key) : ''; }")
 # ---- nothing internal reaches the page ------------------------------------------------------------------------------------------------------
-m('render_source_family', "+ (status ? line('Publisher status', status) : '') + eventLines(p)", "+ (status ? line('Publisher status', status) : '') + line('Source', p.source_family) + eventLines(p)")
+m('render_source_family', "+ (status ? line(STATUS_LABEL, status) : '') + eventLines(p) + sourceBlock(p) + '</article>';", "+ (status ? line(STATUS_LABEL, status) : '') + line('Source', p.source_family) + eventLines(p) + sourceBlock(p) + '</article>';")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('render_storage_blockers', "parts.join('') + '</article>'", "parts.join('') + esc(JSON.stringify(response.storage_blockers)) + '</article>'")
 m('render_limitation_code', "return txt(l.text); }", "return txt(l.code) + ' ' + txt(l.text); }")
 m('attribution_falls_back_to_family', "attribution = txt(s.attribution), out = '';", "attribution = txt(s.attribution) || txt(p.source_family), out = '';")
@@ -102,7 +102,7 @@ m('ftp_url_accepted', "var HTTP_URL = /^https?:\\/\\/", "var HTTP_URL = /^(https
 m('url_whitespace_allowed', "[^\\s\"'<>`\\\\]+$/i;", "[^\"'<>`\\\\]+$/i;")
 m('url_quote_allowed', "[^\\s\"'<>`\\\\]+$/i;", "[^\\s<>`\\\\]+$/i;")
 m('link_without_noopener', "target=\"_blank\" rel=\"noopener noreferrer\">Official source ", "target=\"_blank\">Official source ")
-m('link_url_unvalidated', "var href = safeHref(s.url),", "var href = txt(s.url),")
+m('link_url_unvalidated', 'var href = safeHref(s.url);', 'var href = txt(s.url);')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('link_name_loses_record', " for ' + esc(titleOf(p)) + ' (opens in a new tab)</span>", " (opens in a new tab)</span>")
 # ---- the address ------------------------------------------------------------------------------------------------------------------------------------------
 m('address_in_href', "esc(EYEBROW) + '</p><p class=\"da-rv-addr\">'", "esc(EYEBROW) + '</p><a href=\"https://example.gov/?q=' + encodeURIComponent(subject) + '\">x</a><p class=\"da-rv-addr\">'")
@@ -110,7 +110,7 @@ m('address_in_data_attribute', "'<header class=\"da-rv-head\">", "'<header class
 m('address_in_aria_label', "'<header class=\"da-rv-head\">", "'<header class=\"da-rv-head\" aria-label=\"' + esc(subject) + '\">")
 m('address_placeholder_dropped', "esc(subject || NO_ADDRESS)", "esc(subject)")
 # ---- purity: no network, storage, location, clock, ranking, dynamic code -----------------------------------------------------------------------------
-m('adds_a_fetch', "    if (!renderable(response)) return '';\n    opts = isObj(opts)", "    if (typeof fetch === 'function') { try { fetch('/x'); } catch (e) { void e; } }\n    if (!renderable(response)) return '';\n    opts = isObj(opts)")
+m('adds_a_fetch', '    if (!renderable(response)) return null;\n    var report = response.report', "    if (typeof fetch === 'function') { try { fetch('/x'); } catch (e) { void e; } }\n    if (!renderable(response)) return null;\n    var report = response.report")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('reads_local_storage', "var HS = root.HS = root.HS || {};", "var HS = root.HS = root.HS || {}; var _stored = root.localStorage;")
 m('reads_location', "var HS = root.HS = root.HS || {};", "var HS = root.HS = root.HS || {}; var _here = root.location;")
 m('reads_the_clock', "var HS = root.HS = root.HS || {};", "var HS = root.HS = root.HS || {}; var _now = new Date();")
@@ -136,26 +136,17 @@ m('hero_after_activity',
   "    if (changed.length) parts.push(changedSection(changed, response, inStage, tail));\n    if (activity.length) parts.push(activitySection(activity, response, inStage, !changed.length, changed.length ? '' : tail));",
   "    if (activity.length) parts.push(activitySection(activity, response, inStage, !changed.length, changed.length ? '' : tail));\n    if (changed.length) parts.push(changedSection(changed, response, inStage, tail));")
 m('activity_never_hero', "activitySection(activity, response, inStage, !changed.length, changed.length ? '' : tail)", "activitySection(activity, response, inStage, false, changed.length ? '' : tail)")
-m('history_before_stages',
-  "    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums)); });\n    if (some) parts.push(historySection(history, report));",
-  "    if (some) parts.push(historySection(history, report));\n    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums)); });")
-m('map_after_stages',
-  "    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (some) STAGES.forEach(",
-  "    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums)); });\n    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (false) STAGES.forEach(")
-m('review_after_map',
-  "    if (review.length) parts.push(reviewSection(review, response, stageFor));\n    if (current.length) parts.push(mapSection(numbered, response, report));",
-  "    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (review.length) parts.push(reviewSection(review, response, stageFor));")
-m('filters_after_review',
-  "    if (current.length) parts.push(filtersSection(current, stageFor));\n    if (review.length) parts.push(reviewSection(review, response, stageFor));",
-  "    if (review.length) parts.push(reviewSection(review, response, stageFor));\n    if (current.length) parts.push(filtersSection(current, stageFor));")
-m('actions_before_evidence', "    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar());", "    if (some) parts.push(actionsBar());\n    parts.push(evidenceSection(report));")
+m('history_before_stages', '    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });\n    if (m.unstaged.length) parts.push(unstagedSection(m.unstaged, response));\n    if (some) parts.push(historySection(history, report));', '    if (some) parts.push(historySection(history, report));\n    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });\n    if (m.unstaged.length) parts.push(unstagedSection(m.unstaged, response));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('map_after_stages', '    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (review.length) parts.push(reviewSection(review, response, stageFor));\n    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });', '    if (review.length) parts.push(reviewSection(review, response, stageFor));\n    if (some) STAGES.forEach(function (k) { parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });\n    if (current.length) parts.push(mapSection(numbered, response, report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('review_before_map', '    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (review.length) parts.push(reviewSection(review, response, stageFor));', '    if (review.length) parts.push(reviewSection(review, response, stageFor));\n    if (current.length) parts.push(mapSection(numbered, response, report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('filters_after_map', '    if (current.length) parts.push(filtersSection(current, stageFor));\n    if (current.length) parts.push(mapSection(numbered, response, report));', '    if (current.length) parts.push(mapSection(numbered, response, report));\n    if (current.length) parts.push(filtersSection(current, stageFor));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('actions_before_evidence', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', '    if (some) parts.push(actionsBar(opts));\n    parts.push(evidenceSection(report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('history_shown_when_empty', "    if (some) parts.push(historySection(history, report));", "    parts.push(historySection(history, report));")
 m('stages_on_empty_report', "    if (some) STAGES.forEach(function (k) {", "    STAGES.forEach(function (k) {")
-m('actions_on_empty_report', "    if (some) parts.push(actionsBar());", "    parts.push(actionsBar());")
-m('empty_stage_hidden', "parts.push(stageSection(k, staged[k], response, nums)); });", "if (staged[k].length) parts.push(stageSection(k, staged[k], response, nums)); });")
+m('actions_on_empty_report', '    if (some) parts.push(actionsBar(opts));', '    parts.push(actionsBar(opts));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('empty_stage_hidden', 'parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });', 'if (staged[k].length) parts.push(stageSection(k, staged[k], response, nums, opts.showLifecycle === true)); });')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_stage_note_dropped', ": '<p class=\"da-rv-p da-rv-quiet\">No projects at this stage in this report.</p>')", ": '')")
-m('absence_claim_added', "    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar());",
-  "    if (!some) parts.push('<p>No development activity found near this address.</p>');\n    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar());")
+m('absence_claim_added', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', "    if (!some) parts.push('<p>No development activity found near this address.</p>');\n    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_report_unmarked', "(some ? '' : ' da-rv--empty')", "''")
 m('permitted_title_changed', "permitted: 'Permitted / Under Construction',", "permitted: 'Under Construction',")
 # ---- the stage is the ENGINE's; the view never re-derives it ----------------------------------------------------------------------------
@@ -166,8 +157,7 @@ m('operating_listed_in_stage_section',
   "staged[k] = pick(k === 'approved' && isObj(sec.by_lifecycle) ? arr(byStage[k]).concat(arr(sec.by_lifecycle.operating)) : byStage[k]).filter(function (p) { return !stageFor[p.project_id]; });")
 m('project_in_two_stages', "return !stageFor[p.project_id] && (legacy", "return (legacy")
 m('sorts_stage_cards', "      staged[k] = pick(byStage[k]).filter(", "      staged[k] = pick(byStage[k]).sort(function (a, b) { return titleOf(a) < titleOf(b) ? -1 : 1; }).filter(")
-m('stage_label_from_lifecycle', "function stageLabelOf(p, k) { return (isObj(p.stage) && p.stage.key === k ? txt(p.stage.label) : '') || TITLES[k] || ''; }",
-  "function stageLabelOf(p, k) { return lifeLabel(p); }")
+m('stage_label_from_lifecycle', "    return (isObj(p.stage) && p.stage.key === k ? txt(p.stage.label) : '') ||", '    return lifeLabel(p) ||')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('stage_badge_replaced_by_lifecycle', "var out = k ? stageBadge(p, k) : lifeBadge(p);", "var out = lifeBadge(p);")
 m('proposed_shape_equals_approved',
   "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"3 2.5\"/></svg>',",
@@ -176,15 +166,14 @@ m('proposed_stage_shape_equals_approved',
   "  var STAGE_SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"3 2.5\"/></svg>',",
   "  var STAGE_SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',")
 # ---- a stage card shows the stage, the lifecycle and the publisher's own words, each labelled ------------------------------------------------
-m('publisher_status_dropped', "+ (status ? line('Publisher status', status) : '') + eventLines(p)", "+ eventLines(p)")
-m('stage_card_status_dropped', "      + (status ? line('Publisher status', status) : '')\n      + (ev", "      + (ev")
-m('publisher_status_replaced_by_lifecycle', "      + (status ? line('Publisher status', status) : '')\n      + (ev", "      + (status ? line('Publisher status', lifeLabel(p)) : '')\n      + (ev")
-m('stage_card_lifecycle_dropped', "      + line('HomeSignal lifecycle', lifeLabel(p))\n", "")
-m('publisher_stage_dropped', "      + (pstage ? line('Publisher stage', pstage) : '')\n", "")
+m('publisher_status_dropped', "+ (status ? line(STATUS_LABEL, status) : '') + eventLines(p)", '+ eventLines(p)')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('stage_card_status_dropped', "      + (status ? line(STATUS_LABEL, status) : '')\n      + (k === 'proposed' && isDecided(p)", "      + (k === 'proposed' && isDecided(p)")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('publisher_status_replaced_by_lifecycle', "      + (status ? line(STATUS_LABEL, status) : '')\n      + (k === 'proposed' && isDecided(p)", "      + (status ? line(STATUS_LABEL, lifeLabel(p)) : '')\n      + (k === 'proposed' && isDecided(p)")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('stage_card_lifecycle_dropped', "      + (showLifecycle ? line('HomeSignal lifecycle', lifeLabel(p)) : '')\n", '')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('publisher_stage_dropped', "      + (pstage ? line('Official agency stage', pstage) : '')\n", '')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('why_line_dropped', "(ev ? line('Why it is in this section',", "(false ? line('Why it is in this section',")
 m('why_line_without_evidence', "var ev = isObj(p.stage) && p.stage.key === k ? txt(p.stage.evidence) : '';", "var ev = 'Permit issued';")
-m('first_detected_is_publisher_date', "function firstDetected(p) { return isObj(p.homesignal_observation) ? day(p.homesignal_observation.first_observed_at) : ''; }",
-  "function firstDetected(p) { var pe = publisherEvent(p); return pe ? pe.date : ''; }")
+m('first_detected_is_publisher_date', "function ledgerFirstRead(p) { return isObj(p.homesignal_observation) ? day(p.homesignal_observation.first_observed_at) : ''; }", "function ledgerFirstRead(p) { var pe = publisherEvent(p); return pe ? pe.date : ''; }")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('render_hold', "      + eventLines(p) + sourceBlock(p) + '</article>';", "      + eventLines(p) + (p.rights ? line('Rights', p.rights) : '') + sourceBlock(p) + '</article>';")
 m('render_observation_counts', "      + eventLines(p) + sourceBlock(p) + '</article>';",
   "      + eventLines(p) + (p.homesignal_observation ? line('Observed', p.homesignal_observation.observation_count) : '') + sourceBlock(p) + '</article>';")
@@ -194,8 +183,8 @@ m('review_from_view_not_engine', "var review = pick(isObj(response.render) ? res
 m('review_reversed', ".filter(function (p) { return !!stageFor[p.project_id]; });\n    var history", ".filter(function (p) { return !!stageFor[p.project_id]; }).reverse();\n    var history")
 m('review_includes_unstaged', "var review = pick(isObj(response.render) ? response.render.review : null).filter(function (p) { return !!stageFor[p.project_id]; });",
   "var review = pick(isObj(response.render) ? response.render.review : null);")
-m('review_prompt_predicts', "permitted: 'The published construction timing and project details.'", "permitted: 'Expect construction noise and traffic near the property.'")
-m('review_disclaimer_dropped', "+ '<p class=\"da-rv-p da-rv-quiet\">\"Review\" means the official record is worth reading with your client. It is not a prediction of any effect on the property.</p>');", "+ '');")
+m('review_prompt_predicts', "permitted: 'Verify the official schedule and project details at the source.'", "permitted: 'Expect construction noise and traffic near the property.'")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('review_disclaimer_dropped', '+ \'<p class="da-rv-p da-rv-quiet">"Agent action" is a prompt to check the official record before you talk with your client. It is not a prediction of any effect on the property.</p>\');', "+ '');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('review_without_source', "+ sourceBlock(p) + '</li>';\n    }).join('');\n    return section('review'", "+ '</li>';\n    }).join('');\n    return section('review'")
 # ---- the map: response-only positions, to scale, numbered like the cards, no basemap -----------------------------------------------------------------
 m('distance_without_render', "  function distanceOf(response, id) {\n    var r = isObj(response.render) ? response.render : null;",
@@ -211,7 +200,7 @@ m('map_basemap_added', "var svg = '<svg class=\"da-rv-plot\" viewBox=\"0 0 360 3
 m('map_bearing_defaulted', "if (!m || !has(m, id)) return null;", "if (!m || !has(m, id)) return 0;")
 m('map_caption_dropped', "+ '<p class=\"da-rv-p da-rv-quiet\">Only tracked development activity is shown. Distance is to scale; direction is approximate for roads and areas. The numbers match the project cards below.</p>');", "+ '');")
 # ---- filters: two dimensions, presentation only --------------------------------------------------------------------------------------------------------
-m('type_chip_label_is_key', "var label = reg && isObj(reg[k]) && !reg[k].isFacility ? txt(reg[k].label) : (seen[k] ? seen[k].label : '');", "var label = k;")
+m('type_chip_label_is_key', "return reg && isObj(reg[k]) && !reg[k].isFacility ? txt(reg[k].label) : (seen[k] ? seen[k].label : '');", 'return k;')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('type_chip_count_wrong', "return chip('type', k, label, seen[k] ? seen[k].n : 0, false);", "return chip('type', k, label, current.length, false);")
 m('stage_chip_count_wrong', "current.filter(function (p) { return stageFor[p.project_id] === k; }).length, false);", "current.length, false);")
 m('all_chip_not_pressed', "var types = chip('type', 'all', 'All', current.length, true)", "var types = chip('type', 'all', 'All', current.length, false)")
@@ -226,12 +215,12 @@ m('css_hidden_not_enforced', "    '.da-rv [hidden]{display:none!important}',\n",
 # ---- header, hero and history wording ----------------------------------------------------------------------------------------------------------------------
 m('brokerage_dropped', "var who = [opts.brokerage, opts.agent]", "var who = [opts.agent]")
 m('generated_date_dropped', "(day(report.as_of) ? '<p class=\"da-rv-gen\">' + esc('Generated ' + day(report.as_of)) + '</p>' : '')", "''")
-m('quiet_hero_claims_area', "'<p class=\"da-rv-unit\">Among the official records in this report.</p>'", "'<p class=\"da-rv-unit\">No development activity in this area.</p>'")
+m('quiet_hero_claims_area', "var onFile = shown !== n || n < 1 ? 'Among the official records in this report.'", "var onFile = shown !== n || n < 1 ? 'No development activity in this area.'")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('stage_summary_wrong_count', "+ staged.permitted.length + ' permitted / under construction", "+ staged.approved.length + ' permitted / under construction")
-m('history_claims_no_change_before_ready', "var msg = cov.change_ready === true", "var msg = true")
+m('history_claims_no_change_before_ready', 'return cov.change_ready === true;', 'return true;')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 # ---- actions: in place, inert, never promising "coming" ------------------------------------------------------------------------------------------------------
 m('actions_made_live', "'<button type=\"button\" class=\"da-rv-act\" aria-disabled=\"true\">'", "'<button type=\"button\" class=\"da-rv-act\">'")
-m('actions_say_coming_soon', "'<span class=\"da-rv-soon\">Available soon</span></nav>'", "'<span class=\"da-rv-soon\">Coming soon</span></nav>'")
+m('actions_say_coming_soon', '(soon ? \'<span class="da-rv-soon">Available soon</span>\' : \'\')', '(soon ? \'<span class="da-rv-soon">Coming soon</span>\' : \'\')')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('action_dropped', "var ACTIONS = ['Compare property', 'Watch property', 'Share report', 'Download PDF'];", "var ACTIONS = ['Compare property', 'Watch property', 'Share report'];")
 
 
@@ -243,15 +232,12 @@ def first_failure(out):
 
 
 # ---- the report's outcome (founder ruling R5, 2026-10-02): "No development activity" vs "No data ingested" ---------------------------------------
-m('outcome_from_the_label_text', "var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';",
-  "var key = a && typeof a.label === 'string' ? (a.label === 'No development activity' ? 'NO_DEVELOPMENT_ACTIVITY' : 'NO_DATA_INGESTED') : '';")
-m('outcome_shown_over_projects', "    if (!key || report.projects.length !== 0) return '';", "    if (!key) return '';")
-m('outcome_inferred_from_an_empty_list', "    var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';",
-  "    var key = a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : 'NO_DATA_INGESTED';")
+m('outcome_from_the_label_text', "return a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';", "return a && typeof a.label === 'string' ? (a.label === 'No development activity' ? 'NO_DEVELOPMENT_ACTIVITY' : 'NO_DATA_INGESTED') : '';")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('outcome_shown_over_projects', "    if (!o || report.projects.length !== 0) return '';", "    if (!o) return '';")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('outcome_inferred_from_an_empty_list', "return a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : '';", "return a && typeof a.outcome === 'string' && has(OUTCOMES, a.outcome) ? a.outcome : 'NO_DATA_INGESTED';")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_report_claims_no_activity', "    var o = OUTCOMES[key], body = o.body;", "    key = 'NO_DEVELOPMENT_ACTIVITY'; var o = OUTCOMES[key], body = o.body;")
 m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'No development activity',")
-m('no_data_ingested_explanation_dropped', "    return section('outcome', o.title, '<p class=\"da-rv-p da-rv-outcome-p\">' + esc(body) + '</p>', 'da-rv-hero');",
-  "    return section('outcome', o.title, '', 'da-rv-hero');")
+m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\', \'da-rv-hero\');', "return section('outcome', o.title, '', 'da-rv-hero');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('outcome_block_not_rendered', "    if (!some) parts.push(outcomeSection(report));\n", "")
 m('outcome_radius_invented', "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' near this property.';", "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' within 0.5 miles of this property.';")
 m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])

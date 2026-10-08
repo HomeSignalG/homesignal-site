@@ -295,7 +295,38 @@ export function recentPublisherEvent(p: Pick<ProjectRow, 'date_kind' | 'submitte
   return { kind, label: EVENT_KINDS[kind], date };
 }
 
+/** An official date older than this many days is flagged as old on the report (audit 2026-10-07, finding 2). Plain days, not a rule about the project. */
+export const OLD_RECORD_DAYS = 365;
+/** The stored date column also carries sentinels (1900-01-01, 1969-12-31: see EVENT_KINDS). Nothing before this is shown as a real filing date. */
+export const RECORD_DATE_FLOOR = '1990-01-01';
+/**
+ * The date the publisher gave the record, of any age, with what it was (filed, issued, decided ...). `publisher_event` only carries one inside the last
+ * RECENT_DAYS, so an Approved or Proposed record from years ago showed no date at all and read like last month's. This is the date and its meaning, and whether
+ * it is more than a year old; it is never a status and never a change. Null when the kind is a plan, the date is not a real past day, or it is a sentinel.
+ */
+export function recordDate(p: Pick<ProjectRow, 'date_kind' | 'submitted_at'>, today: string) {
+  const kind = p.date_kind ?? '';
+  if (!Object.prototype.hasOwnProperty.call(EVENT_KINDS, kind)) return null;
+  if (!validDay(p.submitted_at)) return null;
+  const date = p.submitted_at;
+  if (date > today || date < RECORD_DATE_FLOOR) return null;
+  return { kind, label: EVENT_KINDS[kind], date, older_than_a_year: date < addDays(today, -OLD_RECORD_DAYS) };
+}
+
 // ── the boundary ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** Whether `needle` occurs in `text` with no letter or digit directly before or after it. */
+export function containsBounded(text: string, needle: string): boolean {
+  if (!needle) return false;
+  const alnum = /[a-z0-9]/i;
+  let at = text.indexOf(needle);
+  while (at !== -1) {
+    const before = at === 0 ? '' : text[at - 1], after = text[at + needle.length] ?? '';
+    if (!(before && alnum.test(before)) && !(after && alnum.test(after))) return true;
+    at = text.indexOf(needle, at + 1);
+  }
+  return false;
+}
 
 /**
  * The fragments of a private value that would still locate the subject, each with a NAME. The name is what a finding
@@ -323,11 +354,12 @@ export function boundaryFindings(intelligence: Record<string, unknown>, ctx: Pri
   const body = snapshotBodyOf(intelligence);
   for (const k of subjectRelativeKeys(JSON.parse(body))) findings.push('SUBJECT_RELATIVE_KEY:' + k);
   if (!ctx) return findings;
-  // Substring, not word-bounded: in JSON a value is delimited by quotes, not spaces, so a private value that fills a whole
-  // string ("address": "742 Evergreen ...") has no space on either side. (Found by test/national-report.test.mjs 7b.)
+  // Bounded by what is NOT a letter or a digit, never by a space: in JSON a value is delimited by quotes, not spaces, so a private value that fills a whole
+  // string ("address": "742 Evergreen ...") has no space on either side (test 7b). But "742 evergreen" is not in "1742 evergreen": a match that sits inside a
+  // longer house number or street name is a different address, and treating it as a leak withheld a report that held nothing private (audit 2026-10-07).
   const text = norm(body);
-  const has = (needle: string) => needle.length >= 3 && text.includes(needle);
-  const hasSub = (needle: string) => needle.length >= 5 && text.includes(needle);
+  const has = (needle: string) => needle.length >= 3 && containsBounded(text, needle);
+  const hasSub = (needle: string) => needle.length >= 5 && containsBounded(text, needle);
   if (ctx.address && has(norm(ctx.address))) findings.push('ADDRESS_IN_BODY');
   if (ctx.normalized_address && has(norm(ctx.normalized_address))) findings.push('NORMALIZED_ADDRESS_IN_BODY');
   if (ctx.label && has(norm(ctx.label))) findings.push('LABEL_IN_BODY');
@@ -482,6 +514,7 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_status: p.status,
       publisher_stage: p.stage,
       publisher_event: ev,
+      record_date: recordDate(p, today),
       developer: p.developer, size: p.size, investment: p.investment,
       source: { url: p.source_ref, attribution: grant ? (grant.attribution || null) : null },
       homesignal_observation: led
@@ -547,6 +580,7 @@ export function assemble(input: AssembleInput): Assembled {
       change_ready: anyChangeReady,
       area_truncated: truncated,
       source_families_in_report: [...familiesIncluded].filter(Boolean).sort(),
+      source_feed_count: [...familiesIncluded].filter(Boolean).length,
       assessment_basis: 'records_returned_for_this_radius',
       limitations,
     },

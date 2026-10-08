@@ -112,7 +112,7 @@ const run = fn('run');
 ok(/if \(!attempt \|\| attempt\.address !== address\) attempt = \{ key: newKey\(\), address: address \};/.test(run)
    && /if \(access !== 'admin'\) payload\.idempotency_key = attempt\.key;/.test(run),
   '5a a member report (a free one or one of the paid month\'s) carries a key made once per address; an admin report carries none (the report function refuses one)');
-ok(run.indexOf("if (r.status === 0)") > 0 && run.indexOf('attempt = null;') > run.indexOf("if (r.status === 0)"),
+ok(run.indexOf("if (r.status === 0)") > 0 && run.indexOf('attempt = null;', run.indexOf("if (r.status === 0)")) > run.indexOf("if (r.status === 0)"),
   '5b the key is dropped only once the server has answered: after a lost answer, the same address is retried with the same key');
 ok(/b\[6\] = \(b\[6\] & 0x0f\) \| 0x40; b\[8\] = \(b\[8\] & 0x3f\) \| 0x80;/.test(fn('newKey')) && /crypto\.randomUUID/.test(fn('newKey')),
   '5c the key is a random version-4 UUID (the shape the report function accepts), never derived from the address');
@@ -220,6 +220,15 @@ ok(/else if \(act === 'share'\) shareFromReport\(b\);/.test(code) && !/\$\('shar
 ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\]/g) || []).length === 2,
   '9n a report that was not saved gets a plain explanation from the Share button (never a silent click), on both ways a report reaches the page');
 ok(!/'#share='|share=' \+|\+ '#share/.test(code.replace(/var SHARE_LINK = [^\n]*\n/, '')), '9o the page builds no part of the client link: it only checks the one the server made against SHARE_LINK');
+
+// ---- 10. page safety (audit fix 8, 2026-10-07) -----------------------------------------------------------------------------------------
+ok(/<button type="button" class="auth-link" id="auth-back-link">Use a different email<\/button>/.test(page) && !/<a id="auth-back-link"/.test(page),
+  '10a "Use a different email" is a real button (keyboard reachable), not an anchor with no address');
+ok(/function authKeys\(e\)\{[\s\S]*?e\.key === 'Escape'[\s\S]*?closeAuth\(\)[\s\S]*?e\.key !== 'Tab'/.test(code) && /document\.addEventListener\('keydown', authKeys\);/.test(code) && /if \(\$\('auth-overlay'\)\.style\.display !== 'flex'\) return;/.test(code),
+  '10b Escape closes the sign-in dialog and Tab stays inside it, only while it is open');
+ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code) && /if \(epochAtAsk !== sessionEpoch\) \{ attempt = null; return; \}/.test(code)
+   && run.indexOf('if (epochAtAsk !== sessionEpoch)') > 0 && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("var V = window.HS && window.HS.daReportView;") && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("if (body.plan && typeof body.plan.state"),
+  '10c a report that arrives after the person signed out (or another signed in) is dropped before anything of it is shown or kept');
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

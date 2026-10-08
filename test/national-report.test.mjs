@@ -285,6 +285,12 @@ const FIELD = {
     ok(!/evergreen|homer|44\.046|springfield/i.test(f.join(' ')), '7c and the finding does not repeat the private value: ' + want, f);
   }
   ok(F({ ...clean, note: 'ZIP 97477 area, 44.0 lat' }).length === 0, '7d a ZIP and a coarse (fewer than five decimals) number are not findings');
+  // audit 2026-10-07: a match inside a longer house number or street name is a different address, not a leak (and was withheld, uncharged, as one)
+  ok(F({ ...clean, note: 'near 1742 Evergreen' }).length === 0 && F({ ...clean, note: 'at 742 Evergreenway' }).length === 0, '7e2 "742 Evergreen" is not found inside "1742 Evergreen" or "742 Evergreenway"');
+  ok(F({ ...clean, note: '"742 Evergreen"' }).includes('ADDRESS_FRAGMENT_IN_BODY:house_number_and_street') && F({ ...clean, note: '(742 Evergreen)' }).length > 0 && F({ ...clean, note: 'at 742 EVERGREEN, OR' }).length > 0,
+    '7e3 the real thing is still found between quotes, brackets, commas and in capitals');
+  ok(M.containsBounded('a 742 evergreen b', '742 evergreen') && !M.containsBounded('a 1742 evergreen b', '742 evergreen') && M.containsBounded('1742 evergreen 742 evergreen', '742 evergreen') && !M.containsBounded('', 'x') && !M.containsBounded('abc', ''),
+    '7e4 containsBounded: whole, inside a longer token, a later whole occurrence after an inner one, and the empty cases');
   ok(M.boundaryFindings({ zip: '97477', note: '742 Evergreen' }, null).length === 0, '7e with no private context there is nothing to leak (subject-relative keys are still checked)');
   ok(M.boundaryFindings({ zip: '97477', distance_mi: 1 }, null).length === 1, '7e including with no context');
   const fr = M.addressFragments('742 Evergreen Terrace, Springfield, OR 97477');
@@ -433,6 +439,20 @@ const FIELD = {
   ok(ask(cleared, 'customer').uses_report === true && ask(cleared, 'customer').reason === 'DEVELOPMENT_SHOWN', '11k once a source is cleared and its record is shown, the report uses one free report');
   ok(Object.keys(C.creditDecision({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true })).join() === 'uses_report,reason,rule_version',
     '11l the decision carries only whether, why and which rule');
+}
+
+// ---- 12: the official date of a record, of any age (audit 2026-10-07, finding 2) ----------------------------------------------------------
+{
+  const T = '2026-10-07', rd = (kind, day) => M.recordDate({ date_kind: kind, submitted_at: day }, T);
+  const a = rd('filed', '2016-03-04');
+  ok(a && a.kind === 'filed' && a.label === 'Filed' && a.date === '2016-03-04' && a.older_than_a_year === true, '12a an old filing keeps its date and kind and is flagged as more than a year old', a);
+  const b = rd('issued', '2026-09-20');
+  ok(b && b.label === 'Issued' && b.older_than_a_year === false, '12b a recent date is not flagged', b);
+  ok(rd('filed', '2025-10-07').older_than_a_year === false && rd('filed', '2025-10-06').older_than_a_year === true, '12c exactly 365 days old is not old; 366 is (the boundary is in whole days)');
+  ok(rd('filed', '1900-01-01') === null && rd('filed', '1969-12-31') === null && rd('filed', '1989-12-31') === null && rd('filed', '1990-01-01') !== null, '12d the epoch sentinels the column carries are never shown as a filing date; 1990-01-01 is the first real one');
+  ok(rd('filed', '2026-10-08') === null && rd('filed', '9999-09-09') === null && rd('filed', '2099-02-12') === null, '12e a date in the future is not a filing date');
+  ok(rd('scheduled', '2026-09-01') === null && rd('estimated', '2026-09-01') === null && rd('', '2026-09-01') === null && rd(null, '2026-09-01') === null, '12f a plan (scheduled, estimated) or an unknown kind is not an official record date');
+  ok(rd('filed', null) === null && rd('filed', 'not a day') === null && rd('filed', '2026-02-30') === null, '12g no date, an unparseable one, or an impossible one gives nothing');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

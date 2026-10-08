@@ -568,11 +568,11 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   });
   const S = await import('../supabase/functions/_shared/report-snapshot.ts');
   const USER = '0f0e4d2c-1b3a-4c5d-8e9f-a1b2c3d4e5f6';
-  let d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: USER })]]);
+  let d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: USER, email_confirmed_at: '2026-10-01T00:00:00Z' })]]);
   const who = await d.authenticate('t');
   ok(who.email === 'a@b.com' && who.id === USER, '9a authenticate also returns the auth user\'s id');
-  d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: 'not-a-uuid' })]]);
-  ok(JSON.stringify(await d.authenticate('t')) === '{"email":"a@b.com"}', '9a a malformed id is not passed on');
+  d = mk([[/auth\/v1\/user/, () => json({ email: 'a@b.com', id: 'not-a-uuid', email_confirmed_at: '2026-10-01T00:00:00Z' })]]);
+  ok(JSON.stringify(await d.authenticate('t')) === '{"email":"a@b.com","confirmed":true}', '9a a malformed id is not passed on (the confirmed flag is)');
 
   reqs.length = 0;
   d = mk([[/rpc\/evaluation_usage/, () => json([{ evaluation_id: 'e', status: 'active', credit_limit: 10, credits_used: 2, credits_remaining: 8, expires_at: null, expired: false }])]]);

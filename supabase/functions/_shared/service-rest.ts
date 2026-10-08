@@ -55,7 +55,7 @@ export function makeServiceReads(cfg: { url: string; serviceKey: string }, fetch
     return rows as T[];
   }
 
-  async function authenticate(token: string): Promise<{ email: string; id?: string } | null> {
+  async function authenticate(token: string): Promise<{ email: string; id?: string; confirmed: boolean } | null> {
     let r: Response;
     try { r = await fetchFn(base + '/auth/v1/user', { headers: { apikey: cfg.serviceKey, Authorization: 'Bearer ' + token } }); }
     catch { throw new DataUnavailable('network'); }
@@ -64,7 +64,9 @@ export function makeServiceReads(cfg: { url: string; serviceKey: string }, fetch
     const u = await r.json().catch(() => null);
     if (!(u && typeof u.email === 'string' && u.email)) return null;
     // the user's id travels with the email so an entitlement can be asked by id (the evaluation is keyed on the auth user, never an email)
-    return typeof u.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(u.id) ? { email: u.email, id: u.id } : { email: u.email };
+    // `confirmed` is true only when the auth service says the person proved they own this email; anything else (absent, null, empty) is false, so the gate fails closed
+    const confirmed = typeof u.email_confirmed_at === 'string' && u.email_confirmed_at !== '';
+    return typeof u.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(u.id) ? { email: u.email, id: u.id, confirmed } : { email: u.email, confirmed };
   }
 
   async function isAdmin(email: string): Promise<boolean> {

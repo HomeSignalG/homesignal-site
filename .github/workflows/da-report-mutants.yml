@@ -1,0 +1,65 @@
+name: da-report-mutants
+
+# Audit fix 10 (2026-10-07). The Development Activity report has four mutation loops (test/da_report_view_mutants.py,
+# da_report_compare_mutants.py, development_activity_reports_mutants.py, development_activity_review_mutants.py). Each makes a prohibited
+# change to a shipped file and requires a test to FAIL. They were run by hand and no workflow referenced them, so a test that quietly stopped
+# catching its change would pass every normal check. This runs them whenever a report file changes.
+#
+# ADDITIVE ONLY: no schedule (the repo's Actions budget is limited), and it runs on a pull request ONLY when a file the loops edit or read
+# changes. It is a RED CHECK when a mutation survives (exit 1) or the harness faults (exit 2); it is not continue-on-error.
+# The loops edit files in place and always restore them, so each runs on its own fresh checkout copy.
+on:
+  pull_request:
+    paths:
+      - 'lib/da-report-view.js'
+      - 'lib/da-report-compare.js'
+      - 'lib/project-type.js'
+      - 'development-activity-reports.html'
+      - 'development-activity-review.html'
+      - 'shared-report.html'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/admin-gate.ts'
+      - 'supabase/functions/_shared/service-rest.ts'
+      - 'supabase/functions/_shared/safe-log.ts'
+      - 'supabase/functions/development-activity-trial/**'
+      - 'test/da_report_view_mutants.py'
+      - 'test/da_report_compare_mutants.py'
+      - 'test/development_activity_reports_mutants.py'
+      - 'test/development_activity_review_mutants.py'
+      - '.github/workflows/da-report-mutants.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: da-report-mutants-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        loop:
+          - da_report_view_mutants.py
+          - da_report_compare_mutants.py
+          - development_activity_reports_mutants.py
+          - development_activity_review_mutants.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install playwright (the loops run the browser suites)
+        working-directory: ${{ github.workspace }}/..
+        run: |
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund playwright@1.56.0 leaflet@1.9.4
+          npx playwright install --with-deps chromium
+      - name: Verify playwright is actually available to the suites
+        run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — a browser mutation would be reported as survived or skipped');process.exit(1)})"
+      - name: Run the mutation loop (every mutation must be killed)
+        run: python3 test/${{ matrix.loop }}

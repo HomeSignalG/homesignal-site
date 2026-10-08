@@ -130,7 +130,7 @@ const PAGE_SRC = read(PAGE);
   };
   walk('.');
   const ALLOWED = new Set([MOD, PAGE, 'test/da-report-compare.test.mjs', 'test/da-report-compare-structure.test.mjs', 'test/development-activity-reports.browser.test.mjs', 'test/da_report_compare_mutants.py',
-    'test/lib-cache-keys.test.mjs', 'test/da-report-view-structure.test.mjs', 'docs/development-activity-compare-2026-10-03.md', 'docs/development-activity-build-steps-100526.md']);
+    'test/lib-cache-keys.test.mjs', 'test/da-report-view-structure.test.mjs', 'docs/development-activity-compare-2026-10-03.md', 'docs/development-activity-build-steps-100526.md', '.github/workflows/da-report-mutants.yml']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes(PAGE), '6a (control) the walk sees the module and its one page (' + hits.length + ' files name the comparison)');
   ok(stray.length === 0, '6b nothing names the comparison except its module, its one page, its tests, its record and the keys and workflows that watch it', stray);

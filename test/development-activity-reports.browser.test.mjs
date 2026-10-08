@@ -1785,7 +1785,32 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await ctx.close();
 }
 
-// ---- 14. the way back out: HomeSignal and Enterprise links at the top of the page ----------------------------------------------------------------
+// ---- 14. audit fix 8 (2026-10-07): the sign-in dialog is operable from the keyboard ---------------------------------------------------------------
+{
+  const { ctx, page } = await open({ w: world({ trial: null }), signedIn: false });
+  const overlay = () => page.$eval('#auth-overlay', (e) => getComputedStyle(e).display);
+  await page.click('#signin');
+  ok((await overlay()) === 'flex', '14a the sign-in dialog opens');
+  await page.keyboard.press('Escape');
+  ok((await overlay()) === 'none', '14b Escape closes it');
+  await page.click('#signin');
+  await page.fill('#auth-email', 'agent@example.test');
+  await page.click('#auth-submit');
+  await page.waitForSelector('#auth-code', { state: 'visible' });
+  ok((await page.$eval('#auth-back-link', (e) => e.tagName)) === 'BUTTON', '14c "Use a different email" is a real button');
+  let outside = 0;
+  for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
+  ok(outside === 0, '14d Tab stays inside the dialog while it is open', outside);
+  for (let i = 0; i < 12; i++) { await page.keyboard.press('Shift+Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
+  ok(outside === 0, '14e so does Shift+Tab', outside);
+  await page.focus('#auth-back-link');
+  await page.keyboard.press('Enter');
+  ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
+  await page.keyboard.press('Escape');
+  ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
+  await ctx.close();
+}
+// ---- 15. the way back out: HomeSignal and Enterprise links at the top of the page ----------------------------------------------------------------
 // This page has no site header on purpose, so before 2026-10-07 the header's Enterprise > My reports led INTO a page with no link off it. Two plain same-site
 // links now sit in header.top. They carry no state and ask nothing of any function; they must show whether or not anyone is signed in.
 const navLinks = (page) => page.evaluate(() => {
@@ -1802,47 +1827,47 @@ const navLinks = (page) => page.evaluate(() => {
 for (const [who, signedIn] of [['signed out', false], ['signed in', true]]) {
   const { ctx, page, errors, reports, trials, billingCalls } = await open({ signedIn });
   const n = await navLinks(page);
-  ok(n && n.label === 'HomeSignal site', `14a ${who}: the page has a navigation for the site`, n);
+  ok(n && n.label === 'HomeSignal site', `15a ${who}: the page has a navigation for the site`, n);
   ok(n && JSON.stringify(n.links.map((l) => l.text + '=' + l.href)) === JSON.stringify(['HomeSignal=index.html', 'Enterprise=development-activity.html']),
-    `14b ${who}: it holds exactly HomeSignal (the homepage) and Enterprise (the Enterprise page), as plain same-site links`, n && n.links);
-  ok(n && n.links.every((l) => l.shown && l.h >= 44), `14c ${who}: both are drawn, and tall enough to tap (44px)`, n && n.links);
+    `15b ${who}: it holds exactly HomeSignal (the homepage) and Enterprise (the Enterprise page), as plain same-site links`, n && n.links);
+  ok(n && n.links.every((l) => l.shown && l.h >= 44), `15c ${who}: both are drawn, and tall enough to tap (44px)`, n && n.links);
   // the page itself reads the plan when someone is signed in, so the claim is about the LINKS: touching them makes no request of its own
   await page.waitForTimeout(500);
   const before = { reports: reports.length, trials: trials.length, billing: billingCalls.length };
   for (const a of await page.$$('header.top .sitenav a')) { await a.hover(); await a.focus(); }
   await page.waitForTimeout(300);
   const after = { reports: reports.length, trials: trials.length, billing: billingCalls.length };
-  ok(JSON.stringify(before) === JSON.stringify(after), `14d ${who}: hovering and focusing the links makes no request of any function`, { before, after });
-  ok(errors.length === 0, `14e ${who}: no page error`, errors);
+  ok(JSON.stringify(before) === JSON.stringify(after), `15d ${who}: hovering and focusing the links makes no request of any function`, { before, after });
+  ok(errors.length === 0, `15e ${who}: no page error`, errors);
   await ctx.close();
 }
 {
-  // 14f. a phone: both visible, and the row does not make the page scroll sideways
+  // 15f. a phone: both visible, and the row does not make the page scroll sideways
   const { ctx, page } = await open({ width: 390, height: 844 });
   const n = await navLinks(page);
-  ok(n && n.links.length === 2 && n.links.every((l) => l.shown) && n.overflow <= 0, '14f at 390px wide both links are drawn and nothing scrolls sideways', n);
+  ok(n && n.links.length === 2 && n.links.every((l) => l.shown) && n.overflow <= 0, '15f at 390px wide both links are drawn and nothing scrolls sideways', n);
   await ctx.close();
 }
 {
-  // 14g. print: the page's own print rule hides the header, and the links go with it
+  // 15g. print: the page's own print rule hides the header, and the links go with it
   const { ctx, page } = await open();
   await page.emulateMedia({ media: 'print' });
   const n = await navLinks(page);
-  ok(n && n.links.every((l) => !l.shown), '14g printed, the links are not drawn (they are inside the header the print rule removes)', n);
+  ok(n && n.links.every((l) => !l.shown), '15g printed, the links are not drawn (they are inside the header the print rule removes)', n);
   await ctx.close();
 }
 {
-  // 14h. keyboard: each link can be focused
+  // 15h. keyboard: each link can be focused
   const { ctx, page } = await open();
   const focused = await page.evaluate(() => [...document.querySelectorAll('header.top .sitenav a')].map((a) => { a.focus(); return document.activeElement === a; }));
-  ok(focused.length === 2 && focused.every(Boolean), '14h both links can be reached by keyboard focus', focused);
+  ok(focused.length === 2 && focused.every(Boolean), '15h both links can be reached by keyboard focus', focused);
   await ctx.close();
 }
 for (const [text, want] of [['Enterprise', /\/development-activity\.html$/], ['HomeSignal', /\/index\.html$/]]) {
-  // 14i. they really go there (a real navigation to the real page, not a request the page makes)
+  // 15i. they really go there (a real navigation to the real page, not a request the page makes)
   const { ctx, page } = await open();
   await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click('header.top .sitenav a:text-is("' + text + '")')]);
-  ok(want.test(page.url().split('?')[0].split('#')[0]), `14i clicking "${text}" opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
+  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking "${text}" opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
   await ctx.close();
 }
 

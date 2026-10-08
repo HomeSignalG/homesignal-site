@@ -194,7 +194,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 .auth-msg{font-size:13px;margin-top:12px;min-height:1em;color:var(--accent)}
 .auth-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
 .auth-toggle{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
-.auth-toggle a{color:var(--accent);cursor:pointer;font-weight:600}
+.auth-toggle a,.auth-toggle .auth-link{color:var(--accent);cursor:pointer;font-weight:600}
+.auth-toggle .auth-link{background:none;border:none;padding:0;font:inherit;font-weight:600;text-decoration:underline}
 </style>
 </head>
 <body>
@@ -329,12 +330,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" aria-label="Enter your code">
     <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
-    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a id="auth-back-link">Use a different email</a></div>
+    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><button type="button" class="auth-link" id="auth-back-link">Use a different email</button></div>
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=ed78f68a"></script>
-<script src="lib/da-report-compare.js?v=d43d6a2e"></script>
+<script src="lib/da-report-view.js?v=343cdb93"></script>
+<script src="lib/da-report-compare.js?v=611ae3bf"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ============================================================================
@@ -354,7 +355,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var INVITE = /^hse1_[0-9a-f]{64}$/;
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
-  var session = null, access = null, role = null, busy = false, pendingRun = false, minting = false;
+  var session = null, sessionEpoch = 0, access = null, role = null, busy = false, pendingRun = false, minting = false;
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
   var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
@@ -405,6 +406,18 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   }
   function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('',false); setStep('email'); $('auth-overlay').style.display='flex'; }
   function closeAuth(){ $('auth-overlay').style.display='none'; }
+  /** Escape closes the sign-in dialog, and Tab stays inside it while it is open (it is aria-modal, so the page behind must not take focus). */
+  function authKeys(e){
+    if ($('auth-overlay').style.display !== 'flex') return;
+    if (e.key === 'Escape') { e.preventDefault(); pendingRun = false; closeAuth(); return; }
+    if (e.key !== 'Tab') return;
+    var box = $('auth-overlay');
+    var f = Array.prototype.filter.call(box.querySelectorAll('button, input, a[href]'), function(el){ return !el.disabled && el.getClientRects().length > 0; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1], at = document.activeElement;
+    if (e.shiftKey && (at === first || !box.contains(at))) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (at === last || !box.contains(at))) { e.preventDefault(); first.focus(); }
+  }
   async function sendCode(){
     var email=($('auth-email').value||'').trim();
     if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
@@ -1139,6 +1152,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function onSession(s){
     var was = session && session.user ? session.user.id : null;
     session = s && s.access_token ? s : null;
+    if ((session && session.user ? session.user.id : null) !== was) sessionEpoch++; // an answer still on its way belongs to the person who asked, not to whoever is signed in when it lands
     var who = $('who');
     who.textContent = '';
     if (session) {
@@ -1229,10 +1243,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var clientLabel = field('label'); // optional (build step 7): the function keeps it with the address in its deletable private layer, never in the report
     if (clientLabel) payload.label = clientLabel;
     if (access !== 'admin') payload.idempotency_key = attempt.key; // an admin report is never charged and takes no key; every member report (a free one or one of the month's) does
+    var epochAtAsk = sessionEpoch;
     busy = true; $('go').disabled = true; say('Making the report…', false);
     $('creditnote').hidden = true; $('report').textContent = ''; hideShare(); hideWatch();
     var r = await post(REPORT_FN, payload);
     busy = false; $('go').disabled = false;
+    if (epochAtAsk !== sessionEpoch) { attempt = null; return; } // the person signed out (or another signed in) while the report was being made: it is shown to nobody
     if (r.status === 0) { say('The report service could not be reached. Check your connection, then press Make report again: it will not use a second free report.', true); return; }
     attempt = null; // the server answered: this request is finished
     var body = r.body || {};
@@ -1270,6 +1286,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') sendCode(); });
     $('auth-code').addEventListener('keydown', function(e){ if(e.key==='Enter') verifyCode(); });
     $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
+    document.addEventListener('keydown', authKeys);
     $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pendingRun = false; closeAuth(); } });
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
     $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });

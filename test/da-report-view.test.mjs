@@ -171,8 +171,8 @@ const htmlLife = viewLife(W);
   ok(/coming/i.test(textOf(html)) && !/coming/i.test(textOf(html).replace(/Approved \/ Coming/gi, '')), '3g "coming" appears nowhere except in the stage name Approved / Coming (and it does appear there: control)', textOf(html).replace(/Approved \/ Coming/gi, '').match(/.{20}coming.{20}/i));
   ok(cardsOf(sec(html, 'proposed').html).map(cardTitle).join() === 'Oak Grove Townhomes,Lakeline Medical Office,Riverside Retail Center,Planned Bridge Replacement',
     '3h Decided is in the Proposed section as the engine put it (lifecycle proposed), and the cards follow the engine\'s order');
-  ok(/Official agency status:<\/span> Decided/.test(byTitle['Oak Grove Townhomes']), '3i the publisher\'s own word "Decided" is shown verbatim beside the lifecycle');
-  ok(/Official agency status:<\/span> On file/.test(byTitle['Fire Station 12']), '3j an unknown-lifecycle record shows "Lifecycle unknown" and the publisher\'s own status, never a guessed stage');
+  ok(/Status in HomeSignal&#39;s record:<\/span> Decided/.test(byTitle['Oak Grove Townhomes']), '3i the publisher\'s own word "Decided" is shown verbatim beside the lifecycle');
+  ok(/Status in HomeSignal&#39;s record:<\/span> On file/.test(byTitle['Fire Station 12']), '3j an unknown-lifecycle record shows "Lifecycle unknown" and the publisher\'s own status, never a guessed stage');
   ok(!cardsOf(sec(html, 'approved').html).some((c) => /Highway 99|Fire Station/.test(c)) && !cardsOf(sec(html, 'proposed').html).some((c) => /Highway 99|Fire Station/.test(c)),
     '3k operating and unknown records are in NO stage section (the default for open decision 3)');
   ok(/Highway 99 Widening/.test(sec(html, 'activity').html) && /Fire Station 12/.test(sec(html, 'activity').html), '3l they are named in Recent Official Activity instead, where their recent event is');
@@ -185,8 +185,10 @@ const htmlLife = viewLife(W);
     const hq = view(WQ);
     ok(WQ.status === 'OK' && WQ.coverage_state === 'REPORT_READY' && WQ.report.projects.some((p) => p.name === 'Quiet Unknown Record') && WQ.report.sections.by_lifecycle.unknown.length === 1,
       '3p-engine the engine INCLUDES a quiet unknown-lifecycle record (REPORT_READY, listed in projects and in by_lifecycle.unknown): this is what the view is judged against');
-    ok(!/Quiet Unknown Record/.test(hq) && keysOf(hq) === 'activity,approved,proposed,permitted,history,evidence',
-      '3p-view a quiet unknown record is drawn in no stage section (100526: an unknown lifecycle is never forced into Proposed or Approved); the layout around it renders', keysOf(hq));
+    // audit 2026-10-07 (finding 7): it is no longer drawn nowhere. It is listed under its own "Stage not stated" group, never inside a stage section.
+    const uns = sec(hq, 'unstaged');
+    ok(/Quiet Unknown Record/.test(uns ? uns.html : '') && !sections(hq).filter((x) => ['approved', 'proposed', 'permitted'].includes(x.key)).some((x) => /Quiet Unknown Record/.test(x.html)) && keysOf(hq) === 'activity,approved,proposed,permitted,unstaged,history,evidence',
+      '3p-view a quiet unknown record is listed under "Stage not stated" and in no stage section (an unknown lifecycle is never forced into Proposed or Approved)', keysOf(hq));
     ok(!/no development activity|nothing to show|no records (found|nearby)|no projects (found|nearby|near|around|within)/i.test(textOf(hq)),
       '3p-claim and the page makes no area-wide absence claim over it: an empty stage says "No projects at this stage in this report", about the report only');
   }
@@ -194,7 +196,7 @@ const htmlLife = viewLife(W);
   const doctored = clone(W);
   doctored.report.projects.find((p) => p.project_id === 'k-approved').lifecycle = { key: 'unknown', label: 'Lifecycle unknown' };
   const dc = Object.fromEntries(cardsOf(viewLife(doctored)).map((c) => [cardTitle(c), c]));
-  ok(/HomeSignal lifecycle:<\/span> Lifecycle unknown/.test(dc['Menchaca Apartments']) && /Official agency status:<\/span> Approved/.test(dc['Menchaca Apartments']), '3n a card shows the lifecycle the engine sent even when the publisher status says otherwise: the view re-derives nothing');
+  ok(/HomeSignal lifecycle:<\/span> Lifecycle unknown/.test(dc['Menchaca Apartments']) && /Status in HomeSignal&#39;s record:<\/span> Approved/.test(dc['Menchaca Apartments']), '3n a card shows the lifecycle the engine sent even when the publisher status says otherwise: the view re-derives nothing');
   const odd = clone(W);
   odd.report.projects.find((p) => p.project_id === 'k-approved').lifecycle = { key: 'weird" onmouseover="x', label: '' };
   const oh = viewLife(odd);
@@ -406,7 +408,7 @@ const htmlLife = viewLife(W);
   ok(V.SCOPE_NOTE === quote('This report focuses on development activity and change.'), '9c the supporting scope note is the plan\'s (line 1265)');
   ok(V.EYEBROW === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && V.EYEBROW === M.PRODUCT_NAME, '9d the eyebrow equals the engine\'s product name (ruling R6)');
   ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map',
-    'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Change History', 'Official evidence & coverage', 'Report actions']), '9e the section titles, in the 100526 plan\'s order');
+    'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']), '9e the section titles, in the 100526 plan\'s order (plus Stage not stated, audit 2026-10-07)');
   const p100526 = readFileSync(join(root, 'docs/development-activity-plan-100526.md'), 'utf8');
   ok(['WHAT CHANGED AROUND THIS PROPERTY', 'THINGS TO REVIEW WITH YOUR CLIENT', 'DEVELOPMENT ACTIVITY MAP', 'APPROVED / COMING', 'PROPOSED / UNDER REVIEW', 'PERMITTED / UNDER CONSTRUCTION', 'CHANGE HISTORY'].every((t) => p100526.includes(t))
     && ['changed', 'review', 'map', 'approved', 'proposed', 'permitted', 'history'].every((k) => p100526.includes(V.TITLES[k].toUpperCase())), '9f each of those titles is written, in capitals, in the 100526 plan');
@@ -536,7 +538,7 @@ const htmlLife = viewLife(W);
   const asOf = V.util.day(WB.report.as_of);
   ok(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/.test(asOf), '11a (control) the report carries an as-of day to quote: ' + asOf);
   const TAIL = ' Check the published schedule and project details at the official source before a listing, showing or offer.';
-  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. The nearest listed record is “SR-13 (Main St) & 100 North”, about 0.1 miles to the north.' + TAIL,
+  ok(brief(hb) === 'As of ' + asOf + ', HomeSignal\'s covered official sources list 3 official records within 0.5 miles of this property: 3 permitted / under construction. No approved / coming or proposed / under review records are listed in this report. HomeSignal\'s sources do not cover every agency, so that is not a statement that nothing is planned nearby. The nearest listed record is “SR-13 (Main St) & 100 North”, about 0.1 miles to the north. 3 of these records carry official dates more than a year old; confirm each is still active.' + TAIL,
     '11b the Brigham City shape: the briefing says how many, in which stages, that this REPORT lists nothing future-stage (not that the area has none), the nearest record, how far and in which direction, and one neutral check-the-source line', brief(hb));
   ok(hb.indexOf('</header>') > -1 && hb.indexOf('</header>') < hb.indexOf('data-da-briefing') && hb.indexOf('data-da-briefing') < hb.indexOf('<section'), '11c the briefing is a paragraph directly under the header and before the first section; it is not a section, so the plan\'s section order is untouched');
   ok(sections(hb).every((x) => !/briefing/i.test(x.label)) && keysOf(hb) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence' && /<p class="da-rv-brieflab">Client Briefing: Nearby Activity<\/p><p class="da-rv-brief" data-da-briefing>/.test(hb), '11d it adds no section key; its heading is the paragraph\'s own label, "Client Briefing: Nearby Activity"');
@@ -743,6 +745,52 @@ const htmlLife = viewLife(W);
   const WD1 = await wire({ rows: [row('k-dec', 0.2, FAM_A)], projects: [proj('k-dec', FAM_A, { name: 'Only Decided', type: 'Residential', status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' })], ledger: [], events: [], health: [] });
   const bt1 = decode((view(WD1).match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
   ok(!/1 proposed \/ under review/.test(bt1) && /No approved \/ coming or proposed \/ under review records are listed/.test(bt1), '15g a report whose only record was decided says no proposal is under review', bt1);
+}
+
+// ---- 16: every record shows its official date, and an old one says so (audit 2026-10-07, finding 2) ----------------------------------------
+{
+  const WR = await wire({ rows: [row('k-old', 0.2, FAM_A), row('k-new', 0.3, FAM_A)], projects: [
+    proj('k-old', FAM_A, { name: 'Old Filing Flats', type: 'Residential', status: 'Proposed', date_kind: 'filed', submitted_at: '2016-03-04' }),
+    proj('k-new', FAM_A, { name: 'Fresh Filing Flats', type: 'Residential', status: 'Proposed', date_kind: 'filed', submitted_at: '2026-09-20' })], ledger: [], events: [], health: [] });
+  const hr = view(WR);
+  const cardOf2 = (name) => (hr.match(new RegExp('<article class="da-rv-card"[^>]*>(?:(?!</article>)[\\s\\S])*?' + name + '[\\s\\S]*?</article>')) || [''])[0];
+  const oc = decode(cardOf2('Old Filing Flats')), nc = decode(cardOf2('Fresh Filing Flats'));
+  ok(/Official record:<\/span> Filed · Mar 4, 2016 · more than a year old; confirm it is still active/.test(oc), '16a an old record shows its filing date and says it is more than a year old', oc.slice(0, 400));
+  ok(/Official record:<\/span> Filed · Sep 20, 2026/.test(nc) && !/more than a year old/.test(nc), '16b a recent record shows its date without the old note');
+  const b16 = decode((hr.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(/1 of these records carries an official date more than a year old/.test(b16), '16c the briefing counts the old records', b16);
+  const noRd = clone(WR);
+  for (const p of noRd.report.projects) delete p.record_date;
+  const hn = view(noRd);
+  ok(!/more than a year old/.test(hn), '16d a saved report made before the engine carried the date says nothing about it (no date is invented)');
+}
+
+// ---- 17: coverage, wording and unstaged records (audit 2026-10-07, findings 3, 4, 5, 6) -----------------------------------------------------
+{
+  const hw = view(W), mtx17 = textOf((hw.match(/<div class="da-rv-method" data-da-method>[\s\S]*?<\/div>/) || [''])[0]);
+  ok(typeof W.report.coverage.source_feed_count === 'number' && W.report.coverage.source_feed_count === W.report.coverage.source_families_in_report.length, '17a the engine states how many source feeds the report drew on, equal to the families it lists');
+  ok(new RegExp('Coverage: This report draws on ' + W.report.coverage.source_feed_count + ' official source feeds? that returned records within the search area\\. HomeSignal does not cover every agency in every area\\. An agency that is not part of this report was not checked, so a record that is not listed here may still exist\\.').test(mtx17),
+    '17b the method states the count of feeds and, in every report, that HomeSignal does not cover every agency and that an agency outside the report was not checked', mtx17.slice(0, 600));
+  const old17 = clone(W); delete old17.report.coverage.source_feed_count;
+  const mo = textOf((view(old17).match(/<div class="da-rv-method" data-da-method>[\s\S]*?<\/div>/) || [''])[0]);
+  ok(!/draws on/.test(mo) && /Coverage: HomeSignal does not cover every agency in every area\./.test(mo), '17c a saved report made before the count existed states the limit with no number (none is invented)');
+  ok(/Status in HomeSignal&#39;s record:/.test(hw) && !/Official agency status/.test(hw), '17d the status line says whose status it is: HomeSignal\'s record, not the agency\'s own words');
+  ok(/Distance is measured from the property to the near edge of each record's mapped shape\. The compass direction points to a single display point/.test(mtx17) && !/mapped point;/.test(mtx17), '17e the method describes distance and direction as the engine measures them (near edge; a separate display point for direction)');
+  const WPC = await wire({ rows: [row('p1', 0.12, FAM_A), row('p2', 0.18, FAM_A)], projects: [
+    proj('p1', FAM_A, { name: 'Road job one', type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' }),
+    proj('p2', FAM_A, { name: 'Road job two', type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })], ledger: [], events: [], health: [] });
+  const hb17 = view(WPC);
+  ok(/data-da-briefing>[\s\S]*?<\/p><p class="da-rv-p da-rv-quiet" data-da-caution>This briefing reports what official records say and where they are\. It is not a prediction about value, traffic or the character of the neighbourhood\./.test(hb17) && /do not use them to steer a client toward or away from an area\./.test(hb17),
+    '17f the briefing is followed by one plain caution: official records, not a prediction, not a reason to steer a client');
+  const bt17 = decode((hb17.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]);
+  ok(/No approved \/ coming or proposed \/ under review records are listed in this report\. HomeSignal's sources do not cover every agency, so that is not a statement that nothing is planned nearby\./.test(bt17), '17g where the report lists nothing future-stage, the briefing says that is not a statement that nothing is planned', bt17);
+  const WU = await wire({ ...RICH, rows: [row('k-p1', 0.2, FAM_A), row('k-unk-a', 0.4, FAM_B), row('k-unk-b', 0.5, FAM_B)], projects: [
+    proj('k-p1', FAM_A, { name: 'Open Proposal Plaza', type: 'Commercial', status: 'Proposed' }),
+    proj('k-unk-a', FAM_B, { name: 'Quiet Unknown A', type: 'Civic/Public', status: 'On file', date_kind: 'scheduled', submitted_at: '2027-01-01' }),
+    proj('k-unk-b', FAM_B, { name: 'Quiet Unknown B', type: 'Civic/Public', status: 'On file', date_kind: 'scheduled', submitted_at: '2027-02-01' })], ledger: [], events: [] });
+  const hu = view(WU), bu = decode((hu.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]), us = sec(hu, 'unstaged');
+  ok(/2 more official records in this report state no stage\./.test(bu) && us && /2 official records/.test(textOf(us.html)) && /Quiet Unknown A/.test(us.html) && /Quiet Unknown B/.test(us.html)
+    && /does not state a stage, so HomeSignal does not place these under Approved, Proposed or Permitted/.test(textOf(us.html)), '17h records with no stage are counted in the briefing and listed under "Stage not stated", never in a stage', bu);
 }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);

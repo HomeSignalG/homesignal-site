@@ -129,7 +129,9 @@ const all = Object.values(src).map(code).join('\n');
   ok(/MAX_BODY_BYTES = 4096/.test(g) && /Cache-Control': 'no-store'/.test(g), '4e the body is bounded and responses are no-store');
   ok(/dashboard_admins/.test(src.rest) && !/dashboard_admins.*(insert|update|delete)/i.test(src.rest), '4f the allow-list is read from dashboard_admins, never written');
   ok(/error: 'internal'/.test(h) && !/e\.message|err\.message|String\(e\)/.test(h + g), '4g an unexpected error is answered without its message');
-  ok(!/console\./.test(all), '4h and nothing logs (the address may be in scope everywhere here)');
+  // audit fix 9 (2026-10-07): index.ts alone passes ONE sink to _shared/safe-log.ts, which writes a name, a status and a number; everything else here still logs nothing
+  const allButIndex = Object.entries(src).filter(([k]) => k !== 'index').map(([, v]) => code(v)).join('\n');
+  ok(!/console\./.test(allButIndex) && (code(src.index).match(/console\./g) || []).length === 1 && /\(line\) => console\.log\(line\)/.test(code(src.index)), '4h and nothing logs but the one fixed-text line (the address may be in scope everywhere here)');
   ok(/SUPABASE_SERVICE_ROLE_KEY/.test(src.index) && !/SUPABASE_SERVICE_ROLE_KEY/.test(code(src.handler) + code(src.data) + code(src.module) + g + code(src.rest)), '4i only index.ts reads the service key; every other file receives it');
 }
 

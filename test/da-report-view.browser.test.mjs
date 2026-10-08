@@ -386,7 +386,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; }));
       const tOpen = await textOf('open.pdf');
       const n = (t, re) => (t.match(re) || []).length;
-      ok(tClosed === tOpen && n(tClosed, /Official agency status:/g) >= 6 && !/Full official detail/.test(tClosed),
+      ok(tClosed === tOpen && n(tClosed, /Status in HomeSignal's record:/g) >= 6 && !/Full official detail/.test(tClosed),
         '12k printing the report with every detail collapsed on screen prints exactly what it prints with every detail open (the whole report), and not the "Full official detail" toggle', { same: tClosed === tOpen, status: n(tClosed, /Official agency status:/g), toggle: /Full official detail/.test(tClosed) });
       ok(/MAP\s+RECORD/i.test(tClosed) && n(tClosed, /Official source/g) >= 12, '12l the printed report carries the table (Map, Record ...) and a link line for each record in the table and in its card', [/MAP\s+RECORD/i.test(tClosed), n(tClosed, /Official source/g)]);
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = false; }));
