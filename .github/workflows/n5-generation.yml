@@ -32,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'status | open | work | publish | unresolved | reconcile | ready | activate | rollback | fail | discard'
+        description: 'status | open | work | publish | unresolved | reconcile | ready | prove | prove_dry | activate | rollback | fail | discard'
         required: true
         default: 'status'
       generation:
@@ -77,6 +77,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # The pre-activation proof renders Map 1 in Chromium (scripts/n5_preactivation_browser.mjs).
+      # The orchestrator installs playwright + Chromium itself, and only on a tick that proves.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Orchestrate
         id: orchestrate
         env:

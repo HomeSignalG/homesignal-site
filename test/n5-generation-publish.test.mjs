@@ -232,4 +232,47 @@ ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied befor
     'the suite runs the rollback proof, and runs when the rollback changes');
 }
 
+// FIX 5 — THE PRE-ACTIVATION PROOF. READY is not enough: ACTIVATE requires the newest proof to
+// have passed against the generation still serving, and recomputes its data checks. The
+// orchestrator proves between READY and ACTIVATE, in both automatic paths.
+{
+  const partD = readFileSync('docs/n5-generation-publish-part-d.sql', 'utf8');
+  const partH = readFileSync('docs/n5-generation-publish-part-h.sql', 'utf8');
+  const actOf = (t) => {
+    const i = t.indexOf('create or replace function geo.n5_generation_activate(');
+    const end = 'revoke all on function geo.n5_generation_activate(text, text[]) from public;';
+    const j = t.indexOf(end, i);
+    return i < 0 || j < 0 ? '' : t.slice(i, j + end.length);
+  };
+  const act = actOf(partD);
+  ok(act.length > 2500, 'Part D carries activate (control)');
+  ok(actOf(partH) === act, 'Part H applies exactly Part D\'s activate');
+  ok(/has no pre-activation proof/.test(act) && /if not pf\.passed then/.test(act)
+     && /pf\.baseline_generation_id is distinct from geo\.n5_serving_generation_id\(\)/.test(act)
+     && /geo\.n5_generation_preactivation_problems\(p_generation_id, pf\.baseline_generation_id, pf\.declared_no_boundary\)/.test(act),
+    'activate refuses without a passed proof against the serving generation, and recomputes its checks');
+  ok(act.indexOf('n5_generation_preactivation_problems') < act.indexOf("set superseded_from_state = state"),
+    'the proof is checked before anything is switched');
+  for (const c of ['undeclared_missing_boundary', 'declared_no_boundary_measured', 'receipt_membership_rows_differ',
+                   'receipt_marker_rows_differ', 'receipt_status_rows_differ', 'receipt_boundary_rows_differ',
+                   'rows_outside_receipts', 'serving_member_exit_unexplained', 'status_zip_not_canonical'])
+    ok(partD.includes(`'${c}'`), `the proof checks ${c}`);
+  ok(/^begin;$/m.test(partH) && /^commit;$/m.test(partH) && /raise exception 'part H: live n5_generation_activate/.test(partH)
+     && /part H post-condition failed/.test(partH), 'Part H is one transaction, fail-closed before and after');
+  ok(/build_part_h\.py --check/.test(wf) && /n5-generation-publish-part-h\.sql/.test(wf),
+    'CI checks Part H is generated from Part D, and runs when it changes');
+  const orch = readFileSync('scripts/n5_orchestrate.py', 'utf8');
+  ok(/    ready\(gen\)\n    prove\(gen\)\n    activate\(gen\)/.test(orch), 'auto_finish: READY, then prove, then ACTIVATE');
+  ok(/            prove\(pending\[0\]\)\n            activate\(pending\[0\]\)/.test(orch),
+    'a READY generation from an earlier tick is proved again before ACTIVATE');
+  ok(/no-boundary-zip-classification\.csv/.test(orch) && !/\b84684\b/.test(orch),
+    'the declared no-boundary list is read from the Fix 4 file, never transcribed');
+  ok(/geo\.n5_zip_projects_markers_at\(/.test(orch) && /public\.app_zip_projects_markers\(/.test(orch),
+    'the proof reads answers through the one function Map 1 reads, and checks the reader still calls it');
+  const gw = readFileSync('.github/workflows/n5-generation.yml', 'utf8');
+  ok(/actions\/setup-node@v4/.test(gw), 'the generation workflow has node for the browser step');
+  ok(/run_map1_generation\.py/.test(wf), 'CI runs the generation-read proof');
+  ok(/run_part_h\.py/.test(wf), 'CI runs Part H\'s apply + rollback proof');
+}
+
 console.log(`n5-generation-publish: ${n} structural checks passed`);
