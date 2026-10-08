@@ -30,17 +30,6 @@
    ],
    "primary_cta": "Look up another ZIP code or address →",
    "page_title": "ZIP {zip} is not available — HomeSignal"
-  },
-  "retired": {
-   "title": "This ZIP code is no longer in use",
-   "body": [
-    "The U.S. Postal Service has retired ZIP code {zip}.",
-    "Enter a street address to see development activity near a specific location."
-   ],
-   "primary_cta": "Search an address",
-   "secondary_cta": "Search nearby ZIPs",
-   "page_title": "ZIP {zip} is not available | HomeSignal",
-   "meta_description": "ZIP code {zip} is no longer in use. Search an address to see development activity nearby."
   }
  },
  "zips": {
