@@ -16,18 +16,15 @@ name: dc-epoch-dryrun
 #
 # Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
 
+# ⛔ RETIRED FROM PULL REQUESTS 2026-09-25: #1324 is APPLIED. This run's first act is to refuse unless
+# production is in the PRE-#1324 state ("REFUSED: production is not in the pre-apply state"), so from
+# the apply onward it could only fail, on every PR that touches the shared queue / load SQL or the
+# writer. It is kept, dispatch-only, as the record of how #1324 was proven (run 36058486723). The
+# Epoch PostGIS suite (test/dc_epoch_geography_pg/run.sh) keeps running on every PR inside
+# zip-membership-suite.yml. The national dry run for the next change is dc-atlas-dryrun.yml, built on
+# this one's method.
 on:
   workflow_dispatch: {}
-  pull_request:
-    paths:
-      - 'docs/dc-epoch-geography-apply.sql'
-      - 'docs/dc-epoch-dryrun-report.sql'
-      - 'docs/dc-geocode-observations-load.sql'
-      - 'docs/dc-geocode-observations-queue.sql'
-      - 'scripts/dc-geocode-observations.ts'
-      - 'scripts/dc-epoch-replica-dryrun.sh'
-      - 'test/dc_epoch_geography_pg/**'
-      - '.github/workflows/dc-epoch-dryrun.yml'
 
 permissions:
   contents: read

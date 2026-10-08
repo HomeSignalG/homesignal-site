@@ -166,8 +166,10 @@ ok(/frame-src 'self'/.test(read('community.html')) && /frame-src \\'self\\'/.tes
   + 'public-byte change this work leaves behind');
 ok(/rpc\("app_zcta_boundary", \{ p_zip: zip \}\)/.test(m1js),
   '5d the reader is called by name, with a ZIP, from homesignalmap.html');
-ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cpjs) && /embed=1/.test(cpjs),
-  '5e ...reached only through the embed the authed gate renders');
+// 2026-10-02: the ZIP page embed is shown to every visitor (founder). The READER is still
+// authenticated-only (§4d), so a signed-out visitor's embed draws no outline.
+ok(/var zipContextMap =/.test(cpjs) && /homesignalmap\.html\?embed=1/.test(cpjs),
+  '5e ...reached only through the Map 1 embed the ZIP page renders');
 ok(!/app_zcta_boundary/.test(cpjs) && !/HS\.buildLive/.test(cpjs),
   '5f the ZIP runtime itself neither calls the reader nor draws a map — one implementation');
 ok(!/geo\.zcta_boundary/.test(cpjs) && !/geo\.zcta_boundary/.test(m1js),

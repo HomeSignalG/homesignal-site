@@ -1,0 +1,64 @@
+{
+ "zips": [
+  "01002",
+  "01003",
+  "01004",
+  "01007",
+  "01009"
+ ],
+ "meta": [
+  {
+   "zip": "01002",
+   "name": "Amherst (01002)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "01003",
+   "name": "Amherst (01003)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "01004",
+   "name": "Amherst (01004)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "01007",
+   "name": "Belchertown (01007)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  },
+  {
+   "zip": "01009",
+   "name": "Bondsville / Palmer (01009)",
+   "county": "Hampshire",
+   "state": "MA",
+   "data_quality": "pass",
+   "indexable": true
+  }
+ ],
+ "changes": [],
+ "agency": [],
+ "retractions": [],
+ "communities": [
+  {
+   "id": "county-h",
+   "parent_id": null,
+   "level": "county",
+   "zip_codes": [],
+   "name": "Hampshire County"
+  }
+ ],
+ "meetings": []
+}

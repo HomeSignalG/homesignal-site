@@ -78,9 +78,13 @@ const COMPLIANT_POLICY = {
 function bound(over) {
   const d = draft(over);
   d.image_bucket_path = 'maps/' + d.zip + '/proj.png';
+  // popup_open: a real project capture refuses the shot unless the popup is open, and records
+  // it (scripts/maps-social-image.mjs). Since 2026-10-01 the binding requires it (founder:
+  // a post about a project shows its own pin, popup open). record_match: since 2026-10-02 the
+  // capture also records that the pin shows the post's own record (Map 1 step (a)).
   d.evidence.visual = Object.assign({
     status: 'REAL_MAP_VISUAL', state: S.READY, capture_key: HS.mapsCaptureKey(d), attempts: 0,
-    capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
+    popup_open: true, record_match: true, capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
   }, (over && over.visual) || {});
   return d;
 }
@@ -240,6 +244,12 @@ ok(HS.mapsCaptureDue(notMoved, T0, { ignoreClock: true }).due,
   '8d: --ids bypasses the clock (an operator naming a row has decided)');
 ok(!HS.mapsCaptureDue(bound(), T0, { ignoreClock: true }).due,
   '8e: but --ids never bypasses BOUNDNESS — a bound row genuinely needs no picture');
+// --recapture is the one explicit exception (2026-09-27): a fix to Map 1 itself leaves every
+// older picture bound while it shows the old drawing, and no binding key can see that.
+ok(HS.mapsCaptureDue(bound(), T0, { ignoreClock: true, recapture: true }).due,
+  '8f: --ids --recapture re-shoots a BOUND named draft');
+ok(!HS.mapsCaptureDue(bound(), T0, { recapture: 'true' }).due && !HS.mapsCaptureDue(bound(), T0, { recapture: 1 }).due,
+  '8g: only a literal recapture:true does it — a truthy stand-in does not');
 
 // ── §9 NO FAILURE STATE MAY READ AS A FINDING ABOUT A ZIP ─────────────────────────────
 // This is the one the founder named explicitly. A failed or ineligible capture must never
@@ -258,8 +268,17 @@ ok(HS.mapsCaptureStateCopy('SOMETHING_ELSE') === '',
   '9d: an unknown state gets NO invented copy');
 
 // ── §10 STRUCTURAL PINS on the files a behavioural test cannot execute ────────────────
-ok(/HS\.mapsCaptureDue\(d, now, \{ ignoreClock: ONLY_IDS\.length > 0 \}\)/.test(GEN),
+ok(/HS\.mapsCaptureDue\(d, now, \{ ignoreClock: ONLY_IDS\.length > 0, recapture: RECAPTURE \}\)/.test(GEN),
   '10a: the capture script uses the SHIPPED predicate — not a second copy of it');
+// --recapture is refused without --ids, before anything is read, so a whole-queue re-shoot is
+// never one flag away; and the workflow passes it only when its input is literally 'true'.
+ok(/const RECAPTURE = has\('--recapture'\);\s*\nif \(RECAPTURE && !ONLY_IDS\.length\) \{[\s\S]{0,160}process\.exit\(2\);/.test(GEN),
+  '10a2: the script refuses --recapture without --ids, at startup');
+{
+  ok(/\$\{\{ inputs\.recapture == 'true' && '--recapture' \|\| '' \}\}/.test(WF)
+     && /recapture:\s*\n\s*description:[^\n]*\n\s*default: 'false'/.test(WF),
+    '10a3: the workflow passes --recapture only when its input is \'true\', and it defaults to false');
+}
 ok(/HS\.MAPS_CAPTURE_RETRY/.test(GEN), '10b: and the SHIPPED retry ladder');
 // ⚖️ AT THE SCOPE THE SHUTTER ACTUALLY USED. Keying at the draft's own widest scope
 // stamps a PROJECT key on a ZIP-scope picture, which then never matches what
@@ -297,13 +316,14 @@ ok((GEN.match(/recordOutcome\(/g) || []).length >= 2,
 // record what was removed, so a pin that searches the whole file finds the very string it
 // forbids — the trap this repo has already paid for twice.
 const GEN_EXEC = GEN.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
-// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
-// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
-// which syntax declares it — freezing the shape is what made three suites go red on a
-// correct change, for the third time in this workstream.
-ok(/async function zipMapFallback\(/.test(GEN_EXEC),
+// ⚠️ UPDATED 2026-10-01: the ZIP-map fallback for a project that cannot be pinned is GONE
+// (founder: a post about a project shows its own pin, popup open). Those five record-shaped
+// conditions now record a refusal through `projectPinRefusal`, at module scope so its body
+// runs offline. This pin guards that it EXISTS, not which syntax declares it.
+ok(/async function projectPinRefusal\(/.test(GEN_EXEC),
   '10f₀₀: the comment-stripped source still holds the real code (control for §10f₀)');
+ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project', extra\)/.test(GEN_EXEC),
+  '10f₀₀b: a project that cannot be pinned is recorded INELIGIBLE at project scope, with no picture');
 ok(!/await ineligible\(/.test(GEN_EXEC),
   '10f₀: …and no record-shaped condition ends a draft with no picture any more');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
@@ -388,8 +408,8 @@ const compliantPolicy = COMPLIANT_POLICY;
 function dcBound(over) {
   const d = draft();
   d.image_bucket_path = 'maps/19475/x.png';
-  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null,
-    capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
+  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null, popup_open: true,
+    record_match: true, capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
   if (d.evidence.visual.capture_key === null) d.evidence.visual.capture_key = HS.mapsCaptureKey(d);
   return d;
 }
@@ -399,6 +419,8 @@ ok(!HS.mapsCaptureDue(dcBound(), T0).due && HS.mapsCaptureDue(dcBound(), T0).ski
   '11h: …so a second run against it is a NO-OP');
 ok(!HS.mapsCaptureDue(dcBound(), T0, { ignoreClock: true }).due,
   '11i: …and --ids does not re-photograph it either — an explicit id bypasses the CLOCK, never boundness');
+ok(HS.mapsCaptureDue(dcBound(), T0, { ignoreClock: true, recapture: true }).due,
+  '11i2: …unless the operator also says --recapture, which re-shoots it');
 
 // LEGACY INVALIDATION. Every image captured before this policy existed carries a key without
 // the policy segment AND no measured evidence. It must become unbound and due.
@@ -495,8 +517,16 @@ ok(!/\bno\b[^'"]{0,40}\b(data cent|development|project)s?\b[^'"]{0,20}\b(here|in
 // ── §12 THE ATTACH IS CONDITIONAL — STRUCTURAL PINS ──────────────────────────────────
 // A read-then-unconditional-write is a race with a comment on it. These pin the preconditions
 // into the WHERE clause, which is the only place Postgres will evaluate them atomically.
-ok(/status=eq\.draft&revision=eq\.\$\{Number\(draft\.revision\)\}/.test(GEN),
-  '12a: every write filters on status=draft AND the observed revision');
+ok(/async function guardedPatch\(draft, body, status = 'draft'\)/.test(GEN)
+   && /status=eq\.\$\{status\}&revision=eq\.\$\{Number\(draft\.revision\)\}/.test(GEN),
+  '12a: every write filters on the status it read (draft unless named) AND the observed revision');
+// Only the record-check stamp names a status other than draft, and it writes evidence alone.
+{
+  const calls = GEN.match(/guardedPatch\([^;]*?\)\s*;/g) || [];
+  const named = calls.filter((c) => /,\s*d\.status\)\s*;$/.test(c));
+  ok(calls.length >= 3 && named.length === 1 && /\{ evidence: \{ \.\.\.d\.evidence, visual \} \}/.test(named[0]),
+    `12a₁: exactly one write passes a status other than draft — the record-check stamp, evidence only (${named.length} of ${calls.length})`);
+}
 ok(/Prefer: 'return=representation'/.test(GEN),
   '12b: …and asks for the rows back, so a refused precondition is VISIBLE rather than silent');
 ok(/return guardedPatch\(draft, \{/.test(GEN) && (GEN.match(/guardedPatch\(draft/g) || []).length >= 2,

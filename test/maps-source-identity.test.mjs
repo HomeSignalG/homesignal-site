@@ -149,8 +149,8 @@ const toAppProject = (el) => ({
     source_ref: 'https://abc.austintexas.gov/web/permit/x' + i, type: 'Industrial' });
 
   // The accepted Del Valle lifecycle census, reproduced at shape: 36 proposed, 323 approved,
-  // 64 operating development rows, 5 unknown (TABS) — plus 29 facilities that render
-  // 'operating' but live in the FACILITY filter bucket.
+  // 64 operating development rows, 5 unknown (TABS) — plus 29 facilities that live in the
+  // FACILITY filter bucket (their lifecycle renders `unknown`: no source states one).
   const LIFE = { proposed: 36, approved: 323, operating: 64, unknown: 5 };
   const devRows = [];
   let n = 0;
@@ -177,8 +177,10 @@ const toAppProject = (el) => ({
     eq(m.filterKey, 'facility', '7: facility filterKey is facility (incl. the restFacs tail)');
     ok(!LIFECYCLE_KEYS.includes(m.filterKey), '7: a facility is outside every lifecycle filter');
   }
-  eq(HS.resolveMarker(restFacs[0]).lifecycle, 'operating',
-     '7: a restFacs facility still RENDERS operating while filtering as facility');
+  // 2026-09-24: this fixture carries no status — no source states a lifecycle — so it renders
+  // the canonical `unknown`. It was asserted 'operating' before the unsourced-Operating repair.
+  eq(HS.resolveMarker(restFacs[0]).lifecycle, 'unknown',
+     '7: a restFacs facility with no sourced lifecycle RENDERS unknown while filtering as facility');
 
   // Toggling each lifecycle key off hides exactly its development rows — the count must not
   // pick up the +5 restFacs offset the old 452-row window produced.

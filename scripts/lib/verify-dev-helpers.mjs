@@ -48,11 +48,14 @@ export const LIFECYCLE_BUCKETS = new Set([
  *
  * ⚠️ `type` MEANS TWO DIFFERENT THINGS, AND BOTH REACH `window.__HS_SITES`. On a cached
  * engine site and on an authoritative marker (lib/zip-authoritative.js::zipAuthSiteFromMarker,
- * which sets `type: bucket`) it is the LIFECYCLE. On a NATIONAL data-centre record
- * (lib/data.js, the `national_dc_for_zip` plane) it is the project CATEGORY — the literal
- * string `datacenter` — and the lifecycle is in `status` ('Operating'/'Approved'), exactly as
- * that code's own comment says: "Map 1's pin vocabulary is PERMIT status". Reading `type`
- * alone reported all 31 national records across the panel as unrecognised lifecycles.
+ * which sets `type: bucket`) it is the LIFECYCLE. On a NATIONAL data-centre record (lib/data.js
+ * HS.map1DcSite; the plane was national_dc_for_zip when this was written, map1_dc_zip_members
+ * now) it WAS the project CATEGORY — the literal string `datacenter` — with the lifecycle in
+ * `status` ('Operating'/'Approved'). Reading `type` alone reported all 31 national records
+ * across the panel as unrecognised lifecycles.
+ * Since 2026-09-27 HS.map1DcSite also puts the lifecycle key in `type` (and `bucket`), and the
+ * Type in `use_type`, because that is what Map 1's classifier reads; `status` still carries
+ * map_status, so reading `status` first gives the same answer for both shapes.
  *
  * ⛔ IT DELIBERATELY DOES NOT READ `bucket`, THOUGH lib/map.js::isActiveUndecided DOES.
  * That function answers an ELIGIBILITY question and is decision-aware by design; `bucket`
@@ -254,8 +257,8 @@ export function assertZip(zip, rep, isIndexable, st) {
   const wantFac = (rep.counts && rep.counts.facilities != null) ? rep.counts.facilities : null;
   const sites = Array.isArray(rep.sites) ? rep.sites : [];
 
-  // NEW LAYOUT: every tracker page must render the shared left-sidebar shell.
-  if (!st.shell) fails.push(`ZIP ${zip}: new sidebar shell did not render (old layout?)`);
+  // Every tracker page must render the shared site header (Revised Index Design, #1562).
+  if (!st.shell) fails.push(`ZIP ${zip}: site header shell did not render (old layout?)`);
   // SUBSTANCE GATE: indexable iff the stamped flag is true AND the page rendered content.
   const renderedForPolicy = st.rendered != null ? st.rendered : sites;
   const isIndex = /(^|[^n])index/i.test(st.robots) && !/noindex/i.test(st.robots);

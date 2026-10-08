@@ -96,8 +96,13 @@ console.log('--- the bell carries the viewed place ---');
 ok(!/location\.href='alerts\.html'/.test(shellHtml),
   'the bell no longer routes to a bare, ZIP-less alerts.html',
   (shellHtml.match(/.{0,60}location\.href='alerts\.html'.{0,20}/) || [])[0]);
-ok(/aria-label="Notifications"[^>]*onclick="HS\.navTo\('alerts\.html'\)"/.test(shellHtml),
-  'the bell routes through the shared navigator');
+// The bell left the global header (founder, Revised Index Design, 2026-09-30): Alerts is
+// reached from My Places' "Alert Settings" link. HS.navTo, the click-time navigator the bell
+// used, is kept for any shell control that is not an <a>.
+ok(!/aria-label="Notifications"/.test(shellHtml) && !/hs-bell-badge/.test(shellHtml),
+  'the notification bell is no longer in the shared header');
+ok(/<a class="inlinebtn" href="alerts\.html" id="plAlertSettings"/.test(read('properties.html')),
+  'Alerts is reached from My Places (Alert Settings)');
 ok(!/\?zip='\s*\+/.test(shellHtml),
   'the partial hand-builds no ?zip= string that could go stale at inject time');
 const navTo = (shell.match(/HS\.navTo = function[\s\S]*?\n  \};/) || [''])[0];

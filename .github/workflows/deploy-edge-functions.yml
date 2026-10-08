@@ -53,12 +53,27 @@ jobs:
         run: |
           FN="${{ github.event.inputs.function || 'get-address-report' }}"
           echo "Deploying edge function: $FN → project $SUPABASE_PROJECT_REF"
-          # --no-verify-jwt ONLY for the report engine: it authenticates via the anon apikey at
-          # the gateway and is called from the browser + pg_net with no per-request JWT gate
-          # (matches its live config). Every OTHER function keeps JWT verification ON — the
-          # edge-probe reachability preflight (an arbitrary-URL fetcher) must never deploy as
+          # --no-verify-jwt for exactly THREE functions. (1) The report engine: it authenticates via the
+          # anon apikey at the gateway and is called from the browser + pg_net with no per-request JWT
+          # gate (matches its live config). (2) view-shared-report (Development Activity step 8): the
+          # client who opens a private share link has no account, so the link's secret token is the only
+          # credential and the function itself answers only a token the database says is usable; it
+          # reads one stored report and writes nothing. (3) development-activity-billing-webhook
+          # (Development Activity step 11): the payment processor sends no Supabase token, so the
+          # processor's own HMAC signature over the raw body, checked before the body is parsed, is the
+          # only credential, and the function refuses everything when its signing secret is not set.
+          # Every OTHER function keeps JWT verification ON —
+          # the edge-probe reachability preflight (an arbitrary-URL fetcher) must never deploy as
           # an unauthenticated open endpoint; its callers pass the public anon key as a Bearer.
           if [ "$FN" = "get-address-report" ]; then
+            supabase functions deploy "$FN" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --no-verify-jwt
+          elif [ "$FN" = "view-shared-report" ]; then
+            supabase functions deploy "$FN" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --no-verify-jwt
+          elif [ "$FN" = "development-activity-billing-webhook" ]; then
             supabase functions deploy "$FN" \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt

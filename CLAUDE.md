@@ -94,6 +94,13 @@ production run, and written up. Everything before that fetch was sunk cost.
 **Do not ask permission for work you have already verified.** Verifying first and asking after
 spends the full cost and ships nothing; that ordering is the thing this grant exists to fix.
 
+⚖️ **MERGE IS NOT A GATE (founder, 2026-09-29: "you can merge on your own and you do not need
+to ask me").** Squash-merge your own PRs without asking once CI is green on the current head
+and there is no conflict. Never merge with red, held (`action_required`) or unrun checks. The
+stop lists elsewhere in this file still stand: secrets/PII/subscriber data, destructive or
+non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
+approval step only, not the verification before it.
+
 **Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
 
 1. **`jurisdiction-registry.json` only.** No other file.
@@ -186,6 +193,70 @@ settled decisions, and the workbook editing conventions.
 
 **Do not mirror queue items into the workbook or into this file** — two queues drift, which is
 the exact problem `QUEUE.md` exists to end.
+
+---
+
+
+## Permanent historical intelligence — preserve the longitudinal asset
+
+**HomeSignal's longitudinal development history is a core company data asset. Current product
+state may change; historical evidence must survive.** This rule governs every ingest,
+deduplication, classification, refresh, archive, retirement, merge, cleanup, migration and
+storage-optimization decision involving development, regulatory or environmental records.
+
+1. **Never destroy historical observations or change events.** Customer-facing removal,
+   archival, source retirement, disappearance from current source data, or cleanup must not
+   delete the historical record.
+2. **Preserve before-and-after evidence.** A meaningful change must retain the prior facts,
+   new facts, changed fields, observation time, publisher/source evidence and the applicable
+   derivation/facts version.
+3. **Retrieval is not real-world change.** Refresh timestamps, collection times, parser changes,
+   classifier changes, ZIP rematerialization and other technical metadata must never be reported
+   as project change.
+4. **Maintain durable source-record identity.** A source record must remain linkable across
+   observations. ZIP-page copies are memberships/attributes, not separate real-world projects.
+5. **Build toward permanent canonical real-world project lineage.** Filing, zoning, approval,
+   permit, construction, completion, environmental, enforcement and related records that are
+   proven to concern the same real-world development must be linkable under a HomeSignal-minted,
+   immutable canonical project ID. **Do not infer or merge lineage without sufficient evidence.**
+6. **Identity decisions must be auditable and reversible.** Preserve the evidence and
+   rule/version used to link, separate, merge or supersede entities. Correct an identity
+   decision without deleting the underlying observations or prior decision history.
+7. **Archive does not mean delete.** A project may leave the active/customer-facing dataset or
+   move to an inactive/archive state, but its observations, events, source lineage and canonical
+   identity remain available for historical analysis.
+8. **Classification is versioned history.** Preserve source-native values plus the HomeSignal
+   classification and rule/version used at the time. A future classifier change must not rewrite
+   what the source said or fabricate a historical real-world event.
+9. **Environmental and regulatory lineage must be preservable.** EPA, state environmental,
+   enforcement, contamination, fine/penalty, permit, remediation and similar events must be
+   capable of linking to the relevant canonical project/facility when the evidence supports
+   that relationship.
+10. **No cleanup may sacrifice the longitudinal asset.** If a proposed migration,
+    deduplication, retention policy, archive process or storage optimization would overwrite,
+    collapse or delete historical evidence, **STOP and surface the conflict before
+    implementation.**
+
+**Governing principle: CURRENT PRODUCT STATE MAY CHANGE. HISTORICAL EVIDENCE MUST SURVIVE.**
+
+### What this rule does NOT cover — customer-entered private context (founder decision, 2026-09-29)
+
+**Permanent intelligence survives. Customer-entered private context does not become permanent merely because it
+generated that intelligence.** A street address a brokerage typed, its normalized form, the exact property
+coordinates, any identifier that resolves to one address, and any client-identifying detail are **customer context,
+not historical intelligence**. They must never be written into an immutable or append-only table — not a report
+snapshot's body, not its inputs, not a property-key column, and not a value derived from them (a distance or an
+east / north offset measured from the property recovers it to within a metre).
+
+- They live only in the deletable `public.report_private_context` layer, kept while a report, a property Follow or an
+  account relationship needs them, purged **no more than 90 days after the last need ends** (immediately on a verified
+  privacy request or a legal requirement), and purged **in place** so the permanent snapshot that references them by
+  an opaque id stays whole.
+- Rule 10 above is not weakened by this: the report snapshot stays immutable, and what survives a purge is exactly
+  the project intelligence, evidence, identities, observations, change history and issuance record.
+- Read `docs/report-private-context-contract-2026-09-30.md` before touching a stored report, the report engine
+  (Order G) or anything that reads a customer-entered address. Its §6 lists the gates that must be closed before a
+  real customer report is stored.
 
 ---
 
@@ -1162,13 +1233,14 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
 show a topic as on while the digest treats it as off, because there is no second answer to
 disagree with.
 
-SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a10.sql`, plus
+SQL of record: `docs/alert-subscription-canonical-a1.sql` … `-a12.sql`, plus
 `docs/alert-subscription-canonical-CURRENT-STATE.sql` — a dated **read-back** from
 `pg_get_viewdef` / `pg_get_functiondef`, not a hand-written copy. **Read CURRENT-STATE
-before touching any of it.**
+before touching any of it.** Since 2026-09-25 each quoted definition in it carries its
+production md5, so the read-back can be checked rather than trusted.
 
 **Five streams, and notices/meetings NEVER collapse** — `notices | meetings | news |
-global | emerging`. The predecessor unique key was
+global | emerging` (six since A12 below, which added `maps`). The predecessor unique key was
 `(user_id, community_id, pipeline_type, topic)` and notices+meetings share
 `pipeline_type='government_notice'`, so **one of the two selections was silently
 overwritten**. That is why the migration moved 120 → 155 rows: **+35 recovered meetings
@@ -1183,6 +1255,154 @@ selections**, per-stream before→after otherwise identical, fingerprint
   contract F) and is what delivery gates on. No legal conclusion is drawn from the split.
 - **Per-place unsubscribe is preserved** (contract G): `users` is keyed
   `(email, community_id)`, so one place stopping never stops another.
+
+### A12 — A SIXTH STREAM, `maps`: "What is changing in my zip code?" ⚖️ FOUNDER (2026-09-25) — ✅ APPLIED 2026-09-25
+
+A button on Map 1 (`homesignalmap.html`, ZIP mode) signs a resident up for **email copies of
+the Bluesky MAPS posts about that ZIP**. Approved plan: *"Add MAPS as a new type in the
+existing subscription system rather than building a separate signup."* So it is a stream in
+the one store, written by the one additive writer — `docs/alert-subscription-canonical-a12.sql`.
+✅ **APPLIED 2026-09-25 on the founder's "go"**, with its delivery half. Ledger:
+`20260925231226 alert_subscription_canonical_a12_maps_stream` and
+`20260925231403 maps_email_delivery` (homesignal-ingest), each through `apply_migration` from
+the committed file.
+- **No DDL dry run touched production (§7.11).** Instead the pg suite's fixture was first proved
+  to BE production for everything the two files touch: all **20** fingerprints it carries
+  (function bodies, views, constraints, the generated expression, the unique index, the
+  trigger) matched production byte for byte. So CI's 25 checks and 12 killed mutations are a
+  result about production, not about a stand-in.
+- **After:** production equals that replica with both files applied, on all **24** fingerprints
+  (combined md5 `3551a7571400fa623a04e5c941f624e0` on both sides). `user_subscriptions` is
+  still 155 rows with an unchanged row fingerprint; `users` is 13 with an unchanged consent
+  fingerprint; the catalog gained exactly its one `maps` row; `maps_zip_scope_trigger` = 1.
+- **Today's callers still work:** a live call with the six named arguments the site sends
+  today resolved to the new writer and stopped at its first check (no JWT), before any write.
+- `CURRENT-STATE.sql` was re-read the same day; every quoted definition is md5-equal to
+  production.
+- ✅ **The email half went live on 2026-09-26, before this button existed.** Ingest #600 merged
+  (`cc0d2dd`), then `deploy-edge-function.yml` (run `36249476811`, which checks out `ref: main`)
+  deployed `confirm-alerts`. Read back with `get_edge_function`: **version 3**, updated
+  2026-09-26 14:43:54Z, and its source has the approved MAPS wording and the claim's `streams`
+  field. So the confirmation email knows about MAPS before anyone can press the button. The
+  version it replaced (v2) was also safe: it ignored the `streams` column.
+- ✅ **The button went live on 2026-09-26, measured on the live site.** #1352 merged on the
+  founder's "go merge" (`a584ce3`), and `pages` run `36252240912` deployed it at 15:33:53Z.
+  The session sandbox cannot reach homesignal.net (the proxy refuses it, and so does
+  WebFetch), so the live files were fetched through `pg_net` (requests 22617 and 22618, both
+  HTTP 200): `homesignalmap.html` 327,194 bytes, md5 `45c569816f16d9363140a95ec0d1e4bf`, and
+  `shell.js?v=d5a2b311` 124,136 bytes, md5 `29616dfc2269c4b1506f65e99af9014c`. Both are
+  byte-identical to `a584ce3`.
+  - ⚠️ **A live verifier started by the same push can pass against the OLD deploy.**
+    `verify-property-page`, `verify-alerts-page`, `verify-representative-zips` and
+    `verify-communities` read https://homesignal.net and start on the same push as `pages`.
+    On `a584ce3` the first two finished at 15:32:36 and 15:32:50, more than a minute before
+    the deploy landed, and the third ran across it. So those three greens said nothing about
+    the new code. **Compare a live verifier's finish time with the deploy time before
+    counting it.** `verify-map1-card-grain` is not affected: on a push it serves the
+    checked-out tree over localhost.
+  - `verify-communities` also started first, but its walk ran from 15:32:14 to 16:01:11, so
+    only the first 1m39s of 29 minutes came before the deploy. It passed: **12,722**
+    materialized pages checked on https://homesignal.net, **0** failed, **0** cross-state
+    ZIP violations (run `36252240925`).
+  - After the deploy, the three were dispatched again from `main`, with
+    `verify-map1-card-grain` also pointed at the live site (`site_base`):
+    `verify-property-page` run `36252815834` ✅, `verify-alerts-page` run `36252814629` ✅,
+    `verify-representative-zips` run `36252813295` ✅, `verify-map1-card-grain` run
+    `36252817410` ✅. The card-grain run's one LATENT line (TxDOT rows repeated past the
+    12-row cap) is identical in the 2026-09-25 run, before #1352.
+  - Not fixed here: making these verifiers wait for the deploy (for example, triggering them
+    when `pages` completes) changes four workflows and belongs in its own PR.
+
+- 🔑 **A `maps` selection is filed on the ZIP's OWN community row, not the chain root.** Every
+  other stream anchors at the root (§ "Signup wiring restored", DECISIONS.md 2026-07-16); a MAPS
+  post is about exactly one ZIP (`social_posts.zip`), so a root anchor could never be matched to a
+  post. The database refuses it (`user_subscriptions_maps_zip_scoped`), and the integrity view
+  reports that guard (`maps_zip_scope_trigger` MUST be 1). Filing per ZIP also means one email
+  can follow several ZIPs in one county — each is its own identity, its own unsubscribe.
+- **Alert consent only.** `enable_area_email_alerts` gained `p_marketing_consent` (default
+  `true` = every existing caller unchanged); Map 1 passes `false` (contract F). A false tap
+  never REVOKES marketing consent given elsewhere. It also records the first-touch referral.
+- **Nothing is written on the county identity** — no follow floor, no reconcile-to-exact
+  `signup_complete`. The ZIP is saved to My Places by `persistCommunityFollow`, which is also
+  what keeps a brand-new resident out of the non-dismissible onboarding overlay.
+- The sign-in resumes the sign-up after the 6-digit code (`HS.requireAuth(label, afterAuth)`);
+  every other open of the sign-in clears the pending action, so it can never fire on a later,
+  unrelated sign-in.
+- **The Alerts page's "Save alerts" resumes the same way (2026-09-26).** The MAPS confirmation
+  email links "Sign up for those alerts" to `alerts.html?zip=<ZIP>`. A resident who opened it
+  signed out met two faults, both found by `test/alerts-save-topics.browser.test.mjs`:
+  - **The sign-in opened BEHIND the topic picker and could not be clicked.** Every overlay has
+    `z-index:100`, so the later one in `partials/shell.html` paints on top, and the picker
+    comes after the sign-in. `HS.openAuth` now moves the sign-in to the end of its parent,
+    so it is always above whatever asked for it.
+  - **A verified code dropped the save.** `saveTopics` called `requireAuth` with nothing to
+    resume, so the page went to `location.pathname`, losing `?zip=` and the ticked topics.
+    It now resumes itself (`HS.requireAuth('save-topics', HS.saveTopics)`): the picks are
+    still in the open picker, and the save lands on the page's ZIP.
+  - The test drives it signed out in Chromium and checks the save (`signup_complete` once, on
+    97702's government community, with the ticked topic, after the code), the unchanged URL,
+    and the "saved" message. Both halves were broken on purpose and each was caught.
+  - ✅ **LIVE 2026-09-26 22:13Z** (`pages` run `36275409104`, `554c9d2`, the #1366 merge).
+    Fetched through `pg_net` 30 seconds later (requests 24237–24239, all HTTP 200):
+    `alerts.html` 20,154 bytes, md5 `636d6c55…`, linking `shell.js?v=9d7b871e`; that
+    `shell.js` 125,076 bytes, md5 `45badcc7…`, carrying both fixes; `homesignalmap.html`
+    328,157 bytes, md5 `fc69d8e4…`. All three are byte-identical to `554c9d2`.
+- Pinned: `test/maps-zip-email.test.mjs` (site contract) and `test/maps_zip_email_pg/`
+  (the SQL against a disposable Postgres 17, every prohibited mutation killed). **Two
+  workflows, split by repo** — the `check-alert-subscription-parity.yml` precedent:
+  `maps-zip-email-suite.yml` here runs A12 alone (the delivery checks print SKIP), and
+  homesignal-ingest's `check-maps-email-pg.yml` clones this PUBLIC repo and runs both halves
+  with `REQUIRE_DELIVERY=1`. ⚠️ The reverse is impossible — homesignal-ingest is private, and
+  the first version of this job tried to check it out and failed with "Not Found".
+- ⚖️ **THE WORDING IS FOUNDER-APPROVED (2026-09-26) AND LOCKED (Rule #0):** the button
+  ("What is changing in my zip code?"), the consent line, "✓ You're signed up", and both error
+  messages. Each is pinned WHOLE in `test/maps-zip-email.test.mjs` §5b (the button in §5); a
+  fragment match would let the rest of a sentence change and still pass. Each pin was broken
+  on purpose (5 mutations) and each failure exited 1. The email side's approved wording is
+  pinned the same way in homesignal-ingest.
+  - ⚖️ **THE BUTTON NOW READS "Sign up for emails on what is changing in this zip code"**
+    (founder, 2026-09-26, later the same day: *"Change the text in the button to Sign up for
+    emails on what is changing in this zip code"*). Word for word, including the lowercase
+    "zip code". It is set in two places in `homesignalmap.html` — the button and
+    `ZIP_EMAIL_LABEL`, which paints the label back — and both are pinned whole (§5, §5b; a
+    one-letter change to "ZIP code" was caught). **Only the LABEL changed.** The topic the
+    sign-up stores, `HS.MAPS_EMAIL_TOPIC` = "What is changing in my zip code?", is what links
+    a sign-up to the MAPS posts and the email, so it stays as it was, and §5b pins that the
+    button no longer reads it.
+  - ⚖️ **THE CONSENT LINE FITS ON ONE LINE ON DESKTOP** (founder, 2026-09-26: *"this should fit
+    on one line. fix it"*). The words are unchanged; the layout was the defect. `.zip-email`
+    was capped at 640px and the sentence needs ~660px at 12.5px, so "anytime." wrapped. The cap
+    is gone, and nothing forces `nowrap`, so a phone still wraps it instead of scrolling
+    sideways. Checked from the rendered line boxes in Chromium: 1 line at 1280px (browser test
+    1c2), wrapped with no overflow at 390px (1c3). Restoring the cap fails 1c2; adding `nowrap`
+    fails 1c3.
+  - ⚖️ **THE UNSUBSCRIBE PAGE HAS THE FOUNDER'S TEXT FOR A MAP SIGN-UP** (2026-09-26, *"change
+    the text to this"*): *"You're unsubscribed from Development alerts"*, *"You'll no longer
+    receive Development email alerts for ZIP code <ZIP>."*, *"This only changes the Development
+    alerts you signed up for from the map. If you also receive Government Notices, Upcoming
+    Meetings, or Local News emails, those subscriptions are separate and will continue as
+    usual."*, *"You can sign up for Development alerts again anytime from the HomeSignal map."*,
+    and a *"Return to the <ZIP> map"* link to Map 1.
+    - **Shown only when homesignal-ingest's `unsubscribe` function answers `maps_only: true`**
+      with a 5-digit `zip`. It answers that when the identity it just turned off carried
+      nothing but the map sign-up, decided with the confirmation email's own `isMapsOnly`.
+      That is exactly when "those subscriptions are separate" is true: an unsubscribe turns
+      off one identity (email + community), and the other alerts live on other identities.
+      Every other answer keeps the general page, unchanged.
+    - "Sign up again from the map" is true as well: `enable_area_email_alerts` sets
+      `unsubscribed = false` on the identity it writes.
+    - Pinned in `test/unsubscribe-page.test.mjs` (offline) and
+      `test/unsubscribe-page.browser.test.mjs` (Chromium renders each answer). The text is
+      shared from `test/lib/unsubscribe-founder-copy.mjs`. 8 deliberate breaks each failed on
+      exit code.
+    - 🔑 **The function turns the identity off FIRST and asks for its streams AFTER**, so this
+      page works only while `public.alert_identity_streams` still answers for an unsubscribed
+      identity. It does: the resolver view exposes `unsubscribed` as a column and filters only
+      on `origin = 'explicit'`, and no trigger clears a selection on unsubscribe (both read
+      live 2026-09-26). A view that hid unsubscribed people would look like a tidy-up and would
+      quietly drop every MAPS unsubscribe to the general wording, so the SQL suite pins it:
+      **D10** in `test/maps_zip_email_pg/suite.sql` (2026-09-26), killed by the mutation
+      `identity-streams-hide-unsubscribed`; the suite's check floor is now 28.
 
 ### 🔑 A6–A10 EXIST BECAUSE A3's FOREIGN KEY TURNED A SILENT DROP INTO A HARD ABORT
 
@@ -1551,6 +1771,46 @@ capture clipped to `#map`.
 ---
 
 ## 7.07 EVERY MAPS POST MUST HAVE A MAP — THE LADDER IS `PROJECT MAP → ZIP MAP`, NEVER `→ NO MAP` ⚖️ FOUNDER RULING (2026-09-22)
+
+🛑 **SUPERSEDED FOR PROJECT POSTS, 2026-10-01 (founder): "all mp posts need a pin pop up".** A
+MAPS post about a project (`evidence.project_id` set) must show that project's OWN pin with its
+popup open. The `→ ZIP MAP` step no longer applies to it: when the capture job cannot pin the
+project it calls `projectPinRefusal` (it replaced `zipMapFallback` in
+`scripts/maps-social-image.mjs`) and records `CAPTURE_INELIGIBLE` with no picture, which keeps the
+draft unapprovable. **Posts with no project keep the ZIP map and are correct as they are**
+(founder: *"there is no address to pin so they are correct and stay"*).
+- `lib/maps-capture-binding.js`: a project post on a ZIP-scope picture, or a project picture that
+  does not record `visual.popup_open`, is not bound and is refused by `bskyMapGateBlock`; the
+  dashboard says why.
+- The enforced boundary is still the database: `public.hs_maps_map_gate_violations`, migration
+  `20261001233000` in homesignal-ingest. `test/fixtures/maps-map-gate-cases.json` case 04 is now
+  refused and case 14 (project pin with no popup recorded) was added; the parity harness reads that
+  migration.
+- The rest of this section is the dated record of the 2026-09-22 ruling.
+
+⚖️ **AND THE PIN MUST SHOW THE POST'S OWN RECORD — Map 1 step (a), first part (founder-approved
+2026-10-01; built 2026-10-02).** Map 1 draws one pin per `source_key` and fills its popup from one
+row of that key, so where several records share a key the popup can show another one. Measured
+2026-10-02 over the 28 MAPS posts tied to a project: 3 drafts did (10475 "NB WRIGHT AVENUE" shown
+as "FO WRIGHT AVENUE"; 78703 the 2026 Public Storage amendment shown as the 1996 retail center;
+33004 bridge 86010000 shown as 86016000); 0 approved or published posts did.
+- **No Map 1 change.** The reader already returns, per pin, the content the popup prints. The
+  capture job compares it with the post's live record (`HS.mapsPinRecordMismatch`: name, status,
+  date, type, source type, record link, date meaning) before it opens the browser, refuses a
+  mismatch as `CAPTURE_INELIGIBLE` with `record_match: false`, and records `record_match: true` on
+  a good picture.
+- 🔑 **It compares content, never row ids.** The pin's row is often another row with identical
+  content (1 of 2 approved posts, 8 of 13 published), and an id comparison would refuse them.
+- A project picture is bound only when it records `record_match` true. Pictures taken before the
+  check are checked once by `--stamp-record-match` (workflow input `stamp_record_match`), which
+  needs both the picture's own popup name and Map 1 now to match. It writes evidence alone, so an
+  approved post's payload fingerprint does not move, and it never writes an approved post that
+  fails.
+- The database half is homesignal-ingest migration `20261002010000` (approval and publication
+  refuse a project picture without `record_match` true). It is applied only after the stamp
+  pass, so it cannot refuse an approved post that was never checked; the parity harness reads it.
+- Tests: `test/maps-pin-record-match.test.mjs` (the rule on the real shapes, the binding, and the
+  stamp pass executed against a stubbed database); fixture cases 15 and 16.
 
 **§7.06 below made the map mandatory for the Data Center Theme. This makes it universal.** A
 MAPS post that cannot truthfully pin its record does **not** fall through to no image — it
@@ -1948,6 +2208,327 @@ in production, in any schema, in any transaction.**
 **Rule:** any future "production dry run" of DDL uses this shape — copy out read-only, change a
 replica, prove parity. Never `begin; <DDL>; rollback;` against production.
 
+## 7.13 MAP 1 SERVES ONE N5 GENERATION, AND ONLY ACTIVATION CHANGES WHICH (2026-09-25 — APPLIED; GENERATION PATH NOT YET RUNNABLE)
+
+**DDL of record: `docs/n5-generation-publish.sql` (PART A additive · PART B concurrent indexes ·
+PART C key swap + serving splice). ✅ APPLIED TO PRODUCTION 2026-09-25** (founder "go", after the
+disk was raised to 24 GB): PART A via `db-sql.yml` from a byte-equal copy of lines 1-1041 (HTTP
+201); PART B statement by statement (4 unique indexes valid, ~300 MB; 3 NOT NULL checks
+validated); PART C via `db-sql.yml` from a byte-equal copy of lines 1085-1259. **Map 1 was
+fingerprint-identical before and after**: 8 ZIPs × {`app_zip_projects_markers`,
+`app_projects_for_zip`, `app_zip_geography_state`} and the national 12,722-row
+`app_zip_geography_state` md5 `ba55a243b1f4dfc8f7aee0b80ae15530`. The only serving generation is
+still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
+
+- ⚖️ **2026-09-29 — MAP 1 REBUILDS ITSELF, ONCE A DAY, AND SWITCHES ONLY WHEN EVERY CHECK
+  PASSES** (founder: "swap automatically once check pasees"; "keep 2"). Nobody dispatches runs.
+  - **Trigger:** pg_cron job 69 `n5-generation-dispatch` (`47 * * * *`) POSTs a
+    `workflow_dispatch` of `n5-generation.yml` with `mode=work, max_shards=200, auto=1`, using
+    `vault.github_actions_pat` (the digest's credential; its fine-grained token
+    `homesignal-dashboard-dispatch` was given `homesignal-site` Actions read/write on
+    2026-09-29 — test dispatch HTTP 204, run `36636442855`). GitHub's own `17 * * * *`
+    schedule stays as a second trigger; it drops ticks on this repo, pg_cron does not.
+  - **The unattended tick** (`AUTO_LIFECYCLE=1`, no `GENERATION`; #1476): activates a READY
+    generation left by an earlier tick; else opens `n5-national-<UTC date>` when nothing is
+    BUILDING — at most one per 20 h, never after a FAILED newest build, and only with free disk
+    ≥ the 2,048 MB floor + 3,500 MB (the shard's own `disk_free_mb`); works shards and publishes;
+    once the build is complete, calls `geo.n5_generation_mark_ready` then
+    `geo.n5_generation_activate` through `heavy(..., verify=)`. **The database gates still
+    decide**: a refusal turns the tick red and the generation stays where it is.
+  - **Keep two** (founder, 2026-09-29): after every activation, and at the start of each tick,
+    `retire_superseded()` discards every SUPERSEDED generation except the serving one's
+    predecessor (`geo.n5_generation_discard`) and deletes its capture from
+    `preservation.app_project_identity` (~1.1 GiB each; discard does not touch it). Never a
+    FAILED generation, never a generation on a PROTECTED snapshot: `phase1-2026-09-01` is
+    protected (founder ruling 2026-09-01) and `guard_frozen` refuses the delete anyway, so
+    `legacy-phase1-2026-09-01` and its capture stay. A DELETE does not shrink the database;
+    autovacuum makes the space reusable and the next build's inserts reuse it.
+    Proven on a disposable Postgres through the real orchestrator (`run_lifecycle.py` E17-E24:
+    two unattended ticks build and switch two generations; the one two back loses its rows and
+    capture; the predecessor and the protected legacy capture are untouched); 4 of 4 breaks fail it.
+  - 🔴 **THE RETIRE STEP STOPPED THE DAILY BUILD FOR 4 DAYS (2026-10-02 → 10-06) — FIXED 2026-10-06.**
+    Every tick died at `STOP: SQL retire candidates failed HTTP 400 … 57014 statement timeout`,
+    before it could open `n5-national-<date>`; `n5_map1_build` paged at 02:10Z on 10-06
+    ("serving map captured 83.6h ago"). Measured: the candidate query carried the two "still has
+    rows" probes as **correlated** `EXISTS` subqueries, so the planner priced an average-sized
+    generation and chose a sequential scan of `geo.zip_authoritative_membership` (1.8 GB) and
+    `preservation.app_project_identity` (5.7 GB) per candidate. An already-retired generation has
+    no rows, so its probe read the whole table and found nothing: four retired candidates
+    (09-25, 09-27, 09-29, 09-30) exceeded the 120 s limit, on every tick, from at least
+    2026-10-05 09:45Z. With a **literal** id the same probe is an index-only scan (cost ~1.7;
+    all eight probes together 5.7 ms, `Heap Fetches: 0`). The candidate list now reads only
+    `geo.n5_generation`; `_has_rows_sql` / `_has_snapshot_sql` probe each candidate separately.
+    ⚠️ **It only appears once a retired generation exists** — the first ticks with candidates
+    that still held rows were cheap, which is why #1476's tests and first run did not see it.
+    Pinned by `scripts/test_n5_auto_lifecycle.py` §8b (6 checks fail on the old code).
+    ⚠️ **Separate, transient, the same morning:** one tick at 07:47Z failed `FGA Authentication
+    Error. Unauthorized` (HTTP 500) from the Supabase management API; the next hour's did not.
+  - 🟠 **THE NIGHTLY CHANGE-OBSERVATION WINDOW WAS ~3% SHORT, AND THE ALARM WAS RIGHT (2026-10-07).** `dev_change_observation`
+    paged "no daily pass has reached 'nothing due' in 48 hours". Not a bug and not a bad alarm: pg_cron job 74
+    (`dev-change-observe`, `*/5 2-7`) holds 72 calls sized at 200 ZIPs, but about 19 of them a night stop on the 60 s cap on
+    large ZIPs, so the night averages ~171 and observes ~12,300 of 12,722; ~400 ZIPs slip to the next night.
+    **"completed" means some tick found nothing due, not that every ZIP was covered.** Fixed by widening the window to
+    `*/5 2-8` (84 calls, ~14,300 ZIPs, ends well before the 13:17 `verify-communities` run). **The 48-hour threshold is
+    unchanged (founder: "leave 48 hour")**; the structural pin now prices capacity at the measured ~170 a call, not 200.
+  - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
+    build with no progress for 6 h, on no build running while the serving map was captured
+    > 72 h ago, and on two builds in flight at once.
+  - ⚖️ **FIX 5 (2026-10-08): READY IS NOT ENOUGH — A GENERATION SWITCHES ONLY WITH A PASSED
+    PRE-ACTIVATION PROOF** (founder: "prove it before activation … do not activate simply because
+    Steps 1–4 are fixed"). The tick now runs READY → **prove** → ACTIVATE.
+    - **Data half** (`geo.n5_generation_preactivation_problems`, Part D D14): prefix receipts equal the
+      rows they describe and no row sits outside one; no status row outside the registry, and every
+      boundary_complete status declares its own membership count; the canonical ZIPs without a
+      boundary are EXACTLY the declared Fix 4 list (`docs/maps-coverage/fix4/no-boundary-zip-classification.csv`,
+      read by the orchestrator, never transcribed); no member on an unmeasured ZIP; every (ZIP,
+      project) the serving generation shows and the candidate does not is explained (moved, an
+      unresolved outcome, or left the capture). Measured 2026-10-08 on 10-07 vs 10-06: all 0, controls
+      584 receipts · 706 declared (md5 `7d1bf19a…`, equal to the CSV) · 1,000 exits (771 left the
+      capture + 212 POINT_REJECTED).
+    - **Browser half** (`scripts/n5_preactivation_browser.mjs`): ~16 sample ZIPs (changed ones first,
+      one unmeasured, then a deterministic spread) rendered in the real `homesignalmap.html` under BOTH
+      generations; each render must equal what the shipped builder makes from that generation's
+      answer, by identity and position, and the page's difference must equal the answers'. Answers are
+      read through `geo.n5_zip_projects_markers_at`, the one function Map 1's reader itself calls
+      (`docs/map1-zip-read-generation.sql`; serving answer = public answer is checked per ZIP).
+    - `geo.n5_generation_record_proof` records every proof, failed ones included; ACTIVATE (Part H)
+      accepts only the NEWEST proof, only if it passed, only against the generation STILL serving, and
+      recomputes the data half. A failed proof stops the tick red and leaves the generation READY; the
+      next tick proves again. `prove_dry` rehearses the browser half on real data and records nothing.
+    - Proofs: `run_suite.py` P0–P10 (+ M23–M29), `run_lifecycle.py` E13b–E26, `run_part_h.py`,
+      `run_map1_generation.py`, `test/n5-preactivation-browser.browser.test.mjs` (6 probe mutations killed).
+  - **Disk:** the provisioned size is READ from the Supabase Management API
+    (`/v1/projects/<ref>/config/disk`, `attributes.size_gb` GiB, minus 512 MiB) once per run, so
+    an autoscale resize needs no edit (founder, 2026-10-01: "i can not be doing this for years").
+    `DISK_TOTAL_MB` (`36352`, the 2026-09-29 36 GB reading) is the FALLBACK when that read fails;
+    the run log prints `provisioned disk MB … [source]`. The 2,048 MB floor is unchanged. One
+    build ≈ 2.9 GiB. Pinned by `scripts/test_disk_size.py`.
+    ✅ Verified live 2026-10-01 18:27Z (run `36901928216`): `provisioned disk MB 36,352
+    [Supabase disk config (36 GB)]`.
+  - **A halted shard is retried, up to 3 tries.** `n5_claim_shard` never reclaims a `halted`
+    shard, so one timeout used to leave a build unable to finish. Unattended ticks now put a
+    halted shard tried fewer than `MAX_SHARD_ATTEMPTS` (3) times back to `pending` before
+    claiming; a rerun deletes its own partial slice and every gate runs again. A shard that
+    halts 3 times stays halted and `n5_map1_build` alarms. Seen first 2026-10-01: shard 010
+    of `n5-national-2026-10-01` timed out freezing ZIP 01001 minutes after the 2.9M-row open,
+    while the next 145 shards ran clean (requeued by hand once, attempts 1).
+
+- ✅ **2026-09-29 — THE SECOND NATIONAL GENERATION IS SERVING: `n5-national-2026-09-27`
+  (ACTIVE since 20:30:14Z; `n5-national-2026-09-25` is its predecessor, so `rollback` restores
+  it exactly).** READY passed on the first attempt — no INV-1 gap, confirming the Part F fix.
+  - **Serving == candidate:** membership **911,527**, fp `1958341294288126` · markers
+    **1,018,870** · status **12,722**. The pre-switch serving fp re-measured equal to the value
+    recorded at the first activation (`1945248397386972`), so nothing moved underneath.
+  - **Newly visible: 9,966 projects · 633 ZIPs** (`geo.n5_generation_entries`), led by
+    miami-building-permits 4,157 and tempe-building-permits 3,100 — the sources whose rows were
+    re-created after the 09-25 cutoff. 85282 / 33133 / 33127 render 1,184 / 2,494 / 1,558 markers,
+    all `boundary_complete`.
+  - **Left: 3,831 projects** = 3,751 no longer in `public.app_projects` + 60 re-created after this
+    build's cutoff (2026-09-27 16:59:37Z; the next generation recovers them) + 20 `POINT_REJECTED`.
+  - Operationally: GitHub's hourly schedule dropped several ticks; the build was driven by
+    dispatches plus the ticks that did fire. `open` got a 524 and committed — fixed for the next
+    open by #1398 (open now proves a lost response from state).
+
+- ✅ **SUPERSEDED 2026-09-27 — THE GENERATION PATH RAN END TO END AND MAP 1 NOW SERVES
+  `n5-national-2026-09-25` (ACTIVE since 15:00:49Z; `legacy-phase1-2026-09-01` is SUPERSEDED and
+  recorded as its predecessor, so `rollback` restores it exactly).** The heading and the ⛔ bullet
+  below are the dated receipt of 2026-09-25; read this first.
+  - **Serving == candidate, fingerprinted:** membership **905,390** rows, order-independent fp
+    `1945248397386972` (was 901,465 / `1936506161376757` — re-measured equal to the pre-activation
+    baseline immediately before the switch) · markers **1,012,663** (was 1,004,080) · status
+    **12,722** (was 12,719) · **874,158** projects. Sample ZIPs through `app_zip_projects_markers`:
+    97503 1,852 markers · 97502 1,528 · 40207 837, all `boundary_complete`.
+  - **Newly visible (`geo.n5_generation_entries`): 68,575 (ZIP, project) pairs · 66,491 projects ·
+    2,618 ZIPs.**
+  - ⚠️ **AND 64,130 PROJECTS LEFT MAP 1 — measured, not inferred from the +3,925 net.** Split,
+    summing exactly: **57,307** no longer exist in `public.app_projects` at all (their sources
+    pruned them; the legacy build had kept serving records the canonical table had dropped) ·
+    **6,691** still exist but were **re-created after the cutoff** (`created_at` 2026-09-26 00:16Z →
+    09-27 08:15Z against cutoff 2026-09-25 22:01Z — Miami, Tempe and others re-ingest by
+    delete-and-insert), so the frozen snapshot does not contain them; **the next generation
+    recovers them** · **131** `POINT_REJECTED` · **1** `NO_INTERSECTION_WITH_GENERATION_ZCTAS`.
+    57,307 + 6,691 + 131 + 1 = 64,130.
+  - **READY first refused on INV-1 (17 of 1,031,884 keys, reported as 18 over chunks), and INV-1
+    was right.** Both causes were in `geo.n5_gen_record_unresolved` and fixed at the cause by
+    #1392 / Part F (md5 `26db5d6c…` → `7264883d…`): the catalogue join used the raw registry_id
+    while the shard files a registry-less key under `'(null)'` (5 `tdlr_tabs` keys →
+    `REGISTRY_NOAUTH`), and a publisher that timed out in its shard had no class (10 kytc + 2
+    wisdot keys → `RECOVERY_PUBLISHER_UNREACHABLE`, read from that shard's persisted report). No
+    catch-all was added. Unresolved total **54,725**.
+  - Receipt: `docs/maps-coverage/N5-GENERATION-RUNNABILITY-AUDIT-2026-09-25.md` §"Outcome".
+
+- ⛔ **THE GENERATION PATH (`open` → `work` → publish → `ready` → `activate`) HAS NEVER RUN END TO
+  END AGAINST PRODUCTION, AND IT CANNOT YET.** The first real `open` (run `36172375498`) was
+  refused, wrote nothing, and a read-only audit of the whole path against the LIVE catalog then
+  found **11 blocking defects**, each adversarially verified. Receipt, evidence and fix class for
+  each: `docs/maps-coverage/N5-GENERATION-RUNNABILITY-AUDIT-2026-09-25.md`. **Do not dispatch
+  `open` again until they are fixed** — a re-run after the capture commits and before the
+  generation row exists leaves ~1.4 GB of orphaned snapshot rows under a name `open` then refuses.
+  🔑 The executable suite passed because its fixture is more permissive than production and seeds
+  evidence nothing in production writes; **a green suite here proved the design, not the run.**
+
+- **Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation**, through `geo.n5_serving_membership`
+  / `_marker` / `_status`. Every reader of the base tables is spliced onto those views in PART C,
+  which aborts if any reader it did not name still reads a base table.
+- **Candidate rows are written only while their generation is BUILDING.** The database enforces
+  this (`geo.n5_generation_row_guard` on all four serving-plane tables), so a build can never
+  touch what residents see, and the old in-place writers fail closed.
+- ⛔ **`n5_boundary_first.py`, `n5_unit_a_shadow.py` and `n5_a3_markers.py` (except `bench`)
+  are RETIRED.** They deleted and re-inserted the SERVING rows prefix by prefix, with no
+  generation. Do not re-run them through `phase2-b1-zcta.yml`. The one writer is
+  `n5_orchestrate.py` → `scripts/n5_publish.py` → `geo.n5_gen_publish_prefix`.
+- **Lifecycle:** `open` → `work` (shards, then publish every prefix, then
+  `geo.n5_gen_record_unresolved`) → `ready` (`geo.n5_generation_mark_ready`) → `activate`. The
+  COMMIT of `geo.n5_generation_activate` is the only serving switch; no rows are copied.
+  `rollback` restores a superseded generation by state alone.
+- **"Newly visible on HomeSignal" is derived, not stored:** `geo.n5_generation_entries(G)` =
+  G's membership minus its predecessor's. It includes geography corrections, so it never means
+  "new project". It is derivable only while the predecessor's rows exist, and discard refuses
+  the serving generation's predecessor.
+- **ONE AUTHORITY — `public.app_zip_geography_cutover` is no longer a serving switch.** It was the
+  legacy build's per-ZIP rollout flag. `app_projects_for_zip` (the ZIP page, `development.html`,
+  `property.html`, `properties.html`) served Development only where it was enabled, while Map 1
+  never consulted it. PART C derives both `app_projects_for_zip` and `app_zip_geography_state`
+  from the serving generation. Measured 2026-09-25: enabled-and-verified = the 12,013
+  boundary_complete ZIPs exactly (0 either way), so no output changes today. The table stays as
+  the historical rollout record; only the diagnostic `refresh_maps_zip_export` (no readers)
+  still reads it.
+- **Publication scope = shard prefixes ∪ every canonical prefix** (`geo.n5_generation_publish_scope`).
+  Shards alone would leave **40 prefixes / 445 ZIPs** with no status; **442** of those serve a
+  measured zero today and would regress to 'unknown' on activation.
+- ✅ **FIX 3 (2026-09-29): THE OTHER 3 OF THOSE 445 — 94128, 95219, 99128 — HAD NO ROW IN THE
+  LEGACY GENERATION AT ALL, AND HAVE SERVED `boundary_complete` SINCE 2026-09-27.** Each is the only
+  canonical ZIP of its prefix, and the retired legacy writer built only shard prefixes. **A status
+  row must also be the RIGHT one**: READY/ACTIVATE now refuse `canonical_zip_status_disagrees_with_boundary`
+  (status vs `geo.zcta_boundary`, both directions; Part D D11, applied by Part G on 2026-09-29
+  23:56Z, live `md5(prosrc)` `66f5995d…`). Receipt:
+  `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`. `pending` now has no live member
+  by design; `verify-map1-zip-states` exercises it synthetically and fails if any of the three reads it.
+- **Proof:** `test/n5_generation_pg/run_suite.py` (78 assertions + 22 mutations, all killed; run
+  2026-10-01 on PostgreSQL 16) via `n5-generation-publish-suite.yml`;
+  `test/n5-generation-publish.test.mjs` (84 static checks); `run_part_g_rollback.py` (15 checks).
+  *(This line read "58 assertions + 10 mutations … 53 static pins" until 2026-10-01; it went stale
+  as Parts D-G added tests.)*
+- **Part G rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is generated by
+  `build_part_g.py`, fingerprint-proven to restore the pre-Part-G body (`611926…`), and NOT
+  applied. Use it only if the boundary-agreement check refuses a correct build. Then revert
+  D11 in Part D too. The first real build under the check, `n5-national-2026-09-29`, was activated
+  2026-09-30 12:22Z with 0 disagreements.
+- ✅ **FIX 4 (2026-10-01): OF THE 706 `not_measured` ZIPs, 0 ARE HOMESIGNAL BOUNDARY OMISSIONS.
+  704 are legitimate non-ZCTA ZIPs and 2 (84684, 84685) are ZIPs whose existence is not established.
+  All 706 stay `not_measured`.**
+  - Split, from zipcodes 3.0.0 (its types and decommissioned flag are unitedstateszipcodes.org data,
+    not USPS's): PO Box 498 · unique 107 · standard ZIP with no Census ZCTA 52 · decommissioned in
+    the dataset 47 · not in the dataset 2.
+  - `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to Census TIGERweb's 2020
+    ZCTA set. 0 of the 706 are in it. The Census code sets are committed, so this re-checks offline.
+  - ⛔ **Do not give any of them a polygon** (neighbour, centroid, radius or the 2010 delineation).
+  - ✅ **THE 47 ARE BACK ON THE SITE, AS COVERAGE-LIMITED PAGES (founder, 2026-10-03). This replaces the
+    2026-10-01 withhold ("take them off live site until i can investigate further"), which is gone.**
+    The decommissioned flag came from a THIRD-PARTY dataset, not USPS; a missing Census ZCTA proves
+    nothing about mail (PO-box and single-organization ZIPs have none and receive mail daily).
+    - **TWO FILES, one generator (`scripts/build_zip_coverage.py`; `--check` re-derives both;
+      `test/zip-coverage.test.mjs` fails on a hand edit).** The INTERNAL record
+      `docs/maps-coverage/fix4/zip-coverage-internal.json` keeps the full provenance and is never
+      deployed (`docs/` is outside the Pages artifact): `postal_status` · `postal_status_source` ·
+      `postal_status_verified_at` · `zip_type` · `zcta_2010_status` · `zcta_2020_status` ·
+      `map_coverage` · `page_mode` · `verification_notes`. The PUBLIC `lib/zip-coverage.json` is what
+      browsers receive and is DERIVED from it: **only `zip_code`, `zip_type`, `map_coverage`,
+      `page_mode`** per ZIP, plus the approved copy. No provenance, no review notes, no vendor or
+      "decommissioned" wording, no place names. `validate_public` and a Pages step refuse any
+      reintroduction. A ZIP with no entry is a standard page. All 47 are `unverified` /
+      `third_party_flag` / never verified / `address_only`; **28 `specialized_zip`** (20
+      single-organization + 8 PO box) and **19 `verification_pending`** (regular street ZIPs, incl.
+      98205 and 98929, which had a 2010 area).
+    - **Specialized heading (founder, 2026-10-03): "HomeSignal coverage for ZIP [ZIP]"**, which says
+      nothing about the Postal Service. It replaced "This ZIP is active in HomeSignal".
+    - ⛔ **NOTHING IS `retired` OR `active` WITHOUT USPS EVIDENCE.** The validator refuses either on a
+      third-party flag, and `retired` only with `postal_status_source = usps_verified` and a date. That check
+      runs on the INTERNAL record, which is the only place the evidence exists; the public file then
+      carries just `page_mode: retired`. **The mode is decided ONCE, in `build_zip_coverage.py`**
+      (`validate_public` refuses a mode outside the vocabulary and a `standard` entry with no Census
+      area); `gen_zip_pages.py` reads it, and `shell.js` and the live verifier only check it is a known
+      value, failing SAFE to `verification_pending` for one nobody built (2026-10-08: it used to be
+      re-decided in three places). **The public file ships only the copy for modes in use, and the
+      word "retired" is refused in it while no ZIP is retired** (the dormant text stays in the internal
+      record).
+    - **What a visitor gets:** `/community/<zip>/` keeps its normal URL, HTTP 200 and its usual Rule F
+      robots/sitemap decision (never noindex merely for lacking a ZCTA). The page shows the founder's
+      coverage panel plus its government notices, meetings and local news; **no ZIP map, no stat tiles,
+      no development cards, no ZIP-wide count or "0 projects"**. `development.html` / `homesignalmap.html`
+      with `?zip=` show the same panel (noindex, canonical to the document); an address search (lat/lng)
+      near one of them is NEVER replaced. Primary CTA: the homepage address search (`/?near=<zip>`, a hint
+      and focus only); secondary: the page's `#zip-nearby` section.
+    - ⚠️ **The nearby link is absolute on purpose**: the generated documents set `<base href="/">`, so a
+      bare `#zip-nearby` resolves to the HOME page. The browser test caught it.
+    - The other 659 no-boundary ZIPs are UNCHANGED: they keep the standard page with the 2026-10-02
+      "no mapped area" sentence. Extending the panel to them is a founder call, not done here.
+    - Developer-only view (reads the INTERNAL record): `node scripts/zip-coverage-report.mjs [zip…]`. Tests:
+      `test/zip-coverage.test.mjs`, `test/zip-coverage.browser.test.mjs`.
+  - ⏸️ **84684 AND 84685 ARE WITHHELD TOO, AS UNVERIFIED, NOT AS RETIRED (founder, 2026-10-03).** They are
+    now `page_mode unverified` in the coverage model (internal record: `postal_status unverified`,
+    `map_coverage none`, the audit notes below; public file: the four fields only). No document, no
+    sitemap entry, no sibling/city/project link, no redirect; the shell shows a noindex notice that says
+    we could not confirm the ZIP is an active USPS ZIP. Neither is claimed retired, invalid,
+    decommissioned, active or geographic. The old withheld list (`lib/withheld-zip-pages.json`) is gone:
+    this ZIP-level decision and the 47-ZIP restore now share ONE mechanism.
+    - **Why:** USPS lookup was unreachable (`tools.usps.com` blocked from the sandbox); both are absent
+      from zipcodes 3.0.0 and Census 2010/2020 ZCTA. The names "West Mountain" / "Woodland Hills" are
+      registry labels from Census place points, not USPS assignments. Do not derive locality, county,
+      civic, map or related-ZIP content from them, and do not substitute 84651 (West Mountain's
+      mailing ZIP in web sources) or 84653 (Salem / Woodland Hills) for them.
+    - **Re-audit only after USPS or USPS City State Product verification.** Then change its entry
+      in `scripts/build_zip_coverage.py`'s derivation (a verified ZIP type sets its page mode).
+    - `canonical_zip_registry` is untouched: 12,722 rows, both ZIPs present (read 2026-10-03).
+    - `scripts/verify-maps-rollout.mjs` no longer walks 84684 (it was the "hardest centroid" probe); no
+      ZIP was substituted. `lib/generated/gov-notice-coverage.json` still lists both (a delivery lookup,
+      never a page). `docs/maps-full-rollout-migration.sql` still carries the Census place points; they
+      are inert while the pages have no page.
+  - The class is decided only by `scripts/fix4_classify_no_boundary_zips.py`. Per-ZIP record:
+    `docs/maps-coverage/fix4/no-boundary-zip-classification.csv`. Receipt:
+    `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`.
+  - ⚠️ **Fix 3's D11 check does NOT trust `geo.zcta_boundary` to be complete; do not re-derive
+    that it does.** It was claimed during Fix 4 and retracted before merge (receipt §5). The
+    publisher reads the sha256-pinned TIGER archive itself, so a deleted or short table disagrees
+    with it and READY/ACTIVATE refuse (test B2).
+- ⛔ **CAPACITY GATE: PRODUCTION MIGRATION/CUTOVER IS BLOCKED UNTIL VERIFIED DATABASE CAPACITY IS
+  SUFFICIENT.** PART A and PART B each raise unless the operator sets `n5.verified_free_disk_mb`
+  to an INDEPENDENTLY verified physical free-disk figure ≥ 2,048 MB floor + 950 MB PART B peak.
+  The 11,607 MB "total" hard-coded in the N5 scripts is NOT evidence and must not be used to derive
+  it. PART B builds ~450 MB of indexes before PART C frees ~375 MB.
+- ✅ **VERIFIED PHYSICAL CAPACITY (Supabase dashboard, founder-read, 2026-09-25): provisioned
+  database disk 18 GB · utilization 81% · Database 11.3 GB · WAL 2.7 GB · System 206.1 MB.** This
+  REPLACES every assumption that the physical disk is 11,607 MB. ⚖️ **Verdict: 18 GB is
+  INSUFFICIENT** for the migration plus a retained second generation plus the 2,048 MB floor; the
+  provisioned disk is being increased before anything proceeds. Full receipt, arithmetic and the
+  corrected second-generation size (it is ~2.9 GB, not ~1.25 GB — the ~1.25 GB omitted the new
+  snapshot): `docs/maps-coverage/N5-CAPACITY-VERIFIED-2026-09-25.md`.
+  - ⚠️ The scripts still carry `DISK_TOTAL_MB` = 11,607 (unchanged; no code was touched). Against
+    the real 11.3 GB database + 2.7 GB WAL that constant yields a NEGATIVE "free" figure, so those
+    guards refuse on a wrong number rather than a right one. Set `DISK_TOTAL_MB` from the verified
+    provisioned size when running them; do not treat 11,607 as capacity.
+- 🔑 **MAP 1'S ZIP READ COMPARED `char(5)` KEYS WITH A `text` PARAMETER, SO IT NEVER USED ITS
+  INDEX (2026-09-26).** `zcta5` / `zip` are `char(5)` on all three serving tables; `p_zip` is
+  `text`. Postgres casts the column (`(zcta5)::text = p_zip`), no index covers that, and every
+  `app_zip_projects_markers` call scanned the whole serving plane. Measured: 411 PostgREST calls,
+  mean 4.6 s, max 24.5 s against the function's own 25 s timeout, ~119,000 blocks read per call;
+  a cold call took 30.1 s and Map 1 showed "could not be read just now". The same marker read with
+  a `char(5)` value: 19 ms, 68 blocks. `app_authoritative_projects_for_zip` (the ZIP page) already
+  copied `p_zip` into a `char(5)` variable; `docs/map1-zip-read-char5.sql` gives Map 1's reader the
+  same shape. Output cannot change: `p_zip` is refused unless it is exactly 5 digits, and all
+  1.9 M stored keys are. Proof: `test/n5_generation_pg/run_map1_char5.py`.
+  - ✅ **APPLIED 2026-09-26 21:33Z** (`apply_migration`, ledger `20260926213351
+    map1_zip_read_char5`, stored text = the committed file byte for byte, md5 `6d57aa41…`, 7,741
+    chars). Body `5517dce9…` → `4918783a…`; owner, grants, SECURITY DEFINER, STABLE, search_path
+    and the 25 s timeout unchanged. **Same answers, byte for byte, on 6 recorded ZIP reads**
+    (97702 dev + facility, 01004 not_measured, 01009 zero projects, 94128 no status row, 28451 the
+    largest at 8.8 MB), and the public PostgREST call for 97702 returns the same 996,316 bytes.
+  - **Measured after:** 97702 3,221 ms / 128,931 blocks read → **69 ms / 0 read**; 28451 → 576 ms
+    (before, four large ZIPs in one call ran past 60 s); the public call for 97702 used 82 ms of
+    database time and read 0 blocks (before: mean 4,553 ms, ~119,000 blocks read per call).
+  - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
+    never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
+
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
 **Every coordinate claim is classified by what the evidence is, and authority follows that
@@ -2004,6 +2585,9 @@ stays `AUTO_CONFIRMED_MATCH`, and the facility is not drawn.
 - ⚠️ **Residual, stated:** Atlas's own street addresses are not geocoded by the ingest. The same
   internal inconsistency can therefore exist, undetected, on an Atlas-only facility. It was found
   here only because Epoch brought the address into the geocoder.
+  - ✅ **Closed by §7.13 (2026-09-25, PR #1335)**, and measured. 48 entities carrying an Atlas record
+    fail closed on this rule once Atlas is admitted: Lancaster (already withheld) plus **47 never
+    detected before**, 25 of them published today. The bullet above is the dated receipt of the gap.
 
 **What `exact` means in practice, measured:** of 717 current Atlas points labelled `exact`:
 - 592 are site-class;
@@ -2026,6 +2610,335 @@ A label is not evidence of a site.
   - G13: a peer conflict publishes.
 - `test/dc-canonical-geography.test.mjs` G14/G15: facility literals and source names, each shown
   catching an injected exception.
+
+## 7.13 A PUBLISHER'S OWN ADDRESS CHECKS ITS OWN POINT — ACQUIRED FIRST, ADMITTED ONLY AFTER REVIEW (2026-09-25)
+
+**Every publisher that states a street address now has that address geocoded through the ONE
+production ladder and compared with its own point by the SAME `dc_site_claims_conflict`.** No
+Atlas geocoder, no Atlas geography rule, no Atlas reader. PR #1335. Full receipt:
+`docs/dc-atlas-dryrun-receipt-2026-09-25.md`.
+
+⚖️ **STAGE 10 (2026-09-26): ATLAS IS ADMITTED IN THE DDL OF RECORD — founder-approved after the
+admission dry run.** `dc_derived_address_admitted` now admits exactly `epoch_ai/data_centers` and
+`compute_atlas/facilities`. The dry run on that day's production copy (run `36253526398`, PR #1356)
+measured Map 1 1,842 → 1,817 rows / 768 → 757 ZIP pages: **1 added, 26 withheld (SOURCES_DISAGREE),
+0 moved**, every change attributed. The founder lifted this session's no-admission / read-only rules
+for stage 10 explicitly.
+- ✅ **APPLIED 2026-09-26 18:48 UTC AND VERIFIED — production admits Atlas.** Run `36263746674`
+  (`dc-atlas-admission-apply.yml`, main, confirm `ADMIT-ATLAS-STAGE-10`): generated artifact
+  `docs/dc-atlas-admission-apply.sql` (sha256 `2c2c8571…`), in-transaction drift guard on the live
+  switch's `md5(prosrc)` `cd968b64…`, bounded lock wait, post-condition, definition parity. Live
+  switch now `31cb6c9e…`, byte-identical to the DDL of record (recomputed from the file).
+- ✅ **STAGE 11: live Map 1 equals the reviewed list EXACTLY.** After the 19:25/19:35 resolver runs:
+  1,817 rows / 757 ZIPs; the 18:58 snapshot minus the 26 withheld plus Google 46360 fingerprints to
+  the live `18944a61…`, with a control reproducing the snapshot's own fingerprint. Identity
+  fingerprints unchanged. Full receipt: `docs/dc-atlas-admission-receipt-2026-09-26.md`.
+  - ⚠️ **A Map 1 fingerprint is ZIP membership, not position.** The within-ZIP half was measured
+    separately: 2,127 / 2,127 publisher-point placements sit exactly on their observation's point.
+  - ⚠️ **The admission changed 21 decisions the review list did not show:** 21 more entities
+    (16 `CONFIRMED_DC`) are now `DERIVED_ADDRESS_POINT` at a 2 km Atlas-derived disk, **on Map 1 neither
+    before nor after** (the disk does not fit one ZIP). A future review list must cover geography
+    decisions, not only Map 1 rows.
+- 🔁 **ROLLBACK EXISTS AND IS TESTED, NEVER APPLIED:** `dc-atlas-admission-apply.yml` → confirm
+  `ROLLBACK-ATLAS-STAGE-10` runs `docs/dc-atlas-admission-rollback.sql` (Phase A's body from
+  `PHASE_A_REGION`, not retyped). Offline proof: one resolver run after a rollback restores the
+  pre-admission Map 1 exactly. After a real rollback, revert the DDL of record too.
+- The Phase A artifact still regenerates byte for byte: its generator restores exactly the stage-10
+  region (extracted from git, sha256-pinned to `891bb210…`). **The pre-admission instruments refuse
+  cleanly on their production preconditions** (corrected 2026-09-26: an earlier line here said they
+  fail with "admission body shape changed"; checked, they stop first with "Atlas is admitted in
+  production" / "already admitted" / "production already carries this change") — retired receipts.
+
+**Why it was missing: two source-keyed shortcuts, both removed.**
+- `dc_geocode_input` had one Epoch branch; every other source got `NO_GEOCODE_RULE`.
+- The resolver paired claims with `a.source_key < b.source_key`, so a claim only ever met ANOTHER
+  source's claim. Rule_version 5 pairs by `(source, class, observation)`.
+- Before changing the pairing, it was measured that every live entity carries at most one claim per
+  (source, class). So the only new pairs are a publisher point against its own derived point.
+
+**Extraction is per source; policy is one.** `dc_publisher_stated_address` only reads each
+publisher's schema. Atlas's `location.street, city, state postalCode` is composed in the calibration's
+shape. `dc_geocodable_site_address` decides geocodability and names no source.
+
+🔑 **ACQUIRED ≠ ADMITTED.** `dc_derived_address_admitted` is a deployment gate over an extraction,
+never a rank.
+- A non-admitted extraction's derivations are queued, derived and stored. They reach nothing: not the
+  geography evidence, not the geography provenance, and not identity candidate K3.
+- Measured on the national replica, Phase A changed **0 Map 1 rows and 0 geography decisions** across
+  all 12,722 ZIP pages, with the 763-address Atlas queue fully derived and loaded.
+- ⛔ **Admitting Atlas is ONE reviewed edit** of that function, and of the pin
+  `test/dc-atlas-validation-structure.test.mjs` A2/A4 that fails until it is made deliberately.
+
+**What admission does, measured (Phase D, run `36078120976`):** Map 1 goes from 1,814 to 1,790 rows.
+- **25 removed:** publisher site point vs its own address beyond 2,000 m → `SOURCES_DISAGREE`.
+- **1 added:** a town-centroid pin placed by its own address.
+- **0 moved, 0 ZIP-changed.**
+- Of 969 published Atlas facilities: 97.42% unchanged, 48.81% corroborated, 48.61% have no address to
+  check.
+- 21 of the 25 carry Atlas's own `PUBLISHER_APPROXIMATE`. CoreSite DE3's point is the conventional
+  downtown-Denver coordinate, 5.6 km from its stated address.
+- **30 bad points sat in the same ZCTA as their own address** (V09). A same-ZIP test passes every one.
+
+- ⛔ **Absence is never evidence.** 143 failed and 6 ambiguous geocodes, plus 1,311 records with no
+  street, leave their publisher point exactly as it was.
+- ⚠️ **Coverage is bounded by the source.** 1,311 of 2,187 Atlas records state no street address.
+  Validation reaches every Atlas record that states one, not every Atlas record.
+- **Derivation, measured:** 763 addresses in 407.7 s on the replica. The writer batch is 400; on
+  2026-09-25 the live queue (789) drained in two batches. The queue SQL orders admitted work first and
+  works on either side of the apply.
+- #1324's apply artifact is **frozen by hash** (it was applied). `dc-epoch-dryrun.yml` is dispatch-only:
+  its production step refuses by design once production is past #1324.
+
+**Pinned:**
+- `test/dc_atlas_validation_pg`: 20 checks; mutations X00–X18 all killed.
+- `test/dc-atlas-validation-structure.test.mjs`: 21 checks, each with a positive control.
+- `scripts/dc-atlas-replica-dryrun.sh`: the national receipt. Its offline proof is
+  `test/dc_atlas_validation_pg/replica_offline.sh` (fakeprod byte-identical; parity negative control
+  executed).
+
+### ✅ PHASE A IS LIVE (applied 2026-09-25 14:49:47Z). ATLAS IS STILL NOT ADMITTED.
+Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
+- **Applied by `dc-atlas-phase-a-apply.yml`** (run `36149909384`, merged in #1339). The committed
+  artifact ran byte for byte through psql `\i`, sha256 `891bb210…`.
+  - `lock_timeout 5s` was asserted inside the applying session, on one backend pid, before and after.
+  - Runtime 2.4 s, with 0 blocked sessions. Definition parity: 30/30 objects equal to the DDL of record.
+  - That path is the fix for #1324's apply, which had no lock timeout. Its offline proof shows a held
+    lock failing the apply in 5.05 s with 0 objects committed.
+- **Acquired, not admitted:**
+  - The Atlas queue drained in 2 batches (400 + 389).
+  - `dc_address_geocode` went 56 → 845, with 0 duplicates.
+  - 650 Atlas derivations were accepted. **0 reach geography evidence.**
+- **Zero effect — HARDENED PROOF (PR #1344), superseding the #1341 counterfactual.** Production is only
+  READ. `scripts/dc-atlas-phase-a-proof.sh` / `dc-atlas-phase-a-proof.yml`; the one comparator is
+  `scripts/dc_phase_a_proof.py`. Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md` §"Hardened
+  proof".
+  - 🛑 **The #1341 counterfactual had two defects, and its zero was not evidence.** It copied production
+    AFTER the new-code identity run (15:25Z), so OLD never replayed identity from the pre-resolver
+    inputs. And its comparator was never shown able to detect a nonzero. `dc-atlas-phase-a-counterfactual`
+    is deleted.
+  - **True pre-identity replay.** T = `2026-09-25 15:25:00.080497Z`, the first identity run after the
+    14:44Z Atlas and 15:10Z Epoch acquisitions. The state at T is rebuilt from production's history plus
+    the retained `dc_phase_a_*_before_20260925` snapshot (13:43:12Z), and validated four ways against
+    evidence it did not use:
+    - V1: it reproduces the snapshot's own Map 1.
+    - V2: it reproduces the live 14:52:45Z Map 1 (1,084 rows, `c874ef2a…`).
+    - V3: the only resolver runs in [S,T) (14:25, 14:35) ended before the first new input (14:44). The
+      OLD code they ran writes 0 on that state, so no write can hide behind a later T timestamp.
+    - The NEW replay reproduces production's actual 15:25/15:35 decisions row for row.
+  - **The instrument is proven to detect:** 9 positive controls on disposable clones, all detected; 8
+    carry an exact expected result (admission end to end requires any nonzero difference) (run `36176907428` on `6ac7d13`):
+    - Map 1 row move, and an equal-totals swap;
+    - parity refusal;
+    - identity (an entity; a link plus a decision);
+    - geography;
+    - admission (the gate, and END TO END through the NEW resolvers: Map 1 1,835 → 1,811 on a disposable
+      replica);
+    - an evidence leak.
+    Plus 13/13 comparator mutants killed, and an assertion that OLD and NEW are genuinely different code.
+  - **Result (run `36176907428`):** OLD and NEW are identical from the same start fingerprint
+    (`5448f00d…`), with floats and geometry compared exactly.
+    - Identity 25,762 rows, row diff 0.
+    - Geography 4,105 decisions, row diff 0. `rule_version` restamping is the only difference, and is
+      not a decision.
+    - Map 1 over all 12,722 ZIP pages: 1,835 rows / 767 pages, 0 added, 0 removed, 0 moved, 0 ZIP-changed.
+    - Atlas derived evidence in the NEW plane: 0.
+  - 🔒 **The proof job, and `dc-atlas-dryrun`, run ONLY on manual dispatch from `main`.** Both hold
+    `SUPABASE_DB_URL`, which can WRITE to production.
+    - ⚠️ **This is hygiene, not a security boundary.** On `pull_request`, GitHub runs the workflow file from
+      the PR's own head. A same-repo PR can delete the guard, or add a new workflow, and still read
+      repository secrets.
+    - **The real boundary** is a protected `environment:` with required reviewers holding those secrets.
+      That is a founder settings action, and it is still open.
+    - `test/workflow-secret-exposure.test.mjs` fails any NEW secret-holding job wired to run on
+      `pull_request`. It accepts a job only if its `if:` is a pure conjunction containing exactly
+      `github.event_name == 'workflow_dispatch'`, and it fails on:
+      - an `if:` containing `||`;
+      - a workflow-level `env:` secret;
+      - `secrets: inherit`;
+      - `!= 'pull_request'` used under `pull_request_target`.
+      Each shape is pinned by a test case.
+    - ⚠️ **homesignal-ingest runs 14 PR-time database gates with `SUPABASE_WRITE_KEY` by design** (measured
+      2026-09-26). This test does not cover them. The fix for both repos is the same boundary: a protected
+      environment, or a read-only key for read-only gates.
+    - Three exposures from other sessions are named in its `KNOWN_EXPOSED`, each with a reason:
+      `dc-geocode-probe`, `dc-step3c-probe`, `dc-step3c-reconcile` (a PR gate by design). The list can
+      only shrink.
+  - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
+    runs it replays. Re-deriving it later needs a new boundary, not a re-run.
+  - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
+    `dc_address_geocode` is keyed by address text alone. Any ADMITTED observation stating the same line
+    consumes a derivation, whichever source queued it. The 789 lines Phase A's Atlas queue derived before T
+    would not have existed pre-#1335, so giving both replicas the same geocode table made this path read
+    zero by construction.
+    - Measured: 0 admitted consumers of a post-snapshot derivation. Controls: 58 admitted consumers, all on
+      the 56 pre-snapshot derivations; 803 unadmitted consumers of the new ones.
+    - The proof asserts that on both replicas, and step 6b replays OLD in the true pre-#1335 world, without
+      those geocodes. It must equal the replay.
+    - 📌 **It is latent for the future.** An Epoch record whose address equals an already-derived Atlas line
+      would use that derivation. Admitting-by-text is the design, not a leak, but it means acquisition for
+      a non-admitted source is not decision-inert in general.
+  - ⚠️ **THREE INSTRUMENT DEFECTS, each of which made a zero look cleaner than it was:**
+    1. **The production URL goes through a pooler that DROPS startup options.** `PGOPTIONS`
+       (`default_transaction_read_only=on`, `statement_timeout=15min`) never reached the server. A fresh
+       session reads `statement_timeout = 2min` and `default_transaction_read_only = off`. Read-only must be
+       enforced **inside the transaction**: `BEGIN … READ ONLY`, asserted in-session, then rolled back.
+       Earlier runs were read-only only because every query was a fixed SELECT of read functions.
+    2. **Production sets `extra_float_digits = 0` in its configuration file**, so any text dump of a
+       float8 is rounded to 15 significant digits. The replicas were built from rounded coordinates, and
+       lat/lng compared as text were blind below the 15th digit on both sides. Only exact EWKB exposed it,
+       on 18 geocoded points. **Every dump that will be compared or reloaded sets `extra_float_digits = 3`.**
+       The first explanation, two PostGIS versions, was wrong: both sides are 3.3.7.
+    3. **psql CSV writes NULL and `''` identically to Python's `csv.reader`.** Every dump now uses
+       `null '\N'`.
+- ⚠️ **WHY A REPLAY AND NOT A DIFF: the data moves under a deployment.** On 2026-09-25 the Compute Atlas
+  acquisition (cron `40 9`) ran at **14:44Z** and the Epoch acquisition (cron `10 10`) at **15:10Z**.
+  Both are observed times for that one day; no general lateness pattern is claimed. "Nothing acquires
+  before tomorrow" was said in this session and was wrong. **Read `dc_acquisition_run` before assuming a
+  quiet window.**
+- 🔴 **PRE-EXISTING, NAMED, NOT FIXED: Map 1 lost its canonical layer between the Atlas acquisition and
+  the next identity run.** Observed on 2026-09-25 after the 14:44Z Atlas acquisition and before the
+  15:25Z identity run. It has not been measured on other days, so do not generalise it.
+  - The acquisition left every Atlas current observation unlinked (measured 2,216 / 2,216).
+  - Measured 14:52Z: 969 → 1 canonical rows; 1,814 → 1,084 rows; 758 → 365 ZIP pages.
+  - It restored after the 15:25Z/15:35Z resolvers. It is independent of Phase A: the live Map 1
+    dependency closure, traced recursively on 2026-09-25, contains no Phase A object. It is an ordering
+    defect between acquisition and resolution, and needs its own fix.
+- 📌 **FOLLOW-UP, NOT DONE HERE: production-write workflow authorization / human-review gate.**
+  `dc-atlas-phase-a-apply.yml` (#1339) writes DDL to production when dispatched from `main` with the
+  typed string `APPLY-PHASE-A-ccd637e`. There is no protected `environment:` and no required human
+  reviewer; its own preflight (artifact sha256 pin, drift guard, window) is the only other gate. The
+  proof work neither reuses nor modifies it.
+- ⛔ **Admission still needs a POST-Phase-A national dry run.** `dc-atlas-dryrun.yml` refuses by design
+  now that production carries Phase A. The hardened proof script is its natural base: add the Phase D
+  switch on the NEW replica. The earlier "25 removed / 1 added" is stale; today's data has 2,216 Atlas
+  records.
+
+## 7.14 THE OPENSTREETMAP LAYER IS CHECKED WITH THE SHARED RULES AND NEVER MERGED ⚖️ FOUNDER RULING (2026-09-26 — C3a BUILT, NOT YET APPLIED)
+
+**OpenStreetMap is an approved, active data-centre source and stays a SEPARATE layer** (founder,
+2026-09-26: "sepaarate"). Its records stay in `national_dc_records` (ODbL) and are **never merged into
+the canonical CC BY tables**, because that merge would build one database from both licences
+(`docs/dc-osm-current-state-2026-09-26.md` §2). The Map 1 change that follows is gated by **automated
+checks only**. There is no manual list review (founder: "no manual human review", "automated checks").
+
+**C3a gives each OSM pin the same address check every source gets. It reuses shared code and adds no OSM
+decision logic of its own:**
+
+| piece | object | owner |
+|---|---|---|
+| extraction | `dc_publisher_stated_address` OSM branch (the record's own `addr:*` tags; `addr:country` ≠ US → `NOT_US`) | Step 3D |
+| policy, geocoder, cache, verdict | `dc_geocode_input` → `dc_address_geocode` → `dc_derived_point_verdict` (unchanged) | Step 3D |
+| acquisition | `dc_osm_derived_point` (new view) | Step 3D |
+| queue | `dc_geocode_queue` now also lists map-eligible OSM addresses: one writer, one cache | Step 3D |
+| judgement | `dc_osm_address_check` (new view): `dc_site_claims_conflict`, pin = `PUBLISHER_SITE`, geocode = `DERIVED_ADDRESS` | Step 3B |
+
+- **Outcomes:** `CORROBORATED`, `SOURCES_DISAGREE` or `UNCHECKED_*`. An OSM pin is **never moved**.
+  `approximate_project_area` is not a site claim (`UNCHECKED_NO_SITE_CLAIM`).
+- ⛔ **OSM is NOT admitted, and the Map 1 reader does not read either view.** Nothing on Map 1 moves at
+  C3a. Using the check on Map 1 is C3c: a replica dry run, then an automated gate.
+- 🔑 **The judgement lives in Step 3B because the conflict rule does.** The first draft put it in Step 3D.
+  Step 3D loads before Step 3B, so that draft failed to apply (`function dc_site_claims_conflict … does
+  not exist`). The acquisition view (Step 3D) is the only OSM view the queue reads.
+- **Tested, both halves:**
+  - `test/dc_osm_layer_pg`: 15 checks, 9 of 9 prohibited mutations killed, including admitting OSM, a
+    private distance threshold, a moved pin, and a queue that drops or over-takes OSM. Positive control:
+    8 OSM rows on the page, and Map 1 byte-identical after every OSM derivation loads.
+  - `test/dc-osm-layer-structure.test.mjs`: 14 checks.
+  - The Atlas, Epoch, geography, publication and membership suites all still pass.
+- **Apply:** `dc-osm-layer-apply.yml`, dispatch from main with `APPLY-OSM-LAYER-C3A`
+  (`ROLLBACK-OSM-LAYER-C3A` reverses it). It uses the same discipline as the Atlas admission.
+  - The drift guard pins 8 functions to main@800b9a3. Their md5(prosrc) was read on production
+    2026-09-26 and reproduced from that commit's DDL, and all 8 matched. The queue viewdef was also
+    read on production.
+  - Only `dc_publisher_stated_address` changes: md5 `83675b5b…` → `7605c217…`.
+  - Round trip proven offline: apply equals the DDL of record; rollback restores main byte for byte;
+    a second apply and a second rollback are both refused.
+- 📌 **Measured before C3a (read-only):** of 1,384 map-eligible OSM records, **724** GEOCODABLE, 575
+  BLANK, 84 NO_LOCALITY (mostly Canadian), 1 NO_HOUSE_NUMBER. C3b measures the verdicts once the daily
+  10:45 UTC writer has geocoded them.
+- ✅ **C3a APPLIED 2026-09-26 21:53 UTC (run 36274352481); C3b MEASURED 22:26 UTC**
+  (`docs/dc-osm-address-check-receipt-2026-09-26.md`). All 1,384 map-eligible records were checked:
+  527 CORROBORATED, 2 SOURCES_DISAGREE, 195 no match, 660 with no checkable address. Of the 846 OSM
+  markers on Map 1: 303 corroborated, **1 disagrees (QTS NAL 2 DC2, ZIP 43054, 2.2 km)**, 127 no
+  match, 415 uncheckable.
+  - ⚠️ **"On Map 1" means ON A REGISTRY ZIP PAGE.** `map1_dc_zip_members(zip)` answers for any ZCTA,
+    but only the 12,722 `canonical_zip_registry` ZIPs have a page. Rice Data Center (77025) is returned
+    by the per-ZIP read and appears on no page. I first recorded it as the Map 1 disagreement; the
+    receipt carries the correction.
+
+### C3c: the Map 1 change, decided by an automated gate (BUILT; production apply awaits the founder's go)
+
+- **DDL of record:** the switch admits `('openstreetmap', 'telecom_data_center')`. The Map 1 reader's
+  OSM CTE left-joins `dc_osm_address_check`: an ADMITTED `SOURCES_DISAGREE` pin is withheld (the
+  canonical counterpart of a site conflict is GEOGRAPHY_UNRESOLVED), and an ADMITTED `CORROBORATED`
+  pin carries the same `CORROBORATED_BY_DERIVED_ADDRESS` flag a canonical point carries. Every other
+  outcome publishes unchanged. The pin is always the OSM record's own; the geocode never moves it.
+- **THE GATE is `scripts/dc-osm-map1-gate.sh` + `docs/dc-osm-map1-gate.sql`** (founder: "no manual human
+  review", "automated checks").
+  - It copies production into a replica, read-only.
+  - It rolls the replica back to production's exact pre-C3c definitions with the rollback artifact,
+    whose post-condition proves the fingerprints.
+  - It proves the replica's Map 1 equals production's row for row, then applies the byte-identical
+    production artifact to the replica.
+  - Then 11 checks: after == a prediction written independently of the reader; no row added; no pin
+    moved; every removal an admitted OSM disagreement; every flag an admitted corroboration; canonical
+    rows byte-identical; every other column unchanged; withheld ≤ disagreements; rows reconcile.
+  - The resolvers must also write nothing after the switch, since OSM reaches no canonical decision.
+- **The apply job `needs: [offline, gate]` in the same run** (`dc-osm-map1-apply.yml`, confirm
+  `APPLY-OSM-MAP1-C3C`), so production changes only right after the gate passes on that moment's data.
+  A dispatch with any other confirm string runs the rehearsal alone.
+- **The negative control is a CONSISTENTLY wrong artifact.** The offline proof tampers with the reader
+  and also rewrites the artifact's own post-condition fingerprint to match. The artifact's self-check
+  then passes, and only the gate's independent prediction can refuse it: G03 "8 predicted / 3 after",
+  G06 "6 removed". A plain tamper is caught one layer earlier, by the artifact's post-condition, which
+  proves nothing about the gate. That is how the first draft of this control "passed".
+- **Applied tools are FROZEN** (`build_admission.py`, `dc_osm_layer_pg/build_apply.py`, and Phase A's
+  `build_apply.py`): `--check` verifies the applied sha256, and their offline proofs run pinned to the
+  commit they were applied from (c198216, e647a09). Both of their rollbacks now fail closed against
+  production, because their drift guards see the C3c switch. That is intended: roll back C3c first.
+- 🔑 **THE FIRST READER WAS 50× SLOWER ON A JIT-ENABLED SERVER — caught by CI timing out, not by a
+  check.** The OSM check view's plpgsql functions carry Postgres's default 1,000-row estimate, which
+  pushed the reader's estimated cost to ~43 M, past `jit_above_cost`. Each ZIP read then spent ~2 s
+  compiling. The Epoch suite went 9.4 s → **485.7 s**, and CI cancelled `membership` and
+  `atlas-validation` at their 15-minute budgets. Production was unaffected because it runs `jit=off`
+  in its configuration file, which is exactly why nothing would have shown it before merge. Fixed in
+  the reader itself: `set jit to 'off'` on the function, plus a per-pin `left join lateral` lookup.
+  After the fix: 12 ZIPs in 38 ms (pre-C3c reader 33 ms), Epoch suite 9.2 s. Structure pin M1 now
+  requires both. **When a reader joins a view built on plpgsql SRFs, check the estimated cost, not
+  only the result.**
+- ⚠️ **Test-harness hazard found and fixed:** the Map 1 publication fixture stands in a TABLE for
+  `dc_osm_address_check`. The CI `membership` job runs the suites in one database, so the next suite's
+  `create view` failed with "is not a view". `test/map1_dc_publication_pg/run.sh` now drops the
+  stand-in on exit.
+
+## 7.15 A GEOCODE ON THE OTHER SIDE OF THE ROAD IS NOT A MATCH — C7 (2026-09-27 — APPLIED 15:57 UTC, VERIFIED)
+
+**The ONE derived-point verdict (`dc_derived_point_verdict`) also rejects a match whose leading street
+direction contradicts the query's, and a query or match with no house number.** It checked house number
+and state only, so `5500 W County Rd 200 S` matched as `5500 E ...` (17.9 km) was ACCEPTED and withheld a
+real pin, and `31st Avenue East` was read as house number 31. Full receipt:
+`docs/dc-verdict-c7-receipt-2026-09-27.md`.
+- **Measured over every geocode, not a sample:** 7 of 1,015 accepted flip — 6 direction contradictions
+  (control: 225 of 251 direction-bearing queries agree) and 1 missing house number. Effect: 3 withheld Atlas
+  pins restored (Merom IN, Volo IL, Superior WI); 5 false corroborations withdrawn (4 Atlas, 1 OSM).
+- ⚠️ **A direction on ONE side only is never a rejection** — the provider often adds one the publisher
+  omitted (`3043 Black Horse Pike` -> `S BLACK HORSE PIKE`). Pinned (R4) and mutation-checked.
+- ⚠️ **The verdict reaches canonical placements only through `dc_resolve_geography`.** The gate therefore
+  runs both resolvers on the replica BEFORE the change as a baseline, so production's own not-yet-resolved
+  drift is never attributed to C7, then after it, then again (steady state).
+- 📌 **Recorded, not changed: state-only queries** (`6000 TX-18, TX` → Monahans, 69 km). The policy accepts
+  a state as locality by design and nothing shows those three single-candidate matches are wrong.
+- Ships through `dc-verdict-apply.yml` (confirm `APPLY-VERDICT-C7`; needs offline + gate in the same run;
+  rollback `ROLLBACK-VERDICT-C7`). Artifacts generated by `test/dc_verdict_pg/build_verdict.py`.
+- ✅ **APPLIED 2026-09-27 15:57 UTC (run `36330904342`) and verified after the 16:35 resolver:** Map 1
+  1,816 → **1,817** exactly as gated (Volo Data Center restored on 60073; 3 corroborations withdrawn);
+  `SOURCES_DISAGREE` 49 → 46; live verdict md5 `09bbb34f…`.
+- 🚨 **THE MARKER-LOSS WINDOW IS REAL AND WAS SEEN LIVE (step 13).** A Compute Atlas acquisition at 14:49:52
+  replaced all 2,242 current observations with new, UNLINKED ones; until `dc-resolve-canonical` ran at
+  15:25 production Map 1 showed **1 canonical marker instead of 971** (≈35½ min; up to ~60 min worst case,
+  since that resolver is hourly at :25). The first C7 dispatch's parity check caught it mid-copy and
+  refused — **a parity failure during a gate may be this window, not a bad replica; re-read production
+  before diagnosing the gate.**
 
 ## 7.10 A PUBLISHER'S TOWN CENTROID IS NOT A FACILITY, AND GEOGRAPHY WAITS FOR IDENTITY (2026-09-24)
 
@@ -2117,7 +3030,8 @@ the healed v1 state and not the identity-pending outage. Both sides were read th
 **Every data-centre marker on every one of the 12,722 ZIP pages comes from ONE server read,
 `public.map1_dc_zip_members(p_zip)`** (DDL of record `docs/map1-dc-publication.sql`, called
 through `HS.MAP1_DC_RPC` by `homesignalmap.html` and `lib/data.js`). The page never asks which
-source a record came from, never unions sources, and never maps a lifecycle word itself.
+source a record came from and never unions sources. It turns the server's `map_status` into a
+lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `HS.map1DcSite`).
 
 - **Canonical rows**: `CONFIRMED_DC` canonical entities (Step 3A) with `RESOLVED` `POINT`
   geography (Step 3B), a lifecycle inside the ONE map (`operational`→Operating,
@@ -2144,6 +3058,84 @@ source a record came from, never unions sources, and never maps a lifecycle word
   Atlas-only, cancelled, status collapse, superseded) in `zip-membership-suite.yml`, and
   `test/map1-dc-publication.test.mjs` (no second reader, no `atlas_for_zip`/`epoch_for_zip`,
   no private table named by resident code, no place/project special case).
+- 🛑 **UNTIL 2026-09-27 THE PAGE DREW EVERY ONE OF THESE ROWS AS "Other project · lifecycle
+  unknown", WITH NO NAME.** The server was right; the page mapping was not. `HS.map1DcSite`
+  (`lib/data.js`) put the Type in `type`, the lifecycle in `status` and the name in `name`, but
+  Map 1 classifies every site through `HS.resolveTrackerMarker` → `trackerSiteItem`, which reads
+  the Type from `use_type`, the name from `label`, and the lifecycle from `bucket` (then `type`,
+  as a lifecycle word) — the shape `zipAuthSiteFromMarker` and `n5-radius.js` already build.
+  Measured on production 2026-09-27 over all 12,722 registry ZIPs: **1,816 of 1,816 rows on 757
+  ZIP pages** (control: 0 non-member, 0 truncated; map_status Operating 1,481 · Approved 183 ·
+  Proposed 152; `project_type` = `datacenter` on all). The Data center chip hid none of them and
+  the Other project chip hid all of them.
+  - **Fixed as a mapping only:** `use_type` = `project_type`, `label` = `project_name`,
+    `bucket` = `type` = `HS.canonicalLifecycle(map_status)`. No SQL, identity, dedupe, geography
+    or OSM change; `name` and `status` are kept. After, computed by running the shipped code over
+    those production rows: 1,816 of 1,816 Data center in their own lifecycle, 0 Other project,
+    0 Lifecycle unknown. Live on the 28-row sample, the probe below read 28 of 28.
+  - 🔑 **WHY NO TEST SAW IT: the one positive control (`facility-lifecycle-unknown` 8q) called
+    `HS.resolveMarker(site)` directly**, which does read `type` and `status`. The page never
+    takes that path. Test the path the page takes; `test/map1-dc-site-shape.test.mjs` (28 real
+    rows, fingerprinted against production) and `test/map1-dc-type-lifecycle.browser.test.mjs`
+    now do, and both fail on the old mapping.
+  - `scripts/probe-map1-dc-type-lifecycle.mjs` (`verify-map1-dc-type-lifecycle.yml`) checks the
+    real page against the live RPC for the deterministic sample (01040, 01852, 07033, 20187,
+    23150); dispatch it with `site_base=https://homesignal.net` to check what is live.
+    ⚠️ **It goes red between a Compute Atlas acquisition and the next identity (:25) and geography
+    (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
+    2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
+    returned 0 rows. That is production, not the page. Re-run it after the next :35.
+  - `docs/map1-dc-publication.sql`'s header said *"every data-centre pin reaches that stage
+    today; the page reads no lifecycle from this column"*. True when written, false now; the
+    comment is annotated. The edit is inert: every builder that reads the file still passes
+    `--check` (positive control: `build_map1.py --check` fails when the function body changes).
+- 🛑 **FOUR MORE DEFECTS THE FIX EXPOSED, FIXED THE SAME DAY (2026-09-27, founder: "fix
+  defects").** Each was read off the rendered page in the browser harness, and each fix is
+  pinned by a test that was shown to fail when the fix is removed (12 mutations, all caught on
+  exit code).
+  - **"Application on file" on a source's own listing.** The 152 proposed pins read
+    *"Application on file · Current decision status not verified."* while the page footer says
+    *"These are the sources' own records, not local permit filings"*. `HS.currentStatusLine`
+    takes `{ filing: false }` for a record `HS.isSourceOwnRecord` recognises (`record_kind`
+    `national_project`, set only by `HS.map1DcSite`) and returns the approved sentence minus
+    that claim: *"Current decision status not verified."* It is page-only, because the engine
+    never sees such a record, and it is pinned in the parity test's page-extras section.
+  - **Blank source line.** The popup and list rows read the source from `src` or
+    `jurisdiction`; national rows carry `source_name`, so the line was empty ("Development ·
+    · Official record ▸"). `srcLabel` now falls back to `source_name`, and a record with no
+    source at all no longer leaves a stray dot.
+  - **Lists cut at 12 with nothing said.** Every Map 1 list shows at most 12 rows (23150: 13
+    operating data centres, 12 listed). A longer list now ends with *"Showing 12 of N. The
+    other M are on the map."* Ordering and the cap are unchanged.
+  - **The "New projects proposed" tile counted the wrong records.** Both loaders dropped the
+    cached report's `development`/`proposed`/`comment_open` counters (they describe the
+    report's radius set, which Map 1 no longer draws) but not `proposed_active`, added later.
+    12,603 of 12,722 cached reports carry it, so on almost every ZIP page the tile showed the
+    report's radius count, and never counted a proposed data-centre pin. Both loaders now drop
+    it, and the tile counts the Proposed set the page draws through `HS.isActiveUndecided`.
+  - **Screenshots taken before the fix.** The capture key describes the record and the
+    map-state policy, never how Map 1 draws neighbouring records, so a fix to Map 1 leaves old
+    pictures bound. The capture job gained `--recapture` (workflow input `recapture`), which
+    re-shoots NAMED drafts even when bound; it is refused without `--ids`, and `--ids` alone
+    still never re-shoots a bound draft. Measured 2026-09-27: every MAPS image predates the
+    fix; six DRAFTS have a frame that can contain a data-centre pin (listed in the PR that added
+    `--recapture`). The one approved post (97702) has none in frame
+    (the nearest pin is ~0.054° of longitude off-centre at zoom 15) and is not touched; four
+    published posts are already on Bluesky.
+    - ✅ **The six were re-shot 2026-09-27** (run `36339216006`, from `main` at `bd7a7af`, after
+      the live `homesignalmap.html` was checked byte-identical to the repo). All six are
+      `REAL_MAP_VISUAL`, captured 18:04:22–18:04:39Z, still drafts, and pass both approval
+      checks (`hs_maps_map_gate_violations` and `hs_maps_dc_capture_policy_violations` return
+      `[]`). Five keep their capture key and storage path; the file was overwritten in place.
+      **97702's draft moved from a ZIP map to a pinned map of its own project**
+      (`dca8c3bd…`), because the capture ladder prefers a project map and that project is now
+      drawn on Map 1. Its old file `maps/97702/zip-1iivwwic4mzo.png` is now referenced by 0 of
+      58 MAPS rows; removing it is the ingest repo's dispatch-only
+      `cleanup-social-images.yml`, not done here.
+  - 📌 **Observed, not changed:** a proposed national pin's popup still says
+    *"Proposed / hearing"*, the stage word every Proposed record uses, though no hearing is
+    known for these records; and the list tag reads "Development" for any record without a
+    `layer`. Both are page-wide wording, not specific to data centres.
 
 ---
 
@@ -2254,6 +3246,8 @@ HS.classifyProjectType (lib/project-type.js)
 ### 7.11a The FACILITY identity lives there too — and it is not a Development Type (2026-09-24)
 
 A regulated (EPA FRS) facility's badge on the ZIP page's **Regulated facilities nearby** cards
+(⚠️ those cards are retired 2026-09-25 — see *WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT ·
+LOCAL NEWS*; `HS.facTypeBadge` / `HS.facLifecycleLabel` remain as the shared helpers)
 is Map 1's facility identity, decided once by `facilityIdentity` in `lib/project-type.js` (moved
 verbatim out of `resolveMarker`; `resolveMarker` now calls it):
 
@@ -2269,6 +3263,58 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 `layer` (the same value on the same registry_id: 73/73 matched, 0 differing, 2026-09-24).
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
+
+## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
+
+**NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
+inferred status. EPA FRS returns no lifecycle field, yet every surface said "Operating" for every
+EPA facility (measured: 197,991 / 197,991 facility rows). Cromby Generating Station (19475) was
+"Operating" while EPA's own ICIS-Air lists it **Permanently Closed** and its NPDES permit is issued
+to **"FORMER CROMBY GENERATING STATION"**.
+
+- ⛔ **EPA program/permit statuses are REGULATORY evidence, not lifecycle.** Effective, Terminated,
+  Admin Continued, Permanently Closed and "discontinued reporting" are NOT mapped to anything —
+  there is no Closed lifecycle, and none may be added without documented EPA field semantics AND a
+  contract change. Cromby is `unknown`, not Operating and not Closed; the facts stay verbatim in
+  `facility_env`.
+- **ONE authority, reused:** `trackerSiteItem` (what counts as evidence) → `statusTier`
+  (`proposed|approved|operating|unknown`). An FRS element's `type` is not evidence (the producer
+  stamped `built` on all of them); an explicit `bucket` still is. Stored rows carry the existing
+  unknown value `'On file'`.
+- ⚖️ **ONE lifecycle VOCABULARY, and it is not in `lib/map.js` (founder decisions, 2026-09-24).**
+  The keys, labels and status → key rule (`LIFECYCLE_KEYS`, `LIFECYCLE_LABELS`, `lifecycleKey`,
+  `HS.canonicalLifecycle`) moved into `lib/project-type.js` — the #1328 pattern — so the ZIP page
+  can say the lifecycle in Map 1's words without loading the map runtime. `lib/map.js` adds only
+  the colour and throws if the vocabulary is missing. Every surface says **"Lifecycle unknown"**:
+  Map 1 popups, the ZIP facility card (`HS.facLifecycleLabel` → "LIFECYCLE UNKNOWN · INDUSTRIAL";
+  ⚠️ that card is retired 2026-09-25, the helper remains) and the facility detail pill. None prints the raw storage value `On file`.
+- ⚖️ **Map 1 has a "Lifecycle unknown" LIST BAND.** Records whose canonical lifecycle is unknown —
+  EPA facilities, permits and area notices alike — are listed there, chosen by the same `bucketOf`
+  that colours the pin and drives the Stage chips, never by record kind. Before this the EPA
+  facilities (and every unknown-lifecycle development record) appeared in no list at all.
+  Pinned by `test/lifecycle-unknown-presentation.test.mjs` and `map1-stage-filter-chips` §0L.
+- **Seven places asserted it; all now read the one decision:** the producer's `type:"built"`, the
+  `app_refresh_zip` literal (migration `facility_lifecycle_unknown_20260924`, md5
+  `6591d7f7…` → `821a951b…`, reversal proven), `resolveMarker`'s three facility branches, the Map 1
+  popup's "operating now", the Map 1 **"Operating now" rail** (it appended every facility), the ZIP
+  card and the facility detail page.
+- ⚠️ **Do not replay a dated full `CREATE OR REPLACE` of `app_refresh_zip`** from `docs/` or the
+  ingest repo — nine such artifacts predate this and still carry `'Operating'`. They are kept as
+  receipts, and the DATABASE now refuses what a replay would write: trigger
+  `app_projects_facility_lifecycle_guard_trg` (`docs/facility-lifecycle-guard.sql`, migration
+  `facility_lifecycle_guard_20260924`) raises on any facility row becoming `Operating`, so a replay
+  fails loudly into `app_refresh_failures` instead of writing false rows. Proven by a rolled-back
+  replay of the exact pre-change body (md5 `6591d7f7…`) against 19475: refused on its first
+  facility. `public.facility_lifecycle_guard_selftest()` checks both directions (refuses the
+  defect; accepts `On file` and a development `Operating`). The guard writes nothing.
+  A future source that genuinely STATES a facility lifecycle must change the guard and the
+  materializer in the same reviewed change.
+- Rollout: stored rows change as the sweep revisits each ZIP (~10.8 h cycle); cached report sites
+  keep the old stamp until re-collected and are refused client-side meanwhile; the producer change
+  lands on the next `deploy-edge-functions` dispatch.
+- Pinned by `test/facility-lifecycle-unknown.test.mjs` (Cromby fixture
+  `fixtures/epa/zip19475-dfr-programs-2026-09-24.json`, md5 `d9354fad…`, extracted in-database);
+  10 of 10 mutations killed on exit code.
 
 ## 7.1 EPA / REGULATORY IS A SEPARATE DATA PLANE FROM CORE MAP 1 PROJECTS ⚖️ FOUNDER DECISION (2026-09-07)
 
@@ -2464,6 +3510,108 @@ Do not read the Phase 1A/1B sections above as the whole story — they describe 
   contradicted. 0 rows at review time; reachable on any EPA recovery. The refusal branch now
   LEADS: no trusted facility write ⇒ the count renders UNKNOWN, never as fact.
 
+### ✅ `app_refresh_zip()` WRITES ONLY THE `app_projects` ROWS THAT CHANGED (2026-09-25)
+SQL of record: **`docs/app-refresh-zip-write-only-changed.sql`**, a splice of the live body (never
+retyped). Pinned by `test/app-refresh-zip-write-only-changed.test.mjs`.
+- 🔑 **THE HEARTBEAT WAS THE REAPER'S INPUT, SO EVERY ROW HAD TO BE REWRITTEN TO SURVIVE.** Both
+  upserts set every column plus `last_seen_at` unconditionally, and stale rows were
+  `last_seen_at < _run`. Measured: ~250 rewrites per refresh against ~245 rows per ZIP.
+- ⛔ **THE CONDITIONAL UPDATE IS ONLY SAFE TOGETHER WITH THE IDENTITY REAPER.** A stale row is now
+  "key absent from this refresh's expected set" (captured from the same `src` CTE that feeds the
+  insert, for BOTH the development and the facility statement). Skipping unchanged rows while the
+  reaper still reads `last_seen_at` would delete every valid unchanged row.
+- **`last_seen_at` now means "last time the materializer WROTE this row's content"**, not "last
+  refresh". Readers checked: the fingerprint excludes it; `dc_resident_lineage_ledger` passes it
+  through; `geo.n5_shadow_projects_for_zip` (N5, not applied) orders cross-ZIP copies by it. Nothing
+  resident-facing reads it.
+- ⚠️ **A SKIPPED `DO UPDATE` STILL LOCKS THE ROW.** The first revision relied on
+  `on conflict do update ... where is distinct from` alone: physical updates fell ~92%, but WAL
+  and dirtied blocks did not (ON CONFLICT locks the conflicting row before evaluating WHERE; 394/394
+  unchanged rows sampled carried a fresh `xmax`). Identical rows are now anti-joined out BEFORE the
+  insert, so they never conflict. Measure locks with `xmax` taken immediately before the run: a lock
+  from a rolled-back savepoint stays on the tuple, and autovacuum clearing aborted `xmax` values
+  reads as a false lock.
+- The coordinate post-pass condition now lives in `public.app_coord_outlier()`, used by BOTH the
+  upsert and the post-pass. Without that, a clamped row would be rewritten on every refresh forever.
+- Deliberately NOT changed: `app_changes` (no stable identity for every change type),
+  `app_community_meta` (`updated_at` is the sweep's ordering key), `app_zip_source_ids`.
+- Rollback: `public.app_refresh_zip_def_archive` holds the pre-change body (tag
+  `pre-write-only-changed`); execute it and drop `public.app_coord_outlier`.
+
+### ✅ `dev_refresh_collect()` EVALUATES EACH RESPONSE ONCE (2026-09-24)
+SQL of record for the collector is now **`docs/dev-refresh-collect-once-per-response.sql`**; it
+supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the ROLLBACK path).
+- 🔑 **THE 20-MINUTE WINDOW WAS THE ELIGIBILITY RULE, AND IT REPLAYED EVERYTHING.** Job 14 ticks
+  every 2 minutes, so a response stayed "newest in window" for ~10 ticks: measured **1,401
+  responses → 12,070 evaluations (avg 8.62, median 10)**, each accepted replay rewriting `sites`
+  and re-firing its trigger, and each blocked one re-logging the same `fetch_failed` row.
+- **The fix is ONE nullable column, `development_reports.last_collected_response_id`** — processing
+  state, not data — set for EVERY evaluated response (accepted or refused) in the same transaction
+  as its diagnostics. Eligibility = newest in window AND id > cursor. The window is only a scan bound.
+  `dev_refresh_inflight` could not carry it: five other get-address-report producers never write it,
+  and `dev_refresh_log_fire_failures()` deletes its rows the tick a response lands.
+- ⛔ **RETRY IS A FRESH REQUEST, NEVER A REPLAY.** A refused ZIP keeps its old `refreshed_at`, and the
+  UNCHANGED fire side re-fires it after the cooldown. Do not "fix" a refusal by clearing the cursor.
+- NULL cursor = not yet evaluated = the safe state, so there is **no backfill**; backfilling to the
+  newest id would skip a response that landed after the last tick.
+- Pinned by `test/dev-refresh-collect-once-per-response.test.mjs`. Its §1 proves that the new body,
+  minus the named additions, **equals** the superseded body.
+
+### ✅ THE EPA WRITE-GUARD JUDGES FRESHNESS BY THE FACILITY CLOCK (2026-09-27) — PARKED
+SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from the once-per-response
+body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**
+Do not re-apply `docs/dev-refresh-collect-once-per-response.sql` after this file: that body still
+passes `d.refreshed_at` (the CORE clock) to `dev_epa_write_refused` and would restore the defect.
+- 🔑 **REVERSE COUPLING IS CUT.** Step (e) now writes the EPA plane when core is withheld
+  (same write-guard as step (d)). A shape-withheld row cannot iterate sites; it flags a
+  stale nonzero count as unavailable. The 74 ZIPs that presented old facilities as current
+  can recover, and they can no longer masquerade.
+- 🔑 **MISSING `epa.ok` FAIL-CLOSES TO FALSE.** The audit's latent case G coalesced a missing
+  key to `true`, so a payload with no `epa` object was treated as a healthy retrieval. Both
+  `dev_epa_write_refused` and the `facilities_unavailable` third branch now use
+  `coalesce(..., false)`. A genuine zero must carry `epa.ok=true`.
+- 🔑 **THE 7-DAY FRESHNESS LIMB WAS READING THE WRONG CLOCK.** Development refreshes on a ~53 h
+  sweep, so `d.refreshed_at` stayed inside 7 days forever and a genuine EPA zero could never
+  replace a cached nonzero count. Measured 2026-09-27 (read-only): healthy EPA + zero + cached 12
+  + core 1 h → refused; 6.9 d → refused; 7.1 d → accepted. `facilities_refreshed_at` was never an
+  input. Live: **1,004** ZIPs had a fresh core, a facility layer older than 7 days and a nonzero
+  count; **418** were older than 30 days.
+- **The refusal predicate is unchanged** — only the clock that "fresh" consults moves. CORE GUARD 2
+  still reads `d.refreshed_at`. An EPA failure still cannot block a core write.
+- 🆕 **`development_reports.epa_last_outcome`** stores the per-ZIP `epa` object (`ok`, `radius_used`,
+  `raw_rows`, `pre_cap`, `kept`, `reason`, `attempts`) plus `collected_at` / `response_id` /
+  `write_refused` on every evaluated response — accepted in step (d), withheld/core-refused in
+  step (e). `net._http_response` is temporary (1,590 rows at 00:36Z, **0** at 00:37Z). Without this
+  column, source-zero / partial-scope / product-filtered / cap-hit are not instrumented.
+- The engine now emits `pre_cap` (product-filtered count before `MAX_FACILITIES=40`) so a ZIP at
+  exactly 40 can be told apart from a cap-hit after the next deploy.
+
+### ✅ EPA PROBE HARVEST MATCHES THE INGEST ENVELOPE (2026-09-27) — PARKED
+SQL of record: **`docs/epa-frs-probe-schema-align.sql`**, a CREATE OR REPLACE of
+`epa_frs_probe_tick` only. Pinned by `test/epa-probe-schema-align.test.mjs`. **Not applied.**
+`docs/epa-frs-probe-migration.sql` remains the table + original function + cron; do not
+re-apply it after this file or the loose `"Results" and not "Error"` harvest returns.
+- 🔑 **`{"Results":{}}` IS NOT HEALTHY.** The live probe called a body ok on HTTP 200 + the
+  text `"Results"` + no `"Error"`. Ingest used to accept any 2xx and any parseable JSON.
+  Both treated an empty Results object as a successful answer. The engine now schema-fails
+  that shape; this file makes the probe fail it too. `ok` requires HTTP 200 AND `"Results"`
+  AND (`"FRSFacility"` OR `"Facilities"`) AND no `"Error"`. Still text-matched, never
+  jsonb-cast (FRS unescaped backslashes).
+- Official FRS wraps in Results. A bare `{FRSFacility:[…]}` still counts as retrieval on
+  ingest and still fails the probe. That split is deliberate: the probe asks the official
+  envelope; ingest accepts the list it can use.
+- Ingest `frsAt` now treats any status other than 200 as transient (was any non-2xx). A 204
+  used to fall through to parse and become a schema miss or, before that, a silent zero.
+
+### ✅ COMMUNITY ZIP TILE MATCHES MAP 1 ON AN UNKNOWN EPA COUNT (2026-09-27)
+`lib/community-page.js` used the materializer's `regulated facilities` component score
+alone. A refused EPA read with no stored markers (`overlay_unknown` /
+`facilities_unavailable`) rendered as **"0 Regulated facilities"** — the same false
+zero Map 1 already refuses. The strip now shows an em-dash on that flag, never
+inferred from a zero, so a genuine rural empty still reads 0. Pinned by
+`test/facilities-unavailable-copy.test.mjs`. Cache keys on `community.html` and
+`scripts/gen_zip_pages.py` moved with the file.
+
 ### ⛔ PHASE 2 IS NOT DONE — EPA STILL DETERMINES COMPLETION AND INDEXABILITY
 Do not assume the decoupling is finished. Still coupled, deliberately, pending a founder call:
 - `app_refresh_zip`: `data_quality = (_nd+_nf+_nc)>0` and `indexable = … and (_ndp>0 or _nfc>=3)`
@@ -2478,9 +3626,21 @@ Do not assume the decoupling is finished. Still coupled, deliberately, pending a
 
 **Fixing these moves ~1,000 pages out of `indexable` — a truthfulness correction, but a visible
 sitemap/robots delta. It is a founder decision, not autonomous work under the §3 standing grant.**
+
+⛔ **DECIDED 2026-09-27 — THE FOUNDER REJECTED IT. EPA-only ZIPs STAY INDEXABLE.** Verbatim:
+*"Do not unlist ~1,005 map pages just because they have plants and no new construction.
+'Nothing is being built' is a valid answer. Those pages stay listed. This was the old Unit 1
+idea; it is rejected."* The `_nfc >= 3` limb of `indexable` stays. Checked live the same day:
+`app_refresh_zip` still carries it and none of Unit 1's markers; 11,696 of 12,722 ZIPs are
+indexable. **Do not re-propose "EPA presence manufactures completeness" as a reason to
+unlist a page** — a ZIP with regulated facilities and no new construction is an honest,
+useful page, and its answer is "nothing is being built".
 Full inventory + rule-by-rule verdict: `docs/epa-regulatory-decoupling-audit-2026-09-07.md`.
 
-### 🅿️ PHASE 2 · UNIT 1 IS BUILT AND PARKED (2026-09-07) — nothing outward-facing has moved
+### ⛔ PHASE 2 · UNIT 1 IS REJECTED (founder, 2026-09-27) — built and parked 2026-09-07, never applied
+The parked SQL now raises `PHASE 2 UNIT 1 IS REJECTED` as its first executable statement, so
+running it changes nothing (pinned by checks 0/0b in its test; weakening the raise fails
+them). The record below is kept as the dated receipt of what was proposed.
 SQL of record `docs/epa-decouple-phase2-unit1-core-completion-markers.sql` (executable, atomic,
 **not applied**), pinned by `test/epa-phase2-core-markers.test.mjs` (41 assertions, proven
 load-bearing by six mutations). Production still stamps the old expressions; the sitemap,
@@ -2880,6 +4040,18 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     iframes went `clamp(320px,58vw,520px)` → **`clamp(560px,58vw,720px)`**
     (`lib/community-page.js`, `property.html`), so the map gets 363px at desktop / 252px on a
     phone instead of 217px / 78px.
+  - ⚖️ **SUPERSEDED FOR THE ZIP HOST, 2026-10-02 (founder: "a map should be on this page …
+    at the top and small but you can click on View Development Map … to expand to full map
+    development page").** The ZIP page map is now shown to EVERY visitor, signed in or not,
+    at development.html's preview size `clamp(300px,42vw,400px)`, with "View full Development
+    Map →" (`#zipMapFull`) under it on the parent. This reverses the 2026-09-10 A-022 posture
+    that kept the map signed-in only (#1141 closed); ZIP health keeps that gate. The map fits
+    the small frame the same way development.html's does: the panel scrolls inside its own
+    box and the map keeps its 160px minimum, measured at 868x400 and 358x300 (fits-frame §1,
+    §2h, §4c–4e). `property.html` keeps its 560px floor (§4a). A signed-out visitor sees the
+    pins and controls but not the ZIP outline, because `public.app_zcta_boundary` is still
+    not granted to anon (`docs/app-zcta-boundary.sql`); changing that grant is a separate
+    database decision. Pinned by `test/zip-map-preview.browser.test.mjs`.
   - **Full-page Map 1 is UNTOUCHED** — measured `.map-frame` still 600px at 1280x900, and the
     change is four `.hs-embed` rules. Pinned by `test/place-context-map-fits-frame.browser.test.mjs`
     (24 checks), proven load-bearing by three mutations: reverting the CSS reproduces the
@@ -2907,6 +4079,26 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     A site ADAPTER (`residentialEvidenceFromSite`) reads the same three evidence fields off a
     report site so there is one contract, never a second copy. After: 1,666 routine + 340
     unresolved removed, 282 genuine developments kept, **0 bypassing**.
+  - 🛑 **CORRECTED 2026-09-27: "one contract" was not true. The draw-time check dropped records
+    the builder had qualified.** The adapter read the class field as `site.type_raw`. The ZIP-mode
+    builder carries it as `permit_class` (a data-centre-only field), and address mode doesn't carry
+    it at all. So a record qualified on its class field alone was built as Residential, then judged
+    UNRESOLVED in `render()` and never drawn.
+    - **Measured over all 12,722 ZIPs** (`residential-measure.yml` run `36347224473`; 12,016
+      measurable, 706 not measured, 0 unavailable): **19,838 Residential projects across 54 ZIPs
+      were built and not drawn.** Examples: 76227 (5,426), 75068 (4,108), 76226 (2,077). All
+      18,646 `denton-county-dev-permits` records were among them.
+    - **Fix (#1411):** both builders call `HS.residentialGateAtConstruction`. It records the fields
+      the rule judged (`type_raw`, `name`, `registry_id`) on the site as `residential_evidence`,
+      and the draw-time adapter returns that object. The rule and `permit_class` are unchanged.
+    - **After the fix, nationally:** in every ZIP and slice, built = qualified by the rule on the
+      full row = kept by `render()`'s check (shipped modules, not a browser). That is 49,551
+      projects: proposed 4,642 · approved 35,442 · operating 9,467.
+    - **Real browser, same run, on the 54 ZIPs:** the page drew 20,653 of 20,653 assigned
+      projects, where the pre-fix check drew 815. The count was taken from the page's own
+      Leaflet markers.
+    - **Why the census missed it:** it stopped at the builder and never ran `render()`'s check.
+      It now does, and fails when drawn ≠ assigned.
   - ⚖️ **FOUNDER RULING 2026-09-06 — source provenance MAY qualify a record, but only where the
     corpus is demonstrably bounded to a development class.** 8 granted, **each re-proved from its
     own production `type_raw` census** (austin-subdivision-cases, austin-site-plan-cases,
@@ -3774,7 +4966,9 @@ has ever written**.
   *"prototype placeholders pending the TCEQ/ECHO feed"*. `app_coverage_states` has no Environment
   state. So every page asserted a verified absence that nothing measured — #1307's defect class.
 - ⛔ **NO CANONICAL ENVIRONMENT SUBJECT-MEMBERSHIP CONTRACT EXISTS.** Environmental facts live
-  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby*;
+  on OTHER planes and stay there: EPA/ECHO facilities → *Regulated facilities nearby* (⚠️ that
+  ZIP-page section is retired 2026-09-25 — see the next section; facilities live on Map 1's
+  Regulatory Records overlay);
   `Water districts & utilities` is a GOVERNMENT SUBSCRIPTION TOPIC → *Government & civic*;
   environmental Local News → *Local news*; utility-sounding permits → *Development*;
   `app_environmental_risk` has 0 rows; `gov_actions` (enforcement) has 0 rows. None of these is
@@ -3792,6 +4986,68 @@ has ever written**.
   and asserts each renders once in its own section and nothing renders as Environment.
 
 ---
+
+## WHAT'S CHANGING IS DEVELOPMENT · GOVERNMENT · LOCAL NEWS ⚖️ FOUNDER DECISION (2026-09-25)
+
+**On the ZIP detail page, the Map and the What's Changing feed have different jobs.**
+
+- **Map 1** exposes three independent dimensions — STATUS (Operating now · Approved · Proposed ·
+  Lifecycle unknown), PROJECT TYPE (Data center · Industrial · Residential · Roads &
+  infrastructure · Commercial · Civic & public · Other project) and REGULATORY RECORDS
+  (Regulatory facilities). Regulatory is an overlay/attribute. **The Regulatory Records control
+  and the purple R are correct and are unchanged.**
+- **What's Changing** (`lib/community-page.js`) renders exactly **Development & growth ·
+  Government & civic · Local news**. The standalone *"Regulated facilities nearby"* section that
+  sat between Development and Government is **removed**, with its card template and the
+  Development absence sentence's cross-reference to it (*"… the regulated-facility record below
+  is the current public-record floor"*), and the `facilities_only` coverage banner's clause
+  *"— the EPA-registered facility records below are live public data"* (a follow-up: the first
+  merge missed it and left the banner pointing at a section that no longer exists).
+
+**Why:** TYPE = what the entity is · LIFECYCLE = its current state · REGULATORY = an independent
+R attribute · CHANGE = a qualifying real-world event. EPA/ECHO/FRS registry presence establishes
+regulatory **inventory**; it does not by itself establish that anything changed. A future
+qualifying event involving a regulated entity may appear in What's Changing with its regulatory
+attribute preserved — that event architecture is a separate unit and is not built.
+
+- **The data plane is unchanged.** `HS.data.facilities(zip, home)` is still read and still feeds
+  `facTotal`, the *Regulated facilities* count tile in the summary strip above the lens cards
+  (not inside What's Changing). `HS.facTypeBadge` / `HS.facLifecycleLabel` stay defined and
+  tested as the shared facility presentation helpers.
+- ⛔ **Do not restore the section on the strength of older tests or comments.** The tests that
+  pinned its placement were narrowed rather than deleted — the data-plane half kept, the
+  placement half inverted: `test/environment-absence-requires-authoritative-outcome.test.mjs`
+  §4 D, `test/environment-absence.browser.test.mjs` (the EPA row renders in no What's Changing
+  section, the strip tile still counts it, and the headings are exactly the three above), and
+  the card-template checks in `community-facility-type-badge`, `facility-lifecycle-unknown` and
+  `lifecycle-unknown-presentation`, which now exercise the helpers directly. Each new assertion
+  was proven load-bearing by restoring the pre-change runtime (all fail) and re-applying (all pass).
+- Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
+  `#kFac` counter label, both of which also read "Regulated facilities nearby".
+
+## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
+
+**Notify a search engine only when a public page meaningfully changed, only after the new bytes are
+live.** Full record: `docs/indexnow-seo-freshness.md`. The rules that must not be re-derived:
+
+- **ONE authority: `scripts/page_semantics.py`.** `gen_zip_pages.py` hands every document it renders to
+  `PageState`; the fingerprint is taken from the SAME string that is written. Never add a second
+  "which page changed?" path, a per-source IndexNow call, or a hand-kept URL list.
+- **Not content, therefore not in the fingerprint:** the build day (the renderer gets `BUILD_DAY_TOKEN`,
+  replaced only at write time), a TRACKED project's `as_of` (the plane producer sets it to today daily and
+  calls it bookkeeping), script/stylesheet `?v=` keys, CSP/base/viewport. Moving any of these
+  re-announcing ~28,000 pages is the failure this prevents. `S`, `G`, `X0` in `test/indexnow-delta.test.mjs`.
+- **The baseline is the previous LIVE state, read before the build** (`page_semantics.py fetch-baseline`,
+  cache-busted, validated). 404 = seed = notify nothing; any other failure FAILS the build (an unreadable
+  baseline is not a first run). After the deploy the live file is the new state, so it cannot be read then.
+- **Order: baseline → build → gates → deploy → prove live → notify.** `indexnow` is its own job
+  (`needs: deploy`); a failure there cannot touch the deployment. `deploy` must never mention IndexNow.
+- **`indexnow.txt` is the ONLY new permitted root artifact**; the key is written on main builds only and
+  must appear in no other file. No `INDEXNOW_KEY` = skip, never fail the deploy.
+- **A freshness run may skip the deploy only if the semantic state is unchanged AND the live build is this
+  commit** (`decide()`): a freshness run can replace a pending push-build in the concurrency group.
+- **`lastmod` moves only when the fingerprint moves, and is omitted when unknown** — never the build day.
+- Query-string map URLs (`homesignalmap.html?zip=`) and `community.html?zip=` are never submitted.
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 

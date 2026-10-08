@@ -4,6 +4,12 @@
 -- §1 row 3 so the schema stays reproducible. Design + ruling: §Z of
 -- docs/accuracy-audit-2026-08.md.
 --
+-- ⛔ HARVEST PREDICATE SUPERSEDED 2026-09-27. The function body below is the
+-- applied original. SQL of record for `epa_frs_probe_tick` is now
+-- docs/epa-frs-probe-schema-align.sql (require a FRSFacility/Facilities list
+-- key, not just the text "Results"). Re-applying THIS file restores the loose
+-- predicate that called {"Results":{}} healthy. Table + cron are unchanged.
+--
 -- WHY. EPA FRS went down on 2026-08-09 and nothing recorded it. The outage
 -- zeroed the facilities layer on 1,722 of 12,722 cached pages before anyone
 -- noticed, and the only evidence was ad-hoc manual probes that were never

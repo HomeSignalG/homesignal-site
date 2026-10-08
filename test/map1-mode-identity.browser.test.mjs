@@ -4,7 +4,7 @@
 // address-mode wording. It did not move the HERO. Measured on main (e053819) with this
 // suite's own fixtures: searching an address from a ZIP view rendered
 //
-//     kicker  "Development overview"
+//     kicker  "Development map"
 //     H1      "ZIP 78617"
 //     results "Showing development within 2 miles of / 2200 CALDWELL LN, DEL VALLE, TX 78617"
 //
@@ -135,7 +135,7 @@ const waitAddr = (p) => p.waitForFunction(
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(600);
 const z = await hero(page);
-ok(/Development overview/i.test(z.kicker || ''), '1a ZIP mode kicker names the overview', z.kicker);
+ok(/Development map/i.test(z.kicker || ''), '1a ZIP mode kicker names the map', z.kicker);
 ok(/78617/.test(z.h1 || ''), '1b ZIP mode H1 names the ZIP', z.h1);
 ok(z.sub === 'See what is changing in 78617',
   '1c ZIP mode standfirst names THIS ZIP via the shared heading helper', z.sub);
@@ -152,7 +152,7 @@ ok(/CALDWELL/i.test(a.scopeLine || ''), '2b ...centred on the matched address', 
 // THE DEFECT THIS SUITE EXISTS FOR — all four were ZIP-scoped here on main.
 ok(!/ZIP 78617/.test(a.h1 || ''), '2c the H1 no longer makes the whole-ZIP claim', a.h1);
 ok(/around this address/i.test(a.h1 || ''), '2d ...it names the address view', a.h1);
-ok(!/Development overview/i.test(a.kicker || ''), '2e the kicker is no longer the ZIP overview', a.kicker);
+ok(!/Development map/i.test(a.kicker || ''), '2e the kicker is no longer the ZIP overview', a.kicker);
 ok(/Address view/i.test(a.kicker || ''), '2f ...it names the address mode', a.kicker);
 // The ZIP standfirst no longer carries the ZIP NUMBER, so "does it say 'across ZIP'" would pass
 // on both modes and discriminate nothing. What the mode switch owes the resident is that the
@@ -182,7 +182,7 @@ ok(/around this address/i.test(r5.h1 || '') && /Address view/i.test(r5.kicker ||
 await page.click('#backZip a');
 await waitZip(); await page.waitForTimeout(600);
 const b = await hero(page);
-ok(/Development overview/i.test(b.kicker || ''), '4a returning restores the ZIP kicker', b.kicker);
+ok(/Development map/i.test(b.kicker || ''), '4a returning restores the ZIP kicker', b.kicker);
 ok(/78617/.test(b.h1 || ''), '4b ...the ZIP H1', b.h1);
 ok(b.sub === 'See what is changing in 78617', '4c ...and the ZIP standfirst names THIS ZIP', b.sub);
 ok(/All development across/i.test(b.heading || ''), '4d ...over whole-ZIP results', b.heading);

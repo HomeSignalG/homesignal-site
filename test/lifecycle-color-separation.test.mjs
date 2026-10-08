@@ -263,11 +263,16 @@ const epaOnly = HS.resolveTrackerMarker({
   type: 'built', label: 'ANDURIL INDUSTRIES, INC', layer: 'industrial',
   scope: 'point', registry_id: '110072041130', record_url: 'https://echo.epa.gov/x'
 }, function (s) { return (s && s.registry_id) ? String(s.registry_id) : ''; });
-ok(epaOnly.color === LC.operating && parseInt(String(epaOnly.color).replace('#', ''), 16) === opInt,
-  '8i: a classifiable EPA-only site resolves to operating green, which 3D aerial paints — purple is the overlay');
+// 2026-09-24: this fixture still carries the cached producer stamp type:'built'. FRS states no
+// lifecycle and registration is not operation, so the stamp is refused and the pin takes the
+// lifecycle-UNKNOWN neutral — never operating green, and still never the facility purple
+// (purple is the overlay). It was asserted operating green here before the unsourced-Operating repair.
+ok(epaOnly.color === LC.unknown && epaOnly.color !== LC.operating && epaOnly.color !== FACILITY
+   && epaOnly.lifecycle === 'unknown',
+  '8i: a classifiable EPA-only site with no sourced lifecycle paints the lifecycle-unknown neutral, not operating green — purple is the overlay');
 ok(epaOnly.shape === 'triangle' && epaOnly.signal && epaOnly.signal.letter === 'R'
-   && epaOnly.color === LC.operating,
-  '8i2: ANDURIL (layer industrial) is Industrial overlay globally, not a purple block');
+   && epaOnly.color === LC.unknown,
+  '8i2: ANDURIL (layer industrial) is Industrial overlay globally, not a purple block, and not asserted operating');
 const unmappedEpa = HS.resolveTrackerMarker({
   type: 'built', label: 'GENERIC EPA SITE 99',
   scope: 'point', registry_id: '110000000099', record_url: 'https://echo.epa.gov/x'

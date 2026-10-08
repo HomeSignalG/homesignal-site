@@ -138,5 +138,32 @@ ok(/INFRASTRUCTURE: \$\{c\.zip\} reported a failed load/.test(GATE) && /NOTHING 
 ok(/if \(m\.loadFailed\) \{[\s\S]{0,400}?continue;/.test(CODE),
    '9g: …and the state assertions are SKIPPED rather than run against a page that never loaded');
 
+// ── 10 · FIX 3: `pending` has no live member ON PURPOSE, and its contract is still tested ────
+// 94128 / 95219 / 99128 were the only `unknown` ZIPs: each has a ZCTA boundary and had no row
+// in the generation that served until 2026-09-27. Every national generation since carries all
+// 12,722 rows, so the COVERAGE rule failed on a state that is now correctly empty (runs 90, 91).
+const gapList = (CODE.match(/const FORMER_GAP = \[([^\]]*)\]/) || [])[1] || '';
+ok(['94128', '95219', '99128'].every((z) => gapList.includes(`'${z}'`)),
+   '10a: the three fix-3 ZIPs are named as the former gap');
+ok(/gapNow\.every\(\(r\) => r\.kind && r\.kind !== 'pending'\)/.test(CODE),
+   '10b: each must resolve to a MEASURED state — a live `pending` is now a regression, and unresolved fails too');
+ok(/const SYNTHETIC_PENDING_KIND = 'pending';/.test(CODE)
+   && /if \(kind === SYNTHETIC_PENDING_KIND\)/.test(CODE)
+   && (CODE.match(/synthetic: true/g) || []).length === 1,
+   '10c: ONLY `pending` may be exercised synthetically; every other state still needs a live member');
+ok(/COVERAGE: no candidate ZIP is currently in the/.test(GATE) && /return \{ zip: null, kind \};/.test(CODE),
+   '10d: …so COVERAGE still fails for any other state with no live member');
+ok(/ok\(faked > 0,/.test(CODE) && /if \(!faked\) \{ console\.log\(''\); continue; \}/.test(CODE),
+   '10e: the synthetic case must PROVE the page received the fake, or nothing is scored against it');
+ok(/body\.p_kind === 'development' && body\.p_zip === c\.zip/.test(CODE)
+   && /await page\.unroute\(/.test(CODE),
+   '10f: only that ZIP\'s development geography answer is replaced, and only for that page load');
+// the fake is the producer's real 'unknown' reply, and it maps to the state being tested
+const fakeSrc = (CODE.match(/const unknownPayload = \(zip\) => (\(\{[^;]*\}\));/) || [])[1];
+const fake = fakeSrc ? Function('zip', `return ${fakeSrc};`)('94128') : null;
+ok(fake && fake.status === 'unknown' && fake.mode === 'authoritative' && fake.projects === null
+   && fake.markers === null && kindFromProducer(fake) === 'pending',
+   '10g: the synthetic answer is the producer\'s exact unknown shape and resolves to `pending`');
+
 console.log(`\n${n - bad}/${n} passed`);
 if (bad) process.exit(1);

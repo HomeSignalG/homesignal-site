@@ -169,12 +169,14 @@ await page.route('**/*', async (route) => {
 
 // What the shared chrome is telling the resident, right now.
 const chrome = () => page.evaluate(() => {
-  const on = [].slice.call(document.querySelectorAll('.nav a.on'));
-  const el = document.getElementById('locLabel');
+  const on = [].slice.call(document.querySelectorAll('.hs-nav a.on'));
+  // The Viewing chip left the global header (founder, Revised Index Design, 2026-09-30); the
+  // decision it painted is HS.viewingLabel(), the one place the shell still makes it.
+  const vl = (window.HS && HS.viewingLabel) ? HS.viewingLabel() : null;
   return {
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
-    locLabel: el ? el.textContent.trim() : null,
+    locLabel: vl ? vl.text.trim() : null,
     kDev: (document.getElementById('kDev') || {}).textContent || null,
     kFac: (document.getElementById('kFac') || {}).textContent || null,
     totalTileShown: (() => { const t = document.getElementById('ccTot');
@@ -184,13 +186,13 @@ const chrome = () => page.evaluate(() => {
     hero: (document.querySelector('.sub') || {}).textContent || '',
     facMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance !== 'development').length,
     devMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance === 'development').length,
-    locTitle: (() => { const w = el && el.closest('.loc'); return w ? (w.getAttribute('title') || '') : ''; })(),
+    locTitle: vl ? (vl.title || '') : '',
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
       ? { address: HS.state.activeProperty.address, zip: HS.state.activeProperty.zip } : null,
     path: location.pathname, search: location.search
   };
 });
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 // Sign-in state cannot be created offline, so the REAL saved home is installed directly into
 // the shipped state and repainted through the shipped path (HS.setViewLabel -> paintTopbar).
 const installSavedHome = (home) => page.evaluate((h) => {
@@ -213,7 +215,9 @@ await waitShell();
 let c = await chrome();
 info('development.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '1 development.html highlights exactly one sidebar item', c.activeLabels);
-ok(c.activeTokens[0] === 'dev', '1 ...and it is Development & Impact', c.activeTokens);
+// RETARGETED (founder navigation plan v3, 2026-09-30). Development left the sidebar; the
+// development list is part of Explore, so Explore is the item it lights.
+ok(c.activeTokens[0] === 'explore', '1 ...and it is Explore (plan v3)', c.activeTokens);
 ok(c.activeTokens.indexOf('maps') < 0, '1 Maps is NOT active on Development & Impact', c.activeTokens);
 
 // ═══ 2. Map 1 identifies itself ═══
@@ -223,13 +227,12 @@ await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeo
 c = await chrome();
 info('homesignalmap.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '2 Map 1 highlights exactly one sidebar item', c.activeLabels);
-// ⚠️ RETARGETED (A-021). This used to assert `activeTokens[0] === 'maps'`, and that was the
-// right assertion while a Maps sidebar entry existed — the 2026-09-04 defect this file was
-// written for was Map 1 claiming "dev" WHILE Maps was a container. A-021 folded Maps UNDER
-// Development, so there is no Maps entry to light and claiming "dev" IS the fold. The thing
-// this section protects is unchanged: Map 1 must light exactly one item, and it must be the
-// section it actually lives in.
-ok(c.activeTokens[0] === 'dev', '2 ...and it is Development — Map 1 lives under it (A-021)', c.activeTokens);
+// ⚠️ RETARGETED TWICE. This first asserted `activeTokens[0] === 'maps'` while a Maps sidebar
+// entry existed; A-021 then folded Maps under Development and it asserted 'dev'. The founder
+// navigation plan v3 (2026-09-30) makes the sidebar Explore | My Places | Enterprise, and
+// Map 1 is part of Explore. The thing this section protects is unchanged: Map 1 must light
+// exactly one item, and it must be the section it actually lives in.
+ok(c.activeTokens[0] === 'explore', '2 ...and it is Explore — Map 1 lives under it (plan v3)', c.activeTokens);
 ok(c.activeTokens.indexOf('maps') < 0, '2 there is no Maps item to light any more', c.activeTokens);
 
 // ═══ 6. ...while the proven ZIP contract is untouched ═══
@@ -269,10 +272,21 @@ ok(z.distances === 0, '6 no radius distance is attached in ZIP mode', z.distance
 // on, and the two IN-PRODUCT paths A-021 kept are exercised in its place.
 await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
-ok(await page.locator('.nav a[data-nav="maps"]').count() === 0,
-  '3 there is no Maps sidebar entry — Maps was folded under Development (A-021)');
-ok(await page.locator('.nav a').count() === 4,
-  '3 ...and the sidebar is the four containers', await page.locator('.nav a').count());
+ok(await page.locator('.hs-nav a[data-nav="maps"]').count() === 0,
+  '3 there is no Maps primary item (A-021, kept by plan v3)');
+// Primary items are the links that carry data-nav; the Explore dropdown (founder,
+// 2026-10-02) adds three sub-entries that carry none.
+ok(await page.locator('.hs-nav a[data-nav]').count() === 3,
+  '3 ...and the primary nav is the three items (plan v3)', await page.locator('.hs-nav a[data-nav]').count());
+ok((await page.locator('.hs-nav a[data-nav]').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+     === 'explore|props|enterprise',
+  '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
+ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.hs-nav a').count() === 8,
+  '3 ...plus the Explore dropdown\'s three pages and the Enterprise dropdown\'s two, and nothing else', await page.locator('.hs-nav a').count());
+// The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
+c = await chrome();
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',
+  '3 the Dashboard lights My Places (plan v3)', c.activeTokens);
 
 // ═══ 4. The Dashboard is the ALL MY PLACES briefing — it has no map to open ═══
 // RETARGETED (Fix 8). This section used to click a Dashboard "Open full map" control
@@ -298,7 +312,7 @@ const dash = await page.evaluate(() => {
     strip: document.querySelectorAll('#dashStrip').length,
     main: heads(main), rail: heads(rail),
     text: document.body.innerText,
-    viewing: (document.getElementById('locLabel') || {}).textContent || ''
+    viewing: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : ''
   };
 });
 info('4 Dashboard structure', { main: dash.main, rail: dash.rail, viewing: dash.viewing });
@@ -346,8 +360,8 @@ for (const [origin, selector, label] of [
   c = await chrome();
   info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
   ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
-  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev',
-    label + ' -> Development is the active item after the page settles', c.activeTokens);
+  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+    label + ' -> Explore is the active item after the page settles', c.activeTokens);
 }
 
 // ═══ 7. A saved home in Del Valle, a map of Denver ═══
@@ -368,7 +382,7 @@ ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '7 the saved home is still saved (unchanged, still the active property)', c.savedHome);
 ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev', '7 Development is still the active item (A-021)');
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', '7 Explore is still the active item (plan v3)');
 
 // ═══ 7b. Map 1 AT AN EXPLICIT ?zip= IS A ZIP PLACE, even on the saved address's own ZIP ═══
 // SUPERSEDES the earlier 7b, which required "Viewing · 13313 COOMES DR" here. That was the
@@ -658,17 +672,20 @@ const nm = await page.evaluate(() => ({
   dev: (document.getElementById('cDev') || {}).textContent || ''
 }));
 info('not-measured ZIP 84999', nm);
-ok(/not measured yet/i.test(nm.fresh),
-  '14a the page SAYS the ZIP is not measured yet', nm.fresh);
-ok(/will not estimate/i.test(nm.fresh),
-  '14b ...and says it will not estimate from a circle, so 0 is never implied', nm.fresh);
+// 84999 answers status 'not_measured' (no Census area), so since the founder's 2026-10-02
+// wording it says it has no mapped area — never "not measured yet", which is kept for a ZIP
+// waiting on a build (pinned in test/zip-no-mapped-area-copy.test.mjs).
+ok(/ZIP 84999 has no mapped area\. The Census does not draw a boundary for this ZIP code/.test(nm.fresh),
+  '14a the page SAYS the ZIP has no mapped area', nm.fresh);
+ok(/we can't show development records for it/.test(nm.fresh) && !/not measured yet/i.test(nm.fresh),
+  '14b ...and that it cannot show records there, so 0 is never implied', nm.fresh);
 // Matched on the address-mode OFFER, not the literal 'street address' — that phrase named a
 // shape the geocoder never required and left the note. What must not regress is that the
 // not-measured state still points somewhere real, so removing the sentence still fails 14c.
 ok(/\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(nm.fresh),
   '14c ...and offers the address view as the way to get a real answer', nm.fresh);
 // The distinction that matters: not-measured must not read as a measured zero.
-ok(!/^0 projects across/i.test(nm.fresh.trim()),
+ok(!/^0 projects across/i.test(nm.fresh),
   '14d not-measured is never phrased as a measured zero', nm.fresh);
 // THE COUNTER MUST AGREE WITH THE SENTENCE. An unmeasured ZIP drops its radius-derived
 // development rather than passing it off as whole-ZIP, so the surviving count is 0 because we

@@ -136,7 +136,7 @@ try {
     return {
       main: heads('.cols > div:first-child'),
       rail: heads('.cols > div:last-child'),
-      viewing: (document.getElementById('locLabel') || {}).textContent || '',
+      viewing: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : '',
       sub: (document.getElementById('dashSub') || {}).textContent || ''
     };
   });
@@ -267,7 +267,9 @@ try {
   ok(await page.locator('#devSort button.on').getAttribute('data-sort') === 'status', 'sort=status highlights Status');
   ok(await page.locator('#devSort button[data-sort="status"]').textContent() === 'Status', 'Status label renders');
   const sortButtons = await page.locator('#devSort button[data-sort]').allTextContents();
-  ok(sortButtons.join('|') === 'Impact on me|Status|Distance|Newest', 'sort controls appear in expected order');
+  // ?zip= declares a ZIP Place, where address-relative Distance is not offered
+  // (address context keeps it: test/development-distance-context.browser.test.mjs).
+  ok(sortButtons.join('|') === 'Impact on me|Status|Newest', 'sort controls appear in expected order (ZIP Place: no Distance)');
 
   // Destination: community invalid focus
   await page.goto(base + '/community.html?data=seed&zip=78617&focus=bogus', { waitUntil: 'networkidle' });

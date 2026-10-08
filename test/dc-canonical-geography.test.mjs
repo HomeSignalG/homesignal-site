@@ -91,12 +91,12 @@ ok(/cross join lateral public\.dc_location_basis\(o\.source_key, o\.distribution
 ok(/when b\.basis = 'NON_SITE_ROAD' then 'PUBLISHER_ROAD_REFERENCE'/.test(fn)
    && !/'NON_SITE_ROAD' then 'GEOGRAPHY_UNRESOLVED'/.test(fn),
   '7d: a road reference is flagged, never demoted');
-ok(/v_rule_version constant integer := 4;/.test(fn), '7e: rule_version is 4 (canonical geography authority, 2026-09-24)');
+ok(/v_rule_version constant integer := 5;/.test(fn), '7e: rule_version is 5 (a publisher\'s own address validates its own point, 2026-09-24)');
 // 8. rule_version 3: a DERIVED address point is second-class evidence, and never a guess.
-ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACCEPTED';/.test(ev)
+ok(/join public\.dc_observation_derived_point dp[\s\S]*?where dp\.verdict = 'ACCEPTED'\s+and dp\.admitted;/.test(ev)
    && (ev.match(/dc_observation_derived_point/g) || []).length === 1
    && (fn.match(/dc_observation_derived_point/g) || []).length === 1,
-  '8a: only an ACCEPTED derived point enters geography (the verdict is decided once, in Step 3D)');
+  '8a: only an ACCEPTED derived point of an ADMITTED extraction enters geography (verdict and admission are decided once, in Step 3D)');
 const pick = fn.slice(fn.indexOf('create temporary table _geo_pick'), fn.indexOf('create temporary table _geo_out'));
 ok(/order by canonical_entity_id,\s*\(evidence_class in \('PUBLISHER_NON_SITE', 'PUBLISHER_UNUSABLE'\)\),\s*\(evidence_class = 'DERIVED_ADDRESS'\),\s*\(prec = 'exact'\) desc nulls last,/.test(pick)
    && !/source_key|uncertainty/.test(pick),
@@ -122,6 +122,16 @@ ok(!special(authority) && special(authority + " or (b.lat = 40.0379 and b.lng = 
 ok(!byName(authority) && byName(authority.replace("(evidence_class = 'DERIVED_ADDRESS'),", "(source_key = 'compute_atlas') desc, (evidence_class = 'DERIVED_ADDRESS'),"))
    && byName(authority + " and a.source_key <> 'epoch_ai'"),
   'G15: no source name decides authority (an injected source-name ranking is caught)');
+// G15b (rule_version 5): site claims are paired by CLAIM, never by source. rule_version 4 compared a
+// claim only with ANOTHER source's (`a.source_key < b.source_key`), so a publisher's point was never
+// checked against the geocode of that same publisher's address.
+const base = fn.slice(fn.indexOf('create temporary table _geo_out'), fn.indexOf('if p_apply then'));
+const pairings = base.match(/\(a\.source_key, a\.evidence_class, a\.oid\) < \(b\.source_key, b\.evidence_class, b\.oid\)/g) || [];
+const sourcePaired = (t) => /[ab]\.source_key\s*(<|>|<>|=|!=)\s*[ab]\.source_key|d\.source_key\s*<>\s*p\.source_key/.test(t);
+ok(pairings.length === 2 && !sourcePaired(base)
+   && sourcePaired(base.replace(pairings[0] || '@@', 'a.source_key < b.source_key'))
+   && sourcePaired(base + ' and d.source_key <> p.source_key'),
+  'G15b: any two distinct site claims are compared -- no source-based pairing in the conflict or the corroboration test (the v4 pairing, re-injected, is caught)');
 ok(!/source_native_lat\s*=|update public\.dc_source_observation/.test(fn),
   '8e: geography never writes a coordinate into publisher evidence');
 const lb = code.slice(code.indexOf('create or replace function public.dc_location_basis('));

@@ -1,0 +1,86 @@
+name: dev-change-ledger-suite
+
+# THE DEVELOPMENT CHANGE LEDGER (docs/dev-change-ledger.sql; Development Activity plan Order C).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres: 50 adversarial checks (the 11 cases of
+# plan Order E plus the ones the Order B audit measured — retrieval-time noise, timing skew
+# between ZIP copies, sibling records, non-durable keys, lock-down, and option (b): copies that
+# contradict are HELD, never announced), then every prohibited mutation of the SQL — each MUST
+# fail the suite. A second step proves the LIVE ledger upgrades in place: the exact file applied
+# to production on 2026-09-29 is upgraded by the generated migration, no existing row changes,
+# an unknown writer is never overwritten, and a failed post-condition rolls everything back. The offline half
+# (test/dev-change-ledger-structure.test.mjs) runs in unit-tests.yml with every other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only
+# ever address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-copy-conflicts-apply.sql'
+      - 'test/dev_change_ledger_pg/**'
+      - 'test/dev-change-ledger-structure.test.mjs'
+      - '.github/workflows/dev-change-ledger-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-copy-conflicts-apply.sql'
+      - 'test/dev_change_ledger_pg/**'
+      - '.github/workflows/dev-change-ledger-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The shipped ledger passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_change_ledger_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dcl.log
+      - name: The production upgrade is exactly what the generator writes, and it upgrades the live ledger in place
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          python3 test/dev_change_ledger_pg/build_apply.py --check
+          bash test/dev_change_ledger_pg/upgrade.sh 2>&1 | grep -v NOTICE | tee /tmp/dcl-upgrade.log

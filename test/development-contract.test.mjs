@@ -34,10 +34,23 @@ const n5    = strip(read('lib/n5-radius.js'));
 const shellHtml = strip(read('partials/shell.html'));
 const shellJs   = strip(read('shell.js'));
 
-// ---- A-008: TWO surviving surfaces, both reachable, Maps still in nav ----
+// ---- A-008: TWO surviving surfaces, both reachable (as Explore children since v3) ----
 for (const f of ['homesignalmap.html', 'development.html', 'maps.html'])
   ok(fs.existsSync(new URL('../' + f, import.meta.url)), 'A-008 ' + f + ' still exists');
-ok(/href="development\.html"\s+data-nav="dev"/.test(shellHtml), 'A-008 Development is in the nav');
+// v3 (founder navigation plan, 2026-09-30): Development LEFT the primary nav. Like Map 1 in
+// A-021, the PAGE stays and stays reachable (ZIP_NAV_PAGES below, the map's list link, the
+// Address dossier's "All projects"); only its sidebar entry went, and it now lights Explore.
+// The Explore DROPDOWN (founder, 2026-10-02) links development.html and homesignalmap.html as
+// sub-entries, never as primary items, so the two checks below read the header nav WITHOUT it,
+// and the dropdown is pinned on its own.
+const exploreSub = (shellHtml.match(/<div class="hs-navsub" id="hs-explore-sub">[\s\S]*?<\/div>/) || [''])[0];
+const shellPrimary = shellHtml.replace(exploreSub, '');
+ok(exploreSub.length > 0, 'the Explore dropdown block is found (control for the two checks below)');
+ok(!/href="development\.html"/.test(shellPrimary), 'v3 Development is NO LONGER a primary nav item — it is an Explore child');
+ok(/<a href="development\.html"\s+data-sub="qol">Quality of Life Impact<\/a>/.test(exploreSub)
+   && !/data-nav=/.test(exploreSub),
+  'the Explore dropdown links it as "Quality of Life Impact", with no data-nav of its own');
+ok(/<body data-nav="explore"/.test(dev), 'v3 ...and development.html declares "explore"');
 // ⚠️ RETARGETED IN PHASE 8, ONE LINE, AND THE DEVELOPMENT CONTRACT IS UNCHANGED IN
 // SUBSTANCE. This line used to read `A-008 Maps is STILL in the nav — not folded`, which
 // was a true statement about the Phase 6 CHROME, not about Development's capability.
@@ -45,11 +58,11 @@ ok(/href="development\.html"\s+data-nav="dev"/.test(shellHtml), 'A-008 Developme
 // DESIGN — and the thing it was really protecting (Map 1 continues to exist and stay
 // reachable) is asserted below and by the `still exists` / ZIP_NAV_PAGES lines around it.
 // Everything else in this file is byte-identical to Phase 6.
-ok(!/href="homesignalmap\.html"/.test(shellHtml),
-  'A-021 Maps is NO LONGER a sidebar item — folded under Development',
+ok(!/href="homesignalmap\.html"/.test(shellPrimary) && /<a href="homesignalmap\.html"\s+data-sub="map">Development Map<\/a>/.test(exploreSub),
+  'A-021 Maps is NO LONGER a primary nav item; the Explore dropdown lists it as "Development Map"',
   (shellHtml.match(/.{0,40}homesignalmap\.html.{0,40}/) || [])[0]);
-ok(/<body data-nav="dev"/.test(map),
-  'A-021 ...and Map 1 declares "dev", so visiting it lights Development');
+ok(/<body data-nav="explore"/.test(map),
+  'v3 ...and Map 1 declares "explore", so visiting it lights Explore');
 ok(/HS\.MAP_PAGES = \['homesignalmap\.html'\];/.test(shellJs),
   'A-008 Map 1 is still in MAP_PAGES — the PAGE was not retired, only its sidebar entry');
 for (const p of ['development.html', 'homesignalmap.html'])
@@ -103,10 +116,12 @@ ok(/if\(!CUR_ADDRESS\) return;/.test(map),
 for (const fam of ['stagechip', 'typechip', 'regchip'])
   ok(map.includes(fam), 'A-008 Map 1 keeps the ' + fam + ' filter family');
 
-// ---- A-008: map -> list stays 0 (list -> map is the one direction that exists) ----
-ok(!/development\.html/.test(map),
-  'A-008 Map 1 carries NO link back into the development list — the one-way gap is preserved',
-  (map.match(/.{0,40}development\.html.{0,40}/) || [])[0]);
+// ---- A-008: map -> list now exists (founder, 2026-09-26: "should have back button so you
+// can go back to list"). One link, ZIP-stamped through the shared data-znav mechanism. ----
+// SUPERSEDED (founder, 2026-10-02): the page navigates through the Explore dropdown, so the
+// back link is removed and must not return.
+ok(!/devlist-back/.test(map) && !/Back to Quality of Life/.test(map),
+  'A-008 Map 1 carries no back link (navigation is the Explore dropdown)');
 ok(/See it on the map/.test(dev) && /homesignalmap\.html/.test(dev),
   'A-008 list -> map ("See it on the map") is the direction that DOES exist');
 

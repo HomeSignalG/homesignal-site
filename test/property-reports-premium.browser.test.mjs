@@ -56,7 +56,7 @@ const page = await ctx.newPage();
 const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
 
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 const waitDecided = () => page.waitForFunction(() => window.__HS_REPORTS_READY === true, null, { timeout: 30000 });
 const modalState = () => page.evaluate(() => {
   const overlay = document.getElementById('premiumModal');

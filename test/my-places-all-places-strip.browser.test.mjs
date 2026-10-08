@@ -131,7 +131,7 @@ const got = await page.evaluate(() => ({
     meta: ((c.querySelector('.pmeta') || {}).textContent || '').replace(/\s+/g, ' ').trim()
   })),
   calls: window.__calls,
-  chip: (document.getElementById('locLabel') || {}).textContent || '',
+  chip: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : '',
   where: !!document.getElementById('phWhere')
 }));
 const tileText = got.tiles.join(' | ');

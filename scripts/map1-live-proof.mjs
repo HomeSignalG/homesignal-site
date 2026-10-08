@@ -259,9 +259,15 @@ for (const path of ['/partials/shell.html', '/dashboard.html', '/today.html',
   ok(!/href="maps\.html"|'maps\.html'|"maps\.html"/.test(body),
     '10 — ' + path + ' offers no route to the retired map');
 }
+// Plan v3 (2026-09-30): the sidebar is Explore | My Places | Enterprise. The primary map has
+// no sidebar entry; it is reached from the in-page "View Development Map" links.
 const nav = await (await fetch(BASE + '/partials/shell.html', { cache: 'no-store' })).text();
-ok(/href="homesignalmap\.html"\s+data-nav="maps"/.test(nav),
-  '10 — the global nav Maps entry points at the primary map');
+const navItems = [...nav.matchAll(/<a href="([^"]+)"\s+data-nav="([^"]+)"/g)].map(m => m[2] + '=' + m[1]);
+ok(navItems.join('|') === 'explore=index.html|props=properties.html|enterprise=development-activity.html',
+  '10 — the global nav is Explore, My Places, Enterprise', navItems);
+const devList = await (await fetch(BASE + '/development.html', { cache: 'no-store' })).text();
+ok(/data-znav="homesignalmap\.html"/.test(devList),
+  '10 — the development list links the primary map');
 
 // ═══════════ 11. ZIP MODE IS THE WHOLE ZIP — no centroid, no radius ═══════════
 // The invariant: a ZIP search represents the ENTIRE actual ZIP/ZCTA geography and never

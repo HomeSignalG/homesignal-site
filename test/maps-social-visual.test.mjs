@@ -197,9 +197,11 @@ ok(!/^\s*EXPECTED_ARM:/m.test(WF),
 ok(/REAL MAP VISUAL/.test(DASH), 'founder review shows an explicit REAL MAP VISUAL state');
 ok(/AWAITING MAP CAPTURE/.test(DASH), 'an explicit not-yet-attempted state');
 ok(/CAPTURE FAILED/.test(DASH), 'an explicit capture-failure state');
-ok(/CANNOT BE PHOTOGRAPHED YET/.test(DASH), 'an explicit ineligible state');
+// ⚖️ 2026-10-01: for a post about a project, "ineligible" means its own pin cannot be shown
+// yet, and no ZIP map stands in for it (founder ruling). The badge says that.
+ok(/PROJECT PIN CAN\\u2019T BE SHOWN YET/.test(DASH), 'an explicit ineligible state');
 ok(/IMAGE OUT OF DATE/.test(DASH), 'and an explicit state for an image that no longer matches its draft');
-for (const s of ['CAPTURE FAILED', 'CANNOT BE PHOTOGRAPHED YET']) {
+for (const s of ['CAPTURE FAILED', 'PROJECT PIN CAN\\u2019T BE SHOWN YET']) {
   const i = DASH.indexOf(s);
   ok(i > -1 && /not a finding about this ZIP/.test(DASH.slice(i, i + 400)),
     `"${s}" is stated as an instrument fact, never as a finding about the ZIP`);

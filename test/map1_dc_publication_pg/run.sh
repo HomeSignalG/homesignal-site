@@ -9,6 +9,10 @@ set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
+# fixture_dc.sql stands in a TABLE for Step 3B's dc_osm_address_check view; later suites share this
+# database (the CI membership job runs them in sequence) and create the real view, so drop the stand-in
+# on every exit, pass or fail.
+trap 'psql -X -q -c "drop table if exists public.dc_osm_address_check cascade" >/dev/null 2>&1 || true' EXIT
 apply_base() {
   P -f "$root/test/zip_membership_pg/fixture_schema.sql" >/dev/null
   P -f "$root/docs/zip-membership-canonical.sql" >/dev/null

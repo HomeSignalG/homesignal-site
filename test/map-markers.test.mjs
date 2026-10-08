@@ -82,8 +82,11 @@ const tmk = HS.resolveTrackerMarker(site, function () { return ''; });
 ok(tmk.shape === 'triangle' && tmk.color === HS.LIFECYCLE_HEX.proposed, 'tracker dev item: triangle + lifecycle proposed color');
 const fsite = { label: 'EPA site', use_type: 'Industrial', type: 'built', layer: 'industrial', registry_id: 'TX123' };
 const fmk = HS.resolveTrackerMarker(fsite, function (s) { return s.registry_id; });
-ok(fmk.shape === 'triangle' && fmk.color === HS.LIFECYCLE_HEX.operating && fmk.signal && fmk.signal.letter === 'R',
-  'tracker EPA facility with a mapped Type: Type shape + lifecycle colour + R');
+// 2026-09-24: the cached producer stamp type:'built' on an FRS element is not lifecycle evidence,
+// so the tracker pin is the lifecycle-UNKNOWN neutral — same Type shape, same R.
+ok(fmk.shape === 'triangle' && fmk.color === HS.LIFECYCLE_HEX.unknown && fmk.lifecycle === 'unknown'
+   && fmk.signal && fmk.signal.letter === 'R',
+  'tracker EPA facility with a mapped Type: Type shape + lifecycle-unknown colour + R (registration is not operation)');
 const unmappedSite = { label: 'EPA site', type: 'built', registry_id: 'TX999' };
 const umk = HS.resolveTrackerMarker(unmappedSite, function (s) { return s.registry_id; });
 ok(umk.shape === 'square' && umk.color === '#7d148c' && !umk.signal,

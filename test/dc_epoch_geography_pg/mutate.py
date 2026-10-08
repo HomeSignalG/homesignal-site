@@ -177,8 +177,8 @@ MUTATIONS = {
     # point carries none, so it would always win -- even the publisher's own town centroid)
     'G12_lower_uncertainty_wins': (B3, [(PICK_CLASS, "              coalesce(uncertainty_m, 0),\n" + PICK_CLASS, 1)]),
     'G_centroid_fallback': (B3, [(
-        " where dp.verdict = 'ACCEPTED';",
-        " where dp.verdict = 'ACCEPTED' or dp.match_type in ('zip_centroid', 'county_centroid');", 1)]),
+        " where dp.verdict = 'ACCEPTED'\n   and dp.admitted;",
+        " where (dp.verdict = 'ACCEPTED' or dp.match_type in ('zip_centroid', 'county_centroid'))\n   and dp.admitted;", 1)]),
     'G_accept_zip_centroid': (D3, [
         (AREA_LIST, "    elsif p_match_type in ('county_centroid') then", 1),
         (ACCEPT_LIST, "    elsif p_match_type not in ('rooftop', 'parcel_centroid', 'range_interpolated', 'zip_centroid') then", 1)]),
@@ -190,7 +190,7 @@ MUTATIONS = {
                                  "    elsif p_provider_candidates < 1 then", 1)]),
     'G_accept_house_divergence': (D3, [("    elsif q_no is null or m_no is null or q_no <> m_no then",
                                         "    elsif false then", 1)]),
-    'G_range_is_geocodable': (D3, [("        elsif a ~ '^\\d+[A-Za-z]?\\s*[-–]\\s*\\d+' then", "        elsif false then", 1)]),
+    'G_range_is_geocodable': (D3, [("    elsif a ~ '^\\d+[A-Za-z]?\\s*[-–]\\s*\\d+' then", "    elsif false then", 1)]),
     'G_write_source_coordinates': (LOAD, [(
         "on conflict (geocoder_query, ladder_version) do nothing;\n",
         "on conflict (geocoder_query, ladder_version) do nothing;\n"

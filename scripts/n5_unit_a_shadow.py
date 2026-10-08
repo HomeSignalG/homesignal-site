@@ -264,7 +264,16 @@ def select_prefixes():
     return [p for p in done if p in want]
 
 
+RETIRED = (
+    "STOP: RETIRED 2026-09-25. This script rewrote the SERVING geography in place, prefix by\n"
+    "prefix, with no generation. The canonical path is the N5 generation lifecycle:\n"
+    "n5-generation.yml -> scripts/n5_orchestrate.py (work/publish/ready/activate) ->\n"
+    "geo.n5_gen_publish_prefix (docs/n5-generation-publish.sql). The database also refuses\n"
+    "these writes (geo.n5_generation_row_guard), so this refusal only says why sooner.")
+
+
 def main():
+    raise SystemExit(RETIRED)
     prefixes = select_prefixes()
     say("UNIT A - AUTHORITATIVE SHADOW READ PRODUCT", "")
     say("run id / completed prefixes", f"{RUN_ID} / {','.join(prefixes)}")

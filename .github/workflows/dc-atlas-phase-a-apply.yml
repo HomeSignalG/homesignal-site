@@ -1,0 +1,104 @@
+name: dc-atlas-phase-a-apply
+
+# Applies docs/dc-atlas-validation-apply.sql (PR #1335, PHASE A: Atlas derived-address evidence is
+# ACQUIRED, never ADMITTED) to production, once, from main, through scripts/dc-atlas-phase-a-apply.sh:
+#
+#   * the committed artifact is executed byte for byte (psql \i, hash pinned in the script);
+#   * lock_timeout 5s / statement_timeout 2min are SESSION settings asserted inside the applying
+#     session immediately before the artifact runs, on the same backend pid (the #1324 apply had
+#     no lock timeout at all -- this is the fix, without editing the artifact);
+#   * refused inside the :25/:35 resolver window, with any DC session active, or with any lock held
+#     on a DC relation;
+#   * a concurrent monitor records blocked sessions every 0.5 s during the apply;
+#   * afterwards: Atlas must read NOT admitted (else the job fails as an incident), no Atlas row may
+#     reach the geography evidence, and every dc_% view/function + the Map 1 reader must equal a
+#     replica built from main's DDL of record.
+#
+# The `offline` job proves the same script against a disposable stand-in first (bounded lock wait
+# with a held lock, atomic failure, success, second-apply refusal). The `apply` job runs only on a
+# manual dispatch from main that names the confirmation string exactly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type APPLY-PHASE-A-ccd637e to write to production (anything else runs the offline proof only)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/dc-atlas-phase-a-apply.sh'
+      - 'test/dc_atlas_validation_pg/apply_offline.sh'
+      - '.github/workflows/dc-atlas-phase-a-apply.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-phase-a-apply
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Offline proof of the apply script
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_atlas_validation_pg/apply_offline.sh
+
+  apply:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY-PHASE-A-ccd637e'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The artifact is exactly the one merged in #1335
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor ccd637eef492adf32ee58de0fcfb93025ac52ca0 HEAD
+          git diff --quiet ccd637eef492adf32ee58de0fcfb93025ac52ca0 HEAD -- docs/dc-atlas-validation-apply.sql
+          echo "HEAD $(git rev-parse HEAD); artifact unchanged since ccd637e"
+      - name: APPLY PHASE A to production
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-atlas-phase-a-apply.sh

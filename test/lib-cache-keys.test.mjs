@@ -39,8 +39,23 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // capture job and the Approve gate. A fix in it that a warm browser never fetches would
 // leave the dashboard unlocking Approve on a binding rule the capture no longer uses,
 // which is precisely the disagreement it exists to prevent.
+// The three NYC V1 libs joined the set with the Future Surroundings Report. They are the
+// whole sold artifact — the allowlist, the SODA client, and the derived surfaces — so a
+// fix in one of them that a warm browser never fetches would leave a paid report built on
+// a stale allowlist or a stale query window. That is the silent class this file exists to
+// stop, and it is the reason the report page keys them rather than joining KNOWN_KEYLESS.
+// lib/landing.js joined the set with the navigation plan v3 (2026-09-30) and LEFT it with the
+// Revised Index Design (founder, 2026-09-30): index.html no longer loads it or calls
+// HS.landingFor (the file itself is unchanged), and no page loads it, so there is no tag whose
+// key could go stale. If a page loads it again, add it back here.
+// lib/da-report-view.js joined the set with its first page, the private review page (Development Activity build
+// step 4). It is the whole customer report layout, so a fix in it that a warm browser never fetches would show the
+// founder an old layout while the tests prove the new one.
+// lib/da-report-compare.js joined the set with its one page, the customer page (Development Activity build step 10). It is the whole
+// side-by-side comparison, so a fix in it that a warm browser never fetches would show an agent an old comparison.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
-  'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js'];
+  'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -78,7 +93,7 @@ CONTENT_KEYED.forEach((rel) => {
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
   'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
-  'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
+  'lib/coverage-copy.js', 'lib/why.js',
   'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
 // A leading "/" is the generator's absolute form, not a different file (same rule as

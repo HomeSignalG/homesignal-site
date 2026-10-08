@@ -1,0 +1,78 @@
+name: dc-atlas-phase-a-proof
+
+# The HARDENED Phase A zero-effect proof (supersedes dc-atlas-phase-a-counterfactual). Production is
+# only READ. See scripts/dc-atlas-phase-a-proof.sh:
+#   * the common pre-identity state at 2026-09-25T15:25:00.080497Z is reconstructed from production's
+#     own history and VALIDATED (snapshot Map 1, the live 14:52:45Z Map 1 fingerprint, the snapshot
+#     identity fingerprint, and replay-vs-production);
+#   * OLD (pre-#1335) and NEW (Phase A, Atlas unadmitted) each run their own resolvers from it;
+#   * every comparison and every positive control goes through ONE comparator
+#     (scripts/dc_phase_a_proof.py), itself mutation-tested offline first.
+
+# SECURITY: the proof job holds SUPABASE_DB_URL, a credential that can WRITE to production. Its read-only
+# guarantee lives in the script, so a PR that edits the script must never be able to run it with that
+# secret. The proof therefore runs ONLY on manual dispatch from main; pull requests run the offline
+# comparator job alone (no secret). It is also a DATED receipt of 2026-09-25: step 0 refuses once
+# production has resolved anything after the 15:25/15:35 runs it replays, so it must not be a PR check.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'scripts/dc-atlas-phase-a-proof.sh'
+      - 'scripts/dc_phase_a_proof.py'
+      - 'test/dc_phase_a_proof/**'
+      - '.github/workflows/dc-atlas-phase-a-proof.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-phase-a-proof
+  cancel-in-progress: false
+
+jobs:
+  comparator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comparator tests (every detection class, synthetic data with a known answer)
+        run: python3 test/dc_phase_a_proof/test_compare.py
+      - name: Comparator mutation test (every mutant must be killed)
+        run: python3 test/dc_phase_a_proof/mutate.py
+
+  proof:
+    needs: comparator
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - name: Refuse any ref but main (the secret below must only ever meet reviewed code)
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "REFUSED: dispatch from main only (got $GITHUB_REF)"; exit 1; fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Hardened proof on production's own evidence (production is only read)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-atlas-phase-a-proof.sh

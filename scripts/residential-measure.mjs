@@ -14,6 +14,18 @@
 // detached - so "before" is literally this build with the gate off. Anything the two runs
 // disagree about is exactly what the gate removed.
 //
+// THE DRAW-TIME HALF (added 2026-09-27). The page runs a SECOND Residential check in render()
+// (HS.residentialQualifySites), after the builder. This script used to stop at the builder, so
+// it never saw that the draw-time check was removing records the builder had qualified: it read
+// the class field as `type_raw`, which the ZIP-mode builder carries as `permit_class`. It now
+// measures, per ZIP and per lifecycle slice (the page's own resolveTrackerMarker().lifecycle):
+//   assigned   - Residential sites the shipped builder emits
+//   canonical  - markers whose project row passes HS.residentialActivity on the FULL row
+//                (independent of the builder, so `assigned == canonical` is a real check)
+//   drawn      - what the page's draw-time check keeps, on this build
+//   drawn_pre  - what it kept before 2026-09-27: the same check with the evidence the builder
+//                now records removed from each site, which is exactly the old adapter's input
+//
 // Usage: node scripts/residential-measure.mjs   (env: SAMPLE=n to cap ZIPs, CONCURRENCY=n)
 import { readFileSync } from 'node:fs';
 
@@ -33,6 +45,10 @@ const CONCURRENCY = process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 
 // would report New England. Used when the full 12,722-ZIP walk does not fit the runner budget;
 // the receipt must then say STRIDE and the ZIP count, because a sample is not a census.
 const STRIDE = process.env.STRIDE ? parseInt(process.env.STRIDE, 10) : 0;
+// EVERY READ HAS A DEADLINE. fetch has none by default, so one hung connection holds its worker
+// forever and ten of them stall the walk with no output (run 34047642059 sat 75 minutes that
+// way). A timeout is counted as its own reason, so a slow production read reports as one.
+const REQ_TIMEOUT_MS = process.env.REQ_TIMEOUT_MS ? parseInt(process.env.REQ_TIMEOUT_MS, 10) : 90000;
 
 // The SHIPPED modules, loaded in the page's own order.
 globalThis.window = globalThis;
@@ -40,7 +56,7 @@ for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/residential-
   (0, eval)(readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
-const GATE = HS.residentialGateDrops;
+const GATE = HS.residentialGateAtConstruction;
 
 // The product denominator. canonical_zip_registry is the source of truth for which ZIP pages
 // exist, but it is not readable by the anon role, so the script falls back to app_community_meta
@@ -53,7 +69,7 @@ async function pageAll(table, col) {
   for (;;) {
     const url = `${SB}/rest/v1/${table}?select=${col}&order=${col}.asc&limit=1000`
       + (last ? `&${col}=gt.${encodeURIComponent(last)}` : '');
-    const r = await fetch(url, { headers: H });
+    const r = await fetch(url, { headers: H, signal: AbortSignal.timeout(REQ_TIMEOUT_MS) });
     if (!r.ok) return null;
     const rows = await r.json();
     if (!rows.length) break;
@@ -101,6 +117,7 @@ async function oneZip(zip) {
     const r = await fetch(`${SB}/rest/v1/rpc/app_zip_projects_markers`, {
       method: 'POST', headers: H,
       body: JSON.stringify({ p_zip: zip, p_kind: 'development', p_authoritative: true }),
+      signal: AbortSignal.timeout(REQ_TIMEOUT_MS),
     });
     if (!r.ok) {
       const body = (await r.text()).slice(0, 200);
@@ -108,7 +125,11 @@ async function oneZip(zip) {
       T.zips_unavailable++; return;
     }
     payload = await r.json();
-  } catch (e) { reason('threw:' + String(e && e.message).slice(0, 120)); T.zips_unavailable++; return; }
+  } catch (e) {
+    reason(e && e.name === 'TimeoutError' ? 'timeout_' + REQ_TIMEOUT_MS + 'ms'
+                                          : 'threw:' + String(e && e.message).slice(0, 120));
+    T.zips_unavailable++; return;
+  }
 
   const outcome = HS.zipAuthOutcome(payload);
   if (outcome !== 'complete') {
@@ -121,9 +142,9 @@ async function oneZip(zip) {
 
   // AFTER = the shipped build. BEFORE = the same function with the gate detached.
   const after = HS.zipAuthSitesFrom(payload);
-  HS.residentialGateDrops = null;
+  HS.residentialGateAtConstruction = null;
   const before = HS.zipAuthSitesFrom(payload);
-  HS.residentialGateDrops = GATE;
+  HS.residentialGateAtConstruction = GATE;
 
   const isRes = (s) => { try { return HS.resolveTrackerMarker(s).typeKey === 'residential'; } catch { return false; } };
   const byRef = Object.create(null);
@@ -142,6 +163,8 @@ async function oneZip(zip) {
   if (na > 0) T.zips_residential_after++; else if (nb > 0) T.zips_losing_residential++;
   if (na === 0 && nb === 0) T.zips_measured_zero_residential++;
   if (na > 0 && na < nb) T.zips_shrunk++;
+
+  drawTime(zip, after, beforeRes, byRef, isRes);
 
   const seen = new Set();
   for (const s of beforeRes) {
@@ -165,6 +188,54 @@ async function oneZip(zip) {
       if (STREET.test(String(p.name || ''))) T.removed_label_street_number++;
     }
   }
+}
+
+// ── THE DRAW-TIME MEASUREMENT ───────────────────────────────────────────────────────────────
+const SLICES = ['proposed', 'approved', 'operating', 'unknown'];
+const zeroSlices = () => Object.fromEntries(SLICES.map((k) => [k, { markers: 0, projects: 0 }]));
+const D = {
+  assigned: zeroSlices(), canonical: zeroSlices(), drawn: zeroSlices(), drawn_pre: zeroSlices(),
+  zips_assigned_ne_canonical: [], zips_drawn_ne_assigned: [], affected: [],
+  other_types_built: 0, other_types_drawn: 0
+};
+const sliceOf = (s) => {
+  let lc = null;
+  try { lc = HS.resolveTrackerMarker(s, () => '').lifecycle; } catch { lc = null; }
+  return SLICES.indexOf(lc) === -1 ? 'unknown' : lc;
+};
+// markers and distinct projects per slice, for one list of sites
+function tally(sites) {
+  const t = zeroSlices();
+  const seen = Object.fromEntries(SLICES.map((k) => [k, new Set()]));
+  for (const s of sites) {
+    const k = sliceOf(s);
+    t[k].markers++;
+    if (!seen[k].has(s.zip_project_ref)) { seen[k].add(s.zip_project_ref); t[k].projects++; }
+  }
+  return t;
+}
+const addInto = (acc, t) => { for (const k of SLICES) { acc[k].markers += t[k].markers; acc[k].projects += t[k].projects; } };
+const sameTally = (a, b) => SLICES.every((k) => a[k].markers === b[k].markers && a[k].projects === b[k].projects);
+const withoutEvidence = (s) => { const c = Object.assign({}, s); delete c.residential_evidence; return c; };
+
+function drawTime(zip, after, beforeRes, byRef, isRes) {
+  const assignedSites = after.filter(isRes);
+  const canonicalSites = beforeRes.filter((s) => {
+    const p = byRef[s.zip_project_ref];
+    return !!p && HS.residentialActivity(p).verdict === 'DEVELOPMENT';
+  });
+  const drawnAll = HS.residentialQualifySites(after);
+  const drawnSites = drawnAll.filter(isRes);
+  const drawnPreSites = HS.residentialQualifySites(after.map(withoutEvidence)).filter(isRes);
+  D.other_types_built += after.length - assignedSites.length;
+  D.other_types_drawn += drawnAll.length - drawnSites.length;
+
+  const a = tally(assignedSites), c = tally(canonicalSites), d = tally(drawnSites), pre = tally(drawnPreSites);
+  addInto(D.assigned, a); addInto(D.canonical, c); addInto(D.drawn, d); addInto(D.drawn_pre, pre);
+  if (!sameTally(a, c)) D.zips_assigned_ne_canonical.push(zip);
+  if (!sameTally(a, d)) D.zips_drawn_ne_assigned.push(zip);
+  const lostPre = SLICES.reduce((n, k) => n + a[k].projects - pre[k].projects, 0);
+  if (lostPre > 0) D.affected.push({ zip, lost_projects_pre: lostPre, assigned: a, drawn_pre: pre, drawn: d });
 }
 
 const zips = await canonicalZips();
@@ -208,3 +279,38 @@ console.log(JSON.stringify({
   kept_by_family: top(T.kept_by_family), removed_by_family: top(T.removed_by_family),
   non_complete_reasons: top(REASONS, 8)
 }, null, 1));
+
+// The draw-time half. `drawn_pre` is the page before 2026-09-27; `drawn` is this build.
+const sumP = (t) => SLICES.reduce((n, k) => n + t[k].projects, 0);
+const sumM = (t) => SLICES.reduce((n, k) => n + t[k].markers, 0);
+D.affected.sort((x, y) => y.lost_projects_pre - x.lost_projects_pre || (x.zip < y.zip ? -1 : 1));
+console.log('\n===== RESIDENTIAL DRAW-TIME PARITY =====');
+console.log(JSON.stringify({
+  zips_measurable: T.zips_measurable,
+  by_slice: { assigned: D.assigned, canonical: D.canonical, drawn: D.drawn, drawn_pre: D.drawn_pre },
+  totals_projects: { assigned: sumP(D.assigned), canonical: sumP(D.canonical), drawn: sumP(D.drawn), drawn_pre: sumP(D.drawn_pre) },
+  totals_markers: { assigned: sumM(D.assigned), canonical: sumM(D.canonical), drawn: sumM(D.drawn), drawn_pre: sumM(D.drawn_pre) },
+  pre_fix_loss: { projects: sumP(D.assigned) - sumP(D.drawn_pre), markers: sumM(D.assigned) - sumM(D.drawn_pre),
+                  zips: D.affected.length },
+  checks: {
+    assigned_eq_canonical_every_zip_and_slice: D.zips_assigned_ne_canonical.length === 0,
+    drawn_eq_assigned_every_zip_and_slice: D.zips_drawn_ne_assigned.length === 0,
+    other_types_untouched_by_draw_gate: D.other_types_built === D.other_types_drawn,
+    first_mismatches: { assigned_ne_canonical: D.zips_assigned_ne_canonical.slice(0, 10),
+                        drawn_ne_assigned: D.zips_drawn_ne_assigned.slice(0, 10) }
+  },
+  control_other_types: { built: D.other_types_built, drawn: D.other_types_drawn }
+}, null, 1));
+console.log('AFFECTED ZIPS (lost projects before the fix, per slice assigned / drawn_pre / drawn):');
+for (const r of D.affected) {
+  console.log('  ' + r.zip + ' lost=' + r.lost_projects_pre + ' ' + SLICES.map((k) =>
+    k + ':' + r.assigned[k].projects + '/' + r.drawn_pre[k].projects + '/' + r.drawn[k].projects).join(' '));
+}
+console.log('AFFECTED_ZIPS=' + D.affected.map((r) => r.zip).join(','));
+if (D.zips_assigned_ne_canonical.length || D.zips_drawn_ne_assigned.length
+    || D.other_types_built !== D.other_types_drawn) {
+  console.log('RESIDENTIAL DRAW-TIME PARITY: FAIL');
+  process.exitCode = 1;
+} else {
+  console.log('RESIDENTIAL DRAW-TIME PARITY: PASS');
+}

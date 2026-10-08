@@ -126,6 +126,13 @@ function recorder(handler) {
     ok(out.ok === false, `5d. HTTP ${code} → ok:FALSE (a non-2xx is not "no facilities")`);
   }
 }
+{
+  // Probe requires HTTP 200. A 204 used to be "2xx → parse empty → silent zero".
+  const f = recorder(() => res(204, ''));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'transient',
+    '5e. HTTP 204 → ok:FALSE (only 200 is an answer; aligns with the probe)');
+}
 
 // ── 6. malformed / unparseable payload → NOT a zero ───────────────────────────────────────────
 {
@@ -139,12 +146,44 @@ function recorder(handler) {
   ok(out.ok === false, '6b. empty body → ok:FALSE');
 }
 {
-  // Unexpected schema: valid JSON, no Results envelope. Parsed fine, so retrieval SUCCEEDED and
-  // the row list is genuinely empty — an authoritative zero. Pinned so the behaviour is deliberate.
+  // Unexpected schema: valid JSON, no recognized FRS envelope. Parsed is not "answered".
+  // The 2026-09-27 audit measured this as SILENT-ZERO SCHEMA RISK (test 6c used to accept it).
   const f = recorder(() => res(200, JSON.stringify({ SomethingElse: true })));
   const out = await frsFacilities(41.5, -112.0, 3, f);
-  ok(out.ok === true && out.rows.length === 0,
-    '6c. valid JSON with no Results envelope → ok:true, 0 rows (parsed; deliberate)');
+  ok(out.ok === false && out.reason === 'schema' && out.rows.length === 0,
+    '6c. valid JSON with no Results envelope → ok:FALSE, reason:schema (not a zero)');
+}
+
+const SCHEMA_BODIES = [
+  ['empty object', '{}'],
+  ['Results empty object', JSON.stringify({ Results: {} })],
+  ['Results unexpected key', JSON.stringify({ Results: { Unexpected: [] } })],
+  ['JSON null', 'null'],
+  ['JSON array', '[]'],
+  ['JSON string', '"text"'],
+  ['FRSFacility object not array', JSON.stringify({ Results: { FRSFacility: { RegistryId: '1' } } })],
+  ['FRSFacility null', JSON.stringify({ Results: { FRSFacility: null } })],
+];
+for (const [label, text] of SCHEMA_BODIES) {
+  const f = recorder(() => res(200, text));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'schema' && out.rows.length === 0 && out.radius_used === null,
+    `6c+. ${label} → ok:FALSE, reason:schema (audit silent-zero matrix)`);
+}
+{
+  // A recognized empty list is still an AUTHORITATIVE zero — do not over-correct.
+  const f = recorder(() => res(200, JSON.stringify({ Results: { FRSFacility: [] } })));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 0 && out.radius_used === 3,
+    '6c++. Results.FRSFacility=[] is the recognized empty answer → ok:true, authoritative zero');
+}
+{
+  // Schema miss is not retried (same body) and does not shrink the circle.
+  const f = recorder(() => res(200, '{}'));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.attempts === 1 && f.seen.join(',') === '3',
+    '6c+++. schema miss: one attempt at the requested radius, then stop',
+    `attempts=${out.attempts} seen=${f.seen.join(',')}`);
 }
 {
   // The v13 defect: FRS emits invalid JSON escapes. The repair runs BEFORE parse, so this must
@@ -255,6 +294,37 @@ ok(frsRadii(1).join(',') === '1,0.5,0.25', '11b. a smaller request never widens 
     `got ok=${out.ok} radius=${out.radius_used}`);
   ok(out.attempts === 6, '13b. one attempt per rung — a process limit is never retried',
     `got ${out.attempts}`);
+}
+
+// ── 14. a ZERO at a smaller radius is NOT a whole-ZIP zero ────────────────────────────────────
+// Audit 2026-09-27: process limit at 3 and 2, empty answer at 1.5 → ok:true, rows=[],
+// radius_used:1.5, treated as authoritative. That is a partial-scope zero.
+{
+  const f = recorder((rad) => (rad > 1.5 ? res(200, PROCESS_LIMIT) : res(200, body([]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'partial_scope',
+    '14. process limit then empty at r=1.5 → ok:FALSE, reason:partial_scope',
+    `got ok=${out.ok} reason=${out.reason} radius=${out.radius_used}`);
+  ok(out.rows.length === 0 && out.radius_used === null,
+    '14b. the partial zero carries no rows and names no radius');
+  ok(f.seen.join(',') === '3,2,1.5',
+    '14c. it stopped at the first smaller radius that answered empty',
+    `saw ${f.seen.join(',')}`);
+}
+{
+  // Control: empty at the REQUESTED radius is still an authoritative zero.
+  const f = recorder(() => res(200, body([])));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 0 && out.radius_used === 3,
+    '14d. empty at the requested radius is still an authoritative zero');
+}
+{
+  // Control: a smaller NONZERO answer is still accepted (undercount, not a false zero).
+  const f = recorder((rad) => (rad > 1.5 ? res(200, PROCESS_LIMIT) : res(200, body([FACILITY]))));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === true && out.rows.length === 1 && out.radius_used === 1.5,
+    '14e. process limit then a smaller NONZERO count is still accepted',
+    `got ok=${out.ok} radius=${out.radius_used} rows=${out.rows.length}`);
 }
 
 console.log(fails ? `\n${fails} check(s) failed` : '\nAll EPA result-semantics checks passed');

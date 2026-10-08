@@ -206,8 +206,11 @@ ok('9. community-page composes core-empty + overlay-records',
    /coverage_state === 'honestly_empty' && c\.regulatory_overlay_state === 'overlay_records'/.test(page));
 ok('9b. ... and still accepts the pre-split facilities_only',
    /c\.coverage_state === 'facilities_only'/.test(page));
-ok('9c. the banner wording is unchanged (the no-op claim)',
-   /Local government meeting and permit feeds for this area are still being wired — the EPA-registered facility records below are live public data\./.test(page));
+// The banner no longer points at facility records "below": What's Changing carries no facility
+// section (founder decision, 2026-09-25). The composition it is gated on (9, 9b) is unchanged.
+ok('9c. the banner makes no claim about facility records below',
+   /Local government meeting and permit feeds for this area are still being wired\.</.test(page)
+   && !/EPA-registered facility records below/.test(page));
 ok('9d. the honest-empty copy is gated on the overlay agreeing',
    /coverage_state === 'honestly_empty'[\s\S]{0,240}regulatory_overlay_state === 'overlay_empty'/.test(page));
 

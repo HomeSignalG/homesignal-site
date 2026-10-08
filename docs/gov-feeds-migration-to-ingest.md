@@ -1,5 +1,12 @@
 # Government feed automation — migration to homesignal-ingest
 
+> ✅ **DONE 2026-09-27.** The tools, fixtures, tests and workflows now live in
+> `homesignal-ingest` (#611 tools, #612 tests + workflows, #613 `jurisdiction_slug` +
+> header fix) and were removed from this repo. Folder names stayed `gov-feeds` (not
+> `gov_feeds`) so internal paths still resolve. Kept here: `docs/gov-feeds-schema.sql`,
+> the phase-1B docs, `docs/candidates/`, and `lib/generated/` (still read by
+> `test/generated-sql.test.mjs`). The map below is the original plan, kept as a record.
+
 Phase 1A automation **belongs in `homesignal-ingest`**, not `homesignal-site`.
 
 ## Evidence

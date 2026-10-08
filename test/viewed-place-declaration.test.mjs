@@ -28,18 +28,17 @@ const map1   = fs.readFileSync(new URL('../homesignalmap.html', import.meta.url)
 const SAVED = { id: 'h1', address: '13313 COOMES DR', city: 'Del Valle', state: 'TX', zip: '78617' };
 
 // ─────────────────────────────────────────────────────────── the live chip, executed ────
-// paintTopbar is the ONE painter of the chip. Extracted whole and run against a stubbed
-// shell, so these assertions describe what a resident sees, not what the source says.
-const paintFn = (shell.match(/  function paintTopbar\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
-ok(paintFn.length > 400, 'live paintTopbar body extracted from shell.js', paintFn.length);
+// viewingChip is the ONE decision behind the Viewing label (HS.viewingLabel). The horizontal
+// header (Revised Index Design, 2026-09-30) took the chip out of the global chrome, and the
+// decision moved out of paintTopbar into this function so it is still made in one place.
+// Extracted whole and run against a stubbed shell, so these assertions describe the label
+// the shell would show, not what the source says.
+const paintFn = (shell.match(/  function viewingChip\(\) \{[\s\S]*?\n  \}\n/) || [''])[0];
+ok(paintFn.length > 400, 'live viewingChip body extracted from shell.js', paintFn.length);
+ok(/HS\.viewingLabel = function \(\) \{ return viewingChip\(\); \};/.test(shell),
+  'HS.viewingLabel() exposes that one decision');
 
 function chip(opts) {
-  const nodes = {
-    locLabel: { textContent: '', closest: () => wrap },
-    'hs-avatar': { textContent: '', style: {} },
-    'hs-signin': { style: {} }
-  };
-  const wrap = { title: '' };
   const state = {
     activeProperty: opts.home || null,
     zip: String(opts.zip),
@@ -50,12 +49,10 @@ function chip(opts) {
   };
   const HS = { isSample: () => false, homeAddressLine: (p) => p.address + ', ' + p.city + ', ' + p.state + ' ' + p.zip };
   const LS = { get: (k, d) => (k === 'myZip' ? (opts.myZip || null) : d) };
-  const $ = (id) => nodes[id] || null;
   const viewedLabel = () => state.viewLabel || ('ZIP ' + state.zip);
-  const paintNavHrefs = () => {};
-  new Function('HS', 'state', 'LS', '$', 'viewedLabel', 'paintNavHrefs', 'window',
-    paintFn + '\npaintTopbar();')(HS, state, LS, $, viewedLabel, paintNavHrefs, { HS_SEED: null });
-  return { label: nodes.locLabel.textContent, title: wrap.title };
+  const out = new Function('HS', 'state', 'LS', 'viewedLabel', 'window',
+    paintFn + '\nreturn viewingChip();')(HS, state, LS, viewedLabel, { HS_SEED: null });
+  return { label: out.text, title: out.title };
 }
 
 console.log('--- 1. saved address in the SAME ZIP as the route ZIP ---');
@@ -176,6 +173,7 @@ const EXEMPT = {
   'about.html': 'marketing — no Place subject',
   'contact.html': 'marketing — no Place subject',
   'how-it-works.html': 'marketing — no Place subject',
+  'development-activity.html': 'marketing — no Place subject',
   'privacy.html': 'marketing — no Place subject'
 };
 const chromePages = fs.readdirSync(new URL('../', import.meta.url))

@@ -25,6 +25,22 @@ on:
       - 'docs/dc-geocode-observations-load.sql'
       - 'test/dc_epoch_geography_pg/**'
       - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'test/dc_atlas_validation_pg/**'
+      - 'test/dc_osm_layer_pg/**'
+      - 'docs/dc-map1-address-check.sql'
+      - 'test/dc_map1_address_check_pg/**'
+      - 'docs/dc-address-check-monitor.sql'
+      - 'test/dc_address_check_monitor_pg/**'
+      - 'docs/dc-marker-loss-watcher.sql'
+      - 'test/dc_marker_loss_pg/**'
+      - 'docs/dc-resolver-hardening.sql'
+      - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-epoch-timeline-key-apply.sql'
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'test/dc_epoch_timeline_key_pg/**'
+      - 'docs/dc-identity-open-fast-apply.sql'
+      - 'test/dc_identity_open_fast_pg/**'
       - 'lib/data.js'
       - 'lib/zip-authoritative.js'
       - 'homesignalmap.html'
@@ -44,6 +60,22 @@ on:
       - 'docs/dc-geocode-observations-load.sql'
       - 'test/dc_epoch_geography_pg/**'
       - 'docs/dc-epoch-dryrun-report.sql'
+      - 'docs/dc-geocode-observations-queue.sql'
+      - 'test/dc_atlas_validation_pg/**'
+      - 'test/dc_osm_layer_pg/**'
+      - 'docs/dc-map1-address-check.sql'
+      - 'test/dc_map1_address_check_pg/**'
+      - 'docs/dc-address-check-monitor.sql'
+      - 'test/dc_address_check_monitor_pg/**'
+      - 'docs/dc-marker-loss-watcher.sql'
+      - 'test/dc_marker_loss_pg/**'
+      - 'docs/dc-resolver-hardening.sql'
+      - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-epoch-timeline-key-apply.sql'
+      - 'docs/dc-epoch-geography-apply.sql'
+      - 'test/dc_epoch_timeline_key_pg/**'
+      - 'docs/dc-identity-open-fast-apply.sql'
+      - 'test/dc_identity_open_fast_pg/**'
       - '.github/workflows/zip-membership-suite.yml'
   workflow_dispatch: {}
 
@@ -57,7 +89,7 @@ concurrency:
 jobs:
   membership:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30   # was 15: the job runs every PostGIS suite in sequence and the Epoch key + identity-open suites pushed it past the old ceiling (cancelled at 15:17, 2026-10-01)
     services:
       postgres:
         image: postgis/postgis:16-3.4
@@ -124,3 +156,147 @@ jobs:
         if: always()
         run: |
           { echo '## ZIP membership suite'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|\|f\|' /tmp/zm.log || true; echo '```'; echo '## Map 1 data-centre publication contract'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/pb.log || true; echo '```'; echo '## Canonical DC geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/geo.log || true; echo '```'; echo '## Epoch canonical geography'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/epoch.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  # Its own job (2026-09-25): added as a step, the Atlas suite pushed the shared job past its 15-minute
+  # budget (15:03 on 37c2209, then cancelled at 15:00 on 2ba1f8d). A cancelled suite is not a pass, and
+  # stretching one shared budget hides the next overrun; a parallel job keeps every budget honest.
+  atlas-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zip_membership_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Atlas coordinate validation (a publisher's own address checks its own point; acquisition inert until admitted) passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_atlas_validation_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/atlas.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## Atlas coordinate validation'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/atlas.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  # The OpenStreetMap layer's address check (2026-09-26): its own job, same reasoning as above.
+  osm-layer-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zip_membership_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: OpenStreetMap layer address check (each OSM pin against its own address; separate layer, never merged, Map 1 unchanged) passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_osm_layer_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/osm.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## OpenStreetMap layer address check'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|HARNESS|\|f\|' /tmp/osm.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Map 1 address-check view (one state and one derived reason per marker; labels only) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_map1_address_check_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/addrcheck.log
+      - name: Daily address-check monitor (snapshot equals the view; every failure class fires; rides pipeline_health_tick) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_address_check_monitor_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/addrmonitor.log
+      - name: Map 1 marker-loss window closed (a re-acquisition is resolved by the watcher; one lock for every resolver run) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_marker_loss_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/markerloss.log
+      - name: Resolver hardening (dc_resolvers health check fires on every failure class; resolvers closed to anon/authenticated; timeout semantics) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_resolver_hardening_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/resolverhardening.log
+      - name: Epoch timeline record key (one entity per milestone, leftovers superseded not deleted, steady state) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_epoch_timeline_key_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/timelinekey.log
+      - name: Identity-open view (record keys read once, adjudicator only on cross-source pairs; same rows as before; guarded apply) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zip_membership_disposable
+        run: |
+          set -o pipefail
+          bash test/dc_identity_open_fast_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/identityopen.log

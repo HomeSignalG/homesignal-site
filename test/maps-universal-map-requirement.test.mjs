@@ -78,10 +78,10 @@ const SCENARIOS = [
   { name: 'absence / none_found', scope: 'zip', subject: 'absence', dc: true,
     evidence: { theme: 'datacenter', theme_answer: 'none_found' } },
   { name: 'no project_id', scope: 'zip', subject: 'zip-scope', dc: false, evidence: {} },
-  // ⚠️ THE NEXT FOUR CARRY A project_id AND STILL RESOLVE TO ZIP SCOPE. The row cannot know
-  // that — only the capture job, reading live data, can. So the DRAFT's widest scope is
-  // `project` while the CAPTURE legitimately records `zip`, which is the whole reason
-  // `mapsCaptureKey` takes a scope argument.
+  // ⚖️ THE NEXT FOUR CARRY A project_id AND A MAP OF THE WHOLE ZIP. Until 2026-10-01 that
+  // was the accepted fallback ("demoted"); the founder then ruled that a post about a
+  // project must show that project's own pin with its popup open. So for these four a ZIP
+  // map is REFUSED, and the capture job leaves the draft with no picture instead (§8b).
   { name: 'project row disappeared', scope: 'zip', subject: 'zip-scope', dc: true, demoted: true,
     evidence: { ...P, theme: 'datacenter' } },
   { name: 'project coordinates unavailable', scope: 'zip', subject: 'zip-scope', dc: true, demoted: true,
@@ -104,6 +104,9 @@ const capture = (d, scope, opts) => {
   p.image_bucket_path = `maps/${o.pathZip || p.zip}/x.png`;
   const visual = { state: S.READY, captured_at: new Date().toISOString() };
   if (!o.dropScope) visual.scope = scope;
+  // A real project capture records its popup open (the job refuses the shot otherwise), and
+  // since 2026-10-02 that its pin shows the post's own record (Map 1 step (a)).
+  if (scope === 'project') { visual.popup_open = true; visual.record_match = true; }
   if (HS.mapsDcCapturePolicyApplies(p)) visual.capture_policy = policyBlob(scope);
   visual.capture_key = o.key !== undefined ? o.key : HS.mapsCaptureKey(o.keyFrom || p, scope);
   p.evidence.visual = visual;
@@ -141,6 +144,17 @@ for (const sc of SCENARIOS) {
   } else {
     ok(key.indexOf(`v1|${ZIP}|${d.evidence.project_id}|`) === 0,
       `${t} — the identity names the ZIP and the project`, key.slice(0, 40));
+  }
+
+  // ⚖️ (c′) A PROJECT POST ON A ZIP MAP IS REFUSED (founder 2026-10-01).
+  if (sc.demoted) {
+    const zipShot = capture(d, 'zip');
+    ok(HS.mapsCaptureBound(zipShot) === false, `${t} — a ZIP map does NOT bind to a post about a project`);
+    ok(HS.mapsCaptureState(zipShot) !== S.READY, `${t} — …and never reads REAL_MAP_VISUAL`);
+    ok(/must be that project's own pin/.test(HS.mapsMapGateBlock(zipShot)),
+      `${t} — …and the map gate blocks, saying the post needs its project's own pin`);
+    ok(HS.mapsMapGateBlock(d) !== '', `${t} — a missing map BLOCKS too`);
+    continue;
   }
 
   // (c)/(d) THE CAPTURE CAN BE PRODUCED, BINDS, AND REACHES REAL_MAP_VISUAL.
@@ -252,10 +266,37 @@ ok(HS.mapsCaptureStoredScope(legacy.evidence.visual, legacy) === 'project',
   '6c: a project capture with no scope field still reads as PROJECT — the stricter default');
 ok(HS.mapsCaptureBound(legacy) === true, '6d: …so pre-scope project images stay bound');
 
-// ═══ 7. A ZIP FALLBACK ON A PROJECT-BEARING DRAFT IS UPGRADABLE, NOT FINISHED ════════
+// ═══ 7. A ZIP MAP ON A PROJECT-BEARING DRAFT IS REFUSED (founder 2026-10-01) ═════════
+// It was accepted as "the founder's own fallback" from 2026-09-22; six such posts went out,
+// five naming the wrong ZIP, and were deleted from Bluesky. A post about a project shows
+// that project's own pin with its popup open.
 const fallback = capture(draftFor(SCENARIOS[4]), 'zip');
-ok(HS.mapsCaptureBound(fallback) === true, '7a: a project-bearing draft ACCEPTS its ZIP fallback');
-ok(HS.mapsMapGateBlock(fallback) === '', '7b: …and is approvable on it — it has a truthful map');
+ok(HS.mapsCaptureBound(fallback) === false, '7a: a project-bearing draft does NOT accept a ZIP map');
+ok(/must be that project's own pin/.test(HS.mapsMapGateBlock(fallback)),
+  '7b: …and is not approvable on it — the gate says the post needs its own pin');
+const noPopup = capture(draftFor(SCENARIOS[0]), 'project');
+delete noPopup.evidence.visual.popup_open;
+ok(HS.mapsCaptureBound(noPopup) === false && /popup as open/.test(HS.mapsMapGateBlock(noPopup)),
+  '7c: a project pin that does not record its popup open is refused too');
+ok(HS.mapsCaptureBound(capture(draftFor(SCENARIOS[0]), 'project')) === true,
+  '7d: control — the same project pin WITH its popup open binds');
+// Map 1 step (a), 2026-10-02: the pin must also show the post's own record.
+const noRecordCheck = capture(draftFor(SCENARIOS[0]), 'project');
+delete noRecordCheck.evidence.visual.record_match;
+ok(HS.mapsCaptureBound(noRecordCheck) === false
+   && /does not record that its pin shows this post's own record/.test(HS.mapsMapGateBlock(noRecordCheck)),
+  '7e: a project pin taken before the record check is not bound until it has been checked');
+const otherRecord = capture(draftFor(SCENARIOS[0]), 'project');
+otherRecord.evidence.visual.record_match = false;
+otherRecord.evidence.visual.record_mismatch = 'Map 1\'s pin for this project shows a different record (name "A" on the post, "B" on the pin)';
+ok(HS.mapsCaptureBound(otherRecord) === false
+   && /shows a different record from this post's own record/.test(HS.mapsMapGateBlock(otherRecord))
+   && /name "A" on the post, "B" on the pin/.test(HS.mapsMapGateBlock(otherRecord)),
+  '7f: a project pin recorded as showing another record is refused, with the comparison\'s own words');
+const absenceCtl = capture(draftFor(SCENARIOS[1]), 'zip');
+ok(SCENARIOS[1].subject === 'absence' && !('record_match' in absenceCtl.evidence.visual)
+   && HS.mapsCaptureBound(absenceCtl) === true,
+  '7g: control — a post with no project still binds on its ZIP map with no record check (there is no record to show)');
 
 // ═══ 8. NO SPECIAL-CASE POPULATION ANYWHERE (§13) ════════════════════════════════════
 const SRC = ['maps-capture-binding', 'maps-capture-policy', 'maps-social-theme']
@@ -290,28 +331,25 @@ ok(/content_family !== 'MAPS'/.test(SRC) || /content_family === 'MAPS'/.test(SRC
 // matrix for is measuring half the pipeline.
 const GEN = readFileSync(new URL('../scripts/maps-social-image.mjs', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
-// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
-// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
-// which syntax declares it — freezing the shape is what made three suites go red on a
-// correct change, for the third time in this workstream.
-ok(/async function zipMapFallback\(/.test(GEN) && GEN.length > 5000,
+// ⚖️ UPDATED 2026-10-01: the record-shaped conditions are REFUSALS again (founder: a post
+// about a project shows its own pin, popup open), recorded through `projectPinRefusal` with
+// no picture. Named individually, so dropping any ONE of them fails here.
+ok(/async function projectPinRefusal\(/.test(GEN) && GEN.length > 5000,
   '8b₀: the comment-stripped generator still holds the real code (control for §8b)');
-// The four record-shaped conditions are DEMOTIONS, never refusals. Named individually, so
-// turning any ONE of them back fails here rather than three of four passing.
 for (const cond of [
   ['the project row is no longer in app_projects', 'project row gone'],
   ['the live row is not a development record', 'not a development row'],
   ['the project has no coordinates', 'no coordinates'],
   ['the live coordinates differ from the draft evidence', 'moved away from the draft'],
 ]) {
-  const re = new RegExp(`zipFallback\\('${cond[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
-  ok(re.test(GEN), `8b: ${cond[1]} is a ZIP-scope DEMOTION, not a refusal`);
+  const re = new RegExp(`pinRefusal\\('${cond[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+  ok(re.test(GEN), `8b: ${cond[1]} is a recorded refusal with no picture, not a ZIP map`);
 }
-ok(/await zipFallback\(why\)/.test(GEN),
+ok(/await pinRefusal\(why\)/.test(GEN),
   '8b: …and so is a project outside the ZIP\'s authoritative development set');
-ok(!/await ineligible\(/.test(GEN),
-  '8b: no record-shaped condition ends a draft with no picture at all');
+ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project', extra\)/.test(GEN)
+    && !/zipMapFallback|zipFallback\(/.test(GEN),
+  '8b: the refusal records CAPTURE_INELIGIBLE at project scope, and the ZIP-map fallback is gone');
 // WHAT THE PICTURE IS OF IS WRITTEN DOWN. Without this, a ZIP capture is indistinguishable
 // from a project one on the stored row, and the enforced SQL guard defaults it to `project`
 // and demands a target it cannot have — which is exactly what blocked all 18 live absence

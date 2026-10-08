@@ -53,6 +53,29 @@ export type FenceVerdict =
   | { ok: true }
   | { ok: false; reason: string };
 
+export type GeofenceStatus = "inside_zip" | "zip_mismatch" | "too_far";
+
+export function fenceStatusOf(verdict: FenceVerdict): GeofenceStatus {
+  if (verdict.ok) return "inside_zip";
+  if (verdict.reason.includes("matched ZIP")) return "zip_mismatch";
+  return "too_far";
+}
+
+/** Best-effort stamp of the last fence outcome onto the cache row. Connectors
+ *  call this after fenceGeocode so Development can count rejections. */
+export async function noteFenceOutcome(
+  noteFence: ((input: string, status: GeofenceStatus) => void | Promise<void>) | undefined,
+  input: string,
+  verdict: FenceVerdict,
+): Promise<void> {
+  if (!noteFence) return;
+  try {
+    await noteFence(input, fenceStatusOf(verdict));
+  } catch {
+    // never let a stamp failure break placement
+  }
+}
+
 /** Pull the trailing 5-digit ZIP out of a geocoder's matched address ("… , NY, 12095" → 12095;
  *  a ZIP+4 keeps its first five). Returns null when the geocoder stated no ZIP. */
 export function matchedZipOf(matchedAddress?: string | null): string | null {

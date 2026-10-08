@@ -57,6 +57,8 @@ const MUST_MATCH = {
   // Shipped until the helper sentence was removed; kept because every string in this list is
   // REAL, and a wording the page once carried must not start failing the guard.
   'the former helper text (#1090)': 'Choose an address from the suggestions, press Enter, or click search.',
+  // Founder wording 2026-10-02 for a ZIP with no Census area (test/zip-no-mapped-area-copy.test.mjs).
+  'the no-mapped-area note': 'ZIP 10048 has no mapped area. The Census does not draw a boundary for this ZIP code — usually because it serves PO boxes or a single organization rather than streets — so we can\'t show development records for it. Enter a street address to see development around that address.',
   'the CURRENT not-measured note (Fix 9)': 'Development coverage for ZIP 08005 is not measured yet — we will not estimate it from a circle around the ZIP centre. Enter an address for the live view around that address.',
   'the shipped not-measured note': 'Development coverage for ZIP 08005 is not measured yet — we will not estimate it from a circle around the ZIP centre. Enter an address for the live view around your home.',
   "#1086's ZIP-mode hint": 'Enter a street address to switch from ZIP-wide results to development nearby.',

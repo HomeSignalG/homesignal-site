@@ -56,18 +56,40 @@ ok(!/epoch/i.test(MAP), 'M9c: the ONE Map 1 reader names no source -- Epoch publ
 ok((MAP.match(/create or replace function public\./g) || []).length === 1, 'M9d: the Map 1 reader is still ONE function');
 
 // ── the source rule lives in ONE place, keyed like dc_classify_observation ─────────────────
+// 2026-09-24: the address rule is TWO functions -- per-source SCHEMA extraction, then ONE generic
+// geocodability policy -- composed by dc_geocode_input, which names no source.
 const input = (D3.match(/create or replace function public\.dc_geocode_input[\s\S]*?\$fn\$;/) || [''])[0];
-ok(/if p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then/.test(input)
-   && /'NO_GEOCODE_RULE'/.test(input), 'S1: the address rule is keyed on source+distribution; every other source is NO_GEOCODE_RULE');
+const extract = (D3.match(/create or replace function public\.dc_publisher_stated_address[\s\S]*?\$fn\$;/) || [''])[0];
+const policy = (D3.match(/create or replace function public\.dc_geocodable_site_address[\s\S]*?\$fn\$;/) || [''])[0];
+const admit = (D3.match(/create or replace function public\.dc_derived_address_admitted[\s\S]*?\$\$;/) || [''])[0];
+ok(/if p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then/.test(extract)
+   && /'NO_RULE'/.test(extract) && /'NO_GEOCODE_RULE'/.test(input) && /dc_geocodable_site_address/.test(input)
+   && !/p_source_key\s*=|'epoch_ai'|'compute_atlas'/.test(input) && !/source|'epoch_ai'|'compute_atlas'/i.test(policy.replace(/-- .*$/gm, ''))
+   && policy.length > 400,
+  'S1: extraction is keyed on source+distribution (every other source NO_GEOCODE_RULE); the geocodability policy and the composition name no source');
 // Every source-keyed rule is a function keyed like dc_classify_observation; production SQL names
 // epoch_ai nowhere else -- in particular not in the resolver, the adjudicator, geography or the reader.
 const fnOf = (name, src) => (src.match(new RegExp('create or replace function public\\.' + name + '[\\s\\S]*?\\$fn\\$;')) || [''])[0];
 const classify = fnOf('dc_classify_observation', A3);
 const siteAddr = fnOf('dc_site_address', A3);
 const citation = fnOf('dc_record_citation', A3);
-const rest = Object.values(SQL).join('\n').replace(input, '').replace(classify, '').replace(siteAddr, '').replace(citation, '');
-ok([classify, siteAddr, citation].every((f) => f.length > 200 && /'epoch_ai'/.test(f)) && !/'epoch_ai'/.test(rest),
-  'S1b: production SQL names epoch_ai only in the four source-keyed rules (classifier, geocode input, site address, citation)');
+// 2026-10-01: the ONE place a source is named as DATA rather than as a rule -- the record-key discriminator seed
+// (epoch_ai/timelines pairs the name with 'Date'). The key view reads the registry and names no source.
+const seed = (A3.match(/insert into public\.dc_record_key_discriminator[\s\S]*?on conflict[^;]*;/) || [''])[0];
+const rest = Object.values(SQL).join('\n').replace(extract, '').replace(classify, '').replace(siteAddr, '').replace(citation, '').replace(admit, '').replace(seed, '');
+ok([classify, extract, siteAddr, citation].every((f) => f.length > 200 && /'epoch_ai'/.test(f)) && /'epoch_ai'/.test(admit) && !/'epoch_ai'/.test(rest),
+  'S1b: production SQL names epoch_ai only in the source-keyed rules (classifier, address extraction, site address, citation) and the admission gate');
+ok(seed.length > 100 && (seed.match(/\('epoch_ai'/g) || []).length === 1 && /\('epoch_ai', 'timelines', 'Date', 'date'\)/.test(seed),
+  'S1b2: the record-key discriminator seed is the only data naming a source, and it is exactly epoch_ai/timelines/Date');
+ok(/create or replace view public\.dc_observation_record_key[\s\S]*?left join public\.dc_record_key_discriminator/.test(A3)
+   && !/'epoch_ai'/.test((A3.match(/create or replace view public\.dc_observation_record_key[\s\S]*?;\n/) || [''])[0]),
+  'S1b3: the record-key view reads the registry and names no source');
+// 2026-10-01: the identity-open view is read by every geography run; it reads the window-function record-key view ONCE
+// (a materialized CTE) and never from inside a per-row subquery -- the shape that cost ~175 s of a ~192 s read.
+const openView = (A3.match(/create or replace view public\.dc_entity_identity_open[\s\S]*?;\n/) || [''])[0];
+ok(openView.length > 800 && /rk as materialized \(/.test(openView) && /from cand c\b[\s\S]*join rk r1[\s\S]*join rk r2/.test(openView)
+   && !/not exists \([^;]*dc_observation_record_key/.test(openView) && /dc_adjudicate_pair\(p\.observation_a/.test(openView),
+  'S1b4: identity-open reads the record keys once (materialized) and adjudicates only the cross-source pairs of different entities');
 ok(/'NO_SITE_ADDRESS_RULE'/.test(siteAddr), 'S1c: a source with no site-address rule gets no automatic cross-source identity');
 
 // ── the verdict: output quality, fail closed ────────────────────────────────────────────────
@@ -126,7 +148,7 @@ ok(!/dc_identity_review|reviewer|REVIEWED_|WAITING_FOR|NEEDS_(HUMAN_)?REVIEW|MAN
 
 // ── the production apply is GENERATED from the files above, never retyped (claims rule 7) ─────
 const gen = spawnSync('python3', [join(ROOT, 'test/dc_epoch_geography_pg/build_apply.py'), '--check'], { encoding: 'utf8' });
-ok(gen.status === 0, 'S6: docs/dc-epoch-geography-apply.sql is byte-identical to what the generator emits from the DDL of record', (gen.stdout + gen.stderr).trim());
+ok(gen.status === 0, 'S6: docs/dc-epoch-geography-apply.sql is the FROZEN artifact #1324 applied (generated from the DDL of record at the time; never regenerated since)', (gen.stdout + gen.stderr).trim());
 const APPLY = read('docs/dc-epoch-geography-apply.sql');
 ok(APPLY.indexOf('DRIFT: live definition') > 0 && APPLY.indexOf('DRIFT: live definition') < APPLY.indexOf('create or replace function public.dc_geocode_ladder_version')
    && !/create or replace view public\.dc_current_observation/.test(APPLY),

@@ -177,8 +177,22 @@ async function verifyZipPage(page, spec, cached) {
       const countyBadges = document.querySelectorAll('.dt-badge').length;
       const envFlags = document.querySelectorAll('.vflag').length;
       const propertyLinks = Array.from(document.querySelectorAll('a[href*="?addr="]')).length;
+      // NATIONAL DATA-CENTRE PINS, resolved by the page's own resolver (the function its pins,
+      // filters and lists use). The lifecycle checks below read `status`, so they could not see
+      // these rows drawing as Other project / Lifecycle unknown — which all 1,816 did until
+      // 2026-09-27 (HS.map1DcSite filled fields the classifier does not read).
+      const dcSites = sites.filter((s) => s && s.record_kind === 'national_project');
+      const dcResolved = dcSites.map((s) => {
+        const mk = window.__HS_RESOLVE_TRACKER ? window.__HS_RESOLVE_TRACKER(s) : {};
+        const want = (window.HS && window.HS.canonicalLifecycle)
+          ? window.HS.canonicalLifecycle({ status: s.status }).key : null;
+        return { key: s.source_key, type: mk.typeKey, life: mk.lifecycle, want: want, named: !!s.label,
+                 // the fields HS.map1DcSite has filled since 2026-09-27; absent = an older build served
+                 shaped: s.bucket !== undefined && s.use_type !== undefined };
+      });
       return {
         sites,
+        dcResolved,
         devPoints: devPoints.length,
         pointSites: pointSites.length,
         civic: civic.length,
@@ -198,11 +212,11 @@ async function verifyZipPage(page, spec, cached) {
         // what the page's facility read returned (public.zip_mode_report_sites): status + member count
         zipFacilities: window.__HS_ZIP_FACILITIES || null,
         devText: (document.getElementById('cDev') || {}).textContent || '',
-        shell: !!document.querySelector('.side, .nav'),
+        shell: !!document.querySelector('#hs-top .hs-nav a'),
       };
     });
 
-    if (!st.shell) fail('shell renders', 'sidebar missing');
+    if (!st.shell) fail('shell renders', 'site header missing');
     else pass('shell renders');
 
     if (!st.mapInited) fail('map renders', 'leaflet/canvas not initialized');
@@ -328,6 +342,26 @@ async function verifyZipPage(page, spec, cached) {
       }
       const dist = Object.entries(seen).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · ');
       pass('lifecycle badges', `${devRecs.length} dev record(s) bucketed${dist ? ` — ${dist}` : ''}`);
+    }
+
+    // DATA-CENTRE TYPE + LIFECYCLE, on the page's own resolver. Not exercised on a ZIP the
+    // contract returns no data-centre row for — a SKIP, never a pass over zero. Also a SKIP when
+    // the SERVED page predates the site-shape fix (none of its rows carries bucket/use_type):
+    // this workflow runs on the merge push, before Pages deploys, and lib/data.js carries no
+    // cache key — so an old build is deploy lag, not a finding. The mapping's shape itself is
+    // pinned offline (test/map1-dc-site-shape.test.mjs).
+    if (st.dcResolved.length && !st.dcResolved.some((d) => d.shaped)) {
+      skip('data-centre pins', `served page predates the Map 1 data-centre site-shape fix (${st.dcResolved.length} row(s) without bucket/use_type) — re-run after the Pages deploy`);
+    } else if (st.dcResolved.length) {
+      const badDc = st.dcResolved.filter((d) => d.type !== 'datacenter' || !d.want || d.life !== d.want || !d.named);
+      if (badDc.length) {
+        fail('data-centre pins', `${badDc.length} of ${st.dcResolved.length} do not draw as a named Data center in `
+          + `their own lifecycle: ${badDc.slice(0, 3).map((d) => `${d.key}=${d.type}/${d.life} want ${d.want}`).join(', ')}`);
+      } else {
+        pass('data-centre pins', `${st.dcResolved.length} national data-centre pin(s): Data center, lifecycle = map_status, named`);
+      }
+    } else {
+      skip('data-centre pins', 'not exercised — no national data-centre row on this ZIP');
     }
 
     if (expect.badges && st.countyBadges < 1) {

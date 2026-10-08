@@ -2,7 +2,7 @@
 //
 // For each ZIP in $ZIPS (comma-separated), loads THREE page types on the real site —
 // community.html, homesignalmap.html, and the app's development.html — and reports, as a
-// markdown table: does the v13 left-sidebar shell render (present, at the left edge, nav
+// markdown table: does the shared site header render (present, across the top, nav
 // populated), is the page non-blank, and which honest state it shows — populated /
 // coverage-coming / not-covered / honest-empty — flagging anything broken or blank.
 // development.html additionally flags the RETIRED empty-state claim ("We check county and
@@ -34,14 +34,16 @@ async function inspect(page, url) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(SETTLE_MS); // let the shell inject + data queries settle (SETTLE_MS, default 6500)
     const st = await page.evaluate(() => {
-      const side = document.querySelector('.side');
-      const nav = document.querySelector('.side .nav a, .nav a');
-      const r = side ? side.getBoundingClientRect() : null;
+      // The shared shell is the horizontal header (Revised Index Design, #1562): it sits at
+      // the top of the page and carries the primary nav.
+      const head = document.getElementById('hs-top');
+      const nav = document.querySelector('#hs-top .hs-nav a');
+      const r = head ? head.getBoundingClientRect() : null;
       const slot = document.getElementById('hs-slot');
       const text = (document.body.innerText || '').trim();
       return {
-        shellPresent: !!side && !!nav,
-        shellLeft: r ? (r.x < 60 && r.width > 100 && r.height > 200) : false,
+        shellPresent: !!head && !!nav,
+        shellTop: r ? (r.y < 10 && r.width > 300 && r.height >= 40) : false,
         slotHasContent: !!(slot && slot.children.length && (slot.innerText || '').trim().length > 20),
         textLen: text.length,
         hasStrip: !!document.querySelector('.strip'),
@@ -102,7 +104,7 @@ for (const zip of ZIPS) {
   const comm = await inspect(page, `${SITE_BASE}/community.html?zip=${zip}`);
   const dev = await inspect(page, `${SITE_BASE}/homesignalmap.html?zip=${zip}`);
   const app = await inspect(page, `${SITE_BASE}/development.html?zip=${zip}`);
-  const shellOk = (s) => s.failed ? 'FAIL' : (s.shellPresent && s.shellLeft ? 'yes' : 'NO');
+  const shellOk = (s) => s.failed ? 'FAIL' : (s.shellPresent && s.shellTop ? 'yes' : 'NO');
   const commClass = classifyComm(comm);
   const devClass = classifyDev(dev);
   const appClass = classifyDevApp(app);

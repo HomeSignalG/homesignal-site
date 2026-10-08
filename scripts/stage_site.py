@@ -53,6 +53,16 @@ ROOT_FILES = (
     'community.html',
     'contact.html',
     'dashboard.html',
+    'development-activity.html',
+    # Internal, admin-only (build step 4 of docs/development-activity-build-steps-100526.md): noindex, robots-disallowed,
+    # linked from nowhere. The function it calls refuses anyone not signed in and on dashboard_admins.
+    'development-activity-review.html',
+    # The customer page for invited trial members (build step 5c): noindex, robots-disallowed, reached from an invite link and
+    # (since 2026-10-05) from "My reports" in the header's Enterprise dropdown. Both functions it calls answer only a signed-in person, about that person.
+    'development-activity-reports.html',
+    # The client's page for a private share link (build step 8): noindex, robots-disallowed, linked from nowhere, reached only from a link an
+    # agent made. It sends no referrer and holds no sign-in; its one function (view-shared-report) answers only a token the database says is usable.
+    'shared-report.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
@@ -65,6 +75,15 @@ ROOT_FILES = (
     'properties.html',
     'property.html',
     'reports.html',
+    # RETIRED FROM THE ARTIFACT 2026-10-01 (Development Activity Order H, first step). The legacy
+    # browser-direct NYC report page, `future-surroundings-report.html`, is deliberately NOT named
+    # here. It generates a report entirely in the visitor's browser against data.cityofnewyork.us,
+    # so no HomeSignal server sees the request and no server-side quota could ever apply to it.
+    # The plan allows one customer-facing generation path (Hard Rule 24). The file and its three
+    # libraries stay in the repository untouched (ruling R6); only the SERVING stops, so the URL
+    # is a plain 404. TO REVERSE: re-add the line  'future-surroundings-report.html',  here and
+    # flip the pins in test/nyc-v1-report.test.mjs 5f and test/single-customer-generation-path.test.mjs P2.
+    # Decision and receipt: docs/order-h-retire-legacy-generator-2026-10-01.md.
     'share-text.html',
     'terms.html',
     'today.html',
@@ -90,18 +109,23 @@ ROOT_FILES = (
     # test/bsky-did-document.test.mjs and generated in homesignal-ingest by
     # bluesky/lib/feed-contract.mjs::didDocument().
     '.well-known/did.json',
+    # Google Search Console ownership verification (HTML-file method, founder 2026-09-28).
+    # Google re-checks it; removing it un-verifies homesignal.net.
+    'google59e1ae3ef6b75e3a.html',
 )
 
 #: Directory trees that ship, each with the file extensions allowed inside it. A tree is
 #: copied recursively, but only files whose suffix appears here are taken — so a `.sql`,
 #: `.md`, `.py` or build-only `.mjs` dropped inside a shipped tree still does not ship.
-#: (`lib/generated/` holds two runtime JSONs the browser fetches alongside three
-#: build-tooling artifacts — transitions.mjs, versions.mjs and transitions.sql — which
-#: only `scripts/gov-feeds/**` imports from the checkout, never over HTTP.)
+#: (`lib/generated/` holds two runtime JSONs the browser fetches; the three
+#: build-tooling artifacts — transitions.mjs, versions.mjs and transitions.sql — moved
+#: to homesignal-ingest with their generator.)
 TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
-    'assets': ('.js', '.css', '.png', '.svg', '.woff2'),
+    # .webp: the homepage's approved Development Activity report preview
+    # (assets/home-development-activity-report-preview.webp, founder-approved in #1494).
+    'assets': ('.js', '.css', '.png', '.svg', '.webp', '.woff2'),
     'seed': ('.js',),
 }
 

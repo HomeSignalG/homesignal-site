@@ -40,6 +40,168 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — 0 HomeSignal omissions; 704 legitimate, 2 not established
+
+**Classified before changing anything. No HomeSignal data changed.** All 706 stay `not_measured`.
+Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. Per-ZIP record:
+`docs/maps-coverage/fix4/no-boundary-zip-classification.csv`.
+
+- **Split.** Types and the decommissioned flag come from zipcodes 3.0.0, whose base data is
+  unitedstateszipcodes.org's, not USPS's.
+
+  | class | ZIPs |
+  |---|---:|
+  | PO Box | 498 |
+  | unique | 107 |
+  | standard ZIP with no Census ZCTA (31 in New York City) | 52 |
+  | decommissioned in the dataset (19 standard, 20 unique, 8 PO Box) | 47 |
+  | not in the ZIP dataset (84684, 84685): existence not established | 2 |
+  | **HomeSignal omission** | **0** |
+
+  The total is 706: 704 legitimate non-ZCTA ZIPs plus 2 not established.
+- **0 acquisition defects.** `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to
+  Census TIGERweb's 2020 ZCTA set.
+  - It is one check: five layers returned one identical body. It compares codes only, through a route
+    independent of our load path.
+  - 0 of the 706 are in it; positive control 12,016.
+  - The code sets are committed, so it can be re-checked offline.
+- **0 generation defects.** The ACTIVE generation (`n5-national-2026-09-30` at 19:03Z, and 09-29
+  before it) marks exactly these 706 `not_measured` (md5 `7d1bf19a…`), with 0 disagreements.
+- **Kept honest:**
+  - `scripts/fix4_classify_no_boundary_zips.py` is the only place a class is decided.
+  - `test/no-boundary-zip-classification.test.mjs` is in the required `unit` check and runs the
+    classifier's offline self-test.
+  - `no-boundary-zip-classification.yml` regenerates from zipcodes 3.0.0. It is not a required
+    check.
+  - 16 mutations: 15 fail `unit`; the 16th fails only the advisory job.
+- ⛔ **RETRACTED: the "new item" this entry first carried was false.** It said Fix 3's READY/ACTIVATE
+  check trusts `geo.zcta_boundary` to be complete. It does not: the publisher reads the pinned TIGER
+  archive itself, so a deleted or short table disagrees with it and is refused. No guard is needed.
+  See receipt §5.
+- 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
+  - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
+    established) — ⏸️ **pages WITHHELD 2026-10-03 as UNVERIFIED** (not retired), now `page_mode unverified` in
+    the coverage model; re-audit only after USPS or USPS City State Product verification;
+  - the 47 ZIPs the dataset flags as decommissioned — ✅ **BACK ON THE SITE 2026-10-03 as
+    coverage-limited pages** (founder: the flag is third-party, not USPS; no ZCTA is not "inactive").
+    `docs/maps-coverage/fix4/zip-coverage-internal.json` (computed from the Fix 4 record, never deployed)
+    holds the evidence and `lib/zip-coverage.json` the four-field public model: 28 `specialized_zip`,
+    19 `verification_pending`, none `retired`. Still open: confirming each with USPS — only then may a
+    ZIP become `active` or `retired`;
+  - the 52 active standard ZIPs with no Census ZCTA;
+  - ~~the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.~~
+    ✅ **DONE 2026-10-02 (founder wording, "use this"):** *"ZIP 10048 has no mapped area. The
+    Census does not draw a boundary for this ZIP code — usually because it serves PO boxes or a
+    single organization rather than streets — so we can't show development records for it. Enter
+    a street address to see development around that address."* One owner,
+    `HS.zipNoMappedAreaFact` in `lib/zip-authoritative.js`, on Map 1 and the ZIP / development
+    pages; pinned whole in `test/zip-no-mapped-area-copy.test.mjs`. Only a ZIP waiting on a
+    build (producer status `unknown`) keeps "not measured yet". Not changed: the city pages' short
+    "not yet measured — not counted" tag beside these ZIPs.
+
+  The registry and the page copy were not touched.
+
+### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
+
+**Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
+boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`.
+
+- **Why they were omitted:** each is the ONLY canonical ZIP in its ZIP3 prefix (941, 952, 991).
+  The legacy generation's writer (`scripts/n5_unit_a_shadow.py`, retired) built only prefixes
+  that had a phase-1 shard (`select_prefixes()` reads `n5_shard where state='done'`), and wrote
+  `boundary_complete` only for the boundaries it loaded. None of the three prefixes had a phase-1
+  shard, and the separate `not_measured` backfill covered only ZIPs with no boundary. So nothing
+  wrote them: legacy = 12,013 + 706 = **12,719** of 12,722.
+- **The presence half was already repaired** by the generation path (#1336 / #1350): scope =
+  shard prefixes ∪ every canonical prefix, and READY / ACTIVATE refuse on
+  `canonical_zip_without_status`. Both national generations carry 12,722 rows.
+- **Serving since 2026-09-27 15:00Z**, re-measured 2026-09-29 on `n5-national-2026-09-27`:
+  94128 `boundary_complete` 0 · 95219 `boundary_complete` 0 · 99128 `boundary_complete` 1.
+  `app_zip_geography_state`: 12,016 authoritative + 706 not_measured + **0 pending**.
+- **Correct, not just present:** membership was recomputed from the generation's candidate
+  geometry and matches on all three. 94128's 32 source-stated projects all lie 1.0-13.6 km outside
+  its polygon; 95219's one point inside is an unresolved `GEOMETRY_INVALID` record, correctly
+  withheld; 99128's member is a WSDOT line that crosses the polygon.
+- **What this change adds (Part G):** READY / ACTIVATE now also refuse a status that disagrees
+  with `geo.zcta_boundary` (`canonical_zip_status_disagrees_with_boundary`). The publisher labels a
+  ZIP from the TIGER file the loader downloads, so a skipped shape would have published a
+  boundary-bearing ZIP as `not_measured` and passed every existing check. Measured before
+  applying: 0 disagreements in every generation.
+  **Applied 2026-09-29 23:56Z** (`db-sql.yml` run `36647789091`, from `main` `57aa5b6`): live
+  `md5(prosrc)` `66f5995d…` = Part G's post-condition; ACTIVE generation 12,722 rows, 0 disagree.
+  **First real READY + ACTIVATE under it:** `n5-national-2026-09-29`, activated 2026-09-30 12:22Z,
+  12,722 rows, 0 disagree. **Rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is
+  generated, fingerprint-proven to restore the pre-Part-G body exactly, and executed in CI by
+  `run_part_g_rollback.py`. A refusal holds the build BUILDING, and `n5_map1_build` reports it
+  after 6 h with no progress. **Not applied: it exists for use only if the check refuses a
+  correct build.**
+- **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
+  failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
+  only live members of that state. It now asserts the three resolve to a measured state, and
+  exercises the pending contract by handing the live page the producer's exact `unknown` answer.
+
+### 2026-09-28 — 🔴 FINDING (RECORDED, NOT FIXED): the BIS `recency_expr` admits permits back to 1989 — 89.6% of what it returns is not recent
+
+**This is a finding, not authorised work.** Per Rule 16 it is filed as its own item rather
+than folded into the Future Surroundings Report checkpoint, whose scope is fixed and whose
+sold artifact does not touch this code path. **Nothing here has been changed.** Fixing it
+needs founder authorisation because it is a live consumer surface.
+
+**Where:** `supabase/functions/get-address-report/jurisdiction-registry.json`, the
+`socrata` entry for dataset `ipu4-2q9a` (NYC DOB Permit Issuance, BIS legacy):
+
+```
+"recency_expr": "(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'"
+```
+
+**What it assumed.** `issuance_date` is a *text* column. The convention dated 2026-08-02
+reformats it into a sortable `YYYYMMDD` key by slicing the parts out of `MM/DD/YYYY`. That
+was correct when every value in the column had that shape.
+
+**What the column is now.** The publisher has been writing ISO values into it. Measured
+against the live view 2026-09-28: **3,990,689 rows total — 3,881,514 `MM/DD/YYYY` and
+88,238 `YYYY-MM-DD…`.** The slice positions mean nothing on the second shape. For
+`2026-03-01T00:00:00.000` the expression builds the key `3-01206-`, and because the
+comparison is lexical and `3` sorts above `2`, that key clears **any** `{cutoff_compact}`
+beginning with a 2 — i.e. every cutoff this century.
+
+**What that costs, measured 2026-09-28 at a 365-day cutoff (`20250928`):**
+
+| | rows |
+|---|---|
+| admitted by `recency_expr` | 71,681 |
+| genuinely inside the 365-day window | 7,442 |
+| **over-included** | **64,239 (89.6% of what it returns)** |
+| oldest permit the expression admits | **1989-05-11** |
+
+Every one of the 64,239 is an ISO-formatted row. This is not a rounding error at the
+boundary: nine of every ten permits the consumer path calls recent are not.
+
+**There is a green test over this and it cannot see the defect.**
+`test/socrata-text-date-recency.test.ts` passes, and it is a real test — it pins that the
+substring comparison is emitted, that `{cutoff}` is substituted at request time rather than
+frozen, that the older broken ISO comparison is gone rather than merely accompanied, and
+that a blank `recency_expr` falls back to a filter rather than to none. Every one of those
+is about **substitution**. None is about whether the expression the substitution produces
+selects the right rows. It would pass unchanged if the key were pure noise, which for
+88,238 rows it is. Do not read its green as coverage of this finding.
+
+**Why it was not fixed here.** `ipu4-2q9a` is on the NYC V1 allowlist, but
+`get-address-report` is on the EXCLUDE list and contributes nothing to the sold report —
+see `docs/corporate-output-source-rights-audit-2026-09-27.md`. The paid path reads the same
+column with a cast (`issuance_date::floating_timestamp`) and is unaffected; the reasoning,
+and the rejected option of reusing this convention, is written up in
+`docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`. Routing around a defect in a
+second implementation is not resolving it, so it is recorded here against the surface that
+still has it.
+
+**Proposed remedy (NOT AUTHORISED, NOT STARTED).** Replace the substring key with
+`issuance_date::floating_timestamp >= '{cutoff_iso}'`, which is verified working on this
+view in both `$where` and `$order`. Note `date_extract_y` is **not** available on a text
+column here — it returns HTTP 400 on type mismatch. Any other registry entry whose
+`recency_expr` slices a text date has the same exposure the moment its publisher changes
+format; that sweep is also unstarted and unauthorised.
+
 ### 2026-09-20 — DECISION HISTORY: code landed on the branch; deploy + backfill separately gated
 
 **State:** implementation complete and COMMITTED on
@@ -203,6 +365,31 @@ interaction is the root cause, and neither ruling is wrong.
   (`FALLBACK:other`), because the page builds them with `name`/`type` while `HS.trackerSiteItem`
   reads `label`/`use_type`/`layer`. Fixing (b) would move *Other project* geography, which is why
   it was not bundled here.
+  - ✅ **(b) IS FIXED (2026-09-27, PR #1393) — a field mapping, nothing else.** `HS.map1DcSite`
+    now fills `use_type` (from `project_type`), `label` (from `project_name`) and `bucket` / `type`
+    (the lifecycle key of `map_status`, via `HS.canonicalLifecycle`). Moving these pins out of
+    *Other project* is the intended outcome. Measured on production over all 12,722 registry ZIPs:
+    before the fix, **1,816 of 1,816** rows on 757 ZIP pages drew as Other project / Lifecycle
+    unknown with no name; after it (the shipped code run over those production rows), 1,816 of
+    1,816 draw as Data center in their own lifecycle (Operating 1,481 · Approved 183 · Proposed
+    152). The live probe read 28 of 28 on the deterministic sample. No SQL, identity, dedupe, geography or OSM
+    change. (a) is the membership read #1315 replaced; see CLAUDE.md §7.09.
+  - ✅ **Four follow-on defects fixed (2026-09-27, founder: "fix defects"):** the "Application on
+    file" line on proposed national pins, the blank source line, lists cut at 12 with nothing
+    said, and the "New projects proposed" tile reading the report's radius `proposed_active`.
+    See CLAUDE.md §7.09.
+  - ✅ **Six MAPS drafts re-shot 2026-09-27** (`maps-social-image.yml` run `36339216006`,
+    `recapture=true`, dispatched from `main` at `bd7a7af` at 18:03:21Z, after the live
+    `homesignalmap.html` was checked byte-identical to the repo): `5aca7ffc-2473-4e4c-b00e-d5ee01adcfc8`
+    (20904), `c6245e38-386f-434e-88b0-d32aab4fd984` (60607), `491380a5-259e-4c63-b7a7-96d914eb9c36`
+    (64153), `532ff7fe-a30d-4653-9768-816e35e869c7` (85008), `a41fb90e-049d-4e71-babc-5ef2f8a27f18`
+    (85034), `f89ea810-1b98-47ce-9c21-550c42768d6a` (97702). Each row's `evidence.visual.captured_at`
+    (18:04:22–18:04:39Z) and its stored file's `updated_at` are after the dispatch; all six are
+    still drafts and pass both approval checks. 97702 is now a pinned map of its own project
+    instead of a ZIP map (see CLAUDE.md §7.09).
+  - 📌 **Left for the ingest cleanup job:** `maps/97702/zip-1iivwwic4mzo.png` is referenced by 0 of
+    58 MAPS rows after the re-shoot. It is removed by `homesignal-ingest`'s dispatch-only
+    `cleanup-social-images.yml`, not by this repo.
 - 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
   the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
   path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace
@@ -300,10 +487,16 @@ does not substitute centroid proximity for membership.
   · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
   change · no Fix 30/31 work.
 - 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
-  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128); page-eligibility for the 21
+  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128 — ✅ closed by FIX 3, 2026-09-29,
+  entry at the top of the resume point); page-eligibility for the 21
   obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
   architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
   706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+  *(2026-10-01, FIX 4: the 706 are now classified per ZIP with evidence. Reconciled, not
+  corrected: "685" was 706 minus the 21 obsolete pages set aside, and "19 retired" was the
+  decommissioned STANDARD ZIPs; the dataset flags 47 in all (19 standard, 20 unique, 8 PO Box). The
+  founder ruled that all 706 stay `not_measured`. This item stays OPEN: the pages still say "not
+  measured yet".)*
 
 ### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
 

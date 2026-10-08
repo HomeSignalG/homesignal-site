@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<title>HomeSignal — Development Activity review</title>
+<meta name="description" content="HomeSignal internal review page for the Development Activity report.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+/* ============================================================================
+   DEVELOPMENT ACTIVITY — PRIVATE REVIEW PAGE (build step 4 of
+   docs/development-activity-build-steps-100526.md).
+
+   INTERNAL ONLY. Not in navigation, not in the sitemap, noindex, disallowed in
+   robots.txt. It ships with no data: the report comes from the
+   get-development-activity-report function, which refuses anyone who is not
+   signed in AND on the dashboard_admins allowlist (supabase/functions/_shared/
+   admin-gate.ts). The page decides nothing about a report: the engine decides
+   what is in it, and lib/da-report-view.js draws it. Nothing is saved.
+
+   Build step 5d adds "Start a brokerage trial": it asks the
+   development-activity-trial function, which creates a trial only for a signed-
+   in admin, and shows the owner invite link it returns, once. The page keeps
+   the link only in the open page: never in browser storage.
+
+   Standalone like gov-archive.html: the resident app shell carries navigation
+   and a signed-out experience that do not belong on an operator tool.
+   ============================================================================ */
+:root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{max-width:960px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+header.top h1{margin:0;font-size:20px}
+header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
+.who{font-size:13px;color:var(--muted)}
+.who button,.linkbtn{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+form{display:grid;gap:12px}
+.row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
+label{display:grid;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
+input[type=text],input[type=number]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
+input[type=text]:focus-visible,input[type=number]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+[hidden]{display:none!important}
+.card h2{margin:0 0 6px;font-size:17px}
+#tstatus{margin:12px 0 0;font-size:14px;min-height:1.5em}
+#tstatus.err{color:var(--red);font-weight:600}
+#tresult{display:grid;gap:10px;margin-top:12px}
+#tlink{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+fieldset{border:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+legend{font-size:13px;font-weight:600;color:var(--muted);padding:0;margin-bottom:4px}
+fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var(--ink);font-size:14px}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.go{justify-self:start;font:inherit;font-size:14.5px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:11px 18px;cursor:pointer;min-height:44px}
+.go:disabled{opacity:.6;cursor:default}
+.go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+#status{margin:0;font-size:14px;min-height:1.5em}
+#status.err{color:var(--red);font-weight:600}
+#viewnote{margin:0;font-size:13px;color:var(--muted)}
+.auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
+.auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
+.auth-modal h2{margin:0 0 4px;font-size:19px}
+.auth-sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+.auth-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font-size:14px;color:var(--ink);margin-bottom:10px}
+.auth-input:focus{outline:none;border-color:var(--accent)}
+.auth-submit{width:100%;background:var(--accent);color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.auth-submit:disabled{opacity:.6;cursor:default}
+.auth-msg{font-size:13px;margin-top:12px;min-height:1em;color:var(--accent)}
+.auth-close{position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;line-height:1;color:var(--muted);cursor:pointer}
+.auth-toggle{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
+.auth-toggle a{color:var(--accent);cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="in">
+    <div>
+      <h1>Development Activity — private review</h1>
+      <p class="meta">For HomeSignal admins only. Type any U.S. address to see the report a client would get for it. Reports are made live and nothing is saved. Below the report, you can start a brokerage's trial.</p>
+    </div>
+    <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" aria-label="Make a report">
+    <form id="rf" novalidate>
+      <label>Property address
+        <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
+      </label>
+      <div class="row">
+        <label>Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
+        <label>Brokerage (optional)<input type="text" id="brokerage" maxlength="80" placeholder="Your brokerage"></label>
+        <label>Agent (optional)<input type="text" id="agent" maxlength="80" placeholder="Agent name"></label>
+      </div>
+      <p class="hint">The label, brokerage and agent only fill the report's header on this page. From build step 7 they come from the customer's account.</p>
+      <fieldset>
+        <legend>Show</legend>
+        <label><input type="radio" name="view" value="internal" checked> Every record (internal)</label>
+        <label><input type="radio" name="view" value="customer"> What a paying customer sees today</label>
+      </fieldset>
+      <button type="submit" class="go" id="go">Make report</button>
+    </form>
+  </section>
+  <p id="status" role="status" aria-live="polite"></p>
+  <p id="viewnote" hidden></p>
+  <p id="creditnote" hidden></p>
+  <div id="report"></div>
+  <section class="card" aria-labelledby="trial-h">
+    <h2 id="trial-h">Start a brokerage trial</h2>
+    <p class="hint">This creates the brokerage's account, its free-report trial and a link for its owner. The owner opens the link, signs in and can then make reports. HomeSignal shows the link only once.</p>
+    <form id="tf" novalidate>
+      <label>Brokerage name
+        <input type="text" id="tname" maxlength="120" placeholder="Acme Realty" required>
+      </label>
+      <div class="row">
+        <label>Agent seats (optional)<input type="number" id="tseats" min="0" max="1000" step="1" inputmode="numeric" placeholder="No limit"></label>
+        <label>Trial length in days (optional)<input type="number" id="tdays" min="1" max="365" step="1" inputmode="numeric" placeholder="No end date"></label>
+      </div>
+      <button type="submit" class="go" id="tgo">Create trial and owner link</button>
+    </form>
+    <p id="tstatus" role="status" aria-live="polite"></p>
+    <div id="tresult" hidden>
+      <label>Owner invite link<input type="text" id="tlink" readonly></label>
+      <button type="button" class="go" id="tcopy">Copy link</button>
+      <p class="hint" id="tnote"></p>
+    </div>
+  </section>
+</main>
+
+<div id="auth-overlay" class="auth-overlay">
+  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <button class="auth-close" id="auth-close" aria-label="Close">&times;</button>
+    <h2 id="auth-title">Sign in</h2>
+    <p class="auth-sub" id="auth-sub">Enter your email and we'll send you a code &mdash; no password needed.</p>
+    <input type="email" id="auth-email" class="auth-input" placeholder="Email address" autocomplete="email" aria-label="Email address">
+    <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" aria-label="Enter your code">
+    <button id="auth-submit" class="auth-submit">Send me a code</button>
+    <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a id="auth-back-link">Use a different email</a></div>
+  </div>
+</div>
+
+<script src="lib/project-type.js?v=108e00a6"></script>
+<script src="lib/da-report-view.js?v=343cdb93"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============================================================================
+// Sign-in: the same email-code flow and the same allowlist as the other operator
+// pages. The public anon key below is the browser key every page carries; it is
+// NOT enough to make a report — the function needs a signed-in admin's token.
+// ============================================================================
+(function(){
+  var SB_URL = 'https://qwnnmljucajnexpxdgxr.supabase.co';
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var FN = SB_URL + '/functions/v1/get-development-activity-report';
+  var TRIAL_FN = SB_URL + '/functions/v1/development-activity-trial';
+  var client = window.supabase.createClient(SB_URL, SB_ANON);
+  var session = null, pending = false, busy = false, creating = false, pendingTrial = false;
+  var step = 'email', pendingEmail = '';
+  function $(id){ return document.getElementById(id); }
+
+  // ---- sign-in ----------------------------------------------------------------
+  function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#b3322b':'var(--accent)'; }
+  function setStep(s){
+    step = s;
+    if (s==='code'){
+      $('auth-sub').textContent='We emailed a code to '+pendingEmail+'. Enter it below.';
+      $('auth-email').style.display='none'; $('auth-code').style.display='block';
+      $('auth-submit').textContent='Verify & continue'; $('auth-back-wrap').style.display='block';
+      setTimeout(function(){ $('auth-code').focus(); },50);
+    } else {
+      $('auth-sub').textContent="Enter your email and we'll send you a code — no password needed.";
+      $('auth-email').style.display='block'; $('auth-code').style.display='none'; $('auth-code').value='';
+      $('auth-submit').textContent='Send me a code'; $('auth-back-wrap').style.display='none';
+      setTimeout(function(){ $('auth-email').focus(); },50);
+    }
+  }
+  function openAuth(){ pendingEmail=''; $('auth-email').value=''; showMsg('',false); setStep('email'); $('auth-overlay').style.display='flex'; }
+  function closeAuth(){ $('auth-overlay').style.display='none'; }
+  async function sendCode(){
+    var email=($('auth-email').value||'').trim();
+    if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
+    $('auth-submit').disabled=true; showMsg('Sending your code…',false);
+    try{ var r=await client.auth.signInWithOtp({ email:email, options:{ shouldCreateUser:false } });
+      if(r.error){ showMsg(r.error.message,true); } else { pendingEmail=email; setStep('code'); showMsg('',false); }
+    }catch(e){ showMsg('Something went wrong — please try again.',true); }
+    $('auth-submit').disabled=false;
+  }
+  async function verifyCode(){
+    var code=($('auth-code').value||'').trim();
+    if(code.length<4){ showMsg('Enter the code from your email.',true); return; }
+    $('auth-submit').disabled=true; showMsg('Checking…',false);
+    try{ var r=await client.auth.verifyOtp({ email:pendingEmail, token:code, type:'email' });
+      if(r.error){ showMsg(r.error.message,true); $('auth-submit').disabled=false; return; } closeAuth();
+    }catch(e){ showMsg('Something went wrong — please try again.',true); }
+    $('auth-submit').disabled=false;
+  }
+  function onSession(s){
+    session = s && s.access_token ? s : null;
+    var who = $('who');
+    who.textContent = '';
+    if (session) {
+      var email = session.user && session.user.email ? session.user.email : 'an account';
+      who.appendChild(document.createTextNode('Signed in as ' + email + ' · '));
+      var out = document.createElement('button'); out.type = 'button'; out.textContent = 'Sign out';
+      out.addEventListener('click', function(){ client.auth.signOut(); });
+      who.appendChild(out);
+      if (pending) { pending = false; run(); }
+      if (pendingTrial) { pendingTrial = false; createTrial(); }
+    } else {
+      // the owner link belongs to the admin who created it: it leaves the page with them
+      $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';
+      var b = document.createElement('button'); b.type = 'button'; b.id = 'signin'; b.textContent = 'Sign in';
+      b.addEventListener('click', openAuth);
+      who.appendChild(b);
+    }
+  }
+
+  // ---- the report -------------------------------------------------------------
+  function say(text, isError){ var s=$('status'); s.textContent=text||''; s.className=isError?'err':''; }
+  function field(id){ return ($(id).value || '').trim(); }
+  function viewChoice(){ var v=document.querySelector('input[name="view"]:checked'); return v ? v.value : 'internal'; }
+  /** What to tell the operator for each answer the function can give. Plain words; never a raw error code. */
+  function messageFor(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 403) return 'This account is not on the HomeSignal admin list, so it cannot make reports here.';
+    if (httpStatus === 400 && body.detail === 'address') return 'Enter a full street address with the city and state.';
+    if (httpStatus === 400) return 'The request was not accepted. Check the address and try again.';
+    if (httpStatus === 413) return 'The request was too large.';
+    if (body.error === 'geocoder_unavailable') return 'The address lookup service could not be reached. Try again in a minute.';
+    if (body.error === 'data_unavailable') return "HomeSignal's records could not be read just now. Try again in a minute.";
+    if (body.status === 'ADDRESS_NOT_RESOLVED') return 'That address could not be found. Check the street number, city and state.';
+    if (body.status === 'OUTSIDE_COVERAGE') return 'That address is in ZIP ' + (typeof body.zip === 'string' && /^\d{5}$/.test(body.zip) ? body.zip : '(unknown)') + ', which HomeSignal does not cover yet.';
+    return 'Something went wrong making the report. Try again.';
+  }
+  /** Whether a trial customer's report would use one of the free reports, as the report function's ONE credit rule decided it
+   *  (body.credit; founder ruling R5). This page decides nothing: it puts the rule's answer into words. */
+  function creditLine(body){
+    var c = body && body.credit;
+    if (!c || typeof c !== 'object') return '';
+    if (c.uses_report === true) {
+      return 'For a trial customer, this report would use one of the free reports (' + (c.reason === 'NO_DEVELOPMENT_ACTIVITY' ? 'No development activity' : 'development shown') + ').';
+    }
+    if (c.reason === 'INTERNAL_VIEW') return 'The internal view is never charged. Choose \u201cWhat a paying customer sees today\u201d to see whether a client\u2019s report would use a free report.';
+    if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';
+    if (c.reason === 'NOT_STORABLE') return 'For a trial customer, this report would not use a free report: it could not be saved.';
+    return 'For a trial customer, this report would not use a free report.';
+  }
+  async function run(){
+    if (busy) return;
+    var address = field('addr');
+    if (address.length < 8 || address.indexOf(' ') < 0) { say('Enter a full street address with the city and state.', true); $('addr').focus(); return; }
+    if (!session) { pending = true; say('Sign in to make a report.', false); openAuth(); return; }
+    var view = viewChoice();
+    busy = true; $('go').disabled = true; say('Making the report…', false);
+    $('viewnote').hidden = true; $('creditnote').hidden = true; $('report').textContent = '';
+    var httpStatus = 0, body = null;
+    try {
+      var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function(){ ctl.abort(); }, 60000) : null;
+      var res = await fetch(FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SB_ANON },
+        body: JSON.stringify({ address: address, view: view }),
+        signal: ctl ? ctl.signal : undefined
+      });
+      if (timer) clearTimeout(timer);
+      httpStatus = res.status;
+      try { body = await res.json(); } catch (e) { body = null; }
+    } catch (e) {
+      busy = false; $('go').disabled = false;
+      say('The report service could not be reached. Check your connection and try again.', true);
+      return;
+    }
+    busy = false; $('go').disabled = false;
+    if (httpStatus === 401) { session = null; pending = true; openAuth(); }
+    var ok = httpStatus === 200 && body && body.status === 'OK';
+    if (!ok) { say(messageFor(httpStatus, body), true); return; }
+    var opts = { subject: address, label: field('label'), brokerage: field('brokerage'), agent: field('agent'), showLifecycle: true };
+    var V = window.HS && window.HS.daReportView;
+    if (!V || !V.mount($('report'), body, opts)) { say('The report came back but could not be shown.', true); return; }
+    var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
+    // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
+    // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
+    var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
+    if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
+    $('viewnote').textContent = view === 'internal'
+      ? 'Internal view: it includes records from sources that are not yet cleared for paying customers, so a client would see fewer.'
+      : 'Customer view: only records from sources cleared for paying customers.';
+    $('viewnote').hidden = false;
+    var cl = creditLine(body);
+    $('creditnote').textContent = cl; $('creditnote').hidden = !cl;
+  }
+
+  // ---- a brokerage's trial (build step 5d) ---------------------------------------------------------------------
+  // The function creates the trial, and only for a signed-in admin. It checks every field; the page only says, in plain words, what the
+  // function answered. The owner link is shown once and kept nowhere but this open page.
+  function tsay(text, isError){ var s=$('tstatus'); s.textContent=text||''; s.className=isError?'err':''; }
+  /** A box that may be left blank: null when blank, NaN when it is not a whole number. The function checks the range. */
+  function wholeOrNull(id){ var v=($(id).value||'').trim(); if(!v) return null; return /^\d+$/.test(v) ? Number(v) : NaN; }
+  var UNKNOWN = 'HomeSignal could not confirm whether the trial was created. If it was, nobody has its owner link, and that link stops working on its own. You can create the trial again.';
+  /** What to tell the admin for each answer that is not a new trial. Null when the answer does not say whether a trial was made. */
+  function trialMessage(httpStatus, body){
+    body = body || {};
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 403) return 'This account is not on the HomeSignal admin list, so it cannot create trials.';
+    if (httpStatus === 400 && body.detail === 'brokerage_name') return 'Enter the brokerage name: up to 120 characters, on one line.';
+    if (httpStatus === 400 && body.detail === 'seat_limit') return 'Agent seats must be a whole number from 0 to 1000, or left blank for no limit.';
+    if (httpStatus === 400 && body.detail === 'trial_days') return 'Trial length must be a whole number of days from 1 to 365, or left blank for no end date.';
+    if (httpStatus === 400) return 'The request was not accepted. Check the fields and try again.';
+    if (httpStatus === 413) return 'The request was too large.';
+    if (httpStatus === 422) return 'The database refused to create this trial. Nothing was created.';
+    return null;
+  }
+  function dateWords(iso){
+    var d = iso ? new Date(iso) : null;
+    return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+  }
+  async function createTrial(){
+    if (creating) return;
+    var name = ($('tname').value || '').trim();
+    if (!name) { tsay('Enter the brokerage name.', true); $('tname').focus(); return; }
+    var seats = wholeOrNull('tseats'), days = wholeOrNull('tdays');
+    if (Number.isNaN(seats)) { tsay('Agent seats must be a whole number, or left blank for no limit.', true); $('tseats').focus(); return; }
+    if (Number.isNaN(days)) { tsay('Trial length must be a whole number of days, or left blank for no end date.', true); $('tdays').focus(); return; }
+    if (!session) { pendingTrial = true; tsay('Sign in to create a trial.', false); openAuth(); return; }
+    var payload = { action: 'create', brokerage_name: name };
+    if (seats !== null) payload.seat_limit = seats;
+    if (days !== null) payload.trial_days = days;
+    creating = true; $('tgo').disabled = true; $('tresult').hidden = true; $('tlink').value = ''; $('tnote').textContent = '';
+    tsay('Creating the trial…', false);
+    var httpStatus = 0, body = null;
+    try {
+      var res = await fetch(TRIAL_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SB_ANON },
+        body: JSON.stringify(payload)
+      });
+      httpStatus = res.status;
+      try { body = await res.json(); } catch (e) { body = null; }
+    } catch (e) {
+      creating = false; $('tgo').disabled = false;
+      tsay(UNKNOWN, true);
+      return;
+    }
+    creating = false; $('tgo').disabled = false;
+    if (httpStatus === 401) { session = null; pendingTrial = true; openAuth(); }
+    var link = body && typeof body.invite_link === 'string' ? body.invite_link : '';
+    if (httpStatus === 200 && body && body.status === 'OK' && /^https:\/\/homesignal\.net\/[^\s#]+#invite=hse1_[0-9a-f]{64}$/.test(link)) {
+      var seatsWords = body.seat_limit === null ? 'no limit on agent seats' : body.seat_limit === 1 ? '1 agent seat' : body.seat_limit + ' agent seats';
+      var ends = dateWords(body.trial_ends_at), until = dateWords(body.invite_expires_at);
+      tsay('Trial created for ' + body.brokerage_name + ': ' + seatsWords + ', ' + (ends ? 'ends ' + ends : 'no end date') + '.', false);
+      $('tlink').value = link;
+      $('tnote').textContent = 'Send this link only to the owner of ' + body.brokerage_name + ': the first person to open it and sign in becomes the trial\u2019s owner. '
+        + (until ? 'It works until ' + until + '. ' : '') + 'HomeSignal shows it only this once.';
+      $('tcopy').textContent = 'Copy link';
+      $('tresult').hidden = false;
+      $('tname').value = ''; $('tseats').value = ''; $('tdays').value = '';
+      return;
+    }
+    tsay(trialMessage(httpStatus, body) || UNKNOWN, true);
+  }
+  function copyLink(){
+    var v = $('tlink').value;
+    if (!v) return;
+    function select(){ $('tlink').focus(); $('tlink').select(); $('tcopy').textContent = 'Selected: press Ctrl+C or \u2318C'; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(function(){ $('tcopy').textContent = 'Copied'; }, select);
+      else select();
+    } catch (e) { select(); }
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    $('signin').addEventListener('click', openAuth);
+    $('auth-close').addEventListener('click', function(){ pending = false; pendingTrial = false; closeAuth(); });
+    $('auth-submit').addEventListener('click', function(){ if(step==='code') verifyCode(); else sendCode(); });
+    $('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') sendCode(); });
+    $('auth-code').addEventListener('keydown', function(e){ if(e.key==='Enter') verifyCode(); });
+    $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
+    $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pending = false; pendingTrial = false; closeAuth(); } });
+    $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
+    $('tf').addEventListener('submit', function(e){ e.preventDefault(); createTrial(); });
+    $('tcopy').addEventListener('click', copyLink);
+    client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
+    client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
+  });
+})();
+</script>
+</body>
+</html>

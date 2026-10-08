@@ -126,8 +126,13 @@ ok(HS.zipAuthSitesFrom(MEASURED_ZERO).length === 0, 'D2 measured-zero also yield
 const noteNM = HS.zipAuthNote(NOT_MEASURED, '01004', []);
 const noteMZ = HS.zipAuthNote(MEASURED_ZERO, '01009', []);
 ok(noteNM !== noteMZ, 'D3 ...but the two are DESCRIBED differently, which is the whole point');
-ok(/not measured yet/i.test(noteNM), 'D4 the unmeasured ZIP says it is not measured', noteNM);
-ok(/will not estimate/i.test(noteNM), 'D5 ...and says we will not estimate it from a circle', noteNM);
+// A ZIP with no Census area says so (founder wording 2026-10-02, pinned whole in
+// test/zip-no-mapped-area-copy.test.mjs); only a ZIP still waiting on a build says "not measured yet".
+ok(/^ZIP 01004 has no mapped area\./.test(noteNM), 'D4 a no-boundary ZIP says it has no mapped area', noteNM);
+ok(!/not measured yet/i.test(noteNM), 'D5 ...and never that it is "not measured yet"', noteNM);
+const notePending = HS.zipAuthNote(UNKNOWN, '01004', []);
+ok(/not measured yet/i.test(notePending) && /will not estimate/i.test(notePending),
+  'D5b a ZIP still waiting on a build keeps "not measured yet" and the no-circle promise', notePending);
 ok(/No qualifying development/i.test(noteMZ) && /whole ZIP/i.test(noteMZ),
   'D6 the measured-zero ZIP claims a real whole-ZIP measurement', noteMZ);
 ok(/2 projects across the whole of ZIP 78617/.test(HS.zipAuthNote(COMPLETE, '78617', sites)),

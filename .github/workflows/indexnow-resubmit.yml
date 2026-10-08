@@ -1,0 +1,61 @@
+name: indexnow-resubmit
+
+# RECOVERY ONLY. The normal path is the `indexnow` job inside pages.yml, which runs after the
+# deploy and notifies the set computed before it. Use this when that job went red (IndexNow was
+# down, retries ran out) or HELD a mass change that was intended (a template change).
+#
+# It re-reads the `indexnow-delta` artifact of ONE earlier pages run, so it re-sends exactly what
+# that run computed: nothing is recomputed, no page list is maintained by hand, and the site is
+# not rebuilt. Dispatch from main only.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'the pages run whose indexnow-delta artifact to re-send (a number)'
+        required: true
+      allow_mass_change:
+        description: 'true = send even though more than half of all pages changed (template change)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: indexnow-resubmit
+  cancel-in-progress: false
+
+jobs:
+  resubmit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: indexnow-delta
+          path: delta
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Notify IndexNow (key file must be live; older state is allowed)
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          ALLOW_MASS: ${{ inputs.allow_mass_change }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "$ALLOW_MASS" = "true" ]; then EXTRA="--allow-mass"; fi
+          python3 scripts/indexnow.py notify --delta delta/indexnow-delta.json \
+            --receipt "$RUNNER_TEMP/indexnow-receipt.json" --relax-state $EXTRA
+      - name: Keep the sanitized receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-resubmit-receipt
+          path: ${{ runner.temp }}/indexnow-receipt.json
+          retention-days: 90

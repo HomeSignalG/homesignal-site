@@ -63,8 +63,13 @@ function row64165(cpScope, visualScope = 'zip') {
     '0a: the fixture reproduces the production capture key byte for byte');
   ok(HS.mapsDcCapturePolicyEvidence(r.evidence.visual).ok === true,
     '0b: the map-state evidence itself passes the JS policy check — the conflict is the ONLY defect');
-  ok(HS.mapsCaptureBound(row64165('zip')) === true,
-    '0c: control — the same row with ONE consistent scope is bound (ZIP fallback is legitimate)');
+  // ⚖️ UPDATED 2026-10-01 (founder: a post about a project shows its own pin, popup open).
+  // This row names a project, so a ZIP map is not its picture whatever the scope fields say:
+  // it is refused for that reason now, not only for the conflict. The positive control that
+  // a consistent ZIP capture still binds is 2e (a post with no project).
+  ok(HS.mapsCaptureBound(row64165('zip')) === false
+      && /must be that project's own pin/.test(HS.mapsMapGateBlock(row64165('zip'))),
+    '0c: the same project row with ONE consistent ZIP scope is not bound either — a project post needs its own pin');
 }
 
 // ── §1 THE CONFLICT IS REFUSED ──────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@
 // Usage:
 //   node scripts/maps-social-image.mjs --list
 //   node scripts/maps-social-image.mjs --limit 5 [--dry] [--ids <uuid,uuid>]
+//   node scripts/maps-social-image.mjs --ids <uuid,uuid> --recapture   (re-shoot named drafts)
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY), BASE.
 
 import { chromium } from 'playwright';
@@ -59,6 +60,14 @@ const val = (f, d) => { const i = argv.indexOf(f); return i > -1 && argv[i + 1] 
 const DRY = has('--dry');
 const LIMIT = parseInt(val('--limit', '5'), 10);
 const ONLY_IDS = (val('--ids', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
+// --recapture re-shoots the NAMED drafts even when their picture is still bound (see
+// HS.mapsCaptureDue). It is for a fix to Map 1 itself, which no binding key can see, and it
+// is refused without --ids: a whole-queue re-shoot is never one flag away.
+const RECAPTURE = has('--recapture');
+if (RECAPTURE && !ONLY_IDS.length) {
+  console.error('REFUSING --recapture without --ids: name the drafts to re-shoot.');
+  process.exit(2);
+}
 const OUT_DIR = val('--out', '/tmp/maps-social-images');
 
 // 1200x630 — the ratio HomeSignal already ships (og-default.png is 1200x630) and the ratio
@@ -151,6 +160,13 @@ async function panelSectionsInFrame(page) {
       // Chrome that must NOT be in a social capture. Embed mode removes it; this proves it.
       sidebar_hidden: !document.querySelector('#hs-side')
         || getComputedStyle(document.querySelector('#hs-side')).display === 'none',
+      // The horizontal header and the shared footer replaced the sidebar (Revised Index
+      // Design, #1562), so sidebar_hidden now passes with nothing to look at. Kept under its
+      // historical name (it is stored in panel_in_frame); this is the check that still sees.
+      site_chrome_hidden: ['hs-top', 'hs-footer'].every((id) => {
+        const el = document.getElementById(id);
+        return !el || getComputedStyle(el).display === 'none';
+      }),
       search_form_hidden: !document.querySelector('.wrap>.head')
         || getComputedStyle(document.querySelector('.wrap>.head')).display === 'none',
     };
@@ -189,7 +205,7 @@ async function cardInFrame(page) {
   if (missing.length) {
     return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
   }
-  if (!panel.sidebar_hidden || !panel.search_form_hidden) {
+  if (!panel.sidebar_hidden || !panel.site_chrome_hidden || !panel.search_form_hidden) {
     return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
   }
   const controls = await page.evaluate(() => window.HS.mapsDcCaptureReadControls());
@@ -263,7 +279,7 @@ async function selectDrafts() {
   const skipped = { bound: 0, backoff: 0, exhausted: 0 };
   for (const d of rows) {
     // THE SHIPPED PREDICATE, not a second opinion about it.
-    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0 });
+    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0, recapture: RECAPTURE });
     if (!verdict.due) {
       // Reported separately so "already has its picture", "waiting out a backoff" and "has
       // burned its attempt budget" never read as one number.
@@ -305,11 +321,18 @@ async function authoritativePresence(zip, sourceKey) {
   // hunt for a marker that does not exist. Running the same builder here is what keeps one
   // definition of the rendered set instead of two.
   const sites = HS.zipAuthSitesFrom(j);
+  // THE CONTENT MAP 1 PRINTS FOR THIS PIN. The reader returns one entry per source_key and
+  // the page builds the popup from it, so this is what the picture's popup will say. It is
+  // compared with the post's own record before anything is photographed
+  // (HS.mapsPinRecordMismatch).
+  const entry = Array.isArray(j?.projects)
+    ? (j.projects.find((p) => p && p.project_ref === sourceKey) || null) : null;
   return {
     status: j?.status || 'unknown',
     markers: markers ? markers.length : null,
     rendered: sites.length,
     present: sites.some((s) => s && s.zip_project_ref === sourceKey),
+    entry,
   };
 }
 
@@ -320,6 +343,7 @@ async function authoritativePresence(zip, sourceKey) {
  */
 async function liveProject(projectId) {
   const rows = await api(`app_projects?select=id,zip,name,type,status,lat,lng,record_kind,source_key,provenance`
+    + `,${HS.MAPS_PIN_RECORD_FIELDS.join(',')}`
     + `&id=eq.${encodeURIComponent(projectId)}&limit=1`);
   return rows[0] || null;
 }
@@ -436,6 +460,18 @@ async function capture(page, draft, proj, theme) {
       record_url: (hit.s && hit.s.record_url) || null,
     };
   }, [proj.source_key]);
+
+  // THE DRAWN PIN MUST CARRY THIS RECORD'S NAME. The record comparison already ran on the
+  // reader's content before the browser opened; this is the same question asked of the
+  // marker the page actually drew, so a page that drew different content than the reader
+  // returned a moment earlier is refused rather than photographed.
+  if (found.found && (proj.name || '') !== found.label) {
+    return {
+      ok: false,
+      reason: `the pin Map 1 drew is labelled ${JSON.stringify(found.label.slice(0, 80))}, not `
+        + `${JSON.stringify(String(proj.name || '').slice(0, 80))}, so it does not show this post's record`,
+    };
+  }
 
   if (!found.found) {
     if (theme === 'datacenter') {
@@ -829,24 +865,33 @@ async function finishCapture(d, label, r, proj, results) {
     ...(r.absence ? { absence: true } : { marker: r.marker, framed: r.framed }) });
 }
 
-// THE ZIP FALLBACK IS AT MODULE SCOPE SO ITS BODY CAN BE EXECUTED, not merely wired.
-// It was a closure inside `main()`, which made it unreachable from the offline suite: the
-// tests could assert that all five record-refusal exits CALL it and nothing about what it
-// then DOES. That is the shape this repo already names — a wiring pin reads as coverage
-// while the body it points at is never run — and it is why mutation F survived the whole
-// suite. Every value it needs is now an explicit parameter, which also removes the closure
-// class that produced `ReferenceError: scope is not defined` in #1287.
-async function zipMapFallback(page, d, label, results, why) {
-  const themeZ = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
-  let rz;
-  try { rz = await captureAbsence(page, d, themeZ); }
-  catch (e) { rz = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
-  if (rz.theme === undefined) rz.theme = themeZ || null;
-  // The reason the picture is of the ZIP rides on the row, so a reader can tell a
-  // deliberate fallback from an absence answer. `proj` stays null, which is what makes
-  // `finishCapture` key and name it at ZIP scope.
-  if (rz.ok) rz.zip_scope_reason = why;
-  await finishCapture(d, label, rz, null, results);
+// ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — FOUNDER RULING
+// 2026-10-01. When Map 1 cannot pin the project (the row is gone, is not a development
+// record, has no coordinates, has moved away from the draft, or is not drawn in this ZIP),
+// the draft gets NO picture and the reason is recorded. No ZIP map stands in for it: six
+// project posts went out on a ZIP map (five of them naming the wrong ZIP) and were deleted
+// from Bluesky the same day. A draft with no picture cannot be approved, so the founder
+// sees the reason on the dashboard instead of a picture that shows something else.
+//
+// 🛑 SUPERSEDES the 2026-09-21/22 "PROJECT MAP -> ZIP MAP" fallback that stood here, which
+// photographed the whole ZIP for these drafts. Posts with NO project are untouched: they
+// still get the map of their ZIP through `captureAbsence`, and are correct as they are.
+//
+// CAPTURE_INELIGIBLE is the state that means exactly this ("cannot be photographed on its
+// ZIP page yet"), and its long retry floor brings the row back in case the record becomes
+// drawable. It is kept at module scope so its body can be executed offline.
+async function projectPinRefusal(d, label, results, why, mismatch) {
+  const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+  const reason = `The project's own pin could not be shown on Map 1: ${why}. A post about a `
+    + 'project must show its own pin with its popup open (founder ruling 2026-10-01), so no '
+    + 'ZIP map stands in for it.';
+  // ANY picture this draft still holds can no longer be said to show its record, so it is
+  // unbound here (record_match false), not merely left as it was. `record_mismatch` carries
+  // the comparison's own words when that is the reason, for the dashboard.
+  const extra = { record_match: false, ...(mismatch ? { record_mismatch: mismatch } : {}) };
+  const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, reason, theme, 'project', extra);
+  results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason, theme,
+    ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
 }
 
 /**
@@ -886,9 +931,101 @@ async function stampTypes() {
   if (tally.problem) process.exitCode = 1;
 }
 
+/**
+ * --stamp-record-match: Map 1 step (a) for pictures taken BEFORE the record check existed.
+ *
+ * A picture of a project records `record_match` only since 2026-10-02, and without it the
+ * picture is not bound (lib/maps-capture-binding.js). This pass checks the pictures that
+ * already exist instead of re-photographing them, and needs two things to agree:
+ *
+ *   1. the PICTURE: the name its popup showed (`visual.marker_label`, recorded at the
+ *      shutter) is this post's record's name; and
+ *   2. MAP 1 NOW: the content the reader returns for this pin matches this post's record on
+ *      every field (HS.mapsPinRecordMismatch, the same rule a live capture uses).
+ *
+ * Both agree -> `record_match: true`, evidence only. Map 1 now differs -> a draft is refused
+ * (record_match false, CAPTURE_INELIGIBLE), exactly as a live capture would refuse it.
+ * Only the picture is out of date -> nothing is written; the draft stays unbound and the
+ * next capture run re-photographs it.
+ *
+ * APPROVED ROWS. The founder approved an exact payload, and the approval binds it by
+ * hs_social_payload_fingerprint (post text, link, embed, image path, hashtags). Evidence is
+ * not in that fingerprint, so writing `record_match` moves neither the payload nor the
+ * status; the write pins status=approved and the revision, and the row is re-read
+ * afterwards to prove every fingerprint input is unchanged. An approved row that fails
+ * either check is never written: the run reports it and fails.
+ */
+async function stampRecordMatch() {
+  const FP = ['status', 'post_text', 'source_url', 'embed_kind', 'embed', 'image_bucket_path', 'hashtags'];
+  const q = 'social_posts?select=id,zip,tile,post_text,source_url,embed_kind,embed,hashtags,evidence,'
+    + 'image_bucket_path,status,content_family,revision'
+    + '&content_family=eq.MAPS&status=in.(draft,approved)&order=id.asc&limit=5000'
+    + (ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '');
+  const rows = await api(q);
+  const tally = { examined: 0, no_project: 0, not_project_picture: 0, already: 0, stamped: 0,
+    picture_stale: 0, refused: 0, approved_failed: 0, stale: 0 };
+  const results = [];
+  const touchedApproved = [];
+  for (const d of rows) {
+    tally.examined++;
+    const pid = d.evidence && d.evidence.project_id;
+    const v = (d.evidence && d.evidence.visual) || {};
+    if (!pid) { tally.no_project++; continue; }
+    if (!d.image_bucket_path || HS.mapsCaptureStoredScope(v, d) !== 'project') { tally.not_project_picture++; continue; }
+    if (v.record_match === true || v.record_match === 'true') { tally.already++; continue; }
+    const label = `${d.zip} ${d.evidence.project_name || ''}`.trim();
+    const proj = await liveProject(pid);
+    const auth = proj ? await authoritativePresence(d.zip, proj.source_key) : null;
+    const now = !proj ? 'the project row is no longer in app_projects'
+      : !auth.present ? `the project is not drawn on its ZIP's Map 1 page (status ${auth.status})`
+        : HS.mapsPinRecordMismatch(auth.entry, proj);
+    const pictureOk = !!proj && typeof v.marker_label === 'string' && v.marker_label === (proj.name || '');
+    console.log(`  ${d.status} ${d.id} zip=${d.zip} map1_now=${now ? 'DIFFERS' : 'matches'} picture=${pictureOk ? 'matches' : 'differs'}${now ? ` -- ${now}` : ''}`);
+    if (now || !pictureOk) {
+      if (d.status === 'approved') { tally.approved_failed++; continue; }
+      if (now) {
+        tally.refused++;
+        if (!DRY) await projectPinRefusal(d, label, results, now, now);
+      } else {
+        tally.picture_stale++;
+      }
+      continue;
+    }
+    if (DRY) { tally.stamped++; continue; }
+    const visual = { ...v, record_match: true, record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: new Date().toISOString(), record_checked_by: 'stamp-record-match' };
+    const w = await guardedPatch(d, { evidence: { ...d.evidence, visual } }, d.status);
+    if (!w.ok) { tally.stale++; continue; }
+    tally.stamped++;
+    if (d.status === 'approved') touchedApproved.push(d);
+  }
+  // PROVE THE APPROVED PAYLOADS DID NOT MOVE. Every input of hs_social_payload_fingerprint,
+  // and the status, re-read from the database and compared with what was read before.
+  if (touchedApproved.length) {
+    const after = await api(`social_posts?select=id,${FP.join(',')}&id=in.(${touchedApproved.map((d) => d.id).join(',')})`);
+    for (const d of touchedApproved) {
+      const a = after.find((x) => x.id === d.id);
+      const moved = FP.filter((f) => JSON.stringify(a && a[f]) !== JSON.stringify(d[f]));
+      if (!a || moved.length) {
+        throw new Error(`REFUSING TO REPORT SUCCESS: approved row ${d.id} changed ${moved.join(', ') || 'unreadable'}`);
+      }
+    }
+    console.log(`stamp-record-match: ${touchedApproved.length} approved row(s) re-read; status and every payload-fingerprint input unchanged`);
+  }
+  console.log(`stamp-record-match ${DRY ? '(DRY) ' : ''}${JSON.stringify(tally)}`);
+  const parts = tally.no_project + tally.not_project_picture + tally.already + tally.stamped
+    + tally.picture_stale + tally.refused + tally.approved_failed + tally.stale;
+  if (parts !== tally.examined) throw new Error(`stamp-record-match partition ${parts} != examined ${tally.examined}`);
+  if (tally.approved_failed) {
+    console.error(`stamp-record-match: ${tally.approved_failed} APPROVED post(s) show a different record or could not be checked; nothing was written to them`);
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
   if (has('--stamp-types')) { await stampTypes(); return; }
+  if (has('--stamp-record-match')) { await stampRecordMatch(); return; }
   const drafts = await selectDrafts();
   if (has('--list')) {
     for (const d of drafts) {
@@ -929,16 +1066,10 @@ async function main() {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
 
-    // 🗑️ THE `ineligible(...)` HELPER IS GONE, AND ITS ABSENCE IS THE POINT. It recorded a
-    // refusal on the row for five record-shaped conditions; under the every-post-gets-a-map
-    // ruling every one of those is a DEMOTION to ZIP scope instead, so nothing here can
-    // produce CAPTURE_INELIGIBLE any more. Leaving an uncalled helper behind would read to
-    // the next session as a live path.
-    //
-    // ⚠️ INELIGIBLE IS NOT DELETED FROM THE VOCABULARY. 28 production rows still carry that
-    // stamp from runs before this, `lib/maps-capture-binding.js` still reports it, and its
-    // long retry floor is what brings those rows back for a capture. What changed is that
-    // no row SHAPE earns it: it is now only ever a historical value.
+    // ⚖️ CAPTURE_INELIGIBLE IS LIVE AGAIN (founder ruling 2026-10-01): it is what a post
+    // about a project records when Map 1 cannot pin that project. See projectPinRefusal().
+    // (From 2026-09-21 to 2026-10-01 those drafts were demoted to a ZIP map instead, and
+    // this state was only ever a historical stamp.)
 
     // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
     // This branch used to read `await ineligible('the draft carries no project_id, so there
@@ -960,32 +1091,24 @@ async function main() {
       continue;
     }
 
-    // ⚖️ A PROJECT THAT CANNOT BE TRUTHFULLY PINNED IS A REASON TO PHOTOGRAPH THE ZIP, NOT
-    // A REASON TO SHIP A POST WITH NO MAP — founder ruling, 2026-09-21. The five branches
-    // below each ended the draft's run with `ineligible(...)` and no picture at all. The
-    // fallback the ruling states is:
+    // ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — founder ruling
+    // 2026-10-01, superseding the 2026-09-21 "PROJECT MAP -> ZIP MAP" fallback that stood
+    // here. The five branches below are statements about the RECORD: it is gone, it is not
+    // a development row, it has no coordinates, it has moved away from the draft, or the
+    // ZIP's authoritative set does not contain it. Each now leaves the draft with no picture
+    // and the reason recorded (CAPTURE_INELIGIBLE), which keeps Approve blocked.
     //
-    //     PROJECT MAP  ->  (if the project cannot be truthfully represented)  ->  ZIP MAP
-    //
-    // and never PROJECT MAP -> NO MAP. #1280 reached this conclusion for the ABSENCE post
-    // (no project at all) and left these four, which are the same fact arriving later: the
-    // row names a project, and Map 1 cannot place it.
-    //
-    // ⛔ THIS IS NOT "any failure becomes a ZIP map". These are all statements about the
-    // RECORD — it is gone, it is not a development row, it has no coordinates, it has moved
-    // away from the draft, or the ZIP's authoritative set does not contain it. A genuine
-    // INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter could not
-    // verify the controls) still returns `{ok:false}` from `capture*()` and is still
-    // recorded as CAPTURE_FAILED by `finishCapture`. Hiding a broken instrument behind a
-    // weaker screenshot is the one thing the ruling explicitly forbids.
-    const zipFallback = (why) => zipMapFallback(page, d, label, results, why);
+    // ⛔ A genuine INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter
+    // could not verify the controls) still returns `{ok:false}` from `capture*()` and is
+    // still recorded as CAPTURE_FAILED by `finishCapture`.
+    const pinRefusal = (why) => projectPinRefusal(d, label, results, why);
 
     const proj = await liveProject(pid);
-    if (!proj) { await zipFallback('the project row is no longer in app_projects'); continue; }
-    if (proj.record_kind !== 'development') { await zipFallback('the live row is not a development record'); continue; }
-    if (proj.lat == null || proj.lng == null) { await zipFallback('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
+    if (!proj) { await pinRefusal('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await pinRefusal('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await pinRefusal('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      await zipFallback('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
+      await pinRefusal('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
       continue;
     }
 
@@ -994,9 +1117,16 @@ async function main() {
       const why = auth.status !== 'boundary_complete'
         ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      await zipFallback(why);
+      await pinRefusal(why);
       continue;
     }
+
+    // ⚖️ MAP 1 STEP (a): THE PIN MUST SHOW THIS POST'S OWN RECORD. Map 1 draws one pin per
+    // source_key; where several records share a key its popup can show another one. Compared
+    // on content, before the browser opens (HS.mapsPinRecordMismatch).
+    const mismatch = HS.mapsPinRecordMismatch(auth.entry, proj);
+    if (mismatch) { await projectPinRefusal(d, label, results, mismatch, mismatch); continue; }
+    const recordCheckedAt = new Date().toISOString();
 
     // THEME — from the SHIPPED predicate the Acquisition Dashboard uses, so the image this
     // row gets is decided by the same rule that put the row in the Data Center Theme queue.
@@ -1007,7 +1137,7 @@ async function main() {
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
     if (r.theme === undefined) r.theme = theme || null;
-    if (r.ok) r.authMarkers = auth.markers;
+    if (r.ok) { r.authMarkers = auth.markers; r.recordMatch = true; r.recordCheckedAt = recordCheckedAt; }
     await finishCapture(d, label, r, proj, results);
   }
 
@@ -1098,8 +1228,11 @@ async function proveNothingApproved(ids) {
 // precondition failed. The run reports the draft as skipped/stale and leaves the old image
 // and the old evidence exactly as they are. It never re-reads and retries, and it never
 // drops a filter to make the write land.
-async function guardedPatch(draft, body) {
-  const q = `social_posts?id=eq.${draft.id}&status=eq.draft&revision=eq.${Number(draft.revision)}`;
+async function guardedPatch(draft, body, status = 'draft') {
+  // `status` is pinned in the WHERE clause, never moved. Only --stamp-record-match passes
+  // anything but 'draft', and it writes evidence alone (see stampRecordMatch).
+  if (status !== 'draft' && status !== 'approved') throw new Error(`guardedPatch: status ${status}`);
+  const q = `social_posts?id=eq.${draft.id}&status=eq.${status}&revision=eq.${Number(draft.revision)}`;
   const rows = await api(q, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
@@ -1181,6 +1314,12 @@ async function attach(draft, objectPath, r, proj, scope) {
       popup_open: r.checks.popupOpen,
       popup_text: r.checks.popupText,
       halo_present: r.checks.haloPresent,
+      // Map 1 step (a): the pin's content was compared with this post's record before the
+      // shutter (HS.mapsPinRecordMismatch) and the drawn pin carried the record's name.
+      // Anything but an explicit true leaves the picture unbound.
+      record_match: r.recordMatch === true,
+      record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: r.recordCheckedAt || null,
     }),
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
@@ -1277,9 +1416,9 @@ async function attach(draft, objectPath, r, proj, scope) {
 // thrown capture there is no result object to read it from, and re-deriving it from the
 // draft alone would key the refusal at `project` for a ZIP attempt — so the key-moved
 // release in `mapsCaptureDue` would fire every run and the backoff would never hold.
-async function recordOutcome(draft, state, reason, theme, scope) {
+async function recordOutcome(draft, state, reason, theme, scope, extra) {
   const prev = draft.evidence || {};
-  const prevVisual = prev.visual || {};
+  const prevVisual = { ...(prev.visual || {}), ...(extra || {}) };
   // An ineligible outcome does not burn an attempt: attempts measure how often our capture
   // was tried and failed, and no number of retries fixes a project that is not in the ZIP's
   // authoritative set. It gets the long floor instead.
@@ -1318,9 +1457,10 @@ async function recordOutcome(draft, state, reason, theme, scope) {
             ? 'No Map 1 visual could be produced truthfully for this MAPS \u00b7 Data Center Theme '
               + 'candidate. There is NO generic fallback for this theme: approval is blocked in '
               + 'the Acquisition Dashboard until a real capture of the exact project exists.'
-            : 'No project-specific Map 1 visual could be produced truthfully. The draft keeps '
-              + 'its factual text and its Map 1 link; the generic OpenGraph link card remains the '
-              + 'publication fallback and is NOT a project-specific map preview.',
+            : 'No Map 1 visual could be produced truthfully for this MAPS post. Every MAPS post '
+              + 'publishes with its map or not at all (a post about a project with that project\'s '
+              + 'own pin, popup open): approval is blocked in the Acquisition Dashboard until a '
+              + 'real capture exists.',
         },
       },
   });

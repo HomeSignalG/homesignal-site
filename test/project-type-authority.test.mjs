@@ -92,8 +92,8 @@ for (const re of FORBIDDEN) ok(!re.test(PT_CODE), `3a lib/project-type.js code c
   const HS = ctx.HS;
   ok(HS && typeof HS.canonicalProjectType === 'function', '3b loads in a context with no window and no document');
   ok(JSON.stringify(Object.keys(HS).sort()) === JSON.stringify(['CATEGORY_REGISTRY', 'canonicalProjectType',
-    'canonicalFacilityType', 'categoryFor', 'classifyFacilityOverlayType', 'classifyProjectType', 'projectType'].sort()),
-    '3c exports only the Type surface (development Type + facility identity)', Object.keys(HS).join(','));
+    'canonicalFacilityType', 'canonicalLifecycle', 'categoryFor', 'classifyFacilityOverlayType', 'classifyProjectType', 'projectType'].sort()),
+    '3c exports only the Type surface (development Type + facility identity) and the lifecycle vocabulary', Object.keys(HS).join(','));
 }
 
 // ── §4 precedence, pinned on real record shapes ─────────────────────────────────────────
@@ -102,9 +102,10 @@ const HS = load(['lib/project-type.js', 'lib/map.js', 'lib/n5-radius.js', 'lib/r
 const REG = HS.CATEGORY_REGISTRY;
 const PENN = { type: 'Industrial', type_raw: 'Industrial', name: 'Pennhurst Data Centers', status: 'Proposed' };
 const zipModeType = (row) => {
-  const gate = HS.residentialGateDrops; HS.residentialGateDrops = undefined;   // Type, not membership
+  // Type, not membership: detach the builders' Residential gate (their one call site).
+  const gate = HS.residentialGateAtConstruction; HS.residentialGateAtConstruction = undefined;
   try { return HS.resolveTrackerMarker(HS.zipAuthSiteFromMarker({ lat: 40, lng: -75, project_ref: 'x' }, row)).typeKey; }
-  finally { HS.residentialGateDrops = gate; }
+  finally { HS.residentialGateAtConstruction = gate; }
 };
 ok(HS.canonicalProjectType(PENN).typeKey === 'datacenter', '4a Pennhurst (raw Industrial) → canonical datacenter');
 ok(HS.canonicalProjectType(PENN).label === REG.datacenter.label, '4b ...labelled from the registry ("Data center")');

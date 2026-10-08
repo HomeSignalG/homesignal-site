@@ -75,7 +75,7 @@ function fakeClock() {
 
 /** The exact unavailable shape index.ts ships (`facilitiesUnavailable`). ok:false, never a zero. */
 const UNAVAILABLE = (reason) => ({
-  sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, kept: 0 },
+  sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, pre_cap: 0, kept: 0 },
 });
 /** Three real core records, standing in for devSites' output. */
 const CORE_RECORDS = [

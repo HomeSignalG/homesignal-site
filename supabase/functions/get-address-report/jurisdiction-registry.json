@@ -53,6 +53,7 @@
   "socrata": [
     {
       "registry_id": "austin-subdivision-cases",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.austintexas.gov",
       "dataset_id": "s7gx-9m54",
@@ -169,6 +170,7 @@
     },
     {
       "registry_id": "austin-site-plan-cases",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.austintexas.gov",
       "dataset_id": "mavg-96ck",
@@ -286,6 +288,7 @@
     },
     {
       "registry_id": "austin-issued-construction-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.austintexas.gov",
       "dataset_id": "3syk-w9eu",
@@ -361,6 +364,7 @@
     },
     {
       "registry_id": "seattle-building-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.seattle.gov",
       "dataset_id": "76t5-zqzr",
@@ -443,6 +447,7 @@
     },
     {
       "registry_id": "seattle-land-use-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.seattle.gov",
       "dataset_id": "ht3q-kdvx",
@@ -525,6 +530,7 @@
     },
     {
       "registry_id": "chicago-building-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.cityofchicago.org",
       "dataset_id": "ydr8-5enu",
@@ -592,6 +598,7 @@
     },
     {
       "registry_id": "cambridge-building-permits-new-construction",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.cambridgema.gov",
       "jurisdiction": "City of Cambridge",
@@ -637,6 +644,7 @@
     },
     {
       "registry_id": "cambridge-building-permits-addition-alteration",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.cambridgema.gov",
       "jurisdiction": "City of Cambridge",
@@ -682,6 +690,7 @@
     },
     {
       "registry_id": "cambridge-demolition-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.cambridgema.gov",
       "jurisdiction": "City of Cambridge",
@@ -878,6 +887,7 @@
     },
     {
       "registry_id": "mesa-building-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.mesaaz.gov",
       "dataset_id": "dzpk-hxfb",
@@ -1312,6 +1322,7 @@
     },
     {
       "registry_id": "new-orleans-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.nola.gov",
       "dataset_id": "rcm3-fn58",
@@ -1437,6 +1448,7 @@
     },
     {
       "registry_id": "east-baton-rouge-building-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.brla.gov",
       "dataset_id": "7fq7-8j7r",
@@ -1485,6 +1497,7 @@
     },
     {
       "registry_id": "marin-county-building-permits",
+      "geocode_assemble": true,
       "platform": "socrata",
       "domain": "data.marincounty.gov",
       "dataset_id": "mkbn-caye",
@@ -1708,6 +1721,7 @@
   "arcgis": [
     {
       "registry_id": "slc-planning-petitions",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/mMBpeYj0vPFotzbe/arcgis/rest/services/Planning_Petition/FeatureServer/0",
       "dataset_url": "https://gis-slcgov.opendata.arcgis.com/",
@@ -1794,6 +1808,7 @@
     },
     {
       "registry_id": "provo-planning-applications",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gispublicweb.provo.gov/ArcGIS/rest/services/DevServ/CurrentProjects/MapServer/0",
       "dataset_url": "https://www.provo.gov/174/Projects-and-Planning",
@@ -1847,6 +1862,7 @@
     },
     {
       "registry_id": "round-rock-large-development-projects",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/KaARkuoKF9vrGr3P/arcgis/rest/services/Large_Development_Projects_view/FeatureServer/0",
       "dataset_url": "https://www.roundrocktexas.gov/departments/planning-and-development-services/",
@@ -1909,6 +1925,7 @@
     },
     {
       "registry_id": "san-antonio-permits-issued",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/ArcGIS/rest/services/Permits_Issued/FeatureServer/0",
       "dataset_url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/ArcGIS/rest/services/Permits_Issued/FeatureServer/0",
@@ -1973,6 +1990,7 @@
     },
     {
       "registry_id": "san-marcos-planning-cases",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://smgis.sanmarcostx.gov/arcgis/rest/services/Planning/PlanningFeatures/MapServer/15",
       "dataset_url": "https://smgis.sanmarcostx.gov/arcgis/rest/services/Planning/PlanningFeatures/MapServer/15",
@@ -2124,6 +2142,7 @@
     },
     {
       "registry_id": "denver-commercial-construction-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_COMMERCIALCONSTPERMIT_P/FeatureServer/317",
       "dataset_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_COMMERCIALCONSTPERMIT_P/FeatureServer/317",
@@ -2180,6 +2199,7 @@
     },
     {
       "registry_id": "denver-residential-construction-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_RESIDENTIALCONSTPERMIT_P/FeatureServer/316",
       "dataset_url": "https://services1.arcgis.com/zdB7qR0BtYrg0Xpl/arcgis/rest/services/ODC_DEV_RESIDENTIALCONSTPERMIT_P/FeatureServer/316",
@@ -2320,6 +2340,7 @@
     },
     {
       "registry_id": "fort-collins-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Building_Permits/FeatureServer/0",
       "dataset_url": "https://services1.arcgis.com/dLpFH5mwVvxSN4OE/arcgis/rest/services/Building_Permits/FeatureServer/0",
@@ -2390,6 +2411,7 @@
     },
     {
       "registry_id": "colorado-springs-planning-applications",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.coloradosprings.gov/arcgis/rest/services/Planning/PlanDevTracker_PRO/MapServer/0",
       "dataset_url": "https://cos-gis.hub.arcgis.com/datasets/colorado-springs::plan-dev-tracker",
@@ -2557,6 +2579,7 @@
     },
     {
       "registry_id": "tacoma-accela-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/SCwJH1pD8WSn5T5y/arcgis/rest/services/accela_permit_data/FeatureServer/0",
       "dataset_url": "https://data.tacoma.gov/datasets/tacoma::accela-permit-data-tacoma",
@@ -2929,6 +2952,7 @@
     },
     {
       "registry_id": "detroit-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "jurisdiction": "City of Detroit",
       "coverage": [
@@ -2983,6 +3007,7 @@
     },
     {
       "registry_id": "detroit-trades-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "jurisdiction": "City of Detroit",
       "coverage": [
@@ -3032,6 +3057,7 @@
     },
     {
       "registry_id": "detroit-demolition-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "jurisdiction": "City of Detroit",
       "coverage": [
@@ -3071,6 +3097,7 @@
     },
     {
       "registry_id": "ann-arbor-energov-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://utility.arcgis.com/usrsvcs/servers/7f4ea28cb31e4c618bc0f291c69dad36/rest/services/CustomMaps/PublicStaffPermits/FeatureServer/0",
       "dataset_url": "https://www.arcgis.com/home/item.html?id=20a0a96dc9074244a68aa594330b8ced",
@@ -3116,6 +3143,7 @@
     },
     {
       "registry_id": "independence-twp-construction-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/GE4Idg9FL97XBa3P/arcgis/rest/services/ConstructionActivity_Public/FeatureServer/0",
       "dataset_url": "https://www.arcgis.com/home/item.html?id=388966f722254770afc38c2cd0ff0fe9",
@@ -3166,6 +3194,7 @@
     },
     {
       "registry_id": "anaheim-land-use-cases",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0",
       "dataset_url": "https://services3.arcgis.com/hPs600I3X0RTaaaq/arcgis/rest/services/Open_Data_Land_Use_Permits/FeatureServer/0",
@@ -3234,6 +3263,7 @@
     },
     {
       "registry_id": "scottsdale-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.scottsdaleaz.gov/arcgis/rest/services/OpenData_Tabular/MapServer/12",
       "dataset_url": "https://maps-scottsdaleaz.hub.arcgis.com/datasets/scottsdale::building-permits",
@@ -3331,6 +3361,7 @@
     },
     {
       "registry_id": "baltimore-city-housing-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://baltegis.baltimorecity.gov/mapping/rest/services/Housing/DHCD_Open_Baltimore_Datasets/FeatureServer/3",
       "dataset_url": "https://data.baltimorecity.gov/datasets/baltimore::housing-and-building-permits-2019-present",
@@ -3374,6 +3405,7 @@
     },
     {
       "registry_id": "baltimore-county-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4",
       "dataset_url": "https://bcgisdata.baltimorecountymd.gov/arcgis/rest/services/DevelopmentManagement/ActiveDevelopment/MapServer/4",
@@ -3534,6 +3566,7 @@
     },
     {
       "registry_id": "cleveland-issued-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/dty2kHktVXHrqO8i/arcgis/rest/services/Building_Permits/FeatureServer/0",
       "dataset_url": "https://data.clevelandohio.gov/datasets/ClevelandGIS::issued-building-permits",
@@ -3602,6 +3635,7 @@
     },
     {
       "registry_id": "nashville-building-permits-issued",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services2.arcgis.com/HdTo6HJqh92wn4D8/arcgis/rest/services/Building_Permits_Issued_2/FeatureServer/0",
       "dataset_url": "https://data.nashville.gov/datasets/Nashville::building-permits-issued/about",
@@ -3712,6 +3746,7 @@
     },
     {
       "registry_id": "portland-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/89",
       "dataset_url": "https://gis-pdx.opendata.arcgis.com/datasets/PDX::residential-building-permits",
@@ -3804,6 +3839,7 @@
     },
     {
       "registry_id": "madison-planning-projects",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.cityofmadison.com/arcgis/rest/services/Planning/Current_Planning_Projects/MapServer/0",
       "dataset_url": "https://www.cityofmadison.com/dpced/planning/",
@@ -3923,6 +3959,7 @@
     },
     {
       "registry_id": "wake-county-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.wake.gov/arcgis/rest/services/Inspections/Building_Permits/MapServer/0",
       "dataset_url": "https://www.arcgis.com/home/item.html?id=6a9651b339b7413d8dc264f9ae1b3f6f&sublayer=0",
@@ -3994,6 +4031,7 @@
     },
     {
       "registry_id": "miami-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/CvuPhqcTQpZPT9qY/arcgis/rest/services/Building_Permits_Since_2014/FeatureServer/0",
       "dataset_url": "https://www.arcgis.com/home/item.html?id=564477f647634c94a6588d1f57597b30",
@@ -4044,6 +4082,7 @@
     },
     {
       "registry_id": "tempe-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/lQySeXwbBg53XWDi/arcgis/rest/services/building_permits/FeatureServer/0",
       "dataset_url": "https://data-tempegov.opendata.arcgis.com/",
@@ -4153,6 +4192,7 @@
     },
     {
       "registry_id": "hartford-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://utility.arcgis.com/usrsvcs/servers/d595ae995fb049d3ac54919ebf24b1ac/rest/services/HartfordOpenDataTables/FeatureServer/0",
       "dataset_url": "https://data.hartford.gov/",
@@ -4236,6 +4276,7 @@
     },
     {
       "registry_id": "kcmo-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/4o5uMWTHuOhUVJPd/arcgis/rest/services/All_BuildingPermits_2020_to_2025/FeatureServer/0",
       "dataset_url": "https://data.kcmo.org/",
@@ -4301,6 +4342,7 @@
     },
     {
       "registry_id": "fairfax-active-site-construction",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1",
       "dataset_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/1",
@@ -4374,6 +4416,7 @@
     },
     {
       "registry_id": "fairfax-recent-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4",
       "dataset_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4",
@@ -4444,6 +4487,7 @@
     },
     {
       "registry_id": "frisco-active-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1",
       "dataset_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1",
@@ -4494,6 +4538,7 @@
     },
     {
       "registry_id": "tucson-commercial-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/81",
       "dataset_url": "https://gisdata.tucsonaz.gov/",
@@ -4563,6 +4608,7 @@
     },
     {
       "registry_id": "tucson-residential-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://mapdata.tucsonaz.gov/arcgis/rest/services/PublicMaps/PermitsCode/MapServer/85",
       "dataset_url": "https://gisdata.tucsonaz.gov/",
@@ -4634,6 +4680,7 @@
     },
     {
       "registry_id": "gilbert-energov-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.gilbertaz.gov/arcgis/rest/services/OD/Growth_Development_Tables_1/MapServer/3",
       "dataset_url": "https://data-tog.opendata.arcgis.com/datasets/cba4345453f94ca5881b7727f069a431_3",
@@ -4700,6 +4747,7 @@
     },
     {
       "registry_id": "casa-grande-active-development-sites",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://rogue.casagrandeaz.gov/arcgis/rest/services/Planning/Active_Development_Sites/FeatureServer/0",
       "dataset_url": "https://www.casagrandeaz.gov/planning-development/",
@@ -4853,6 +4901,7 @@
     },
     {
       "registry_id": "arlington-planning-cases",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis2.arlingtontx.gov/agsext2/rest/services/OpenData/OD_Property/MapServer/0",
       "dataset_url": "https://data-arlingtontx.opendata.arcgis.com/",
@@ -5035,6 +5084,7 @@
     },
     {
       "registry_id": "san-antonio-prelim-plan-review",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/g1fRTDLeMgspWrYp/arcgis/rest/services/Preliminary_Plan_Review_Meetings/FeatureServer/0",
       "dataset_url": "https://open-crd-cosagis.hub.arcgis.com/",
@@ -5305,6 +5355,7 @@
     },
     {
       "registry_id": "harris-county-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits/FeatureServer/1",
       "dataset_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/ePermits/FeatureServer",
@@ -5532,6 +5583,7 @@
     },
     {
       "registry_id": "harris-county-plats",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/Plats_NonHouston_SV/MapServer/0",
       "dataset_url": "https://www.gis.hctx.net/arcgishcpid/rest/services/Permits/Plats_NonHouston_SV/MapServer/0",
@@ -5575,6 +5627,7 @@
     },
     {
       "registry_id": "fort-worth-zoning-cases",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12",
       "dataset_url": "https://mapit.fortworthtexas.gov/ags/rest/services/Planning_Development/Zoning_case_service/MapServer/12",
@@ -6292,6 +6345,7 @@
     },
     {
       "registry_id": "henderson-residential-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/1",
       "dataset_url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/1",
@@ -6349,6 +6403,7 @@
     },
     {
       "registry_id": "henderson-commercial-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/2",
       "dataset_url": "https://maps.cityofhenderson.com/arcgis/rest/services/public/OpenDevPermits/MapServer/2",
@@ -6418,6 +6473,7 @@
     },
     {
       "registry_id": "phoenix-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.phoenix.gov/pub/rest/services/Public/Planning_Permit/MapServer/1",
       "dataset_url": "https://apps-secure.phoenix.gov/pdd/search/permits",
@@ -6957,6 +7013,7 @@
     },
     {
       "registry_id": "cabarrus-county-plan-reviews",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0",
       "dataset_url": "https://location.cabarruscounty.us/arcgisservices/rest/services/Current_Accela_Permits/Plan_Reviews/MapServer/0",
@@ -7036,6 +7093,7 @@
     },
     {
       "registry_id": "new-hanover-county-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0",
       "dataset_url": "https://gis.nhcgov.com/server/rest/services/Thematic/BuildingPermits/FeatureServer/0",
@@ -7169,6 +7227,7 @@
     },
     {
       "registry_id": "brunswick-county-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0",
       "dataset_url": "https://services1.arcgis.com/W6gamXPYQeLXrdAd/arcgis/rest/services/Permit_Locations/FeatureServer/0",
@@ -7409,6 +7468,7 @@
     },
     {
       "registry_id": "savannah-commercial-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0",
       "dataset_url": "https://pub.sagis.org/arcgis/rest/services/Savannah/BuildingPermit_FC/FeatureServer/0",
@@ -7454,6 +7514,7 @@
     },
     {
       "registry_id": "louisville-active-construction-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0",
       "dataset_url": "https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/active_construction_permits/FeatureServer/0",
@@ -7527,6 +7588,7 @@
     },
     {
       "registry_id": "kenton-county-devtracking-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services2.arcgis.com/90vxQoG8CT8O1MXs/arcgis/rest/services/DevTracking_Permits_KC_Processing/FeatureServer/0",
       "dataset_url": "https://services2.arcgis.com/90vxQoG8CT8O1MXs/arcgis/rest/services/DevTracking_Permits_KC_Processing/FeatureServer/0",
@@ -7583,6 +7645,7 @@
     },
     {
       "registry_id": "sioux-falls-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3",
       "dataset_url": "https://gis.siouxfalls.gov/arcgis/rest/services/Data/Community/MapServer/3",
@@ -7644,6 +7707,7 @@
     },
     {
       "registry_id": "bozeman-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1",
       "dataset_url": "https://gisweb.bozeman.net/arcgis/rest/services/Internal/Building_Permits/MapServer/1",
@@ -7719,6 +7783,7 @@
     },
     {
       "registry_id": "missoula-addresses-with-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0",
       "dataset_url": "https://services.arcgis.com/HfwHS0BxZBQ1E5DY/arcgis/rest/services/AddressesWithPermits_mso/FeatureServer/0",
@@ -7798,6 +7863,7 @@
     },
     {
       "registry_id": "columbia-mo-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3",
       "dataset_url": "https://gis.gocolumbiamo.com/arcgis/rest/services/View_Services/City_Projects_Construction_Updated/MapServer/3",
@@ -7894,6 +7960,7 @@
     },
     {
       "registry_id": "overland-park-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0",
       "dataset_url": "https://services1.arcgis.com/YQsWDBr0DjMtoTQo/arcgis/rest/services/Building_Permits/FeatureServer/0",
@@ -7980,6 +8047,7 @@
     },
     {
       "registry_id": "topeka-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1",
       "dataset_url": "https://maps.topeka.gov/arcgis/rest/services/CityworksViews/BuildingPermits/MapServer/1",
@@ -8045,6 +8113,7 @@
     },
     {
       "registry_id": "lincoln-residential-new-construction-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4",
       "dataset_url": "https://gis.lincoln.ne.gov/public/rest/services/Planning/Residential_New_Construction_Permits/MapServer/4",
@@ -8098,6 +8167,7 @@
     },
     {
       "registry_id": "little-rock-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0",
       "dataset_url": "https://maps.littlerock.gov/server/rest/services/Permits_All/MapServer/0",
@@ -8162,6 +8232,7 @@
     },
     {
       "registry_id": "bentonville-catalyst-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1",
       "dataset_url": "https://gis.bentonvillear.com/arcgis/rest/services/Electric_System/Catalyst_Planning/FeatureServer/1",
@@ -8270,6 +8341,7 @@
     },
     {
       "registry_id": "adams-county-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0",
       "dataset_url": "https://services3.arcgis.com/4PNQOtAivErR7nbT/arcgis/rest/services/Building_Permits_Eye_On_Adams/FeatureServer/0",
@@ -8342,6 +8414,7 @@
     },
     {
       "registry_id": "canyon-county-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1",
       "dataset_url": "https://maps.canyonco.org/arcgisserver/rest/services/DSD/Building_Permits_NEW_2023/FeatureServer/1",
@@ -8416,6 +8489,7 @@
     },
     {
       "registry_id": "san-jose-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8",
       "dataset_url": "https://geo.sanjoseca.gov/server/rest/services/PLN/PLN_PermitsAndComplaints/MapServer/8",
@@ -8561,6 +8635,7 @@
     },
     {
       "registry_id": "salem-structure-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
       "dataset_url": "https://services.arcgis.com/kIA6yS9KDGqZL7U3/arcgis/rest/services/Structure_Permits/FeatureServer/0",
@@ -8615,6 +8690,7 @@
     },
     {
       "registry_id": "spokane-county-building-planning-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0",
       "dataset_url": "https://services3.arcgis.com/WlYQgAChrqj0tuQi/arcgis/rest/services/Spokane_County_Building_and_Planning_Permits/FeatureServer/0",
@@ -8782,6 +8858,7 @@
     },
     {
       "registry_id": "loudoun-county-residential-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1",
       "dataset_url": "https://logis.loudoun.gov/gis/rest/services/Projects/ResBuildingPermits/MapServer/1",
@@ -8923,6 +9000,7 @@
     },
     {
       "registry_id": "huntsville-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0",
       "dataset_url": "https://maps.huntsvilleal.gov/server/rest/services/Licenses/BuildingPermits/MapServer/0",
@@ -8978,6 +9056,7 @@
     },
     {
       "registry_id": "chattanooga-permits-archive",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0",
       "dataset_url": "https://services2.arcgis.com/cclAu9OKhOfjeUdr/arcgis/rest/services/Chatt_permits_to_12_31_2025/FeatureServer/0",
@@ -9026,6 +9105,7 @@
     },
     {
       "registry_id": "knoxville-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0",
       "dataset_url": "https://services8.arcgis.com/Ty9G85JMF2cDHlRt/arcgis/rest/services/BuildingPermits/FeatureServer/0",
@@ -9091,6 +9171,7 @@
     },
     {
       "registry_id": "desoto-county-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0",
       "dataset_url": "https://gis.desotocountyms.gov/arcgis/rest/services/Permits_Energov/FeatureServer/0",
@@ -9139,6 +9220,7 @@
     },
     {
       "registry_id": "flathead-county-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1",
       "dataset_url": "https://services6.arcgis.com/o8tYBvi7zCbkyszZ/arcgis/rest/services/Building_Permits/FeatureServer/1",
@@ -9190,6 +9272,7 @@
     },
     {
       "registry_id": "aurora-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44",
       "dataset_url": "https://ags.auroragov.org/aurora/rest/services/OpenData/MapServer/44",
@@ -9423,6 +9506,7 @@
     },
     {
       "registry_id": "albuquerque-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0",
       "dataset_url": "https://coageo.cabq.gov/cabqgeo/rest/services/agis/City_Building_Permits/MapServer/0",
@@ -9546,6 +9630,7 @@
     },
     {
       "registry_id": "butler-county-ks-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0",
       "dataset_url": "https://services5.arcgis.com/SU4Aj97XUNDcwkDb/arcgis/rest/services/Permits_Premium/FeatureServer/0",
@@ -9834,6 +9919,7 @@
     },
     {
       "registry_id": "charlotte-land-dev-commercial-projects",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0",
       "dataset_url": "https://gis.charlottenc.gov/arcgis/rest/services/PLN/LandDevCommercialProjects/MapServer/0",
@@ -9895,6 +9981,7 @@
     },
     {
       "registry_id": "asheville-accela-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2",
       "dataset_url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaPermitsView/MapServer/2",
@@ -10098,6 +10185,7 @@
     },
     {
       "registry_id": "memphis-dpd-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services2.arcgis.com/saWmpKJIUAjyyNVc/arcgis/rest/services/DPD_Building_Permits/FeatureServer/0",
       "dataset_url": "https://data.memphistn.gov/datasets/MEMEGIS::dpd-building-permits-1",
@@ -10332,6 +10420,7 @@
     },
     {
       "registry_id": "johns-creek-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/bqfNVPUK3HOnCFmA/arcgis/rest/services/Building_Permits_Issued/FeatureServer/0",
       "dataset_url": "https://www.arcgis.com/home/item.html?id=65b4974c90f8465a99fec4d4ff7d7b30",
@@ -10476,6 +10565,7 @@
     },
     {
       "registry_id": "stamford-major-developments",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services3.arcgis.com/V28nrLFIbcYZbnPl/arcgis/rest/services/Stamford_Developments/FeatureServer/0",
       "dataset_url": "https://www.stamfordct.gov/government/departments/land-use-bureau",
@@ -10524,6 +10614,7 @@
     },
     {
       "registry_id": "allentown-energov-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/WUqVDRuvIiIiH2Pl/arcgis/rest/services/EnerGov_Building_Permits_Current/FeatureServer/0",
       "dataset_url": "https://www.allentownpa.gov/Government/Departments/Building-Standards-and-Safety",
@@ -10662,6 +10753,7 @@
     },
     {
       "registry_id": "peoria-az-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3",
       "dataset_url": "https://gis.peoriaaz.gov/arcgis/rest/services/Accela/Peoria_Building_Permit_All/FeatureServer/3",
@@ -10826,6 +10918,7 @@
     },
     {
       "registry_id": "bend-or-permit-applications",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0",
       "dataset_url": "https://services5.arcgis.com/JisFYcK2mIVg9ueP/arcgis/rest/services/Permit_Applications_Point/FeatureServer/0",
@@ -10909,6 +11002,7 @@
     },
     {
       "registry_id": "worcester-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0",
       "dataset_url": "https://services1.arcgis.com/j8dqo2DJE7mVUBU1/arcgis/rest/services/Building_Permits/FeatureServer/0",
@@ -11499,6 +11593,7 @@
     },
     {
       "registry_id": "champaign-il-special-use-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer/20",
       "dataset_url": "https://gisportal.champaignil.gov/ms/rest/services/Open_Data/Open_Data/MapServer",
@@ -14465,6 +14560,7 @@
     },
     {
       "registry_id": "el-paso-new-residential-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "jurisdiction": "City of El Paso",
       "coverage": [
@@ -14512,6 +14608,7 @@
     },
     {
       "registry_id": "bismarck-building-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/XxHmL09eFqJWI0gE/arcgis/rest/services/Map1/FeatureServer/0",
       "dataset_url": "https://www.bismarcknd.gov/1106/Issued-Building-Permits",
@@ -15830,6 +15927,7 @@
     },
     {
       "registry_id": "sonoma-county-fire-rebuild-permits",
+      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://services1.arcgis.com/P5Mv5GY5S66M8Z1Q/arcgis/rest/services/Wildfire_Rebuild_Permits_Public_View_Layer/FeatureServer/0",
       "dataset_url": "https://permitsonoma.org/",
@@ -16251,6 +16349,7 @@
   "ckan": [
     {
       "registry_id": "boston-approved-building-permits",
+      "geocode_assemble": true,
       "platform": "ckan",
       "base_url": "https://data.boston.gov",
       "resource_id": "6ddcd912-32a0-43df-9908-63574f8c7e77",
@@ -16304,6 +16403,7 @@
     },
     {
       "registry_id": "pittsburgh-pli-permits",
+      "geocode_assemble": true,
       "platform": "ckan",
       "base_url": "https://data.wprdc.org",
       "resource_id": "f4d1177a-f597-4c32-8cbf-7885f56253f6",
@@ -16421,6 +16521,7 @@
   "csv": [
     {
       "registry_id": "san-diego-approved-permits",
+      "geocode_assemble": true,
       "platform": "csv",
       "url": "https://seshat.datasd.org/development_permits/approvals_issued_2026_datasd.csv",
       "dataset_url": "https://data.sandiego.gov/datasets/development-permits-set1/",
@@ -16494,6 +16595,7 @@
   "carto": [
     {
       "registry_id": "philadelphia-li-permits",
+      "geocode_assemble": true,
       "platform": "carto",
       "sql_url": "https://phl.carto.com/api/v2/sql",
       "table": "permits",

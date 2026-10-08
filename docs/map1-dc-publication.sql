@@ -32,9 +32,10 @@
 --     centre is a false statement. The same map governs the compatibility rows.
 --     ⚖️ ABSENT IS NOT A STATUS (2026-09-24). A canonical entity that NO current observation
 --     states any lifecycle for is published with map_status 'Unknown' — the truth, and the
---     value Map 1 already renders as its grey "Lifecycle unknown" stage (every data-centre pin
---     reaches that stage today; the page reads no lifecycle from this column) and the one the
---     page verifier accepts. Nothing is invented: no source's silence becomes 'operational'.
+--     value Map 1 renders as its grey "Lifecycle unknown" stage and the one the page verifier
+--     accepts. (Until 2026-09-27 EVERY data-centre pin reached that stage, because the page read
+--     no lifecycle from this column; HS.map1DcSite now maps map_status to the lifecycle, so only
+--     a genuine 'Unknown' does.) Nothing is invented: no source's silence becomes 'operational'.
 --     A lifecycle any observation DOES state always wins over silence, whichever observation
 --     places the entity — location and lifecycle are separate facts. Compatibility rows are
 --     unchanged: an absent OSM status still does not publish.
@@ -47,6 +48,16 @@
 --   ZCTA polygon's bounding box, which contains every member, so no radius can lose one. A ZIP
 --   with no usable boundary returns no rows (not_measured is never replaced by a centroid,
 --   radius, nearest ZIP or neighbouring boundary). No distance is returned.
+--
+-- THE OSM ADDRESS CHECK (2026-09-26, C3c): a compatibility row carries the OpenStreetMap layer's
+--   own address check (Step 3B dc_osm_address_check: its own stated address, the shared geocoder
+--   and the shared conflict rule). ONLY WHEN THAT EXTRACTION IS ADMITTED
+--   (dc_derived_address_admitted('openstreetmap', 'telecom_data_center'), reported as the check's
+--   `admitted`): a SOURCES_DISAGREE pin is withheld, exactly as a canonical entity whose site
+--   claims conflict is GEOGRAPHY_UNRESOLVED; a CORROBORATED pin carries the same quality flag a
+--   corroborated canonical point carries (CORROBORATED_BY_DERIVED_ADDRESS). Every other outcome
+--   publishes unchanged: absence of a usable check is not evidence against a pin. A pin is never
+--   moved, and OSM stays a separate layer (never merged into the canonical tables).
 --
 -- ONE MARKER PER FACILITY ACROSS THE TWO POPULATIONS: a compatibility row is suppressed when a
 --   published canonical entity sits at IDENTICAL coordinates (<= 1 m) and the pairing is
@@ -75,6 +86,11 @@ language sql
 stable
 security definer
 set search_path to 'public', 'geo', 'pg_temp'
+-- JIT OFF (C3c, 2026-09-26): the OSM check's plpgsql functions carry the default 1,000-row estimate,
+-- which inflates this function's estimated cost past jit_above_cost, and JIT compilation then cost
+-- ~2 s per ZIP read on a JIT-enabled server (measured: 12 ZIPs 24.3 s with JIT, 38 ms without; the
+-- pre-C3c reader 33 ms). Production runs jit=off in its configuration; this pins it on the function.
+set jit to 'off'
 as $function$
   with
   -- THE ONE LIFECYCLE MAP: source lifecycle word -> Map 1 permit-vocabulary pin status.
@@ -153,14 +169,22 @@ as $function$
            r.project_name, r.developer_or_operator, r.raw_status, r.normalized_status,
            lc.map_status, r.project_type, r.lat, r.lng, r.location_text, r.location_precision,
            r.last_seen_at, null::uuid as canonical_entity_id,
-           'legacy_osm_compat'::text as publication_basis, '{}'::text[] as quality_flags,
+           'legacy_osm_compat'::text as publication_basis,
+           case when k.admitted and k.check_outcome = 'CORROBORATED'
+                then array['CORROBORATED_BY_DERIVED_ADDRESS']::text[] else '{}'::text[] end as quality_flags,
            1 as source_count, null::double precision as positional_uncertainty_m
       from bb
       join public.national_dc_records r
         on r.lat between bb.y0 - 1e-4 and bb.y1 + 1e-4
        and r.lng between bb.x0 - 1e-4 and bb.x1 + 1e-4
       join lifecycle lc on lc.v = r.normalized_status
-     where r.map_eligible),
+      -- one check per pin in the box, looked up per pin: the check view's plpgsql functions carry
+      -- the default 1,000-row estimate, so a plain join lets the planner cost it as a national scan
+      left join lateral (select c.check_outcome, c.admitted
+                           from public.dc_osm_address_check c
+                          where c.osm_record_id = r.id) k on true
+     where r.map_eligible
+       and not (coalesce(k.admitted, false) and k.check_outcome = 'SOURCES_DISAGREE')),
   osm_kept as (
     select o.* from osm o
      where not (

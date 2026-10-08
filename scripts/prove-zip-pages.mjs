@@ -160,10 +160,19 @@ const main = async () => {
   const sm = await readFile(join(SITE, 'sitemap.xml'), 'utf8');
   const smZips = [...sm.matchAll(/<loc>[^<]*\/community\/(\d{5})\/<\/loc>/g)].map((m) => m[1]);
   ok(!/community\.html\?zip=/.test(sm), 'the artifact sitemap no longer advertises the legacy URL');
-  ok(smZips.length === man.rule_f_pass,
-     `the sitemap advertises exactly the Rule F pass set (${smZips.length} = ${man.rule_f_pass})`);
+  // Rule D (SEO plan step 4): the index-eligible set is Rule F OR Rule D, so the sitemap is
+  // compared with the generator's own indexable_zips as a SET. A count against rule_f_pass
+  // alone went red on the first national build with the plane (10,413 advertised vs 8,743
+  // Rule F), which was correct behaviour; a count alone would also pass two different sets
+  // of the same size.
+  const idxZips = [...(man.indexable_zips || [])].sort();
+  const smSorted = [...smZips].sort();
+  ok(idxZips.length > 0 && smSorted.length === idxZips.length
+       && smSorted.every((z, i) => z === idxZips[i]),
+     `the sitemap advertises exactly the Rule F OR Rule D set (${smZips.length} = ${idxZips.length}; `
+     + `rule_f_pass ${man.rule_f_pass}, rule_d_pass ${man.rule_d_pass})`);
   ok(smZips.includes(C.pass_dev_fail) && !smZips.includes(C.fail_dev_pass),
-     'an Alerts-PASS page is advertised and an Alerts-FAIL page is not');
+     'an index-eligible page is advertised and a noindex page is not');
   // INVERTED 2026-09-19 — same rule the two assertions above state: the advertised set must
   // BE the index-eligible set. Page-purpose separation assumed the two halves were two sets
   // of documents; they are not. Measured against production: every homesignalmap.html?zip=

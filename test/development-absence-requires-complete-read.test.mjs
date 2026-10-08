@@ -201,21 +201,26 @@ console.log('\n7. withDistance MUST NOT LAUNDER the verdict (property.html re-di
 console.log('\n8. THE COPY COMES FROM THE ONE OWNER, and Map 1 is byte-for-byte unchanged');
 {
   const HS = loadData(makeSb({ data: [], error: null }));
-  const nm = HS.zipAuthUnmeasuredFact('not_measured', '84011');
+  // 'unknown' = waiting on a build: the only producer status that is still "not measured yet".
+  // A no-boundary ZIP (producer 'not_measured') gets the founder's no-mapped-area sentence,
+  // pinned whole in test/zip-no-mapped-area-copy.test.mjs.
+  const nm = HS.zipAuthUnmeasuredFact('not_measured', '84011', 'unknown');
   const un = HS.zipAuthUnmeasuredFact('unavailable', '84011');
   ok(/not measured yet/.test(nm) && /84011/.test(nm), '8a not_measured states the fact, names the ZIP');
   ok(/could not be read/.test(un), '8b unavailable states a read failure, not an absence');
   ok(!/no records|nothing|not on file|no permit/i.test(nm + un),
     '8c neither sentence asserts an absence of records');
   ok(!/enter an address/i.test(nm),
-    '8d the fact carries NO address-box invitation — the ZIP page has no such control');
+    '8d the pending fact carries NO address-box invitation (Map 1 appends its own)');
   ok(HS.zipAuthUnmeasuredFact('complete', '84011') === '',
     '8e a complete read gets no unread sentence');
   // The refactor must not have reworded Map 1's live sentence on 1,259 pages.
   const expected = 'Development coverage for ZIP 84011 is not measured yet — we will not estimate '
     + 'it from a circle around the ZIP centre. Enter an address for the live view around that address.';
-  ok(HS.zipAuthNote({ status: 'not_measured' }, '84011', []) === expected,
-    '8f zipAuthNote is BYTE-IDENTICAL to its pre-refactor output');
+  ok(HS.zipAuthNote({ status: 'unknown' }, '84011', []) === expected,
+    '8f zipAuthNote for a ZIP waiting on a build is BYTE-IDENTICAL to its pre-refactor output');
+  ok(HS.zipAuthNote({ status: 'not_measured' }, '84011', []) === HS.zipNoMappedAreaFact('84011'),
+    '8f2 a no-boundary ZIP gets the founder no-mapped-area sentence, once (no second invitation)');
   ok(HS.zipAuthNote({ status: 'boundary_complete', projects: [], markers: [] }, '84011', [])
       === 'No qualifying development records across ZIP 84011. This is a measurement of the '
         + 'whole ZIP, not an empty search.',

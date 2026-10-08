@@ -346,13 +346,42 @@ merge is reversible: the decision, not the evidence, is what gets corrected.';
 --     marker id) being minted for the same Epoch record every day -- measured: 270 entities for
 --     92 current records after 3 runs.
 --     A rename mints a new key (fails safe: a decision is lost, nothing is merged). A name that
---     repeats inside a run is NOT a key, so epoch_ai/timelines (538 rows, 92 names) stays
---     singleton -- the rule is the uniqueness measurement, not a list of distributions;
+--     repeats inside a run is NOT a key on its own, so epoch_ai/timelines (538 rows, 92 names) was
+--     singleton -- the rule is the uniqueness measurement, not a list of distributions. SUPERSEDED
+--     2026-10-01 for that distribution only: dc_record_key_discriminator pairs the name with one more
+--     payload field ('Date'), and (name, Date) is the key;
 --   * otherwise a singleton key that no other observation can ever share.
+-- A source whose records repeat a NAME inside one run (epoch_ai/timelines: several milestones per data centre) can
+-- still have a stable key: the name PLUS one payload field that tells its rows apart. That pairing is DATA, not
+-- code — this registry names it, so no source appears in the key rule below. 2026-10-01: epoch_ai/timelines,
+-- 'Date' — (name, Date) is unique in every run (7 of 7) and 534 of 546 pairs persist across all seven.
+create table if not exists public.dc_record_key_discriminator (
+  source_key       text not null,
+  distribution_key text not null,
+  payload_field    text not null check (btrim(payload_field) <> ''),
+  key_label        text not null check (key_label ~ '^[a-z]+$'),
+  primary key (source_key, distribution_key)
+);
+alter table public.dc_record_key_discriminator enable row level security;
+revoke all on public.dc_record_key_discriminator from anon, authenticated;
+insert into public.dc_record_key_discriminator (source_key, distribution_key, payload_field, key_label)
+values ('epoch_ai', 'timelines', 'Date', 'date')
+on conflict (source_key, distribution_key) do nothing;
+comment on table public.dc_record_key_discriminator is
+'STEP 3A. For a source with no record id whose names repeat inside a run: the one payload field that, together with the
+name, is a stable record key (rank 1, only when the pair is unique in its own run). Evidence identity only.';
+
 create or replace view public.dc_observation_record_key with (security_invoker = true) as
 select o.home_signal_observation_id,
        case when o.publisher_record_id is not null
               then o.source_key || '|' || o.distribution_key || '|' || o.publisher_record_id
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
+             and nullif(btrim(o.raw_payload ->> d.payload_field), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name), btrim(o.raw_payload ->> d.payload_field)) = 1
+              then o.source_key || '|' || o.distribution_key || '|name+' || d.key_label || ':'
+                   || btrim(o.source_native_name) || '|' || btrim(o.raw_payload ->> d.payload_field)
             when s.supplies_publisher_record_id is false
              and nullif(btrim(o.source_native_name), '') is not null
              and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
@@ -362,11 +391,18 @@ select o.home_signal_observation_id,
        case when o.publisher_record_id is not null then 0
             when s.supplies_publisher_record_id is false
              and nullif(btrim(o.source_native_name), '') is not null
+             and nullif(btrim(o.raw_payload ->> d.payload_field), '') is not null
+             and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
+                                             btrim(o.source_native_name), btrim(o.raw_payload ->> d.payload_field)) = 1 then 1
+            when s.supplies_publisher_record_id is false
+             and nullif(btrim(o.source_native_name), '') is not null
              and count(*) over (partition by o.source_key, o.acquisition_run_id, o.distribution_key,
                                              btrim(o.source_native_name)) = 1 then 1
             else 2 end as record_key_rank   -- 0 publisher id, 1 unique name, 2 singleton
   from public.dc_source_observation o
-  join public.dc_source s on s.source_key = o.source_key;
+  join public.dc_source s on s.source_key = o.source_key
+  left join public.dc_record_key_discriminator d
+    on d.source_key = o.source_key and d.distribution_key = o.distribution_key;
 
 revoke all on public.dc_observation_record_key from anon, authenticated;
 
@@ -678,6 +714,7 @@ join o t on t.source_key <> d.source_key
 cross join lateral public.dc_classify_observation(t.source_key, t.distribution_key,
                                                   t.source_native_type, t.raw_payload) tc
  where d.verdict = 'ACCEPTED'
+   and d.admitted   -- a derivation of a not-yet-admitted extraction (Step 3D) surfaces nothing
    and tc.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
    and t.source_native_lat is not null and t.source_native_lon is not null
    and ( ST_DWithin(ST_SetSRID(ST_MakePoint(d.lng, d.lat), 4326)::geography,
@@ -1262,40 +1299,56 @@ best-anchored entity and follow the evidence on every run.';
 -- Everything else stays OPEN -- the automatic IDENTITY_UNRESOLVED -- and is recomputed from the
 -- current evidence every time this view is read. There is no queue and nothing waits for a person.
 create or replace view public.dc_entity_identity_open with (security_invoker = true) as
-with d as (
-    select k.observation_a, k.observation_b, k.candidate_rule_key, a.decision_state, a.decision_rule_key
+with pre as (
+    -- 2026-10-01: ONLY a pair of two DIFFERENT entities from two DIFFERENT sources can ever be open, so that test
+    -- runs BEFORE the adjudicator, not after it. The adjudicator is the expensive part (it builds geocode inputs
+    -- per pair) and this view used to run it on every candidate and then discard the same-source ones: measured
+    -- on production 2026-10-01, ~195 s of the ~199 s geography run, almost all of it on epoch_ai/timelines pairs
+    -- that share a name and a source. The decision is only ever read for the pairs that survive this test.
+    select k.observation_a, k.observation_b, k.candidate_rule_key,
+           xa.canonical_entity_id ea, xb.canonical_entity_id eb
       from public.dc_identity_candidate k
-     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b, k.candidate_rule_key) a
-     where a.decision_state <> 'CONFIRMED_DISTINCT'
-), e as (
-    select xa.canonical_entity_id ea, xb.canonical_entity_id eb,
-           d.candidate_rule_key, d.decision_state, d.decision_rule_key
-      from d
-      join public.dc_entity_observation xa on xa.home_signal_observation_id = d.observation_a
-      join public.dc_entity_observation xb on xb.home_signal_observation_id = d.observation_b
+      join public.dc_entity_observation xa on xa.home_signal_observation_id = k.observation_a
+      join public.dc_entity_observation xb on xb.home_signal_observation_id = k.observation_b
      where xa.source_key <> xb.source_key
        and xa.canonical_entity_id <> xb.canonical_entity_id
+), e as (
+    select p.ea, p.eb, p.candidate_rule_key, a.decision_state, a.decision_rule_key
+      from pre p
+     cross join lateral public.dc_adjudicate_pair(p.observation_a, p.observation_b, p.candidate_rule_key) a
+     where a.decision_state <> 'CONFIRMED_DISTINCT'
 ), both_dirs as (
     select ea canonical_entity_id, eb other_entity_id, candidate_rule_key, decision_state, decision_rule_key from e
     union
     select eb, ea, candidate_rule_key, decision_state, decision_rule_key from e
+), cand as (
+    select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
+      from both_dirs b
+      join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
+      join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
+     where me.superseded_by is null
+       and oe.superseded_by is null
+       and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+), rk as materialized (
+    -- 2026-10-01: the record keys are a window-function view over EVERY observation. The exclusivity test used to
+    -- reach it from inside a per-row NOT EXISTS and re-derived it for each pair: measured on production, ~175 s of
+    -- a ~192 s read (272 rows). Computed once here (rank < 2 only) it is 0.4 s and the whole test 2.2 s.
+    -- The test stays a CORRELATED probe on purpose: written as a join over rk the planner pairs the two record-key
+    -- sets before it applies the entity filter and the read exceeds 900 s (measured, probe cancelled).
+    select home_signal_observation_id, record_key, record_key_rank
+      from public.dc_observation_record_key
+     where record_key_rank < 2
 )
-select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
-  from both_dirs b
-  join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
-  join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
- where me.superseded_by is null
-   and oe.superseded_by is null
-   and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
-   and not exists (
+select c.canonical_entity_id, c.other_entity_id, c.candidate_rule_key, c.decision_state, c.decision_rule_key
+  from cand c
+ where not exists (
         select 1
           from public.dc_entity_observation l1
-          join public.dc_observation_record_key r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
+          join rk r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
           join public.dc_entity_observation l2
-            on l2.canonical_entity_id = b.other_entity_id
-          join public.dc_observation_record_key r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
-         where l1.canonical_entity_id = b.canonical_entity_id
-           and r1.record_key_rank < 2 and r2.record_key_rank < 2
+            on l2.canonical_entity_id = c.other_entity_id
+          join rk r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
+         where l1.canonical_entity_id = c.canonical_entity_id
            and split_part(r1.record_key, '|', 1) = split_part(r2.record_key, '|', 1)
            and split_part(r1.record_key, '|', 2) = split_part(r2.record_key, '|', 2)
            and r1.record_key <> r2.record_key);

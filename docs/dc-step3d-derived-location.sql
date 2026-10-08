@@ -6,8 +6,11 @@
 -- This file stores the second fact beside the first, never inside it.
 --
 -- WHAT IT IS
---   * dc_geocode_input        per-SOURCE canonical rule: which address a record states, and
---                             whether it is a geocodable site address at all (precondition).
+--   * dc_geocode_input        which address a record states (dc_publisher_stated_address,
+--                             per-source SCHEMA extraction) and whether it is a geocodable site
+--                             address at all (dc_geocodable_site_address, ONE generic policy).
+--   * dc_derived_address_admitted  the deployment gate: which extractions' derivations may reach
+--                             geography and identity decisions (acquired != admitted).
 --   * dc_address_geocode      append-only DERIVED evidence: one row per (query, ladder version).
 --                             Written ONLY by .github/workflows/dc-geocode-observations.yml,
 --                             which runs HomeSignal's ONE geocoding ladder
@@ -59,12 +62,142 @@ comment on function public.dc_geocode_ladder_version() is
 dc_address_geocode stores. A ladder change is a new version, so old derivations are never
 mistaken for new ones and nothing is overwritten.';
 
--- ── INPUT RULE: is this a geocodable SITE address? (precondition only) ─────────────────────
+-- ── INPUT RULE, TWO SEPARATE QUESTIONS (2026-09-24, Atlas address validation) ──────────────
+-- The rule used to be one Epoch-only branch that both READ Epoch's payload and DECIDED whether
+-- the result was a site address; every other source got NO_GEOCODE_RULE. So a publisher that
+-- states a street address beside its own point (Compute Atlas: 876 of 2,187 current records carry
+-- a `street`) was never checked against that address, and Lancaster was caught only because Epoch
+-- happened to state the same address. The two questions are now two functions:
+--
+--   1. PUBLISHER SCHEMA EXTRACTION -- dc_publisher_stated_address. Where does this source's payload
+--      state an address, and what does it say? Source-keyed, because payload schemas genuinely
+--      differ (Epoch: one `Address` string + `Country`; Atlas: `location.street/city/state/
+--      postalCode`). It returns the publisher's words as ONE line and decides nothing about them.
+--   2. GEOCODABILITY POLICY -- dc_geocodable_site_address. Is that line specific enough to send to
+--      the production ladder? ONE generic rule for every source, knowing no source name.
+--
+-- dc_geocode_input composes the two and keeps its signature, so every consumer is unchanged.
+-- Neither function decides geography, ZIP or identity.
+
+-- 1. EXTRACTION. Per source; returns (extraction, address_line, reason):
+--      STATED       the publisher states an address; address_line is it, verbatim modulo whitespace
+--      NOT_US       the publisher places the record outside the United States
+--      NO_RULE      no extraction rule for this source (nothing is ever geocoded for it)
+--    Atlas composes its structured fields in the SAME shape the 2026-09-24 calibration geocoded
+--    (docs/dc-geocode-probe-inputs.sql, kind 'calib': "street, city, state zip"), so the measured
+--    2,000 m bound applies to exactly this input. A field the publisher left empty is omitted,
+--    never guessed; a blank street yields an empty line, which the policy rejects as BLANK.
+create or replace function public.dc_publisher_stated_address(p_source_key text,
+                                                              p_distribution_key text,
+                                                              p_payload jsonb)
+returns table(extraction text, address_line text, reason text)
+language plpgsql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+declare
+    loc jsonb;
+    st  text;
+begin
+    if p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then
+        if coalesce(p_payload->>'Country', '') <> 'United States' then
+            return query select 'NOT_US'::text, null::text, 'the publisher places this record outside the United States'::text;
+            return;
+        end if;
+        return query select 'STATED'::text,
+            btrim(regexp_replace(coalesce(p_payload->>'Address', ''), '\s+', ' ', 'g')),
+            'Epoch Address field'::text;
+        return;
+    end if;
+    if p_source_key = 'compute_atlas' and p_distribution_key = 'facilities' then
+        loc := coalesce(p_payload->'location', '{}'::jsonb);
+        st := btrim(regexp_replace(coalesce(loc->>'street', ''), '\s+', ' ', 'g'));
+        return query select 'STATED'::text,
+            case when st = '' then ''
+                 else concat_ws(', ', st,
+                                nullif(btrim(regexp_replace(coalesce(loc->>'city', ''), '\s+', ' ', 'g')), ''),
+                                nullif(btrim(concat_ws(' ',
+                                    nullif(btrim(coalesce(loc->>'state', '')), ''),
+                                    nullif(btrim(coalesce(loc->>'postalCode', '')), ''))), ''))
+            end,
+            'Atlas location.street, city, state postalCode'::text;
+        return;
+    end if;
+    -- OpenStreetMap (telecom=data_center), the SEPARATE ODbL layer in national_dc_records. The
+    -- payload is the record's own OSM tags (raw_tags). Composed in the same "number street, city,
+    -- state zip" shape as Atlas, so the same policy and the same calibrated bound apply. A missing
+    -- house number or street yields an empty line (BLANK); an OSM country tag other than US is NOT_US.
+    if p_source_key = 'openstreetmap' and p_distribution_key = 'telecom_data_center' then
+        if nullif(upper(btrim(coalesce(p_payload->>'addr:country', ''))), '') not in ('US', 'USA') then
+            return query select 'NOT_US'::text, null::text, 'the OSM record places this facility outside the United States'::text;
+            return;
+        end if;
+        st := btrim(regexp_replace(concat_ws(' ', nullif(btrim(coalesce(p_payload->>'addr:housenumber', '')), ''),
+                                                  nullif(btrim(coalesce(p_payload->>'addr:street', '')), '')), '\s+', ' ', 'g'));
+        return query select 'STATED'::text,
+            case when btrim(coalesce(p_payload->>'addr:housenumber', '')) = ''
+                   or btrim(coalesce(p_payload->>'addr:street', '')) = '' then ''
+                 else concat_ws(', ', st,
+                                nullif(btrim(regexp_replace(coalesce(p_payload->>'addr:city', ''), '\s+', ' ', 'g')), ''),
+                                nullif(btrim(concat_ws(' ',
+                                    nullif(btrim(coalesce(p_payload->>'addr:state', '')), ''),
+                                    nullif(btrim(coalesce(p_payload->>'addr:postcode', '')), ''))), ''))
+            end,
+            'OSM addr:housenumber addr:street, addr:city, addr:state addr:postcode'::text;
+        return;
+    end if;
+    return query select 'NO_RULE'::text, null::text, 'no address extraction rule for this source'::text;
+end;
+$fn$;
+
+comment on function public.dc_publisher_stated_address(text, text, jsonb) is
+'STEP 3D. Publisher SCHEMA extraction only: where a source states its address, as one line. Keyed by
+source because payload schemas differ; decides nothing about the line (dc_geocodable_site_address does).';
+
+-- 2. POLICY. Is this line a geocodable SITE address? (precondition only; one rule for every source)
 -- A house number and a locality are REQUIRED before anything is sent to a geocoder. Without a
 -- locality a geocoder may place the address in any town ("13360 Miller Rd NW"); without a house
 -- number it returns a road or a place ("Co Rd 42, Montgomery" was matched to 42 COUNTY CT, a
--- different street). A NUMBER RANGE ("14436-14998 Fairview Rd") names a frontage, not a point.
--- Passing this gate proves nothing about the result: output quality is judged separately.
+-- different street). A NUMBER RANGE ("14436-14998 Fairview Rd") names a frontage, not a point
+-- (this also refuses Hawaii's hyphenated house numbers, "92-384 Farrington Highway": a missed
+-- validation, never a wrong one). Passing this gate proves nothing about the result: output
+-- quality is judged separately (dc_derived_point_verdict).
+create or replace function public.dc_geocodable_site_address(p_line text)
+returns table(input_quality text, geocoder_query text, reason text)
+language plpgsql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+declare
+    a    text := btrim(regexp_replace(coalesce(p_line, ''), '\s+', ' ', 'g'));
+    rest text;
+    states constant text := '(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)';
+    state_names constant text := '(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|District of Columbia)';
+begin
+    if a = '' then
+        return query select 'BLANK'::text, null::text, 'the publisher states no address'::text;
+    elsif a !~ '^\d' or a ~ '^\d{5}(-\d{4})?$' then   -- a bare ZIP names an area, not a site
+        return query select 'NO_HOUSE_NUMBER'::text, null::text, 'no house number: a road, place or area is not a site address'::text;
+    elsif a ~ '^\d+[A-Za-z]?\s*[-–]\s*\d+' then
+        return query select 'HOUSE_NUMBER_RANGE'::text, null::text, 'a house-number range names a frontage, not a point'::text;
+    else
+        rest := regexp_replace(a, '^\S+\s*', '');   -- a 5-digit HOUSE number is not a ZIP
+        if rest ~ '\m\d{5}(-\d{4})?\M'
+           or a ~ (',\s*' || states || '(\s|,|$)')
+           or a ~* ('\m' || state_names || '\M') then
+            return query select 'GEOCODABLE'::text, a, 'house number and locality present'::text;
+        else
+            return query select 'NO_LOCALITY'::text, null::text, 'no ZIP or state: the geocoder could place this street in any town'::text;
+        end if;
+    end if;
+end;
+$fn$;
+
+comment on function public.dc_geocodable_site_address(text) is
+'STEP 3D. The ONE geocodability policy, for every source: GEOCODABLE requires a single house number
+and a locality. A PRECONDITION, never a verdict on the result. Knows no source name.';
+
+-- The composition every consumer reads (signature unchanged since 2026-09-24).
 create or replace function public.dc_geocode_input(p_source_key text, p_distribution_key text,
                                                    p_payload jsonb)
 returns table(input_quality text, geocoder_query text, reason text)
@@ -73,41 +206,53 @@ immutable
 set search_path to 'public', 'pg_temp'
 as $fn$
 declare
-    a    text;
-    rest text;
-    states constant text := '(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)';
-    state_names constant text := '(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming|District of Columbia)';
+    x record;
 begin
-    if p_source_key = 'epoch_ai' and p_distribution_key = 'data_centers' then
-        a := btrim(regexp_replace(coalesce(p_payload->>'Address', ''), '\s+', ' ', 'g'));
-        if coalesce(p_payload->>'Country', '') <> 'United States' then
-            return query select 'NOT_US'::text, null::text, 'the publisher places this record outside the United States'::text;
-        elsif a = '' then
-            return query select 'BLANK'::text, null::text, 'the publisher states no address'::text;
-        elsif a !~ '^\d' or a ~ '^\d{5}(-\d{4})?$' then   -- a bare ZIP names an area, not a site
-            return query select 'NO_HOUSE_NUMBER'::text, null::text, 'no house number: a road, place or area is not a site address'::text;
-        elsif a ~ '^\d+[A-Za-z]?\s*[-–]\s*\d+' then
-            return query select 'HOUSE_NUMBER_RANGE'::text, null::text, 'a house-number range names a frontage, not a point'::text;
-        else
-            rest := regexp_replace(a, '^\S+\s*', '');   -- a 5-digit HOUSE number is not a ZIP
-            if rest ~ '\m\d{5}(-\d{4})?\M'
-               or a ~ (',\s*' || states || '(\s|,|$)')
-               or a ~* ('\m' || state_names || '\M') then
-                return query select 'GEOCODABLE'::text, a, 'house number and locality present'::text;
-            else
-                return query select 'NO_LOCALITY'::text, null::text, 'no ZIP or state: the geocoder could place this street in any town'::text;
-            end if;
-        end if;
-        return;
+    select * into x from public.dc_publisher_stated_address(p_source_key, p_distribution_key, p_payload);
+    if x.extraction = 'NO_RULE' then
+        return query select 'NO_GEOCODE_RULE'::text, null::text, 'no address rule for this source'::text;
+    elsif x.extraction = 'NOT_US' then
+        return query select 'NOT_US'::text, null::text, x.reason;
+    else
+        return query select * from public.dc_geocodable_site_address(x.address_line);
     end if;
-    -- Every other source: no rule, so nothing is geocoded. Adding a source is adding a branch.
-    return query select 'NO_GEOCODE_RULE'::text, null::text, 'no address rule for this source'::text;
 end;
 $fn$;
 
 comment on function public.dc_geocode_input(text, text, jsonb) is
-'STEP 3D. Per-source address rule, keyed like dc_classify_observation. GEOCODABLE requires a
-single house number and a locality; it is a PRECONDITION, never a verdict on the result.';
+'STEP 3D. dc_publisher_stated_address (per-source schema extraction) then dc_geocodable_site_address
+(one generic policy). GEOCODABLE is a PRECONDITION, never a verdict on the result.';
+
+-- ── ADMISSION: which extractions' derivations may reach canonical decisions ───────────────
+-- Acquiring derived evidence and letting it change decisions are two deployments, not one. A new
+-- extraction is admitted only after a national dry run of its consequences has been reviewed as a
+-- system (docs/dc-atlas-dryrun-report.sql). Until then its derivations are written and reported
+-- (dc_observation_derived_point.admitted = false) and change NOTHING: not the geography evidence,
+-- not the geography provenance, not the identity candidates.
+-- This is a deployment gate over an extraction, never an authority rank: an admitted derivation is
+-- judged by the SAME class rules as every other, and a non-admitted one is simply absent.
+-- Admitting an extraction = one reviewed edit to this function (the committed-switch pattern).
+--   epoch_ai/data_centers   admitted 2026-09-24 (#1324, national dry run 36058486723)
+--   compute_atlas/facilities admitted 2026-09-26 (stage 10), after the admission dry run on that
+--                            day's production copy (dc-atlas-admission-dryrun.yml, run 36253526398:
+--                            1 facility added, 26 withheld, 0 moved), reviewed by the founder.
+--                            Applied by scripts/dc-atlas-admission-apply.sh.
+--   openstreetmap/telecom_data_center admitted (C3c) -- the SEPARATE OSM layer's address check. It
+--                            reaches no canonical decision (OSM is never a dc_source_observation);
+--                            it lets map1_dc_zip_members withhold an OSM pin its own address
+--                            contradicts and flag one it corroborates. Gated by
+--                            scripts/dc-osm-map1-gate.sh on a replica of production; applied by
+--                            scripts/dc-osm-map1-apply.sh.
+create or replace function public.dc_derived_address_admitted(p_source_key text, p_distribution_key text)
+returns boolean
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $$ select (p_source_key, p_distribution_key) in (('epoch_ai', 'data_centers'), ('compute_atlas', 'facilities'), ('openstreetmap', 'telecom_data_center')) $$;
+
+comment on function public.dc_derived_address_admitted(text, text) is
+'STEP 3D. Deployment gate: whether an extraction''s derivations may reach geography and identity.
+Binary admission of a reviewed extraction, never a rank. See the header of this section.';
 
 -- ── DERIVED EVIDENCE: what the ladder returned ────────────────────────────────────────────
 create table if not exists public.dc_address_geocode (
@@ -179,8 +324,12 @@ immutable
 set search_path to 'public', 'pg_temp'
 as $fn$
 declare
-    q_no text := substring(coalesce(p_query, '') from '^(\d+)');
-    m_no text := substring(coalesce(p_matched, '') from '^(\d+)');
+    -- a house number is digits (one optional letter) and then a space: '31st Avenue' carries none
+    q_no text := substring(coalesce(p_query, '') from '^(\d+)[A-Za-z]?\s');
+    m_no text := substring(coalesce(p_matched, '') from '^(\d+)[A-Za-z]?\s');
+    -- the street's leading direction, as its first letter (North/N -> N): 300 S Fish Lake Rd is not 300 N
+    q_dir text := upper(left(substring(coalesce(p_query, '') from '(?i)^\d+[A-Za-z]?\s+(north|south|east|west|n|s|e|w)\M'), 1));
+    m_dir text := upper(left(substring(coalesce(p_matched, '') from '(?i)^\d+[A-Za-z]?\s+(north|south|east|west|n|s|e|w)\M'), 1));
     q_st text := substring(coalesce(p_query, '') from ',\s*([A-Z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*(?:,|$)');
     m_st text := substring(coalesce(p_matched, '') from ',\s*([A-Z]{2}),\s*\d{5}\s*$');
 begin
@@ -200,6 +349,9 @@ begin
     elsif q_no is null or m_no is null or q_no <> m_no then
         return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
             'matched house number ' || coalesce(m_no, 'none') || ' is not the queried ' || coalesce(q_no, 'none');
+    elsif q_dir is not null and m_dir is not null and q_dir <> m_dir then
+        return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
+            'matched street direction ' || m_dir || ' is not the queried ' || q_dir;
     elsif q_st is not null and m_st is not null and q_st <> m_st then
         return query select 'REJECTED_MATCH_DIVERGES'::text, null::double precision,
             'matched state ' || m_st || ' is not the queried ' || q_st;
@@ -212,7 +364,8 @@ $fn$;
 
 comment on function public.dc_derived_point_verdict(text, integer, text, text, double precision, double precision) is
 'STEP 3D. Output-quality rule for a derived point. Area centroids, failures, unknown types,
-ambiguous or divergent matches never become a site. ACCEPTED carries the calibrated 2,000 m
+ambiguous or divergent matches (house number, street direction, state) never become a site.
+ACCEPTED carries the calibrated 2,000 m
 positional uncertainty that Map 1 membership must respect.';
 
 -- ── CURRENT OBSERVATION -> DERIVED POINT ─────────────────────────────────────────────────
@@ -227,7 +380,9 @@ select o.home_signal_observation_id, o.source_key, o.distribution_key,
        case when gi.input_quality <> 'GEOCODABLE' then 'NOT_GEOCODABLE'
             else v.verdict end as verdict,
        v.positional_uncertainty_m,
-       case when gi.input_quality <> 'GEOCODABLE' then gi.reason else v.reason end as verdict_reason
+       case when gi.input_quality <> 'GEOCODABLE' then gi.reason else v.reason end as verdict_reason,
+       -- deployment gate (dc_derived_address_admitted): false = acquired and reported, decides nothing
+       public.dc_derived_address_admitted(o.source_key, o.distribution_key) as admitted
   from public.dc_current_observation o
  cross join lateral public.dc_geocode_input(o.source_key, o.distribution_key, o.raw_payload) gi
   left join public.dc_address_geocode d
@@ -243,12 +398,69 @@ comment on view public.dc_observation_derived_point is
 'STEP 3D. Each current observation of a source with an address rule, its geocoder query, the
 derivation for the current ladder version (if any) and the fail-closed verdict.';
 
+-- ── OPENSTREETMAP: THE SEPARATE LAYER'S ADDRESS CHECK (2026-09-26, founder: OSM stays separate) ──
+-- OpenStreetMap is an approved source kept as its OWN ODbL layer (national_dc_records): it is never
+-- merged into the canonical CC BY tables (docs/dc-osm-current-state-2026-09-26.md §2). This view
+-- checks each OSM pin against the OSM record's own stated address WITHOUT that merge. It owns no
+-- decision of its own; every one is the shared rule every source uses:
+--   extraction + policy  dc_geocode_input('openstreetmap', 'telecom_data_center', raw_tags)
+--   the geocoder         dc_address_geocode, filled by the one writer from dc_geocode_queue
+--   the output rule      dc_derived_point_verdict
+--   the gate             dc_derived_address_admitted -- false: acquired and reported, decides nothing
+-- It is a separate view, not rows in dc_observation_derived_point, because that view feeds the
+-- canonical identity and geography resolvers: an OSM row there would be the merge.
+-- An OSM pin is a SITE claim when the loader recorded it as the facility's own mapped point
+-- (precise_location) or its own mapped outline (approximate_campus_area); anything else makes no
+-- site claim and is never judged. The JUDGEMENT (the shared conflict rule) is Step 3B's view
+-- dc_osm_address_check; this view is acquisition only, which is all the writer's queue reads.
+create or replace view public.dc_osm_derived_point with (security_invoker = true) as
+select r.source_key, r.map_eligible, r.location_precision, r.lat as osm_lat, r.lng as osm_lng,
+       gi.input_quality, gi.geocoder_query, gi.reason as input_reason,
+       d.derivation_id, d.provider, d.match_type, d.lat, d.lng, d.matched_address,
+       d.provider_candidates, d.derived_at, d.run_ref,
+       case when gi.input_quality <> 'GEOCODABLE' then 'NOT_GEOCODABLE' else v.verdict end as verdict,
+       v.positional_uncertainty_m,
+       case when gi.input_quality <> 'GEOCODABLE' then gi.reason else v.reason end as verdict_reason,
+       case when r.location_precision in ('precise_location', 'approximate_campus_area')
+            then 'PUBLISHER_SITE' end as osm_claim_class,
+       r.id as osm_record_id,
+       public.dc_derived_address_admitted('openstreetmap', 'telecom_data_center') as admitted
+  from public.national_dc_records r
+ cross join lateral public.dc_geocode_input('openstreetmap', 'telecom_data_center', r.raw_tags) gi
+  left join public.dc_address_geocode d
+    on d.geocoder_query = gi.geocoder_query
+   and d.ladder_version = public.dc_geocode_ladder_version()
+  left join lateral public.dc_derived_point_verdict(d.match_type, d.provider_candidates,
+                    gi.geocoder_query, d.matched_address, d.lat, d.lng) v on true;
+
+revoke all on public.dc_osm_derived_point from anon, authenticated;
+
+comment on view public.dc_osm_derived_point is
+'STEP 3D. The OpenStreetMap layer''s address check: each national_dc_records row, its own stated
+address through the shared extraction/policy, the shared geocoder''s derivation and the shared
+verdict. Acquisition only: judged by dc_osm_address_check (Step 3B). Never merged into canonical
+tables; never moves an OSM pin.';
+
 -- ── WORK QUEUE for the writer ────────────────────────────────────────────────────────────
+-- `admitted` (appended 2026-09-24): whether ANY current observation stating this address belongs to
+-- an admitted extraction. The writer drains admitted work first, so a large not-yet-admitted
+-- backlog can never delay a derivation that decisions are waiting for.
+-- The OpenStreetMap layer's map-eligible addresses join the SAME queue (2026-09-26): one geocoder,
+-- one ladder, one cache keyed by the address, whichever layer states it.
 create or replace view public.dc_geocode_queue with (security_invoker = true) as
-select distinct p.geocoder_query, public.dc_geocode_ladder_version() as ladder_version
-  from public.dc_observation_derived_point p
- where p.input_quality = 'GEOCODABLE'
-   and p.derivation_id is null;
+select q.geocoder_query, public.dc_geocode_ladder_version() as ladder_version,
+       bool_or(q.admitted) as admitted
+  from (select p.geocoder_query, p.admitted
+          from public.dc_observation_derived_point p
+         where p.input_quality = 'GEOCODABLE'
+           and p.derivation_id is null
+        union all
+        select o.geocoder_query, o.admitted
+          from public.dc_osm_derived_point o
+         where o.map_eligible
+           and o.input_quality = 'GEOCODABLE'
+           and o.derivation_id is null) q
+ group by q.geocoder_query;
 
 revoke all on public.dc_geocode_queue from anon, authenticated;
 

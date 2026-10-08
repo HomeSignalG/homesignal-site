@@ -60,6 +60,29 @@ ok(/HS\.activeUndecidedCount/.test(MAP),
     + 'describe a refused application as an active, pending one',
     stmt.slice(0, 200));
 }
+// Both loaders drop the REPORT's proposed_active beside its development/proposed counters
+// (2026-09-27): it is the same rule over the report's radius set, not over what the page draws.
+// While it stayed, the tile on 12,603 of 12,722 ZIP pages counted the wrong population and left
+// out every proposed data-centre pin.
+{
+  const zipDrop = /delete zipCounts\.development; delete zipCounts\.proposed; delete zipCounts\.comment_open;[\s\S]{0,600}delete zipCounts\.proposed_active;/;
+  const addrDrop = /delete data\.counts\.development; delete data\.counts\.proposed; delete data\.counts\.comment_open;\s*\n\s*delete data\.counts\.proposed_active;/;
+  ok(zipDrop.test(MAP), 'ZIP mode drops the report\'s counts.proposed_active with its other development counters');
+  ok(addrDrop.test(MAP), 'address mode drops the engine\'s counts.proposed_active with its other development counters');
+  ok((MAP.match(/delete [\w.]+\.proposed_active;/g) || []).length === 2,
+    'exactly two drops — one per loader, no third path that keeps it');
+}
+// A source's own listing is not a filing: the status line asks lib/map.js, it does not decide.
+{
+  const i = MAP.indexOf('function currentStatusHTML(s, cls){');
+  const body = MAP.slice(i, MAP.indexOf('\n  }', i));
+  ok(i > 0 && /HS\.isSourceOwnRecord\(s\)/.test(body) && /\{ filing: false \}/.test(body),
+    'currentStatusHTML routes a source\'s own listing through HS.currentStatusLine with filing:false', body.slice(0, 300));
+  // Read the CODE, not its comments: the comment above it quotes the claim it drops.
+  const code = body.replace(/\/\/.*$/gm, '');
+  ok(/HS\.currentStatusLine/.test(code) && !/Application on file|Current decision status/.test(code),
+    'and carries no sentence of its own — the copy stays in the one authority');
+}
 
 // ── the mixed browsing category is DISCLOSED, and only when it is mixed ─────────
 ok(/HS\.proposedRailNote/.test(MAP), 'the Proposed rail asks whether it holds a decided record');

@@ -249,6 +249,11 @@ ok(/panelSectionsInFrame/.test(GEN_CODE) && /does not fit the frame/.test(GEN),
 ok(/IMG_W = 1200, IMG_H = 630/.test(GEN_CODE), '7: the 1200x630 image contract is unchanged');
 ok(/sidebar_hidden/.test(GEN_CODE) && /search_form_hidden/.test(GEN_CODE),
   '7: global chrome is asserted ABSENT before the shutter, not assumed');
+// The header and footer replaced the sidebar (#1562), so sidebar_hidden alone sees nothing:
+// the capture must also check those two, and refuse on them.
+ok(/site_chrome_hidden:\s*\['hs-top', 'hs-footer'\]/.test(GEN_CODE)
+   && /!panel\.site_chrome_hidden/.test(GEN_CODE),
+  '7: the shared header and footer are asserted hidden before the shutter, and refuse the capture when shown');
 // Anti-fabrication, still.
 ok(/source_key/.test(GEN_CODE) && !/findIndex\(\(x\) => x && x\.s && x\.s\.lat/.test(GEN_CODE),
   '7: the marker is still joined on the stable project key, never on coordinates or DOM order');

@@ -253,14 +253,16 @@ create or replace function pg_temp.allpages() returns table(zip text, project_na
     canonical_entity_id uuid)
 language sql as $$ select z.zcta5, m.project_name, m.map_status, m.canonical_entity_id
                      from geo.zcta_boundary z cross join lateral pg_temp.page(z.zcta5) m $$;
-create or replace function pg_temp.verdict(p_name text) returns text language sql as $$
+-- scoped to a SOURCE (2026-09-24): every source with an address extraction now appears in the
+-- derived-point view (Atlas records too), so a lookup by name alone would pick an arbitrary one
+create or replace function pg_temp.verdict(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select d.verdict from public.dc_observation_derived_point d
     join public.dc_current_observation c using (home_signal_observation_id)
-   where c.source_native_name = p_name order by d.home_signal_observation_id limit 1 $$;
-create or replace function pg_temp.iq(p_name text) returns text language sql as $$
+   where c.source_native_name = p_name and c.source_key = p_source order by d.home_signal_observation_id limit 1 $$;
+create or replace function pg_temp.iq(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select d.input_quality from public.dc_observation_derived_point d
     join public.dc_current_observation c using (home_signal_observation_id)
-   where c.source_native_name = p_name limit 1 $$;
+   where c.source_native_name = p_name and c.source_key = p_source order by d.home_signal_observation_id limit 1 $$;
 create or replace function pg_temp.idstate(p_name text, p_source text default 'epoch_ai') returns text language sql as $$
   select string_agg(distinct r.identity_state, ',') from public.dc_record_identity r
     join public.dc_current_observation c using (home_signal_observation_id)
@@ -339,7 +341,7 @@ insert into _r select nextval('_r_n_seq'), 'E09 Epoch-only accepted point, no ca
        pg_temp.idstate('Solo Campus') = 'AUTO_CONFIRMED_DISTINCT'
    and g.geography_status = 'RESOLVED' and g.rule_key = 'DERIVED_ADDRESS_POINT' and g.lat = 40.05
    and g.lng = -97.55 and g.positional_uncertainty_m = 2000 and g.publisher_precision is null
-   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 4,
+   and 'DERIVED_ADDRESS_POINT' = any (g.quality_flags) and g.rule_version = 5,
        pg_temp.idstate('Solo Campus') || ' ' || g.geography_status || '/' || g.rule_key || ' ' || g.lat || ',' || g.lng
   from pg_temp.geo('Solo Campus') g;
 
@@ -582,5 +584,53 @@ insert into _r select nextval('_r_n_seq'), 'E36 [B] a publisher point its OWN ad
    and not exists (select 1 from pg_temp.allpages() where project_name in ('Far Address DC', 'Far Address Epoch')),
        (select g.geography_status || ' ' || g.rule_key || ' ' || g.quality_flags::text from pg_temp.geo('Far Address DC', 'compute_atlas') g)
        || ' id=' || coalesce(pg_temp.idstate('Far Address Epoch'), '?');
+
+-- E37 (2026-10-01): the identity-open view runs the adjudicator only on cross-source pairs of different entities. It must
+-- return EXACTLY what the previous definition (below, generated from origin/main, never retyped) returns on this state.
+create temp view _old_identity_open as
+with d as (
+    select k.observation_a, k.observation_b, k.candidate_rule_key, a.decision_state, a.decision_rule_key
+      from public.dc_identity_candidate k
+     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b, k.candidate_rule_key) a
+     where a.decision_state <> 'CONFIRMED_DISTINCT'
+), e as (
+    select xa.canonical_entity_id ea, xb.canonical_entity_id eb,
+           d.candidate_rule_key, d.decision_state, d.decision_rule_key
+      from d
+      join public.dc_entity_observation xa on xa.home_signal_observation_id = d.observation_a
+      join public.dc_entity_observation xb on xb.home_signal_observation_id = d.observation_b
+     where xa.source_key <> xb.source_key
+       and xa.canonical_entity_id <> xb.canonical_entity_id
+), both_dirs as (
+    select ea canonical_entity_id, eb other_entity_id, candidate_rule_key, decision_state, decision_rule_key from e
+    union
+    select eb, ea, candidate_rule_key, decision_state, decision_rule_key from e
+)
+select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
+  from both_dirs b
+  join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
+  join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
+ where me.superseded_by is null
+   and oe.superseded_by is null
+   and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+   and not exists (
+        select 1
+          from public.dc_entity_observation l1
+          join public.dc_observation_record_key r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
+          join public.dc_entity_observation l2
+            on l2.canonical_entity_id = b.other_entity_id
+          join public.dc_observation_record_key r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
+         where l1.canonical_entity_id = b.canonical_entity_id
+           and r1.record_key_rank < 2 and r2.record_key_rank < 2
+           and split_part(r1.record_key, '|', 1) = split_part(r2.record_key, '|', 1)
+           and split_part(r1.record_key, '|', 2) = split_part(r2.record_key, '|', 2)
+           and r1.record_key <> r2.record_key);
+
+insert into _r select nextval('_r_n_seq'), 'E37 [open] the cross-source pre-filter returns exactly the rows the previous identity-open definition returned (non-vacuous: the open set is not empty)',
+       (select count(*) from public.dc_entity_identity_open) > 0
+   and (select count(*) from public.dc_entity_identity_open) = (select count(*) from _old_identity_open)
+   and not exists (select 1 from (select * from public.dc_entity_identity_open except select * from _old_identity_open) x)
+   and not exists (select 1 from (select * from _old_identity_open except select * from public.dc_entity_identity_open) y),
+       (select count(*) || ' new vs ' || (select count(*) from _old_identity_open) || ' old' from public.dc_entity_identity_open);
 
 select check_name, coalesce(pass, false), coalesce(detail, '') from _r order by n;
