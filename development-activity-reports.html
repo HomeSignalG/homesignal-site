@@ -594,7 +594,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (httpStatus === 401) return 'Sign in first.';
     if (httpStatus === 503 && body.error === 'billing_not_set_up') return 'Subscribing is not open yet.';
     if (httpStatus === 409 && body.error === 'already_paid') return 'Your brokerage already has the plan.';
-    if (httpStatus === 409 && body.error === 'checkout_in_progress') return 'Your payment page is already being opened. Wait a minute, then press Subscribe again.';
+    if (httpStatus === 409 && body.error === 'checkout_in_progress') return 'A payment page was just opened for your brokerage. Use that tab, or wait a few minutes and press Subscribe again.';
     if (httpStatus === 409) return 'Your brokerage already has a subscription, so a second one was not started.';
     if (httpStatus === 403) return "Only your brokerage's owner can subscribe.";
     return 'The payment page could not be opened just now. Try again in a minute.';

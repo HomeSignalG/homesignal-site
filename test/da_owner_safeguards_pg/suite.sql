@@ -233,40 +233,30 @@ select pg_temp._ck('B21 a subject that is not a lower-case hex hash cannot be st
 create temp table _bx as select brokerage_id b from _ev where name = 'X';
 create temp table _by as select brokerage_id b from _ev where name = 'Y';
 create function pg_temp._co(p_b uuid, p_at text) returns text language sql as
-$$ select outcome || ':' || coalesce(url, '-') from public.billing_checkout_claim_at(p_b, pg_temp._t(p_at)) $$;
+$$ select outcome from public.billing_checkout_claim_at(p_b, pg_temp._t(p_at)) $$;
 
-select pg_temp._ck('C01 the first request for a brokerage is told to make the checkout (CLAIMED)', pg_temp._co((select b from _bx), '2031-04-01 10:00:00') = 'CLAIMED:-');
-select pg_temp._ck('C02 a second request while the first is still making it is told BUSY, and makes none', pg_temp._co((select b from _bx), '2031-04-01 10:00:10') = 'BUSY:-');
-select pg_temp._ck('C03 recording the address works once (true) and a second record is false and keeps the first',
-  public.billing_checkout_record((select b from _bx), 'https://pay.example.test/checkout/one') = true
-  and public.billing_checkout_record((select b from _bx), 'https://pay.example.test/checkout/two') = false);
-select pg_temp._ck('C04 afterwards every request gets THAT address back (OPEN), never a new checkout',
-  pg_temp._co((select b from _bx), '2031-04-01 10:05:00') = 'OPEN:https://pay.example.test/checkout/one'
-  and pg_temp._co((select b from _bx), '2031-04-01 10:59:00') = 'OPEN:https://pay.example.test/checkout/one');
-select pg_temp._ck('C05 after 60 minutes the slot is free again (CLAIMED)', pg_temp._co((select b from _bx), '2031-04-01 11:00:01') = 'CLAIMED:-');
-select pg_temp._ck('C05b and the old address is dropped', (select url from public.billing_checkout_claim where brokerage_id = (select b from _bx)) is null);
-select pg_temp._ck('C06 a checkout that was never finished (a crash) frees itself after 2 minutes', pg_temp._co((select b from _bx), '2031-04-01 11:01:30') = 'BUSY:-'
-  and pg_temp._co((select b from _bx), '2031-04-01 11:02:05') = 'CLAIMED:-');
-select pg_temp._ck('C07 releasing a slot that is waiting for its address frees it at once (true)',
-  public.billing_checkout_release((select b from _bx)) = true and pg_temp._co((select b from _bx), '2031-04-01 11:02:20') = 'CLAIMED:-');
-select pg_temp._ck('C08 releasing a slot whose checkout WAS made does not remove it (false) — an open checkout stays the one open checkout',
-  public.billing_checkout_record((select b from _bx), 'https://pay.example.test/checkout/three') = true
-  and public.billing_checkout_release((select b from _bx)) = false
-  and pg_temp._co((select b from _bx), '2031-04-01 11:03:00') = 'OPEN:https://pay.example.test/checkout/three');
-select pg_temp._ck('C09 another brokerage is independent', pg_temp._co((select b from _by), '2031-04-01 11:03:00') = 'CLAIMED:-');
+select pg_temp._ck('C01 the first request for a brokerage is told to make the checkout (CLAIMED)', pg_temp._co((select b from _bx), '2031-04-01 10:00:00') = 'CLAIMED');
+select pg_temp._ck('C02 a second request a few seconds later is told BUSY, and makes none', pg_temp._co((select b from _bx), '2031-04-01 10:00:10') = 'BUSY');
+select pg_temp._ck('C03 every request in the next ten minutes is told BUSY too (nothing hands out a checkout)',
+  pg_temp._co((select b from _bx), '2031-04-01 10:05:00') = 'BUSY' and pg_temp._co((select b from _bx), '2031-04-01 10:09:59') = 'BUSY');
+select pg_temp._ck('C04 after ten minutes the slot is free again (CLAIMED)', pg_temp._co((select b from _bx), '2031-04-01 10:10:01') = 'CLAIMED');
+select pg_temp._ck('C05 and the hold restarts from that claim: BUSY just after, CLAIMED ten minutes later',
+  pg_temp._co((select b from _bx), '2031-04-01 10:15:00') = 'BUSY' and pg_temp._co((select b from _bx), '2031-04-01 10:20:02') = 'CLAIMED');
+select pg_temp._ck('C05b the slot holds a brokerage and a time and nothing else (two columns, none of them an address)',
+  (select string_agg(column_name, ',' order by column_name collate "C") from information_schema.columns where table_schema = 'public' and table_name = 'billing_checkout_claim') = 'brokerage_id,claimed_at');
+select pg_temp._ck('C06 releasing the slot (the processor could not make a checkout) frees it at once (true)',
+  public.billing_checkout_release((select b from _bx)) = true and pg_temp._co((select b from _bx), '2031-04-01 10:20:10') = 'CLAIMED');
+create temp table _rel as select public.billing_checkout_release((select b from _bx)) first_try;
+create temp table _rel2 as select public.billing_checkout_release((select b from _bx)) second_try;
+select pg_temp._ck('C08 releasing a slot that is not held is false, not an error', (select first_try from _rel) and not (select second_try from _rel2));
+select pg_temp._ck('C08b and the brokerage can claim again straight after', pg_temp._co((select b from _bx), '2031-04-01 10:21:00') = 'CLAIMED');
+select pg_temp._ck('C09 another brokerage is independent', pg_temp._co((select b from _by), '2031-04-01 10:20:10') = 'CLAIMED');
 select pg_temp._ck('C10 an unknown brokerage is refused in the account''s words (EV003)', pg_temp._why('select * from public.billing_checkout_claim_at(''' || pg_temp._u(98) || ''', now())') like 'EV003: NOT_ENTITLED%');
 update public.brokerage_account set status = 'suspended' where id = (select b from _by);
 select pg_temp._ck('C11 a suspended brokerage is refused too', pg_temp._why('select * from public.billing_checkout_claim_at(''' || (select b from _by) || ''', now())') like 'EV003%');
 update public.brokerage_account set status = 'active' where id = (select b from _by);
 select pg_temp._ck('C12 null arguments are refused (22023)', pg_temp._why('select * from public.billing_checkout_claim_at(null, now())') like '22023%'
   and pg_temp._why('select * from public.billing_checkout_claim_at(''' || (select b from _bx) || ''', null)') like '22023%');
-select pg_temp._ck('C13 an address that is not https, or has a space, is refused (22023)',
-  pg_temp._why('select public.billing_checkout_record(''' || (select b from _by) || ''', ''http://pay.example.test/x'')') like '22023%'
-  and pg_temp._why('select public.billing_checkout_record(''' || (select b from _by) || ''', ''https://pay.example.test/a b'')') like '22023%'
-  and pg_temp._why('select public.billing_checkout_record(''' || (select b from _by) || ''', null)') like '22023%');
-select pg_temp._ck('C14 a bad address cannot be stored even directly', pg_temp._why('update public.billing_checkout_claim set url = ''javascript:alert(1)'' where url is null') like '23514%'
-  or pg_temp._why('update public.billing_checkout_claim set url = ''javascript:alert(1)''') like '23514%');
-select pg_temp._ck('C15 recording for a brokerage with no slot is false, not an error', public.billing_checkout_record(pg_temp._u(97), 'https://pay.example.test/x') = false);
 create temp table _bz as select e.brokerage_id b from public.evaluation_create('Team Z', null, null) e;
 select pg_temp._ck('C17 the wrapper makes a first claim for a fresh brokerage: CLAIMED', (select outcome from public.billing_checkout_claim((select b from _bz))) = 'CLAIMED');
 select pg_temp._ck('C17b and it uses the database clock: the slot began within the last five minutes, and a second wrapper claim now is BUSY',
@@ -279,13 +269,13 @@ select pg_temp._ck('C17b and it uses the database clock: the slot began within t
 create function pg_temp._mine() returns setof pg_proc language sql as
 $$ select p.* from pg_proc p where p.pronamespace = 'public'::regnamespace
      and (p.proname like 'share\_view\_%' or p.proname like 'billing\_checkout\_%' or p.proname in ('brokerage_team_of', 'brokerage_member_remove', 'da_owner_safeguards_check')) $$;
-select pg_temp._ck('D01 the file owns exactly ten functions', (select count(*) from pg_temp._mine()) = 10, (select count(*) from pg_temp._mine())::text);
+select pg_temp._ck('D01 the file owns exactly nine functions', (select count(*) from pg_temp._mine()) = 9, (select count(*) from pg_temp._mine())::text);
 select pg_temp._ck('D02 none is executable by anyone but the owner and service_role',
   not exists (select 1 from pg_temp._mine() p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                where a.grantee <> p.proowner and (a.grantee <> (select oid from pg_roles where rolname = 'service_role') or a.privilege_type <> 'EXECUTE')));
-select pg_temp._ck('D03 and service_role CAN execute every one', (select count(*) from pg_temp._mine() p where has_function_privilege('service_role', p.oid, 'execute')) = 10);
+select pg_temp._ck('D03 and service_role CAN execute every one', (select count(*) from pg_temp._mine() p where has_function_privilege('service_role', p.oid, 'execute')) = 9);
 select pg_temp._ck('D04 every function except the limits is SECURITY DEFINER with a fixed search_path',
-  (select count(*) from pg_temp._mine() p where p.proname <> 'share_view_limits' and p.prosecdef and p.proconfig::text like '%search_path%') = 9);
+  (select count(*) from pg_temp._mine() p where p.proname <> 'share_view_limits' and p.prosecdef and p.proconfig::text like '%search_path%') = 8);
 select pg_temp._ck('D05 both tables have row level security on and no grant to any role but the owner',
   (select count(*) from pg_class c where c.relname in ('share_view_window', 'billing_checkout_claim') and c.relrowsecurity) = 2
   and not exists (select 1 from pg_class c, aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a

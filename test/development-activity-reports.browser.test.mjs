@@ -187,10 +187,9 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     configured: () => w.configured,
     createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
-    // the brokerage's single checkout slot (audit item D): the world keeps the address of the checkout it made, as the database would
-    checkoutClaim: async () => (w.checkoutOpen ? { outcome: 'OPEN', url: w.checkoutOpen } : w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),
-    checkoutRecord: async (_b, url) => { w.checkoutOpen = url; },
-    checkoutRelease: async () => { w.checkoutOpen = null; },
+    // the brokerage's single checkout slot (audit item D): held for ten minutes by whoever claimed it; the address of a checkout is kept nowhere
+    checkoutClaim: async () => (w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),
+    checkoutRelease: async () => undefined,
   });
   w.reportHandler = RH.makeHandler({
     ...gate, now: () => NOW, rights: w.rights,
@@ -1875,19 +1874,19 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
 }
 
 {
-  // audit item D, one open checkout at a time: a second press while the first checkout is open goes to THAT checkout; one being made is said in plain words
+  // audit item D, one open checkout at a time: a press while a payment page was opened in the last ten minutes is told so in plain words; no second checkout is made
   const w = world({ role: 'owner', used: 3 });
   const { ctx, page, checkouts, errors } = await open({ w });
   await waitBilling(page, /Free trial/);
   w.checkoutBusy = true;
   await page.click('#subscribe');
-  await page.waitForFunction(() => /already being opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
-  ok(/Your payment page is already being opened\. Wait a minute, then press Subscribe again\./.test(await text(page, '#billing-status')) && checkouts.length === 0 && w.checkoutMade === 0 && page.url().startsWith(base + PAGE),
-    '15o a checkout another request is still making: the owner is told to wait a minute, the browser stays put, and no checkout is made');
-  w.checkoutBusy = false; w.checkoutOpen = CHECKOUT_URL;
+  await page.waitForFunction(() => /just opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/A payment page was just opened for your brokerage\. Use that tab, or wait a few minutes and press Subscribe again\./.test(await text(page, '#billing-status')) && checkouts.length === 0 && w.checkoutMade === 0 && page.url().startsWith(base + PAGE),
+    '15o a checkout opened a moment ago: the owner is told to use that tab or wait, the browser stays put, and no second checkout is made');
+  w.checkoutBusy = false;
   await page.click('#subscribe');
   await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
-  ok(w.checkoutMade === 0 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL, '15p a checkout that is already open is the one the browser is sent to: the processor is not asked for a second', [w.checkoutMade, checkouts]);
+  ok(w.checkoutMade === 1 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL, '15p once the slot is free a press makes ONE checkout and sends the browser to it', [w.checkoutMade, checkouts]);
   ok(errors.filter((e) => !/409/.test(e)).length === 0, '15q no page error', errors);
   await ctx.close();
 }

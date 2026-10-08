@@ -20,15 +20,17 @@ const naming = (needle) => FUNCS.filter((p) => code[p].includes(needle));
 // ---- 1. the SQL file --------------------------------------------------------------------------------------------------------------------------------
 {
   const dropLines = SQL.split('\n').filter((l) => /^-- drop /.test(l));
-  ok(dropLines.length === 12 && dropLines.filter((l) => /drop table/.test(l)).length === 2 && dropLines.filter((l) => /drop function/.test(l)).length === 10, '1a the footer rolls back exactly twelve objects: ten functions and two tables');
+  ok(dropLines.length === 11 && dropLines.filter((l) => /drop table/.test(l)).length === 2 && dropLines.filter((l) => /drop function/.test(l)).length === 9, '1a the footer rolls back exactly eleven objects: nine functions and two tables');
   const created = [...SQL.matchAll(/create (?:or replace )?function public\.(\w+)/g)].map((m) => m[1]);
-  ok(created.length === 10 && dropLines.filter((l) => /drop function/.test(l)).every((l) => created.some((c) => l.includes('public.' + c + '('))), '1b every function it creates has a rollback line', created);
+  ok(created.length === 9 && dropLines.filter((l) => /drop function/.test(l)).every((l) => created.some((c) => l.includes('public.' + c + '('))), '1b every function it creates has a rollback line', created);
   ok(!/\b(alter|drop)\s+(table|function|trigger|index|constraint)[^;]*\b(brokerage_member|evaluation_|brokerage_account|billing_report_limit|report_rate_)/i.test(SQL.replace(/^--.*$/gm, '')),
     '1c it alters, drops or replaces nothing that exists: no existing table, constraint, trigger or entitlement function is touched');
   ok(!/create or replace function public\.(evaluation_|brokerage_member_guard|brokerage_membership_of|billing_(usage|plan_of|report_limit|event|paid)|report_rate_)/.test(SQL), '1d and replaces none of the functions it stands on');
   ok(/alter table public\.share_view_window\s+enable row level security/.test(SQL) && /alter table public\.billing_checkout_claim enable row level security/.test(SQL)
      && /revoke all on public\.share_view_window\s+from public, anon, authenticated, service_role/.test(SQL) && /revoke all on public\.billing_checkout_claim from public, anon, authenticated, service_role/.test(SQL),
     '1e both tables are system-only: RLS on and every privilege revoked from every role');
+  { const ct = SQL.slice(SQL.indexOf('create table if not exists public.billing_checkout_claim'), SQL.indexOf(');', SQL.indexOf('create table if not exists public.billing_checkout_claim'))).replace(/^\s*--.*$/gm, '');
+    ok(!/\burl\b|\baddress\b|\bemail\b/i.test(ct) && /brokerage_id/.test(ct) && /claimed_at/.test(ct), '1f2 the checkout slot table holds a brokerage and a time: no checkout address, no email (the launch gate keeps the address out of every table)'); }
   ok(!/grant (select|insert|update|delete|all)[^;]*on public\.(share_view_window|billing_checkout_claim)/.test(SQL), '1f and nothing is ever granted on them');
   ok(/if public\.evaluation_report_limit\(\) <> 10 or public\.billing_report_limit\(\) <> 100/.test(SQL), '1g the post-condition refuses to apply if the founder\'s 10 and 100 moved');
   ok(!/\bemail\b|\bip\b|\baddress\b/i.test(SQL.slice(SQL.indexOf('create table if not exists public.share_view_window'), SQL.indexOf('create index if not exists share_view_window_by_start')).replace(/^\s*--.*$/gm, '')),
@@ -68,10 +70,9 @@ const naming = (needle) => FUNCS.filter((p) => code[p].includes(needle));
   ok(h.indexOf('deps.checkoutClaim(') > 0 && h.indexOf('deps.checkoutClaim(') < h.indexOf('deps.createCheckout('), '4a the slot is claimed BEFORE the processor is asked for a checkout');
   ok(h.indexOf('checkoutAvailability(usage') < h.indexOf('deps.checkoutClaim('), '4b and only for a brokerage the plan check allows (an agent, a paid brokerage or an unset processor never claims)');
   ok(/catch \(e\) \{\s*await deps\.checkoutRelease\([^)]*\)\.catch\(\(\) => \{\s*\}\);\s*throw e;/.test(h), '4c a checkout that could not be made frees the slot and re-raises the real error');
-  ok(/deps\.checkoutRecord\([^)]*\)\.catch\(/.test(h), '4d recording the address is best effort: a checkout that WAS made is never lost');
-  ok(/slot\.outcome === 'OPEN'\) return reply\(req, \{ status: 'OK', url: slot\.url \}\)/.test(h) && /slot\.outcome === 'BUSY'\) return reply\(req, \{ error: 'checkout_in_progress' \}, 409\)/.test(h), '4e an open checkout is given back, and a busy slot is 409');
+  ok(/slot\.outcome === 'BUSY'\) return reply\(req, \{ error: 'checkout_in_progress' \}, 409\)/.test(h) && !/slot\.url|checkoutRecord|'OPEN'/.test(h), '4e a busy slot is 409 and no checkout address is ever kept or handed back');
   const b = code['supabase/functions/_shared/billing-reads.ts'];
-  ok(/checkoutUrlFrom\(\{ data: \{ attributes: \{ url: r\.url \} \} \}\)/.test(b), '4f a stored address is checked against the processor\'s own domain again before a browser sees it');
+  ok(!/\burl\b/.test(b.slice(b.indexOf('checkoutClaim'))) , '4f the claim reader carries no address at all');
 }
 
 // ---- 5. the team: the asker is the token\'s person, never a field of the request ----------------------------------------------------------------------

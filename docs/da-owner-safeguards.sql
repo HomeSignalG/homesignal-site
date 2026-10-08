@@ -18,9 +18,10 @@
 --       public.share_view_limits()            the numbers (PROPOSED, not founder-set; changed in this one function)
 --       public.share_view_claim_at / _claim   the claim
 --  C. ONE OPEN CHECKOUT AT A TIME.  A brokerage owner who presses Subscribe twice, or in two tabs, used to get two checkouts and could pay twice. The
---     checkout function now claims the brokerage's single checkout slot first; while a checkout it made is still open it gets THAT checkout back,
---     never a second one. The slot is held 60 minutes, or 2 minutes while the checkout is still being made (so a crash never locks anyone out).
---       public.billing_checkout_claim_at / _claim, _record, _release
+--     checkout function now claims the brokerage's single checkout slot first; while the slot is held (10 minutes) a second press is told a payment page was
+--     just opened and no second checkout is made. The address of the checkout is NEVER stored (the launch gate pins that no table holds one): the slot is a
+--     brokerage id and a time, nothing else. A checkout the processor could not make frees the slot at once.
+--       public.billing_checkout_claim_at / _claim, _release
 --
 -- ACCESS: system-only (the K0 / L1 posture, as docs/report-rate-limit.sql): RLS on, no policy, every privilege on the tables revoked from every
 -- role, EXECUTE on the functions for service_role alone. The edge functions are the only callers.
@@ -215,23 +216,19 @@ as $$ select * from public.share_view_claim_at(p_client, p_link, now()) $$;
 -- =====================================================================================================================================
 -- C. ONE OPEN CHECKOUT AT A TIME
 -- =====================================================================================================================================
--- One row per brokerage. `url` is null while the checkout is being made, then the processor's checkout address. The address is a payment link bound to
--- that brokerage (it names no person); the table is system-only like every table here.
+-- One row per brokerage: the instant its slot was last claimed. NOTHING ELSE: the address of the checkout is not kept anywhere (the launch gate pins that no
+-- table of the public schema holds one), so a second press cannot be handed the first checkout back; it is told one was just opened.
 create table if not exists public.billing_checkout_claim (
   brokerage_id uuid        primary key references public.brokerage_account (id),
-  claimed_at   timestamptz not null,
-  url          text,
-  constraint billing_checkout_claim_url check (url is null or (url ~ '^https://[^[:space:]]+$' and length(url) <= 2000))
+  claimed_at   timestamptz not null
 );
 
--- CLAIMED: nothing is open — the caller makes ONE checkout, then calls _record (or _release if it could not be made).
--- OPEN:    a checkout made less than 60 minutes ago exists — the caller gives THAT address back and makes no new checkout.
--- BUSY:    another request began making one less than 2 minutes ago and has not finished — the caller makes none (the answer is "try again shortly").
+-- CLAIMED: the slot was free — the caller makes ONE checkout (and calls _release if the processor could not make it).
+-- BUSY:    a checkout was claimed less than 10 minutes ago — the caller makes none.
 create or replace function public.billing_checkout_claim_at(p_brokerage uuid, p_at timestamptz)
-returns table (outcome text, url text)
+returns table (outcome text)
 language plpgsql security definer set search_path = public, pg_temp
 as $$
-#variable_conflict use_column
 declare c public.billing_checkout_claim%rowtype;
 begin
   if p_brokerage is null or p_at is null then
@@ -245,42 +242,26 @@ begin
   end if;
   perform pg_advisory_xact_lock(hashtextextended('billing_checkout|' || p_brokerage::text, 0));
   select * into c from public.billing_checkout_claim k where k.brokerage_id = p_brokerage;
-  if found and c.url is not null and c.claimed_at > p_at - interval '60 minutes' then
-    return query select 'OPEN'::text, c.url;
+  if found and c.claimed_at > p_at - interval '10 minutes' then
+    return query select 'BUSY'::text;
     return;
   end if;
-  if found and c.url is null and c.claimed_at > p_at - interval '2 minutes' then
-    return query select 'BUSY'::text, null::text;
-    return;
-  end if;
-  insert into public.billing_checkout_claim as k (brokerage_id, claimed_at, url) values (p_brokerage, p_at, null)
-  on conflict (brokerage_id) do update set claimed_at = excluded.claimed_at, url = null;
-  return query select 'CLAIMED'::text, null::text;
+  insert into public.billing_checkout_claim as k (brokerage_id, claimed_at) values (p_brokerage, p_at)
+  on conflict (brokerage_id) do update set claimed_at = excluded.claimed_at;
+  return query select 'CLAIMED'::text;
 end $$;
 
 create or replace function public.billing_checkout_claim(p_brokerage uuid)
-returns table (outcome text, url text)
+returns table (outcome text)
 language sql security definer set search_path = public, pg_temp
 as $$ select * from public.billing_checkout_claim_at(p_brokerage, now()) $$;
 
--- The checkout was made: keep its address for the next request. true when THIS call recorded it (the slot was still waiting for one).
-create or replace function public.billing_checkout_record(p_brokerage uuid, p_url text) returns boolean
-language plpgsql security definer set search_path = public, pg_temp
-as $$
-begin
-  if p_brokerage is null or p_url is null or p_url !~ '^https://[^[:space:]]+$' or length(p_url) > 2000 then
-    raise exception using errcode = '22023', message = 'CHECKOUT_RECORD_NEEDS_A_HTTPS_ADDRESS';
-  end if;
-  update public.billing_checkout_claim set url = p_url where brokerage_id = p_brokerage and url is null;
-  return found;
-end $$;
-
--- The checkout could not be made: free the slot so the owner can try again at once. Removes only a slot still waiting for its address.
+-- The checkout could not be made: free the slot at once so the owner can try again. true when a slot was removed.
 create or replace function public.billing_checkout_release(p_brokerage uuid) returns boolean
 language plpgsql security definer set search_path = public, pg_temp
 as $$
 begin
-  delete from public.billing_checkout_claim where brokerage_id = p_brokerage and url is null;
+  delete from public.billing_checkout_claim where brokerage_id = p_brokerage;
   return found;
 end $$;
 
@@ -313,7 +294,6 @@ revoke all on function public.share_view_claim_at(text, text, timestamptz)   fro
 revoke all on function public.share_view_claim(text, text)                   from public, anon, authenticated, service_role;
 revoke all on function public.billing_checkout_claim_at(uuid, timestamptz)   from public, anon, authenticated, service_role;
 revoke all on function public.billing_checkout_claim(uuid)                   from public, anon, authenticated, service_role;
-revoke all on function public.billing_checkout_record(uuid, text)            from public, anon, authenticated, service_role;
 revoke all on function public.billing_checkout_release(uuid)                 from public, anon, authenticated, service_role;
 revoke all on function public.da_owner_safeguards_check()                    from public, anon, authenticated, service_role;
 grant execute on function public.brokerage_team_of(uuid)                         to service_role;
@@ -323,7 +303,6 @@ grant execute on function public.share_view_claim_at(text, text, timestamptz)   
 grant execute on function public.share_view_claim(text, text)                   to service_role;
 grant execute on function public.billing_checkout_claim_at(uuid, timestamptz)   to service_role;
 grant execute on function public.billing_checkout_claim(uuid)                   to service_role;
-grant execute on function public.billing_checkout_record(uuid, text)            to service_role;
 grant execute on function public.billing_checkout_release(uuid)                 to service_role;
 grant execute on function public.da_owner_safeguards_check()                    to service_role;
 
@@ -372,7 +351,7 @@ end
 $post$;
 
 -- ROLLBACK (this file only; every statement is idempotent. Stored counters and checkout slots are discarded, which is harmless: they are windows
--- and in-flight markers, not history. A removed agent STAYS removed: the membership row is history and is not touched.)
+-- and short-lived markers, not history. A removed agent STAYS removed: the membership row is history and is not touched.)
 -- drop function if exists public.da_owner_safeguards_check();
 -- drop function if exists public.brokerage_team_of(uuid);
 -- drop function if exists public.brokerage_member_remove(uuid, uuid);
@@ -381,7 +360,6 @@ $post$;
 -- drop function if exists public.share_view_limits();
 -- drop function if exists public.billing_checkout_claim(uuid);
 -- drop function if exists public.billing_checkout_claim_at(uuid, timestamptz);
--- drop function if exists public.billing_checkout_record(uuid, text);
 -- drop function if exists public.billing_checkout_release(uuid);
 -- drop table if exists public.share_view_window;
 -- drop table if exists public.billing_checkout_claim;

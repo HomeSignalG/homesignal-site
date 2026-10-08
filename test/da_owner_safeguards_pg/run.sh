@@ -120,7 +120,7 @@ scenarios() {
   P -c "grant usage on schema public to anon, authenticated, service_role" >/dev/null
   local r denied=1 named=1 sig
   for r in anon authenticated; do
-    for sig in "brokerage_team_of('$SB')" "brokerage_member_remove('$SB','$SB')" "share_view_claim('$CL', null)" "billing_checkout_claim('$SB')" "billing_checkout_record('$SB','https://x.example/y')" "billing_checkout_release('$SB')" "share_view_limits()" "da_owner_safeguards_check()"; do
+    for sig in "brokerage_team_of('$SB')" "brokerage_member_remove('$SB','$SB')" "share_view_claim('$CL', null)" "billing_checkout_claim('$SB')" "billing_checkout_release('$SB')" "share_view_limits()" "da_owner_safeguards_check()"; do
       out="$(psql -X -q -tA -v ON_ERROR_STOP=0 -c "set role $r; select * from public.$sig;" 2>&1 || true)"
       echo "$out" | grep -q "permission denied for function" || { denied=0; echo "  not denied: $r $sig: $(echo "$out" | head -c 100)"; }
     done
@@ -129,7 +129,7 @@ scenarios() {
       echo "$out" | grep -q "permission denied for table $t" || named=0
     done
   done
-  ok "$denied" "S11 anon and authenticated are refused ('permission denied for function') for all eight callable functions, with the schema open to them"
+  ok "$denied" "S11 anon and authenticated are refused ('permission denied for function') for all seven callable functions, with the schema open to them"
   ok "$named" "S12 and for both tables ('permission denied for table')"
   out="$(psql -X -q -tA -v ON_ERROR_STOP=0 -c "set role service_role; select count(*) from public.billing_checkout_claim_at('$SB', '2040-01-01 00:00:00+00');" 2>&1 || true)"
   ok "$([ "$(echo "$out" | head -1)" = "1" ] && echo 1 || echo 0)" "S13 the system role (service_role) can call the functions (and so the schema above really was open)" "$out"
@@ -154,7 +154,7 @@ P -f "$SQL" >/dev/null 2>"$here/.apply.err" || { echo "FAIL — the shipped SQL 
 rm -f "$here/.apply.err"
 dep_after="$(fp_deps)"
 ok "$([ "$dep_before" = "$dep_after" ] && echo 1 || echo 0)" "F1 applying it changes NOTHING it stands on (every other function, column, constraint, trigger and privilege is identical)" "$dep_before vs $dep_after"
-ok "$([ "$(n_mine)" = "12" ] && echo 1 || echo 0)" "F2 it creates exactly twelve objects: ten functions and two tables" "$(n_mine)"
+ok "$([ "$(n_mine)" = "11" ] && echo 1 || echo 0)" "F2 it creates exactly eleven objects: nine functions and two tables" "$(n_mine)"
 
 echo "---- suite.sql ----"
 suite_out="$(P -tA -F'|' -f "$here/suite.sql" 2>&1)" || { echo "CRASH — suite.sql stopped before it finished"; echo "$suite_out" | tail -5; exit 3; }
@@ -179,7 +179,7 @@ if [ "${MUTANT:-0}" = "0" ]; then
   ok "$([ "$(P -tA -c "select count(*) from public.share_view_window")" = "$held_before" ] && echo 1 || echo 0)" "I2 and a second apply keeps the counters it already held"
   removed="$(P -tA -c "select count(*) from public.brokerage_member where status='deactivated'")"
   rollback_sql "$SQL" > "$here/.rb.sql"
-  ok "$([ "$(wc -l < "$here/.rb.sql")" = "12" ] && echo 1 || echo 0)" "B0 the footer carries twelve rollback statements" "$(wc -l < "$here/.rb.sql")"
+  ok "$([ "$(wc -l < "$here/.rb.sql")" = "11" ] && echo 1 || echo 0)" "B0 the footer carries eleven rollback statements" "$(wc -l < "$here/.rb.sql")"
   P -f "$here/.rb.sql" >/dev/null 2>&1 || true
   ok "$([ "$(n_mine)" = "0" ] && echo 1 || echo 0)" "B1 the rollback removes every function and both tables it created" "$(n_mine)"
   ok "$([ "$(fp_deps)" = "$dep_before" ] && echo 1 || echo 0)" "B2 and nothing else: the entitlement, the billing layer and everything under them are exactly as before the file was applied"
