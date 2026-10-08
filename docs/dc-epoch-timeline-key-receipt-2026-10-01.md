@@ -2,6 +2,8 @@
 
 **Status: APPLIED to production 2026-10-01 17:11–17:12 UTC (PR #1507, squash `d2b13465`). The geography job did NOT get faster — see "Applied" and "What the geography job is actually spending".**
 
+> **Later the same day (2026-10-01 22:46 UTC) the geography job WAS fixed**, by a different change: the identity-open view now reads the record keys once (PR #1523). Its run time went from 210.6 s to 26.9 s, and was 42–45 s a week later. See `docs/dc-identity-open-fast-receipt-2026-10-01.md`. The "not yet fixed" wording below is the dated record of 17:57 UTC and is left standing.
+
 **What ships:** `docs/dc-epoch-timeline-key-apply.sql` (the production artifact), the same two statements in
 `docs/dc-step3a-canonical-identity.sql` (the DDL of record), `test/dc_epoch_timeline_key_pg/` (the rehearsal) and a
 two-line update to `test/dc-epoch-geography-structure.test.mjs` (see "The rule that was tested", below).
