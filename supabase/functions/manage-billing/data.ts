@@ -24,6 +24,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const billing = makeBillingReads(rpc);
   return {
     authenticate, isAdmin, usageOf: billing.usageOf,
+    checkoutClaim: billing.checkoutClaim, checkoutRecord: billing.checkoutRecord, checkoutRelease: billing.checkoutRelease,
     configured: () => isConfigured(cfg.billing),
     async createCheckout(brokerageId: string): Promise<string> {
       if (!isConfigured(cfg.billing)) throw new CheckoutUnavailable('not configured');

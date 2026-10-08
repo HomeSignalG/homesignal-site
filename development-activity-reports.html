@@ -117,6 +117,11 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #team .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
 #minted{display:grid;gap:10px}
 #invite-link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+#team h3{margin:6px 0 0;font-size:15px}
+#team-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+#team-list li{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+#team-list .who{font-size:14px;overflow-wrap:anywhere}
+#team-list .go{padding:8px 14px;font-size:13.5px}
 #team-status{margin:0;font-size:14px;min-height:1.5em}
 #team-status.err{color:var(--red);font-weight:600}
 #profile{display:grid;gap:10px}
@@ -235,6 +240,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       <button type="button" class="go" id="copy-invite">Copy link</button>
       <p class="hint" id="invite-note"></p>
     </div>
+    <h3 id="team-list-title">Your team</h3>
+    <p class="hint">Agents who have joined, and invite links nobody has used yet. Removing an agent ends their access to your brokerage's reports; their saved reports and the count of reports used stay as they are. Withdrawing an invite link makes it stop working.</p>
+    <ul id="team-list" aria-labelledby="team-list-title"></ul>
+    <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
     <p id="team-status" role="status" aria-live="polite"></p>
   </section>
   <section class="card" id="saved" aria-labelledby="saved-title" hidden>
@@ -356,6 +365,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var STASH = 'hs-da-invite';
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   var session = null, sessionEpoch = 0, access = null, role = null, busy = false, pendingRun = false, minting = false;
+  var teamFresh = false, teamBusy = false, armed = null, armedTimer = null; // the team list (audit item D)
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
   var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
@@ -584,6 +594,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (httpStatus === 401) return 'Sign in first.';
     if (httpStatus === 503 && body.error === 'billing_not_set_up') return 'Subscribing is not open yet.';
     if (httpStatus === 409 && body.error === 'already_paid') return 'Your brokerage already has the plan.';
+    if (httpStatus === 409 && body.error === 'checkout_in_progress') return 'Your payment page is already being opened. Wait a minute, then press Subscribe again.';
     if (httpStatus === 409) return 'Your brokerage already has a subscription, so a second one was not started.';
     if (httpStatus === 403) return "Only your brokerage's owner can subscribe.";
     return 'The payment page could not be opened just now. Try again in a minute.';
@@ -645,9 +656,78 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function teamSay(text, isError){ var s=$('team-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide or show the invite card. Hiding it also forgets any link it was showing, so a link is never left for the next person. */
   function showTeam(on){
-    if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); }
+    if (!on) { $('minted').hidden = true; $('invite-link').value = ''; $('invite-note').textContent = ''; teamSay('', false); teamFresh = false; $('team-list').textContent = ''; $('team-empty').hidden = true; }
     $('team').hidden = !on;
     $('mint').disabled = minting || !on;
+    if (on && !teamFresh) loadTeam();
+  }
+  // ---- the team (audit item D): who is on it, remove an agent, withdraw an invite -------------------------------------------------------
+  // The list is the trial function's `team` answer for the signed-in owner: masked labels and opaque handles, never an address. Whether a person may remove
+  // or withdraw anything is the database's check, made when they press; this page only asks and shows what came back. Removing takes two presses.
+  function teamMessage(httpStatus){
+    if (httpStatus === 401) return 'Sign in first.';
+    if (httpStatus === 403) return "Only an owner of your brokerage can change the team.";
+    return 'The team could not be read just now. Try again in a minute.';
+  }
+  function disarm(){ if (armedTimer) clearTimeout(armedTimer); armedTimer = null; if (armed) { armed.btn.textContent = armed.label; armed = null; } }
+  function teamRow(text, kind, ref, label, doing){
+    var li = document.createElement('li');
+    var who = document.createElement('span'); who.className = 'who'; who.textContent = text; li.appendChild(who);
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'go ghost'; b.textContent = label; b.setAttribute('data-kind', kind); b.setAttribute('data-ref', ref);
+    b.addEventListener('click', function(){ pressTeam(b, kind, ref, label, doing); });
+    li.appendChild(b);
+    return li;
+  }
+  function renderTeam(body){
+    var list = $('team-list'); list.textContent = '';
+    var members = Array.isArray(body.members) ? body.members : [], invites = Array.isArray(body.invites) ? body.invites : [];
+    var UUIDRE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    members.forEach(function(m){
+      if (!m || typeof m.ref !== 'string' || !UUIDRE.test(m.ref) || typeof m.label !== 'string') return;
+      var joined = dateWords(m.joined_at);
+      list.appendChild(teamRow('Agent ' + m.label + (joined ? ' · joined ' + joined : ''), 'member', m.ref, 'Remove', 'remove_member'));
+    });
+    invites.forEach(function(i){
+      if (!i || typeof i.ref !== 'string' || !UUIDRE.test(i.ref)) return;
+      var made = dateWords(i.created_at), until = dateWords(i.expires_at);
+      list.appendChild(teamRow('Invite link' + (made ? ' made ' + made : '') + (until ? ' · works until ' + until : '') + ' · not used yet', 'invite', i.ref, 'Withdraw', 'withdraw_invite'));
+    });
+    $('team-empty').hidden = list.children.length > 0;
+  }
+  async function loadTeam(){
+    if (teamBusy || !session || !session.user || access !== 'trial' || role !== 'owner') return;
+    var forUser = session.user.id, epoch = sessionEpoch;
+    teamBusy = true;
+    var r = await post(TRIAL_FN, { action: 'team' });
+    teamBusy = false;
+    if (epoch !== sessionEpoch || !session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way: show them nothing of it
+    var body = r.body || {};
+    if (r.status === 200 && body.status === 'OK') { teamFresh = true; renderTeam(body); return; }
+    teamSay(teamMessage(r.status), true);
+  }
+  async function pressTeam(btn, kind, ref, label, doing){
+    if (teamBusy || !session || !session.user || role !== 'owner') return;
+    if (kind === 'member' && !(armed && armed.btn === btn)) { // removing someone ends their access: ask for a second press
+      disarm(); armed = { btn: btn, label: label }; btn.textContent = 'Press again to remove';
+      armedTimer = setTimeout(disarm, 6000);
+      return;
+    }
+    disarm();
+    var forUser = session.user.id, epoch = sessionEpoch;
+    teamBusy = true; btn.disabled = true;
+    var payload = { action: doing }; payload[kind === 'member' ? 'member' : 'invite'] = ref;
+    teamSay(kind === 'member' ? 'Removing…' : 'Withdrawing…', false);
+    var r = await post(TRIAL_FN, payload);
+    teamBusy = false;
+    if (epoch !== sessionEpoch || !session || !session.user || session.user.id !== forUser) return;
+    var body = r.body || {};
+    if (r.status === 200 && body.status === 'OK') {
+      teamSay(kind === 'member' ? (body.removed ? 'Agent removed. They no longer have access to your brokerage\u2019s reports.' : 'That agent had already been removed.')
+                                : (body.withdrawn ? 'Invite link withdrawn. It no longer works.' : 'That invite link was no longer open.'), false);
+    } else {
+      teamSay(r.status === 403 ? 'That could not be changed: it is not part of your team, or only an owner can do it.' : teamMessage(r.status), true);
+    }
+    teamFresh = false; loadTeam(); // always read the real list again: nothing this page held is trusted
   }
   // ---- your name on reports (build step 7): the agent's own name, saved to their sign-in account ------------------------------
   function profileSay(text, isError){ var s=$('profile-status'); s.textContent=text||''; s.className=isError?'err':''; }
@@ -1133,6 +1213,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
         + (until ? 'It works until ' + until + '. ' : '') + 'If your trial has a limit on agents and it is full, the link cannot be used. HomeSignal shows this link only this once.';
       $('copy-invite').textContent = 'Copy link';
       $('minted').hidden = false;
+      teamFresh = false; loadTeam(); // the new link now appears in the list below (it can be withdrawn there)
       return;
     }
     if (r.status === 401) { session = null; openAuth(); }

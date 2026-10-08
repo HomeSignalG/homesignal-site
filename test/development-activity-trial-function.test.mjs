@@ -29,6 +29,7 @@ const UID = 'a1111111-1111-4111-8111-111111111111';
 const TOKEN = 'hse1_' + '0123456789abcdef'.repeat(4);
 const ACTIVE = { status: 'active', credits_used: 3, credits_remaining: 7, expired: false };
 const NOW = new Date('2026-10-02T12:00:00Z');
+const M1 = 'c0000000-0000-4000-8000-000000000001', I1 = 'c0000000-0000-4000-8000-000000000002';
 const calls = [];
 function deps(over = {}) {
   const rec = (name, f) => async (...a) => { calls.push([name, ...a]); return f(...a); };
@@ -39,6 +40,9 @@ function deps(over = {}) {
     redeemInvite: rec('redeemInvite', over.redeemInvite ?? (async () => ({ role: 'agent', replayed: false }))),
     createTrial: rec('createTrial', over.createTrial ?? (async () => ({ invite_link: E.inviteLink(TOKEN), invite_expires_at: '2026-10-16T12:00:00+00:00' }))),
     roleOf: rec('roleOf', over.roleOf ?? (async () => 'agent')),
+    teamOf: rec('teamOf', over.teamOf ?? (async () => ({ members: [{ ref: M1, label: 'a***@example.test', joined_at: '2026-10-03T12:00:00+00:00' }], invites: [{ ref: I1, created_at: '2026-10-04T12:00:00+00:00', expires_at: '2026-10-18T12:00:00+00:00' }] }))),
+    removeMember: rec('removeMember', over.removeMember ?? (async () => true)),
+    withdrawInvite: rec('withdrawInvite', over.withdrawInvite ?? (async () => true)),
     inviteAgent: rec('inviteAgent', over.inviteAgent ?? (async () => ({ invite_link: E.inviteLink(TOKEN), invite_expires_at: '2026-10-16T12:00:00+00:00' }))),
     now: over.now ?? (() => NOW),
   };
@@ -370,6 +374,71 @@ for (const [label, route, status, error] of [
 }
 ok(/action: "invite"/.test(H.CAPABILITY.method) && /owner/.test(H.CAPABILITY.access) && H.CAPABILITY.writes.some((w) => /agent invite/.test(w)) && !/evaluation_/.test(JSON.stringify(H.CAPABILITY)),
   '7s the capability names the invite action, says it is for an owner, lists what it writes, and names no database function');
+
+// ---- 8. the team (audit item D, docs/da-owner-safeguards.sql part A): list, remove an agent, withdraw an invite ------------------------------------------
+r = await ask(deps(), { action: 'team' });
+ok(r.status === 200 && r.json.status === 'OK' && JSON.stringify(Object.keys(r.json).sort()) === '["invites","members","status"]' && r.json.members[0].label === 'a***@example.test'
+   && r.json.members[0].ref === M1 && r.json.invites[0].ref === I1 && named('teamOf').length === 1 && named('teamOf')[0][1] === UID,
+  '8a an owner is shown their team: the agents as masked labels and the open invites, each with an opaque handle - for the person the token names, never one the request names');
+ok(!/@.*\./.test(r.json.members[0].label.replace('***@example.test', '')) && !/hse1_/.test(r.text) && r.cache === 'no-store', '8b no address and no invite token is in the list, and it is never cached');
+r = await ask(deps({ teamOf: async () => { throw new E.NotEntitled('x'); } }), { action: 'team' });
+ok(r.status === 403 && r.json.error === 'not_allowed', '8c anyone who is not an owner is refused 403, and the database - not the handler - says who is an owner');
+r = await ask(deps({ teamOf: async () => { throw new H.DataUnavailable('x'); } }), { action: 'team' });
+ok(r.status === 502 && r.json.error === 'data_unavailable', '8d a team that cannot be read is 502, never an empty team');
+r = await ask(deps({ teamOf: async () => { throw new Error('boom ' + M1); } }), { action: 'team' });
+ok(r.status === 500 && r.json.error === 'internal' && !r.text.includes(M1), '8e any other failure is 500 and its message is never shown');
+r = await ask(deps(), { action: 'remove_member', member: M1 });
+ok(r.status === 200 && r.json.removed === true && JSON.stringify(Object.keys(r.json).sort()) === '["removed","status"]' && JSON.stringify(named('removeMember').map((c) => c.slice(1))) === JSON.stringify([[UID, M1]]),
+  '8f an owner removes an agent: the database is asked with the person the token names (the ACTOR) and the handle, and the answer says only whether this call did it');
+r = await ask(deps({ removeMember: async () => false }), { action: 'remove_member', member: M1 });
+ok(r.status === 200 && r.json.removed === false, '8g removing someone already removed is a clean false, not an error');
+r = await ask(deps({ removeMember: async () => { throw new E.NotEntitled('x'); } }), { action: 'remove_member', member: M1 });
+ok(r.status === 403 && r.json.error === 'not_allowed', '8h a handle that is not theirs to remove (another brokerage, an owner, themselves, unknown) is one answer: 403 not_allowed');
+let badBodies = 0;
+for (const b of [{ action: 'remove_member' }, { action: 'remove_member', member: 'x' }, { action: 'remove_member', member: 5 }, { action: 'remove_member', member: M1, actor: UID }, { action: 'remove_member', invite: I1 }, { action: 'remove_member', member: [M1] }]) {
+  r = await ask(deps(), b);
+  if (r.status === 400 && named('removeMember').length === 0) badBodies++;
+}
+ok(badBodies === 6, '8i a missing, malformed or extra field is 400 before the database is asked (six bodies) - the caller cannot name the actor', badBodies);
+r = await ask(deps(), { action: 'withdraw_invite', invite: I1 });
+ok(r.status === 200 && r.json.withdrawn === true && JSON.stringify(Object.keys(r.json).sort()) === '["status","withdrawn"]' && JSON.stringify(named('withdrawInvite').map((c) => c.slice(1))) === JSON.stringify([[UID, I1]]),
+  '8j an owner withdraws an open invite: the actor is the token\'s person, the handle is the invite');
+r = await ask(deps({ withdrawInvite: async () => false }), { action: 'withdraw_invite', invite: I1 });
+ok(r.status === 200 && r.json.withdrawn === false, '8k an invite no longer open is a clean false');
+r = await ask(deps({ withdrawInvite: async () => { throw new E.NotEntitled('x'); } }), { action: 'withdraw_invite', invite: I1 });
+ok(r.status === 403 && r.json.error === 'not_allowed', '8l an invite that is not theirs is 403 not_allowed');
+r = await ask(deps(), { action: 'withdraw_invite', member: M1 });
+ok(r.status === 400 && named('withdrawInvite').length === 0, '8m a withdrawal carries an invite handle, not a member handle');
+ok(['team', 'remove_member', 'withdraw_invite'].every((a) => H.CAPABILITY.method.includes(a)) && H.CAPABILITY.writes.length === 5, '8n the capability lists the three new actions and what they write');
+r = await ask(deps({ isAdmin: async () => true }), { action: 'team' });
+ok(named('teamOf').length === 1, '8o being an admin does not skip the database\'s ownership check: it is asked for an admin too');
+// the real data layer
+const ROW_M = { kind: 'member', ref: M1, role: 'agent', label: 'a***@example.test', at: '2026-10-03T12:00:00+00:00', expires_at: null };
+const ROW_I = { kind: 'invite', ref: I1, role: 'agent', label: null, at: '2026-10-04T12:00:00+00:00', expires_at: '2026-10-18T12:00:00+00:00' };
+r = await real([USER, NOT_ADMIN, [/\/rest\/v1\/rpc\/brokerage_team_of$/, () => json([ROW_M, ROW_I])]], { action: 'team' });
+ok(r.status === 200 && r.json.members.length === 1 && r.json.invites.length === 1 && JSON.stringify(seen.map((x) => x.path.split('?')[0]).slice(-1)) === '["/rest/v1/rpc/brokerage_team_of"]'
+   && JSON.stringify(seen.at(-1).body) === JSON.stringify({ p_actor: UID }) && seen.at(-1).headers.Authorization === 'Bearer svc-key',
+  '8p the real data layer: ONE call to brokerage_team_of with the person as actor, with the service key');
+let bad8 = 0;
+for (const rows of [[{ ...ROW_M, role: 'owner' }], [{ ...ROW_M, kind: 'other' }], [{ ...ROW_M, ref: 'x' }], [{ ...ROW_M, label: '' }], [{ ...ROW_M, expires_at: '2026-10-18T12:00:00+00:00' }], [{ ...ROW_I, label: 'x@y.z' }], [{ ...ROW_I, expires_at: null }], [{ ...ROW_M, at: 'soon' }], [null], 'x']) {
+  r = await real([USER, NOT_ADMIN, [/brokerage_team_of$/, () => json(rows)]], { action: 'team' });
+  if (r.status === 502 && r.json.error === 'data_unavailable') bad8++;
+}
+ok(bad8 === 10, '8q a row of the wrong shape (an owner, an unknown kind, a bad handle, an empty label, an invite with a label, a member with an expiry, ...) is a fault, never a team (ten shapes)', bad8);
+r = await real([USER, NOT_ADMIN, [/brokerage_team_of$/, () => json({ code: 'EV003', message: 'NOT_ENTITLED' }, 400)]], { action: 'team' });
+ok(r.status === 403 && r.json.error === 'not_allowed', '8r the database answering NOT_ENTITLED is 403 not_allowed');
+r = await real([USER, NOT_ADMIN, [/brokerage_member_remove$/, () => json(true)]], { action: 'remove_member', member: M1 });
+ok(r.status === 200 && r.json.removed === true && JSON.stringify(seen.at(-1).body) === JSON.stringify({ p_actor: UID, p_member_id: M1 }), '8s removal is ONE call to brokerage_member_remove with the actor and the handle');
+r = await real([USER, NOT_ADMIN, [/evaluation_invite_revoke$/, () => json(true)]], { action: 'withdraw_invite', invite: I1 });
+ok(r.status === 200 && r.json.withdrawn === true && JSON.stringify(seen.at(-1).body) === JSON.stringify({ p_invite_id: I1, p_actor: UID }), '8t withdrawal is ONE call to the existing evaluation_invite_revoke with the invite and the actor');
+let bad9 = 0;
+for (const [fn, body] of [['brokerage_member_remove', { action: 'remove_member', member: M1 }], ['evaluation_invite_revoke', { action: 'withdraw_invite', invite: I1 }]]) {
+  for (const route of [() => json({ message: 'down' }, 503), () => json('yes'), () => json(null), () => json({ code: 'EV003', message: 'NOT_ENTITLED' }, 400)]) {
+    r = await real([USER, NOT_ADMIN, [new RegExp(fn + '$'), route]], body);
+    if ((r.status === 502 && r.json.error === 'data_unavailable') || (r.status === 403 && r.json.error === 'not_allowed')) bad9++;
+  }
+}
+ok(bad9 === 8, '8u a 5xx or a non-boolean answer is a fault (502) and a NOT_ENTITLED is 403 - never "done" (eight cases)', bad9);
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

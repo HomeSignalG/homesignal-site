@@ -9,6 +9,7 @@
 // PURE of environment and network: the database call arrives as `rpc` (_shared/service-rest.ts).
 import { DataUnavailable } from './service-rest.ts';
 import type { ServiceRpc } from './service-rest.ts';
+import { checkoutUrlFrom } from './lemon-billing.ts';
 import type { LedgerEvent } from './lemon-billing.ts';
 
 /** Where the processor brings a person back to after a checkout. It only brings them back: the page re-reads the plan, and a success URL grants nothing. */
@@ -51,6 +52,9 @@ export function planSummary(u: BillingUsage | null): PlanSummary {
   return { state: u.state, role: u.role, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining, period_ends_at: u.period_ends_at };
 }
 
+/** The checkout slot (docs/da-owner-safeguards.sql, part C): CLAIMED = make one checkout; OPEN = one is already open, here is its address; BUSY = another request is making it. */
+export type CheckoutSlot = { outcome: 'CLAIMED' | 'BUSY' } | { outcome: 'OPEN'; url: string };
+
 export type AppliedEvent = { outcome: 'RECORDED' | 'DUPLICATE'; bound: boolean; state: PlanState; is_latest: boolean };
 
 export function makeBillingReads(rpc: ServiceRpc) {
@@ -72,6 +76,40 @@ export function makeBillingReads(rpc: ServiceRpc) {
         brokerage_id: u.brokerage_id.toLowerCase(), role: u.role, state: u.state, credit_limit: u.credit_limit,
         credits_used: u.credits_used, credits_remaining: u.credits_remaining, period_ends_at: u.period_ends_at,
       };
+    },
+
+    /**
+     * Take the brokerage's single checkout slot (public.billing_checkout_claim, ONE transaction, serialised per brokerage). An open checkout's address
+     * comes back from the database and is checked again here against the processor's own domain before it can reach a browser: a stored address that
+     * fails that is a fault (DataUnavailable), never handed on. Any failure to claim is DataUnavailable: no checkout is made without the slot.
+     */
+    async checkoutClaim(brokerageId: string): Promise<CheckoutSlot> {
+      if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout claim needs a brokerage id');
+      const { data, error } = await rpc('billing_checkout_claim', { p_brokerage: brokerageId });
+      if (error) throw new DataUnavailable('billing_checkout_claim');
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (r && r.outcome === 'CLAIMED' && r.url === null) return { outcome: 'CLAIMED' };
+      if (r && r.outcome === 'BUSY' && r.url === null) return { outcome: 'BUSY' };
+      if (r && r.outcome === 'OPEN') {
+        const url = checkoutUrlFrom({ data: { attributes: { url: r.url } } });
+        if (url) return { outcome: 'OPEN', url };
+      }
+      throw new DataUnavailable('shape');
+    },
+
+    /** Keep the address of the checkout just made, so the next request gets THIS one back. Best effort for the caller: the checkout exists either way. */
+    async checkoutRecord(brokerageId: string, url: string): Promise<void> {
+      if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout record needs a brokerage id');
+      const { error } = await rpc('billing_checkout_record', { p_brokerage: brokerageId, p_url: url });
+      if (error) throw new DataUnavailable('billing_checkout_record');
+    },
+
+    /** The checkout could not be made: free the slot at once. Best effort: if this fails the slot frees itself in two minutes. */
+    async checkoutRelease(brokerageId: string): Promise<void> {
+      if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout release needs a brokerage id');
+      const { error } = await rpc('billing_checkout_release', { p_brokerage: brokerageId });
+      if (error) throw new DataUnavailable('billing_checkout_release');
     },
 
     /**

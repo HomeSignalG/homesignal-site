@@ -49,3 +49,58 @@ export function makeRateReads(rpc: ServiceRpc) {
     },
   };
 }
+
+// ---- THE CLIENT LINK RATE LIMIT (docs/da-owner-safeguards.sql, part B) --------------------------------------------------------------------------------
+// view-shared-report answers a person who is not signed in, so its subjects are not accounts: a CLIENT (a one-way hash of the caller's network address,
+// salted with a server secret, so the table never holds an address and a hash cannot be reversed by trying every address) and a LINK (the SHA-256 of
+// the token, which the database already knows). The numbers live in public.share_view_limits() and nowhere in this repo's TypeScript.
+export type ShareLimitedBy = 'client' | 'link';
+export type ShareViewVerdict =
+  | { allowed: true }
+  | { allowed: false; retryAfterSeconds: number; limitedBy: ShareLimitedBy; windowSeconds: WindowSeconds };
+
+const HEX = /^[0-9a-f]{32,64}$/;
+
+/**
+ * The caller's network address, as the platform's edge saw it. `cf-connecting-ip` is set by the edge itself and cannot be chosen by the caller; the other
+ * two are fallbacks a caller could influence, which can only let them dodge their OWN client window (the link window still binds), never someone else's.
+ * No header at all is the one shared client "unknown": a request with no address is limited together, not let through.
+ */
+export function networkAddressOf(headers: Headers): string {
+  const cf = headers.get('cf-connecting-ip'); if (cf && cf.trim()) return cf.trim().slice(0, 64);
+  const real = headers.get('x-real-ip'); if (real && real.trim()) return real.trim().slice(0, 64);
+  const fwd = headers.get('x-forwarded-for'); if (fwd && fwd.split(',')[0].trim()) return fwd.split(',')[0].trim().slice(0, 64);
+  return 'unknown';
+}
+
+/** The client's subject: HMAC-SHA-256 of the address under the server's secret, 64 lower-case hex digits. Refuses to run with no secret (an unsalted hash is an address). */
+export async function shareClientKey(headers: Headers, secret: string): Promise<string> {
+  if (!secret) throw new DataUnavailable('share client key needs a secret');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode('share-view-client|' + networkAddressOf(headers)));
+  return Array.from(new Uint8Array(mac)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function makeShareViewRateReads(rpc: ServiceRpc) {
+  return {
+    /** Take one request from the client's windows and (when the token is well formed) the link's, or learn one is full. A refusal has consumed nothing. */
+    async claim(clientKey: string, linkHash: string | null): Promise<ShareViewVerdict> {
+      if (!HEX.test(clientKey) || (linkHash !== null && !HEX.test(linkHash))) throw new DataUnavailable('share view claim needs hashed subjects');
+      const { data, error } = await rpc('share_view_claim', { p_client: clientKey, p_link: linkHash });
+      if (error) throw new DataUnavailable('share_view_claim');
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (!r || typeof r.allowed !== 'boolean') throw new DataUnavailable('shape');
+      if (r.allowed) {
+        if (r.retry_after_seconds !== 0 || r.limited_by !== null || r.limited_window_secs !== null) throw new DataUnavailable('shape');
+        return { allowed: true };
+      }
+      if (!Number.isInteger(r.retry_after_seconds) || r.retry_after_seconds < 1 || r.retry_after_seconds > 86400
+          || (r.limited_by !== 'client' && r.limited_by !== 'link')
+          || !(WINDOW_SECONDS as readonly number[]).includes(r.limited_window_secs)) {
+        throw new DataUnavailable('shape');
+      }
+      return { allowed: false, retryAfterSeconds: r.retry_after_seconds, limitedBy: r.limited_by, windowSeconds: r.limited_window_secs };
+    },
+  };
+}

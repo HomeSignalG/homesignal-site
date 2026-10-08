@@ -79,11 +79,15 @@ window.supabase = { createClient: function () { return { auth: {
 
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
+const TEAM_M1 = 'c0000000-0000-4000-8000-000000000001', TEAM_M2 = 'c0000000-0000-4000-8000-000000000003', TEAM_I1 = 'c0000000-0000-4000-8000-000000000002';
 function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true } = {}) {
   // build step 11: `plan` is the state the database would answer for this brokerage (none, paid, past_due, canceled, ...), `paidUsed` the reports used this month
   const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
-    watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false };
+    watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false,
+    // the owner's team (audit item D): what the database would list, and what the page asked it to change
+    team: { members: [{ ref: TEAM_M1, label: 'a***@example.test', joined_at: '2026-10-03T12:00:00+00:00' }, { ref: TEAM_M2, label: 'j***@brokerage.test', joined_at: '2026-10-05T12:00:00+00:00' }],
+            invites: [{ ref: TEAM_I1, created_at: '2026-10-04T12:00:00+00:00', expires_at: '2026-10-18T12:00:00+00:00' }] }, teamFails: false, teamRefuse: false, teamRemoved: [], teamWithdrawn: [] };
   const state = () => (w.trial === null ? null : { status: w.used >= 10 ? 'complete' : w.trial, credits_used: w.used, credits_remaining: 10 - w.used, expired: false });
   const gate = { authenticate: async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null), isAdmin: async () => w.admin };
   w.trialHandler = TH.makeHandler({
@@ -102,6 +106,17 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
       return { invite_link: E.inviteLink(MINT_TOKEN), invite_expires_at: '2026-10-16T12:00:00.123456+00:00' };
     },
     createTrial: async () => { throw new Error('the customer page never creates a trial'); },
+    teamOf: async () => { if (w.teamFails) throw new TH.DataUnavailable('x'); if (w.role !== 'owner') throw new E.NotEntitled('x'); return JSON.parse(JSON.stringify(w.team)); },
+    removeMember: async (_u, ref) => {
+      if (w.teamFails) throw new TH.DataUnavailable('x'); if (w.teamRefuse || w.role !== 'owner') throw new E.NotEntitled('x');
+      const i = w.team.members.findIndex((m) => m.ref === ref); if (i < 0) return false;
+      w.team.members.splice(i, 1); w.teamRemoved.push(ref); return true;
+    },
+    withdrawInvite: async (_u, ref) => {
+      if (w.teamFails) throw new TH.DataUnavailable('x'); if (w.teamRefuse || w.role !== 'owner') throw new E.NotEntitled('x');
+      const i = w.team.invites.findIndex((m) => m.ref === ref); if (i < 0) return false;
+      w.team.invites.splice(i, 1); w.teamWithdrawn.push(ref); return true;
+    },
     now: () => NOW,
   });
   // build step 8: the agent's share-link function, on the REAL handler and the real link form. The store behind it is the world's: a link is
@@ -172,6 +187,10 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     configured: () => w.configured,
     createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
+    // the brokerage's single checkout slot (audit item D): the world keeps the address of the checkout it made, as the database would
+    checkoutClaim: async () => (w.checkoutOpen ? { outcome: 'OPEN', url: w.checkoutOpen } : w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),
+    checkoutRecord: async (_b, url) => { w.checkoutOpen = url; },
+    checkoutRelease: async () => { w.checkoutOpen = null; },
   });
   w.reportHandler = RH.makeHandler({
     ...gate, now: () => NOW, rights: w.rights,
@@ -1782,6 +1801,94 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await waitBilling(page, /Free trial/);
   ok(await billingShown(page) && /Only your brokerage's owner can subscribe\./.test(await billingText(page)) && await page.$eval('#subscribe', (e) => e.hidden) && checkouts.length === 0,
     '13e an agent on #billing sees the card, is told only the owner can subscribe, and has no Subscribe button');
+  await ctx.close();
+}
+
+// ---- 15. audit item D (2026-10-08): the owner's team - remove an agent, withdraw an invite -------------------------------------------------------------
+{
+  const w = world({ role: 'owner' });
+  const { ctx, page, trials, errors, foreign } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => document.querySelectorAll('#team-list li').length > 0, null, { timeout: 8000 }).catch(() => {});
+  const rows = await page.$$eval('#team-list li', (ls) => ls.map((l) => ({ text: l.querySelector('.who').textContent, btn: l.querySelector('button').textContent })));
+  ok(rows.length === 3 && /^Agent a\*\*\*@example\.test · joined October 3, 2026$/.test(rows[0].text) && rows[0].btn === 'Remove' && /^Agent j\*\*\*@brokerage\.test/.test(rows[1].text)
+     && /^Invite link made October 4, 2026 · works until October 18, 2026 · not used yet$/.test(rows[2].text) && rows[2].btn === 'Withdraw',
+    '15a an owner sees their team: each agent as a masked label with the day they joined, and each open invite link, with Remove / Withdraw', rows);
+  const asked = trials.filter((t) => t.body && t.body.action === 'team');
+  ok(asked.length === 1 && JSON.stringify(asked[0].body) === '{"action":"team"}' && asked[0].auth === 'Bearer user-token', '15b the list is ONE request to the trial function with the person\'s own token and nothing but the action', asked.map((t) => t.body));
+  ok(!(await page.$eval('#team-list', (e) => e.textContent)).includes('agent@example.test') && !/hse1_/.test(await page.$eval('#team-list', (e) => e.textContent)), '15c no email address and no invite token is on the page');
+  // removal takes two presses
+  await page.click('#team-list li:nth-child(1) button');
+  ok(w.teamRemoved.length === 0 && /Press again to remove/.test(await page.$eval('#team-list li:nth-child(1) button', (e) => e.textContent)), '15d the first press removes nobody: the button asks to be pressed again');
+  await page.click('#team-list li:nth-child(2) button');
+  ok(w.teamRemoved.length === 0 && /Press again to remove/.test(await page.$eval('#team-list li:nth-child(2) button', (e) => e.textContent)) && (await page.$eval('#team-list li:nth-child(1) button', (e) => e.textContent)) === 'Remove',
+    '15e arming a second agent disarms the first (only one button is ever ready)');
+  await page.click('#team-list li:nth-child(1) button'); // arms the first agent again (the second was armed), then the second press removes
+  await page.click('#team-list li:nth-child(1) button');
+  await page.waitForFunction(() => /Agent removed/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const rm = trials.filter((t) => t.body && t.body.action === 'remove_member');
+  ok(rm.length === 1 && JSON.stringify(rm[0].body) === JSON.stringify({ action: 'remove_member', member: TEAM_M1 }) && w.teamRemoved.join() === TEAM_M1 && /no longer have access/.test(await text(page, '#team-status')),
+    '15f the second press removes that agent with ONE request naming the member handle (never the actor), and says so', rm.map((t) => t.body));
+  await page.waitForFunction(() => document.querySelectorAll('#team-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
+  const after = await page.$$eval('#team-list li .who', (ls) => ls.map((l) => l.textContent));
+  ok(after.length === 2 && !after.some((t) => /a\*\*\*@example/.test(t)), '15g the list is read again from the server and the removed agent is gone', after);
+  // withdraw an invite: one press
+  await page.click('#team-list li:nth-child(2) button');
+  await page.waitForFunction(() => /Invite link withdrawn/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  const wd = trials.filter((t) => t.body && t.body.action === 'withdraw_invite');
+  ok(wd.length === 1 && JSON.stringify(wd[0].body) === JSON.stringify({ action: 'withdraw_invite', invite: TEAM_I1 }) && w.teamWithdrawn.join() === TEAM_I1, '15h withdrawing an invite is one press and one request naming the invite handle', wd.map((t) => t.body));
+  await page.waitForFunction(() => document.querySelectorAll('#team-list li').length === 1, null, { timeout: 8000 }).catch(() => {});
+  ok((await page.$$eval('#team-list li', (ls) => ls.length)) === 1 && errors.length === 0 && foreign.length === 0, '15i and the list shows what is left; no page error, nothing foreign fetched', { errors, foreign });
+  await ctx.close();
+}
+{
+  // a new invite appears in the list; the list is empty-state honest; a refusal and an outage are plain words
+  const w = world({ role: 'owner' }); w.team = { members: [], invites: [] };
+  const { ctx, page } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => !document.getElementById('team-empty').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(await page.$eval('#team-empty', (e) => !e.hidden && /No agents have joined yet/.test(e.textContent)) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0, '15j with nobody on the team the page says so, in plain words');
+  w.team.invites.push({ ref: TEAM_I1, created_at: '2026-10-08T12:00:00+00:00', expires_at: '2026-10-22T12:00:00+00:00' });
+  await page.click('#mint');
+  await page.waitForFunction(() => document.querySelectorAll('#team-list li').length === 1, null, { timeout: 8000 }).catch(() => {});
+  ok((await page.$$eval('#team-list li', (ls) => ls.length)) === 1 && await page.$eval('#team-empty', (e) => e.hidden), '15k after a new link is made the list is read again and shows it');
+  w.teamRefuse = true;
+  await page.click('#team-list li:nth-child(1) button');
+  await page.waitForFunction(() => /could not be changed/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/That could not be changed: it is not part of your team, or only an owner can do it\./.test(await text(page, '#team-status')) && await page.$eval('#team-status', (e) => e.className === 'err'), '15l a refusal by the database is said in plain words, as an error');
+  await ctx.close();
+}
+{
+  const w = world({ role: 'owner' }); w.teamFails = true;
+  const { ctx, page, errors } = await open({ w });
+  await waitCount(page, /free reports left/);
+  await page.waitForFunction(() => /could not be read/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/The team could not be read just now/.test(await text(page, '#team-status')) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0 && errors.filter((e) => !/502/.test(e)).length === 0,
+    '15m a team that cannot be read says so and shows no list (never an empty team passed off as the real one)', [errors, await text(page, '#team-status'), await page.$$eval('#team-list li', (ls) => ls.length)]);
+  await ctx.close();
+}
+for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person with no trial', world({ trial: null, role: 'owner' })]]) {
+  const { ctx, page, trials } = await open({ w });
+  await page.waitForTimeout(500);
+  ok(!(await teamShown(page)) && trials.filter((t) => t.body && t.body.action === 'team').length === 0, '15n ' + label + ' never sees the team and the page never asks for it');
+  await ctx.close();
+}
+
+{
+  // audit item D, one open checkout at a time: a second press while the first checkout is open goes to THAT checkout; one being made is said in plain words
+  const w = world({ role: 'owner', used: 3 });
+  const { ctx, page, checkouts, errors } = await open({ w });
+  await waitBilling(page, /Free trial/);
+  w.checkoutBusy = true;
+  await page.click('#subscribe');
+  await page.waitForFunction(() => /already being opened/.test(document.getElementById('billing-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Your payment page is already being opened\. Wait a minute, then press Subscribe again\./.test(await text(page, '#billing-status')) && checkouts.length === 0 && w.checkoutMade === 0 && page.url().startsWith(base + PAGE),
+    '15o a checkout another request is still making: the owner is told to wait a minute, the browser stays put, and no checkout is made');
+  w.checkoutBusy = false; w.checkoutOpen = CHECKOUT_URL;
+  await page.click('#subscribe');
+  await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
+  ok(w.checkoutMade === 0 && checkouts.length === 1 && checkouts[0] === CHECKOUT_URL, '15p a checkout that is already open is the one the browser is sent to: the processor is not asked for a second', [w.checkoutMade, checkouts]);
+  ok(errors.filter((e) => !/409/.test(e)).length === 0, '15q no page error', errors);
   await ctx.close();
 }
 
