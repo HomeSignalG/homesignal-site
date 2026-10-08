@@ -365,6 +365,25 @@ def main():
        R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'") == g4
        and R.q1(c, "select count(*) from geo.n5_generation_proof where generation_id=%s and passed", (g4,)) == 1, g4)
 
+    # ------------------------------------------- THE REHEARSAL AGAINST A NON-SERVING BASELINE
+    # prove_dry takes any baseline. Its reader-parity control must still compare the SERVING
+    # generation with the public reader; comparing the baseline failed production's first
+    # rehearsal (run 37804664654) on exactly the ZIPs that changed.
+    O = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY)
+    zips = O.proof_sample(g4, R.LEGACY)
+    differs = [z for z in zips if R.q1(c, "select geo.n5_zip_projects_markers_at(%s,%s,'development') "
+                                          "is distinct from public.app_zip_projects_markers(%s,'development',true)",
+                                       (R.LEGACY, z, z))]
+    proofs = R.q1(c, "select count(*) from geo.n5_generation_proof")
+    ok("E27 control: the rehearsal's sample holds a ZIP whose baseline answer differs from what Map 1 serves",
+       len(differs) > 0, (zips, differs))
+    try:
+        dry, why = O.mode_prove_dry(), None
+    except SystemExit as e:
+        dry, why = None, str(e)
+    ok("E27 prove_dry against a non-serving baseline passes and records nothing",
+       dry == 0 and R.q1(c, "select count(*) from geo.n5_generation_proof") == proofs, why)
+
     c.close()
     R.drop_db("n5gen_e2e")
     print("=" * 60)

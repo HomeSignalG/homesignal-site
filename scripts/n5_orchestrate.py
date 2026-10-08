@@ -769,8 +769,11 @@ select zip from (select distinct on (zip) zip, k, o from (select * from c union 
 
 def proof_input(gen, base, zips):
     """Each sample ZIP's answer under both generations, read through the ONE function Map 1
-    reads (geo.n5_zip_projects_markers_at), plus the reader-parity control: the serving
-    generation's answer through that function must equal the public reader's own answer."""
+    reads (geo.n5_zip_projects_markers_at), plus the reader-parity control: the SERVING
+    generation's answer through that function must equal the public reader's own answer.
+    The control names the serving generation, never `base`: in `prove` they are the same,
+    but `prove_dry` may take any baseline, and comparing a non-serving baseline with the
+    public reader fails on exactly the ZIPs that changed (run 37804664654, 2026-10-08)."""
     out = {"candidate_generation_id": gen, "baseline_generation_id": base, "zips": []}
     reader_mismatch = []
     # Where the page centres the map: the ZIP's cached report point when there is one (every
@@ -783,7 +786,7 @@ def proof_input(gen, base, zips):
     for z in zips:
         r = sql(f"""select geo.n5_zip_projects_markers_at({lit(gen)}, {lit(z)}, 'development') c,
        geo.n5_zip_projects_markers_at({lit(base)}, {lit(z)}, 'development') b,
-       geo.n5_zip_projects_markers_at({lit(base)}, {lit(z)}, 'development')
+       geo.n5_zip_projects_markers_at(geo.n5_serving_generation_id(), {lit(z)}, 'development')
          = public.app_zip_projects_markers({lit(z)}, 'development', true) same,
        {home(z)};""", f"proof answers {z}", read_only=True, timeout=300)[0]
         if not r["same"]:
