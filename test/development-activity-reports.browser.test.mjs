@@ -1810,6 +1810,66 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
   await ctx.close();
 }
+// ---- 15. the way back out: HomeSignal and Enterprise links at the top of the page ----------------------------------------------------------------
+// This page has no site header on purpose, so before 2026-10-07 the header's Enterprise > My reports led INTO a page with no link off it. Two plain same-site
+// links now sit in header.top. They carry no state and ask nothing of any function; they must show whether or not anyone is signed in.
+const navLinks = (page) => page.evaluate(() => {
+  const nav = document.querySelector('header.top .sitenav');
+  if (!nav) return null;
+  const links = [...nav.querySelectorAll('a')];
+  const box = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return { shown: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0, h: Math.round(r.height) }; };
+  return {
+    label: nav.getAttribute('aria-label'),
+    links: links.map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href'), ...box(a) })),
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  };
+});
+for (const [who, signedIn] of [['signed out', false], ['signed in', true]]) {
+  const { ctx, page, errors, reports, trials, billingCalls } = await open({ signedIn });
+  const n = await navLinks(page);
+  ok(n && n.label === 'HomeSignal site', `15a ${who}: the page has a navigation for the site`, n);
+  ok(n && JSON.stringify(n.links.map((l) => l.text + '=' + l.href)) === JSON.stringify(['HomeSignal=index.html', 'Enterprise=development-activity.html']),
+    `15b ${who}: it holds exactly HomeSignal (the homepage) and Enterprise (the Enterprise page), as plain same-site links`, n && n.links);
+  ok(n && n.links.every((l) => l.shown && l.h >= 44), `15c ${who}: both are drawn, and tall enough to tap (44px)`, n && n.links);
+  // the page itself reads the plan when someone is signed in, so the claim is about the LINKS: touching them makes no request of its own
+  await page.waitForTimeout(500);
+  const before = { reports: reports.length, trials: trials.length, billing: billingCalls.length };
+  for (const a of await page.$$('header.top .sitenav a')) { await a.hover(); await a.focus(); }
+  await page.waitForTimeout(300);
+  const after = { reports: reports.length, trials: trials.length, billing: billingCalls.length };
+  ok(JSON.stringify(before) === JSON.stringify(after), `15d ${who}: hovering and focusing the links makes no request of any function`, { before, after });
+  ok(errors.length === 0, `15e ${who}: no page error`, errors);
+  await ctx.close();
+}
+{
+  // 15f. a phone: both visible, and the row does not make the page scroll sideways
+  const { ctx, page } = await open({ width: 390, height: 844 });
+  const n = await navLinks(page);
+  ok(n && n.links.length === 2 && n.links.every((l) => l.shown) && n.overflow <= 0, '15f at 390px wide both links are drawn and nothing scrolls sideways', n);
+  await ctx.close();
+}
+{
+  // 15g. print: the page's own print rule hides the header, and the links go with it
+  const { ctx, page } = await open();
+  await page.emulateMedia({ media: 'print' });
+  const n = await navLinks(page);
+  ok(n && n.links.every((l) => !l.shown), '15g printed, the links are not drawn (they are inside the header the print rule removes)', n);
+  await ctx.close();
+}
+{
+  // 15h. keyboard: each link can be focused
+  const { ctx, page } = await open();
+  const focused = await page.evaluate(() => [...document.querySelectorAll('header.top .sitenav a')].map((a) => { a.focus(); return document.activeElement === a; }));
+  ok(focused.length === 2 && focused.every(Boolean), '15h both links can be reached by keyboard focus', focused);
+  await ctx.close();
+}
+for (const [text, want] of [['Enterprise', /\/development-activity\.html$/], ['HomeSignal', /\/index\.html$/]]) {
+  // 15i. they really go there (a real navigation to the real page, not a request the page makes)
+  const { ctx, page } = await open();
+  await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click('header.top .sitenav a:text-is("' + text + '")')]);
+  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking "${text}" opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
+  await ctx.close();
+}
 
 await browser.close();
 server.close();
