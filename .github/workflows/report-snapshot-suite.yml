@@ -92,6 +92,8 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-service-monitor.sql'
+      - 'test/report_service_monitor_pg/**'
       - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
@@ -176,6 +178,8 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-service-monitor.sql'
+      - 'test/report_service_monitor_pg/**'
       - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
@@ -344,6 +348,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log
+      - name: The report-service email alarm passes; the file applies twice and rolls back exactly; it is refused when what it stands on is missing; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_service_monitor_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsm.log
       - name: Changes Since Report and Follow run end to end; the answer is the same while the context is kept and after it is purged
         env:
           PGHOST: localhost
