@@ -1,0 +1,53 @@
+name: dc-atlas-admission-dryrun
+
+# STAGE 8 of the Atlas plan: what would ADMITTING Atlas change, on today's data? Production is only READ
+# (scripts/dc-atlas-admission-dryrun.sh); the admission switch is flipped in a disposable replica only, and
+# every changed facility is printed individually in this job's log for the founder's review.
+#
+# SECURITY: holds SUPABASE_DB_URL (a production-write credential), so it runs ONLY on manual dispatch from
+# main (test/workflow-secret-exposure.test.mjs enforces the guard). No pull_request trigger.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-admission-dryrun
+  cancel-in-progress: false
+
+jobs:
+  dryrun:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - name: Refuse any ref but main (the secret below must only ever meet reviewed code)
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then echo "REFUSED: dispatch from main only (got $GITHUB_REF)"; exit 1; fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Admission dry run on today's production data (production is only read; replica only)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-atlas-admission-dryrun.sh

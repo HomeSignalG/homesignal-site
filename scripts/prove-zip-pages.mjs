@@ -4,9 +4,9 @@
 // It asserts the two things a post-JS DOM check cannot: that the bytes a crawler receives
 // already carry the SEO contract, and that executing JavaScript does not reverse it.
 //
-// FROZEN CONTROLS (re-derived from live data 2026-09-04 14:26–14:35Z; the classes are the
-// founder's A–J). They are passed in as CONTROLS so a reclassification by normal ingestion
-// is a one-line, visible replacement rather than a rewritten script:
+// CONTROLS are DERIVED from the build each run (see resolveControls below) and each class is
+// asserted NON-EMPTY, so a ZIP crossing Rule F by normal ingestion substitutes and reports
+// instead of reddening the build. point_dense stays pinned. The classes are the founder's A–J:
 //   A pass_dev_pass  Alerts PASS + development PASS
 //   B pass_dev_fail  Alerts PASS + development FAIL   <- Alerts alone qualifies a page
 //   C fail_dev_pass  Alerts FAIL + development PASS   <- development cannot qualify one
@@ -18,9 +18,11 @@
 //   I               anonymous render (every request here is anonymous, no address, no home)
 //   J point_dense    the densest development ZIP: no coordinate may leak onto its page
 import { createServer } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
+import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, classifyMembers, chooseControls,
+         publishedControls } from './lib/zip-page-controls.mjs';
 
 const SITE = process.env.SITE_DIR || '_site';
 const PORT = 8099;
@@ -47,14 +49,49 @@ const grab = (h, re) => { const m = re.exec(h); return m ? m[1].trim() : null; }
 const get = (base, z, ua) =>
   fetch(`${base}/community/${z}/`, { headers: ua ? { 'User-Agent': ua } : {} });
 
+// Control resolution lives in scripts/lib/zip-page-controls.mjs — a PURE core with no
+// playwright import, so the offline unit job can drive it. See that file's header.
+async function resolveControls(SITE, man, pins) {
+  const members = await classifyMembers(SITE, man);
+  const { controls, empties, notes } = chooseControls(pins, members);
+  for (const k of Object.keys(CLASSIFY)) {
+    if (PINNED_ONLY.has(k)) continue;
+    ok(!empties.includes(k), `control class ${k} is NON-EMPTY (${(members[k] || []).length} member(s)) — `
+      + `an empty class would let its assertion pass over nothing`);
+  }
+  if (notes.length) {
+    console.log('\n----- CONTROL SUBSTITUTIONS (drift is visible, not fatal) -----');
+    for (const n of notes) console.log(n);
+    console.log('  Update the pins in .github/workflows/pages.yml when convenient — the proof');
+    console.log('  is already testing the right pages either way.');
+    console.log('---------------------------------------------------------------');
+  }
+  // PUBLISH THE MEMBERSHIP INTO THE ARTIFACT, beside the documents it describes, so the
+  // DEPLOYED twin (scripts/prove-zip-pages-live.mjs) resolves the same controls from the
+  // same classifier instead of carrying its own frozen copy. Written before any assertion
+  // can exit, and a failure here is fatal on purpose: a live monitor with no membership to
+  // read must go red, never fall back to pins.
+  await writeFile(join(SITE, CONTROLS_FILE),
+                  JSON.stringify(publishedControls(man, members)) + '\n');
+  console.log(`published ${CONTROLS_FILE}: `
+    + Object.entries(members).map(([k, v]) => `${k}=${v.length}`).join(' '));
+  return controls;
+}
+
 const main = async () => {
   await new Promise((r) => server.listen(PORT, r));
   const base = `http://127.0.0.1:${PORT}`;
-  const C = JSON.parse(process.env.CONTROLS || '{}');
+  // The manifest is read up front now: control resolution needs it. The later sitemap
+  // reconciliation reads the same object rather than re-reading the file.
+  const man = JSON.parse(await readFile(join(SITE, 'zip-pages-manifest.json'), 'utf8'));
+  const PINS = JSON.parse(process.env.CONTROLS || '{}');
+  if (!PINS.point_dense) throw new Error('CONTROLS is missing point_dense (the one pin that is not derived)');
+  const C = await resolveControls(SITE, man, PINS);
   for (const k of ['pass_dev_pass', 'pass_dev_fail', 'fail_dev_pass', 'fail_dev_fail',
                    'local_news', 'weather_thin', 'honest_empty', 'fanout', 'point_dense']) {
-    if (!C[k]) throw new Error(`CONTROLS is missing ${k}`);
+    if (!C[k]) throw new Error(`no control resolved for ${k}`);
   }
+  console.log('controls: ' + Object.entries(C).map(([k, v]) => `${k}=${v}`).join(' '));
   const P = C.pass_dev_fail, F = C.fail_dev_pass;   // the two page-purpose-separation halves
 
   // ---- initial HTTP response, three user agents -----------------------------------------
@@ -120,16 +157,33 @@ const main = async () => {
   ok(bad.status === 404, 'a non-canonical ZIP path is not a page (404, never an indexable shell)');
 
   // ---- sitemap reconciliation over the real artifact -------------------------------------
-  const man = JSON.parse(await readFile(join(SITE, 'zip-pages-manifest.json'), 'utf8'));
   const sm = await readFile(join(SITE, 'sitemap.xml'), 'utf8');
   const smZips = [...sm.matchAll(/<loc>[^<]*\/community\/(\d{5})\/<\/loc>/g)].map((m) => m[1]);
   ok(!/community\.html\?zip=/.test(sm), 'the artifact sitemap no longer advertises the legacy URL');
-  ok(smZips.length === man.rule_f_pass,
-     `the sitemap advertises exactly the Rule F pass set (${smZips.length} = ${man.rule_f_pass})`);
+  // Rule D (SEO plan step 4): the index-eligible set is Rule F OR Rule D, so the sitemap is
+  // compared with the generator's own indexable_zips as a SET. A count against rule_f_pass
+  // alone went red on the first national build with the plane (10,413 advertised vs 8,743
+  // Rule F), which was correct behaviour; a count alone would also pass two different sets
+  // of the same size.
+  const idxZips = [...(man.indexable_zips || [])].sort();
+  const smSorted = [...smZips].sort();
+  ok(idxZips.length > 0 && smSorted.length === idxZips.length
+       && smSorted.every((z, i) => z === idxZips[i]),
+     `the sitemap advertises exactly the Rule F OR Rule D set (${smZips.length} = ${idxZips.length}; `
+     + `rule_f_pass ${man.rule_f_pass}, rule_d_pass ${man.rule_d_pass})`);
   ok(smZips.includes(C.pass_dev_fail) && !smZips.includes(C.fail_dev_pass),
-     'an Alerts-PASS page is advertised and an Alerts-FAIL page is not');
-  ok(/homesignalmap\.html\?zip=/.test(sm),
-     'the development half of the sitemap survives untouched (page-purpose separation)');
+     'an index-eligible page is advertised and a noindex page is not');
+  // INVERTED 2026-09-19 — same rule the two assertions above state: the advertised set must
+  // BE the index-eligible set. Page-purpose separation assumed the two halves were two sets
+  // of documents; they are not. Measured against production: every homesignalmap.html?zip=
+  // URL serves a byte-identical document (Pages selects by PATH, ignoring the query string),
+  // ships `noindex, nofollow`, and canonicalises to the ZIP-less URL. Advertising 11,718 of
+  // them contradicted this proof's own premise. Restoring the advertisement means making
+  // those URLs real documents (/development/<zip>/), and this line is what changes then.
+  // ⚠️ Its DEPLOYED twin is scripts/prove-zip-pages-live.mjs — move the two together, or the
+  // daily live verifier goes red the day after this merges.
+  ok(!/homesignalmap\.html\?zip=/.test(sm),
+     'the sitemap no longer advertises the noindex development URLs');
 
   // ---- JavaScript must not reverse the build-time decision -------------------------------
   // Every context below is ANONYMOUS: no session, no saved property, no address (control I).
@@ -171,6 +225,16 @@ const main = async () => {
   await browser.close();
   server.close();
   console.log(`\n${pass} passed, ${fail} failed`);
+
+  // The drift-suggestion block that lived here is GONE, and its absence is the point:
+  // it existed to make a red build cheap to repair. Controls now substitute themselves, so
+  // drift never reddens the build and there is nothing to repair. Substitutions are printed
+  // above by resolveControls().
   if (fail) process.exit(1);
 };
-main().catch((e) => { console.error(e); process.exit(1); });
+// Auto-run ONLY when executed directly. Importing this module for the offline test must
+// not start a web server and walk an artifact that is not there.
+import { fileURLToPath } from 'node:url';
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

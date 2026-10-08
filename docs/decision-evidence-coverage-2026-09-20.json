@@ -1,0 +1,4062 @@
+{
+  "measured_at": "2026-09-20",
+  "source_coverage": {
+    "entries": 240,
+    "by_evidence_level": {
+      "decision": 53,
+      "none": 152,
+      "date_only": 35
+    },
+    "can_report_denial": 53,
+    "cannot_report_denial": 187,
+    "by_state": {
+      "TX": {
+        "total": 22,
+        "can": 12
+      },
+      "WA": {
+        "total": 11,
+        "can": 6
+      },
+      "IL": {
+        "total": 7,
+        "can": 1
+      },
+      "IN": {
+        "total": 2,
+        "can": 0
+      },
+      "MA": {
+        "total": 6,
+        "can": 0
+      },
+      "NY": {
+        "total": 6,
+        "can": 0
+      },
+      "AZ": {
+        "total": 11,
+        "can": 2
+      },
+      "MD": {
+        "total": 10,
+        "can": 1
+      },
+      "OH": {
+        "total": 7,
+        "can": 2
+      },
+      "LA": {
+        "total": 2,
+        "can": 1
+      },
+      "CA": {
+        "total": 8,
+        "can": 1
+      },
+      "UT": {
+        "total": 4,
+        "can": 0
+      },
+      "CO": {
+        "total": 8,
+        "can": 2
+      },
+      "MN": {
+        "total": 3,
+        "can": 1
+      },
+      "MI": {
+        "total": 6,
+        "can": 0
+      },
+      "TN": {
+        "total": 10,
+        "can": 0
+      },
+      "OR": {
+        "total": 7,
+        "can": 3
+      },
+      "WI": {
+        "total": 2,
+        "can": 0
+      },
+      "NC": {
+        "total": 10,
+        "can": 6
+      },
+      "FL": {
+        "total": 3,
+        "can": 1
+      },
+      "CT": {
+        "total": 3,
+        "can": 1
+      },
+      "MO": {
+        "total": 6,
+        "can": 2
+      },
+      "VA": {
+        "total": 6,
+        "can": 2
+      },
+      "NV": {
+        "total": 6,
+        "can": 0
+      },
+      "DE": {
+        "total": 3,
+        "can": 2
+      },
+      "GA": {
+        "total": 5,
+        "can": 3
+      },
+      "KY": {
+        "total": 5,
+        "can": 1
+      },
+      "SD": {
+        "total": 8,
+        "can": 1
+      },
+      "MT": {
+        "total": 4,
+        "can": 0
+      },
+      "KS": {
+        "total": 4,
+        "can": 0
+      },
+      "NE": {
+        "total": 3,
+        "can": 0
+      },
+      "AR": {
+        "total": 4,
+        "can": 1
+      },
+      "ID": {
+        "total": 3,
+        "can": 1
+      },
+      "PA": {
+        "total": 11,
+        "can": 1
+      },
+      "SC": {
+        "total": 2,
+        "can": 0
+      },
+      "AL": {
+        "total": 3,
+        "can": 0
+      },
+      "MS": {
+        "total": 1,
+        "can": 0
+      },
+      "WY": {
+        "total": 3,
+        "can": 0
+      },
+      "NM": {
+        "total": 1,
+        "can": 0
+      },
+      "NJ": {
+        "total": 1,
+        "can": 0
+      },
+      "ME": {
+        "total": 2,
+        "can": 0
+      },
+      "IA": {
+        "total": 3,
+        "can": 0
+      },
+      "VT": {
+        "total": 4,
+        "can": 0
+      },
+      "AK": {
+        "total": 1,
+        "can": 0
+      },
+      "HI": {
+        "total": 1,
+        "can": 0
+      },
+      "OK": {
+        "total": 1,
+        "can": 0
+      },
+      "NH": {
+        "total": 1,
+        "can": 0
+      },
+      "WV": {
+        "total": 1,
+        "can": 0
+      },
+      "RI": {
+        "total": 1,
+        "can": 0
+      },
+      "ND": {
+        "total": 2,
+        "can": 1
+      }
+    }
+  },
+  "application_coverage": "NOT MEASURED — needs the live database (see the header)",
+  "entries": [
+    {
+      "registry_id": "austin-subdivision-cases",
+      "platform": "socrata",
+      "jurisdiction": "City of Austin",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "austin-site-plan-cases",
+      "platform": "socrata",
+      "jurisdiction": "City of Austin",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 3,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "austin-issued-construction-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Austin",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "seattle-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Seattle",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "seattle-land-use-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Seattle",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "chicago-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Chicago",
+      "states": [
+        "IL",
+        "IN"
+      ],
+      "counties": 3,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "cambridge-building-permits-new-construction",
+      "platform": "socrata",
+      "jurisdiction": "City of Cambridge",
+      "states": [
+        "MA"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "cambridge-building-permits-addition-alteration",
+      "platform": "socrata",
+      "jurisdiction": "City of Cambridge",
+      "states": [
+        "MA"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "cambridge-demolition-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Cambridge",
+      "states": [
+        "MA"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "nyc-dobnow-approved-permits",
+      "platform": "socrata",
+      "jurisdiction": "New York City (DOB NOW)",
+      "states": [
+        "NY"
+      ],
+      "counties": 6,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nyc-dob-permit-issuance",
+      "platform": "socrata",
+      "jurisdiction": "New York City (DOB BIS legacy)",
+      "states": [
+        "NY"
+      ],
+      "counties": 5,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "mesa-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Mesa",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "montgomery-county-residential-permits",
+      "platform": "socrata",
+      "jurisdiction": "Montgomery County",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "montgomery-county-commercial-permits",
+      "platform": "socrata",
+      "jurisdiction": "Montgomery County",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "montgomery-county-demolition-permits",
+      "platform": "socrata",
+      "jurisdiction": "Montgomery County",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "cincinnati-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Cincinnati",
+      "states": [
+        "OH"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "new-orleans-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of New Orleans",
+      "states": [
+        "LA"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "east-baton-rouge-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Baton Rouge / Parish of East Baton Rouge",
+      "states": [
+        "LA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "marin-county-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "County of Marin",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "austin-zoning-cases",
+      "platform": "socrata",
+      "jurisdiction": "City of Austin Planning Department",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "buffalo-building-permits",
+      "platform": "socrata",
+      "jurisdiction": "City of Buffalo",
+      "states": [
+        "NY"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "prince-georges-county-permits",
+      "platform": "socrata",
+      "jurisdiction": "Prince George's County",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "slc-planning-petitions",
+      "platform": "arcgis",
+      "jurisdiction": "Salt Lake City",
+      "states": [
+        "UT"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "provo-planning-applications",
+      "platform": "arcgis",
+      "jurisdiction": "Provo",
+      "states": [
+        "UT"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "round-rock-large-development-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Round Rock",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "san-antonio-permits-issued",
+      "platform": "arcgis",
+      "jurisdiction": "San Antonio",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "san-marcos-planning-cases",
+      "platform": "arcgis",
+      "jurisdiction": "San Marcos",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "fort-worth-development-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Fort Worth",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "denver-commercial-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City and County of Denver",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "denver-residential-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City and County of Denver",
+      "states": [
+        "CO"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "boulder-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Boulder",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "fort-collins-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Fort Collins",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "colorado-springs-planning-applications",
+      "platform": "arcgis",
+      "jurisdiction": "City of Colorado Springs",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "bellevue-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Bellevue",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "tacoma-accela-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Tacoma",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "pierce-county-pals-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Pierce County (PALS)",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "clark-county-active-dev-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Clark County",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "minneapolis-ccs-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Minneapolis (CCS)",
+      "states": [
+        "MN"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "detroit-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Detroit",
+      "states": [
+        "MI"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "detroit-trades-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Detroit",
+      "states": [
+        "MI"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "detroit-demolition-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Detroit",
+      "states": [
+        "MI"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ann-arbor-energov-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Ann Arbor",
+      "states": [
+        "MI"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "independence-twp-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Independence Township (Oakland County)",
+      "states": [
+        "MI"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "anaheim-land-use-cases",
+      "platform": "arcgis",
+      "jurisdiction": "City of Anaheim",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "scottsdale-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Scottsdale",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "baltimore-city-housing-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Baltimore",
+      "states": [
+        "MD"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "baltimore-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Baltimore County",
+      "states": [
+        "MD"
+      ],
+      "counties": 3,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "columbus-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Columbus",
+      "states": [
+        "OH"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "cleveland-issued-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Cleveland",
+      "states": [
+        "OH"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nashville-building-permits-issued",
+      "platform": "arcgis",
+      "jurisdiction": "Metro Nashville-Davidson County",
+      "states": [
+        "TN"
+      ],
+      "counties": 4,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "portland-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Portland",
+      "states": [
+        "OR"
+      ],
+      "counties": 3,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "madison-planning-projects",
+      "platform": "arcgis",
+      "jurisdiction": "City of Madison",
+      "states": [
+        "WI"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "raleigh-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Raleigh",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "wake-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Wake County",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "miami-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Miami",
+      "states": [
+        "FL"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "tempe-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Tempe",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "irving-development-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Irving",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "hartford-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Hartford",
+      "states": [
+        "CT"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 3,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "kcmo-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Kansas City, Missouri",
+      "states": [
+        "MO"
+      ],
+      "counties": 3,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "fairfax-active-site-construction",
+      "platform": "arcgis",
+      "jurisdiction": "Fairfax County Land Development Services",
+      "states": [
+        "VA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "fairfax-recent-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Fairfax County Land Development Services",
+      "states": [
+        "VA"
+      ],
+      "counties": 3,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "frisco-active-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Frisco",
+      "states": [
+        "TX"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "tucson-commercial-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Tucson",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "tucson-residential-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Tucson",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "gilbert-energov-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Town of Gilbert",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "casa-grande-active-development-sites",
+      "platform": "arcgis",
+      "jurisdiction": "City of Casa Grande",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "udot-active-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Utah Department of Transportation",
+      "states": [
+        "UT"
+      ],
+      "counties": 0,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "arlington-planning-cases",
+      "platform": "arcgis",
+      "jurisdiction": "City of Arlington",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "arlington-permit-applications",
+      "platform": "arcgis",
+      "jurisdiction": "City of Arlington",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "reno-ldc-projects",
+      "platform": "arcgis",
+      "jurisdiction": "City of Reno",
+      "states": [
+        "NV"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "san-antonio-prelim-plan-review",
+      "platform": "arcgis",
+      "jurisdiction": "City of San Antonio",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "denton-county-dev-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Denton County",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "clv-planning-cases",
+      "platform": "arcgis",
+      "jurisdiction": "City of Las Vegas",
+      "states": [
+        "NV"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "arlington-issued-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Arlington",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "harris-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Harris County Permits",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "txdot-projects-info-all",
+      "platform": "arcgis",
+      "jurisdiction": "Texas Department of Transportation",
+      "states": [
+        "TX"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "houston-plat-applications",
+      "platform": "arcgis",
+      "jurisdiction": "City of Houston Planning & Development Department",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "harris-county-plats",
+      "platform": "arcgis",
+      "jurisdiction": "Harris County Permits (unincorporated / non-Houston)",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "fort-worth-zoning-cases",
+      "platform": "arcgis",
+      "jurisdiction": "City of Fort Worth Development Services",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "clark-county-active-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Clark County, Nevada — Public Works",
+      "states": [
+        "NV"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "nvdot-project-boundaries",
+      "platform": "arcgis",
+      "jurisdiction": "Nevada Department of Transportation (NVDOT; self-abbreviates \"NDOT\") — NEVADA, not Nebraska and not North Dakota",
+      "states": [
+        "NV"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "dallas-specific-use-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Dallas",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "henderson-residential-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Henderson, Nevada",
+      "states": [
+        "NV"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "henderson-commercial-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Henderson, Nevada",
+      "states": [
+        "NV"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "phoenix-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Phoenix",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "kent-county-de-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Kent County, Delaware",
+      "states": [
+        "DE",
+        "MD"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "virginia-beach-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Virginia Beach",
+      "states": [
+        "VA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "durham-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City & County of Durham",
+      "states": [
+        "NC"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "cabarrus-county-plan-reviews",
+      "platform": "arcgis",
+      "jurisdiction": "Cabarrus County",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "new-hanover-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "New Hanover County, North Carolina",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "brunswick-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Brunswick County, North Carolina",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "dekalb-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "DeKalb County, Georgia",
+      "states": [
+        "GA"
+      ],
+      "counties": 4,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "forsyth-county-ga-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Forsyth County, Georgia",
+      "states": [
+        "GA"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "savannah-commercial-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Savannah / Chatham County",
+      "states": [
+        "GA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "louisville-active-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Louisville Metro, Kentucky",
+      "states": [
+        "KY"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "kenton-county-devtracking-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Planning & Development Services of Kenton County",
+      "states": [
+        "KY"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sioux-falls-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Sioux Falls, South Dakota",
+      "states": [
+        "SD"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "bozeman-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Bozeman, Montana",
+      "states": [
+        "MT"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "missoula-addresses-with-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Missoula, Montana",
+      "states": [
+        "MT"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "columbia-mo-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Columbia, Missouri",
+      "states": [
+        "MO"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "overland-park-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Overland Park, Kansas",
+      "states": [
+        "KS"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "topeka-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Topeka, Kansas",
+      "states": [
+        "KS"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "lincoln-residential-new-construction-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Lincoln, Nebraska",
+      "states": [
+        "NE"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "little-rock-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Little Rock, Arkansas",
+      "states": [
+        "AR"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "bentonville-catalyst-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Bentonville, Arkansas",
+      "states": [
+        "AR"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "adams-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Adams County, Colorado",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "canyon-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Canyon County, Idaho",
+      "states": [
+        "ID"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "san-jose-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of San Jose, California",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "salem-structure-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Salem, Oregon",
+      "states": [
+        "OR"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "spokane-county-building-planning-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Spokane County, Washington",
+      "states": [
+        "WA"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "new-castle-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "New Castle County, Delaware",
+      "states": [
+        "DE",
+        "PA"
+      ],
+      "counties": 3,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "loudoun-county-residential-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Loudoun County, Virginia",
+      "states": [
+        "VA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "charleston-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Charleston County, South Carolina",
+      "states": [
+        "SC"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "huntsville-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Huntsville, Alabama",
+      "states": [
+        "AL"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "chattanooga-permits-archive",
+      "platform": "arcgis",
+      "jurisdiction": "City of Chattanooga / Hamilton County, Tennessee",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "knoxville-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Knoxville / Knox County, Tennessee",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "desoto-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "DeSoto County, Mississippi",
+      "states": [
+        "MS"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "flathead-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Flathead County, Montana",
+      "states": [
+        "MT"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "aurora-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Aurora, Colorado",
+      "states": [
+        "CO"
+      ],
+      "counties": 3,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sheridan-county-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Sheridan County, Wyoming",
+      "states": [
+        "WY"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "albuquerque-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Albuquerque, New Mexico",
+      "states": [
+        "NM"
+      ],
+      "counties": 2,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "thurston-county-residential-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Thurston County, Washington",
+      "states": [
+        "WA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "butler-county-ks-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Butler County",
+      "states": [
+        "KS"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sussex-county-de-conditional-use",
+      "platform": "arcgis",
+      "jurisdiction": "Sussex County, Delaware",
+      "states": [
+        "DE"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 3
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "weld-county-site-plan-review",
+      "platform": "arcgis",
+      "jurisdiction": "Weld County, Colorado",
+      "states": [
+        "CO"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "fdot-active-construction-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Florida Department of Transportation",
+      "states": [
+        "FL"
+      ],
+      "counties": 0,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "massdot-highway-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Massachusetts Department of Transportation",
+      "states": [
+        "MA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "charlotte-land-dev-commercial-projects",
+      "platform": "arcgis",
+      "jurisdiction": "City of Charlotte",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "asheville-accela-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Asheville",
+      "states": [
+        "NC"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "lexington-row-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Lexington-Fayette Urban County Government",
+      "states": [
+        "KY"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "boone-county-ky-planning-board-actions",
+      "platform": "arcgis",
+      "jurisdiction": "Boone County Planning Commission",
+      "states": [
+        "KY",
+        "OH"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "memphis-dpd-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Memphis Division of Planning & Development",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "murfreesboro-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Murfreesboro, Tennessee",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "chattanooga-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Chattanooga-Hamilton County Regional Planning Agency",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "clarksville-montgomery-final-subdivisions",
+      "platform": "arcgis",
+      "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "clarksville-montgomery-preliminary-subdivisions",
+      "platform": "arcgis",
+      "jurisdiction": "Clarksville-Montgomery County Regional Planning Commission",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "johns-creek-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Johns Creek, Georgia",
+      "states": [
+        "GA"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "lee-county-fl-development-orders",
+      "platform": "arcgis",
+      "jurisdiction": "Lee County, Florida",
+      "states": [
+        "FL"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "stamford-major-developments",
+      "platform": "arcgis",
+      "jurisdiction": "City of Stamford",
+      "states": [
+        "CT"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "allentown-energov-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Allentown, Pennsylvania",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "naperville-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Naperville, Illinois",
+      "states": [
+        "IL"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "peoria-az-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Peoria, Arizona",
+      "states": [
+        "AZ"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "coconino-county-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Coconino County, Arizona",
+      "states": [
+        "AZ"
+      ],
+      "counties": 2,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "bend-or-permit-applications",
+      "platform": "arcgis",
+      "jurisdiction": "City of Bend, Oregon",
+      "states": [
+        "OR"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "worcester-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Worcester, Massachusetts",
+      "states": [
+        "MA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "delaware-county-pa-subdivisions-land-developments",
+      "platform": "arcgis",
+      "jurisdiction": "Delaware County, Pennsylvania",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "chester-county-pa-act247-plans",
+      "platform": "arcgis",
+      "jurisdiction": "Chester County, Pennsylvania",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "centre-county-pa-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Centre County, Pennsylvania",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "york-county-pa-planning-subdivisions",
+      "platform": "arcgis",
+      "jurisdiction": "York County, Pennsylvania",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "montgomery-county-pa-act247-proposals",
+      "platform": "arcgis",
+      "jurisdiction": "Montgomery County Planning Commission",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "summit-county-oh-planning-commission-items",
+      "platform": "arcgis",
+      "jurisdiction": "Summit County Planning Commission",
+      "states": [
+        "OH"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "stlouis-county-mo-subdivisions",
+      "platform": "arcgis",
+      "jurisdiction": "St. Louis County, Missouri (unincorporated)",
+      "states": [
+        "MO"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "kcmo-development-cases",
+      "platform": "arcgis",
+      "jurisdiction": "City of Kansas City, Missouri",
+      "states": [
+        "MO"
+      ],
+      "counties": 4,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "columbia-mo-capital-projects",
+      "platform": "arcgis",
+      "jurisdiction": "City of Columbia, Missouri",
+      "states": [
+        "MO"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "cook-county-il-highway-construction-program",
+      "platform": "arcgis",
+      "jurisdiction": "Cook County Department of Transportation and Highways",
+      "states": [
+        "IL"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "lake-county-il-construction-program",
+      "platform": "arcgis",
+      "jurisdiction": "Lake County, Illinois Division of Transportation",
+      "states": [
+        "IL"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "champaign-il-special-use-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Champaign, Illinois",
+      "states": [
+        "IL"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "mdot-stip-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Michigan Department of Transportation",
+      "states": [
+        "MI"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nj-stip-projects",
+      "platform": "arcgis",
+      "jurisdiction": "New Jersey Department of Transportation",
+      "states": [
+        "NJ"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "maine-dot-public-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Maine Department of Transportation",
+      "states": [
+        "ME"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "maine-dot-public-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Maine Department of Transportation",
+      "states": [
+        "ME"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "iowa-dot-bid-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Iowa Department of Transportation",
+      "states": [
+        "IA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "iowa-dot-bid-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Iowa Department of Transportation",
+      "states": [
+        "IA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "vtrans-project-locations",
+      "platform": "arcgis",
+      "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+      "states": [
+        "VT"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "vtrans-project-locations-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Vermont Agency of Transportation (VTrans)",
+      "states": [
+        "VT"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "slo-county-planning-permits",
+      "platform": "arcgis",
+      "jurisdiction": "San Luis Obispo County Department of Planning & Building",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ctdot-project-work-areas",
+      "platform": "arcgis",
+      "jurisdiction": "Connecticut Department of Transportation (CTDOT)",
+      "states": [
+        "CT"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "aldot-rebuild-alabama-grant-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Alabama Department of Transportation (ALDOT) — Rebuild Alabama Annual Grant Program",
+      "states": [
+        "AL"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "aldot-atrip-ii-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Alabama Department of Transportation (ALDOT) — ATRIP-II",
+      "states": [
+        "AL"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-proposed",
+      "platform": "arcgis",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "states": [
+        "WA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-under-construction",
+      "platform": "arcgis",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "states": [
+        "WA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wsdot-project-delivery-plan-complete",
+      "platform": "arcgis",
+      "jurisdiction": "Washington State Department of Transportation (WSDOT)",
+      "states": [
+        "WA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "adot-tip-fy2026-2030",
+      "platform": "arcgis",
+      "jurisdiction": "Arizona Department of Transportation (ADOT) — adopted FY2026-2030 Transportation Improvement Program",
+      "states": [
+        "AZ"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wisdot-highway-program-6yr",
+      "platform": "arcgis",
+      "jurisdiction": "Wisconsin Department of Transportation (WisDOT) — 6-Year Highway Improvement Program",
+      "states": [
+        "WI"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "mdot-sha-project-portal",
+      "platform": "arcgis",
+      "jurisdiction": "Maryland Department of Transportation State Highway Administration (MDOT SHA) — Project Portal",
+      "states": [
+        "MD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "akdot-stip-24-27",
+      "platform": "arcgis",
+      "jurisdiction": "Alaska Department of Transportation & Public Facilities (AKDOT&PF) — STIP FFY 2024-2027 (Approved Final)",
+      "states": [
+        "AK"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "hdot-active-design-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Hawaii Department of Transportation (HDOT) — Active Design Projects",
+      "states": [
+        "HI"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "anne-arundel-commercial-site-plans",
+      "platform": "arcgis",
+      "jurisdiction": "Anne Arundel County, Maryland — Office of Planning and Zoning",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "anne-arundel-subdivision-activity",
+      "platform": "arcgis",
+      "jurisdiction": "Anne Arundel County, Maryland — Office of Planning and Zoning",
+      "states": [
+        "MD"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "burlington-vt-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Burlington, Vermont — Department of Permitting & Inspections",
+      "states": [
+        "VT"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "burlington-vt-zoning-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Burlington, Vermont — Department of Permitting & Inspections (Zoning)",
+      "states": [
+        "VT"
+      ],
+      "counties": 1,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "okdot-workplan-roadways",
+      "platform": "arcgis",
+      "jurisdiction": "Oklahoma Department of Transportation",
+      "states": [
+        "OK"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "idot-annual-program-construction",
+      "platform": "arcgis",
+      "jurisdiction": "Illinois Department of Transportation",
+      "states": [
+        "IL"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "idot-annual-program-bridges",
+      "platform": "arcgis",
+      "jurisdiction": "Illinois Department of Transportation",
+      "states": [
+        "IL"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "odot-current-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Ohio Department of Transportation",
+      "states": [
+        "OH"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "odot-current-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Ohio Department of Transportation",
+      "states": [
+        "OH"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nysdot-capital-program-projects",
+      "platform": "arcgis",
+      "jurisdiction": "New York State Department of Transportation",
+      "states": [
+        "NY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nysdot-capital-program-projects-2",
+      "platform": "arcgis",
+      "jurisdiction": "New York State Department of Transportation",
+      "states": [
+        "NY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nysdot-capital-program-projects-3",
+      "platform": "arcgis",
+      "jurisdiction": "New York State Department of Transportation",
+      "states": [
+        "NY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nhdot-ten-year-plan-projects",
+      "platform": "arcgis",
+      "jurisdiction": "New Hampshire Department of Transportation",
+      "states": [
+        "NH"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wvdoh-active-projects",
+      "platform": "arcgis",
+      "jurisdiction": "West Virginia Division of Highways (WVDOT)",
+      "states": [
+        "WV"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ridot-rhode-restore-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Rhode Island Department of Transportation",
+      "states": [
+        "RI"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "indot-spms-active-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Indiana Department of Transportation (INDOT)",
+      "states": [
+        "IN"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "modot-stip-locations-accepted",
+      "platform": "arcgis",
+      "jurisdiction": "Missouri Department of Transportation (MoDOT)",
+      "states": [
+        "MO"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "scdot-project-viewer-lines",
+      "platform": "arcgis",
+      "jurisdiction": "South Carolina Department of Transportation (SCDOT)",
+      "states": [
+        "SC"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "kdot-wincpms-project-locations",
+      "platform": "arcgis",
+      "jurisdiction": "Kansas Department of Transportation (KDOT)",
+      "states": [
+        "KS"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "mndot-stip-roadway-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Minnesota Department of Transportation (MnDOT)",
+      "states": [
+        "MN"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "mndot-chip-roadway-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Minnesota Department of Transportation (MnDOT)",
+      "states": [
+        "MN"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ndot-program-book-segments",
+      "platform": "arcgis",
+      "jurisdiction": "Nebraska Department of Transportation (NDOT) — NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+      "states": [
+        "NE"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ndot-program-book-points",
+      "platform": "arcgis",
+      "jurisdiction": "Nebraska Department of Transportation (NDOT) — NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
+      "states": [
+        "NE"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "penndot-transportation-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Pennsylvania Department of Transportation",
+      "states": [
+        "PA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "mt-mdt-stip-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Montana Department of Transportation",
+      "states": [
+        "MT"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-structures",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-safety-points",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-construction-reconstruction",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-resurfacing",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-pavement-preservation",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-safety-lines",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sd-stip-railroad-crossings",
+      "platform": "arcgis",
+      "jurisdiction": "South Dakota Department of Transportation",
+      "states": [
+        "SD"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ar-ardot-job-status-points",
+      "platform": "arcgis",
+      "jurisdiction": "Arkansas Department of Transportation",
+      "states": [
+        "AR"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ar-ardot-job-status-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Arkansas Department of Transportation",
+      "states": [
+        "AR"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "el-paso-new-residential-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of El Paso",
+      "states": [
+        "TX"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "bismarck-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "City of Bismarck",
+      "states": [
+        "ND"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "udot-active-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Utah Department of Transportation",
+      "states": [
+        "UT"
+      ],
+      "counties": 0,
+      "evidence": "date_only",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "vdot-syip-approved-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Virginia Department of Transportation (VDOT) — Six-Year Improvement Program (SYIP), approved projects",
+      "states": [
+        "VA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "vdot-syip-approved-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Virginia Department of Transportation (VDOT) — Six-Year Improvement Program (SYIP), approved projects",
+      "states": [
+        "VA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "itd-itip-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Idaho Transportation Department (ITD) — Idaho Transportation Investment Program (ITIP), FY2027–2033",
+      "states": [
+        "ID"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "itd-itip-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Idaho Transportation Department (ITD) — Idaho Transportation Investment Program (ITIP), FY2027–2033",
+      "states": [
+        "ID"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wydot-stip-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Wyoming Department of Transportation (WYDOT) — State Transportation Improvement Program (STIP)",
+      "states": [
+        "WY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "wydot-stip-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Wyoming Department of Transportation (WYDOT) — State Transportation Improvement Program (STIP)",
+      "states": [
+        "WY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "kytc-syp-highway-plan",
+      "platform": "arcgis",
+      "jurisdiction": "Kentucky Transportation Cabinet (KYTC) — Six-Year Highway Plan (SYP), 2026 enacted plan. KENTUCKY: the agency is the Transportation CABINET, not a DOT; KDOT is KANSAS.",
+      "states": [
+        "KY"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ncdot-stip-projects-points",
+      "platform": "arcgis",
+      "jurisdiction": "North Carolina Department of Transportation (NCDOT) — 2026-2035 State Transportation Improvement Program (STIP)",
+      "states": [
+        "NC"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "ncdot-stip-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "North Carolina Department of Transportation (NCDOT) — 2026-2035 State Transportation Improvement Program (STIP)",
+      "states": [
+        "NC"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "city-of-orange-active-planning-projects",
+      "platform": "arcgis",
+      "jurisdiction": "City of Orange, California",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "nddot-special-road-fund-projects",
+      "platform": "arcgis",
+      "jurisdiction": "North Dakota Department of Transportation (NDDOT)",
+      "states": [
+        "ND"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "caltrans-sb1-projects",
+      "platform": "arcgis",
+      "jurisdiction": "California Department of Transportation (Caltrans)",
+      "states": [
+        "CA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "oregon-dot-stip-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Oregon Department of Transportation (ODOT)",
+      "states": [
+        "OR"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "oregon-dot-stip-projects-lines",
+      "platform": "arcgis",
+      "jurisdiction": "Oregon Department of Transportation (ODOT)",
+      "states": [
+        "OR"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "sonoma-county-fire-rebuild-permits",
+      "platform": "arcgis",
+      "jurisdiction": "County of Sonoma — Permit Sonoma",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "jackson-county-or-building-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Jackson County, Oregon",
+      "states": [
+        "OR"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "jackson-county-or-land-use-permits",
+      "platform": "arcgis",
+      "jurisdiction": "Jackson County, Oregon",
+      "states": [
+        "OR"
+      ],
+      "counties": 1,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": true
+    },
+    {
+      "registry_id": "georgia-dot-gpas-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Georgia Department of Transportation (GDOT)",
+      "states": [
+        "GA"
+      ],
+      "counties": 0,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 1,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "tennessee-dot-projects",
+      "platform": "arcgis",
+      "jurisdiction": "Tennessee Department of Transportation (TDOT)",
+      "states": [
+        "TN"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "iowa-dot-five-year-program",
+      "platform": "arcgis",
+      "jurisdiction": "Iowa Department of Transportation",
+      "states": [
+        "IA"
+      ],
+      "counties": 0,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "boston-approved-building-permits",
+      "platform": "ckan",
+      "jurisdiction": "City of Boston",
+      "states": [
+        "MA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "pittsburgh-pli-permits",
+      "platform": "ckan",
+      "jurisdiction": "City of Pittsburgh",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "allegheny-county-asbestos-permits",
+      "platform": "ckan",
+      "jurisdiction": "Allegheny County Health Department",
+      "states": [
+        "PA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "san-diego-approved-permits",
+      "platform": "csv",
+      "jurisdiction": "City of San Diego",
+      "states": [
+        "CA"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "philadelphia-li-permits",
+      "platform": "carto",
+      "jurisdiction": "City of Philadelphia",
+      "states": [
+        "PA"
+      ],
+      "counties": 3,
+      "evidence": "decision",
+      "can_report_denial": true,
+      "declared_decision_values": {
+        "denied": 2,
+        "withdrawn": 1
+      },
+      "has_decision_date_column": false
+    },
+    {
+      "registry_id": "shelby-county-building-permits",
+      "platform": "opendatasoft",
+      "jurisdiction": "Shelby County, Tennessee",
+      "states": [
+        "TN"
+      ],
+      "counties": 1,
+      "evidence": "none",
+      "can_report_denial": false,
+      "declared_decision_values": {
+        "denied": 0,
+        "withdrawn": 0
+      },
+      "has_decision_date_column": false
+    }
+  ]
+}

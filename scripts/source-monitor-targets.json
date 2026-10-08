@@ -912,7 +912,8 @@
         "services.arcgis.com",
         "services2.arcgis.com",
         "services3.arcgis.com",
-        "egisdata.baltimorecity.gov"
+        "egisdata.baltimorecity.gov",
+        "baltegis.baltimorecity.gov"
       ]
     }
   ]

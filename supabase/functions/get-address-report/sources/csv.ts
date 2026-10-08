@@ -35,11 +35,13 @@ import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
-import { fenceGeocode, filedZipOf } from "./geo-fence.ts";
+import { fenceGeocode, filedZipOf, noteFenceOutcome } from "./geo-fence.ts";
+import { buildGeocodeInput } from "./geo-input.ts";
 import {
   coverageMatches,
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
+import { browsingBucketFor, decisionFor, decisionEvidenceLevel } from "./decision.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -51,6 +53,9 @@ export interface CsvRegistryEntry {
   /** Human landing page; the record_url fallback when no per-row URL is derivable. */
   dataset_url: string;
   jurisdiction: string;
+  /** OPT-IN: assemble a COMPLETE one-line address before geocoding instead of sending the
+   *  bare address column. Absent/false ⇒ prior behavior. */
+  geocode_assemble?: boolean;
   coverage: { state: string; county?: string }[];
   column_map: ColumnMap;
   type_map?: Record<string, string>;
@@ -89,6 +94,10 @@ export interface CsvRunReport {
   fetched: number;
   emitted: number;
   excluded_by_status: ExcludedStatus[];
+  /** matched a DECISION bucket → EMITTED with a sourced decision notation. Reported
+   *  apart from excluded_by_status so "surfaced 12 denials" and "dropped 12 records"
+   *  can never read the same in a run report. */
+  decided_by_status: ExcludedStatus[];
   unmapped_statuses: UnmappedStatus[];
   /** matched a registry key only after case-folding — NON-failing drift note */
   case_insensitive_matches: CaseFoldMatch[];
@@ -109,6 +118,8 @@ export interface CsvDeps {
   >;
   /** ZIP centroid for entries using spatial_zip_radius_mi. */
   zipCentroid?: { lat: number; lng: number };
+  /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
+  noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
 
 export interface CsvCommunityRow { state?: string | null; county?: string | null; }
@@ -152,7 +163,7 @@ async function runEntry(
 ): Promise<{ records: NormalizedRecord[]; report: CsvRunReport }> {
   const report: CsvRunReport = {
     registry_id: entry.registry_id, url: entry.url,
-    file_rows: 0, fetched: 0, emitted: 0, excluded_by_status: [], unmapped_statuses: [],
+    file_rows: 0, fetched: 0, emitted: 0, excluded_by_status: [], decided_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
     blank_status: 0, skipped_no_coords: 0, geocode_failures: 0, no_record_url: 0, quarantined: [], truncated_at_max_rows: null,
   };
@@ -207,6 +218,7 @@ async function runEntry(
     return { records, report };
   }
   const excludeCount = new Map<string, number>();
+  const decidedCount = new Map<string, number>();
   const unmappedCount = new Map<string, number>();
   const caseFold = new Map<string, CaseFoldMatch>();
   const maxRows = entry.max_rows ?? 20000;
@@ -229,19 +241,27 @@ async function runEntry(
     if (bucket === undefined) { unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1); continue; }
     if (hit.caseInsensitive) noteCaseFold(caseFold, "status", statusRaw, hit.matchedKey);
     if (bucket === "exclude") { excludeCount.set(statusRaw, (excludeCount.get(statusRaw) ?? 0) + 1); continue; }
+    // A DECISION bucket does NOT continue — the row is emitted with its decision
+    // attached. Counted here so the run report can distinguish surfaced from dropped.
+    if (bucket === "denied" || bucket === "withdrawn") { decidedCount.set(statusRaw, (decidedCount.get(statusRaw) ?? 0) + 1); }
     const rec = await normalizeRow(row, entry, statusRaw, bucket, deps, report, typeLookup, caseFold, zip);
     if (rec) records.push(rec);
   }
 
   report.emitted = records.length;
   report.excluded_by_status = [...excludeCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+  report.decided_by_status = [...decidedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
   return { records, report };
 }
 
+// A decision bucket maps to the BROWSING category, never to a lifecycle it never reached:
+// a denied application is a HISTORICAL PROPOSAL, so it stays where a resident looks for
+// it and carries its decision beside it. See sources/decision.ts.
 const BUCKET_TO_TYPE: Record<string, NormalizedRecord["type"]> = {
   proposed: "proposed", approved: "approved", operating: "built",
+  denied: browsingBucketFor("denied"), withdrawn: browsingBucketFor("withdrawn"),
 };
 
 async function normalizeRow(
@@ -282,14 +302,18 @@ async function normalizeRow(
   if (lat != null && lng != null) {
     geoPrecision = "point"; scope = "point";
   } else if (address && deps.geocode) {
-    const g = await deps.geocode(address);
-    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: address }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
+    const gi = entry.geocode_assemble
+      ? buildGeocodeInput({ rawAddress: address, jurisdiction: entry.jurisdiction, state: entry.coverage[0]?.state, zipColValue: valOrNull(readCol(row, cm.zip)), reportZip })
+      : { input: address, filedZip: filedZipOf(readCol(row, cm.zip), reportZip) };
+    const g = await deps.geocode(gi.input);
+    if (!g) { report.geocode_failures++; report.quarantined.push({ reason: "geocode failed", sample: gi.input }); lat = null; lng = null; geoPrecision = "jurisdiction"; scope = "area"; }
     else {
       // GEOFENCE (anti-fabrication) — the shared implementation, identical across all five
       // connectors. Census range-interpolation can match the same street name in another
       // city/state. A miss NULLS the coords — the record stays listed as an area item, the
       // untrusted marker is never rendered. Source-supplied coords are NEVER fenced.
-      const verdict = fenceGeocode(g, filedZipOf(readCol(row, cm.zip), reportZip), deps.zipCentroid);
+      const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      await noteFenceOutcome(deps.noteFence, gi.input, verdict);
       if (!verdict.ok) {
         report.geocode_failures++;
         report.quarantined.push({ reason: verdict.reason, sample: address });
@@ -305,6 +329,15 @@ async function normalizeRow(
   } else {
     geoPrecision = "jurisdiction"; scope = "area"; lat = null; lng = null;
   }
+  // DECISION HISTORY, built from values this row already proves: the publisher's own
+  // status word, its own decision_date column, and the official URL the
+  // anti-fabrication gate already required. `decided_on` stays null when the source
+  // states no decision date — never filled from file_date or the refresh clock.
+  const decisionRec = decisionFor({
+    bucket, statusRaw,
+    decisionDate: isoDay(readCol(row, cm.decision_date)),
+    recordUrl, urlPrecision: precision,
+  });
 
   const rec: NormalizedRecord = {
     source_id: `csv:${hostOf(entry.url)}:${entry.registry_id}:${caseNo ?? title}`,
@@ -317,6 +350,9 @@ async function normalizeRow(
     type_raw: typeSrcVal || null,   // verbatim publisher value, pre-map (see NormalizedRecord)
     bucket,
     type: BUCKET_TO_TYPE[bucket],
+    decision: decisionRec,
+    decided: decisionRec !== null,
+    decision_evidence: decisionEvidenceLevel(entry),
     relevance: "development",
     rel_rule: `source:csv:${entry.registry_id}`,
     layer: layerFor(useType),

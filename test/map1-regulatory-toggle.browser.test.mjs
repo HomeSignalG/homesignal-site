@@ -21,6 +21,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -68,7 +69,29 @@ const ZIP_AUTH = { '20171': { zip: '20171', mode: 'development', status: 'bounda
   markers: [{ project_ref: 'arcgis:fairfax:P-1', lat: 38.95065, lng: -77.36458,
     marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 }] } };
 
-const browser = await chromium.launch();
+// ── ADDRESS-MODE FIXTURES ─────────────────────────────────────────────────────────
+// The resident's journey in the bug report was ADDRESS mode, not ZIP mode, and the two
+// differ in the 3D painter: address mode applies a radius cull that ZIP mode does not.
+// Same three production records, re-placed inside the 1-mile default radius so the cull
+// keeps them; e/n are what siteEN reads in address mode, and the lat/lng agree with them.
+const ADDR_TEXT = '13313 Coomes Dr, Del Valle, TX';
+const ADDR_HOME = { lat: 38.9506, lng: -77.3645 };
+const ADDR_DUAL = Object.assign({}, DUAL, { e: 0.22, n: 0.18, lat: 38.95321, lng: -77.36040 });
+const ADDR_FAC = Object.assign({}, PLAIN_FAC, { e: 0.30, n: 0.42, lat: 38.95669, lng: -77.35891 });
+// The project reaches address mode only through the canonical N5 radius RPC — n5MergeSites
+// drops the report engine's own development points on purpose, so mocking it into `sites`
+// would prove nothing about the path production uses.
+const N5_ROWS = [{ source_key: 'arcgis:fairfax:P-1', feature_id: 'f1', distance_mi: 0.39,
+  marker_lat: 38.95495, marker_lng: -77.35984, provenance: 'source_point',
+  geometry_type: 'Point', registry_id: 'fairfax-active-site-construction', has_more: false }];
+const N5_PROJECTS = [{ source_key: 'arcgis:fairfax:P-1', name: 'Pennhurst Data Centers',
+  type: 'Data Center', status: 'Approved', source_ref: 'https://plus.fairfaxcounty.gov/x',
+  registry_id: 'fairfax-active-site-construction', submitted_at: '2026-01-04',
+  date_kind: 'filed', impact_score: null, impact_dimensions: null }];
+
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const page = await (await browser.newContext()).newPage();
 const pageErrors = [];
 page.on('pageerror', e => pageErrors.push(String(e).slice(0, 200)));
@@ -77,12 +100,24 @@ const zipOf = (url) => (url.match(/(?:zip=eq\.|%7B)(\d{5})/) || [])[1] || null;
 await page.route('**/*', async (route) => {
   const url = route.request().url();
   if (url.startsWith(base)) return route.continue();
+  if (url.includes('/functions/v1/geocode-address'))
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ match: { lat: ADDR_HOME.lat, lng: ADDR_HOME.lng, matchedAddress: ADDR_TEXT } }) });
+  if (url.includes('/functions/v1/get-address-report'))
+    return route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ address: ADDR_TEXT, counts: { facilities: 2 },
+        sites: [ADDR_DUAL, ADDR_FAC], refreshed_at: '2026-09-06T00:00:00Z', facilities_unavailable: false }) });
+  if (url.includes('/rpc/n5_projects_within_radius'))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(N5_ROWS) });
+  if (url.includes('/rest/v1/app_projects'))
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(N5_PROJECTS) });
   if (url.includes('/rpc/app_zip_projects_markers')) {
     let z = '';
     try { z = String(JSON.parse(route.request().postData() || '{}').p_zip || ''); } catch (e) { z = ''; }
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(ZIP_AUTH[z] || { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null }) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
   if (url.includes('/rest/v1/communities'))
@@ -126,6 +161,7 @@ const markers = () => page.evaluate(() =>
     const rect = html.match(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([\d.]+)"/);
     return {
       polygons: (html.match(/<polygon/g) || []).length,
+      primaryPoints: ((html.match(/points="([^"]+)"/) || [])[1] || '').trim().split(/\s+/).filter(Boolean).length,
       purple: /#7d148c/i.test(html),
       rBadge: />R<\/text>/.test(html) && /#7d148c/i.test(html),
       badgeX: rect ? Number(rect[1]) : null,
@@ -149,6 +185,21 @@ const rowsLook = () => page.evaluate(() => {
   });
   return { stage: read('#mapkey .stagechip'), type: read('#mapkeyShapes .typechip') };
 });
+
+// ── 0L. EPA FACILITIES HAVE A LIST HOME (founder decision, 2026-09-24) ───────────────
+// An EPA registration states no lifecycle, so the two EPA fixtures (cached type:'built' and all)
+// are listed under "Lifecycle unknown" — never under "Operating now", and never in no list.
+const bandsOf = () => page.evaluate(() => ({
+  built: (document.getElementById('builtList') || {}).textContent || '',
+  unknown: (document.getElementById('unknownList') || {}).textContent || '',
+  unknownHead: ((document.querySelector('.band-h.t-unknown') || {}).textContent || '').trim()
+}));
+{
+  const b = await bandsOf();
+  ok(b.unknownHead === 'Lifecycle unknown' && /ANDURIL/.test(b.unknown) && /CORESITE/.test(b.unknown),
+    '0L: both EPA facilities are listed under Lifecycle unknown', JSON.stringify(b).slice(0, 300));
+  ok(!/ANDURIL|CORESITE/.test(b.built), '0L: no EPA facility is listed under Operating now');
+}
 
 // ── 1. THREE ROWS, IN ORDER, AND THE THIRD IS NOT A TYPE ──────────────────────────
 const headings = await page.evaluate(() =>
@@ -253,15 +304,19 @@ ok(await regState() === 'true', '2g: ...and restored for the rest of the suite')
 // ── 3. THE BADGE IS AN OVERLAY IN THE LOWER-RIGHT CORNER ──────────────────────────
 const on = await markers();
 ok(on.length === 3, '3: the three production records render', on.length);
-const dual = on.filter(m => m.polygons === 1 && m.rBadge);
+const dual = on.filter(m => m.primaryPoints === 8 && m.rBadge);
 ok(dual.length === 1, '3b: the regulated data centre keeps its octagon AND gains the R badge', dual.length);
 ok(dual[0].badgeX > 7 && dual[0].badgeY > 7,
   '3c: the badge sits in the LOWER-RIGHT corner of a 14px pin',
   dual[0].badgeX + ',' + dual[0].badgeY);
 ok(dual[0].badgeW < 14 * 0.8, '3d: …and is visually secondary to the project marker',
   dual[0].badgeW + ' < ' + (14 * 0.8));
-ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 1,
-  '3e: a regulatory-only location draws a standalone purple square');
+// overlay-on-Type is GLOBAL: every Map 1 surface reads HS.resolveMarker. These
+// fixtures are production rows; the contract is not ZIP-scoped.
+ok(on.filter(m => m.purple && m.polygons === 0 && !m.rBadge).length === 0,
+  '3e: no classifiable EPA record draws a standalone purple square — regulatory is the overlay');
+ok(on.filter(m => m.primaryPoints === 3 && m.rBadge).length === 1,
+  '3e2: industrial EPA draws a Type triangle + purple R — regulatory is the overlay');
 ok(on.filter(m => m.polygons === 1 && !m.purple).length === 1,
   '3f: a project with no regulatory record gets no purple at all — nothing is invented');
 
@@ -270,10 +325,10 @@ const lookBefore = await rowsLook();
 await clickReg();
 ok(await regState() === 'false', '4: clicking the switch turns it off');
 const off = await markers();
-ok(off.length === 2, '4b: OFF -> the regulatory-only location is hidden', off.length);
+ok(off.length === 3, '4b: OFF -> classifiable EPA stays as its Type pin; only the R is dropped', off.length);
 ok(off.filter(m => m.rBadge).length === 0, '4c: OFF -> no R badge is painted anywhere');
-ok(off.filter(m => m.polygons === 1).length === 2,
-  '4d: OFF -> BOTH data centres are still drawn — the project is never hidden by this switch', off.length);
+ok(off.filter(m => m.polygons >= 1).length === 3,
+  '4d: OFF -> both data centres AND the industrial EPA Type pin are still drawn', off.length);
 // The founder's list, measured against the rendered rows: nothing about Stage or Type may
 // change, gray out, strike through, hide or reset.
 const lookAfter = await rowsLook();
@@ -288,10 +343,92 @@ ok(lookAfter.type.every(r => r.split('|')[1] === 'true' && r.split('|')[4] === '
 await clickReg();
 ok(await regState() === 'true', '5: clicking again turns it back on');
 const back = await markers();
-ok(back.length === 3 && back.filter(m => m.rBadge).length === 1,
-  '5b: the badge is repainted on the pin that is already on the map', back.filter(m => m.rBadge).length);
+ok(back.length === 3 && back.filter(m => m.rBadge).length === 2,
+  '5b: the badge is repainted on every overlay pin that is already on the map', back.filter(m => m.rBadge).length);
 ok(JSON.stringify(await rowsLook()) === JSON.stringify(lookBefore),
   '5c: …and the other two rows are still untouched');
+
+// ── 5d. 3D AERIAL PAINTS THE SAME COLOURS THE 2D PINS DO ──────────────────────────
+// Production 3D aerial used to colour every building from the lifecycle bucket, so
+// an EPA-only location became a green "Operating now" block while the legend still
+// said "Purple R = regulatory record". Colour now comes from site3DPaint → mk.color.
+// The jsdelivr mock in this file does not serve three.js, so this path is the
+// Canvas-2D aerial fallback — the same paint function the WebGL path uses.
+await page.click('#viewSeg button[data-v="3d"]');
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length >= 3,
+  null, { timeout: 25000 });
+const aerialInfo = await page.evaluate(() => {
+  const paints = window.__HS_AERIAL_PAINT || [];
+  const find = (re) => paints.find((r) => re.test(r.label || '')) || null;
+  return {
+    n: paints.length,
+    facility: (window.HS && HS.REGULATORY_LEGEND && HS.REGULATORY_LEGEND.color) || null,
+    approved: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.approved) || null,
+    operating: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.operating) || null,
+    unknown: (window.HS && HS.LIFECYCLE_HEX && HS.LIFECYCLE_HEX.unknown) || null,
+    anduril: find(/ANDURIL/),
+    coresite: find(/CORESITE/),
+    penn: find(/Pennhurst/)
+  };
+});
+ok(aerialInfo.n >= 3, '5d: 3D aerial painted the three fixture records', aerialInfo.n);
+// EPA FRS states no lifecycle (2026-09-24): an EPA-only record — even a CACHED element still
+// carrying the old type:'built' stamp, as this fixture does — is lifecycle UNKNOWN, never
+// operating green, and never a purple pin.
+ok(aerialInfo.anduril && String(aerialInfo.anduril.color).toLowerCase() === String(aerialInfo.unknown).toLowerCase()
+    && String(aerialInfo.anduril.color).toLowerCase() !== String(aerialInfo.operating).toLowerCase()
+    && aerialInfo.anduril.signal === true,
+  '5e: classifiable EPA is lifecycle-unknown on 3D aerial with the purple R overlay — not operating, not a purple pin',
+  JSON.stringify(aerialInfo.anduril) + ' unknown=' + aerialInfo.unknown);
+ok(aerialInfo.penn && String(aerialInfo.penn.color).toLowerCase() === String(aerialInfo.approved).toLowerCase()
+    && aerialInfo.penn.signal === false,
+  '5f: a project with no regulatory record keeps its status colour',
+  JSON.stringify(aerialInfo.penn));
+ok(aerialInfo.coresite && aerialInfo.coresite.signal === true
+    && String(aerialInfo.coresite.color).toLowerCase() === String(aerialInfo.unknown).toLowerCase(),
+  '5g: a dual-identity EPA data centre with no sourced lifecycle is lifecycle-unknown and carries the purple R',
+  JSON.stringify(aerialInfo.coresite));
+// ── 5h. THE SWITCH OWNS THE 3D BLOCKS TOO ────────────────────────────────────────
+// §4b-§4g proved this for the 2D pins. The 3D aerial is a SECOND renderer of the same
+// filter, so proving the colour there without proving the toggle there would leave the
+// half a resident actually complained about unasserted: OFF must remove the EPA-only
+// BLOCK, keep the project block, drop the R — and still touch neither chip row.
+const look3DBefore = await rowsLook();
+await clickReg();
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
+  null, { timeout: 25000 });
+const aerialOff = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
+  (r) => ({ label: r.label, color: r.color, signal: r.signal })));
+ok(aerialOff.length === 3 && aerialOff.some((r) => /ANDURIL/.test(r.label || '')),
+  '5h: OFF -> the industrial EPA BLOCK stays on 3D aerial as its Type colour — the overlay is gone, not the pin',
+  JSON.stringify(aerialOff.map((r) => r.label)));
+ok(aerialOff.filter((r) => r.signal).length === 0,
+  '5i: OFF -> no purple R rides on any 3D block');
+ok(aerialOff.filter((r) => /CORESITE|Pennhurst|ANDURIL/.test(r.label || '')).length === 3
+   && aerialOff.every((r) => String(r.color).toLowerCase() !== String(aerialInfo.facility).toLowerCase()),
+  '5j: OFF -> Type pins stay in their status colours — regulatory never owns the pin',
+  JSON.stringify(aerialOff));
+ok(JSON.stringify(await rowsLook()) === JSON.stringify(look3DBefore),
+  '5k: …and turning it off from the 3D view still moves neither the Stage nor the Type row');
+await clickReg();
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
+  null, { timeout: 25000 });
+ok((await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).filter((r) => r.signal).length)) === 2,
+  '5l: ON again -> the R comes back on every overlay block');
+
+const shotDir = process.env.HS_SCREENSHOT_DIR;
+if (shotDir) {
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: join(shotDir, 'map1_3d_aerial_regulatory_purple.png'), fullPage: false });
+}
+await page.click('#viewSeg button[data-v="2d"]');
+await page.waitForTimeout(300);
+if (shotDir) {
+  await page.screenshot({ path: join(shotDir, 'map1_2d_regulatory_purple.png'), fullPage: false });
+}
 
 // ── 6. THE OTHER DIRECTION — Stage and Type never move the regulatory switch ──────
 await page.click('#mapkey span:has-text("Approved")');
@@ -303,6 +440,53 @@ ok(await regState() === 'true', '6b: clicking a Type chip does not touch it eith
 // …and Stage still composes with the badge: hiding a stage hides the pin, badge and all.
 ok((await markers()).every(m => !m.rBadge || m.polygons === 1),
   '6c: a badge only ever exists on a pin that is itself visible');
+
+// ── 6d. ADDRESS MODE — THE JOURNEY IN THE BUG REPORT ─────────────────────────────
+// The screenshot that opened this was ZIP 78617 -> search an address -> 3D aerial, which
+// is ADDRESS mode. It is a different geographic path (radius cull, N5 development, no ZIP
+// frame), so proving the paint in ZIP mode alone would leave the reported view unproven.
+// §6 and §6b left a Stage chip and a Type chip switched OFF. Restore them, or this
+// section would measure a filtered population and read as a paint failure.
+await page.click('#mapkey span:has-text("Approved")');
+await page.click('#mapkeyShapes .typechip[data-cat="datacenter"]');
+await page.waitForTimeout(150);
+await page.click('#viewSeg button[data-v="2d"]');
+await page.fill('#addr', ADDR_TEXT);
+await page.click('#go');
+await page.waitForFunction((label) => {
+  const s = window.__HS_SITES || [];
+  return !window.__HS_ZIP_MODE_ONLY && s.length >= 3 && s.some((r) => /Pennhurst/.test(String(r.label || '')));
+}, ADDR_TEXT, { timeout: 30000 });
+await page.click('#viewSeg button[data-v="3d"]');
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length >= 3,
+  null, { timeout: 25000 });
+const addrPaint = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
+  (r) => ({ label: r.label, color: String(r.color).toLowerCase(), signal: r.signal })));
+const facHex = String(aerialInfo.facility).toLowerCase();
+const find2 = (re) => addrPaint.find((r) => re.test(r.label || '')) || null;
+ok(addrPaint.length >= 3, '6d: address mode 3D aerial painted the three records', addrPaint.length);
+ok(find2(/ANDURIL/) && find2(/ANDURIL/).color === String(aerialInfo.unknown).toLowerCase()
+   && find2(/ANDURIL/).signal === true,
+  '6e: address mode — classifiable EPA is lifecycle-unknown + R, the same as every other Map 1',
+  JSON.stringify(find2(/ANDURIL/)));
+ok(find2(/Pennhurst/) && find2(/Pennhurst/).color === String(aerialInfo.approved).toLowerCase(),
+  '6f: address mode — a nearby project keeps its status colour', JSON.stringify(find2(/Pennhurst/)));
+ok(find2(/CORESITE/) && find2(/CORESITE/).signal === true
+   && find2(/CORESITE/).color === String(aerialInfo.unknown).toLowerCase(),
+  '6g: address mode — the dual-identity EPA data centre is lifecycle-unknown plus the purple R',
+  JSON.stringify(find2(/CORESITE/)));
+await clickReg();
+await page.waitForFunction(
+  () => Array.isArray(window.__HS_AERIAL_PAINT) && window.__HS_AERIAL_PAINT.length === 3,
+  null, { timeout: 25000 });
+const addrOff = await page.evaluate(() => (window.__HS_AERIAL_PAINT || []).map(
+  (r) => ({ label: r.label, color: String(r.color).toLowerCase(), signal: r.signal })));
+ok(addrOff.some((r) => /ANDURIL/.test(r.label || '')) && addrOff.length === 3
+   && addrOff.filter((r) => r.signal).length === 0,
+  '6h: address mode — regulatory OFF drops every R and keeps the Type pin',
+  JSON.stringify(addrOff));
+await clickReg();
 
 ok(pageErrors.length === 0, '7: no uncaught page errors', pageErrors.join(' | '));
 

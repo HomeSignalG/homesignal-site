@@ -51,8 +51,23 @@ ok('served page downloads images instead of signing a URL',
   /storage\.from\('social-images'\)\.download\(p\.image_bucket_path\)/.test(doc));
 ok('served page renders the Approve button LOCKED for image-bearing MAPS drafts',
   /data-gate="image" disabled/.test(doc));
+// ⚠️ THIS PINNED A LITERAL THAT MOVED, AND SO IT HAD BEEN RED SINCE 2026-09-15 — on
+// PRODUCTION, against a page that was working correctly the whole time. It asserted the
+// inline expression `mapsImageRequired(gr) && !_bskyImgOk[id]` inside the click handler;
+// #1221 (b8adc02) moved that expression into the shared `bskyApprovalBlockReason` so the
+// button and the handler could not disagree — a strictly STRONGER form of the property
+// this line exists to protect. `git log -S` puts its removal in that commit.
+//
+// A production verifier that fails on a correct refactor is worse than one that does not
+// exist: the next reader has to decide whether a red badge means a broken page or a stale
+// pin, and the cheap answer is to stop reading it. Both halves are asserted now, exactly as
+// test/maps-preview-parity.test.mjs already does offline — pinning only the call would let
+// the rule be gutted while the handler kept calling an empty gate.
 ok('served page re-checks the gate in the click handler',
-  /mapsImageRequired\(gr\) && !_bskyImgOk\[id\]/.test(doc));
+  /var block=bskyApprovalBlockReason\(gr\);[\s\S]{0,120}?if\(block\)\{[\s\S]{0,80}?return;/.test(doc));
+ok('…and the served gate still carries the image rule',
+  /mapsImageRequired\(p\) && !_bskyImgOk\[p\.id\]/
+    .test((doc.match(/function bskyApprovalBlockReason\(p\)\{([\s\S]*?)\n  \}/) || [, ''])[1]));
 ok('served page never makes the bucket public and holds no service key',
   !/getPublicUrl/.test(doc) && !/service_role|SUPABASE_SERVICE/.test(doc));
 

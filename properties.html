@@ -4,20 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Saved Places</title>
+<title>HomeSignal — My Places</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=031bef8e">
 </head>
-<body data-nav="props">
+<body data-nav="props" data-no-where>
 <template id="hs-content">
   <div class="page">
     <div class="ph">
-      <div class="eyebrow">Saved Places</div>
-      <h1>Your Saved Places</h1>
-      <p>Follow as many homes as you like — yours, a rental, or a family member's. Each is watched independently, and you're alerted when something changes near any of them.</p>
+      <div class="eyebrow">My Places</div>
+      <h1>My Places</h1>
+      <p>Everything HomeSignal watches for you. An <b>Address</b> is one location; a <b>ZIP&nbsp;Code</b> is a whole community. Followed <b>Developments</b> are listed here so you can find them again — they are not Addresses or ZIP Codes, and following a Development does not turn on email alerts.</p>
+    </div>
+    <!-- My Places' two secondary destinations (founder navigation plan v3). Both pages left the
+         primary menu and live under My Places now: the Dashboard is "What's Changed" and
+         alerts.html is "Alert Settings". Plain hrefs with no ?zip=, like the Dashboard's own
+         "Manage your alerts" link: this page covers every Place, so it names none. -->
+    <div class="pl-secondary" id="plSecondary" style="display:flex;flex-wrap:wrap;gap:8px;margin:-6px 0 20px">
+      <a class="inlinebtn" href="dashboard.html" id="plWhatsChanged" style="text-decoration:none">What's Changed &rarr;</a>
+      <a class="inlinebtn" href="alerts.html" id="plAlertSettings" style="text-decoration:none">Alert Settings &rarr;</a>
     </div>
     <div class="strip" id="propStrip"></div>
-    <div class="bt-row"><h2 style="font-size:15px;margin:0">Places you follow</h2><button class="addbtn" onclick="HS.addHome()">+ Add a Saved Place</button></div>
+    <div class="toolbar toolbar--lead">
+      <div class="seg" id="plViews">
+        <button class="on" type="button" data-view="all">All</button>
+        <button type="button" data-view="addresses">Addresses</button>
+        <button type="button" data-view="zips">ZIP Codes</button>
+        <button type="button" data-view="projects">Developments</button>
+      </div>
+      <div class="sp"></div>
+      <button class="addbtn" type="button" id="plAddAddress">+ Add Address</button>
+      <button class="addbtn" type="button" id="plAddZip">+ Add ZIP Code</button>
+    </div>
     <div class="propgrid" id="propGrid"></div>
   </div>
 </template>
@@ -27,48 +45,472 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
+<script src="lib/dashboard-aggregate.js?v=2aa31001"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=61d2fce9"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
+
+  // ---- THIS PAGE'S SCOPE IS EVERY PLACE, SO IT NAMES EVERY PLACE ----------------------
+  // My Places is the CONTAINER of the resident's Places, never one of them, so the Viewing
+  // control must not name a single saved Address here. It did: with no declaration of its
+  // own the page fell through to the shell's saved-address default, and a resident whose
+  // address sits in the ZIP they are focused on read "Viewing · 13313 COOMES DR" at the top
+  // of the page listing all five of their places (founder-observed on production,
+  // 2026-09-15). #1214 established the rule that outranks that default — an explicit
+  // page-level declaration — and correctly reasoned that "no single Place is in view" here,
+  // but it recorded that as an EXEMPTION from declaring rather than as a declaration, so
+  // this page alone kept naming one Address. The Dashboard, the other all-places surface,
+  // already got the treatment and is right; this is the same one line.
+  //
+  // PAGE-LOCAL ONLY, same as dashboard.html: HS.setViewLabel writes state.viewLabel, which
+  // is never persisted and is rebuilt by the shell on every full-page navigation, so it
+  // cannot leak to another page. viewZip, myZip, HS.state.zip and the active address are
+  // all untouched — the saved address stays saved, stays active, still anchors the
+  // home-relative reads below, and is still one tap away in the switcher.
+  //
+  // `precise` is what outranks the saved-address default (shell.js::paintTopbar's
+  // homeIsCurrent gate); it is the same flag and the same call the Dashboard ships.
+  // Declared FIRST, before any await, so the chip never paints an Address and then
+  // corrects itself two fetches later.
+  HS.setViewLabel('ALL MY PLACES', { precise: true });
   // Never hang silently: a failed read renders an honest retry state.
-  var changes, projects;
+  var changes, projects, followedProjects;
   try {
     changes = await HS.data.changes(S.zip, null);
     projects = await HS.data.projects(S.zip, null);
+    followedProjects = await loadFollowedProjects();
   } catch (e) {
-    console.warn('[properties] data load failed', e);
-    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your Saved Places</h1>'
+    console.warn('[my places] data load failed', e);
+    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load My Places</h1>'
       + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
       + '<button class="btn primary" onclick="location.reload()">Try again</button>';
     return;
   }
-  var avg = S.properties.length
-    ? Math.round(S.properties.reduce(function(s,p){return s+(p.score||0);},0) / S.properties.length) : null;
 
-  document.getElementById('propStrip').innerHTML =
-    HS.tpl.statTile(S.properties.length, 'Saved Places', '')
-    + HS.tpl.statTile(changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0;}).length, 'Need you across all places', 'accent')
-    + HS.tpl.statTile(projects.length, 'Nearby projects total', '')
-    + (avg != null ? HS.tpl.statTile(avg, 'Avg property score', 'g') : '');
+  // A-002 / A-010 — TWO PLACE TYPES, TWO EXISTING STORES, KEPT DISTINCT.
+  // Address  -> app_properties, via HS.state.properties (the Census-confirmed home writer)
+  // ZIP Code -> app_follows / myCommunities, via HS.followedCommunities()
+  // They are NOT merged into one collection and a ZIP Code is never written into
+  // app_properties. My Places is the one management CONTAINER; the underlying types,
+  // workflows and destinations stay exactly as they already were.
+  // Followed projects are listed here too (app_follows target_type=project) so
+  // "Add to My Places to follow" is truthful. They are not a Place type: they do
+  // not count in Places Monitored and have no "+ Add Project" writer.
+  function addresses() { return S.properties || []; }
+  function zips() { return HS.followedCommunities ? HS.followedCommunities() : []; }
+  async function loadFollowedProjects() {
+    var ids = HS.followedProjectIds ? HS.followedProjectIds() : [];
+    if (!ids.length) return [];
+    var rows = [];
+    try {
+      rows = HS.data.projectsByIds ? await HS.data.projectsByIds(ids) : [];
+    } catch (e) { rows = []; }
+    var byId = {};
+    (rows || []).forEach(function (p) { if (p && p.id != null) byId[String(p.id)] = p; });
+    return ids.map(function (id) {
+      return byId[String(id)] || { id: id, name: 'Followed development', _unresolved: true };
+    });
+  }
 
-  var tone = { 'Your home':'var(--green)', 'Rental':'var(--amber)', 'Family':'var(--blue)' };
-  document.getElementById('propGrid').innerHTML = S.properties.map(function (p) {
-    // per-property computed: nearest N projects, open windows
-    var near = HS.withDistance(projects, p).filter(function(x){return (x.distance_mi||9e9) <= 5;});
-    var needs = HS.withDistance(changes, p).filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
-    return '<div class="propcard" onclick="HS.selectProperty(\'' + p.id + '\');location.href=\'property.html?id=' + p.id + '\'">'
-      + '<div class="miniscore">' + (p.score||'') + '</div>'
-      + '<div class="pinfo"><div class="ptag" style="color:' + (tone[p.tag]||'var(--green)') + '">' + HS.esc(p.tag||p.label) + '</div>'
+  // A-010 / Fix 8J: the view is deep-linkable so another surface can land on the type it
+  // manages (the Dashboard's Following section routes here with ?view=projects). Whitelisted
+  // against the four views this page already declares as data-view buttons — an unknown or
+  // absent value falls back to 'all', which is also what every existing link resolves to, so
+  // no current entry point changes. Nothing else about the page reads the query string.
+  var VIEWS = ['all', 'addresses', 'zips', 'projects'];
+  var view = (function () {
+    var q = new URLSearchParams(location.search).get('view');
+    return VIEWS.indexOf(q) !== -1 ? q : 'all';
+  })();
+
+  // AN OPEN COMMENT WINDOW IS A DATE THAT EXISTS AND HAS NOT PASSED — never a missing one.
+  // `HS.daysUntil` returns NULL when there is no window_closes_at, and in JavaScript
+  // `null >= 0` is TRUE (null coerces to 0 in a relational comparison), so the bare
+  // `daysUntil(x) >= 0` this page used counted every record that has NO comment window at
+  // all as one that needs you. Measured on live data before the fix: ZIP 78617 holds 17
+  // non-news changes, ALL 17 with window_closes_at NULL and 0 open — and the strip read
+  // "17 Need you" while every Address card below it read "Nothing needs you".
+  //
+  // The `d != null &&` form is not new here: shell.js:2034, alerts.html:272 and
+  // lib/templates.js (three sites) already guard exactly this way. This page and
+  // property.html were the two that did not.
+  function isOpenWindow(x) {
+    var d = HS.daysUntil(x && x.window_closes_at);
+    return d != null && d >= 0;
+  }
+  function openWindowCount(list) { return (list || []).filter(isOpenWindow).length; }
+
+  // ---- THE STRIP MEASURES EVERY PLACE, NOT THE ONE ZIP IN VIEW -------------------------
+  // `changes` / `projects` above are read for the VIEWED ZIP alone, so two tiles used to
+  // name that ZIP ("Need you · ZIP 78617") on the page whose whole subject is the
+  // resident's WHOLE membership. Naming the ZIP was the honest thing to do while the
+  // number only covered it; measuring every Place is the honest thing to do instead.
+  // The per-Address cards below still read the viewed ZIP and are deliberately unchanged.
+  //
+  // 🔑 THE DEVELOPMENT COUNT GOES THROUGH THE PAGE'S OWN RPC, AND THAT IS THE WHOLE
+  // FINDING. A head-only `count: 'exact'` over `app_projects.zip` is the cheap obvious
+  // implementation and it counts a DIFFERENT POPULATION from the one a resident sees:
+  // `app_projects_for_zip` routes development through `app_authoritative_projects_for_zip`,
+  // whose set comes from `geo.zip_authoritative_membership` — the authoritative ZIP
+  // BOUNDARY — not from the `zip` column. Measured 2026-09-15 on the three ZIPs of the
+  // reported account: 75009 authoritative 470 vs `zip` column 24 · 78617 500 vs 512 ·
+  // 78657 4 vs 4. Celina would have read 24 while its page lists 470.
+  //
+  // ⛔ AND THE "500+" WAS FALSE. `DEV_QUERY_CAP = 500` assumed the RPC truncates at 500
+  // rows, so `devCapped()` printed a "+" on any ZIP at or above it. The authoritative RPC
+  // returns ONE jsonb array that no row cap can truncate (lib/data.js::rpcAllRows), and
+  // the measurement says so: of 7,996 ZIPs carrying authoritative membership, exactly ONE
+  // sits at 500 (78617 — the reported page) and 397 sit ABOVE it, up to 14,702. So 500 is
+  // not a ceiling, 78617 really holds 500, and the tile was claiming "at least 500" about
+  // a number it had in full. Honesty now rides on the RPC's own `complete` flag instead of
+  // a row-count guess: a ZIP that did not read is EXCLUDED from the total and from the
+  // place count beside it, never folded in as a zero.
+  var ALL = { devTotal: null, devPlaces: 0, needs: null, needsPlaces: 0, totalPlaces: 0 };
+  // Development rows keyed by ZIP, for the Address cards. A ZIP is present here ONLY when
+  // its read completed — absence means "not measured", which the card renders as silence
+  // rather than as a zero.
+  var DEV_BY_ZIP = {};
+
+  // Says exactly how much of the membership the number covers. A tile may only claim
+  // "all N places" when every one of them was actually read.
+  function placesScopeLabel(covered, total) {
+    if (!total) return '';
+    if (covered >= total) return total === 1 ? ' · your 1 place' : ' · all ' + total + ' places';
+    return ' · ' + covered + ' of ' + total + ' places';
+  }
+
+  async function loadAllPlaces() {
+    var A = HS.dashAgg;
+    // lib/data.js and lib/dashboard-aggregate.js can be served from a browser cache older
+    // than this page, so every cross-module call is guarded. A missing helper leaves the
+    // tile unrendered — never a fabricated 0. Same defensive shape as HS.data.projectsByIds
+    // elsewhere on this page.
+    if (!A || !A.canonicalPlaces || !A.queryZips) return;
+    var places = A.canonicalPlaces({ properties: S.properties, followedZips: zips() });
+    ALL.totalPlaces = places.length;
+    var q = A.queryZips(places, A.MAX_QUERY_ZIPS || 25);
+    if (!q.length) return;
+
+    // How many of the resident's PLACES a set of read ZIPs accounts for. One ZIP can back
+    // two Places (a saved Address inside a followed ZIP) — the resident's unit is the
+    // Place, so that is what the label counts.
+    function coveredBy(list) {
+      var set = {};
+      (list || []).forEach(function (zz) { set[zz] = 1; });
+      return places.filter(function (pl) { return pl.zip && set[pl.zip]; }).length;
+    }
+
+    // The ZIPs a saved Address sits in — the only ones whose ROWS are worth keeping.
+    var addrZips = {};
+    addresses().forEach(function (ap) { if (ap && ap.zip) addrZips[String(ap.zip)] = 1; });
+
+    if (HS.data.projects) {
+      var okZips = [], total = 0, next = 0;
+      async function devWorker() {                 // bounded concurrency, never Promise.all(N)
+        while (next < q.length) {
+          var zq = q[next++];
+          try {
+            // The page's OWN development reader, so the tile counts exactly what the ZIP's
+            // page lists (it routes through app_projects_for_zip -> the authoritative set).
+            // The VIEWED ZIP was already read at the top of this callback for the Address
+            // cards, with identical arguments — reuse it rather than pull the same payload
+            // twice. That ZIP is usually the resident's densest (78617 alone is 500 rows),
+            // so the duplicate was the single most expensive thing on the page. Caught by
+            // test/my-places-all-places-strip.browser.test.mjs §4a, which counts the calls.
+            var list = (String(zq) === String(S.zip) && Array.isArray(projects))
+              ? projects
+              : await HS.data.projects(zq);
+            // complete === false is a FAILED or not-yet-cut-over read, not an empty ZIP. A
+            // ZIP whose geography has not been cut over returns {unavailable:true}, which
+            // lands here as complete:false — counting it as 0 would assert "nothing is being
+            // built" about a place nobody looked at. Seed mode sets no flag at all, so the
+            // test is `!== false` rather than a truthiness check.
+            if (Array.isArray(list) && list.complete !== false) {
+              okZips.push(zq); total += list.length;
+              // KEEP the rows for a ZIP a saved Address actually lives in, so that card can
+              // measure against its OWN ZIP (see addressCard). Only those ZIPs are retained
+              // — a resident may follow 25 ZIPs, and holding every dense payload to render
+              // two cards would be the expensive half of this page for nothing.
+              if (addrZips[zq]) DEV_BY_ZIP[zq] = list;
+            }
+          } catch (e) { /* quarantine the ZIP, never the tile */ }
+        }
+      }
+      var runners = [];
+      for (var w = 0; w < Math.min(A.QUERY_CONCURRENCY || 4, q.length); w++) runners.push(devWorker());
+      await Promise.all(runners);
+      if (okZips.length) { ALL.devTotal = total; ALL.devPlaces = coveredBy(okZips); }
+    }
+
+    if (HS.data.openWindowChangesForZips) {
+      try {
+        var rows = await HS.data.openWindowChangesForZips(q);
+        // ONE notice is materialized once PER ZIP, so a county filing reachable from two of
+        // the resident's places would otherwise be counted twice. The shipped dedupe key is
+        // reused rather than re-derived (lib/dashboard-aggregate.js::changeKey, which
+        // deliberately keys on more than source_ref because a portal URL is shared by many
+        // items). Filter first with the SAME predicate the Address cards use, then dedupe.
+        var open = (rows || []).filter(isOpenWindow);
+        ALL.needs = (A.dedupeChanges ? A.dedupeChanges(open) : open).length;
+        ALL.needsPlaces = coveredBy(q);
+      } catch (e) { ALL.needs = null; console.warn('[my places] open-window read failed', e); }
+    }
+  }
+
+  function strip() {
+    var a = addresses(), z = zips();
+    // A SCORE THAT WAS NEVER MEASURED IS NOT A ZERO. `p.score || 0` summed absent scores as
+    // real zeros and rendered "0 Avg Address score" as if it had been computed; measured,
+    // app_properties.score is NULL on every stored row, so the tile was reporting a
+    // fabricated measurement. Average only the addresses that actually carry a number, and
+    // omit the tile entirely when none does — the same rule the Address card already
+    // follows with `p.score || ''`.
+    var scored = a.filter(function (p) { return typeof p.score === 'number' && isFinite(p.score); });
+    var avg = scored.length
+      ? Math.round(scored.reduce(function (s2, p) { return s2 + p.score; }, 0) / scored.length)
+      : null;
+    // A TILE THAT CANNOT BE MEASURED IS NOT RENDERED — the rule the Avg score tile above
+    // already follows. These two are measured asynchronously, so they are absent on the
+    // first paint and appear when their read lands; they never flash a placeholder 0.
+    var html = HS.tpl.statTile(a.length + z.length, 'Places', '');
+    if (ALL.needs != null) {
+      html += HS.tpl.statTile(ALL.needs,
+        'Need you' + placesScopeLabel(ALL.needsPlaces, ALL.totalPlaces), 'accent');
+    }
+    if (ALL.devTotal != null) {
+      html += HS.tpl.statTile(ALL.devTotal,
+        (ALL.devTotal === 1 ? 'Development' : 'Developments') + ' found'
+        + placesScopeLabel(ALL.devPlaces, ALL.totalPlaces), '');
+    }
+    if (avg != null) html += HS.tpl.statTile(avg, 'Avg Address score', 'g');
+    document.getElementById('propStrip').innerHTML = html;
+  }
+
+  var tone = { 'Your home': 'var(--green)', 'Rental': 'var(--amber)', 'Family': 'var(--blue)' };
+
+  // Every card states its TYPE. "All" is not a blended card type — an Address and a ZIP
+  // Code are visibly different things that happen to share one container.
+  function typeChip(label) {
+    return '<span class="ptype" style="font-size:10px;font-weight:700;letter-spacing:.04em;'
+      + 'text-transform:uppercase;color:var(--ink-2)">' + HS.esc(label) + '</span>';
+  }
+
+  // WHICH development rows an Address may be measured against: its OWN ZIP's, never the
+  // viewed ZIP's. `projects` is read for S.zip alone, so an Address in another ZIP was being
+  // scored against a different county's records — every one of them far away, so the card
+  // reported "0 nearby projects" about a place nothing had ever looked at. Measured on the
+  // reported account: 96 ISLAND DR (Horseshoe Bay 78657) read 0 while 78657 holds FOUR
+  // development records, all four carrying points, ~120 miles from the Del Valle rows it was
+  // actually being compared with.
+  //
+  // Returns null when that ZIP has not been measured — NOT an empty list. The two are
+  // different facts and the card renders them differently: a completed read of zero nearby
+  // records is a measurement and prints "0 nearby projects"; an absent or failed read prints
+  // nothing at all. Conflating them is what produced the original defect.
+  function devRowsFor(p) {
+    if (!p || !p.zip) return null;
+    // The viewed ZIP is already in hand at first paint, so its card never waits.
+    if (String(p.zip) === String(S.zip) && Array.isArray(projects) && projects.complete !== false) {
+      return projects;
+    }
+    var rows = DEV_BY_ZIP[String(p.zip)];
+    return Array.isArray(rows) ? rows : null;
+  }
+
+  function addressCard(p) {
+    // per-Address computed: nearest projects, open windows
+    var rows = devRowsFor(p);
+    var near = rows
+      ? HS.withDistance(rows, p).filter(function (x) { return (x.distance_mi || 9e9) <= 5; })
+      : null;
+    // Same null-window guard as the strip (see openWindowCount). The distance gate is
+    // deliberately LEFT AS IS and is reported separately: measured table-wide, 0 of 182,834
+    // app_changes rows carry coordinates, so `(x.distance_mi || 9e9) <= 5` can only ever
+    // exclude — which is why this card read "Nothing needs you" even while the strip was
+    // over-counting. Removing it would change what every Address card reports nationally
+    // (1,158 comment windows are open right now), so it is a product decision, not a
+    // correctness fix, and is not bundled in here.
+    var needs = HS.withDistance(changes, p).filter(function (x) {
+      var d = HS.daysUntil(x.window_closes_at);
+      return d != null && d >= 0 && (x.distance_mi || 9e9) <= 5;
+    }).length;
+    return '<div class="propcard" data-kind="address" data-id="' + HS.esc(p.id) + '">'
+      + '<div class="miniscore">' + (p.score || '') + '</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:' + (tone[p.tag] || 'var(--green)') + '">' + typeChip('Address') + ' · ' + HS.esc(HS.placeDisplayTag(p, 'Address')) + '</div>'
       + '<h3>' + HS.esc(p.address) + '</h3><div class="paddr">' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div>'
-      + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs===1?'s':'') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
-      + '<span>' + near.length + ' nearby projects</span><span style="color:var(--green);font-weight:600">+' + p.value_outlook + '%</span></div></div></div>';
-  }).join('')
-  + '<div class="propcard" onclick="HS.addHome()" style="border-style:dashed;justify-content:center">'
-  + '<div style="text-align:center"><div style="font-size:22px;color:var(--green);line-height:1">＋</div>'
-  + '<div style="font-weight:600;color:var(--ink-2);font-size:13.5px;margin-top:4px">Add another Saved Place</div>'
-  + '<div style="font-size:11.5px;color:var(--ink-3)">Free — follow as many as you like</div></div></div>';
+      + '<div class="pmeta">' + (needs ? '<span class="needs">◔ ' + needs + ' need' + (needs === 1 ? 's' : '') + ' you</span>' : '<span style="color:var(--ink-3)">Nothing needs you</span>')
+      + (near ? '<span>' + near.length + ' nearby project' + (near.length === 1 ? '' : 's') + '</span>' : '')
+      + (p.value_outlook != null ? '<span style="color:var(--green);font-weight:600">+' + HS.esc(p.value_outlook) + '%</span>' : '')
+      + '</div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="remove-address" data-id="' + HS.esc(p.id) + '">Remove Address</button>'
+      + '</div></div></div>';
+  }
+
+  function zipCard(z) {
+    // The ZIP Code's destination is UNCHANGED — the same page the follow flow has always
+    // opened. My Places lists it; it does not re-route it.
+    var href = HS.pageHref ? HS.pageHref('community.html', { zip: z.zip }) : ('community.html?zip=' + encodeURIComponent(z.zip));
+    return '<div class="propcard" data-kind="zip" data-zip="' + HS.esc(z.zip) + '" data-href="' + HS.esc(href) + '">'
+      + '<div class="miniscore">◍</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:var(--blue)">' + typeChip('ZIP Code') + '</div>'
+      + '<h3>' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</h3>'
+      + '<div class="paddr">' + HS.esc(z.zip) + (z.state ? ', ' + HS.esc(z.state) : '') + '</div>'
+      + '<div class="pmeta"><span style="color:var(--ink-3)">Whole-community coverage</span></div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="unfollow-zip" data-zip="' + HS.esc(z.zip) + '">Unfollow</button>'
+      + '</div></div></div>';
+  }
+
+  function projectLocationLine(p) {
+    if (!p || p._unresolved) return 'Location not listed on this development record';
+    var bits = [];
+    if (p.address) bits.push(String(p.address));
+    if (p.zip) bits.push('ZIP ' + String(p.zip));
+    if (bits.length) return bits.join(' · ');
+    return 'Location not listed on this development record';
+  }
+
+  function projectCard(p) {
+    var loc = projectLocationLine(p);
+    var sub = p.status || p.type || 'Followed development';
+    var hrefOpts = { id: p.id };
+    if (p.zip && /^\d{5}$/.test(String(p.zip))) hrefOpts.zip = String(p.zip);
+    var href = HS.pageHref ? HS.pageHref('development.html', hrefOpts)
+      : ('development.html?id=' + encodeURIComponent(p.id) + (hrefOpts.zip ? '&zip=' + encodeURIComponent(hrefOpts.zip) : ''));
+    return '<div class="propcard" data-kind="project" data-id="' + HS.esc(p.id) + '" data-href="' + HS.esc(href) + '">'
+      + '<div class="miniscore">◎</div>'
+      + '<div class="pinfo">'
+      + '<div class="ptag" style="color:var(--ink-2)">' + typeChip('Development') + (sub ? ' · ' + HS.esc(sub) : '') + '</div>'
+      + '<h3>' + HS.esc(p.name || 'Followed development') + '</h3>'
+      + '<div class="paddr">' + HS.esc(loc) + '</div>'
+      + '<div class="pmeta"><span style="color:var(--ink-3)">Followed in My Places. Does not turn on email alerts.</span></div>'
+      + '<div class="pacts" style="margin-top:8px">'
+      + '<button class="btn" type="button" data-act="unfollow-project" data-id="' + HS.esc(p.id) + '">Unfollow</button>'
+      + '</div></div></div>';
+  }
+
+  // Empty states are PER VIEW. An empty ZIP Codes view while Addresses exist is a true
+  // statement about that type, not a defect — so each view says what is actually missing.
+  function emptyCard(kind) {
+    if (kind === 'projects') {
+      return '<div class="propcard" style="border-style:dashed;justify-content:center">'
+        + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">No Developments followed yet</div>'
+        + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">Open a development and tap Add to My Places to follow. Followed Developments appear here so you can reopen them. This does not turn on email alerts.</div>'
+        + '</div></div>';
+    }
+    var copy = kind === 'zips'
+      ? { t: 'No ZIP Codes yet', d: 'Follow a ZIP Code to watch a whole community.', btn: '+ Add ZIP Code', act: 'add-zip' }
+      : { t: 'No Addresses yet', d: 'Add a home and we\'ll watch official records around it.', btn: '+ Add Address', act: 'add-address' };
+    return '<div class="propcard" style="border-style:dashed;justify-content:center">'
+      + '<div style="text-align:center"><div style="font-weight:600;color:var(--ink-2);font-size:13.5px">' + copy.t + '</div>'
+      + '<div style="font-size:11.5px;color:var(--ink-3);margin:2px 0 8px">' + copy.d + '</div>'
+      + '<button class="btn primary" type="button" data-act="' + copy.act + '">' + copy.btn + '</button></div></div>';
+  }
+
+  function render() {
+    strip();
+    var a = addresses(), z = zips(), p = followedProjects || [];
+    var html = '';
+    var vb = document.getElementById('plViews');
+    if (vb) [].forEach.call(vb.querySelectorAll('button'), function (b) {
+      b.classList.toggle('on', b.getAttribute('data-view') === view);
+      var k = b.getAttribute('data-view');
+      var n = k === 'addresses' ? a.length
+        : k === 'zips' ? z.length
+        : k === 'projects' ? p.length
+        : null;
+      var label = k === 'all' ? 'All' : k === 'addresses' ? 'Addresses' : k === 'zips' ? 'ZIP Codes' : 'Developments';
+      // "All" CARRIES NO COUNT. It used to print a.length + z.length + p.length while the
+      // stat tile above prints a.length + z.length — two different totals on one screen,
+      // and the larger one quietly redefined Developments as geographic places. The three
+      // TYPED counts are the truthful ones and stay; the combined figure is REMOVED rather
+      // than replaced, because no combined total is approved on any surface. "All" is a
+      // filter, and a filter does not need to assert a total to name itself.
+      b.textContent = n == null ? label : label + ' (' + n + ')';
+    });
+    if (view === 'all' || view === 'addresses') {
+      html += a.length ? a.map(addressCard).join('') : emptyCard('addresses');
+    }
+    if (view === 'all' || view === 'zips') {
+      html += z.length ? z.map(zipCard).join('') : emptyCard('zips');
+    }
+    if (view === 'projects') {
+      html += p.length ? p.map(projectCard).join('') : emptyCard('projects');
+    } else if (view === 'all' && p.length) {
+      html += p.map(projectCard).join('');
+    }
+    document.getElementById('propGrid').innerHTML = html;
+  }
+
+  document.getElementById('plViews').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-view]'); if (!b) return;
+    view = b.getAttribute('data-view'); render();
+  });
+  // A-010: two DISTINCT primary actions on the two EXISTING workflows. No generic
+  // "+ Add a Place", and no second writer for either type.
+  document.getElementById('plAddAddress').addEventListener('click', function () { HS.addHome(); });
+  document.getElementById('plAddZip').addEventListener('click', function () { HS.openLoc(); });
+
+  document.getElementById('propGrid').addEventListener('click', async function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (btn) {
+      e.stopPropagation();
+      var act = btn.getAttribute('data-act');
+      if (act === 'add-address') { HS.addHome(); return; }
+      if (act === 'add-zip') { HS.openLoc(); return; }
+      if (act === 'remove-address') {
+        var id = btn.getAttribute('data-id');
+        var card = btn.closest('[data-kind="address"]');
+        var label = card ? (card.querySelector('h3') || {}).textContent : 'this Address';
+        // A-012 requires a confirmation. It names what is removed AND what is not, because
+        // the honest worry is that "remove" silently takes the alerts or the ZIP with it.
+        if (!window.confirm('Remove ' + label + ' from My Places?\n\nThis removes only this saved Address. Your ZIP Code follows and alert history are not affected.')) return;
+        btn.disabled = true; btn.textContent = 'Removing…';
+        var okDel = await HS.removeAddress(id);
+        if (!okDel) { btn.disabled = false; btn.textContent = 'Remove Address';
+          window.alert("Couldn't remove that Address — please try again."); return; }
+        render(); return;
+      }
+      if (act === 'unfollow-zip') {
+        var zip = btn.getAttribute('data-zip');
+        if (!window.confirm('Unfollow ZIP Code ' + zip + '?\n\nThis removes only this ZIP Code follow. Your Addresses are not affected.')) return;
+        HS.unfollowCommunity(zip);
+        render(); return;
+      }
+      if (act === 'unfollow-project') {
+        var pid = btn.getAttribute('data-id');
+        if (!pid) return;
+        if (!window.confirm('Stop following this Development?\n\nIt will leave My Places. This does not change email alerts. Your Addresses and ZIP Codes are not affected.')) return;
+        if (HS.unfollowProject) await HS.unfollowProject(pid);
+        followedProjects = (followedProjects || []).filter(function (row) { return String(row.id) !== String(pid); });
+        render(); return;
+      }
+      return;
+    }
+    // Card body click -> the type's EXISTING destination, unchanged.
+    var acard = e.target.closest('[data-kind="address"]');
+    if (acard) { HS.selectProperty(acard.getAttribute('data-id'));
+      location.href = 'property.html?id=' + encodeURIComponent(acard.getAttribute('data-id')); return; }
+    var zcard = e.target.closest('[data-kind="zip"]');
+    if (zcard) { location.href = zcard.getAttribute('data-href'); return; }
+    var pcard = e.target.closest('[data-kind="project"]');
+    if (pcard) { location.href = pcard.getAttribute('data-href'); }
+  });
+
+  render();
+  // Paint the page first, then fill the two measured tiles in. The read spans every
+  // Place, so it must never hold up the list the resident came here for.
+  // render(), not strip(): the per-ZIP rows this read collects are what the Address cards
+  // measure against, so the cards have to be repainted too — otherwise an Address outside
+  // the viewed ZIP would keep showing nothing after its ZIP had actually been read.
+  loadAllPlaces().then(render, function (e) { console.warn('[my places] all-places read failed', e); });
 });
 </script>
 </body>

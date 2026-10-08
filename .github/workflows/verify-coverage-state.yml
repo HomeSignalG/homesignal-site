@@ -17,7 +17,14 @@ jobs:
     # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
     # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
     # at $0. Measured max successful run: 1.1 min -> bound 15.
-    timeout-minutes: 15
+    #
+    # RAISED 15 -> 30 (2026-09-15) because the full-population read got ~10x more expensive,
+    # not because the job got slower at what it does. app_coverage_states aggregates
+    # app_projects (3.19M rows / 2.9 GB, visibility map 0.1% set) per ZIP, so the read cannot
+    # go index-only and costs ~33 ms/ZIP warm — ~7 min for 12,722 ZIPs, and only in pages
+    # small enough to clear anon's 3s statement_timeout. The bound stays FINITE on purpose;
+    # if the database-side fix lands (see the reader's header), put this back to 15.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -12,7 +12,7 @@
     <div style="padding:28px;">
       <h1 id="title" style="font-size:20px;font-weight:800;margin:0 0 10px;">One moment…</h1>
       <div id="msg" style="font-size:15px;line-height:1.55;color:#3f3f46;">Completing your request.</div>
-      <a href="https://homesignal.net" style="display:inline-block;margin-top:22px;background:#1f5130;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:8px;">Go to HomeSignal</a>
+      <a id="cta" href="https://homesignal.net" style="display:inline-block;margin-top:22px;background:#1f5130;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:8px;">Go to HomeSignal</a>
     </div>
     <div style="padding:16px 28px;border-top:1px solid #eef0f1;font-size:12px;color:#8a8a85;">HomeSignal — neutral · sourced · non-partisan</div>
   </div>
@@ -20,7 +20,7 @@
   (function () {
     var FN = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/unsubscribe";
     var t = new URLSearchParams(window.location.search).get("t") || "";
-    var title = document.getElementById("title"), msg = document.getElementById("msg");
+    var title = document.getElementById("title"), msg = document.getElementById("msg"), cta = document.getElementById("cta");
     var M = {
       unsubscribed:  ["You're unsubscribed", "You will no longer receive HomeSignal digest emails. You can re-subscribe anytime at homesignal.net."],
       not_found:     ["Link not recognized", "This unsubscribe link is invalid or has already been used."],
@@ -28,10 +28,33 @@
       error:         ["Something went wrong", "We couldn't process your request right now. Please try again later."]
     };
     function show(k){ title.textContent = M[k][0]; msg.textContent = M[k][1]; }
+    // A Map 1 sign-up ("Development alerts") gets the founder's text (2026-09-26). The
+    // unsubscribe function answers maps_only only when the identity it turned off carried
+    // nothing but that sign-up, which is what makes "those subscriptions are separate and
+    // will continue as usual" true. Any other answer keeps the general message above.
+    function showMaps(zip) {
+      title.textContent = "You're unsubscribed from Development alerts";
+      msg.textContent = "";
+      [
+        "You'll no longer receive Development email alerts for ZIP code " + zip + ".",
+        "This only changes the Development alerts you signed up for from the map. If you also receive Government Notices, Upcoming Meetings, or Local News emails, those subscriptions are separate and will continue as usual.",
+        "You can sign up for Development alerts again anytime from the HomeSignal map."
+      ].forEach(function (line, i) {
+        var p = document.createElement("p");
+        p.style.margin = i ? "10px 0 0" : "0";
+        p.textContent = line;
+        msg.appendChild(p);
+      });
+      cta.textContent = "Return to the " + zip + " map";
+      cta.href = "https://homesignal.net/homesignalmap.html?zip=" + zip;
+    }
+    function isMapsAnswer(d) {
+      return !!d && d.status === "unsubscribed" && d.maps_only === true && /^\d{5}$/.test(String(d.zip));
+    }
     if (!t) { show("missing_token"); return; }
     fetch(FN + "?t=" + encodeURIComponent(t))
       .then(function (r) { return r.json().catch(function(){ return {status:"error"}; }); })
-      .then(function (d) { show((d && M[d.status]) ? d.status : "error"); })
+      .then(function (d) { if (isMapsAnswer(d)) showMaps(String(d.zip)); else show((d && M[d.status]) ? d.status : "error"); })
       .catch(function () { show("error"); });
   })();
 </script>

@@ -9,6 +9,7 @@ surfaceBanner('audit-marker-symbology');
 
 global.window = { HS: {} };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 const FAC = HS.markerRegistry.facilityHex;

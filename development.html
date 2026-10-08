@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Development</title>
+<title>HomeSignal — Quality of Life Impact</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=031bef8e">
 </head>
-<body data-nav="dev">
+<body data-nav="explore" data-explore="qol">
 <template id="hs-content"><div class="page" id="devPage">
   <div style="height:14px;width:36%;border-radius:6px;background:var(--line-2);margin:4px 0 16px"></div>
   <div class="card"><div style="height:11px;width:42%;border-radius:6px;background:var(--line-2);margin-bottom:9px"></div><div style="height:11px;width:88%;border-radius:6px;background:var(--line-2);margin-bottom:9px"></div><div style="height:11px;width:66%;border-radius:6px;background:var(--line-2)"></div></div>
@@ -18,15 +18,32 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Canonical owner of ZIP geography semantics: lib/data.js::rpcAllRows classifies
+     app_projects_for_zip's {unavailable, zip_geography_status} envelope through
+     HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
+     verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
+<script src="lib/zip-authoritative.js?v=20261002a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/coverage-copy.js"></script>
 <script src="lib/impact.js"></script>
 <script src="lib/why.js"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=61d2fce9"></script>
 <script>
 HS.onReady(async function () {
+  // Gate 2: the URL is authoritative at the moment of the fetch (shared helper —
+  // no per-page geography rule). Must precede every S.zip read below.
+  HS.ensureViewedZip();
+  // AN EXPLICIT ROUTE ZIP IS A DECLARED ZIP PLACE. Synchronous, before the first await, so the
+  // Viewing control names the ZIP rather than a saved Address that merely sits inside it.
+  // Development is a TOOL, not a Place, so this is conditional: reached with no ?zip= it
+  // declares nothing and the saved address still supplies the default context. The project
+  // dossier (?id=) overrides it in applyRecordView(), which names the record's own address.
+  HS.declareRouteZipPlace();
   var S = HS.state, home = S.activeProperty;
   var id = new URLSearchParams(location.search).get('id');
   var qs = new URLSearchParams(location.search);
@@ -54,7 +71,21 @@ HS.onReady(async function () {
   // 443 of the 801 all-empty pages, where no registry entry covers the county at all and
   // so nothing is being read. Contract + the six bans on this copy: lib/coverage-copy.js.
   var coverageHTML = '';
-  if (!projects.length && !facilities.length && community) {
+  // SAME DEFECT CLASS AS THE ZIP PAGE'S DEVELOPMENT SECTION, one page over — and it is the
+  // SAME producer, so this is the shared contract being honoured rather than a second fix.
+  // `app_projects_for_zip` answers a ZIP whose whole-ZIP geography is not established with
+  // {unavailable:true, zip_geography_status}; lib/data.js::rpcAllRows carries that verdict
+  // on the array (classified by the one owner, lib/zip-authoritative.js). Without consulting
+  // it, `!projects.length` reads a REFUSAL as an empty area and this page states "Nothing on
+  // the public record near here yet" over 709 of 12,722 canonical ZIPs. Fail closed: the
+  // test is for the VALUE, never for the absence of a failure.
+  var devOutcome = (projects && projects.outcome) || 'unavailable';
+  var devReadComplete = projects.complete === true && devOutcome === 'complete';
+  var devUnreadNote = devReadComplete ? ''
+    : (window.HS && HS.zipAuthUnmeasuredFact ? HS.zipAuthUnmeasuredFact(devOutcome, S.zip, projects && projects.reason) : '');
+  // The coverage block NAMES SOURCES and asserts what was checked (lib/coverage-copy.js),
+  // so it may only be built on a read that actually happened.
+  if (devReadComplete && !projects.length && !facilities.length && community) {
     try {
       // Civic notices ride a different rail (app_changes) than map markers (app_projects),
       // and a page with government notices is NOT empty — 20 pages differ on exactly this,
@@ -90,6 +121,16 @@ HS.onReady(async function () {
       sort: HS.sanitizeSort ? HS.sanitizeSort(initSort) : 'impact',
       dataView: false
     };
+    // DISTANCE IS ADDRESS-RELATIVE. On a ZIP Place (declared above by
+    // HS.declareRouteZipPlace -> S.viewPlaceType === 'zip') there is no address to measure
+    // from, so Distance is offered neither as a sort nor as a table column, and a URL that
+    // asks for it (sort=distance, or lens=2, the distance lens) falls back to the default.
+    // Address context (no route ZIP) keeps all of it unchanged.
+    var zipPlace = S.viewPlaceType === 'zip';
+    if (zipPlace) {
+      if (state2.sort === 'distance') state2.sort = 'impact';
+      if (state2.lens === 2) state2.lens = 0;
+    }
     function sorted() {
       var a = projects.slice();
       if (state2.lens === 1) { // what's being built — group by type & stage
@@ -113,17 +154,51 @@ HS.onReady(async function () {
         // That is unsupportable wherever no registry entry covers the county, so it is gone
         // from BOTH branches: the rich block when we can name what we draw on, and
         // otherwise a sentence that states only what the page holds.
-        body = coverageHTML || ('<div class="card" style="text-align:center;padding:26px 18px">'
-          + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
-          + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>');
+        // "Nothing on the public record near here yet" is a VERIFIED-ABSENCE claim and is
+        // reachable only on a complete authoritative read. Where the read was refused or
+        // failed, the page states what is true of the READ — the words come from the one
+        // owner (HS.zipAuthUnmeasuredFact), with no address-box invitation appended because
+        // this page has none. Library absent -> no sentence at all, which claims nothing.
+        body = coverageHTML || (devReadComplete
+          ? ('<div class="card" style="text-align:center;padding:26px 18px">'
+            + '<h3 style="margin-bottom:6px">Nothing on the public record near here yet</h3>'
+            + '<p class="sowhat" style="margin:0">No permit or planning records for this area.</p></div>')
+          // No invented heading here: the owner's sentence is the whole statement, and a
+          // headline would have to say something this page has not established.
+          : (devUnreadNote
+            ? '<div class="card" style="text-align:center;padding:26px 18px">'
+              + '<p class="sowhat" style="margin:0">' + HS.esc(devUnreadNote) + '</p></div>'
+            : ''));
       } else {
         body = state2.dataView ? dataTable(a) : ('<div class="devgrid">' + a.map(HS.tpl.devCard).join('') + '</div>');
       }
-      page.innerHTML =
-        '<div class="ph"><div class="eyebrow">Development</div><h1>What\'s being built — and how it impacts you</h1>'
-        + '<p>' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p></div>'
-        + '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
-        + seg('impact','Impact on me') + seg('status','Status') + seg('distance','Distance') + seg('newest','Newest')
+      // Header + the Map 1 preview are drawn ONCE; sorting and Table view repaint only
+      // #devResults, so the iframe (canonical Map 1 via ?embed=1, the same host pattern
+      // lib/community-page.js uses) keeps its browsing context and never reloads.
+      var results = page.querySelector('#devResults');
+      if (!results) {
+        var mapHref = HS.navHref('homesignalmap.html', S.zip);
+        page.innerHTML =
+          '<div class="ph"><div class="eyebrow">Development</div><h1>Quality of Life Impact</h1>'
+          + '<p style="max-width:none">' + HS.tpl.qolImpactScoreBrand + ' - Ranks nearby developments by their potential impact on your quality of life.</p>'
+          // With a ZIP the preview below carries its own "View full Development Map →", so the
+          // header link would be a duplicate; without one there is no preview, so it stays.
+          + (S.zip ? '' : '<div style="margin-top:12px"><a class="inlinebtn" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none">View Development Map →</a></div>')
+          + '</div>'
+          + (S.zip
+            ? '<div class="devmap-preview" id="devMapPreview" style="margin:0 0 20px">'
+              + '<iframe id="devMapFrame" title="Development Map for ZIP ' + HS.esc(S.zip) + '" loading="lazy" '
+              + 'style="width:100%;height:clamp(300px,42vw,400px);border:1px solid var(--line);border-radius:12px;display:block" '
+              + 'src="homesignalmap.html?embed=1&amp;zip=' + encodeURIComponent(S.zip) + '"></iframe>'
+              + '<a class="inlinebtn" id="devMapFull" href="' + HS.esc(mapHref) + '" data-znav="homesignalmap.html" style="text-decoration:none;margin-top:10px">View full Development Map →</a>'
+              + '</div>'
+            : '')
+          + '<div id="devResults"></div>';
+        results = page.querySelector('#devResults');
+      }
+      results.innerHTML =
+        '<div class="toolbar toolbar--lead"><div class="seg" id="devSort">'
+        + seg('impact','Impact on me') + seg('status','Status') + (zipPlace ? '' : seg('distance','Distance')) + seg('newest','Newest')
         + '</div><div class="sp"></div>'
         + '<button class="fpill" id="devDataBtn">⊞ Table view</button></div>'
         + body
@@ -157,10 +232,10 @@ HS.onReady(async function () {
       return '<button class="' + (on ? 'on' : '') + '" data-sort="' + k + '">' + label + '</button>';
     }
     function dataTable(a){
-      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th><th>Distance</th><th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
+      return '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Stage</th>' + (zipPlace ? '' : '<th>Distance</th>') + '<th>' + HS.tpl.qolImpactScoreBrand + '</th></tr></thead><tbody>'
         + a.map(function(p){ return '<tr onclick="location.href=\'development.html?id=' + p.id + '\'" onkeydown="if(event.key===\'Enter\')location.href=\'development.html?id=' + p.id + '\'" tabindex="0" style="cursor:pointer">'
           + '<td><b>' + HS.esc(p.name) + '</b></td><td>' + HS.esc(p.type) + '</td><td>' + HS.esc(p.status) + '</td>'
-          + '<td>' + HS.esc(p.stage||'') + '</td><td>' + HS.esc(p.dist||'') + '</td><td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
+          + '<td>' + HS.esc(p.stage||'') + '</td>' + (zipPlace ? '' : '<td>' + HS.esc(p.dist||'') + '</td>') + '<td>' + HS.esc((HS.impactScoreValue && HS.impactScoreValue(p.impact_score)) || '') + '</td></tr>'; }).join('')
         + '</tbody></table>';
     }
     function wire() {
@@ -170,17 +245,35 @@ HS.onReady(async function () {
     paint();
   }
 
-  function renderDetail(pid) {
-    var p = projects.find(function(x){return x.id===pid;});
+  function missingRecord() {
+    page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>';
+  }
+  async function renderDetail(pid) {
+    var p = projects.find(function(x){return String(x.id)===String(pid);});
     // Facilities share this route/page but branch to their own dossier template —
     // a regulated facility is an EXISTING CONDITION, not development activity, so the
     // header/labels read "Regulated facility" throughout (spec §7).
     if (!p) {
-      var f = facilities.find(function(x){return x.id===pid;});
+      var f = facilities.find(function(x){return String(x.id)===String(pid);});
       if (f) { renderFacility(f); return; }
     }
-    if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button><div class="ph"><h1>We couldn\'t find that record</h1><p>It may have been removed from the county feed, or the link is out of date. Everything currently on record is on the development page.</p></div>'; return; }
-    HS.data.meetings(S.zip, home).then(function (meetings) {
+    // My Places can open a followed project from another ZIP. The list above is
+    // the viewed ZIP only — fetch by id rather than claiming the record is gone.
+    if (!p && HS.data && HS.data.projectsByIds) {
+      try {
+        var fetched = await HS.data.projectsByIds([pid]);
+        p = fetched && fetched[0];
+      } catch (e) { p = null; }
+    }
+    if (!p) { missingRecord(); return; }
+    // THIS RECORD OWNS THE VIEWING CHIP. Opening a project dossier is looking at ONE
+    // listed location. ensureViewedZip above only names the ZIP, so the chip stayed
+    // "ZIP 78617" on Pearce Lane even though My Places already showed 11921 PEARCE LN
+    // from the same p.address field. precise:true so a saved Address in this ZIP cannot
+    // steal the chip (Gate 4). Does not write myZip, does not insert app_properties,
+    // does not selectProperty — a project is not a saved home.
+    applyRecordView(p);
+    HS.data.meetings(p.zip || S.zip, home).then(function (meetings) {
       var mtg = HS.bestMeeting(meetings, p.id);   // soonest UPCOMING first, else latest held
       // Timeline: only sourced milestones — filing date, record stage/status, or a
       // linked meeting. Never invent a future vote or expected date from status alone.
@@ -221,6 +314,8 @@ HS.onReady(async function () {
         : '';
 
       var statusClass = p.status==='Active'?'active':p.status==='Approved'?'appr':'prop';
+      var listedAddr = listedAddress(p);
+      var backHref = HS.navHref('development.html', S.zip);
       // "Why this matters" (Sprint-3): four evidence-based answers + what the
       // record does and doesn't establish — shared backbone lib/why.js.
       var wd = HS.whyDerive(p, {
@@ -236,7 +331,7 @@ HS.onReady(async function () {
         ? '<div class="impacts">' + HS.tpl.impactChips(dims) + '</div>'
         : '';
       page.innerHTML =
-        '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
+        '<button class="backbtn" onclick="location.href=\'' + HS.esc(backHref) + '\'">← Back to development</button>'
         + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">' + HS.esc(p.name) + ' <span class="status ' + statusClass + '">' + HS.esc(p.status) + '</span></div><h1 style="margin-bottom:2px">How this affects you</h1></div>'
         + '<div class="detail"><div class="panel">'
         + '<div class="kicker">The bottom line</div>'
@@ -254,8 +349,9 @@ HS.onReady(async function () {
         + '<button class="btn" onclick="HS.addToCalendar(\'' + p.id + '\')">Add hearing to calendar</button>'
         + '<button class="btn" onclick="window.open(\'' + HS.esc(p.source_ref) + '\',\'_blank\',\'noopener\')">Read the official record</button>'
         + '<button class="btn" onclick="location.href=\'' + HS.esc(HS.navHref('homesignalmap.html', S.zip)) + '\'">See it on the map</button>'
-        + '<button class="btn ghost" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">Follow this project</button></div>'
+        + projectFollowButton(p) + '</div>'
         + '<div class="divider"></div><div class="kicker">The specs</div><div class="specs">'
+        + (listedAddr ? specRow('Address', listedAddr) : '')
         + specRow('Developer', p.developer) + specRow('Size', p.size) + specRow('Investment', p.investment)
         + specRow('Jobs created', p.jobs) + specRow('Distance', p.dist) + specRow('Status', p.stage)
         + '</div>' + (p.approx ? '<p style="font-size:11.5px;color:var(--ink-2);margin:12px 0 0">Some details are still preliminary while county records sync — the official record is the source of truth.</p>' : '') + '</div></div>';
@@ -267,6 +363,7 @@ HS.onReady(async function () {
   // is SAID to be absent, never guessed. Enforcement zeros render as a positive signal
   // ONLY while compliance tracking is on (§5) — otherwise the tracking-off caveat shows.
   function renderFacility(f) {
+    applyRecordView(f);
     var fenv = f.facility_env || null;
     var interp = HS.fac.interpret(fenv);
     var sigs = HS.fac.signals(fenv);
@@ -298,11 +395,19 @@ HS.onReady(async function () {
       return '<button class="btn' + (links[0] === l ? ' primary' : '') + '" onclick="window.open(\'' + HS.esc(l.url) + '\',\'_blank\',\'noopener\')">' + HS.esc(l.label) + '</button>';
     }).join('');
 
+    var listedAddr = listedAddress(f);
+    var backHref = HS.navHref('development.html', S.zip);
     page.innerHTML =
-      '<button class="backbtn" onclick="location.href=\'development.html\'">← Back to development</button>'
-      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status active">Operating</span></div>'
+      '<button class="backbtn" onclick="location.href=\'' + HS.esc(backHref) + '\'">← Back to development</button>'
+      // LIFECYCLE IS THE STORED CANONICAL VALUE, NOT A LITERAL (2026-09-24). This pill read a
+      // hard-coded green "Operating" for every EPA facility; FRS registration is not operation.
+      // It now renders app_projects.status in the shared lifecycle vocabulary
+      // (HS.canonicalLifecycle, lib/project-type.js — the words Map 1 and the ZIP card use), and
+      // carries NO lifecycle colour class: public.app_refresh_zip writes the unknown value
+      // ('On file') for a facility, and colouring it would assert a stage no source stated.
+      + '<div class="ph" style="margin-bottom:16px"><div class="eyebrow" style="display:flex;align-items:center;gap:10px">Regulated facility <span class="status">' + HS.esc(HS.canonicalLifecycle ? HS.canonicalLifecycle(f).label : '') + '</span></div>'
       + '<h1 style="margin-bottom:2px">' + HS.esc(f.name) + '</h1>'
-      + '<p style="margin:6px 0 0">An existing regulated facility on the public record — environmental context, not development activity.</p></div>'
+      + '<p style="margin:6px 0 0">A regulated facility on the public record — environmental context, not development activity.</p></div>'
       + '<div class="detail"><div class="panel">'
       + '<div class="kicker">Interpreted status</div>'
       + statusHtml
@@ -312,6 +417,7 @@ HS.onReady(async function () {
       + '</div>'
       + '<div class="panel side"><div class="kicker">Identity</div><div class="specs">'
       + specRow('Facility', f.name) + specRow('Type', f.type)
+      + (listedAddr ? specRow('Address', listedAddr) : '')
       + specRow('FRS Registry ID', f.registry_id)
       + specRow('Statutes', statutes.join(', '))
       + specRow('TCEQ RN', fenv && fenv.tceq_rn)
@@ -319,6 +425,27 @@ HS.onReady(async function () {
       + '</div>'
       + '<div class="divider"></div><div class="kicker">Source — official records</div><div class="doact">' + linksHtml + '</div>'
       + '</div></div>';
+  }
+  function listedAddress(rec) {
+    if (!rec || rec.address == null) return '';
+    return String(rec.address).trim();
+  }
+  function applyRecordView(rec) {
+    if (!rec) return;
+    if (rec.zip && /^\d{5}$/.test(String(rec.zip))) HS.state.zip = String(rec.zip);
+    var addr = listedAddress(rec);
+    if (addr && typeof HS.setViewLabel === 'function') HS.setViewLabel(addr, { precise: true });
+    // Opening a record retires any ZIP Place declared from the route: this view is about the
+    // project's listed address. No id — a listed project address is not a saved Place, so no
+    // saved Address is ticked in the switcher either.
+    if (addr && typeof HS.setViewPlaceType === 'function') HS.setViewPlaceType('address');
+  }
+  function projectFollowButton(p) {
+    var following = !!(HS.isFollowing && HS.isFollowing('project', p.id));
+    var label = following
+      ? (HS.PROJECT_FOLLOW_ON || '✓ Following in My Places')
+      : (HS.PROJECT_FOLLOW_ADD || 'Add to My Places to follow');
+    return '<button class="btn ghost' + (following ? ' following' : '') + '" type="button" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">' + HS.esc(label) + '</button>';
   }
   function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
 });

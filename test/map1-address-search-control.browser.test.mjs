@@ -26,6 +26,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,6 +91,7 @@ const routeHandler = async (route) => {
   if (url.includes('/rpc/app_zip_projects_markers')) return J(ZIP_AUTH);
   if (url.includes('/functions/v1/get-address-report')) return J(REPORT);
   if (url.includes('/rest/v1/app_projects')) return J(PROJECTS);
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
   if (url.includes('/rest/v1/development_reports')) return J(ZIP_ROW);
   if (url.includes('/rest/v1/')) return J([]);
   if (url.includes('leaflet@1.9.4/dist/leaflet.js') || url.includes('leaflet@1.9.4/dist/leaflet.css')) {

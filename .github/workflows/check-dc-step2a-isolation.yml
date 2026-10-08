@@ -1,0 +1,31 @@
+name: dc-step2a-isolation
+
+# PERMANENT gate. The Step 2A evidence tables (dc_source, dc_acquisition_run,
+# dc_source_observation) hold what a PUBLISHER asserted. They carry no canonical
+# entity identity, no lifecycle resolution and no geography, so a resident-facing
+# surface reading them would be presenting a raw source assertion as HomeSignal's
+# answer -- a second truth path beside app_zip_projects_markers and
+# lib/map.js::statedDataCenter, which is what the ONE CANONICAL TRUTH PATH rule
+# forbids. This gate fails the moment such a read is added.
+#
+# It runs on every PR and on main, not only on paths that touch dc_* files: the
+# violation this exists to catch is a NEW read added to a page, and that page is
+# the only file such a commit would touch.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: the gate can fail (self-test)
+        run: node scripts/check-dc-step2a-isolation.mjs --self-test
+      - name: no resident-facing surface reads Step 2A evidence
+        run: node scripts/check-dc-step2a-isolation.mjs

@@ -1,0 +1,1184 @@
+publisher_record_id,sentence,expected
+123net-dc1-southfield-mi,Coordinates geocoded from the street address in the announcement;,NEUTRAL
+123net-dc2-southfield-mi,Coordinates from the US Census geocoder for the street address on the operator's page;,NEUTRAL
+123net-dc3-southfield-mi,Coordinates from the US Census geocoder for the street address on the operator's page;,NEUTRAL
+123net-dc4-byron-center-mi,Coordinates from the US Census geocoder;,NEUTRAL
+1623-farnam-omaha-ne,Coordinates are a street-address approximation.,NEUTRAL
+32-avenue-of-the-americas-ny,"Coordinates are a building-centroid geocode (Wikidata, sourced from building records) — plausible but not independently cross-checked against a primary GIS source.",NEUTRAL
+365-data-centers-commack-ny,"Coordinates are a street-address geocode (two OSM address points exist at this address ~110 m apart), hence precision ""approximate"".",NEUTRAL
+365-data-centers-washington-dc,Flagging explicitly for reviewer attention given the near-zero pin distance from a live record.,NEUTRAL
+365-data-centers-washington-dc,"Coordinates geocoded via the US Census geocoder for the exact numbered street address (match: '1275 K ST NW, WASHINGTON, DC, 20005').",NEUTRAL
+4am-development-burkhalter-road-statesboro-ga,Coordinates are approximate to Burkhalter Road pending parcel confirmation.,NON_SITE_ROAD
+60-hudson-street-ny,"Coordinates are a building-level geocode from a map aggregator, not independently verified against a primary GIS source.",NEUTRAL
+9ldg-niagara-falls-ny,"Coordinates are approximate (3807 Highland Ave, Niagara Falls NY).",NEUTRAL
+a1-data-center-millville-nj,Coordinates are approximate.,NEUTRAL
+aalo-atomics-inl-id,"Coordinates are Wikipedia's cited centroid for the entire ~890 sq mi Idaho National Laboratory reservation (43°32'00""N 112°56'41""W), not a confirmed location for this specific reactor within that reservation -- treat as approximate at the multi-county-site level, not facility-parcel level.",NEUTRAL
+abit-usa-duff-tn,the point is the Duff community centroid because the street address could not be geocoded.,NON_SITE_AREA
+aboutbit-merom-sullivan-county-in,Coordinates approximate.,NEUTRAL
+actapio-east-wenatchee-wa,"Coordinates are the OSM building polygon carrying the street address, inside the OSM site boundary named 'Actapio'.",NEUTRAL
+aecc-woodruff-county-solar-ar,"Coordinate is the registry pin, treated as approximate.",NEUTRAL
+aes-delta-wind-tunica-ms,"Coordinates: no source states a lat/lon or a town, and HARD RULE 2 forbids deriving a point from a county name — so the coordinate is the arithmetic centroid of the 41 wind-turbine nodes OpenStreetMap records inside Tunica County (bbox 34.4634..34.5318 N, -90.4247..-90.3365 W), a count that exactly matches the sourced 41 turbines;",NEUTRAL
+aes-oak-ridge-solar-morehouse-parish-la,The county field records AES's own attribution and the coordinate is marked approximate because of that disagreement.,NEUTRAL
+agincourt-valparaiso-porter-county-in,Coordinates are the St.,NEUTRAL
+agriforce-east-palestine-columbiana-oh,Coordinates approximate (East Palestine city-center).,NON_SITE_AREA
+agriforce-west-point-columbiana-oh,Coordinates approximate.,NEUTRAL
+aib-clt-01-spartanburg-county-sc,"that address is NOT in the SEC filing, so it is recorded here only as a note and the coordinate is the Tyger River Industrial Drive road centroid (approximate, not parcel-confirmed).",NEUTRAL
+ainet-one-market-center-baltimore-md,"Coordinates confirmed via US Census geocoder (exact match on 300 W Lexington St, Baltimore, MD 21201).",NEUTRAL
+alabama-power-clearview-ranch-macon-al,"Alabama Power has not disclosed an exact address, so the coordinate is a representative point on the Macon-Bullock county line and is marked approximate.",NEUTRAL
+alabama-power-gorgas-bess-parrish-al,"Coordinates are the Parrish place centroid, not a parcel-confirmed point.",NEUTRAL
+alabama-supercomputer-center-huntsville-al,Coordinate is the OpenStreetMap feature at the stated address.,NEUTRAL
+alaska-communications-anchorage-ak,"Coordinates are a Census geocode of the street address (TIGER-line interpolated), not a confirmed parcel.",NEUTRAL
+aligned-conesville-oh,Coordinates approximate (village-level).,NON_SITE_AREA
+aligned-data-centers-amber-ok,"Coordinates are the town of Amber, not a parcel.",NON_SITE_AREA
+aligned-pataskala-licking-oh,Coordinates approximate (Pataskala city-center).,NON_SITE_AREA
+aligned-peoria-campus-az,Coordinate derived from the OSM geometries of the two named roads;,NEUTRAL
+aligned-peoria-campus-az,"treat as an approximate intersection pin, not a parcel.",NON_SITE_ROAD
+aligned-phx13-glendale-az,Coordinates are the Glendale area centroid.,NON_SITE_AREA
+aligned-project-caprock-hale-county-tx,"Coordinates corrected: Abernathy TX is at approximately 33.84°N, 101.84°W;",NEUTRAL
+aligned-quantum-frederick-md,Coordinates are approximate for campus area near Buckeystown/Adamstown.,NEUTRAL
+aliquippa-data-center-beaver-county-pa,coordinates are city-level.,NON_SITE_AREA
+aliquippa-data-center-beaver-county-pa,Parcel is not geocoded in the records consulted;,NEUTRAL
+alliant-cedar-river-generating-station-ia,"Coordinates are approximate - the address is the existing Prairie Creek Generating Station, on whose property the new units will sit.",NEUTRAL
+alliant-golden-plains-bess-ia,Coordinate is a county-level approximation for Kossuth County;,NON_SITE_AREA
+alliant-lansing-bess-ia,Coordinate is a town-level approximation;,NON_SITE_AREA
+alliant-west-riverside-energy-center-beloit-wi,The coordinate is OSM's named feature for the plant itself.,NEUTRAL
+alliant-wever-bess-ia,"Coordinate is a town-level approximation for Wever, Lee County;",NON_SITE_AREA
+alliant-whispering-willow-north-bess-ia,"Coordinate is a town-level approximation for Latimer, Franklin County.",NON_SITE_AREA
+alpha-technologies-huntington-wv,"One outlet (WV MetroNews/DCD, not independently refetched) gives the street number as 1125 6th Avenue while WCHS and the Census geocoder both resolve 1225 6th Avenue, Huntington, WV 25701 as a valid address -- used 1225 as the geocoded value;",NEUTRAL
+alterra-development-marshall-mi,"Coordinates are an approximate Marshall-area estimate, not parcel-geocoded;",NON_SITE_AREA
+alterra-marshall-technology-energy-center-gas-mi,"Coordinates mirror the compute record's approximate Marshall-area point, not a siting-confirmed location.",NON_SITE_AREA
+amazon-data-services-reno-storey-county-nv,Coordinates are a street-level approximation from OpenStreetMap's Peru Drive geometry - no parcel-confirmed point was published.,NEUTRAL
+amazon-devlin-tech-park-va,Coordinates approximate for northwest corner of Devlin and Linton Hall roads.,NEUTRAL
+amazon-perry-township-stark-oh,Coordinates approximate (township-level).,NON_SITE_AREA
+american-bitcoin-niagara-falls-ny,"Coordinates are an approximate industrial-corridor geocode of the street address, not an independently confirmed parcel pin.",NON_SITE_ROAD
+american-tower-edc-oklahoma-city-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+american-tower-mount-royal-east-greenwich-nj,coordinates are the Mount Royal locality centroid and must not be read as a site pin.,NON_SITE_AREA
+american-tower-pike-township-indianapolis-in,"Coordinates are the Township Line Road corridor in Pike Township, not a parcel-confirmed footprint.",NON_SITE_ROAD
+american-tower-reedy-creek-charlotte-nc,Coordinates are a nature-preserve-level approximation;,NEUTRAL
+anchorstone-58-east-data-campus-ringgold-va,"Coordinates are town-centroid for Ringgold, VA (approximate) — exact parcel not geocoded from a parcel ID in sources reviewed this session.",NON_SITE_AREA
+andover-hpc-development-nj,"Coordinates are approximate for Andover Township, Sussex County;",NON_SITE_AREA
+apollo-power-generation-facility-wood-oh,"Coordinates are a road-level geocode, not a parcel centroid.",NON_SITE_ROAD
+apple-maiden-nc,Coordinates are an approximate geocode of the disclosed Startown Rd address (~183 ac per public reporting);,NEUTRAL
+apple-mesa-az,Coordinates are an approximate geocode of the Signal Butte Rd address;,NEUTRAL
+apple-reno-nv,"Coordinates are an address-level geocode (ArcGIS, exact-address match);",NEUTRAL
+apple-waukee-ia,Coordinates are an approximate geocode;,NEUTRAL
+applied-digital-polaris-forge-1-ellendale-nd,Coordinates are Ellendale city centroid;,NON_SITE_AREA
+applied-digital-polaris-forge-2-harwood-nd,Coordinates are Harwood city centroid;,NON_SITE_AREA
+aps-desert-sun-power-plant-gila-bend-az,"Coordinates are an approximate geocode west of Gila Bend, not a siting-confirmed point;",NEUTRAL
+archgreen-grand-island-hall-ne,"Coordinates are derived from the OpenStreetMap geometry of North 60th Road and the article's ""quarter mile south of Capital Avenue"" description, not a parcel-confirmed point.",NEUTRAL
+arconic-arsenal-data-site-massena-ny,"Coordinates are the OSM landuse centroid for Arconic Massena Operations, not a data-center parcel.",NEUTRAL
+arizona-land-consulting-balterra-tonopah-az,Coordinate is the OSM 411th Avenue / Camelback Road intersection on the site's western edge.,NON_SITE_ROAD
+arizona-land-consulting-hassayampa-ranch-tonopah-az,"Coordinates are an approximate town-level geocode near Tonopah, not a parcel-confirmed point.",NON_SITE_AREA
+armstrong-power-south-bend-township-armstrong-county-pa,Coordinates are township-level.,NON_SITE_AREA
+artemis-power-tech-wolfe-ky,"COORDINATES ARE WEAK AND SHOULD BE REVIEWED: no parcel or address is published, and OpenStreetMap maps KY 1036 only on the Lee County side of the line, so the point used here is an approximate anchor on that road near the county line, not a confirmed Wolfe County footprint.",NEUTRAL
+atlantic-power-nest-cogen-kenilworth-nj,"Coordinates are the Kenilworth borough centroid (Wikipedia) — a rough proxy for the plant's actual position on this large campus, not a parcel-level geocode — precision marked approximate accordingly.",NON_SITE_AREA
+atlas-agro-richland-data-center-campus-wa,Atlas Agro's North American president describes the data center as 'a partner that helps us build the necessary power and utility infrastructure.' Coordinates are an approximate geocode of the stated address.,NEUTRAL
+atomic-data-minneapolis-central-mn,The Minneapolis East site is deliberately not recorded here: no address or coordinates are published and none may be invented.,NEUTRAL
+avaio-digital-leo-little-rock-ar,coordinates are approximate for the I-530 corridor south of Little Rock.,NON_SITE_ROAD
+avaio-taurus-brandon-ms,"Coordinates approximate (Brandon city center, Rankin County).",NON_SITE_AREA
+aventus-715-marshfield-wi,"⚠️ The geocode resolved to ""East Commerce Drive, Mill Creek Business Park, Marshfield"" rather than the exact street number the operator publishes (901 Commerce Dr.), so the pin is street-level within the business park and should be treated as approximate, not parcel-confirmed.",NEUTRAL
+aws-2550-beech-road-new-albany-oh,Coordinates are the Licking County Auditor parcel centroid.,NEUTRAL
+aws-3180-beech-road-new-albany-oh,Coordinates are the Licking County Auditor parcel centroid (parcel 095-111618-04.000).,NEUTRAL
+aws-benton-bossier-parish-la,Coordinates are derived from the published road description and are approximate;,NEUTRAL
+aws-benton-bossier-parish-la,no parcel coordinate has been published.,NEUTRAL
+aws-blanchard-caddo-parish-la,Coordinates are derived from the published road description and are approximate;,NEUTRAL
+aws-blanchard-caddo-parish-la,no parcel coordinate has been published.,NEUTRAL
+aws-boardman-bombing-range-road-or,Coordinates are the centroid of the four OSM building footprints.,NEUTRAL
+aws-boardman-lewis-clark-west-or,Coordinates are the OSM footprint centroid of the three mapped buildings.,NEUTRAL
+aws-boardman-morrow-county-or,Coordinates are Boardman city centroid;,NON_SITE_AREA
+aws-boardman-rippee-road-or,Coordinates are the centroid of the mapped buildings.,NEUTRAL
+aws-calvert-cliffs-md,Coordinates approximate for Calvert Cliffs area.,NON_SITE_AREA
+aws-carters-store-tech-campus-spotsylvania-va,Coordinates exact (8432 Flippo Drive geocode).,NEUTRAL
+aws-clinton-hinds-ms,"Coordinates are a geocode of Clinton, MS (city centroid) — no source fetched in this run gives a street address or the industrial-park parcel.",NON_SITE_AREA
+aws-cosgray-hilliard-oh,"Coordinates are now parcel-exact via the Franklin County Auditor (parcel 050-011455, 4580-4640 Cosgray Rd, Amazon Data Services Inc, data-center use class, ~95 ac).",NEUTRAL
+aws-costas-ridgeland-ms,"Coordinates are the OSM-tagged traffic-signal node at the actual Highland Colony Parkway / West County Line Road intersection (confirmed via Overpass API query against current OpenStreetMap way data, not an estimate), not a confirmed parcel boundary -- precision 'approximate'.",NON_SITE_ROAD
+aws-crosby-court-franklin-county-oh,Coordinates are the Franklin County Auditor parcel centroid.,NEUTRAL
+aws-galaxy-sidney-oh,"Codename 'Project Galaxy.' Coordinates approximate (parcel: north of Millcreek Road, west of Vandemark Road, Sidney OH).",NEUTRAL
+aws-grafton-ma,"pin is street-level, not parcel-level.",NEUTRAL
+aws-grafton-ma,"Coordinates set 2026-09-12 to the OSM way centroid for Centennial Drive, North Grafton (the source names the street but no house number, so the US Census address geocoder returns no match);",NEUTRAL
+aws-green-new-florence-mo,Coordinates are approximate (parcel centroid at I-70 / Hwy 19 NE quadrant).,NEUTRAL
+aws-hayden-run-hilliard-oh,Coordinates are the Franklin County Auditor parcel centroid.,NEUTRAL
+aws-hobart-in,Coordinates estimated from 61st Ave/Colorado St;,NON_SITE_ROAD
+aws-industrial-parkway-jerome-township-oh,Coordinates are the Union County Auditor parcel centroid.,NEUTRAL
+aws-jefferson-township-fayette-oh,Coordinates approximate (Jeffersonville / township-level).,NON_SITE_AREA
+aws-laveen-az,Coordinates are the Laveen area centroid.,NON_SITE_AREA
+aws-mattermeade-caroline-va,Coordinates are the Bowling Green / Woodford area centroid.,NON_SITE_AREA
+aws-newton-court-new-albany-oh,Coordinates are the Licking County Auditor parcel centroid.,NEUTRAL
+aws-project-atlas-madison-county-ms,"CORRECTION: this record aggregates two campuses that Madison County's own tax/incentive administration treats as legally and financially separate -- the Madison County Mega Site (927 acres, off Highway 22 and Nissan Parkway, Canton) and the Costas Property (786 acres, Highland Colony Parkway / West County Line Road, Ridgeland) -- confirmed by a 2026-08-19 Mississippi Free Press report on Madison County's denial of AWS's Canton tax-valuation appeal: the county 'has entered into two fee-in-lieu-of-taxes agreements with the tech giant for its data center campuses in Canton and Ridgeland.' Recommend re-scoping this record to the Canton (Madison County Mega Site) campus alone -- its location.lat/lon (32.6121, -90.039) and 'exact' precision already read as Canton-specific, closer to Canton than to Ridgeland -- and using the companion new-facility record aws-costas-ridgeland-ms (786 acres, Highland Colony Pkwy/West County Line Rd intersection) for Ridgeland.",NON_SITE_ROAD
+aws-project-atlas-madison-county-ms,Coordinates are approximate Canton-area centroid.,NON_SITE_AREA
+aws-project-atlas-madison-county-ms,"location.precision was also corrected from 'exact' to 'approximate': this record's own notes already stated the coordinate is a Canton-area centroid, so the 'exact' claim was wrong.",NON_SITE_AREA
+aws-project-cosmos-marysville-oh,Coordinates are approximate Marysville Innovation Park area.,NEUTRAL
+aws-project-spectrum-somervell-county-tx,"Up to 18 two-story buildings on Vistra-owned land adjacent to the Comanche Peak Nuclear Power Plant, with an additional 1,265+ acres being coordinated in neighboring Hood County;",NEUTRAL
+aws-project-steamboat-warren-county-ms,"Confirmed absence of a precise site: MPB reports the announcement was made in downtown Vicksburg and other coverage places the campus 'near the new Port of Vicksburg', but no source fetched in this run discloses the parcel, road, or acreage — coordinates are a Vicksburg city centroid, precision 'approximate'.",NON_SITE_AREA
+aws-richmond-county-nc,Coordinates are Rockingham city centroid.,NON_SITE_AREA
+aws-summit-crossing-tech-campus-spotsylvania-va,Coordinates approximate (Summit Crossing Road geocode;,NEUTRAL
+aws-wallula-gap-walla-walla-wa,Coordinates are the Wallula area centroid.,NON_SITE_AREA
+aws-warner-road-jerome-township-oh,Coordinates are the Union County Auditor parcel centroid.,NEUTRAL
+aws-wheatfield-in,Coordinates are the Wheatfield centroid.,NEUTRAL
+beacon-calvert-al,"Coordinates are the Calvert community centroid, not the 650-acre parcel.",NON_SITE_AREA
+beacon-calvert-al,"COUNTY AMBIGUITY: Beacon's own page places the hub in Mobile County and that is what is recorded, but Calvert is an unincorporated community straddling Mobile and Washington counties, and the OSM village node used for the coordinate sits on the Washington County side.",NEUTRAL
+beacon-westline-dove-creek-san-angelo-tx,"Coordinates are an approximate geocode of the named road junction (Tankersley, TX), not a parcel centroid — recommend verifying against the TCEQ permit's exact site description if available.",NON_SITE_ROAD
+beale-gardner-johnson-county-ks,Coordinates are approximate.,NEUTRAL
+beale-project-atlas-coweta-ok,Coordinates are a Coweta town-centroid approximation;,NON_SITE_AREA
+beale-project-blue-pima-county-az,Coordinates are approximate.,NEUTRAL
+beale-project-clydesdale-tulsa-county-ok,Coordinates are approximate.,NEUTRAL
+beale-project-pilot-de-soto-ks,Coordinates are De Soto city centroid;,NON_SITE_AREA
+bell-works-holmdel-data-center-nj,Coordinates are the mapped Bell Works main building;,NEUTRAL
+beltline-luther-horizon-technology-park-ok,Coordinates are a Luther town-centroid approximation;,NON_SITE_AREA
+bentaus-chadbourn-miller-county-ar,"no source gives coordinates or a street address, and the pin has NOT been confirmed to fall inside the assembled tract.",NEUTRAL
+bentaus-chadbourn-miller-county-ar,"Coordinates are the OpenStreetMap point for Mandeville, the nearest named community inside the block of parcels described by the Texarkana Gazette - 'bordered on the west by U.S.",NON_SITE_AREA
+bginusa-york-ne,"Coordinates are a north-York approximation, NOT a parcel geocode.",NEUTRAL
+big-allis-solar-clay-ne,COORDINATES ARE APPROXIMATE: GEM's own approximate figure.,NEUTRAL
+big-elk-solar-washington-ne,Coordinates are the plant location published in EIA-860M.,NEUTRAL
+binary-net-vault-lincoln-ne,Coordinates are a geocode of the operator's stated address.,NEUTRAL
+bitdeer-clarington-oh,Coordinates are the Clarington area centroid.,NON_SITE_AREA
+bitdeer-knoxville-tn,Coordinates are an approximate parcel-area estimate for the South National Drive industrial corridor in Knox County (near APN 110-02627 per public tax-assessment/LoopNet listing) since no geocoder was available in-session to pin the exact parcel centroid — flagging for a follow-up precision pass if the site is approved.,NON_SITE_ROAD
+bitdeer-massillon-stark-county-oh,Coordinates are an approximate geocode;,NEUTRAL
+bitdeer-rockdale-tx,"Coordinates are Rockdale, TX city-center (not facility-exact).",NON_SITE_AREA
+bitdeer-shalersville-portage-county-oh,"Coordinates are an approximate geocode of Shalersville Township, not a confirmed parcel pin — no source gave exact site coordinates.",NON_SITE_AREA
+bitdeer-wenatchee-pangborn-wa,"Coordinates approximate (Pangborn area, Douglas County).",NON_SITE_AREA
+bitdeer-whitetail-creek-trumbull-county-oh,Coordinates are approximate.,NEUTRAL
+bitzero-polson-lake-county-mt,"Coordinates are the Polson city center (Wikipedia infobox), not a confirmed site parcel — treat as representative only.",NON_SITE_AREA
+blockchain-power-bens-run-tyler-county-wv,"Coordinates are the Bens Run community centroid, not a surveyed footprint.",NON_SITE_AREA
+blockchain-power-blacksville-monongalia-county-wv,"The Dominion Post's cited filing address (1251 Earl L Core Rd, Morgantown, WV 26505) reads as an administrative/mailing address rather than the mine-site parcel itself, so it was NOT used for this record's coordinates;",NEUTRAL
+blockchain-power-blacksville-monongalia-county-wv,"coordinates instead approximate the Blacksville, Monongalia County community near the former mine.",NEUTRAL
+blockchain-power-hazelton-preston-county-wv,"Coordinates are the Hazelton community centroid, not a surveyed footprint.",NON_SITE_AREA
+blockchain-power-miracle-run-monongalia-county-wv,"Coordinates are the Miracle Run community centroid, not a surveyed footprint.",NON_SITE_AREA
+blockchain-power-tunnelton-preston-county-wv,"Coordinates are the Tunnelton town centroid, not a surveyed footprint.",NON_SITE_AREA
+blockops-helena-west-helena-ar,Coordinates are an OpenStreetMap geocode of the street address named in the council coverage.,NEUTRAL
+blockops-marion-ar,"Coordinates are the OpenStreetMap city point for Marion and are a placeholder at town level, not a site.",NON_SITE_AREA
+blockops-moreland-ar,"the pin is therefore the church, not the mine, and precision is approximate.",NEUTRAL
+blockops-moreland-ar,"Coordinates are the OpenStreetMap point for Moreland First Baptist Church, the only landmark any source gives for this site ('directly across the street');",NEUTRAL
+blockops-russellville-ar,Coordinates are the OpenStreetMap city point for Russellville.,NON_SITE_AREA
+blockware-solutions-belfry-pike-ky,Coordinates as tracked by Global Energy Monitor's facility database.,NEUTRAL
+blockware-sunpark-boone-lincoln-county-wv,coordinates are the Hobet mine point and the specific 20-acre parcel is not published.,NEUTRAL
+bloomberg-orangeburg-ny,"Coordinates are a town-level geocode, not a confirmed parcel pin.",NON_SITE_AREA
+blue-fern-cle-elum-data-center-wa,coordinates are an approximate geocode of the described location.,NEUTRAL
+bluegrassnet-louisville-jefferson-ky,Precision approximate (registry geocode).,NEUTRAL
+blusky-ai-walsenburg-co,Coordinates are the Walsenburg town centroid (approximate);,NON_SITE_AREA
+boxminer-la-pine-or,Coordinates are a street-level approximation near Reed Road;,NEUTRAL
+brady-island-wind-lincoln-ne,COORDINATES ARE APPROXIMATE: the pin is the village of Brady (OpenStreetMap/Nominatim);,NON_SITE_AREA
+brady-island-wind-lincoln-ne,"RWE notes most turbines would sit in the hills north of the Platte River, so the true centroid is north of this point.",NEUTRAL
+brennan-barrington-hills-il,Coordinates are the mapped Penny Road corridor and are approximate;,NON_SITE_ROAD
+bridgehead-industrial-oakley-data-center-ca,"Coordinates from the CEQAnet filing (38°0'22.4""N 121°44'20.9""W).",NEUTRAL
+bridgeport-data-center-campus-coweta-ga,Coordinates are approximate to Moreland.,NON_SITE_AREA
+broken-bow-wind-custer-ne,"Coordinates are phase 1's, hence approximate for the pair.",NEUTRAL
+btc-digital-manila-ar,Coordinates are the OpenStreetMap point for Manila;,NEUTRAL
+buckley-bros-pawhuska-ok,"Coordinates are a Pawhuska town-centroid approximation, not a parcel-confirmed point.",NON_SITE_AREA
+burt-county-wind-burt-ne,Coordinates agree between EIA-860M and Global Energy Monitor.,NEUTRAL
+calethos-lithium-valley-imperial-county-ca,Coordinates are approximate.,NEUTRAL
+cambrin-project-cornmaze-town-of-beloit-wi,Coordinates geocode Town Line Road.,NEUTRAL
+canadys-station-colleton-county-sc,Coordinates are an approximate geocode of the Canadys community.,NEUTRAL
+cango-greenvolt-soperton-ga,"it is corroborated by LN Compute's own announcement of the sale plus a Soperton, GA property listing — hence confidence ""reported"" and approximate coordinates (city center).",NON_SITE_AREA
+cascade-advanced-energy-facility-wa,"Coordinates (46.4706, -119.3339) anchor to Energy Northwest's Columbia Generating Station on the DOE Hanford Reservation, Benton County -- the distinct Cascade SMR parcel, described only as 'adjacent to' Columbia Generating Station, has no publicly confirmed exact coordinate;",NEUTRAL
+cascade-digital-power-hatfield-wi,"Coordinates are the Hatfield locality geocode, not a parcel-confirmed point.",NON_SITE_AREA
+cass-county-solar-cass-ne,COORDINATES ARE APPROXIMATE: the pin is the village of Murray (OpenStreetMap/Nominatim).,NON_SITE_AREA
+cassville-grant-county-wi,Coordinates are Cassville city centroid;,NON_SITE_AREA
+centeris-south-hill-puyallup-wa,Coordinates are an approximate geocode of the SH1 address.,NEUTRAL
+centersquare-ewr2-weehawken-nj,Coordinates are an OSM geocode of the street address.,NEUTRAL
+centersquare-ewr3-piscataway-nj,Coordinates from the PeeringDB facility record for 3 Corporate Place.,NEUTRAL
+centersquare-ord2-elk-grove-village-il,County omitted: the geocoder returns DuPage for this address while Elk Grove Village spans two counties.,NEUTRAL
+centersquare-ord2-elk-grove-village-il,Coordinates geocoded from the published street address.,NEUTRAL
+centersquare-ord4-lisle-il,Coordinates geocoded from the published street address.,NEUTRAL
+centra-portland-me,"GWI (Great Works Internet, headquartered in Biddeford, ME) independently lists a facility at this SAME address (340 Cumberland Ave) -- treated here as a tenant/point-of-presence inside this same interconnection building rather than a separate facility, per this wave's one-pin-per-parcel rule, since a second record would otherwise carry an identical pin.",NEUTRAL
+centrilogic-rochester-ny,Coordinates are a street-address geocode.,NEUTRAL
+cerebras-oklahoma-city-ok,Coordinates are approximate (dispatch seed);,NEUTRAL
+chestnut-river-holyoke-ma,"The coordinate is the OSM-mapped former Hampden Paper Co building at the cited address, marked approximate because the proposal covers the wider complex.",NEUTRAL
+cielo-clarksville-tn,Coordinates are the Clarksville area centroid.,NON_SITE_AREA
+cielo-gaffney-cherokee-county-sc,Coordinates are an approximate geocode of Ford Road — no parcel-level location was published.,NON_SITE_ROAD
+cielo-haines-city-fl,"coordinates are the Haines City area centroid, not the actual site.",NON_SITE_AREA
+cipher-barber-lake-colorado-city-tx,Coordinates are the Colorado City area centroid.,NON_SITE_AREA
+cipher-black-pearl-wink-tx,Coordinates are the Wink area centroid.,NON_SITE_AREA
+cipher-colchis-tom-green-tx,Coordinates are the NE-San-Angelo / Red Creek substation area centroid (approximate) pending a parcel-level GIS lookup.,NON_SITE_AREA
+cipher-digital-odessa-tx,"Coordinates are Odessa, TX city-center (not facility-exact).",NON_SITE_AREA
+cipher-mclennan-county-tx,Coordinates approximate (McLennan County / Waco geocode;,NEUTRAL
+cipher-mikeska-mcculloch-county-tx,"Coordinates approximate (Brady, TX geocode).",NEUTRAL
+cipher-milsing-huntsville-walker-tx,"Coordinates approximate (Huntsville, TX geocode).",NEUTRAL
+cipher-reveille-cotulla-la-salle-tx,"Coordinates approximate (Cotulla, TX geocode).",NEUTRAL
+cipher-stingray-andrews-county-tx,"Coordinates approximate (Andrews, TX geocode;",NEUTRAL
+citynet-bridgeport-harrison-county-wv,"Pin came from a STREET-level geocode match (Platinum Drive, the prior name/adjacent street for this parcel), not a building-level match, so treat it as approximate.",NEUTRAL
+citynet-charleston-kanawha-county-wv,Geocode matched the exact house number.,NEUTRAL
+cleanarc-ruther-glen-va,Coordinates are the Ruther Glen area centroid.,NON_SITE_AREA
+cleanspark-austin-county-tx,"Austin County (seat Bellville) fits that framing, so coordinates are an approximate county reference point, not a parcel.",NON_SITE_AREA
+cleanspark-brazoria-county-tx,"No city or street address disclosed in any source found — coordinates are an approximate reference point at the Brazoria County seat (Angleton, TX), not a parcel location.",NON_SITE_AREA
+cleanspark-cheyenne-wy,"site 2 (45 MW) is described only as 'Wyoming' in the 8-K, with secondary/aggregator sources placing it in the 'Cheyenne market' — coordinates and city are therefore approximate for the combined record.",NEUTRAL
+cleanspark-clinton-ms,"The coordinates are an OpenStreetMap geocode of Industrial Park Drive, Clinton — a real road named by source 1 — and precision is 'representative_multi_site' because the record stands for both parcels;",NON_SITE_ROAD
+cleanspark-clinton-ms,the I-20 frontage parcel has no geocodable address in any source fetched here.,NEUTRAL
+cleanspark-jackson-tn,pin is the Jackson city centroid (15-acre parcel not located).,NON_SITE_AREA
+cleanspark-mountain-city-tn,"Coordinates are the Mountain City town centroid, not the parcel — no source states the site's address or lat/lon.",NON_SITE_AREA
+cleanspark-new-tazewell-tn,coordinates use New Tazewell - confidence downgraded to 'reported' pending disambiguation.,NEUTRAL
+cleanspark-west-crossville-tn,"not a separately mapped postal place, so coordinates are approximated to Crossville's town center (Cumberland County) - a coarse approximation.",NON_SITE_AREA
+cloudburst-oklahoma-city-campus-ok,Coordinates are an Oklahoma City centroid approximation.,NON_SITE_AREA
+cloudburst-san-marcos-tx,coordinates use San Marcos city area as centroid.,NON_SITE_AREA
+cloudhq-manassas-mcc-va,"Coordinates sourced directly from CloudHQ website (38.71955, -77.49819).",NEUTRAL
+cloudhq-msp-campus-chaska-mn,"Chaska states ""Cloud HQ has not applied for, and the City of Chaska has not offered, any form of tax relief or other subsidies."" Coordinates are CloudHQ's own published campus point (44.81068, -93.63557), which sits ~200 m from the OSM point for the city-stated street address.",NEUTRAL
+cloverleaf-bluestem-tonganoxie-ks,"Location precision is approximate: no source seen states coordinates, a street address or a parcel, so the pin is the Tonganoxie town centroid (OpenStreetMap/Nominatim) and the actual footprint lies some distance south of it.",NON_SITE_AREA
+cloverleaf-carlton-kewaunee-county-wi,"Coordinates are a town-level locator, not a parcel.",NON_SITE_AREA
+cloverleaf-cherry-blossom-frenchtown-mi,"Coordinates are an approximate Frenchtown Township / former-hospital-site estimate, not parcel-geocoded.",NEUTRAL
+cloverleaf-ironwood-dundee-township-mi,Coordinates are a township-level geocode.,NON_SITE_AREA
+cloverleaf-pumpkin-technology-campus-harlem-ga,"Coordinates are the Harlem city centroid (OSM Nominatim), not a parcel.",NON_SITE_AREA
+cloverleaf-red-clay-lowndes-al,Coordinates are the OSM-confirmed U.S.,NEUTRAL
+cloverleaf-troy-il,Coordinates are derived from the mapped road intersection and are approximate.,NON_SITE_ROAD
+cloverleaf-troy-mo,Coordinates are the Troy area centroid.,NON_SITE_AREA
+cloverleaf-wrightstown-village-wi,Coordinates are a municipality-level locator.,NON_SITE_AREA
+coachella-valley-technology-campus-ca,"Coordinates are an approximate road-segment geocode (Avenue 52), not a parcel-confirmed point.",NON_SITE_ROAD
+cogent-cheyenne-114-w-10th-wy,Coordinates are an address-level geocode.,NEUTRAL
+cogent-elkridge-howard-md,"Coordinates confirmed via US Census geocoder (exact match on 6050 Race Road, Elkridge, MD 21075).",NEUTRAL
+cogent-oklahoma-city-ok,coordinates approximate to Oklahoma City.,NON_SITE_AREA
+cognovum-trumbull-ct,"Coordinates cross-checked: US Census geocoder (41.240871, -73.146313) and the OSM building footprint (41.2407281, -73.1474121) agree within ~100m;",NEUTRAL
+coinmint-massena-ny,"Lawrence River — no confirmed street address exists in public sourcing, so coordinates here are Massena, NY's town center, not the facility's actual footprint (approximate, per location.precision).",NON_SITE_AREA
+coinmint-plattsburgh-ny,"Coordinates are as stated by the source (44.680538, -73.451475) but are marked approximate because they resolve to a shopping plaza, not a confirmed equipment footprint.",NEUTRAL
+colocrossing-buf1-buffalo-ny,Coordinates are a street-address geocode.,NEUTRAL
+cologix-cedar-knolls-campus-nj,Represented as one record (precision representative_multi_site) because no source gave a distinguishable street-level geocode for 9 Wing Drive vs.,NEUTRAL
+cologix-cedar-knolls-campus-nj,location used is the Hanover Township centroid.,NON_SITE_AREA
+cologix-col1-columbus-oh,Coordinates are a street-address geocode.,NEUTRAL
+cologix-col2-columbus-oh,Coordinates are a street-address geocode.,NEUTRAL
+cologix-col3-columbus-oh,Coordinates are a street-address geocode.,NEUTRAL
+cologix-col4-columbus-oh,Coordinates are a street-address geocode.,NEUTRAL
+cologix-col5-orange-township-delaware-county-oh,"Coordinates are the Lewis Center/Orange Township town centroid, not parcel-verified in this session — recommend a follow-up parcel-level geocode of 6787 Green Meadows Drive before publishing at high precision.",NON_SITE_AREA
+cologix-dsm3-altoona-ia,Coordinates are approximate and sit on Northeast 56th Street near the Meta Altoona campus;,NEUTRAL
+cologix-johnstown-oh,"Coordinates are the Johnstown, Licking County area centroid.",NON_SITE_AREA
+cologix-nnj3-parsippany-nj,"Coordinates are the Parsippany-Troy Hills township centroid (Wikipedia), not a confirmed parcel geocode for 200 Webro Road — marked approximate.",NON_SITE_AREA
+colospace-bedford-nh,"colospace.com's own site could not be fetched in this run (expired TLS certificate), so this record rests on two independently fetched third-party directory listings (DataCenterCatalog, Baxtel) plus the address-to-building geocode match, hence 'reported' rather than 'confirmed' confidence.",NEUTRAL
+colospace-bedford-nh,"Rather than ship a second record carrying an identical pin (this wave's one-pin-per-parcel rule), that is recorded here as a note instead: it is most likely the same building or business park -- possibly a shared carrier-neutral building housing both ColoSpace's product and a FirstLight point of presence -- and is not independently confirmed as a physically distinct site.",NEUTRAL
+comanche-circle-sailfish-hood-county-tx,Coordinates are approximate.,NEUTRAL
+comcast-clinton-edge-data-center-nj,Coordinates from an OSM geocode of the street address.,NEUTRAL
+compass-datacenters-loudoun-county-i-true-north-va,"Recommend a human geocode/parcel check before promoting, since exact building-level siting within the campus was not confirmed this session.",NEUTRAL
+compass-goodyear-campus-az,Coordinates are the cited Bullard Avenue / Yuma Road intersection from OpenStreetMap;,NON_SITE_ROAD
+compass-goodyear-campus-az,"the campus lies to the northwest, so the pin is approximate.",NEUTRAL
+compass-lauderdale-meridian-ms,Coordinates are the Meridian centroid (no parcel coordinates published).,NEUTRAL
+compass-statesville-nc,Coordinates are the Statesville area centroid.,NON_SITE_AREA
+connect-data-centers-albuquerque-nm,"Coordinates are a street-level OpenStreetMap geocode of Daytona Road NW, not a confirmed parcel centroid -- precision is approximate.",NON_SITE_ROAD
+connect-data-centers-oppidan-memphis-tn,Pin is a road-level geocode of the stated address (parcel not confirmed).,NON_SITE_ROAD
+construction-partners-dothan-al,"The $20 million figure is the whole headquarters investment, not a data-hall-only cost, and no MW, square footage, completion date or site address has been disclosed - the coordinate is the city of Dothan and is marked approximate.",NON_SITE_AREA
+continent-8-atlantic-city-convention-center-nj,Coordinates from the Colo Map facility record.,NEUTRAL
+continent-8-west-virginia-dc1-south-charleston-wv,Pin is the city centroid.,NON_SITE_AREA
+continent-8-west-virginia-dc2-petersburg-grant-county-wv,Pin is the town centroid — no street address published.,NON_SITE_AREA
+copia-griffin-energy-stanfield-az,"Coordinates are an approximate point on the described I-8 corridor southeast of Stanfield, derived from the sources' location description — the parcel boundary is not published.",NON_SITE_ROAD
+copia-maricopa-energy-center-harquahala-az,"Coordinate is Nominatim's representative point for the OSM landuse polygon named ""Maricopa Energy Center"".",NEUTRAL
+cordelio-crossover-wind-cross-county-ar,Coordinates are the OpenStreetMap county point for Cross County.,NEUTRAL
+cordelio-crossover-wind-cross-county-ar,"No source gives a site address or turbine-string location, and a 32-turbine array spans many square miles, so this is a county-level approximation only - not a site centroid.",NON_SITE_AREA
+core-scientific-muskogee-ok,Coordinates are approximate.,NEUTRAL
+core-scientific-pecos-tx,Coordinates are the Pecos area centroid.,NON_SITE_AREA
+coresite-bowers-santa-clara-ca,Coordinates approximate based on 2805 Bowers Ave address.,NEUTRAL
+coresite-ch1-chicago-il,Coordinates geocoded from the published street address.,NEUTRAL
+coresite-ch2-chicago-il,Coordinates geocoded from the published street address.,NEUTRAL
+coresite-de3-denver-co,Coordinates are the Denver centroid.,NEUTRAL
+coresite-la1-los-angeles-ca,"Coordinates are an approximate building geocode, not a parcel-confirmed point.",NEUTRAL
+coreweave-digital-crossroads-hammond-in,Coordinates are the Hammond area centroid.,NON_SITE_AREA
+corscale-gainesville-crossing-va,Coordinates are the Gainesville area centroid.,NON_SITE_AREA
+crane-pdx01-forest-grove-or,Coordinates are the Forest Grove area centroid.,NON_SITE_AREA
+crawfish-creek-energy-storage-jackson-al,reverse geocoding places the point on County Road 197 in Jackson County.,NEUTRAL
+crawfish-creek-energy-storage-jackson-al,Coordinates are the site location as reported by the project company in its EIA-860M filing;,NEUTRAL
+creekstone-delta-ut,Coordinates at Delta city centroid;,NON_SITE_AREA
+crofton-bluffs-wind-knox-ne,Second wind site in Knox County alongside Elkhorn Ridge — the two carry distinct coordinates and capacities.,NEUTRAL
+crow-holdings-cleanarc-stemmons-dallas-tx,"The exact parcel address is not disclosed in the announcement, so coordinates are a Dallas city-level geocode rather than a parcel point.",NON_SITE_AREA
+crusoe-blue-energy-victoria-tx,Coordinates are the Victoria area centroid.,NON_SITE_AREA
+crusoe-nolan-county-tx,Coordinates are a city-level geocode.,NON_SITE_AREA
+crusoe-warrenton-mo,Coordinates approximate.,NEUTRAL
+crypto-knight-hosting-cheyenne-wy,"No street address is published in either source, so coordinates are an approximate point for Cheyenne.",NEUTRAL
+cypress-creek-steel-river-energy-center-wilson-ar,"the pin is the town centroid, not a surveyed project boundary.",NON_SITE_AREA
+cyrusone-chi6-wood-dale-il,"Street-level coordinate is approximate: the press release names only Wood Dale, and the Bryn Mawr Avenue location comes from secondary reporting.",NEUTRAL
+cyrusone-cin6-florence-boone-ky,"Coordinates are a geocode of that address, not a parcel-confirmed footprint.",NEUTRAL
+cyrusone-dugway-proving-ground-tooele-county-ut,Coordinates are approximate.,NEUTRAL
+cyrusone-mesa-elliot-ellsworth-az,"Coordinate is the OSM Elliot/Ellsworth intersection, not a parcel centroid.",NON_SITE_ROAD
+cyrusone-yorkville-chi11-il,Coordinates are the centre of the described parcel boundaries and are approximate.,NEUTRAL
+darkhorse-cathedra-rockwood-tn,pin is the Rockwood municipal centroid.,NON_SITE_AREA
+dartpoints-btr1-baton-rouge-la,"PeeringDB publishes the same coordinate for BTR1 and BTR2, so the pin here is the OpenStreetMap house-number match for 7127 Florida Blvd and is marked approximate.",NEUTRAL
+dartpoints-btr2-baton-rouge-la,"PeeringDB publishes an identical coordinate for BTR1 and BTR2, so the pin here is the OpenStreetMap house-number match for 7139 Florida Blvd.",NEUTRAL
+dartpoints-charleston-ladson-sc,Coordinates are the OSM building footprint centroid.,NEUTRAL
+dartpoints-columbia-sc,Coordinates and address are from the OSM node carrying the operator's own site reference (CAE01).,NEUTRAL
+dartpoints-greenville-sc,Coordinates are the OSM address point for 78 Global Drive.,NEUTRAL
+dartpoints-lexington-fayette-ky,"Coordinates are a geocode of the street address, not a parcel-confirmed footprint.",NEUTRAL
+dartpoints-shv01-shreveport-la,"Street address not published on a source fetched this session, so the point is a Shreveport geocode flagged approximate.",NEUTRAL
+dartpoints-spartanburg-sc,Coordinates are the OSM building footprint centroid.,NEUTRAL
+data-city-energy-abundance-laredo-tx,Coordinate anchored on Laredo.,NEUTRAL
+data-holdings-eau-claire-wi,"⚠️ Data Holdings publishes no street address, saying only that the facility is ""on the south side of Eau Claire"", so the coordinates are an approximate CITY-LEVEL point and are NOT the facility footprint — they should be corrected before the pin is treated as meaningful.",NON_SITE_AREA
+data-holdings-milwaukee-wi,Coordinates are an address geocode.,NEUTRAL
+data3-tulsa-ok,Coordinates are a street-address geocode of the tower complex.,NEUTRAL
+databank-brooklyn-park-mn,"Coordinates approximate (Brooklyn Park city-area estimate, not parcel-geocoded this session).",NON_SITE_AREA
+databank-bwi1-baltimore-md,"Coordinates confirmed via US Census geocoder (exact match on 300 W Lexington St, Baltimore, MD 21201) -- same carrier hotel building as the separately-recorded AiNET One Market Center facility;",NEUTRAL
+databank-bwi1-baltimore-md,"the two are distinct commercial colocation operations sharing one address, so the shared pin is disclosed rather than a duplicate.",NEUTRAL
+databank-indo-cartersville-ga,Coordinates are the Cartersville area centroid.,NON_SITE_AREA
+databank-las1-las-vegas-nv,"The building is mapped in OpenStreetMap as 'DataBank Las Vegas LAS1' at this address, which is how the coordinates were confirmed.",NEUTRAL
+databank-lenexa-ks,"Coordinates are the US Census geocode of the listed street address, retrieved 2026-09-13;",NEUTRAL
+databank-lga3-orangeburg-ny,"Coordinates geocoded from the street address via US Census geocoder (address-range interpolation, not a confirmed parcel), hence approximate precision.",NEUTRAL
+databank-ord3-mount-prospect-il,Coordinates geocoded from the published street address.,NEUTRAL
+databank-ord4-oak-brook-il,Coordinates geocoded from the published street address.,NEUTRAL
+databank-overland-park-ks,"Coordinates are the US Census geocode of the listed street address, retrieved 2026-09-13;",NEUTRAL
+databank-san1-san-diego-ca,"Coordinates are an approximate geocode, not a parcel-confirmed point.",NEUTRAL
+dataone-vineland-bloom-fuel-cell-plant-nj,Coordinates are an OSM geocode of the campus address on South Lincoln Avenue (same site as nebius-vineland-nj).,NEUTRAL
+datayard-dayton-oh,Coordinates approximate.,NEUTRAL
+dc-blox-atlanta-west-ga,Coordinates are Lithia Springs area centroid.,NON_SITE_AREA
+dc-blox-birmingham-al,"Coordinates are the OSM building polygon centroid for the parcel, which OSM independently tags as a data centre named ""DC Blox Data Center"".",NEUTRAL
+dc-blox-camp-hall-berkeley-county-sc,"No source gives a street address or parcel for the specific building site within the multi-thousand-acre Camp Hall park, so the coordinates used here are the Berkeley County centroid (from OSM Nominatim) as an explicitly disclosed county-level placeholder, not even a city-level pin -- do not read this as parcel- or city-level precision.",NON_SITE_AREA
+dc-blox-greenville-sc,"Coordinates geocoded from the operator's stated street address via the US Census geocoder, not stated directly by any source as facility coordinates.",NEUTRAL
+dc-blox-huntsville-al,"Coordinates are an address-point geocode of the street address DC BLOX publishes, not a confirmed parcel footprint.",NEUTRAL
+dc-blox-montgomery-al,"a secondary search summary placed it off the I-65 Hope Hull exit (roughly 12 miles southwest of the centroid used here) but no page stating that was successfully fetched, so it is not recorded.",NEUTRAL
+dc-blox-montgomery-al,"COORDINATES ARE A MONTGOMERY CITY-CENTROID GEOCODE, not the site: the only site detail in a fetched source is the name ""Interstate Industrial Park"", which does not resolve in Nominatim;",NON_SITE_AREA
+dc-blox-montgomery-al,The coordinate should be tightened before this record is trusted for mapping.,NEUTRAL
+dc-blox-myrtle-beach-cls-sc,Coordinates come from the named OSM feature for the facility itself.,NEUTRAL
+dc-blox-north-augusta-sc,"no street number is given by either source, so the coordinate is an Atomic Road geocode (approximate).",NEUTRAL
+dc-blox-warren-township-marion-county-in,Coordinates are approximate.,NEUTRAL
+dc-devco-project-pulse-gum-springs-ar,"Coordinates are the OpenStreetMap point for Gum Springs, the community the Southwest Arkansas Mega Site is identified with (described as roughly five miles south of Arkadelphia);",NON_SITE_AREA
+dcblox-atlanta-east-conyers-ga,Coordinates approximate;,NEUTRAL
+dcblox-chattanooga-e16th-tn,Coordinates are a geocode of the street address.,NEUTRAL
+deca-ghent-carroll-county-ky,Coordinates are the Ghent city centroid and are approximate — the parcel has not been mapped publicly.,NON_SITE_AREA
+decennial-akron-fulton-county-in,Coordinates are the town of Akron;,NON_SITE_AREA
+dedispec-berkeley-springs-morgan-county-wv,Pin is the town centroid — no street address is published.,NON_SITE_AREA
+deep-green-lansing-mi,Coordinates are the US Census geocoder's match for the Cedar St / N Larch St intersection named in the source;,NON_SITE_ROAD
+deep-lake-energy-center-nicholas-county-wv,Pin is the Summersville town centroid;,NON_SITE_AREA
+deep-lake-energy-center-nicholas-county-wv,"the source places the site 'near Summersville' without a road or parcel, so the coordinate is approximate.",NEUTRAL
+deep-river-data-cumnock-lee-county-nc,"coordinates are the Cumnock community, not a parcel.",NON_SITE_AREA
+deltas-edge-solar-carroll-ms,Coordinate taken from the OSM plant outline centroid;,NEUTRAL
+deltas-edge-solar-carroll-ms,"the EIA row carries only two decimal places (33.5/-90.1), which is too coarse for a pin.",NEUTRAL
+deltona-holder-industrial-park-citrus-county-fl,"Coordinates are an approximate geocode of Lecanto, the nearest named place in sourcing, not the parcel itself.",NON_SITE_AREA
+dermody-kramers-lane-louisville-jefferson-ky,Coordinates are a geocode of the street address.,NEUTRAL
+desri-long-lake-solar-phillips-county-ar,Coordinate taken from Global Energy Monitor's plant record;,NEUTRAL
+digi-power-x-columbiana-al,"Coordinates are the OSM industrial-park polygon centroid for Industrial Parkway, not a confirmed parcel footprint.",NEUTRAL
+digico-lax1-monterey-park-ca,"Coordinates are an approximate street-level geocode, not a parcel-confirmed point.",NEUTRAL
+digihost-erie-county-ny,"Coordinates are an approximate geocode, not an independently confirmed parcel pin.",NEUTRAL
+digital-fortress-ptl-portland-or,Coordinates are the OSM address point for 511 SW 10th Ave (multi-tenant building).,NEUTRAL
+digital-fortress-ptl2-beaverton-or,Coordinates are the OSM building footprint for 9705 SW Sunshine Ct.,NEUTRAL
+digital-fortress-ptl3-beaverton-or,Coordinates are the OSM building footprint for 9610 SW Sunshine Ct.,NEUTRAL
+digital-realty-727-s-grand-ave-la-ca,"Coordinates are an approximate street-level geocode, not a parcel-confirmed point.",NEUTRAL
+digital-realty-charlotte-nc,Coordinates are approximate Moores Chapel Road area.,NEUTRAL
+digital-realty-clifton-campus-nj,Represented as a single record (precision representative_multi_site) because neither operator page gave a distinguishable parcel-level geocode for the two buildings and no independent source was fetched to separate them;,NEUTRAL
+digital-realty-cornelius-pass-cornell-hillsboro-or,Coordinates are the Cornelius Pass / Cornell intersection (OSM node 38738445);,NON_SITE_ROAD
+digital-realty-jfk10-manhattan-ny,"Coordinates are an approximate geocode of the building, not a confirmed parcel pin.",NEUTRAL
+digital-realty-oak10-ca,"Coordinates are an OSM building centroid (way/377378597), not parcel-confirmed.",NEUTRAL
+digital-realty-ord12-franklin-park-il,Coordinates geocoded from the published street address.,NEUTRAL
+digital-realty-vernon-ca,"Coordinates are an approximate street-level geocode, not a parcel-confirmed point.",NEUTRAL
+diode-ventures-gemstone-kuna-id,"both agree on street and ZIP, and a mapped building beats an address-range interpolation, but for a 620-acre campus treat the pin as site-level regardless.",NEUTRAL
+diode-ventures-gemstone-kuna-id,Coordinates set 2026-09-12 from the OpenStreetMap building POI at 3250 S Locust Grove Road.,NEUTRAL
+diode-ventures-gemstone-kuna-id,The US Census geocoder returns a point 1.6 km north for the same address;,NEUTRAL
+diversified-longhorn-pad-a-horton-township-elk-pa,Coordinate is a township-centroid geocode.,NON_SITE_AREA
+dmint-olb-group-selmer-tn,Pin is a road-level geocode of Industrial Park Drive (parcel not confirmed).,NON_SITE_ROAD
+docomo-guam-harmon-gu,"Precision 'approximate' (street-level geocode, not a confirmed parcel).",NEUTRAL
+docomo-saipan-susupe-mp,"Coordinates geocoded via OSM Nominatim on 'Nauru Loop, Susupe, Saipan' (street-level match) -- precision 'approximate', not a confirmed parcel.",NEUTRAL
+doe-oak-ridge-reservation-ai-data-centers-tn,"This is recorded as a single record with representative_multi_site precision, geocoded to the East Tennessee Technology Park, because DOE names two sites but publishes no design, footprint, or capacity for either;",NEUTRAL
+doe-oak-ridge-reservation-ai-data-centers-tn,"ORNL itself geocodes to 35.9301332, -84.3119307.",NEUTRAL
+dominion-cumberland-energy-center-va,"Coordinates are an approximate geocode of northern Cumberland County along the James River, not a surveyed site point.",NEUTRAL
+dominion-mount-storm-combined-cycle-grant-county-wv,Coordinates are the existing Mt.,NEUTRAL
+dominion-mount-storm-power-station-grant-county-wv,Coordinates as published by Global Energy Monitor.,NEUTRAL
+dpo-wisconsin-rapids-hpc-wi,"Exact street address and acreage not disclosed in the announcement, so coordinates are the Wisconsin Rapids city geocode.",NON_SITE_AREA
+drfortress-koapaka-honolulu-hi,"Coordinates geocoded from the street address via OSM Nominatim (matched a specific building at this house number on Koapaka Street, Salt Lake/Airport Industrial Park area);",NEUTRAL
+drox-group-rural-hall-forsyth-county-nc,"Coordinates are approximate for Rural Hall, NC.",NON_SITE_AREA
+dte-cold-creek-energy-center-branch-mi,"PIN PRECISION: the MPSC filing names only ""Branch County"" and no township or parcel has been published, so the coordinates are a COUNTY CENTROID placeholder, not a site pin.",NON_SITE_AREA
+dte-fish-creek-energy-center-montcalm-mi,"local permit coverage places a DTE battery system in Bushnell Township's portion of the Fish Creek Solar Park, and the pin is a Bushnell Township centroid on that basis — it is a placeholder, not a parcel.",NON_SITE_AREA
+dte-fish-creek-energy-center-montcalm-mi,"PIN PRECISION: the MPSC filing states only ""Montcalm County"";",NEUTRAL
+dte-pine-river-energy-center-gratiot-mi,"PIN PRECISION: the MPSC filing names only ""Gratiot County"", so the coordinates are a COUNTY CENTROID placeholder.",NON_SITE_AREA
+dte-pine-river-energy-center-gratiot-mi,"Gratiot County does contain a Pine River Township, but the filing does not say the project sits there and that inference is deliberately NOT encoded in the pin.",NEUTRAL
+duke-energy-belews-creek-smr-stokes-county-nc,Coordinates are those of the existing Belews Creek Steam Station;,NEUTRAL
+duke-energy-davidson-county-cc4-nc,Coordinates are a road-level approximation of the address named in the reporting.,NON_SITE_ROAD
+duke-energy-progress-richmond-county-bridge-power-nc,"Coordinates are the Hamlet town centroid, not a parcel.",NON_SITE_AREA
+eagle-rock-pairmont-data-center-campus-spotsylvania-va,Coordinates not parcel-confirmed -> omitted.,NEUTRAL
+eagle-rock-pine-ridge-tech-park-twiggs-ga,"Coordinates are the Twiggs County centroid (OSM Nominatim) — the site is near the county's western river edge, so the pin is indicative only.",NON_SITE_AREA
+east-kentucky-network-ivel-floyd-ky,Address and coordinates are taken from PeeringDB's registrant-maintained record;,NEUTRAL
+east-kentucky-network-ivel-floyd-ky,"precision is marked approximate because the point is a registry geocode of the street address, not a parcel-confirmed footprint.",NEUTRAL
+ebon-international-big-sandy-lawrence-ky,Coordinates are the Louisa city centroid and are approximate — Big Sandy Generating Station is not mapped as a named feature in OpenStreetMap and the leased parcel was never publicly delineated.,NON_SITE_AREA
+echostar-cheyenne-wy,"Coordinates approximate the Cheyenne Business Park, not a parcel-confirmed point.",NEUTRAL
+ecl-csc1-santa-clara-ca,Coordinates are Santa Clara city centroid (approximate).,NON_SITE_AREA
+eco-yotta-oneonta-ny,"Coordinates geocoded from the street address via US Census geocoder (address-range interpolation on County Route 9, not a confirmed parcel), hence approximate precision.",NEUTRAL
+edgeconnex-den01-denver-co,coordinates are an approximate street-level point.,NEUTRAL
+edgeconnex-edclas01-las-vegas-nv,Coordinates are an OpenStreetMap house-level geocode of the PeeringDB-registered address.,NEUTRAL
+edgeconnex-liberty-road-douglas-county-ga,Coordinates are approximate to Liberty Road.,NON_SITE_ROAD
+edgeconnex-mad01-madison-wi,Coordinates are an address geocode.,NEUTRAL
+edgeconnex-sli01-slidell-la,"Street address and coordinates CONFIRMED 2026-09-10 against PeeringDB facility 11786 ""EdgeConneX New Orleans (EDCSLI01)"" at 2070 Gause Blvd E;",NEUTRAL
+edgeconnex-sli01-slidell-la,these replace the earlier city-level Slidell geocode.,NEUTRAL
+edgeconnex-sli01-slidell-la,"Precision remains approximate — PeeringDB coordinates are address-geocoded, not a surveyed parcel.",NEUTRAL
+edgeconnex-union-city-campus-fulton-ga,Coordinates are the Union City centroid (OSM Nominatim);,NON_SITE_AREA
+edgecore-culpeper-tech-zone-va,Coordinates are an approximate geocode of the Culpeper Technology Zone.,NEUTRAL
+edgecore-dobson-farms-east-florence-az,Coordinate derived from the OSM geometries of Arizona Farms Road and Attaway Road.,NEUTRAL
+edgecore-mesa-az,Coordinates approximate for Elliot Road corridor.,NON_SITE_ROAD
+edgecore-shannon-hill-louisa-va,"Coordinates are an approximate geocode of the Shannon Hill interchange, not a parcel-confirmed point.",NON_SITE_ROAD
+edged-aurora-il,Coordinates approximate for Bilter Rd area of north Aurora;,NON_SITE_ROAD
+edged-energy-ankeny-ia,"coordinates are city-level, not parcel-geocoded — mark approximate).",NON_SITE_AREA
+edged-gateway-prichard-al,Coordinates are the Prichard municipal centroid — no street address appears in any fetched source.,NON_SITE_AREA
+edgeuno-sju1-san-juan-pr,Coordinates are the facility's own PeeringDB listing;,NEUTRAL
+edpr-cypress-knee-solar-chicot-county-ar,"the coordinate is the county seat (Lake Village) and is a county-level placeholder, not the project footprint.",NON_SITE_AREA
+edpr-ragsdale-solar-madison-ms,"Coordinates are Global Energy Monitor's plant point, marked approximate — no parcel coordinate was published by EDPR.",NEUTRAL
+ekpc-cooper-station-unit-3-pulaski-ky,"Coordinates are Global Energy Monitor's point for the existing Cooper Station, where the new unit will be built;",NEUTRAL
+ekpc-liberty-station-casey-ky,"Coordinates are anchored on the city of Liberty (Casey County seat) because the only location detail published is 'off of KY 49 in Casey County' - the parcel is not disclosed, so precision is approximate, not a geocoded site.",NON_SITE_AREA
+elysian-partners-fairview-crossroads-fairview-township-york-pa,the coordinate here is a township-centroid geocode.,NON_SITE_AREA
+elysian-partners-fairview-crossroads-fairview-township-york-pa,The source records no capacity figure and no geocoded parcel;,NEUTRAL
+emerald-lakes-etheridge-lakes-data-center-chesapeake-va,Coordinates are approximate (Centerville Turnpike/Great Bridge area);,NEUTRAL
+emerald-lakes-etheridge-lakes-data-center-chesapeake-va,exact parcel not geocoded from GIS this session.,NEUTRAL
+empire-ai-beta-buffalo-ny,"coordinates are geocoded to that building on the Buffalo Niagara Medical Campus, hence approximate.",NEUTRAL
+empire-ai-gamma-buffalo-ny,"Coordinates are a Buffalo city-level placeholder, approximate;",NON_SITE_AREA
+enbridge-cowboy-solar-bess-laramie-county-wy,"Enbridge publishes the county but not a parcel or address, so coordinates are an approximate point for Cheyenne.",NEUTRAL
+encore-technologies-blu1-blue-ash-oh,Greater Cincinnati colocation facility registered in PeeringDB with building-level coordinates.,NEUTRAL
+energy-storage-solutions-fayetteville-cumberland-county-nc,"Site-specific details (parcel, acreage, exact coordinates) not yet public;",NEUTRAL
+energysolutions-kewaunee-new-nuclear-wi,Coordinates are the Kewaunee Power Station site.,NEUTRAL
+enfinity-eg-saturn-solar-i-perry-al,"Coordinates are the Perry County centroid — the source gives no site address, and the two co-located plants share this approximate pin.",NON_SITE_AREA
+enfinity-eg-saturn-solar-ii-perry-al,Coordinates are the Perry County centroid and are deliberately shared with the co-located EG Saturn Solar I — the source publishes no separate site address for either plant.,NON_SITE_AREA
+enseva-hiawatha-ia,Coordinates geocoded from the published street address to an OpenStreetMap address point.,NEUTRAL
+entergy-arkansas-cypress-solar-battery-jefferson-county-ar,"Coordinates are the OpenStreetMap point for Pastoria, the community Energy-Storage.news names in its site description ('approximately 3,000 acres of land east of the Arkansas River near Pastoria');",NON_SITE_AREA
+entergy-arkansas-cypress-solar-battery-jefferson-county-ar,"this is a nearest-community approximation across a 3,000-acre footprint, not a site centroid.",NON_SITE_AREA
+entergy-bogalusa-west-solar-washington-parish-la,"Coordinates are a Bogalusa geocode, flagged approximate;",NEUTRAL
+entergy-bogalusa-west-solar-washington-parish-la,no parcel coordinate was published.,NEUTRAL
+entergy-cypress-harvest-solar-iberville-la,"Coordinates are a geocode of Milly Plantation Road, one of the two roads the reporting names as the site's bounds, flagged approximate.",NON_SITE_ROAD
+entergy-delta-blues-greenville-ms,"MDEQ's permit record (source 3) gives the site address as 85 Stokes King Road, Greenville, MS 38701 (Washington County), but OpenStreetMap has no geocode for that road or for the adjacent Gerald Andrus station, so the coordinates are a Greenville city centroid and precision is 'approximate' — the street is recorded from the permit record, the lat/lon is not.",NON_SITE_AREA
+entergy-delta-solar-bolivar-ms,"GEM's page header mislabels the state as Louisiana while giving Bolivar County — Bolivar County is in Mississippi and the coordinates fall in Mississippi, so MS is recorded here.",NEUTRAL
+entergy-delta-solar-bolivar-ms,"Coordinates are Global Energy Monitor's plant point, marked approximate;",NEUTRAL
+entergy-ironwood-power-station-jones-mill-ar,"Coordinates are an OpenStreetMap geocode of Jones Mill Road in Hot Spring County, the Jones Mill / Lake Catherine locality named in coverage of the groundbreaking.",NON_SITE_ROAD
+entergy-jefferson-power-station-redfield-ar,"Coordinates are the OpenStreetMap point for the existing White Bluff Power Plant, the site Entergy names for the new station ('adjacent to Entergy's existing coal-fired power plant');",NEUTRAL
+entergy-new-orleans-solar-station-la,"Coordinate is the EIA plant point, reported to three decimal places, and is marked approximate.",NEUTRAL
+entergy-penton-solar-desoto-ms,"Coordinates are converted from the MDEQ NOI's own LiDAR-derived site point (34°51'38.484""N, 90°16'13.584""W), which the form asks to be the project entrance/start point rather than a footprint centroid — hence precision 'approximate'.",NEUTRAL
+entergy-pointe-coupee-cccts-la,"Coordinates are an OpenStreetMap geocode of the existing Big Cajun site the filing names as the siting reference, flagged approximate — the new units' parcel has not been published.",NEUTRAL
+entergy-river-bend-ap1000-west-feliciana-la,"Coordinates are the OpenStreetMap point for River Bend Nuclear Generating Station, flagged approximate for the proposed expansion.",NEUTRAL
+entergy-traceview-ridgeland-ms,"Coordinates are an OpenStreetMap geocode of that street address, not a confirmed parcel or stack location — precision 'approximate'.",NEUTRAL
+entergy-vicksburg-aps-ms,"coordinates are an OpenStreetMap geocode that resolves 'Kemp Bottom Road, Baxter Wilson Power Station, Vicksburg' — the road and plant name are confirmed by OSM, but no fetched source states a lat/lon, so precision is 'approximate'.",NEUTRAL
+entergy-walnut-bend-solar-lee-county-ar,"The pin is Global Energy Monitor's, but it does not fall inside Lee County — the county GEM itself assigns the plant — and it is also well southwest of Brinkley, the town Entergy names.",NEUTRAL
+entergy-walnut-bend-solar-lee-county-ar,COORDINATE NEEDS VERIFICATION BEFORE PUBLICATION.,NEUTRAL
+entergy-westlake-power-station-calcasieu-la,"Coordinates are a Westlake city geocode, flagged approximate.",NON_SITE_AREA
+epic-hosting-verona-wi,Coordinates are a campus-level locator for Epic's Milky Way address in Verona.,NEUTRAL
+epicio-st-croix-vi,"Nominatim resolved 'Estate Northside, St Croix' only at the district/village level, not the street number, so precision is 'approximate' and the pin should be read as locating Estate Northside generally, not the parcel.",NON_SITE_AREA
+equinix-bo1-waltham-ma,"Coordinates are an approximate geocode of the street address, not a confirmed parcel footprint.",NEUTRAL
+equinix-ch8-minooka-il,Coordinates are the Minooka area centroid.,NON_SITE_AREA
+equinix-la3-el-segundo-ca,"Coordinates are an approximate building-centroid geocode (OSM), not a parcel-confirmed point.",NEUTRAL
+equinix-la4-el-segundo-ca,"Coordinates are an approximate geocode, not a parcel-confirmed point.",NEUTRAL
+equinix-ny11-carteret-nj,"Coordinates are a street-address geocode from Inflect's own listing, not a confirmed parcel boundary.",NEUTRAL
+equinix-ny4-secaucus-nj,"Coordinates are the shared PeeringDB pin for the whole Equinix Secaucus campus (NY2/NY4/NY5/NY6), not an NY4-specific rooftop geocode — marked approximate accordingly.",NEUTRAL
+equinix-ny6-secaucus-nj,"Coordinates are an OSM address point for that street address, not a confirmed building footprint.",NEUTRAL
+equinix-ny9-manhattan-ny,"Coordinates geocoded from the street address via US Census geocoder (address-range interpolation, not a confirmed suite/floor footprint), hence approximate precision.",NEUTRAL
+equinix-se4-kent-wa,"Coordinates are the OpenStreetMap address record for 6906 South 204th Street, which is not itself tagged as a data center - hence precision 'approximate'.",NEUTRAL
+erdc-dsrc-vicksburg-ms,Coordinates are an OpenStreetMap geocode of ERDC's published 3909 Halls Ferry Road address;,NEUTRAL
+estrella-solar-storage-bernalillo-county-nm,"Coordinate is an approximate anchor near the Atrisco Vista / I-40 area, not a parcel boundary.",NEUTRAL
+etc-dc-opco-lysite-fremont-county-wy,Coordinates are a geocode from the published distance-and-bearing description and are not a parcel-confirmed point.,NEUTRAL
+eurus-ee-gemina-solar-triana-al,"Coordinates are the Triana place centroid, not a parcel-confirmed point.",NEUTRAL
+evocative-jfk2-chappaqua-ny,Geocode resolves to the 480 N.,NEUTRAL
+exoticridge-bulls-gap-tn,Coordinates are the Bulls Gap town point;,NON_SITE_AREA
+expedient-cmh1-upper-arlington-oh,Coordinates are a street-address geocode.,NEUTRAL
+expedient-cmh2-dublin-oh,Coordinates are a street-level geocode.,NEUTRAL
+expedient-cmh3-lewis-center-oh,"The street number would not geocode, so coordinates are a road-level geocode of E.",NON_SITE_ROAD
+fbi-greywolf-pocatello-id,"the pin is building-level, not parcel-surveyed, hence precision remains approximate.",NEUTRAL
+fbi-greywolf-pocatello-id,Coordinates corrected 2026-09-12 from a Pocatello city-centroid placeholder to the OpenStreetMap POI for the FBI facility on Duckett Byrnes Street (cited below);,NEUTRAL
+fermi-matador-amarillo-tx,Coordinates approximate (seed-provided;,NEUTRAL
+fiberhub-las1-las-vegas-nv,Coordinates are PeeringDB's registered facility point.,NEUTRAL
+fiddle-falls-solar-pontotoc-ms,"Coordinates are the centroid of the OSM outline, which its own mapper tagged 'geometry approx' — recorded as approximate, not a surveyed footprint.",NEUTRAL
+firstlight-brunswick-me,"US Census had no match for this street (likely too new for the TIGER address-range dataset -- 'Resilient Circle' is a newly-named street at the redeveloped former Brunswick Naval Air Station business park), so the OSM building match is the only geocode available here.",NEUTRAL
+firstlight-williston-vt,"IMPORTANT CORRECTION TO SOURCE DATA: Baxtel's directory lists this facility as 'FirstLight Burlington,' but the street address (45 Krupp Dr) does not exist in Burlington -- both the US Census geocoder and OSM Nominatim resolve it unambiguously to Williston, VT (OSM building match way/620853160, 'Krupp Drive...",NEUTRAL
+firstlight-williston-vt,Recorded here under its true municipality (Williston) per this wave's geocoding-verification requirement rather than the aggregator's market-name label.,NEUTRAL
+fisk-quantum-leap-nashville-tn,"Coordinates are a geocode of Herman Street within 37208, not a parcel;",NON_SITE_ROAD
+fisk-quantum-leap-nashville-tn,no source states lat/lon.,NEUTRAL
+flat-fork-solar-brinkley-ar,The coordinate and the town agree;,NEUTRAL
+flat-fork-solar-brinkley-ar,"Francis County, but the registry coordinate sits near Brinkley in Monroe County, matching the town Entergy names.",NEUTRAL
+fleet-data-centers-storey-county-nv,Coordinates approximate to the TRIC/USA Parkway area.,NON_SITE_ROAD
+fleet-peru-ridge-self-generation-storey-county-nv,"Coordinates are an approximate geocode of Peru Drive in Storey County, not a parcel-confirmed point.",NON_SITE_ROAD
+fleet-south-valley-self-generation-storey-county-nv,"Coordinates are an approximate geocode of USA Parkway in Storey County, not a parcel-confirmed point.",NON_SITE_ROAD
+flexential-parker-co,"Coordinates are an approximate Compark Boulevard geocode, not parcel-confirmed.",NEUTRAL
+flexential-portland-hillsboro-6-or,Coordinates are a street-level approximation of NE Aloclek Place;,NEUTRAL
+flexential-portland-hillsboro-6-or,the exact parcel has not been geocoded.,NEUTRAL
+fluidstack-abernathy-tx,Coordinates are the Abernathy town centroid.,NON_SITE_AREA
+fluidstack-okmulgee-county-ok,Coordinates are an Okmulgee town-centroid approximation.,NON_SITE_AREA
+fnts-omaha-ne,Coordinates are the OpenStreetMap building centroid.,NEUTRAL
+forgelight-ventures-conway-ar,"Coordinates are the OpenStreetMap point for Conway Municipal Airport at Cantrell Field, whose OSM record places it on Lollie Road - the road named in reporting as the project's location ('Southwest Conway near Lollie Road and the Conway Municipal Airport area').",NEUTRAL
+fort-cherry-power-station-robinson-township-washington-pa,Coordinate is Global Energy Monitor's approximate point for the site.,NEUTRAL
+fort-martin-power-station-maidsville-monongalia-county-wv,Coordinates are as published by Global Energy Monitor for the plant itself.,NEUTRAL
+fort-spunky-pacifico-energy-hood-county-tx,Coordinates are approximate.,NEUTRAL
+fortistar-north-tonawanda-generating-ny,Coordinates are geocoded to the City of North Tonawanda because the fetched DPS notice names only the city and county;,NON_SITE_AREA
+fortitude-grand-island-ne,coordinates are Grand-Island-city-level only.,NON_SITE_AREA
+foundry-minden-ne,Coordinates are the Minden town centroid — NOT a site geocode.,NON_SITE_AREA
+four-three-glenbrook-salem-township-luzerne-pa,Coordinate is a township-centroid geocode shared with the separate QTS 'Salem 2' record.,NON_SITE_AREA
+four-winds-sugar-hill-portland-ny,Coordinates are the golf-course polygon centroid;,NEUTRAL
+foxtail-flats-solar-storage-san-juan-county-nm,Coordinate is an approximate anchor derived from 'about 10 miles northwest of Farmington'.,NEUTRAL
+franklin-partners-pavilion-township-mi,"Coordinates are a township-level geocode, not the parcel at S 26th St & E N Ave.",NON_SITE_AREA
+freestone-energy-center-fairfield-tx,Coordinates are a Fairfield town-level geocode;,NON_SITE_AREA
+fremont-peak-luckett-road-marana-az,Coordinates are approximate for the Luckett Road parcels.,NON_SITE_ROAD
+gage-wind-gage-ne,coordinates are GEM's own approximate figure.,NEUTRAL
+galaxy-helios-dickens-county-tx,Coordinates are approximate.,NEUTRAL
+galaxy-helios-dickens-tx,"Coordinates are approximate (single-source, not independently cross-verified — geocoding tools could not confirm the street address this pass).",NEUTRAL
+gateway-business-park-offgrid-generation-letcher-ky,Coordinates are a geocode of Gateway Industrial Park Drive and are approximate.,NON_SITE_ROAD
+gci-anchorage-ak,"Pin is therefore an Anchorage city-level approximation (Nominatim), not either street address.",NON_SITE_AREA
+gemini-data-center-sioux-falls-sd,Coordinates are approximate for the northeast Sioux Falls site.,NEUTRAL
+genesis-digital-assets-anderson-sc,"Coordinates are an approximate geocode of Anderson, SC — the source places the site 'near the community of Anderson' with no address.",NEUTRAL
+genesis-digital-assets-union-lockhart-sc,"Coordinates are the Lockhart, SC centroid and are illustrative only.",NEUTRAL
+genh-morley-dam-mecosta-mi,"Coordinates are a village-level geocode, not a parcel pin — the exact Frank Deyo Dam site footprint has not been published.",NON_SITE_AREA
+geronimo-nobles-county-powered-data-park-mn,"Coordinates are approximate (near Worthington, MN).",NEUTRAL
+gibson-county-data-center-in,Coordinates are the Gibson County centroid.,NON_SITE_AREA
+girasol-solar-farm-sunflower-ms,"Pre-approval project: the coordinate is developer-supplied in the EIA filing, so precision is recorded as approximate.",NEUTRAL
+global-ai-windsor-co,"Coordinates are approximate (former Kodak campus, Eastman Park Drive area), not parcel-confirmed.",NEUTRAL
+global-reach-ames-ia,Coordinates geocoded from the operator's published address to the OpenStreetMap building at 2321 North Loop Drive in the ISU Research Park.,NEUTRAL
+global-stack-kings-county-fairgrounds-hanford-ca,Location is the fairgrounds centroid (approximate).,NEUTRAL
+globalinx-fastnet-cls-ocean-city-md,"Coordinates are therefore a disclosed representative pin at Ocean City Municipal Airport (via OSM Nominatim), NOT a confirmed parcel location;",NEUTRAL
+gmi-computing-mountain-pine-ar,"location is a Nominatim city-level geocode for Mountain Pine, Garland County (disclosed via precision: approximate).",NON_SITE_AREA
+goldendale-energy-storage-klickitat-wa,Coordinates are an approximate geocode of the described smelter site.,NEUTRAL
+google-arcola-loudoun-va,Coordinates are an approximate geocode of the disclosed Arcola Blvd address;,NEUTRAL
+google-armstrong-county-tx,Coordinates approximate (based on dispatch seed;,NEUTRAL
+google-bosc-lima-oh,Coordinates are the Lima city centroid;,NON_SITE_AREA
+google-botetourt-greenfield-va,"Coordinates are an approximate geocode of the Greenfield industrial park near Daleville, not a parcel-confirmed point.",NEUTRAL
+google-cedar-rapids-ia,Coordinates approximate for Big Cedar Industrial Center at 76th Ave SW and Edgewood Rd SW in SW Cedar Rapids.,NEUTRAL
+google-columbia-county-ga,the coordinate is the Columbia County centroid (approximate) and no city has been disclosed.,NON_SITE_AREA
+google-council-bluffs-ia,Coordinates are an approximate geocode of a disclosed campus address;,NEUTRAL
+google-douglas-county-ga,Coordinates are the Douglasville city centroid (approximate) — Google does not publish a campus address.,NON_SITE_AREA
+google-fort-wayne-in,exact parcel centroid not verified from public permit records.,NEUTRAL
+google-fort-wayne-in,Coordinates are approximate site area;,NEUTRAL
+google-haskell-county-tx,Coordinates are the Haskell city centroid (no parcel-level GPS found).,NON_SITE_AREA
+google-henderson-nv,Coordinates are an approximate geocode of the disclosed Warm Springs Rd location;,NEUTRAL
+google-hermantown-mn,Coordinates are the Hermantown city centroid (approximate).,NON_SITE_AREA
+google-jackson-county-stevenson-al,coordinates from the Widows Creek plant.,NEUTRAL
+google-lagrange-ga,Coordinates are the LaGrange city centroid (approximate).,NON_SITE_AREA
+google-lancaster-oh,Coordinates are an approximate geocode.,NEUTRAL
+google-lenoir-nc,Coordinates are an approximate geocode of the disclosed Lynhaven Dr address;,NEUTRAL
+google-lincoln-ne,coordinates are Lincoln-city-center-level only.,NON_SITE_AREA
+google-loch-midlothian-va,"Coordinates are an approximate site centroid (address-derived, not GPS-verified).",NEUTRAL
+google-meitner-pampa-tx,Coordinates are the Pampa area centroid.,NON_SITE_AREA
+google-michigan-city-in,Coordinates are the Michigan City centroid (approximate).,NON_SITE_AREA
+google-moncks-corner-sc,Coordinates are an approximate geocode of a disclosed campus address;,NEUTRAL
+google-montgomery-county-tn,Coordinates are approximate for that site.,NEUTRAL
+google-muskogee-county-ok,"Coordinates corrected to approximate Council Hill location (35.57°N, 95.65°W);",NEUTRAL
+google-muskogee-county-ok,"original coordinates (35.65, −95.37) fell near Muskogee city / Summit area rather than Council Hill.",NEUTRAL
+google-nebraska-ai-campus-proposed,Coordinates are approximate centroid of the Otoe/Gage County search area.,NON_SITE_AREA
+google-new-albany-oh,The coordinate is now parcel-exact to the Franklin operational parcel.,NEUTRAL
+google-omaha-ne,"Coordinates are a rough estimate from the named intersection (114th & State St), NOT a parcel-level geocode -- a GIS/assessor pass could sharpen this to exact.",NON_SITE_ROAD
+google-papillion-ne,Coordinates are an approximate geocode of the disclosed Schram Rd address;,NEUTRAL
+google-project-louie-monrovia-in,Coordinates approximate (site east of Monrovia near SR-42/Keller Hill Rd area).,NON_SITE_ROAD
+google-project-mica-kc-northland-mo,Coordinates are approximate for the site northeast of the I-435/US-169 interchange.,NON_SITE_ROAD
+google-pryor-ok,Coordinates are Pryor city center.,NON_SITE_AREA
+google-red-oak-tx,Coordinates are the Red Oak town centroid (no parcel GPS confirmed).,NON_SITE_AREA
+google-redhawk-mesa-az,"Coordinates at Elliot and Sossaman roads, SE Mesa.",NEUTRAL
+google-ridgeville-sc,Coordinates are Ridgeville area centroid.,NON_SITE_AREA
+google-skyway-pine-island-mn,Coordinates are the Pine Island area centroid.,NON_SITE_AREA
+google-spade-new-florence-mo,Coordinates are an approximate site centroid (no verified parcel record).,NEUTRAL
+google-spring-sand-springs-ok,"Coordinates estimated from the site description (near HWY 97 / Rock School Rd), not geocoder-verified.",NON_SITE_ROAD
+google-stillwater-ok,Coordinates are approximate (city centroid shifted north).,NON_SITE_AREA
+google-storey-county-nv,Google publishes no street address — the coordinate is the Storey County centroid (approximate).,NON_SITE_AREA
+google-west-memphis-ar,Coordinates approximate for the Bolliger Road industrial area.,NON_SITE_ROAD
+google-wilbarger-vernon-tx,Coordinates are the Vernon area centroid.,NON_SITE_AREA
+google-winding-woods-st-george-sc,Coordinates are the St.,NEUTRAL
+google-winding-woods-st-george-sc,George area centroid.,NON_SITE_AREA
+grand-river-power-hamlin-township-mi,"Coordinates are Nominatim's match for Smithville Dam, the landmark the source uses to locate the site;",NEUTRAL
+grande-prairie-wind-holt-ne,"Global Energy Monitor agrees on owner, capacity and year and supplies the coordinates.",NEUTRAL
+granite-renewables-logan-county-co,Coordinates are the Sterling town centroid (approximate);,NON_SITE_AREA
+grda-grand-river-energy-center-unit-4-ok,"Coordinates are OSM's point for the Grand River Energy Center, marked approximate — OSM's address line associates the site with Pryor Creek while the dedication coverage locates it at Chouteau;",NEUTRAL
+great-lakes-colocation-lake-park-ia,Coordinates are the Lake Park municipal centroid and are approximate accordingly.,NON_SITE_AREA
+greeley-wind-nebraska-greeley-ne,"NextEra's own page gives the 250-construction-job and landowner/tax figures but no turbine count or site boundary, so coordinates are a county-level approximation anchored on Greeley Center and must not be read as a project footprint.",NON_SITE_AREA
+greenidge-generating-station-torrey-ny,"Address geocoded from the address DEC's letter is directed to (590 Plant Road, Dresden, NY 14441);",NEUTRAL
+greenidge-generation-dresden-ny,"Coordinates are a town-level geocode of the Dresden address, not a confirmed parcel pin.",NON_SITE_AREA
+greenidge-underwood-nd,"city-level coordinates, approximate.",NON_SITE_AREA
+gta-gu1-gu2-piti-gu,"Coordinates geocoded via OSM Nominatim on 'Marine Corps Drive, Piti, Guam' (street-level match, not a confirmed parcel) -- precision set 'approximate'.",NEUTRAL
+gta-gu3-alupang-tamuning-gu,"Status set to operational on the strength of GTA's own 2026 newsroom article, which states verbatim: ""GTA operates three data centers, with its newest facility, GU3 in Alupang."" Coordinates geocoded via OSM Nominatim on 'Alupang, Guam' (resolved to Alupang Street, Tamuning) -- precision 'approximate', not a confirmed parcel.",NEUTRAL
+guild-ventures-kenwood-commons-albany-ny,"Coordinates geocoded to the named Kenwood / Doane Stuart site in Albany, approximate.",NEUTRAL
+gw-ranch-pacifico-energy-pecos-county-tx,Coordinates are approximate.,NEUTRAL
+h5-buffalo-i-lockport-ny,"Coordinates are a campus-level geocode (ConnectBase), not a per-building parcel pin.",NEUTRAL
+h5-buffalo-ii-lockport-ny,"Coordinates are a nearby-offset approximation of the campus location, not an independently confirmed parcel pin for this specific building.",NEUTRAL
+h5-data-centers-chandler-az,Coordinates geocoded from the cited address;,NEUTRAL
+h5-data-centers-chandler-az,Nominatim returns an OSM feature named 'H5 Phoenix' at that address and the US Census geocoder agrees to ~20 m.,NEUTRAL
+h5-data-centers-cincinnati-gest-oh,Coordinates are a street-address geocode.,NEUTRAL
+h5-data-centers-cleveland-rockwell-oh,Coordinates are a street-address geocode.,NEUTRAL
+h5-data-centers-secaucus-nj,"Coordinates are the operator-supplied registry point for the address, not a parcel-confirmed footprint.",NEUTRAL
+h5-la-vista-ne,"Coordinates are a street-address approximation, not a parcel geocode.",NEUTRAL
+h6-coin-newcastle-wy,Coordinates approximate the town of Newcastle.,NEUTRAL
+hanton-city-smithfield-ri,Coordinates are approximate Smithfield-area coordinates.,NON_SITE_AREA
+hawaiiantel-endeavor-honolulu-hi,"Pin is a Honolulu city-level approximation (Nominatim), not the specific parcel — do not read the absence of a street field as meaning one wasn't sought.",NON_SITE_AREA
+hawaiiantel-kawaihae-hi,"Pin is a Kawaihae town-level approximation (Nominatim), not a specific parcel.",NON_SITE_AREA
+hawaiki-cable-kapolei-hi,"Coordinates are a Census TIGER-line geocode of the street address, not a confirmed parcel survey.",NEUTRAL
+hca-it-services-data-center-nashville-tn,"the street field is left empty here because that address could not be reconciled against the mapped building footprint used for the coordinates, which reverse-geocodes to Old Franklin Road.",NEUTRAL
+hexa-builders-black-horse-pike-monroe-nj,Coordinates are a street-level geocode of Black Horse Pike in Williamstown;,NON_SITE_ROAD
+hillwood-sterling-buick-city-flint-mi,"Hillwood-Sterling's deal, per Gander Newsroom, is reported as a ~200-acre interest within the broader former Buick City footprint) -- precision 'approximate' reflects both the geocode-not-parcel caveat AND this sub-parcel uncertainty.",NEUTRAL
+hillwood-sterling-buick-city-flint-mi,"in Flint'), and EPA's own 2023-11-01 press release on the Flint Commerce Center LLC prospective-purchaser agreement for 'roughly 330 acres of the former Buick City manufacturing facility.' Leith Street is independently documented (via a non-cited Wikipedia cross-check, used only to sanity-check geography, not as a source) as the street that divides the ~413-acre Buick City site into northern and southern sections, and the chosen Leith Street road segment (of several OpenStreetMap-tagged segments) falls within the site's other documented boundary streets (E Pierson Rd to the north, N Saginaw St/Industrial to the west, E Hamilton Ave to the south, James P Cole Blvd to the east -- all geocoded this run to confirm the bounding box).",NON_SITE_ROAD
+hog-lick-aggregates-white-hall-marion-wv,"Coordinates are a White Hall community-level pin, not a parcel-level location, since no street address was given.",NON_SITE_AREA
+honda-longmont-co,"Coordinates are an approximate geocode of the building address, not a confirmed suite/parcel.",NEUTRAL
+host-digital-northeast-oklahoma-ok,the coordinates recorded here are a provisional approximation for the Tulsa metro and are not parcel- or address-confirmed.,NEUTRAL
+hp-cherokee-data-center-tulsa-ok,Coordinates approximate to the Cherokee Industrial Park area.,NEUTRAL
+hub787-carolina-pr,"Coordinates are the facility's own PeeringDB listing (18.442021, -66.021669);",NEUTRAL
+humboldt-gibson-county-bitcoin-mine-tn,Pin is the Humboldt town centroid;,NON_SITE_AREA
+hunters-ridge-south-data-center-campus-spotsylvania-va,Coordinates approximate (Cosner Drive geocode;,NEUTRAL
+hut8-beacon-point-robstown-tx,Coordinates are the Robstown area centroid.,NON_SITE_AREA
+hut8-river-bend-west-feliciana-la,Coordinates approximate St.,NEUTRAL
+hydravault-chicago-il,Coordinates geocoded from the published street address.,NEUTRAL
+hyperscale-data-dowagiac-mi,"Coordinates are an approximate Dowagiac city estimate, not parcel-geocoded.",NON_SITE_AREA
+impactdata-greensboro-nc,Coordinates are the Greensboro centroid.,NEUTRAL
+inch-eastern-land-south-annville-lebanon-pa,Coordinate is a township-centroid geocode.,NON_SITE_AREA
+infobunker-boone-ia,"Coordinates come from the Iowa DNR facility record, which documents 20 m locational accuracy;",NEUTRAL
+invenergy-decoy-solar-arkansas-county-ar,"the coordinate is the county seat (DeWitt) and is a county-level placeholder, not the project footprint.",NON_SITE_AREA
+ip-pathways-urbandale-ia,Coordinates geocoded from the operator's published street address to an OpenStreetMap building-level match.,NEUTRAL
+iren-horizon-childress-tx,Coordinates approximate (county seat area).,NON_SITE_AREA
+iren-project-emerald-kiowa-ok,"Coordinates are the town of Kiowa, not a parcel-confirmed footprint.",NON_SITE_AREA
+iren-sweetwater-tx,"Coordinates are approximate (Sweetwater city center, Nolan County seat).",NON_SITE_AREA
+iren-woods-county-ok,Coordinates are the Alva area centroid.,NON_SITE_AREA
+iron-city-wells-karthaus-township-clearfield-pa,Coordinate is a township-centroid geocode;,NON_SITE_AREA
+iron-mountain-chi1-des-plaines-il,Coordinates geocoded from the published street address.,NEUTRAL
+iron-mountain-miamisburg-oh,Coordinates are city-centroid (approximate).,NON_SITE_AREA
+iron-mountain-nje1-edison-nj,Coordinate provenance (resolved 2026-09-12): Iron Mountain's own location page embeds a Google Maps link containing TWO coordinate pairs from two different Place IDs.,NEUTRAL
+iron-mountain-nje1-edison-nj,"Both page-stated pairs are ~1.8-1.9 km from the US Census geocoder's point for this address, which interpolates along the street centre line and is wrong here.",NEUTRAL
+irs-enterprise-computing-center-kearneysville-wv,"Coordinates are the OSM point for the IRS building, not a parcel survey.",NEUTRAL
+isocentric-networks-tulsa-ok,Coordinates are a Tulsa centroid approximation;,NON_SITE_AREA
+ite-guam-harmon-gu,"Coordinates geocoded via OSM Nominatim on 'Harmon Industrial Park, Guam' (street-level match, resolved to East Harmon, Tamuning Municipality) -- precision 'approximate', not a confirmed parcel.",NEUTRAL
+ite-saipan-susupe-mp,"Coordinates geocoded via OSM Nominatim on 'Tekken Street, Saipan' (street-level match, resolved to Susupe) -- precision 'approximate', not a confirmed parcel.",NEUTRAL
+its-monticello-ia,Coordinate is a town-level approximation;,NON_SITE_AREA
+ivcm-imperial-county-ca,Coordinates approximate;,NEUTRAL
+jackson-technical-enguard-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+jefferson-proving-ground-data-center-jefferson-county-in,Coordinates are an approximate geocode of the former proving-ground airfield north of Madison.,NEUTRAL
+jet-ai-moapa-clark-county-nv,Coordinates are the Moapa settlement point from OpenStreetMap;,NEUTRAL
+joliet-technology-center-il,"Coordinates approximate Jackson Township at Rowell and Bernhard Rds, south Joliet (~40 mi SW of Chicago), near Chicagoland Speedway.",NEUTRAL
+joule-millard-county-ut,"Coordinates approximate for Holden, Millard County.",NON_SITE_AREA
+jpmorgan-chase-orangeburg-ny,"Coordinates geocoded from the street address via US Census geocoder (address-range interpolation, not a confirmed parcel), hence approximate precision.",NEUTRAL
+k-junction-solar-york-ne,"OPPD stepped back from direct development after York County adopted stricter solar zoning regulations, describing the transfer as a ""responsible path forward."" No source published a site boundary or nearest town, so coordinates are a county-level approximation for York County and must not be treated as a parcel location.",NON_SITE_AREA
+kairos-hermes-2-oak-ridge-tn,"Coordinates are an approximate anchor to the Heritage Center Industrial Park / former East Tennessee Technology Park (K-25/K-33 site), west Oak Ridge, Roane County -- no parcel-exact public coordinate was found for the K-33 sub-site this session;",NEUTRAL
+karis-dubuque-county-ia,"Coordinates are approximate: the point sits on the Olde Davenport Road corridor between Feeney Road and Laudeville Road in unincorporated Dubuque County, the location described in reporting.",NON_SITE_ROAD
+kentucky-industrial-alliance-cave-point-cave-city-ky,Exact parcel location within the industrial park not confirmed -- coordinates are a Cave City town-center pin.,NON_SITE_AREA
+komo-plaza-seattle-wa,Recorded as one site at the east building's coordinates rather than as per-tenant records.,NEUTRAL
+ku-ew-brown-12-mercer-ky,Coordinates are the OpenStreetMap feature for the existing E.W.,NEUTRAL
+lambda-aligned-plano-tx,Coordinates are the Plano area centroid.,NON_SITE_AREA
+lambda-chicago-edgeconnex-il,"the Lambda building address is unpublished, so coordinates use the Chicago centroid.",NEUTRAL
+lancium-crusoe-abilene-tx,"Coordinates are approximate (geocoded from a listed street address, not parcel-confirmed — the ~800-1,000-acre campus could place any specific building up to ~1-2 miles from this point).",NEUTRAL
+lancium-fort-stockton-tx,"Coordinates are Fort Stockton, TX city-center (not facility-exact).",NON_SITE_AREA
+landshark-energy-solar-calhoun-ms,Pre-approval project with a developer-supplied coordinate;,NEUTRAL
+lawrenceburg-flatwoods-road-data-center-tn,Coordinates are the Lawrenceburg town point — no parcel location on Flatwoods Road has been published.,NON_SITE_AREA
+leeward-huckleberry-solar-mayes-county-ok,"Coordinates are Global Energy Monitor's plant point, marked approximate.",NEUTRAL
+leeward-mayes-solar-mayes-county-ok,"Coordinates are Global Energy Monitor's plant point, marked approximate.",NEUTRAL
+leeward-salt-branch-solar-mayes-county-ok,"Coordinates are Global Energy Monitor's plant point, marked approximate: GEM's sibling page for Leeward's Twelvemile project carries this same coordinate while Leeward places Twelvemile in Bryan/Johnston counties, so GEM's points in this portfolio are treated as indicative rather than parcel-confirmed.",NEUTRAL
+leeward-twelvemile-solar-1-2-bryan-county-ok,"Global Energy Monitor's Twelvemile page instead reports Mayes County at 36.3316, -95.2293 — the identical coordinate GEM gives for Leeward's Saltbranch project, about 260 km away — so that point was rejected as a copy error rather than used.",NEUTRAL
+leeward-twelvemile-solar-1-2-bryan-county-ok,COORDINATE CAVEAT — read before using this pin.,NEUTRAL
+leeward-twelvemile-solar-1-2-bryan-county-ok,"The coordinate here is the city of Durant, an approximate county anchor, NOT the array footprint.",NEUTRAL
+leeward-twelvemile-solar-3-johnston-county-ok,Global Energy Monitor's Twelvemile entry places the project in Mayes County at a coordinate identical to its Saltbranch entry;,NEUTRAL
+leeward-twelvemile-solar-3-johnston-county-ok,"COORDINATE CAVEAT: the pin is the Johnston County centroid, an approximate county anchor and not the array footprint.",NON_SITE_AREA
+leola-data-center-mcpherson-county-sd,"The CUP application itself lists 11641 358th Avenue, Leola, SD 57456 as the site's general area/street address, which is what was geocoded here (US Census geocoder);",NEUTRAL
+leola-data-center-mcpherson-county-sd,"precision is approximate because this is a street-level geocode, not a confirmed parcel-corner survey point.",NEUTRAL
+les-terry-bundy-generating-station-lancaster-ne,Coordinates from EIA-860M.,NEUTRAL
+lex-developments-pocatello-id,"This pin is a Pocatello city-centroid placeholder (precision: approximate): neither source fetched gave a parcel-level address for the former Hoku polysilicon site, and OpenStreetMap has no feature for it.",NON_SITE_AREA
+lex-developments-pocatello-id,"It is NOT a claim about where on the Hoku parcel the proposal sat, and it is not co-located with the FBI Grey Wolf record in this batch, whose pin was corrected to its own OSM building POI 4.0 km north.",NEUTRAL
+lge-mill-creek-6-jefferson-ky,"Coordinates are the OpenStreetMap feature for the existing Mill Creek Generating Station, where the unit would be sited;",NEUTRAL
+lightedge-papillion-ne,"Coordinates are a PAPILLION CITY-LEVEL point, not a geocode of American Parkway — this record needs an address geocode pass before its map pin should be trusted.",NON_SITE_AREA
+lightedge-solutions-altoona-ia,"Worth a follow-up with a direct call/site-visit-grade source, or a successful fetch of the spec-sheet PDF, to pin capacity.",NEUTRAL
+lighthouse-data-centers-spartanburg-sc,Coordinate is the OSM footprint of the LSC Communications parcel (approximate).,NEUTRAL
+lightsource-bp-black-bear-solar-montgomery-al,Coordinates are the Montgomery County centroid — no site address is published.,NON_SITE_AREA
+liquid-web-dc3-lansing-mi,it is not recorded here because its address could not be geocoded from a checkable source.,NEUTRAL
+ln-compute-cuthbert-ga,Coordinates are Cuthbert city-center (approximate);,NON_SITE_AREA
+ln-energy-blackshear-pierce-ga,Coordinates are Blackshear city-center (approximate);,NON_SITE_AREA
+logistix-hamilton-innovation-center-butler-county-oh,"Coordinates are the Hamilton, OH city-area centroid, not an independently geocoded parcel point for 1380 University Boulevard.",NON_SITE_AREA
+long-ridge-hannibal-power-plant-monroe-oh,Coordinates are a street-level geocode of the operator-published address.,NEUTRAL
+lumen-akron-2-oh,"Address and neighborhood (Middlebury/Goodyear Heights) independently confirmed via Signal Akron local journalism and OSM Nominatim geocode, corroborated by three aggregator listings (datacentermap.com, baxtel.com, datacenters.com), which consistently label it 'Akron 2' (legacy Level 3 branding) to distinguish it from a separate, unverified 'Lumen Akron 1' at 520 S.",NEUTRAL
+lumen-memphis-crowfarn-drive-tn,Address geocodes to an industrial building on Crowfarn Drive.,NEUTRAL
+lumen-nashville-sidco-drive-tn,"Postal code omitted: PeeringDB carries 37201 for this address while a geocode of the street resolves to 37204, and the discrepancy was not resolved on any page retrieved.",NEUTRAL
+lumen-oklahoma-city-1-ok,"Coordinates are a street-address geocode, not a parcel-confirmed footprint.",NEUTRAL
+lumen-tulsa-1-ok,"Coordinates are a street-address geocode, not a parcel-confirmed footprint.",NEUTRAL
+lumen-weehawken-1-nj,Pin left as supplied;,NEUTRAL
+lumen-weehawken-1-nj,"Coordinates are the Weehawken township centroid (Wikipedia), not a confirmed parcel geocode for 300 Boulevard East specifically — marked approximate.",NON_SITE_AREA
+lumen-weehawken-1-nj,"Coordinate provenance (checked 2026-09-12): unresolved between two weak candidates ~1.2 km apart, both inside Weehawken — the US Census geocoder returns no match for 300 Boulevard East, and the only OpenStreetMap feature with that address is a parking amenity in Lincoln Harbor rather than a building.",NEUTRAL
+lunavi-cheyenne-wy,Coordinates approximate the street address.,NEUTRAL
+maguire-hayden-harrington-de,location pin is Harrington's OSM place centroid (approximate).,NEUTRAL
+managedway-tym1-troy-mi,Coordinates are the operator-registered PeeringDB building pin.,NEUTRAL
+managedway-tym2-troy-mi,Coordinates are the operator-registered PeeringDB building pin.,NEUTRAL
+mara-flared-gas-fleet-tx-nd,"Represented here as a single aggregate record rather than N per-site entries: MARA discloses this program only in aggregate (25 MW total across Texas + North Dakota wellheads), with no per-site count, capacity breakdown, or coordinates published — consistent with a genuinely mobile/modular operating model (containerized generators moved between wellheads as flaring economics shift at individual wells), not merely underreported.",NEUTRAL
+mara-granbury-hood-tx,Coordinates are Granbury-area approximate (facility is at the Wolf Hollow II plant SW of town) pending a parcel-level GIS lookup.,NEUTRAL
+mara-hannibal-monroe-oh,Coordinates are Hannibal-village approximate.,NEUTRAL
+mara-hopedale-harrison-oh,Coordinates are Hopedale-village approximate.,NEUTRAL
+mara-kearney-buffalo-ne,Coordinates are Kearney-area approximate.,NEUTRAL
+mara-site-mat-1177-matagorda-tx,Coordinates are a COUNTY-CENTROID approximation — exact city undisclosed.,NON_SITE_AREA
+marathon-digital-garden-city-tx,"Coordinates are Garden City, TX city-center (not facility-exact).",NON_SITE_AREA
+markley-lowell-ma,"Coordinates are approximate city centroid (Sacred Heart/Back Central neighborhoods, Lowell).",NON_SITE_AREA
+mason-columbia-road-data-center-mi,Coordinates from the US Census geocoder for the address in the utility request;,NEUTRAL
+mason-county-hyperscale-campus-maysville-ky,"Coordinates are a geocode of Big Pond Pike (reported as the site road, near KY-3056) and are approximate — the parcel boundaries are not published.",NON_SITE_ROAD
+mcni-concord-township-hancock-county-ia,"Coordinates are an approximate geocode of Garner, the nearest named place in sourcing, not the parcel itself.",NON_SITE_AREA
+md-squared-power-pikeville-pike-ky,"Coordinates are a city-level pin (Pikeville, Pike County) since the exact parcel within the industrial park is not confirmed in the source.",NON_SITE_AREA
+menlo-digital-jamestown-drive-petersburg-va,Coordinates are an approximate geocode of the cited street address.,NEUTRAL
+menlo-equities-great-oaks-parkway-san-jose-ca,Coordinates are a street-level geocode of Great Oaks Parkway (approximate).,NON_SITE_ROAD
+menomonie-data-center-wi,Coordinates are the Menomonie centroid.,NEUTRAL
+meta-aiken-county-sc,Coordinates are Graniteville area centroid.,NON_SITE_AREA
+meta-altoona-ia,Coordinates are the Altoona town centroid.,NON_SITE_AREA
+meta-anthem-tulsa-ok,"Coordinates approximate (near 11th St & Creek Turnpike, East Tulsa).",NEUTRAL
+meta-beaver-dam-wi,Coordinates are approximate city centroid for Beaver Dam;,NON_SITE_AREA
+meta-cheyenne-wy,Coordinates approximate for High Plains Business Park in SE Cheyenne.,NEUTRAL
+meta-el-paso-tx,"coordinates are approximate city-area centroid, exact parcel not publicly identified.",NON_SITE_AREA
+meta-forest-city-nc,"Coordinates are a Rutherford County GIS parcel centroid, held approximate pending a raw-geometry re-pull;",NEUTRAL
+meta-fort-worth-tx,Coordinates are an approximate geocode of the disclosed Like Way address;,NEUTRAL
+meta-gallatin-tn,"Campus coordinates are city-centroid approximation for Gallatin, TN.",NON_SITE_AREA
+meta-huntsville-al,Coordinates are approximate for Cummings Research Park area.,NEUTRAL
+meta-hyperion-richland-parish-la,"This is DISTINCT NEW information not yet reflected in the existing record's notes/community fields (which per the roster are already populated) -- flagging for maintainer review rather than as a field-merge, since 'community' on this record is locked (already has a value) and it is not yet certain whether Evest will ship as a second facility record or as an update to this one once its own docket number and site-specific coordinates are public.",NEUTRAL
+meta-jeffersonville-in,Coordinates are approximate River Ridge Commerce Center area.,NEUTRAL
+meta-kansas-city-northland-mo,Coordinates are approximate for the Golden Plains Technology Park area.,NEUTRAL
+meta-kuna-id,Coordinates are Kuna city centroid;,NON_SITE_AREA
+meta-lebanon-in,Coordinates are approximate LEAP District area north of Lebanon.,NEUTRAL
+meta-mesa-az,Coordinates are an approximate geocode of the disclosed Ellsworth Rd address;,NEUTRAL
+meta-middleton-township-oh,Coordinates are approximate Middleton Township centroid.,NON_SITE_AREA
+meta-montgomery-al,"original record used central Montgomery city coordinates (32.362, -86.301) which are approximately 13 miles north of the Hyundai plant area.",NEUTRAL
+meta-montgomery-al,"Coordinates corrected to approximate HMMA corridor (~32.185 N, ~86.273 W);",NON_SITE_ROAD
+meta-rosemount-mn,Coordinates approximate for northern UMore Park area.,NEUTRAL
+meta-sarpy-springfield-ne,Coordinates approximate for the Springfield expansion area;,NEUTRAL
+metro-edge-imd1-chicago-il,Coordinates geocoded from the published street address.,NEUTRAL
+metrobloks-liberty-mo,Coordinates are the Liberty area centroid.,NON_SITE_AREA
+metrobloks-martindale-brightwood-indianapolis-in,Coordinates approximate from the cited street address (pending parcel-precise geocode).,NEUTRAL
+metrobloks-mia-a1-miami-fl,"Coordinates are an approximate Airport West-area estimate, not a parcel-confirmed geocode of the street address.",NON_SITE_AREA
+metrobloks-southfield-mi,"Closed-loop cooling planned, city says 'minimal long-term water use.' Coordinates are an approximate Inkster/11 Mile intersection estimate, not parcel-geocoded.",NON_SITE_ROAD
+microsoft-bristow-mnz03-va,Coordinates approximate.,NEUTRAL
+microsoft-cheyenne-expansion-wy,Coordinates approximate for Bison Business Park / SE Cheyenne area.,NEUTRAL
+microsoft-columbia-quincy-wa,Coordinates are the published minute-precision location (47°14'N 119°52'W).,NEUTRAL
+microsoft-dorr-township-mi,"Coordinates are an approximate Dorr Township / US-131 estimate, not parcel-geocoded.",NEUTRAL
+microsoft-douglasville-ga,Coordinates are Douglasville city centroid;,NON_SITE_AREA
+microsoft-east-point-ben-hill-road-ga,"the road spans a distance, so treat the pin as indicative.",NEUTRAL
+microsoft-east-point-ben-hill-road-ga,"Coordinates are the OSM geocode for Ben Hill Road in the 30349 ZIP — a road midpoint, not a parcel;",NON_SITE_ROAD
+microsoft-east-wenatchee-wa,Coordinates are an approximate geocode of the Urban Industrial Way corridor;,NON_SITE_ROAD
+microsoft-el-mirage-az,Coordinates are El Mirage city centroid;,NON_SITE_AREA
+microsoft-fairwater-fayetteville-ga,Coordinates are the Fayetteville area centroid.,NON_SITE_AREA
+microsoft-fernley-nv,Coordinates are the Fernley area centroid.,NON_SITE_AREA
+microsoft-firecracker-rome-ga,Coordinates are approximate;,NEUTRAL
+microsoft-gaines-township-mi,"Coordinates are an approximate Patterson Avenue / Gaines Township estimate (deliberately offset from the existing Switch record's East Paris Avenue coordinates), not parcel-geocoded.",NON_SITE_ROAD
+microsoft-goodyear-az,Coordinates approximate;,NEUTRAL
+microsoft-granger-in,Coordinates are approximate Granger unincorporated community area.,NON_SITE_AREA
+microsoft-heath-oh,Coordinates are approximate Heath city centroid;,NON_SITE_AREA
+microsoft-hebron-oh,Coordinates are approximate Hebron village area.,NON_SITE_AREA
+microsoft-hickory-catawba-county-nc,Coordinates are a Hickory city-level approximation — the sources describe the parcel only as ~160 acres west of US 321 adjacent to Hickory Lincolnton Hwy.,NON_SITE_AREA
+microsoft-irving-tx,"No street address, acreage or capacity is published in the fetched sources, so coordinates are a city-level geocode.",NON_SITE_AREA
+microsoft-kenosha-wi,"Coordinates approximate for NW quadrant of I-94/Hwy 142 intersection, Kenosha County.",NON_SITE_ROAD
+microsoft-laporte-in,Coordinates are approximate Radius Industrial Park area.,NEUTRAL
+microsoft-lowell-township-mi,"Coordinates are an approximate Lowell Township estimate, not parcel-geocoded.",NON_SITE_AREA
+microsoft-malaga-wa,Coordinates approximate for Malaga area on Malaga Alcoa Highway.,NEUTRAL
+microsoft-mountain-west-des-moines-ia,Address sourced from a secondary aggregator search summary (not independently fetched this session) but independently geocode-verified as a real West Des Moines / Dallas County address via OSM Nominatim.,NEUTRAL
+microsoft-mwh-quincy-wa,Coordinates are the centroid of the OSM industrial-landuse polygon named for the facility.,NEUTRAL
+microsoft-palmetto-fulton-ga,Coordinates are the Palmetto city centroid (OSM Nominatim);,NON_SITE_AREA
+microsoft-pecos-tx,coordinates are Pecos city center as exact parcel not disclosed.,NON_SITE_AREA
+microsoft-person-county-roxboro-nc,Coordinates are the Roxboro / Woodsdale area centroid.,NON_SITE_AREA
+microsoft-project-nova-caledonia-wi,"Coordinates are a street-level geocode of Botting Road, not a parcel-confirmed point.",NON_SITE_ROAD
+microsoft-san-antonio-expansion-tx,Coordinates are approximate Castroville area centroid;,NON_SITE_AREA
+microsoft-silver-springs-lyon-county-nv,"Coordinates are the Silver Springs reference point, not a parcel.",NEUTRAL
+microsoft-skipwith-road-campus-mecklenburg-va,exact Skipwith/Butler Farm Road intersection not independently geocoded this session.,NON_SITE_ROAD
+microsoft-skipwith-road-campus-mecklenburg-va,"Coordinates are Boydton, VA town-centroid (approximate);",NON_SITE_AREA
+microsoft-tyrone-ga,Coordinates approximate (address-derived;,NEUTRAL
+midamerican-knoxville-bess-ia,"Coordinates are approximate: the OpenStreetMap object covers the whole Knoxville Power Plant site, which includes an older oil-fired peaker as well as the battery, so the point is the site centroid rather than the battery footprint.",NEUTRAL
+midcon-recovery-solutions-oklahoma-city-ok,Coordinates are approximate to the Quail Springs area of northwest Oklahoma City;,NEUTRAL
+miningstore-grundy-center-ia,"Destroyed by fire on 2025-01-09 (structure fully vented/burned before crews arrived per Grundy County Emergency Management Coordinator, quoted in The Gazette);",NEUTRAL
+mlp-ventures-plymouth-township-conshohocken-pa,Coordinates are an approximate geocode of the cited street address.,NEUTRAL
+mmm-acquisitions-bells-ferry-marietta-ga,Coordinates are approximate to Bells Ferry Road.,NON_SITE_ROAD
+mn8-mammoth-solar-kanawha-county-wv,"⚠️ PIN IS A COUNTY CENTROID, not the site.",NON_SITE_AREA
+mon-power-davis-solar-tucker-county-wv,Pin is the Davis town centroid.,NON_SITE_AREA
+mon-power-valley-point-solar-preston-county-wv,Pin is the Valley Point community centroid;,NON_SITE_AREA
+mon-power-wylie-ridge-solar-hancock-county-wv,"Wylie Ridge itself is not separately geocoded here, so treat the coordinate as approximate.",NEUTRAL
+mon-power-wylie-ridge-solar-hancock-county-wv,Pin is the Weirton city centroid;,NON_SITE_AREA
+moreland-holding-moreland-ar,"Coordinates are the OpenStreetMap community point for Moreland, deliberately distinct from the church pin used for the separate blockops-moreland-ar record so the two Moreland sites are not conflated;",NON_SITE_AREA
+mountain-state-clean-energy-maidsville-monongalia-county-wv,Coordinates are the Longview Plant point from Global Energy Monitor;,NEUTRAL
+mountain-state-renewables-solar-maidsville-monongalia-county-wv,Coordinates are the Longview Plant point;,NEUTRAL
+ms-solar-grid-data-new-orleans-east-la,"Coordinates are a Read Boulevard geocode, flagged approximate.",NEUTRAL
+msu-hpc2-portera-starkville-ms,Coordinates are the OpenStreetMap building point for the High Performance Computing Collaboratory at 2 Research Boulevard.,NEUTRAL
+murray-industries-pineville-bell-ky,"The exact parcel has not been publicly identified, so coordinates are the Pineville (county seat) centroid and are approximate only — the site may be several kilometres from this pin.",NON_SITE_AREA
+mwtn-data-center-of-the-rockies-casper-wy,"Coordinates come from an OSM address point for the operator at this address, not a mapped building footprint.",NEUTRAL
+natelli-new-hill-nc,Coordinates are the New Hill area centroid.,NON_SITE_AREA
+nautilus-cryptomine-building-1-pa,"Two buildings (1 and 2) confirmed independently by baxtel.com and cleanview.co as distinct operating structures on the same campus, matching the two nearby-but-distinct OSM coordinates in this batch.",NEUTRAL
+nautilus-millinocket-me,"Coordinates: OpenStreetMap Nominatim building match 'Great Northern Paper Administration Building' at this address (way/355222391), cross-checked against the US Census geocoder (onelineaddress) which landed ~230m away on the same site;",NEUTRAL
+nautilus-stockton-1-ca,"Coordinates are the project coordinates printed on the CEQA Notice of Determination (37°57'48""N 121°22'5""W), not a surveyed footprint.",NEUTRAL
+navy-dsrc-stennis-space-center-ms,Coordinates are the OpenStreetMap point for John C.,NEUTRAL
+ncar-wyoming-supercomputing-center-cheyenne-wy,Coordinates and street are corroborated by the OpenStreetMap building tagged telecom=data_center with operator 'University Corporation for Atmospheric Research'.,NEUTRAL
+nccs-massena-reynolds-ny,"Coordinates are an approximate placement on that industrial complex derived from the source's description, NOT a surveyed parcel.",NEUTRAL
+nebius-bhm01-birmingham-al,"Coordinates address-approximate (201 Milan Pkwy, Oxmoor Corporate Park).",NEUTRAL
+nebius-independence-mo,Coordinates approximate for Eastgate Commerce Center in eastern Independence.,NEUTRAL
+nebius-vineland-nj,"Coordinates are approximate (site: South Lincoln and Sheridan Avenues, East Vineland;",NEUTRAL
+nebraska-colocation-centers-lincoln-ne,"Coordinates are the OpenStreetMap building match for that address (display name ""Sharp, 206, South 13th Street, Downtown, Lincoln, Lancaster County, Nebraska, 68508""), not a recalled geocode.",NEUTRAL
+nemadji-trail-energy-center-superior-wi,"Coordinates are a street-level geocode, not a parcel.",NEUTRAL
+netl-computational-science-engineering-center-morgantown-wv,"Pin is the published campus street address, not a parcel-confirmed building footprint.",NEUTRAL
+netsonic-green-bay-wi,Coordinates are a best-effort geocode of the street address.,NEUTRAL
+neural-nexus-memphis-tn,"Located on 'two full city blocks' in downtown Memphis described both as 'adjacent to FedExForum and Beale Street' and 'across from AutoZone Park' (Downtown Memphis Commission) -- these are the same downtown block cluster, but no street address or parcel has been published, so this pin uses the AutoZone Park landmark centroid, disclosed as approximate.",NEUTRAL
+newberry-bitcoin-mine-luce-county-mi,Pin is the Newberry village centroid.,NON_SITE_AREA
+nextera-bellefonte-solar-hollywood-al,"Coordinate is a County Road 33 road anchor in Hollywood, not a surveyed site boundary.",NEUTRAL
+nextera-forgeview-solar-mississippi-county-ar,"Coordinate from Global Energy Monitor, treated as approximate.",NEUTRAL
+nextera-greer-solar-washington-ms,"Coordinates are Global Energy Monitor's plant point, marked approximate.",NEUTRAL
+nextera-high-spring-solar-muskogee-county-ok,Coordinates are a Muskogee County centroid approximation;,NON_SITE_AREA
+nextera-rush-springs-solar-stephens-county-ok,Coordinates are a Stephens County centroid approximation — NextEra's page does not publish a parcel location.,NON_SITE_AREA
+nextera-wildwood-solar-tallahatchie-ms,"Coordinates are Global Energy Monitor's plant point, marked approximate.",NEUTRAL
+nexus-hubbard-campus-hill-county-tx,Coordinate anchored on the city of Hubbard;,NON_SITE_AREA
+njfx-wall-township-nj,Coordinates are the OSM building mapped under the operator's legal name;,NEUTRAL
+noaa-environmental-security-computing-center-fairmont-wv,Pin is the city centroid — the exact park parcel is not published in the cited source.,NON_SITE_AREA
+noec-core-data-center-vinita-ok,"coordinates are the town of Vinita, since the address did not resolve in OSM.",NON_SITE_AREA
+north-campbell-land-hopkinsville-50mw-christian-ky,"The location, footprint, construction cost and development schedule have not been disclosed, so the coordinates are the Hopkinsville city centroid and are approximate only — the actual site is unknown.",NON_SITE_AREA
+north-campbell-land-hopkinsville-mine-christian-ky,Coordinates are a geocode of North Campbell Street and are approximate — the substation itself is not mapped as a named feature in OpenStreetMap.,NON_SITE_ROAD
+northern-data-maysville-jackson-ga,Coordinates are approximate to Maysville.,NON_SITE_AREA
+northmark-valara-spartanburg-sc,Coordinates are an approximate geocode of the South Pine Street address reported in local coverage;,NEUTRAL
+northpoint-fairfield-data-center-solano-ca,"Coordinates are geocoded to Vanden Road in Fairfield only (no confirmed parcel or street address), so treat the pin as a rough area marker.",NEUTRAL
+nova-energy-cryptomine-frenchcreek-venango-county-pa,Coordinates are an approximate township-level point;,NON_SITE_AREA
+nova-energy-cryptomine-frenchcreek-venango-county-pa,the exact well pad is not publicly geolocated.,NEUTRAL
+nova-innova-data-center-albuquerque-nm,Coordinate is a Mesa del Sol locality approximation.,NON_SITE_AREA
+novva-apex-industrial-park-north-las-vegas-nv,"Coordinates are an approximate point for the Apex area, not a parcel-confirmed location.",NEUTRAL
+novva-las-vegas-nicco-way-nv,Coordinates are a street-level OpenStreetMap geocode of Nicco Way.,NON_SITE_ROAD
+novva-mesa-az,Coordinates approximate.,NEUTRAL
+novva-tahoe-reno-storey-county-nv,Coordinates are an approximate TRIC-area geocode (exact parcel point not published).,NEUTRAL
+nppd-princeton-road-station-lancaster-ne,Coordinates are the plant location published in EIA-860M.,NEUTRAL
+nscale-monarch-mason-county-wv,"Coordinates are approximate for north of Point Pleasant, Mason County.",NEUTRAL
+ntt-global-mesa-az,Coordinates approximate for Pecos/Crismon intersection.,NON_SITE_ROAD
+nuvu-county-drive-petersburg-va,"Coordinates are an approximate geocode of the cited street address, not a parcel-confirmed point.",NEUTRAL
+nyse-mahwah-data-center-nj,"Heavily fortified: a river/moat around the perimeter, bomb-sniffing dogs, and an interior 'building within a building.' Inflect's listing names the facility 'EuronextNJ1.' Coordinates are a geocode of the street address embedded in Inflect's own page, not a confirmed parcel boundary, hence approximate.",NEUTRAL
+oakland-university-computing-auburn-hills-mi,"Coordinates are an approximate campus-area estimate, not parcel-geocoded.",NEUTRAL
+ocosa-321-south-boston-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+odessa-partners-dafter-township-mi,"⚠️ COORDINATES ARE THE DAFTER TOWNSHIP CENTROID from Nominatim, not the site: the source locates the mine only as being in Dafter Township across the street from Lake Superior Academy, and no street address was obtainable in this run.",NON_SITE_AREA
+odessa-partners-dafter-township-mi,Treat the pin as township-level.,NON_SITE_AREA
+oklahoma-ai-ventures-black-bear-noble-county-ok,"Coordinates are approximate to Perry, the Noble County seat.",NON_SITE_AREA
+oklo-aurora-pike-county-oh,"no public parcel-level lat/lon has been disclosed for Oklo's 206-acre tract, so location precision is 'approximate' (regional site-level placeholder, not a parcel-confirmed point).",NEUTRAL
+one-data-center-america-ontario-ca,Recorded as a single city-level entry rather than two records to avoid guessing which address belongs to which site or inventing a second coordinate.,NON_SITE_AREA
+one-nuclear-project-cayman-ascension-parish-la,"Location coordinates are an approximate point for Donaldsonville (nearest named town), not a parcel-confirmed site.",NON_SITE_AREA
+oppd-cass-county-station-cass-ne,Coordinates from EIA-860M.,NEUTRAL
+oppd-pierce-county-energy-center-ne,"Coordinates are a rural-Pierce-County approximation, NOT a parcel-level geocode.",NEUTRAL
+oppd-turtle-creek-station-sarpy-ne,"Coordinates are derived from the stated intersection, NOT a parcel geocode.",NON_SITE_ROAD
+oppidan-beaver-dam-edge-wi,Coordinates are a municipality-level locator;,NON_SITE_AREA
+oppidan-clop-aiken-graniteville-sc,Coordinate is the Graniteville town centroid (approximate) — no street number is published.,NON_SITE_AREA
+oracle-elk-grove-village-il,"Coordinates are the Elk Grove Village municipal centroid, not a parcel.",NON_SITE_AREA
+oregon-industrial-park-data-center-lucas-oh,coordinates approximate.,NEUTRAL
+origis-covington-solar-ms,Coordinate recorded as approximate and the conflict left visible rather than silently resolved — a reviewer should pin this before it goes live.,NEUTRAL
+origis-covington-solar-ms,"The filing's own county (Covington) and its coordinate disagree: 31.4395/-89.4846 falls roughly 13 km south of the Covington County line, near Sumrall in Lamar County.",NEUTRAL
+origis-golden-triangle-i-lowndes-ms,"Coordinates are Global Energy Monitor's Phase 1 point, marked approximate.",NEUTRAL
+origis-golden-triangle-ii-lowndes-ms,"Distinct phase and distinct coordinates from origis-golden-triangle-i-lowndes-ms, roughly 400 m apart on the same complex;",NEUTRAL
+origis-golden-triangle-ii-lowndes-ms,"Coordinates are Global Energy Monitor's Phase 2 point, marked approximate.",NEUTRAL
+origis-optimist-solar-clay-ms,"Coordinates are Global Energy Monitor's plant point, marked approximate.",NEUTRAL
+origis-optimist-solar-clay-ms,"The fourth project in the same Origis/TVA Mississippi portfolio, Hope Solar + Storage (Clay County, 200 MWac plus 200 MW / 800 MWh, targeted end-2028), is NOT recorded here because no source read this session published a coordinate for it.",NEUTRAL
+origis-walker-springs-i-solar-clarke-al,Coordinates are the Walker Springs place geocode — the operator publishes no site address — and are shared with the adjacent Walker Springs II record.,NEUTRAL
+origis-walker-springs-ii-solar-clarke-al,coordinates are the Walker Springs place geocode and are deliberately shared with that record because the operator publishes no separate site address for either plant.,NEUTRAL
+orsted-eleven-mile-solar-center-pinal-az,"Coordinate is Nominatim's representative point for the OSM landuse polygon named ""Eleven Mile Solar Center"", not a surveyed centroid.",NEUTRAL
+otava-ann-arbor-mi,"DELIBERATE GAP: the operator page places this facility in the Avis Farms business park south of downtown but does not print a street address, and the commonly-cited 640 Avis Dr address appeared only in a search-results summary this session, never on a page that was fetched — so no street is asserted and the pin is a city-level geocode, not the building.",NON_SITE_AREA
+outrigger-washington-daviess-county-in,Coordinates are an approximate geocode of the I-69/US 50 interchange east of Washington.,NON_SITE_ROAD
+overwatch-resilience-gsp-greer-sc,"The reported address (578 Robinson Road, Greer) did not geocode;",NEUTRAL
+overwatch-resilience-gsp-greer-sc,"coordinate is a Robinson Road, Greenville County geocode and is approximate.",NEUTRAL
+overwatch-resilience-gsp-greer-sc,NEEDS MAINTAINER VERIFICATION before the pin or status is treated as settled.,NEUTRAL
+oxbow-solar-pointe-coupee-la,Coordinate is the EIA-derived plant point (plant code 65030).,NEUTRAL
+panama-energy-center-lancaster-ne,COORDINATES ARE APPROXIMATE: the pin is the village of Hallam (OpenStreetMap/Nominatim);,NON_SITE_AREA
+parkway-gravel-st-georges-de,Location precision is approximate: geocoded to the unincorporated place of St.,NEUTRAL
+parkway-gravel-st-georges-de,The specific parcel south of the C&D Canal off US Route 13 did not resolve via geocoding.,NEUTRAL
+patmos-fairfield-al,"COORDINATES ARE THE FAIRFIELD MUNICIPAL CENTROID, not the building: the source identifies the site only as ""the former Walmart Supercenter"", no street address, and an Overpass query over the Fairfield bounding box returned no Walmart-named or former-retail building in OSM.",NON_SITE_AREA
+patmos-kansas-city-mo,Coordinates are the Kansas City centroid.,NON_SITE_AREA
+pch-wi-holdings-wisconsin-rapids-wood-county-wi,Coordinates are approximate.,NEUTRAL
+peak-mining-texas-2-corpus-christi-tx,Coordinates are an approximate adjacent-parcel estimate.,NEUTRAL
+penzance-1500-gateway-fredericksburg-va,Coordinates are an approximate geocode of the cited street address.,NEUTRAL
+penzance-bedington-berkeley-county-wv,Coordinates approximate for Falling Waters area.,NON_SITE_AREA
+percheron-data-center-or,osm_ids 1501824327/328/329 are near-identical coordinates (within ~0.2km) almost certainly representing OSM nodes for the same single campus/buildings and are dropped as duplicates.,NEUTRAL
+petawatt-zeroc-massena-ny,"Coordinates are a road-level geocode of County Route 42 near Dennison Road, not a confirmed parcel point.",NON_SITE_ROAD
+peterson-project-sisson-stafford-va,Coordinates are an approximate geocode of the described Kings Highway / Albion Lane area.,NON_SITE_ROAD
+philcade-data-center-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+phoenixnap-phx02-phoenix-az,Coordinates are geocoded from the cited street address (Nominatim and US Census geocoder agree to ~10 m);,NEUTRAL
+plainsmen-project-thunderbird-enid-ok,Coordinates are the city of Enid: this is a four-campus proposal with no single footprint.,NON_SITE_AREA
+platte-wind-keith-ne,"COORDINATES ARE APPROXIMATE: the project spans three counties and has no single published site point, so the pin is the Keith County seat (Ogallala), geocoded via OpenStreetMap/Nominatim — it is an index point, not a surveyed footprint.",NON_SITE_AREA
+plum-creek-wind-wayne-ne,"Distinct from the Haystack Wind Project, also Ørsted-owned and also in Wayne County — GEM carries separate coordinates, capacity and commissioning year for each.",NEUTRAL
+pnnl-ai-data-center-richland-wa,Coordinates are an approximate geocode of the PNNL campus in Richland.,NEUTRAL
+pontoon-bridge-road-massena-ny,Coordinates are a street-address geocode.,NEUTRAL
+poolside-project-horizon-pecos-county-tx,Coordinate anchored on Fort Stockton (nearest named town in coverage);,NON_SITE_AREA
+posey-county-boberg-road-data-center-in,Coordinates are the Boberg Road corridor in Posey County.,NON_SITE_ROAD
+potentia-oklahoma-campus-02-inola-ok,"Coordinates are approximate to the town of Inola, not a parcel-confirmed point.",NON_SITE_AREA
+powerconnex-i-new-albany-oh,Coordinates approximate.,NEUTRAL
+powerconnex-ii-new-albany-oh,Coordinates approximate.,NEUTRAL
+powerhouse-95-spotsylvania-va,coordinates are approximate.,NEUTRAL
+powerhouse-charlotte-nc,Coordinates are the Charlotte centroid.,NEUTRAL
+powerhouse-chirisa-chester-va,Coordinates are the Chester area centroid.,NON_SITE_AREA
+powerhouse-hobart-lake-county-in,"no street address is published, so coordinates are the city of Hobart.",NON_SITE_AREA
+powerhouse-pax-carlisle-pa,Coordinates are the Carlisle area centroid.,NON_SITE_AREA
+powerhouse-provident-grand-prairie-tx,Coordinates reflect the southern Grand Prairie / Ellis County zone.,NEUTRAL
+powerhouse-uhland-caldwell-county-tx,Coordinates are approximate.,NEUTRAL
+prado-ai-jackson-metro-ms,"Location: the March PSC filing named Ridgeland, but Prado has since said only 'the Jackson metro area' and declined to say where — coordinates are a Ridgeland city geocode from the filing, precision 'approximate';",NON_SITE_AREA
+prairie-breeze-wind-antelope-ne,"Coordinates are phase 1's, hence precision ""approximate"" for the campus as a whole.",NEUTRAL
+prairie-ronde-solar-st-landry-la,"Coordinate is the EIA plant point, reported to two decimal places only, so it is marked approximate.",NEUTRAL
+premier-project-arrowhead-irwin-ga,"Coordinates are the Mystic community centroid (OSM Nominatim), not a parcel.",NON_SITE_AREA
+prime-ord-elk-grove-village-il,Coordinates geocoded from the published street address.,NEUTRAL
+prime-santa-clara-silicon-valley-campus-ca,kept as a generic corroborated Prime Santa Clara presence but should be geocoded against SJC0x addresses in a follow-up GIS pass rather than assumed distinct from the other two candidates below.,NEUTRAL
+prime-smf02-sacramento-ca,Coordinates approximate (McClellan Business Park).,NEUTRAL
+prime-storage-powers-ferry-place-marietta-ga,Coordinates come from the geocoded street address.,NEUTRAL
+prince-william-digital-gateway-va,Coordinates are approximate for Pageland Lane corridor.,NON_SITE_ROAD
+priseda-prosperity-drive-silver-spring-md,"Coordinates confirmed via US Census geocoder (exact match on 12401 Prosperity Dr, Silver Spring, MD 20904;",NEUTRAL
+project-altair-newberry-county-sc,"Coordinates are an approximate geocode of Prosperity, SC — Mid-Carolina Commerce Park II did not resolve in OSM.",NEUTRAL
+project-boulder-colleton-county-sc,Coordinates are approximate.,NEUTRAL
+project-cannoli-van-buren-township-wayne-county-mi,Coordinates are approximate.,NEUTRAL
+project-cardinal-yorkville-il,Coordinates approximate NW of IL Rt 47 and Galena Rd in Yorkville;,NEUTRAL
+project-delta-walnut-cove-nc,Coordinates are Walnut Cove city centroid.,NON_SITE_AREA
+project-gravity-archbald-lackawanna-county-pa,Coordinates are approximate.,NEUTRAL
+project-oak-walt-sanders-road-coweta-ga,Coordinates are approximate to Walt Sanders Road.,NON_SITE_ROAD
+project-river-data-center-bradley-county-tn,"Coordinates are a geocode of Lower River Road NW, not the parcel;",NON_SITE_ROAD
+project-river-data-center-bradley-county-tn,no source states lat/lon.,NEUTRAL
+project-ruby-upatoi-muscogee-ga,Coordinates are approximate to Upatoi.,NON_SITE_AREA
+project-shirley-eagle-creek-township-lake-county-in,Coordinates are approximate.,NEUTRAL
+project-tango-loxahatchee-fl,Coordinates are approximate site location.,NEUTRAL
+project-turbo-llc-project-azalea-thomson-ga,Coordinates are the Thomson city centroid (OSM Nominatim);,NON_SITE_AREA
+project-turbo-okelly-road-gainesville-ga,Coordinates are approximate to O'Kelly Road.,NON_SITE_ROAD
+project-west-lagrange-troup-ga,Coordinates are approximate to LaGrange.,NON_SITE_AREA
+prologis-allen-township-northampton-pa,Coordinate is an OSM address geocode.,NEUTRAL
+prologis-mila-trenton-oh,Coordinates are the Trenton area centroid.,NON_SITE_AREA
+prologis-project-sail-coweta-ga,Coordinates are Newnan city centroid;,NON_SITE_AREA
+prologis-project-steel-yorkville-il,Coordinates are the centre of the described parcel boundaries and are approximate.,NEUTRAL
+prologis-silver-creek-valley-san-jose-ca,Coordinates are approximate.,NEUTRAL
+prologis-washington-township-mi,Coordinates are the US Census geocoder's match for the 32 Mile Rd / Powell Rd intersection named in the source;,NON_SITE_ROAD
+prometheus-hyperscale-fort-morgan-co,Coordinates are the Fort Morgan town centroid (approximate);,NON_SITE_AREA
+prometheus-hyperscale-pueblo-co,Coordinates are the Pueblo city centroid (approximate).,NON_SITE_AREA
+provident-chesterton-porter-county-in,Coordinates are the 1110 Pearson Road address given for the site.,NEUTRAL
+prsm-group-cumberland-county-nc,"The developer declined to disclose the site beyond 'an industrial park, not near residences', so coordinates are a Cumberland County-level approximation only.",NON_SITE_AREA
+prsm-preble-county-oh,Coordinates are a road-level geocode of Orphans Road in Monroe Township — approximate.,NON_SITE_ROAD
+ptolemy-data-systems-sheridan-wy,"that address is not confirmed in a primary source, so only the street-level geocode is recorded and no street field is asserted.",NEUTRAL
+puente-hills-mall-data-center-city-of-industry-ca,Location is the mall centroid (approximate).,NEUTRAL
+qts-aurora-co,Coordinates based on Gun Club Rd address.,NEUTRAL
+qts-blue-hole-blakely-ga,Coordinates are the Blakely area centroid.,NON_SITE_AREA
+qts-cedar-rapids-ia,Coordinates approximate for Big Cedar Industrial Center;,NEUTRAL
+qts-chicago-1-il,Coordinates geocoded from the published street address.,NEUTRAL
+qts-clinton-clinton-county-ia,Coordinates are approximate.,NEUTRAL
+qts-dane-county-deforest-wi,Coordinates are the DeForest centroid.,NEUTRAL
+qts-east-windsor-nj,Coordinates are the operator-supplied registry point;,NEUTRAL
+qts-east-windsor-nj,no parcel-level geocode is published for the street address.,NEUTRAL
+qts-eisenhower-augusta-ga,Coordinates are the Augusta area centroid.,NON_SITE_AREA
+qts-jersey-city-nj,Coordinates from the PeeringDB facility record.,NEUTRAL
+qts-kearneysville-berkeley-jefferson-wv,"Coordinates are a Kearneysville-area approximation, not a confirmed parcel location.",NON_SITE_AREA
+qts-marvel-bessemer-al,Coordinates are approximate for the Red Ridge parcel area.,NEUTRAL
+qts-mia1-sweetwater-fl,"Address (11234 NW 20th St) is commonly listed as ""Miami"" per USPS mailing-city convention, but independently resolves to Sweetwater city, Miami-Dade County via both the US Census Bureau Geocoder and OpenStreetMap Nominatim (same building/parcel, ~90m agreement) -- corrected here per dataset precedent (cf.",NEUTRAL
+qts-overland-park-ks,"Coordinates are the US Census geocode of the listed street address, retrieved 2026-09-13;",NEUTRAL
+qts-phoenix-2-az,Coordinates geocoded from 1400 N 40th St via Nominatim.,NEUTRAL
+qts-phoenix-4-tolleson-az,Coordinates geocoded from the cited address via the US Census geocoder.,NEUTRAL
+qts-salem-township-luzerne-pa,"no parcel-level location has been published, and it therefore coincides with the coordinate used for the separate 4-3 Glenbrook 'Salem 3' record - the two are different land assemblages by different developers.",NEUTRAL
+qts-salem-township-luzerne-pa,Coordinate is a township-centroid geocode;,NON_SITE_AREA
+qts-york-county-sc,Coordinates are an approximate geocode of Hands Mill Highway.,NON_SITE_ROAD
+quail-ranch-solar-storage-bernalillo-county-nm,"The two sources disagree, so the record carries the city only and the pin is the Rio Rancho locality anchor, not the array footprint — a maintainer should resolve the county against the interconnection or permit record before publishing.",NON_SITE_AREA
+quantica-bsdi-billings-mt,Coordinates approximate between Billings and Broadview.,NEUTRAL
+quartz-solar-cross-county-ar,"Third solar plant identified in Cross County alongside Cherry Valley and the tracked Crossover Wind project — distinct coordinates and capacities, not a duplicate of either.",NEUTRAL
+qx-net-lexington-fayette-ky,"precision is approximate (registry geocode, not a parcel).",NEUTRAL
+qx-net-lexington-fayette-ky,Address and coordinates come from PeeringDB's registrant-maintained record;,NEUTRAL
+rack59-oklahoma-city-ok,Coordinates are an Oklahoma City centroid approximation;,NON_SITE_AREA
+racksquared-columbus-oh,Downtown Columbus colocation facility registered in PeeringDB with building-level coordinates.,NEUTRAL
+raeden-gibraltar-mclouth-mi,Coordinates are the US Census geocoder's match for the street address named in the source;,NEUTRAL
+raeden-grand-crossing-south-city-of-industry-ca,"Coordinates are an approximate representative point within the Grand Crossing master-planned development (the specific private road 'Marcellin Drive' is not indexed in OpenStreetMap), not a parcel-confirmed point.",NEUTRAL
+raeden-one-campus-martius-detroit-mi,"Coordinates are an address geocode, not a parcel-confirmed footprint.",NEUTRAL
+raeden-taurus-colorado-springs-co,Coordinates are the Colorado Springs area centroid.,NON_SITE_AREA
+ranalli-lysander-ny,Coordinates are the Lysander area centroid.,NON_SITE_AREA
+range-act-gillette-campbell-county-wy,Listed via a colocation marketplace directory and geocoded to the Southern Drive Industrial Park;,NEUTRAL
+range-act-wheatland-platte-county-wy,Coordinates are a street-level geocode.,NEUTRAL
+rattlesnake-creek-wind-dixon-ne,"Coordinates are an approximate centroid of the Allen/Emerson/Wakefield project area, NOT a turbine-array geocode.",NON_SITE_AREA
+rb-inyokern-data-center-ca,"Coordinates are an approximate road-intersection geocode near North Brown Road, not a parcel-confirmed point.",NON_SITE_ROAD
+rcm-hill-project-aquila-hill-county-tx,Coordinates are approximate.,NEUTRAL
+red-post-maverick-project-wise-va,coordinates approximate to the Lonesome Pine Regional Business & Technology Park.,NEUTRAL
+redivider-homestead-speedway-fl,"Coordinates are the speedway venue centroid (OSM), not a confirmed parcel within the property;",NEUTRAL
+related-digital-cheyenne-wy,"Coordinates approximate the Cheyenne Business Parkway, not a parcel-confirmed point.",NEUTRAL
+revolve-labs-moose-lake-mn,Coordinates are the Moose Lake city centroid (approximate);,NON_SITE_AREA
+revolve-labs-windom-mn,Coordinates are the Windom city centroid (approximate).,NON_SITE_AREA
+riot-calvert-city-marshall-ky,Coordinates are Calvert City approximate.,NEUTRAL
+riot-paducah-mccracken-ky,Coordinates are the Commerce Drive site (approximate).,NEUTRAL
+riot-platforms-rockdale-tx,"Coordinates are Rockdale, TX city-center (not facility-exact) — no facility-specific coordinates were found in any source this pass.",NON_SITE_AREA
+ritter-communications-data-technology-center-jonesboro-ar,"both say only 'Jonesboro.' The pin is an OpenStreetMap geocode of Ritter's published Jonesboro address, 2400 Ritter Drive (OSM now labels that point 'RightFiber', Ritter's rebranded business), used as a company-campus-level approximation.",NEUTRAL
+river-run-energy-center-mercer-county-nd,"Location is a representative pin for Stanton, the Mercer County seat and site of the project's public open house (Stanton Civic Center) -- no source checked this run states a specific parcel, township/range, or road for the plant/data-center site itself.",NON_SITE_AREA
+river-run-energy-center-mercer-county-nd,"Treat this coordinate as county/town-level context, not a site-level pin.",NON_SITE_AREA
+riverview-innovation-tech-campus-tonawanda-ny,Coordinates are approximate for the River Road parcel.,NON_SITE_ROAD
+rochester-colo-pittsford-ny,"Coordinates are the Town of Pittsford centroid (OSM Nominatim) -- both the US Census geocoder and OSM Nominatim failed to resolve the street address without a confirmed house number, so this is a disclosed city/town-level pin, NOT parcel-level precision.",NON_SITE_AREA
+rocking-r-solar-caddo-parish-la,The coordinate is the OpenStreetMap point for the village of Hosston;,NEUTRAL
+rocking-r-solar-caddo-parish-la,"reporting places the site just north of Gilliam near the Louisiana 2 exit off I-49, so the pin is a nearest-settlement approximation and is not parcel-confirmed.",NEUTRAL
+rokeby-energy-center-lancaster-ne,"COORDINATES ARE APPROXIMATE: the pin is the Rokeby locality south of Lincoln (OpenStreetMap/Nominatim), not a surveyed array footprint.",NEUTRAL
+roswell-information-park-chaves-county-nm,Coordinate is the Roswell locality anchor;,NON_SITE_AREA
+roundhouse-cascade-locks-or,Coordinates are approximate (Port of Cascade Locks).,NEUTRAL
+route-66-solar-storage-cibola-county-nm,"Coordinate is a Cibola County locality approximation near the Grants/Milan area, not a parcel-confirmed point.",NON_SITE_AREA
+rowan-digital-frederick-md,Coordinates approximate for same Quantum Frederick campus area as Aligned record.,NEUTRAL
+rowan-temple-tx,Coordinates are the Temple area centroid.,NON_SITE_AREA
+rubix-ashland-works-russell-greenup-ky,"Coordinates are the Russell city centroid and are approximate — the mapped Ashland Works footprint extends east into Boyd County, roughly 3 km from this pin.",NON_SITE_AREA
+ryan-companies-florence-tech-park-az,Coordinate derived from the OSM geometries of Judd Road and Attaway Road.,NEUTRAL
+ryan-companies-southwest-crossing-data-park-eloy-az,Coordinate derived from the OSM geometries of Houser Road and Estrella Road.,NEUTRAL
+ryan-stuart-summit-point-jefferson-county-wv,Coordinates are the Summit Point community centroid;,NON_SITE_AREA
+rye-sardis-lake-hydro-panola-ms,Pin recorded as approximate for that reason.,NEUTRAL
+sabey-butte-mt,"Coordinate is a road-level OSM Nominatim geocode of German Gulch Road near the Ramsay/Ramsay-Butte area (Silver Bow County), not a confirmed parcel boundary.",NON_SITE_ROAD
+sabey-decatur-technology-park-marion-county-in,Coordinates are approximate.,NEUTRAL
+sabey-intergate-manhattan-ny,"Coordinates geocoded from the street address the operator publishes (375 Pearl Street, New York, NY 10038), hence approximate.",NEUTRAL
+sabey-intergate-quincy-campus-wa,Coordinates are an approximate geocode of the campus address.,NEUTRAL
+sabey-umatilla-or,Coordinates are Umatilla city centroid.,NON_SITE_AREA
+sabre-solar-holmes-ms,"Coordinates are the centroid of the OSM multipolygon, tagged 'outline approx' by its mapper — recorded as approximate.",NEUTRAL
+safe-harbor-hydroelectric-lancaster-county-pa,Dam coordinates are approximate.,NEUTRAL
+sagebrush-hallam-hyperscale-campus-lancaster-ne,Coordinates are an approximation of the reported SW 58th Street assemblage west of Hallam;,NEUTRAL
+sahuarita-holdings-project-gravel-pima-county-az,"Coordinate is a road-level geocode of W Twin Buttes Road, so the pin is approximate within the road's length.",NON_SITE_ROAD
+salcido-broadway-grant-county-wa,"Salcido does not publish a street address or town for this site, so the coordinates are a Grant County approximation and should be refined before publication.",NEUTRAL
+salcido-eller-douglas-county-wa,"Salcido does not publish a street address or town for ELLER, so the coordinates are a Douglas County approximation and should be refined before publication.",NEUTRAL
+salcido-entiat-chelan-county-wa,the city and coordinates are inferred from the site's name and are marked approximate.,NEUTRAL
+salcido-fortress-quincy-wa,"Distinct from Salcido's other Quincy site (Horizon) but exact street address for either is not published, so both use the same Quincy centroid — treat as two candidate parcels pending precise siting.",NEUTRAL
+salcido-horizon-quincy-wa,Distinct from Fortress (see that record's note on shared Quincy centroid — exact parcel addresses unpublished for both).,NEUTRAL
+salt-creek-solar-lancaster-ne,COORDINATES ARE APPROXIMATE: GEM's own approximate figure.,NEUTRAL
+san-juan-solar-storage-kirtland-nm,"the coordinate is still a Kirtland locality approximation, not a parcel-confirmed point, so precision is 'approximate'.",NON_SITE_AREA
+sandia-725e-hpc-data-center-albuquerque-nm,"Coordinate is an approximate anchor on Sandia's Albuquerque campus at Kirtland AFB, not a building-level point.",NEUTRAL
+sandow-lakes-energy-station-lee-county-tx,Coordinates are a county-level geocode.,NON_SITE_AREA
+sansone-wixom-road-mi,Coordinates from the US Census geocoder for the street address named in the source;,NEUTRAL
+sansone-york-township-washtenaw-mi,Coordinates are a township-level geocode.,NON_SITE_AREA
+saxum-forest-avenue-jackson-ms,"Coordinates are an OpenStreetMap geocode of Forest Avenue in Northwest Jackson, not a parcel footprint.",NON_SITE_ROAD
+scipio-technologies-huntsville-al,"Coordinate is the PeeringDB-reported point, which reverse-geocodes to the immediate vicinity rather than exactly onto the stated street, hence approximate.",NEUTRAL
+scott-data-center-omaha-ne,"Coordinates are an approximation of the Peter Kiewit Institute / Scott Technology Campus area, not a parcel geocode.",NEUTRAL
+seguro-project-bella-casa-grande-az,Coordinates derived from the cited Cornman Road / Midway Road intersection using OpenStreetMap road alignments;,NON_SITE_ROAD
+seminoe-generating-station-carbon-county-wy,Coordinates are an approximate placement on the ranch from the described location.,NEUTRAL
+sentinel-east-whiteland-chester-county-pa,Coordinates are approximate for the township.,NON_SITE_AREA
+sentinel-grove-technology-park-fort-pierce-fl,"Coordinates corrected 2026-09-10: an earlier draft of this record and of willow-lakes-west-midway-fort-pierce-fl shared one pin (27.4467, -80.3256) that matched neither described parcel.",NEUTRAL
+sentinel-grove-technology-park-fort-pierce-fl,"This pin is derived by geocoding the landmarks the sources name — OpenStreetMap places the Minute Maid Road / Orange Avenue (SR 68) intersection at 27.44805, -80.55996, and the county description puts the site on the east side of Minute Maid Road about 2,600 ft north of that intersection, south and east of the SFWMD C-25 Canal;",NON_SITE_ROAD
+sentinel-princeton-nurseries-south-brunswick-nj,"Coordinates are an approximate geocode of the parcel from OSM road features, not a parcel-confirmed point.",NEUTRAL
+sequitor-edge-rapid-city-sd,"Coordinate is an OSM Nominatim road-level geocode of S Highway 79, Rapid City -- not a confirmed parcel.",NON_SITE_ROAD
+serverfarm-ch1-chicago-il,Coordinates geocoded from the published street address.,NEUTRAL
+serverfarm-clarksville-ar,"Coordinates are an OpenStreetMap geocode of Palmer Road in Clarksville, the road the Arkansas Democrat-Gazette identifies as the site's location ('just north of the city's water treatment plant on Palmer Road');",NON_SITE_ROAD
+serverfarm-clarksville-power-plant-ar,"The pin is a road-level OpenStreetMap geocode of Palmer Road, not a surveyed location for either facility.",NON_SITE_ROAD
+serverfarm-clarksville-power-plant-ar,"This record deliberately SHARES its approximate pin with serverfarm-clarksville-ar: the plant is described only as being on 'property adjacent to the data center,' and no source identifies its own parcel.",NEUTRAL
+serverfarm-covington-hazelbrand-ga,"Coordinates are an approximate Covington geocode, not a parcel-confirmed footprint.",NEUTRAL
+shelbourne-white-clay-newark-de,"Location precision is approximate: this pin is Newark, DE's city centroid (OSM);",NON_SITE_AREA
+shelbourne-white-clay-newark-de,"273 and CarMax intersection) did not resolve via US Census or OSM Nominatim geocoding — tried the bare street name, a structured street+city+state query, and the 'CarMax Newark DE' landmark;",NON_SITE_ROAD
+silicon-foundation-warwood-wheeling-ohio-county-wv,"Coordinates are the OSM address point for 74 Warwood Avenue, not a parcel-confirmed footprint.",NEUTRAL
+silicon-ranch-lambert-solar-georgetown-county-sc,Coordinate is the OSM 'Lambert' hamlet point (approximate) — no source read this session gives the array's parcel or centroid.,NEUTRAL
+simple-mining-manchester-ia,"Exact street address (widely reported elsewhere as 1016 Grant Street) is NOT included here because I only ever saw it in WebSearch AI-summaries of manchesterpress.com/telegraphherald.com, never on a page I successfully fetched (manchesterpress.com 429'd twice) — used Manchester city-seat coordinates instead per the approximate-precision fallback rule.",NEUTRAL
+sioux-county-wind-sioux-ne,"COORDINATES ARE APPROXIMATE: the pin is the county seat (Harrison, via OpenStreetMap/Nominatim);",NON_SITE_AREA
+site-layer-4-goshen-hole-platte-county-wy,Coordinates are a geocode from that published description and are not a parcel-confirmed point.,NEUTRAL
+slate-belt-holdings-upper-mount-bethel-northampton-pa,"Coordinates are township-level, not parcel-confirmed.",NON_SITE_AREA
+smarttec-site-01-mead-ok,Coordinates are the town of Mead;,NON_SITE_AREA
+socrates-north-new-albany-oh,Coordinates approximate (New Albany / Licking-side cluster).,NEUTRAL
+socrates-south-new-albany-oh,Coordinates approximate.,NEUTRAL
+socrates-the-younger-new-albany-oh,Coordinates approximate.,NEUTRAL
+solis-arx-progress-park-wythe-va,"Coordinates are an approximate geocode of Progress Park (Max Meadows / Fort Chiswell area off I-81), not a parcel-confirmed point.",NEUTRAL
+solstice-data-allen-park-mi,"Coordinates are Nominatim's street-level match for Enterprise Drive, the only location the source gives (no house number);",NEUTRAL
+soluna-project-annie-paris-tx,"Directory listings give a street address (4210 Old Bonham Rd, Paris, TX 75460) but I could not independently geocode it;",NEUTRAL
+soluna-project-annie-paris-tx,"lat/lon here is the Paris, TX city centroid — precision should be treated as approximate, not exact, until the address is geocoded.",NON_SITE_AREA
+soluna-project-edith-wenatchee-wa,"Wenatchee/Chelan is used here because that is the filing's own wording for the project, and the coordinates are the Wenatchee city centroid, not a site footprint.",NON_SITE_AREA
+soluna-project-kati-willacy-tx,Coordinates are anchored to Raymondville (county seat);,NON_SITE_AREA
+sos-limited-park-falls-wi,Coordinates are a best-effort locator for the mill site.,NEUTRAL
+springfield-township-andersonville-road-data-center-mi,Coordinates are the southeastern (section 36) segment of Andersonville Road consistent with parcel 07-36-401-012 and the Andersonville Rd/White Lake Rd description;,NON_SITE_ROAD
+srs-ai-data-center-savannah-river-site-sc,"Coordinates are the SRS site centroid, not a specific tract — precision approximate.",NEUTRAL
+srs-energy-generation-savannah-river-site-sc,Coordinates are the SRS site centroid — precision approximate.,NEUTRAL
+st-albans-data-center-vt,"Albans city-boundary centroid (OSM relation 199108, 'Saint Albans City, Franklin County, Vermont'), not a parcel-level pin;",NON_SITE_AREA
+st-james-solar-vacherie-la,"Coordinate is the EIA plant point, reported to four decimal places, and is marked approximate.",NEUTRAL
+stack-dfw01-plano-tx,"No street address is published on the operator page, so coordinates are a city-level geocode.",NON_SITE_AREA
+stack-dfw02-lancaster-tx,Coordinates are a city-level geocode.,NON_SITE_AREA
+stack-hillsboro-or,Coordinates are the Hillsboro area centroid.,NON_SITE_AREA
+stack-nal01-new-albany-oh,Coordinates approximate (New Albany).,NEUTRAL
+stack-nova-loudoun-va,Coordinates are the Ashburn/Dulles area centroid.,NON_SITE_AREA
+stack-phx01-avondale-az,Coordinates geocoded from the cited address (Nominatim and US Census geocoder agree).,NEUTRAL
+stack-phx02-phoenix-az,Coordinates geocoded from 800 N 40th St via the US Census geocoder.,NEUTRAL
+stack-svy03a-hayward-ca,"Coordinates are a geocoded street-address point, not parcel-confirmed.",NEUTRAL
+stak-energy-north-slope-ak,Coordinates estimated (~26 miles south of Prudhoe Bay 70.2N/148.5W);,NEUTRAL
+standard-power-coshocton-oh,Coordinates are a street-level geocode of the published address.,NEUTRAL
+stantec-randee-howell-township-mi,"Coordinates are Nominatim's match for Grand River Avenue in Howell Township, the road the source names as bisecting the site;",NEUTRAL
+star-light-energy-center-valencia-county-nm,"Coordinate is a Los Lunas locality approximation, set apart from the Sky Ranch anchor so the two Valencia County sites do not share a pin.",NON_SITE_AREA
+starkville-industrial-park-road-crypto-mine-ms,"Coordinates are an OpenStreetMap geocode of Industrial Park Road, Starkville — the road named as the site, not a parcel point.",NON_SITE_ROAD
+starwood-digital-project-washington-de,Coordinates approximate for Delaware City area.,NON_SITE_AREA
+state-of-ohio-computer-center-columbus-oh,coordinates are an approximate geocode consistent with the cited 'west end of the OSU campus'.,NEUTRAL
+stem-practice-sycamore-view-memphis-tn,Coordinates are an OSM-mapped building way at the exact street address.,NEUTRAL
+stillwater-lovejoy-panhandle-road-clayton-ga,Coordinates come from the geocoded Panhandle Road address and are approximate.,NEUTRAL
+stonebridge-fort-meade-fl,Coordinates are Fort Meade city centroid;,NON_SITE_AREA
+stonebridge-pacific-columbia-county-wi,Coordinates are an approximate town-level centroid.,NON_SITE_AREA
+stratos-box-elder-ut,Coordinates are approximate for western Box Elder County;,NON_SITE_AREA
+stream-data-centers-project-liberty-marion-county-sc,"No specific parcel/address was made public before withdrawal — coordinates are Marion, SC town center, precision approximate.",NON_SITE_AREA
+stream-stamp-alabama-ny,"Coordinates are geocoded to the Town of Alabama, Genesee County, NOT to a confirmed parcel.",NON_SITE_AREA
+sunzia-wind-central-nm,"The footprint spans three counties (San Miguel, Lincoln, Torrance), so the coordinate is a single representative point in the Lincoln County portion rather than a site boundary;",NEUTRAL
+swarm-systems-marshalltown-ia,"Coordinates are approximate — the point sits at the JBS Marshalltown industrial site, next to which the Edgewood Industrial Park city-owned parcels lie;",NEUTRAL
+swift-willow-westover-al,"Coordinate is a Cheshire Drive road anchor in Westover, not a surveyed parcel centroid.",NEUTRAL
+switch-las-19-enterprise-nv,"Coordinates are an approximate geocode of the named intersection, not a parcel-confirmed point.",NON_SITE_ROAD
+switch-pyramid-campus-grand-rapids-mi,"Coordinates are approximate Pyramid campus location on East Paris Ave, Gaines Township.",NEUTRAL
+synergy-south-russellville-al,"Coordinates are the Russellville place centroid: the source names only 'Jackson Avenue', and Nominatim returns two distinct Jackson Avenue segments (North and South) in the city, so a street-level pin could not be chosen without guessing.",NEUTRAL
+t5-atlanta-iv-palmetto-ga,Coordinates approximate (I-85/Gullatt Rd corridor).,NON_SITE_ROAD
+t5-chicago-iii-northlake-il,Coordinates geocoded from the published street address.,NEUTRAL
+t5-chicago-iv-grayslake-il,Coordinates are the Grayslake area centroid.,NON_SITE_AREA
+t5-minneapolis-1001-third-avenue-mn,"PeeringDB registers ""T5@Minneapolis"" (T5 Data Centers) at 1001 3rd Ave South, Minneapolis 55404, with coordinates within ~10 m of the OSM ""Sleep Number Building"" polygon.",NEUTRAL
+t5-nampa-id,"Coordinate provenance (checked 2026-09-12): the pin is the Nampa city centroid, NOT the stated 8300 Birch Lane address — the US Census geocoder returns no match for that address and the only OpenStreetMap feature named Birch Lane near Nampa carries ZIP 83867 (Silverton, Shoshone County), so it is a different road.",NON_SITE_AREA
+t5-nampa-id,the pin is city-level and should not be read as parcel-level.,NON_SITE_AREA
+t5-silicon-valley-newark-ca,"Coordinates are a best-effort approximate estimate for the disclosed street address, not an independently geocoded parcel point - recommend a follow-up pass with a mapping source to confirm precisely.",NEUTRAL
+ta-infrastructure-endicott-ak,"Endicott field's own coordinates could not be resolved: OSM Nominatim's only match for ""Endicott"" in Alaska was Endicott Arm, a fjord near Juneau over 1,500 km from the North Slope, which was checked and rejected as clearly wrong rather than used.",NEUTRAL
+ta-infrastructure-endicott-ak,"The pin used instead is Prudhoe Bay, the nearest well-mapped North Slope hub, as an explicit regional approximation — it is not the specific causeway/gravel-pad location, which this session could not geocode.",NEUTRAL
+ta-realty-east-tanners-church-ellenwood-ga,Coordinates are approximate to Ellenwood;,NON_SITE_AREA
+tac-data-centers-wythe-county-va,"Coordinates are an approximate geocode of the described area, not a parcel-confirmed point.",NEUTRAL
+takanock-goshen-elkhart-county-in,Coordinates are the city of Goshen;,NON_SITE_AREA
+takanock-project-baccara-maricopa-county-az,Coordinates are approximate.,NEUTRAL
+takanock-project-baccara-maricopa-county-az,"Coordinates corrected 2026-08-31 to the filed parcel (501-43-016A) in the southwest quarter of Section 28, Township 3 North, Range 1 West.",NEUTRAL
+talen-susquehanna-aws-pa,"Coordinates are Wikipedia's figure (NRC-sourced per Wikipedia's infobox), not independently re-verified against raw NRC data this session -- location.precision is 'approximate' pending that verification.",NEUTRAL
+tallassee-mill-data-center-al,"Coordinate is the OpenStreetMap ""Tallassee Mills"" feature.",NEUTRAL
+tc-atlanta-development-winston-douglas-ga,"Coordinates are the Winston community centroid (OSM Nominatim), not a parcel.",NON_SITE_AREA
+tcdc-ector-county-tx,Coordinates are approximate (Odessa area).,NON_SITE_AREA
+telehouse-chelsea-manhattan-ny,"Coordinates geocoded from the street address via US Census geocoder (address-range interpolation, not a confirmed floor footprint), hence approximate precision.",NEUTRAL
+telehouse-staten-island-ny,"coordinates geocoded from the street address via US Census geocoder (address-range interpolation, not a confirmed parcel/building footprint), hence approximate precision.",NEUTRAL
+telkite-aeris-ki-sawyer-marquette-mi,the OSM geocode for the K.I.,NEUTRAL
+tenaska-lindsay-hill-billingsley-al,"Coordinates are the OSM plant polygon centroid, which is tagged from EIA-860, hence precision ""exact"".",NEUTRAL
+tenaska-nebraska-ai-campus-power-plant-proposed,Coordinates mirror the approximate Otoe/Gage search-area centroid already used on the paired compute record — NOT a siting-confirmed point.,NON_SITE_AREA
+tenhats-fort-summit-knoxville-tn,"This pin is the OSM 'Old City' quarter centroid (a landmark disclosed in the sources as the facility's location), not the parcel;",NEUTRAL
+tenhats-fort-summit-knoxville-tn,"COORDINATE CAVEAT: neither the US Census geocoder nor OSM Nominatim could resolve '550 Fort Summit Way' (zero matches, tried with and without zip, plus a structured query) -- the street appears to postdate both services' address indexes.",NEUTRAL
+tenkey-franklin-ky,Coordinates are approximate for that I-65 exit area within Franklin city limits.,NEUTRAL
+tep-springerville-gas-conversion-az,Coordinates and the EIA plant code come from the OpenStreetMap plant polygon;,NEUTRAL
+teraplex-gallup-tradeport-mckinley-county-nm,Coordinate is a locality-level approximation anchored on Mentmore/Gallup — not a parcel-confirmed point.,NON_SITE_AREA
+terawulf-hawesville-ky,TeraWulf's official PR cited 'over 250 buildable acres.' Coordinates are approximate (Hawesville town center).,NON_SITE_AREA
+terawulf-lake-mariner-ny,"Address 7725 Lake Rd, Barker, NY — coordinates are a town-level geocode, not a confirmed parcel pin (approximate).",NON_SITE_AREA
+terawulf-morgantown-charles-county-md,Coordinates approximate.,NEUTRAL
+terawulf-muskie-eastpark-ky,Coordinates are the EastPark park centroid.,NEUTRAL
+terra-hosting-vermillion-rise-newport-in,"Coordinates approximate (large multi-parcel park, pending precise siting).",NEUTRAL
+terra-nexus-camden-kershaw-county-sc,"Coordinate is a Park Road (ZIP 29032) geocode, not parcel-confirmed.",NEUTRAL
+terrapower-natrium-kemmerer-wy,"Coordinates approximate the Kemmerer/Naughton area, not a parcel-confirmed point.",NEUTRAL
+tesla-cortex-2-giga-texas-austin-tx,Coordinate is the Giga Texas campus point;,NEUTRAL
+the-data-centers-star-campus-newark-de,"Coordinates are the 'STAR Campus' OSM way centroid (approximate) — the specific parcel within the 271-acre campus where this project would have sited was not stated in any source reviewed, and the project was never built.",NEUTRAL
+thor-equities-augusta-township-mi,Coordinates are approximate Augusta Township centroid.,NON_SITE_AREA
+thor-equities-kingston-technology-hub-bartow-ga,Coordinates are approximate to Kingston.,NON_SITE_AREA
+thornburg-business-park-data-center-spotsylvania-va,Coordinates approximate (Morris Rd geocode;,NEUTRAL
+thornburg-industrial-park-data-center-spotsylvania-va,Coordinates approximate (S Roxbury Mill Rd geocode;,NEUTRAL
+tierpoint-hawthorne-westchester-ny,"Coordinates are an approximate geocode of the Skyline Drive campus, not a confirmed parcel pin.",NON_SITE_ROAD
+tierpoint-oklahoma-city-ok,Coordinates are an Oklahoma City centroid approximation.,NON_SITE_AREA
+tierpoint-omaha-bellevue-ne,Coordinates are a street-address approximation.,NEUTRAL
+tierpoint-omaha-midlands-papillion-ne,Coordinates are a street-address approximation.,NEUTRAL
+tierpoint-russell-street-baltimore-md,"Coordinates confirmed via US Census geocoder (exact match on 1401 Russell St, Baltimore, MD 21230).",NEUTRAL
+tierpoint-tulsa-state-farm-ok,Coordinates are a Tulsa centroid approximation;,NON_SITE_AREA
+tierpoint-waterbury-ct,"Coordinates cross-checked: US Census geocoder (41.554386, -73.041037) and OSM building footprint (41.554366, -73.0410751) agree within a few meters.",NEUTRAL
+tigerdc-project-spero-spartanburg-county-sc,Coordinates are an approximate geocode of the Tyger River Industrial Park area.,NEUTRAL
+tondu-stronach-township-manistee-mi,"Coordinates are a township-level geocode, not the parcel.",NON_SITE_AREA
+town-of-janesville-data-center-rock-county-wi,"Coordinates are a street-level geocode of North Polzin Road, not a parcel.",NON_SITE_ROAD
+tpa-social-circle-technology-park-ga,"Coordinates corrected to Social Circle city centroid (33.6562°N, 83.7182°W);",NON_SITE_AREA
+tpa-social-circle-technology-park-ga,original record had 33.5912°N which is approximately 4.5 miles south of the actual city center per multiple geocoding sources.,NON_SITE_AREA
+tract-buckeye-tech-corridor-az,"Coordinates are an approximate town-level geocode (Buckeye, south of I-10), not a parcel-confirmed point.",NON_SITE_AREA
+tract-caldwell-valley-uhland-tx,Coordinates are the Uhland area centroid.,NON_SITE_AREA
+tract-farmington-technology-park-mn,"Coordinates are an approximate estimate for 220th St W south of downtown Farmington — not geocoded this session, verify before publish.",NEUTRAL
+tract-hanover-technology-park-va,"Coordinates are an approximate geocode north of Ashland, not a parcel-confirmed point.",NEUTRAL
+tract-mountain-road-technology-park-hanover-va,Coordinates are an approximate geocode of the Route 33 / Mountain Road corridor in western Hanover near the Henrico line.,NON_SITE_ROAD
+tract-peru-shelf-storey-county-nv,"Coordinates are an OpenStreetMap Peru Drive road point, not a parcel-confirmed location.",NEUTRAL
+tract-silver-springs-nv,Coordinates approximate to Silver Springs.,NON_SITE_AREA
+tract-tuckahoe-technology-park-goochland-county-va,Coordinates are approximate.,NEUTRAL
+tract-virginia-highlands-storey-county-nv,"Coordinates are the Lockwood reference point, not a parcel boundary.",NEUTRAL
+treaty-oak-redfield-solar-grant-county-ar,"Coordinates are the OpenStreetMap point for Sheridan, the Grant County town sources associate the array with ('the array near Sheridan').",NEUTRAL
+treaty-oak-redfield-solar-grant-county-ar,"Sources consistently place the project in SOUTHEASTERN Grant County, which is east of Sheridan, so this pin is a town-level approximation that likely sits west of the actual 1,033-acre footprint - do not treat it as a site centroid.",NON_SITE_AREA
+treetop-east-fishkill-ny,"secondary reporting places the site ""off of I-84 and Lime Kiln Road"" but that was NOT verified in a fetched source, so no street is recorded and coordinates are a TOWN-LEVEL placeholder for East Fishkill, Dutchess County.",NON_SITE_AREA
+triboro-industrial-park-jessup-olyphant-lackawanna-county-pa,Coordinates are approximate.,NEUTRAL
+truss-energy-carpenter-wy,coordinates are an approximate geocode of Carpenter.,NEUTRAL
+tulsa-technology-exchange-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+tulsaconnect-dc1-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+tulsaconnect-dc2-tulsa-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+tulsaconnect-downtown-dc5-tulsa-ok,"No street address published on the operator's overview page, so location is a Tulsa centroid approximation only.",NON_SITE_AREA
+tulsaconnect-east-dc3-tulsa-ok,Coordinates are a Tulsa centroid approximation;,NON_SITE_AREA
+twisted-gun-solar-mingo-logan-county-wv,Do not publish this pin without a parcel- or permit-level coordinate.,NEUTRAL
+twisted-gun-solar-mingo-logan-county-wv,"⚠️ PIN IS A REFERENCE POINT, NOT THE SITE.",NEUTRAL
+twisted-gun-solar-mingo-logan-county-wv,"the coordinates here are Chauncey itself (which is in Logan County), so the real footprint is roughly 8 miles away.",NEUTRAL
+type-one-energy-project-infinity-bull-run-tn,"Coordinates are the Bull Run Fossil Plant site (Anderson County, near Clinton), taken from a published source rather than estimated.",NEUTRAL
+uh-mhpcc-kihei-hi,"Business directories (Yelp, Yellow Pages) independently and consistently name 550 Lipoa Pkwy, Kihei as the address, and the US Census geocoder resolves that exact string to a valid address at this zip (96753);",NEUTRAL
+umich-lanl-research-computing-ypsilanti-township-mi,Coordinates are the US Census geocoder's match for the Textile Rd / Bridge Rd intersection named in the sources;,NON_SITE_ROAD
+university-of-alabama-hpc-tuscaloosa-al,"Coordinates are the campus centroid, not the building on the eastern edge of campus.",NEUTRAL
+us-signal-ia01-waukee-ia,The street address is documented but the coordinate is a city-level approximation.,NON_SITE_AREA
+us-signal-mi01-kentwood-mi,Coordinates from the US Census geocoder for the street address on the operator's page;,NEUTRAL
+us-signal-mi02-byron-center-mi,"Coordinates from the US Census geocoder, which matched the exact house number;",NEUTRAL
+us-signal-mi03-van-buren-township-mi,"Coordinates from Nominatim, which resolved the exact house number;",NEUTRAL
+us-signal-mi04-southfield-mi,Coordinates geocoded from the street address on the operator's page;,NEUTRAL
+us-signal-mi05-auburn-hills-mi,Coordinates geocoded from the street address on the operator's page;,NEUTRAL
+us-signal-wi01-madison-wi,Coordinates are an address geocode.,NEUTRAL
+us-signal-wi02-fitchburg-wi,Coordinates are an address geocode.,NEUTRAL
+valorc3-oklahoma-city-ok,coordinates are approximate to Oklahoma City.,NON_SITE_AREA
+vantage-co21-aurora-co,"Coordinates are an approximate geocode of the '48th Avenue and E-470' road intersection (Nominatim), not a parcel address.",NON_SITE_ROAD
+vantage-nv1-storey-county-nv,Coordinates are approximate TRIC centroid.,NEUTRAL
+vantage-oh2-millersport-fairfield-oh,"Coordinates approximate (Millersport city-center, not parcel-verified).",NON_SITE_AREA
+vantage-stafford-va4-va,Coordinates are county-centroid approximation — specific site address not confirmed in sources.,NON_SITE_AREA
+vantage-wa13-quincy-wa,Coordinates are an approximate geocode of the campus address.,NEUTRAL
+vc-summer-units-2-3-fairfield-county-sc,Coordinates are the OSM feature for the V.C.,NEUTRAL
+vermaland-la-osa-eloy-az,Coordinates are approximate (parcel south of Eloy city center along Greene Canal;,NEUTRAL
+verrus-project-flex-lyon-township-oakland-county-mi,Coordinates are approximate.,NEUTRAL
+viridian-apecs-janesville-wi,"Coordinates are the geocoded former GM plant site, not a parcel-confirmed footprint.",NEUTRAL
+volt-edge-project-alpaca-union-county-sc,"the two geocode ~40m apart, consistent with the same industrial park).",NEUTRAL
+volt-edge-project-alpaca-union-county-sc,"Coordinates geocoded from that street address via the US Census geocoder — not stated as facility coordinates by any source, and the industrial park spans multiple parcels so the specific building footprint is unconfirmed.",NEUTRAL
+voltagrid-covington-power-plant-ga,"Coordinates are an approximate Covington geocode, not a parcel-confirmed footprint.",NEUTRAL
+voltagrid-quincy-gas-generation-wa,"The coordinates are the Quincy city centroid - the parcel on Grant County PUD land was not identified in the reporting, so precision is 'approximate' and the pin should not be read as a site footprint.",NON_SITE_AREA
+walker-buddy-ellis-road-data-center-livingston-la,"The coordinate is the OpenStreetMap centre of the roughly 2.4 km Buddy Ellis Road corridor south of Walker, not a parcel-confirmed point.",NON_SITE_ROAD
+walmart-bentonville-data-center-ar,"Identity, owner, address, county and coordinates are from the Arkansas DEQ Permit Data System facility record AFIN 04-01474, which names the site ""WAL-MART DGTC/ISD #9280"" with alternate name ""EAST DATA CENTER"", owner WALMART INC, status Active.",NEUTRAL
+walmart-bentonville-data-center-ar,"Coordinates are ADEQ's own (36.364241, -94.182712;",NEUTRAL
+walmart-bentonville-data-center-ar,"NAD83, ADEQ photo interpolation, measured 2013-02-04), which supersede the earlier US Census street geocode they sit ~87 m from.",NEUTRAL
+warrenton-group-halifax-road-petersburg-va,Coordinates are an approximate geocode of the cited street address.,NEUTRAL
+washington-state-data-center-olympia-wa,"Coordinates are the OSM polygon for the 1500 Jefferson Building, which contains but is larger than the data center wing.",NEUTRAL
+wave-garden-macedonia-ar,Coordinates are the OpenStreetMap point for the Macedonia community in Columbia County;,NEUTRAL
+we-energies-oak-creek-natural-gas-wi,Coordinates are the existing Oak Creek power plant site.,NEUTRAL
+we-energies-paris-rice-wi,Coordinates are a town-level locator near the existing Paris peaker site.,NON_SITE_AREA
+westdulles-iron-horse-hanover-va,Coordinates are an approximate geocode of the cited street address.,NEUTRAL
+western-hospitality-childersburg-al,"Coordinates are the Childersburg municipal centroid, NOT the industrial-park parcel — ""Childersburg Industrial Park"" and ""Alabama Ordnance Works"" both return empty from Nominatim.",NON_SITE_AREA
+western-hospitality-partners-commerce-parkway-oldham-ky,Coordinates are the OpenStreetMap record for the drive-in property.,NEUTRAL
+western-hospitality-partners-pekin-il,Coordinates are the mapped Lutticken Lake feature and are approximate.,NEUTRAL
+wf-industrial-yaphank-ny,"Coordinates are the Yaphank hamlet centroid (OSM Nominatim), NOT the parcel -- disclosed here per contract rule H;",NEUTRAL
+white-oak-technology-park-columbia-county-ga,Coordinates are approximate (near Augusta).,NEUTRAL
+white-rose-project-kilo-south-elgin-il,Coordinates are derived from the mapped extent of Kenyon Road and are approximate.,NEUTRAL
+whitefiber-nc1-madison-nc,Coordinates are the Madison town centroid.,NON_SITE_AREA
+wildcat-ridge-archbald-lackawanna-county-pa,Coordinates are approximate.,NEUTRAL
+willow-lakes-west-midway-fort-pierce-fl,Coordinates corrected 2026-09-10: an earlier draft shared a pin with sentinel-grove-technology-park-fort-pierce-fl that sat about 10 km from this parcel.,NEUTRAL
+willow-lakes-west-midway-fort-pierce-fl,"This pin is the West Midway Road / I-95 crossing the source names, derived from OpenStreetMap geometry (Midway Road runs east-west at latitude 27.3742 and I-95 crosses it at longitude -80.4104);",NON_SITE_ROAD
+windstream-wholesale-oklahoma-city-ok,Coordinates are an approximate geocode of the street address.,NEUTRAL
+windy-lane-energy-center-de-baca-county-nm,Coordinate is the Fort Sumner locality anchor for De Baca County;,NON_SITE_AREA
+wiscasset-proposed-me,"Coordinates are approximate, based on Wiscasset area near former Maine Yankee site.",NEUTRAL
+xai-colossus-2-memphis-tn,"5400 is recorded because it is the figure in the earlier, better-attributed source, and the coordinates are a geocode of that address, not a confirmed parcel boundary.",NEUTRAL
+xai-colossus-2-memphis-tn,"PIN CORRECTED 2026-09-13: the previous coordinate (34.999654,-90.04295) was a bare OSM address POINT for 5400 Tulane Road (place=house, ~11m x 9m, no building geometry), sitting 759 m from the warehouse it was meant to mark.",NEUTRAL
+xai-colossus-2-memphis-tn,"The pin is now the centroid of OSM building way 1386926534, explicitly tagged name=""xAI Macrohard Colossus 2"", operator=xAI, telecom=data_center, addr:housenumber=5420 (way version 3, last edited 2025-12-31).",NEUTRAL
+xai-colossus-2-memphis-tn,"precision remains ""approximate"": the pin is a crowd-sourced OSM footprint corroborated by Wikipedia, NOT a parcel-confirmed point -- Shelby County assessor records returned 403 and could not be checked.",NEUTRAL
+xai-minihard-memphis-tn,"Coordinates are an OSM ADDRESS POINT for 5414 Tulane Road (Nominatim returns category=place / type=house at 34.9994934,-90.0429461), NOT a mapped building footprint -- corrected 2026-09-13 after an earlier note in this record overclaimed it as a building way.",NEUTRAL
+xai-minihard-memphis-tn,"Note the sibling record xai-colossus-2-memphis-tn carries the same class of address-point pin ~20m away, which is why the two appear near-identical;",NEUTRAL
+xai-minihard-memphis-tn,"a separate review found an OSM building way tagged for Colossus 2 some 760m from that pin, so the campus buildings are NOT where either address point sits.",NEUTRAL
+xai-southaven-ms,coordinates are approximate for that address.,NEUTRAL
+yondr-cerberus-manassas-va,"The announcement names Manassas but no street address or parcel, so coordinates are an approximate city-level geocode.",NON_SITE_AREA
+youngwoo-project-brookwood-al,"Coordinates are a Brookwood Parkway street-segment geocode near Brookwood Middle School, not a parcel-confirmed point.",NEUTRAL
+zinke-arizona-independent-technology-campus-pinal-az,Coordinates are the Porter Road / Barnes Road intersection derived from OpenStreetMap road alignments;,NON_SITE_ROAD
+zinke-arizona-independent-technology-campus-pinal-az,"the campus lies southeast of that point, so the pin is approximate.",NEUTRAL

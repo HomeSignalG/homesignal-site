@@ -102,10 +102,22 @@ ok(S.proposed.includes('Long Range Program'), 'Long Range Program → proposed')
 ok(S.approved.includes('Construction Work Program') && S.approved.includes('Under Construction'),
   'Construction Work Program + Under Construction → approved');
 ok(S.operating.length === 0, 'operating is empty — the kept set has no completed status');
-for (const s of ['Legacy Projects', 'Overhead Projects', 'Temporarily Shored Bridges', 'Deferred', 'Rejected', 'UNKNOWN']) {
+for (const s of ['Legacy Projects', 'Overhead Projects', 'Temporarily Shored Bridges', 'Deferred', 'UNKNOWN']) {
   ok(S.exclude.includes(s), `${s} → exclude`);
 }
-const allStatuses = [...S.proposed, ...S.approved, ...S.operating, ...S.exclude];
+// ⚖️ 'Rejected' MOVED exclude → denied (founder decision-history contract, 2026-09-20).
+// It used to be dropped, which is how a project GDOT actually refused simply vanished
+// from every page instead of remaining findable with its refusal on the record. It is
+// now EMITTED, browsing under Proposed, carrying a sourced decision notation, and
+// refused by every active-proposal count and social claim (sources/decision.ts).
+ok(S.denied && S.denied.includes('Rejected'),
+  "'Rejected' → denied, not exclude — a refused project stays discoverable with its decision");
+ok(!S.exclude.includes('Rejected'),
+  "'Rejected' left exclude — a status lives in exactly one bucket or buildBucketLookup throws");
+// Every bucket, read generically — see the note on the same idiom in the sibling
+// connector suites: a hand-spread bucket list turns a completeness check into an
+// under-count the moment a bucket is added.
+const allStatuses = Object.values(S).flat();
 ok(new Set(allStatuses).size === allStatuses.length, 'no status appears in two buckets');
 ok(allStatuses.length === 9, 'all 9 publisher STATUS values are accounted for (they sum to 26,544)');
 

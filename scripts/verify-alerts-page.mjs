@@ -22,12 +22,15 @@
 //     real cards if news rows exist — never a blank pane)
 //   • canonical 12-topic gate: every Local News row on the page maps to an
 //     alerts row carrying >=1 approved topic (reported always; fails CI only
-//     when LOCAL_NEWS_TOPIC_GATE=1 — see docs/local-news-topic-gate-migration.sql)
+//     when LOCAL_NEWS_TOPIC_GATE=1 — see docs/local-news-topic-gate-migration.sql).
+//     Reported NOT MEASURED when the public key cannot read alerts.subtopics,
+//     which is the case since 2026-09-26 (scripts/lib/local-news-topic-gate.mjs)
 //   • mobile viewport (390×844): no horizontal overflow, content still renders
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { readLocalNewsTopicMap, topicGateVerdict, TOPIC_RULE_OWNER } from './lib/local-news-topic-gate.mjs';
 surfaceBanner('verify-alerts-page');
 
 const cfg = readFileSync(new URL('../config.js', import.meta.url), 'utf8');
@@ -98,27 +101,13 @@ const I = (zip, name, detail) => { report.push({ zip, check: name, ok: null, det
 // applied without producing a false failure against un-gated production.
 const GATE_ENFORCE = process.env.LOCAL_NEWS_TOPIC_GATE === '1';
 
-// source_url -> true when the alerts row carries >=1 canonical subtopic.
-async function localNewsTopicMap() {
-  const map = new Map();
-  for (let offset = 0; ; offset += 1000) {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/alerts?category=eq.local_news&select=source_url,subtopics`
-      + `&order=source_url&offset=${offset}&limit=1000`,
-      { headers: { apikey: APIKEY, Authorization: `Bearer ${APIKEY}` } },
-    );
-    if (!res.ok) throw new Error(`Supabase alerts: ${res.status}`);
-    const batch = await res.json();
-    for (const r of batch) {
-      if (!r.source_url) continue;
-      const tagged = Array.isArray(r.subtopics) && r.subtopics.length >= 1;
-      map.set(r.source_url, (map.get(r.source_url) || false) || tagged);
-    }
-    if (batch.length < 1000) break;
-  }
-  return map;
+// Since 2026-09-26 the public key cannot read alerts.subtopics, so this read can come back
+// NOT MEASURED instead of throwing; see scripts/lib/local-news-topic-gate.mjs.
+const TOPIC = await readLocalNewsTopicMap({ fetchImpl: fetch, supabaseUrl: SUPABASE_URL, apikey: APIKEY });
+if (!TOPIC.measured) {
+  console.log(`verify-alerts-page: local news topic gate NOT MEASURED (alerts read refused, HTTP ${TOPIC.status}); `
+    + `the page checks still run. The rule is enforced by ${TOPIC_RULE_OWNER}.`);
 }
-const TOPIC_MAP = await localNewsTopicMap();
 
 const browser = await chromium.launch();
 try {
@@ -197,17 +186,10 @@ try {
     // Canonical 12-topic gate: no Local News row on this page may lack an
     // approved topic. Truth = alerts.subtopics, joined on source_ref/source_url.
     const localNews = rows.filter((ch) => (ch.category || '') === 'Local News');
-    const untagged = localNews.filter((ch) => TOPIC_MAP.get(ch.source_ref) !== true);
-    if (untagged.length === 0) {
-      P(zip, 'local news topic gate',
-        `all ${localNews.length} Local News row(s) carry >=1 canonical topic`);
-    } else {
-      const detail = `${untagged.length} of ${localNews.length} Local News row(s) carry NO canonical topic`
-        + ` (e.g. "${String(untagged[0].title).slice(0, 70)}")`;
-      if (GATE_ENFORCE) F(zip, 'local news topic gate', detail);
-      else I(zip, 'local news topic gate',
-        `${detail} — gate not yet applied; set LOCAL_NEWS_TOPIC_GATE=1 to enforce`);
-    }
+    const verdict = topicGateVerdict({ topic: TOPIC, localNews, enforce: GATE_ENFORCE });
+    if (verdict.kind === 'P') P(zip, 'local news topic gate', verdict.detail);
+    else if (verdict.kind === 'F') F(zip, 'local news topic gate', verdict.detail);
+    else I(zip, 'local news topic gate', verdict.detail);
 
     // Mobile usability
     if (MOBILE) {

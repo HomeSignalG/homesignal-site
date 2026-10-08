@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.",
-  "registry_entries": 239,
+  "registry_entries": 240,
   "statewide": {
     "AK": [
       {
@@ -1116,10 +1116,24 @@
     ],
     "MD|Baltimore": [
       {
+        "id": "baltimore-city-housing-permits",
+        "label": "City of Baltimore",
+        "scope": "city",
+        "commercial": false
+      },
+      {
         "id": "baltimore-county-permits",
         "label": "Baltimore County",
         "scope": "local",
         "commercial": true
+      }
+    ],
+    "MD|Baltimore city": [
+      {
+        "id": "baltimore-city-housing-permits",
+        "label": "City of Baltimore",
+        "scope": "city",
+        "commercial": false
       }
     ],
     "MD|Harford": [

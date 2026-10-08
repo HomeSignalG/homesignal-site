@@ -4,7 +4,7 @@
 // address-mode wording. It did not move the HERO. Measured on main (e053819) with this
 // suite's own fixtures: searching an address from a ZIP view rendered
 //
-//     kicker  "Development overview"
+//     kicker  "Development map"
 //     H1      "ZIP 78617"
 //     results "Showing development within 2 miles of / 2200 CALDWELL LN, DEL VALLE, TX 78617"
 //
@@ -26,6 +26,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -87,6 +88,7 @@ const routeHandler = async (route) => {
   if (url.includes('/rpc/app_zip_projects_markers')) return J(ZIP_AUTH);
   if (url.includes('/functions/v1/get-address-report')) return J(REPORT);
   if (url.includes('/rest/v1/app_projects')) return J(PROJECTS);
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
   if (url.includes('/rest/v1/development_reports')) return J(ZIP_ROW);
   if (url.includes('/rest/v1/')) return J([]);
   // Leaflet is REAL. Served from a local copy WHEN ONE RESOLVES, else from the CDN the page
@@ -133,10 +135,10 @@ const waitAddr = (p) => p.waitForFunction(
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitZip(); await page.waitForTimeout(600);
 const z = await hero(page);
-ok(/Development overview/i.test(z.kicker || ''), '1a ZIP mode kicker names the overview', z.kicker);
+ok(/Development map/i.test(z.kicker || ''), '1a ZIP mode kicker names the map', z.kicker);
 ok(/78617/.test(z.h1 || ''), '1b ZIP mode H1 names the ZIP', z.h1);
-ok(/See what is changing in your zip code/i.test(z.sub || ''),
-  '1c ZIP mode standfirst is the ZIP-mode line', z.sub);
+ok(z.sub === 'See what is changing in 78617',
+  '1c ZIP mode standfirst names THIS ZIP via the shared heading helper', z.sub);
 ok(/All development across/i.test(z.heading || ''), '1d ...and the results heading agrees', z.heading);
 
 // ══════════════ 2. ADDRESS MODE — the hero must stop making the whole-ZIP claim ══════════════
@@ -150,14 +152,16 @@ ok(/CALDWELL/i.test(a.scopeLine || ''), '2b ...centred on the matched address', 
 // THE DEFECT THIS SUITE EXISTS FOR — all four were ZIP-scoped here on main.
 ok(!/ZIP 78617/.test(a.h1 || ''), '2c the H1 no longer makes the whole-ZIP claim', a.h1);
 ok(/around this address/i.test(a.h1 || ''), '2d ...it names the address view', a.h1);
-ok(!/Development overview/i.test(a.kicker || ''), '2e the kicker is no longer the ZIP overview', a.kicker);
-ok(/Near-home view/i.test(a.kicker || ''), '2f ...it names the near-home mode', a.kicker);
+ok(!/Development map/i.test(a.kicker || ''), '2e the kicker is no longer the ZIP overview', a.kicker);
+ok(/Address view/i.test(a.kicker || ''), '2f ...it names the address mode', a.kicker);
 // The ZIP standfirst no longer carries the ZIP NUMBER, so "does it say 'across ZIP'" would pass
 // on both modes and discriminate nothing. What the mode switch owes the resident is that the
 // address hero is not the ZIP hero, so that is what is asserted — with the old claim kept beside it.
 ok(!/across ZIP/i.test(a.sub || ''), '2g the standfirst drops the whole-ZIP claim', a.sub);
-ok(!/See what is changing in your zip code/i.test(a.sub || ''),
+ok(!/See what is changing in 78617/i.test(a.sub || ''),
   '2g2 ...and is no longer the ZIP-mode standfirst at all', a.sub);
+ok(/^See what is changing at /i.test(a.sub || '') && /CALDWELL/i.test(a.sub || ''),
+  '2g3 ...it names THIS address via the shared heading helper', a.sub);
 ok(!/ZIP 78617/.test(a.title || ''), '2h the document title follows the mode too', a.title);
 // The hero must not claim a RADIUS either — the radius is stated once, where it is true, and a
 // second copy in the hero would go stale the moment the resident changes it.
@@ -169,7 +173,7 @@ await page.click('#radSel button[data-r="5"]');
 await waitAddr(page); await page.waitForTimeout(900);
 const r5 = await hero(page);
 ok(/within 5 miles of$/.test(r5.heading || ''), '3a the radius change took effect', r5.heading);
-ok(/around this address/i.test(r5.h1 || '') && /Near-home view/i.test(r5.kicker || ''),
+ok(/around this address/i.test(r5.h1 || '') && /Address view/i.test(r5.kicker || ''),
   '3b the hero still names the address view after it', { h1: r5.h1, kicker: r5.kicker });
 
 // ══════════════ 4. THE SWITCH RUNS BOTH WAYS ══════════════
@@ -178,9 +182,9 @@ ok(/around this address/i.test(r5.h1 || '') && /Near-home view/i.test(r5.kicker 
 await page.click('#backZip a');
 await waitZip(); await page.waitForTimeout(600);
 const b = await hero(page);
-ok(/Development overview/i.test(b.kicker || ''), '4a returning restores the ZIP kicker', b.kicker);
+ok(/Development map/i.test(b.kicker || ''), '4a returning restores the ZIP kicker', b.kicker);
 ok(/78617/.test(b.h1 || ''), '4b ...the ZIP H1', b.h1);
-ok(/See what is changing in your zip code/i.test(b.sub || ''), '4c ...and the ZIP standfirst', b.sub);
+ok(b.sub === 'See what is changing in 78617', '4c ...and the ZIP standfirst names THIS ZIP', b.sub);
 ok(/All development across/i.test(b.heading || ''), '4d ...over whole-ZIP results', b.heading);
 
 // ══════════════ 5. A DIRECT ADDRESS VISIT ALSO GETS ADDRESS-MODE IDENTITY ══════════════
@@ -199,8 +203,10 @@ await p2.fill('#addr', '2200 Caldwell Ln, Del Valle, TX 78617');
 await p2.click('#go');
 await waitAddr(p2); await p2.waitForTimeout(600);
 const d = await hero(p2);
-ok(/around this address/i.test(d.h1 || '') && /Near-home view/i.test(d.kicker || ''),
+ok(/around this address/i.test(d.h1 || '') && /Address view/i.test(d.kicker || ''),
   '5b a direct address search gets the same address-mode identity', { h1: d.h1, kicker: d.kicker });
+ok(/^See what is changing at /i.test(d.sub || '') && /CALDWELL/i.test(d.sub || ''),
+  '5c ...and the standfirst names THIS address', d.sub);
 
 ok(pageErrors.length === 0, '6 the whole journey ran with no fatal client error', pageErrors);
 

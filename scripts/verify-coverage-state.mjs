@@ -25,6 +25,7 @@
 import { chromium } from 'playwright';
 import { readFileSync } from 'node:fs';
 import { surfaceBanner } from './lib/surface-banner.mjs';
+import { loadDeployedCoverage } from './lib/zip-coverage-live.mjs';
 surfaceBanner('verify-coverage-state');
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
@@ -52,13 +53,48 @@ function normalize(r) {
   };
 }
 
+// A READ FAILURE IS NOT AN ASSERTION FAILURE, AND THIS JOB COULD NOT TELL YOU WHICH.
+// The old body threw `REST <path> -> 500` and discarded the response, so the daily red
+// read as "an invariant is failing" — and was recorded that way in CLAUDE.md for over a
+// week — when in fact the very FIRST read was being cancelled and not one assertion had
+// run. PostgREST puts the Postgres SQLSTATE and message in the body; surface them.
+class ReadError extends Error {
+  constructor(path, status, body) {
+    const j = (() => { try { return JSON.parse(body); } catch { return null; } })();
+    super(`REST ${path} -> ${status}`
+      + (j?.code ? ` [${j.code}]` : '')
+      + (j?.message ? ` ${j.message}` : (body ? ` ${body.slice(0, 200)}` : '')));
+    this.status = status; this.code = j?.code || null; this.path = path;
+  }
+}
+// 57014 is `canceling statement due to statement timeout`. It is the ONE failure this
+// reader can do something about (ask for less), so it is named rather than inferred from
+// the status: PostgREST reports it as a 500, the same status a genuine outage carries.
+const isTimeout = (e) => e instanceof ReadError && (e.code === '57014' || e.status === 500);
+
 async function rest(path) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
   });
-  if (!res.ok) throw new Error(`REST ${path} -> ${res.status}`);
+  if (!res.ok) throw new ReadError(path, res.status, await res.text().catch(() => ''));
   return res.json();
 }
+
+// AN UNREADABLE SOURCE AND A FAILING INVARIANT MUST NOT LOOK THE SAME IN THE LOG. This
+// file is top-level await, so a throw surfaces as an unhandled rejection and prints a bare
+// stack — which is exactly how "the first read was cancelled" got recorded as "the stale
+// assertion is failing". Label it, and say plainly that nothing was verified.
+process.on('unhandledRejection', (e) => {
+  const read = e instanceof ReadError || /unreadable at floor page size/.test(e?.message || '');
+  console.error(`\n${read ? 'INFRASTRUCTURE' : 'ERROR'}: ${e?.message || e}`);
+  if (read) {
+    console.error('NOTHING WAS VERIFIED — this run could not READ the source, so it makes no');
+    console.error('claim about any invariant. Do not record it as an assertion failure.');
+  } else if (e?.stack) {
+    console.error(e.stack);
+  }
+  process.exit(1);
+});
 
 const fails = [];
 const ok = (name, cond, extra) => {
@@ -66,15 +102,53 @@ const ok = (name, cond, extra) => {
   if (!cond) fails.push(name);
 };
 
-// ── 1-3: full-population invariants (keyset-paginated; PostgREST caps at 1000) ──
+// ── 1-3: full-population invariants (keyset-paginated, ADAPTIVE page size) ──
+//
+// ⚠️ A 1000-ROW PAGE OF THIS VIEW CANNOT BE READ BY `anon`, AND THAT IS ARITHMETIC, NOT A
+// FLAKE. The view LEFT JOINs a LATERAL `count(*) FILTER (...) FROM app_projects WHERE
+// zip = m.zip` per ZIP. `app_projects` is ~3.19M rows / 2.9 GB with its visibility map
+// 0.1% set (relallvisible 210 of relpages 370,510), so that aggregate cannot go
+// index-only despite `app_projects_zip_kind_date_idx (zip, record_kind, ...)` covering
+// it — every ZIP pays ~144 random heap fetches. Measured 2026-09-15 with EXPLAIN ANALYZE:
+// one 1000-row page = 55.6 s cold, 33.1 s warm (86,678 page reads even warm — the working
+// set does not fit cache). The `anon` role carries `statement_timeout = 3s`. So the first
+// page was cancelled every single day and the run died before assertion one.
+//
+// PAGE COST IS NOT UNIFORM, which is why a smaller CONSTANT would only move the failure:
+// a 50-row page measured 206 ms at the start of the ZIP range but 3,516 ms at
+// `zip > '40000'`, a ~17x spread, because dense ZIPs carry 275 app_projects rows against
+// 127. Only an adaptive size can cross both. Same ladder as verify-development.mjs (halve
+// on a failed page, floor 1, recover after clean pages) — there it is row SIZE that
+// blows the budget, here it is per-row WORK, and the remedy is identical.
+//
+// 📌 THE DURABLE FIX IS IN THE DATABASE, NOT HERE, and is deliberately NOT bundled: with
+// the visibility map set, that lateral becomes an index-only scan and the whole read goes
+// back to ~1 min. This reader only stops lying about why it failed.
+const MAX_STEP = 32;
 const rows = [];
-for (let last = ''; ;) {
-  // `select=*` on purpose: naming regulatory_overlay_state before the view migration
-  // 400s the whole request, which would read as an outage rather than as a not-yet.
-  const page = await rest(`app_coverage_states?select=*&order=zip.asc&limit=1000` + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
-  rows.push(...page);
-  if (page.length < 1000) break;
-  last = page[page.length - 1].zip;
+{
+  let step = MAX_STEP, last = '', clean = 0, floorRetries = 0;
+  for (;;) {
+    // `select=*` on purpose: naming regulatory_overlay_state before the view migration
+    // 400s the whole request, which would read as an outage rather than as a not-yet.
+    let page;
+    try {
+      page = await rest(`app_coverage_states?select=*&order=zip.asc&limit=${step}`
+        + (last ? `&zip=gt.${encodeURIComponent(last)}` : ''));
+    } catch (e) {
+      if (!isTimeout(e)) throw e;                 // a real outage is not a page-size problem
+      if (step > 1) { step = Math.max(1, Math.floor(step / 2)); clean = 0; continue; }
+      floorRetries++;
+      if (floorRetries > 3) throw new Error(`app_coverage_states unreadable at floor page size: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 2500 * floorRetries));
+      continue;
+    }
+    floorRetries = 0;
+    rows.push(...page);
+    if (page.length < step) break;
+    last = page[page.length - 1].zip;
+    if (++clean >= 3 && step < MAX_STEP) { step = Math.min(MAX_STEP, step * 2); clean = 0; }
+  }
 }
 const metaCount = Number(await fetch(`${SUPABASE_URL}/rest/v1/app_community_meta?select=zip`, {
   method: 'HEAD',
@@ -183,7 +257,61 @@ const failedRows = rows.filter(r => nz(r).core === 'failed_ingest' && !FAILED_AL
   .concat(stuckHold.filter(r => !FAILED_ALLOWLIST.has(r.zip)));
 ok('coverage-pass: zero FAILED materializations (and no hold past its window)', failedRows.length === 0,
    failedRows.slice(0, 5).map(r => r.zip + ':' + nz(r).core).join(','));
+// ── THE RECENT-ATTEMPT WINDOW MUST COVER THE SWEEP PERIOD (2026-09-15) ──
+// `stale_data` means "refreshed_at >72h old AND no recent failed-attempt evidence". The
+// ladder decides "recent" with `last_refresh_attempt_at >= now() - RECENT_ATTEMPT_WINDOW_H`,
+// and that constant is only meaningful relative to how long the rolling refresh takes to
+// visit every ZIP. If a full sweep takes LONGER than the window, then for the difference
+// between them a perfectly healthy, on-schedule ZIP has no attempt inside the window and is
+// named `stale_data` — asserting an absence of retry evidence the row itself contradicts.
+//
+// That is exactly what happened: the ladder was written against a 250-rows-per-15-min
+// scheduler (~16.7h sweep, 24h SLA) where 48h was ~2x the sweep. The cron later became
+// `*/2 * * * *` -> `dev_refresh_tick(8, 20)` = 240 attempts/hour = a 53.0h sweep, and the
+// 48h constant did not follow. Measured 2026-09-15: all 25 `stale_data` ZIPs sat in a
+// 48.00h..51.94h band with ZERO outside it, and 25 of 25 carried
+// last_refresh_attempt_at > refreshed_at. The scheduler was healthy; the boundary was wrong.
+//
+// So the coupling is asserted rather than commented. This costs no extra query — the rows
+// already carry `last_refresh_attempt_at`. The OBSERVED sweep period is the oldest attempt
+// across the universe; a sweep that outgrows the window fails HERE, naming the scheduler,
+// instead of silently relabelling healthy ZIPs as stale one page at a time.
+const RECENT_ATTEMPT_WINDOW_H = 72;   // keep in sync with docs/coverage-state-model.sql
+const attemptAgesH = rows
+  .map(r => r.last_refresh_attempt_at ? (Date.now() - Date.parse(r.last_refresh_attempt_at)) / 3600000 : null)
+  .filter(a => a !== null && Number.isFinite(a));
+const neverAttempted = rows.filter(r => r.refreshed_at !== null && r.last_refresh_attempt_at === null);
+const observedSweepH = attemptAgesH.length ? Math.max(...attemptAgesH) : null;
+// A universe with no attempt timestamps at all cannot answer the question. Say so rather
+// than passing on an empty set — a vacuous check is not a check.
+if (observedSweepH === null) {
+  console.log('INFO sweep: no last_refresh_attempt_at anywhere — window coverage UNVERIFIED (nothing was measured)');
+} else {
+  ok(`coverage-pass: recent-attempt window (${RECENT_ATTEMPT_WINDOW_H}h) covers the observed sweep period`,
+     observedSweepH <= RECENT_ATTEMPT_WINDOW_H,
+     `observed sweep ${observedSweepH.toFixed(2)}h over ${attemptAgesH.length} ZIPs`
+     + ` — widen the window in docs/coverage-state-model.sql or speed the rolling refresh;`
+     + ` until they agree, healthy mid-sweep ZIPs are misreported as stale_data`);
+  console.log(`INFO sweep: observed period ${observedSweepH.toFixed(2)}h vs ${RECENT_ATTEMPT_WINDOW_H}h window`
+    + ` (${neverAttempted.length} report rows never attempted)`);
+}
+
 const staleRows = rows.filter(r => nz(r).core === 'stale_data');
+// Print the attempt-age band with the failure. A `stale_data` ZIP whose last attempt is
+// INSIDE the window is a genuine abandonment; one just OUTSIDE it is the boundary defect
+// above recurring. Without the band the two are indistinguishable in the log, and the
+// boundary case is the one that gets misfiled as a throughput problem.
+if (staleRows.length) {
+  const band = staleRows
+    .map(r => r.last_refresh_attempt_at ? (Date.now() - Date.parse(r.last_refresh_attempt_at)) / 3600000 : null)
+    .filter(a => a !== null && Number.isFinite(a));
+  const retried = staleRows.filter(r => r.last_refresh_attempt_at && r.refreshed_at
+    && Date.parse(r.last_refresh_attempt_at) > Date.parse(r.refreshed_at));
+  console.log(`INFO stale_data: ${staleRows.length} ZIP(s), attempt-age`
+    + (band.length ? ` ${Math.min(...band).toFixed(2)}h..${Math.max(...band).toFixed(2)}h` : ' unknown')
+    + `, ${retried.length} of them with an attempt NEWER than their last success`
+    + ` (if that count is high and the band hugs ${RECENT_ATTEMPT_WINDOW_H}h, this is the window, not abandonment)`);
+}
 ok('coverage-pass: zero unintentionally STALE ZIPs', staleRows.length === 0,
    staleRows.slice(0, 5).map(r => r.zip).join(','));
 ok('coverage-pass: every ZIP classified (full universe)', rows.length === metaCount && rows.length > 0);
@@ -207,7 +335,11 @@ for (const s of sample) {
 // The rendered `data-coverage-state` attribute carries whatever the view says, so the
 // expected value is read from the row rather than hardcoded — that is what lets one
 // rendering test cover both the pre-split and post-split shapes.
-const pickRow = (pred) => rows.find(pred);
+// A ZIP with a coverage panel (lib/zip-coverage.json, founder 2026-10-03) shows that panel
+// instead of its coverage-state copy, so it is never a render sample.
+const WH = await loadDeployedCoverage(SITE_BASE);
+console.log('ZIP coverage panels: ' + WH.note);
+const pickRow = (pred) => rows.find((r) => !WH.modes.has(r.zip) && pred(r));
 const rFacOnly = pickRow(r => nz(r).core === 'honestly_empty' && nz(r).overlay === 'overlay_records');
 // ⚠️ THE HONEST-EMPTY SAMPLE MUST MATCH THE PAGE'S OWN CONDITION, NOT ITS COMPLEMENT.
 // lib/community-page.js renders the "we checked every supported public source … including

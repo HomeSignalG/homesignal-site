@@ -1,0 +1,528 @@
+name: report-snapshot-suite
+
+# DURABLE REPORT SNAPSHOTS (docs/report-snapshot.sql; Development Activity plan Order F) and their
+# PRIVACY BOUNDARY (docs/report-private-context.sql; F2, founder decision 2026-09-29): the immutable
+# snapshot holds permanent intelligence only, and the customer-entered street address lives in a separate,
+# deletable private context that is purged 90 days after the last thing needing it (at once on a verified
+# privacy request).
+# Runs the SHIPPED SQL against a DISPOSABLE Postgres, twice over:
+#   1. the private layer — retention clock, purge in place, audit log, lock-down — then every prohibited
+#      mutation of that SQL, each of which MUST fail the suite;
+#   2. the snapshot — the database mints report_id, content_hash must be the SHA-256 of the stored body,
+#      the body is kept byte for byte, a snapshot is immutable, nothing private can enter it, purging the
+#      private context leaves it byte-identical; the exact Order F table that is live in production
+#      upgrades to a fresh-install shape (and is refused if a report is stored); then every prohibited
+#      mutation, each of which MUST fail the suite.
+#   3. the NATIONAL REPORT ENGINE (Order G): its real output, assembled for six subject addresses, is stored by the
+#      real snapshot module through the real writer, and every assertion is about what the database holds — one
+#      permanent report for six customers, no private value or fragment in it, the private layer holding exactly what
+#      was entered, a purge leaving the report byte-identical, and each kind of leak caught where it can be.
+#   4. the PURGE SCHEDULE (docs/report-private-context-purge-schedule.sql; Order F2 gate 5): the pg_cron job that runs
+#      the F2 purge batch every 15 minutes, and the alertable monitor check that pages when a private context is more
+#      than an hour past its purge date. Against a stand-in pg_cron and a stand-in monitor: the job and its schedule, the
+#      health read, every monitor outcome, the scheduled command purging exactly what is due, a check that cannot run
+#      failing instead of killing the monitor, an exact rollback, two refusals that arm nothing, and every prohibited
+#      mutation, each of which MUST fail the suite.
+#   5. CHANGES SINCE REPORT and FOLLOW (Order G follow-up; contract §6 gate 4): the real edge function handler and data layer,
+#      driven against the shipped ledger, reportable-events view, private layer and snapshot SQL. A report is assembled by the
+#      real engine and stored by the real writer; events are written; the reader answers "what changed since" while a Follow
+#      keeps the private context alive AND after the context is purged, byte-identically (for the same clock and ledger state); a
+#      purged context is named, not reopened; nothing private appears in any response; and the data layer touches only the four data
+#      relations it is allowed plus the gate's allow-list and user lookup and the two need functions. Not shipped, and stated: the
+#      transport is a PostgREST translator, the sign-in and allow-list are canned, and the failure TABLE under the source-health view
+#      and the roles are stand-ins (the view the reader queries is production's own, sliced from docs/dev-change-baseline.sql).
+#   6. the SHARE-LINK PRIMITIVE (docs/report-share.sql; Order J unit J1): an opaque, revocable, optionally expiring link to one
+#      stored report. The database holds only the SHA-256 of the token, decides in ONE function whether a link is usable
+#      (ACTIVE / EXPIRED / REVOKED / UNKNOWN, revoked beating expired, the report handed back only for ACTIVE), never changes an
+#      expiry and never undoes a revoke, and touches nothing of the snapshot or the private layer; a share survives a purge of
+#      its report's private context. Against the REAL snapshot and private-layer SQL: the checks, a second apply, the rollback
+#      with shares stored, the refusal without the snapshot table, and every prohibited mutation, each of which MUST fail a
+#      NAMED check of the suite (a mutation that only crashes it fails the run). No caller, no endpoint, no page.
+#   7. SHARE AND PDF (docs/report-share-delivery.sql; Development Activity build step 8): the layer that gives that primitive its
+#      owner, its caller and its lifetime. A member of the brokerage that owns a stored report makes a link that lasts 6 months, lists the
+#      report's links and revokes them; a client who holds a link reads the report. Against the REAL account spine, private layer,
+#      snapshot, entitlement, saved-reports and share-primitive SQL: the checks, two REAL concurrent sessions racing for a report's last
+#      place (exactly one wins), a create under REPEATABLE READ refused, a second apply, the rollback with shares stored, the refusal
+#      without the primitive, and every prohibited mutation, each of which MUST fail a NAMED check of the suite.
+#   8. THE WATCH (docs/property-watch.sql, docs/property-watch-schedule.sql; Development Activity build step 9): an agent watches the
+#      property of one of its brokerage's stored reports; a daily system job checks it and emails the agent when a nearby project's official
+#      status changes. Against the REAL account spine, private layer, snapshot, entitlement and saved-reports SQL: the watch layer's checks, two
+#      REAL concurrent sessions racing for a brokerage's last place under the limit of 25 (exactly one wins), two job runs claiming at once (disjoint),
+#      a start under REPEATABLE READ refused, a second apply, the rollback with watches stored (every follow need CLOSED), the refusal without
+#      the saved-reports functions and every prohibited mutation; then the schedule (the pg_cron job, the wrapper, the health read and the
+#      alertable monitor check) against stand-ins for pg_cron, pg_net, the vault and the monitor, with its own exact rollback, refusals and
+#      prohibited mutations. Each mutation MUST fail a NAMED check of the suite (a mutation that only crashes it fails the run).
+#   9. BILLING (docs/brokerage-billing.sql; Development Activity build step 11): the $79 a month plan's database layer, in its own job so its
+#      mutation loop does not share the first job's time. A processor subscription is bound to one brokerage, the plan state is derived from the
+#      payment ledger's latest live event, a paid brokerage's reports are charged to a 100-a-month allotment kept in its own append-only ledger (the
+#      cap is a CONSTRAINT), and the six readers that decide whose a report is read one view over both ledgers. Against the REAL account spine,
+#      private layer, snapshot, entitlement, saved-reports, share, watch, payment-event and header SQL: the checks, two REAL sessions racing for a
+#      month's 100th report, the same key sent twice at once, one subscription named for two brokerages at once, an issue under REPEATABLE READ
+#      refused, a second apply, the rollback with paid reports stored (the six readers put back to exactly their earlier definitions), the refusals
+#      when a layer or a splice anchor is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run).
+#  10. THE LAUNCH GATE (test/launch_gate_pg; Development Activity build step 13), in its own job: the plan's end-to-end sequence as ONE scenario, through the
+#      real handlers and data layers of development-activity-trial, get-development-activity-report, manage-billing and development-activity-billing-webhook,
+#      against the SHIPPED SQL of every layer the product stands on: sign-up (admin creates the trial, owner joins, owner invites an agent), ten free
+#      reports, the end of the trial, the owner's checkout, the processor's test payment (which grants nothing) and live payment (which binds the subscription
+#      to the brokerage and opens a month of 100), a hundred paid reports, the 101st refused, saved reports across both ledgers, another brokerage unable to
+#      read or take any of it, and a cancellation that ends new reports and deletes nothing. The payment processor is a stand-in that records what it was sent:
+#      NOTHING here reaches Lemon Squeezy, holds a real key or charges anyone, and the processor's field names are still the unconfirmed ones (see
+#      docs/development-activity-launch-gate-2026-10-04.md). Its mutation loop (test/launch_gate_mutants.py) is manual, like the other mutation loops.
+#  11. THE REPORT RATE LIMIT (docs/report-rate-limit.sql; launch-readiness, the carried open item "free-report rate limit"), in its own job: a ceiling on how
+#      many report REQUESTS a member and their brokerage may make in a minute, an hour and a day, counted by the DATABASE in fixed windows, serialised, with
+#      refused attempts consuming nothing. Against the REAL account spine and every entitlement and billing layer: applying it changes nothing they own (a
+#      fingerprint of everything else is identical), the checks at fixed instants (every window boundary, the longer wait named, an old clock unable to reopen a
+#      window, no email/address/IP stored, system-only), EIGHT real sessions racing one person's minute admit exactly ten and SIXTEEN real sessions across four
+#      people of one brokerage admit exactly thirty, a claim above READ COMMITTED refused, the API roles refused by the database, a second apply, an exact
+#      rollback, the refusal when a layer is absent, and every prohibited mutation, each of which MUST fail a NAMED check (a crash fails the run). The launch
+#      gate's section 15 then proves the same limit end to end through the real report handler. It touches neither the 10 free reports nor the 100 paid ones.
+# The offline halves (test/report-snapshot.test.mjs, test/report-snapshot-structure.test.mjs,
+# test/report-private-context-structure.test.mjs, test/report-private-context-purge-structure.test.mjs,
+# test/report-share.test.mjs, test/report-share-structure.test.mjs, test/report-share-delivery-structure.test.mjs,
+# test/share-link-functions.test.mjs, test/shared-report-page.test.mjs, test/property-watch-*.test.mjs,
+# test/national-report*.test.mjs) run in unit-tests.yml with every
+# other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever
+# address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-private-context-sequence-lockdown.sql'
+      - 'test/report_private_context_purge_pg/**'
+      - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
+      - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-private-context-structure.test.mjs'
+      - 'test/report-snapshot.test.mjs'
+      - 'supabase/functions/_shared/report-snapshot.ts'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
+      - 'test/dev_change_ledger_pg/fixture.sql'
+      - 'test/changes_since_report_pg/**'
+      - 'supabase/functions/_shared/changes-since-report.ts'
+      - 'supabase/functions/_shared/change-reads.ts'
+      - 'supabase/functions/_shared/service-rest.ts'
+      - 'supabase/functions/_shared/admin-gate.ts'
+      - 'supabase/functions/follow-development-report/**'
+      - 'docs/report-share.sql'
+      - 'test/report_share_pg/**'
+      - 'test/report-share-structure.test.mjs'
+      - 'test/report-share.test.mjs'
+      - 'supabase/functions/_shared/report-share.ts'
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
+      - 'test/trial_report_pg/**'
+      - 'test/evaluation_entitlement_pg/fixture.sql'
+      - 'docs/evaluation-entitlement.sql'
+      - 'docs/brokerage-account-spine.sql'
+      - 'supabase/functions/get-development-activity-report/**'
+      - 'supabase/functions/_shared/credit-rule.ts'
+      - 'supabase/functions/_shared/evaluation-reads.ts'
+      - 'supabase/functions/development-activity-trial/**'
+      - 'docs/report-share-delivery.sql'
+      - 'docs/saved-reports.sql'
+      - 'test/report_share_delivery_pg/**'
+      - 'test/report-share-delivery-structure.test.mjs'
+      - 'supabase/functions/_shared/share-reads.ts'
+      - 'supabase/functions/_shared/private-subject.ts'
+      - 'supabase/functions/manage-shared-report/**'
+      - 'supabase/functions/view-shared-report/**'
+      - 'docs/property-watch.sql'
+      - 'docs/property-watch-schedule.sql'
+      - 'test/property_watch_pg/**'
+      - 'test/property_watch_schedule_pg/**'
+      - 'test/property-watch-structure.test.mjs'
+      - 'test/property-watch-changes.test.mjs'
+      - 'test/property-watch-functions.test.mjs'
+      - 'test/property-watch-email.test.mjs'
+      - 'supabase/functions/_shared/property-watch.ts'
+      - 'supabase/functions/_shared/watch-reads.ts'
+      - 'supabase/functions/_shared/watch-email.ts'
+      - 'supabase/functions/_shared/email-send.ts'
+      - 'supabase/functions/_shared/report-run.ts'
+      - 'supabase/functions/_shared/report-reads.ts'
+      - 'supabase/functions/manage-property-watch/**'
+      - 'supabase/functions/run-property-watch/**'
+      - 'docs/brokerage-billing.sql'
+      - 'docs/payment-event-ledger.sql'
+      - 'docs/report-header.sql'
+      - 'test/brokerage_billing_pg/**'
+      - 'test/launch_gate_pg/**'
+      - 'test/launch-gate-structure.test.mjs'
+      - 'docs/report-rate-limit.sql'
+      - 'test/report_rate_limit_pg/**'
+      - 'test/report-rate-limit-structure.test.mjs'
+      - 'test/report-rate-limit-function.test.mjs'
+      - 'supabase/functions/_shared/rate-reads.ts'
+      - 'test/billing-structure.test.mjs'
+      - 'test/billing-functions.test.mjs'
+      - 'test/lemon-billing.test.mjs'
+      - 'supabase/functions/_shared/billing-reads.ts'
+      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/manage-billing/**'
+      - 'supabase/functions/development-activity-billing-webhook/**'
+      - '.github/workflows/report-snapshot-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/report-snapshot.sql'
+      - 'docs/report-private-context.sql'
+      - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-private-context-sequence-lockdown.sql'
+      - 'test/report_private_context_purge_pg/**'
+      - 'test/report_snapshot_pg/**'
+      - 'test/report_private_context_pg/**'
+      - 'test/report-snapshot-structure.test.mjs'
+      - 'test/report-private-context-structure.test.mjs'
+      - 'test/report-snapshot.test.mjs'
+      - 'supabase/functions/_shared/report-snapshot.ts'
+      - 'test/national_report_pg/**'
+      - 'supabase/functions/_shared/national-report.ts'
+      - 'supabase/functions/_shared/project-type.generated.js'
+      - 'supabase/functions/_shared/report-rights.json'
+      - 'test/dev_change_ledger_pg/fixture.sql'
+      - 'test/changes_since_report_pg/**'
+      - 'supabase/functions/_shared/changes-since-report.ts'
+      - 'supabase/functions/_shared/change-reads.ts'
+      - 'supabase/functions/_shared/service-rest.ts'
+      - 'supabase/functions/_shared/admin-gate.ts'
+      - 'supabase/functions/follow-development-report/**'
+      - 'docs/report-share.sql'
+      - 'test/report_share_pg/**'
+      - 'test/report-share-structure.test.mjs'
+      - 'test/report-share.test.mjs'
+      - 'supabase/functions/_shared/report-share.ts'
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
+      - 'test/trial_report_pg/**'
+      - 'test/evaluation_entitlement_pg/fixture.sql'
+      - 'docs/evaluation-entitlement.sql'
+      - 'docs/brokerage-account-spine.sql'
+      - 'supabase/functions/get-development-activity-report/**'
+      - 'supabase/functions/_shared/credit-rule.ts'
+      - 'supabase/functions/_shared/evaluation-reads.ts'
+      - 'supabase/functions/development-activity-trial/**'
+      - 'docs/report-share-delivery.sql'
+      - 'docs/saved-reports.sql'
+      - 'test/report_share_delivery_pg/**'
+      - 'test/report-share-delivery-structure.test.mjs'
+      - 'supabase/functions/_shared/share-reads.ts'
+      - 'supabase/functions/_shared/private-subject.ts'
+      - 'supabase/functions/manage-shared-report/**'
+      - 'supabase/functions/view-shared-report/**'
+      - 'docs/property-watch.sql'
+      - 'docs/property-watch-schedule.sql'
+      - 'test/property_watch_pg/**'
+      - 'test/property_watch_schedule_pg/**'
+      - 'test/property-watch-structure.test.mjs'
+      - 'test/property-watch-changes.test.mjs'
+      - 'test/property-watch-functions.test.mjs'
+      - 'test/property-watch-email.test.mjs'
+      - 'supabase/functions/_shared/property-watch.ts'
+      - 'supabase/functions/_shared/watch-reads.ts'
+      - 'supabase/functions/_shared/watch-email.ts'
+      - 'supabase/functions/_shared/email-send.ts'
+      - 'supabase/functions/_shared/report-run.ts'
+      - 'supabase/functions/_shared/report-reads.ts'
+      - 'supabase/functions/manage-property-watch/**'
+      - 'supabase/functions/run-property-watch/**'
+      - 'docs/brokerage-billing.sql'
+      - 'docs/payment-event-ledger.sql'
+      - 'docs/report-header.sql'
+      - 'test/brokerage_billing_pg/**'
+      - 'test/launch_gate_pg/**'
+      - 'test/launch-gate-structure.test.mjs'
+      - 'docs/report-rate-limit.sql'
+      - 'test/report_rate_limit_pg/**'
+      - 'test/report-rate-limit-structure.test.mjs'
+      - 'test/report-rate-limit-function.test.mjs'
+      - 'supabase/functions/_shared/rate-reads.ts'
+      - 'test/billing-structure.test.mjs'
+      - 'test/billing-functions.test.mjs'
+      - 'test/lemon-billing.test.mjs'
+      - 'supabase/functions/_shared/billing-reads.ts'
+      - 'supabase/functions/_shared/lemon-billing.ts'
+      - 'supabase/functions/manage-billing/**'
+      - 'supabase/functions/development-activity-billing-webhook/**'
+      - '.github/workflows/report-snapshot-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      # 22, not the runner's default: the national report round trip imports the real TypeScript modules
+      # (report-snapshot.ts, national-report.ts), and Node strips types on import from 22.18 — the same pin unit-tests.yml uses.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The private context passes; it applies twice; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpc.log
+      - name: The event counter is closed to the API roles; a later sequence on the layer is too; an unrelated one is untouched; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_pg/sequence_lockdown.sh 2>&1 | grep -v NOTICE | tee /tmp/rpcseq.log
+      - name: The shipped snapshot passes; it applies twice; the Order F table upgrades; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_snapshot_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rs.log
+      - name: The national report engine's real output goes through the real writer
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/national_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/nr.log
+      - name: The purge schedule and its monitor check pass; the file applies twice and rolls back exactly; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log
+      - name: Changes Since Report and Follow run end to end; the answer is the same while the context is kept and after it is purged
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/changes_since_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/csr.log
+      - name: The share-link primitive passes; it applies twice and rolls back exactly; it touches nothing it depends on; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_share_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsh.log
+      - name: Creating a trial (admins only), joining it and making trial reports go through the real handlers, data layers, snapshot module and evaluation SQL; charged once, never twice, refused when used up
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/trial_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/trial.log
+      - name: A brokerage's member makes a 6-month link to its own stored report, lists and revokes it; a client who holds it reads the report; two sessions racing for the last place cannot both have it; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_share_delivery_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsd.log
+      - name: The Watch passes; two sessions racing for a brokerage's last place cannot both have it; two job runs never take the same watch; the rollback closes every follow need; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/property_watch_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pw.log
+      - name: The Watch's schedule, wrapper, health read and monitor check pass; the file applies twice and rolls back exactly; it is refused when what it stands on is missing; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/property_watch_schedule_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pws.log
+
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Billing passes; two sessions racing for the 100th report of a month cannot both have it; one key is charged once; a subscription belongs to one brokerage; the file applies twice and rolls back exactly with paid reports stored; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/brokerage_billing_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/billing.log
+
+  report-rate-limit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The report rate limit passes; real sessions racing a minute admit exactly the ceiling; applying it changes nothing the entitlement owns; it applies twice and rolls back exactly
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_rate_limit_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/report-rate-limit.log
+      - name: Every prohibited mutation of the rate limit is killed by a named check
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_rate_limit_pg/mutate_all.sh 2>&1 | grep -v NOTICE | tee /tmp/report-rate-limit-mutations.log
+
+  launch-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential, processor key or signing secret is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}${LEMON_SQUEEZY_API_KEY:-}${LEMON_SQUEEZY_WEBHOOK_SECRET:-}" ]; then
+            echo "ABORT: this gate must only ever address the disposable container and a stand-in processor."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      # 22, not the runner's default: the round trip imports the real TypeScript handlers and modules, and Node strips types on import from 22.18
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The launch gate - sign-up, ten free reports, the end of the trial, checkout, payment, a hundred paid reports, the 101st refused, cancellation - through the real handlers and the shipped SQL
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/launch_gate_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/launch-gate.log

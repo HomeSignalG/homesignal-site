@@ -23,6 +23,8 @@
 // Project Details" pages (PROJECT / OWNER / TENANT / DESIGN FIRM sections with
 // "Label:  Value" rows). Confirm against PIN_FIXTURES before first live run.
 
+import { fenceGeocode, filedZipOf, noteFenceOutcome } from "./geo-fence.ts";
+
 // ───────────────────────────── types ─────────────────────────────
 
 /** Extended site shape (§4.1 of the case-study doc) — additive over the v15 contract. */
@@ -89,6 +91,12 @@ export interface TabsDeps {
   geocode: (address: string) => Promise<
     { lat: number; lng: number; match_type?: string; matched_address?: string | null; geocode_source?: string; needs_review?: boolean } | null
   >;
+  /** Report ZIP centroid — the distance half of the shared geofence. */
+  zipCentroid?: { lat: number; lng: number } | null;
+  /** Report ZIP — filed ZIP for the shared geofence when the location line has none. */
+  reportZip?: string | null;
+  /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
+  noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
   /** Polite delay between registry requests, ms. Default 1200. */
   delayMs?: number;
   /** Optional pinned search executor (set only after PIN_SEARCH exists). */
@@ -272,6 +280,13 @@ async function normalize(
   const geo = await deps.geocode(p.location_addr);
   if (!geo) return { error: `geocode failed for "${p.location_addr}"` };
 
+  // Shared geofence (anti-fabrication). TABS is point-scope: a rejected geocode is
+  // quarantined, never demoted to a synthetic area placement.
+  const filedZip = filedZipOf(p.location_addr.match(/\b(\d{5})\b/)?.[1], deps.reportZip || null);
+  const verdict = fenceGeocode(geo, filedZip, deps.zipCentroid);
+  await noteFenceOutcome(deps.noteFence, p.location_addr, verdict);
+  if (!verdict.ok) return { error: verdict.reason };
+
   const site: TabsSite = {
     label: p.project_name || p.facility_name || p.project_no,
     scope: "point",
@@ -417,7 +432,7 @@ export async function tabsForZip(
   const quarantined: Quarantined[] = [];
   for (const pins of Object.values(pinsByCounty)) {
     if (!counties.has(pins.county.trim().toLowerCase())) continue;
-    const r = await refreshByRegistry(pins.project_nos, deps);
+    const r = await refreshByRegistry(pins.project_nos, { ...deps, reportZip: deps.reportZip ?? zip });
     for (const s of r.sites) {
       if ((s.location_addr || "").includes(zip)) sites.push(s);
       else quarantined.push({ project_no: s.project_no, reason: `outside ZIP ${zip} (filed location: ${s.location_addr})` });

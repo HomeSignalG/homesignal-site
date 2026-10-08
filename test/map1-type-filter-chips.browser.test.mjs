@@ -27,6 +27,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -45,10 +46,14 @@ const srv = createServer(async (q, s) => {
 await new Promise(r => srv.listen(8819, '127.0.0.1', r));
 const base = 'http://127.0.0.1:8819';
 
-// ── FIXTURES: four project types across two stages, plus one EPA facility ───────────
+// ── FIXTURES: four project types across two stages, plus one UNMAPPED EPA facility ──
+// The EPA record has no classifiable class field (no layer / use_type), so it stays
+// the standalone purple square. Classifiable EPA (Type shape + R) is pinned by the
+// overlay suites; this suite needs a regulatory pin that is independent of the Type
+// row — hidden when Regulatory is off, still drawn when every Type chip is off.
 const FACILITY = { e: 1.482, n: 1.664, lat: 38.94932, lng: -77.36519,
-  src: 'EPA FRS · registry 110071955663', type: 'built', label: 'CORESITE - VA1 DATA CENTER',
-  layer: 'industrial', scope: 'point', registry_id: '110071955663',
+  src: 'EPA FRS · registry 110071955663', type: 'built', label: 'GENERIC EPA SITE 99',
+  scope: 'point', registry_id: '110071955663',
   record_url: 'https://echo.epa.gov/detailed-facility-report?fid=110071955663' };
 
 const mk = (n, ref, name, type, status) => ({
@@ -70,7 +75,9 @@ const ZIP_ROW = { '20171': [{ zip: '20171', home_lat: 38.9506, home_lng: -77.364
   refreshed_at: '2026-09-07T00:00:00Z', facilities_unavailable: false }] };
 const COMMUNITIES = { '20171': [{ name: 'Herndon (20171)', level: 'zip', county: 'Fairfax', state: 'VA' }] };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];
@@ -86,6 +93,7 @@ await page.route('**/*', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(ZIP_AUTH[z] || { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null }) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
   if (url.includes('/rest/v1/communities'))
@@ -186,9 +194,12 @@ ok(!legacy.btn && !legacy.menu && !legacy.showTypes && legacy.sh === 0,
 
 // ── 2. TOGGLING ONE TYPE MOVES ONLY THAT TYPE ───────────────────────────────────────
 const V0 = await visible();
+// ⚖️ 2026-09-15: the untyped EPA fixture no longer draws a pin of its own — a record
+// matching no Type has no base pin, and regulatory annotates pins rather than sourcing
+// them. The Type pins this section is actually about are unchanged.
 ok(has(V0, /data center/) === 1 && has(V0, /industrial/) === 1 && has(V0, /commercial/) === 1
-   && has(V0, /regulated facility/) === 1,
-  '2: setup — one pin per project type, plus the EPA facility on its own', V0.join(' / '));
+   && has(V0, /regulated facility/) === 0,
+  '2: setup — one pin per project type; the untyped EPA record draws none', V0.join(' / '));
 await clickType('data_center');
 const V1 = await visible();
 ok(has(V1, /data center/) === 0, '2: unchecking Data center removes the Data center pin');
@@ -248,8 +259,12 @@ ok((await chips()).every(c => !c.checked), '6: nothing was silently re-enabled')
 // ── 7. REGULATORY IS INDEPENDENT OF TYPE ────────────────────────────────────────────
 ok(await page.evaluate(() => !!document.getElementById('regToggleBox').checked),
   '7: the Regulatory chip is untouched by every Type going off');
-ok((await visible()).length > 0,
-  '7: ...and the regulatory overlay is STILL DRAWN with no project type selected', (await visible()).join(' / '));
+// ⚖️ INVERTED 2026-09-15. "Independent" now means the switch does not decide base pins in
+// EITHER direction: with no Type selected the map is empty, and the Regulatory chip stays
+// checked and clickable while drawing nothing. The chip assertion above is the live half.
+ok((await visible()).length === 0,
+  '7: ...and with no project type selected NOTHING is drawn — the switch adds no pin',
+  (await visible()).join(' / '));
 await setReg(false);
 ok((await visible()).length === 0, '7: with regulatory off as well, the map is genuinely empty');
 await setReg(true);

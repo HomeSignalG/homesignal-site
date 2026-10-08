@@ -91,7 +91,7 @@ if (MAP.configured_zips.includes('21204'))  failures.push('containment: Baltimor
 const page = readFileSync(join(root, 'community.html'), 'utf8');
 const renderer = readFileSync(join(root, 'lib/community-page.js'), 'utf8');
 if (!/<script[^>]+src=["']lib\/gov-notice-copy\.js["']/.test(page)) failures.push('wiring: community.html does not load lib/gov-notice-copy.js');
-if (!/<script[^>]+src=["']lib\/community-page\.js["']/.test(page)) failures.push('wiring: community.html does not load lib/community-page.js');
+if (!/<script[^>]+src=["']lib\/community-page\.js(?:\?v=[a-f0-9]+)?["']/.test(page)) failures.push('wiring: community.html does not load lib/community-page.js');
 if (page.indexOf('lib/gov-notice-copy.js') > page.indexOf('lib/community-page.js')) failures.push('wiring: gov-notice-copy.js must load BEFORE community-page.js, which calls it');
 if (!renderer.includes('HS.govNoticeCopy.build(')) failures.push('wiring: lib/community-page.js never calls build()');
 if (!/fetch\(['"]lib\/generated\/gov-notice-coverage\.json['"]\)/.test(renderer)) failures.push('wiring: lib/community-page.js never fetches the coverage map');

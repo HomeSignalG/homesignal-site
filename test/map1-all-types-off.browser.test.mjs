@@ -26,6 +26,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const require = createRequire(import.meta.url);
 
 let fails = 0;
@@ -98,7 +99,9 @@ const COMMUNITIES = {
   '20173': [{ name: 'Herndon (20173)', level: 'zip', county: 'Fairfax', state: 'VA' }]
 };
 
-const browser = await chromium.launch();
+const launchOpts = { args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+if (process.env.HS_CHROME) launchOpts.executablePath = process.env.HS_CHROME;
+const browser = await chromium.launch(launchOpts);
 const ctx = await browser.newContext();
 const page = await ctx.newPage();
 const pageErrors = [];
@@ -114,6 +117,7 @@ await page.route('**/*', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(ZIP_AUTH[z] || { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null }) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
   if (url.includes('/rest/v1/communities'))
@@ -198,19 +202,17 @@ const txt = await page.textContent('#mapkeyEmpty');
 ok(/no project types are selected/i.test(txt) && /select all types/i.test(txt),
   '4: the note names the control and carries the way back', txt.trim().replace(/\s+/g, ' '));
 
-// ── 4b. EVERY TYPE OFF BUT REGULATORY ON IS NOT AN EMPTY MAP ─────────────────────────
-// The note must not claim emptiness over a map that is still drawing regulatory records.
+// ── 4b. EVERY TYPE OFF IS AN EMPTY MAP, WHATEVER THE SWITCH SAYS ────────────────────
+// ⚖️ SUPERSEDED 2026-09-15 (was: "…IS NOT AN EMPTY MAP"). Regulatory is always an
+// independent overlay, so it cannot draw a record under no selected Type. With every Type
+// off the map is genuinely empty and the note's plain claim is true again.
 await setReg(true);
-ok((await pins()) === 2,
-  '4b: all Types off + regulatory ON -> the two regulatory records are still drawn', await pins());
-// ⚖️ THE NOTE'S CLAIM CHANGED, so this assertion inverts — deliberately, not by accident.
-// It used to assert "the map is empty", which is FALSE here (regulatory records are still
-// drawn), so it had to stay silent. It now reports the CONTROL's own state, "No project
-// types are selected", which is TRUE here and stays true whatever else the map is drawing.
-ok(await noteShown(), '4b: ...and the note still fires, because it reports the CONTROL, not emptiness');
+ok((await pins()) === 0,
+  '4b: all Types off + regulatory ON -> nothing is drawn; the switch sources no pin', await pins());
+ok(await noteShown(), '4b: ...and the note fires, reporting the CONTROL the resident touched');
 const v4b = await verify();
-ok(v4b.allTypesOff === true && v4b.regulatoryOn === true && v4b.visibleMarkers === 2,
-  '4b: every Type is still off — the switch did not turn any of them back on',
+ok(v4b.allTypesOff === true && v4b.regulatoryOn === true && v4b.visibleMarkers === 0,
+  '4b: every Type is still off, the switch is still on, and nothing came back',
   JSON.stringify({ allTypesOff: v4b.allTypesOff, reg: v4b.regulatoryOn, visible: v4b.visibleMarkers }));
 
 // ── 5. RE-ENABLE ONE TYPE -> NOTE GONE, RECORDS BACK ─────────────────────────────────

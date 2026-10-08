@@ -28,6 +28,7 @@ import io
 import json
 import os
 import re
+import socket
 import struct
 import sys
 import time
@@ -137,9 +138,17 @@ _SQL_WRITE_RE = re.compile(r"(?<![a-z_])(" + "|".join(SQL_WRITE_WORDS) + r")(?![
                            re.IGNORECASE)
 
 
+#: A standard single-quoted SQL literal, '' being the escaped quote. Literal CONTENT is data,
+#: never executed, so the scan below ignores it: publisher keys are not SQL, and the live key
+#: 'arcgis:centre-county-pa-building-permits:Call In R Fi' read as the verb CALL and crashed a
+#: shard (audit 2026-09-25). Dollar-quoted bodies are deliberately NOT stripped - they are
+#: code (a DO body), and DO is itself refused.
+_SQL_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
+
+
 def assert_read_only(query, tag=""):
     """Raise unless the statement is one whose re-execution changes nothing."""
-    m = _SQL_WRITE_RE.search(query)
+    m = _SQL_WRITE_RE.search(_SQL_LITERAL_RE.sub("''", query))
     if m:
         raise SystemExit(
             "STOP: sql(read_only=True) refused - %s carries the write word %r at "
@@ -160,7 +169,22 @@ class SQLPayloadTooLarge(Exception):
     """
 
 
-def sql(query, tag="", raise_413=False, read_only=False):
+#: Front-of-origin timeouts: the gateway gave up waiting, the origin may still be working.
+SQL_GATEWAY_TIMEOUT_STATUS = (502, 504, 520, 522, 524)
+
+
+class SQLGatewayTimeout(SystemExit):
+    """The response was lost in FRONT of the origin; the statement's outcome is UNKNOWN.
+
+    Raised only when a caller passes gateway_unknown=True. The Supabase API gateway cuts a
+    request at 120 s (HTTP 524, measured 2026-09-26 on geo.n5_gen_prepare_publish) while the
+    database keeps executing and commits. A caller that opts in must then PROVE the outcome
+    from database state - it never re-sends the write. It subclasses SystemExit so any caller
+    that does not handle it still stops, exactly as before.
+    """
+
+
+def sql(query, tag="", raise_413=False, read_only=False, timeout=900, gateway_unknown=False):
     if read_only:
         assert_read_only(query, tag)
     retryable = SQL_RETRY_STATUS_READONLY if read_only else SQL_RETRY_STATUS
@@ -172,11 +196,17 @@ def sql(query, tag="", raise_413=False, read_only=False):
             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
                      "Accept": "application/json", "User-Agent": UA}, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=900) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
+        except (TimeoutError, socket.timeout) as e:
+            if gateway_unknown and not read_only:
+                raise SQLGatewayTimeout(f"{tag}: client wait expired - outcome unknown ({e})")
+            raise
         except urllib.error.HTTPError as e:
             if e.code == 413 and raise_413:
                 raise SQLPayloadTooLarge(f"{tag}: {len(query)} chars refused as 413")
+            if gateway_unknown and not read_only and e.code in SQL_GATEWAY_TIMEOUT_STATUS:
+                raise SQLGatewayTimeout(f"{tag}: HTTP {e.code} - response lost, outcome unknown")
             if e.code not in retryable or attempt == SQL_MAX_ATTEMPTS:
                 raise SystemExit(
                     f"STOP: SQL {tag} failed HTTP {e.code} on attempt {attempt}\n"
@@ -190,6 +220,47 @@ def sql(query, tag="", raise_413=False, read_only=False):
             say(f"SQL {tag} HTTP {e.code} - retry {attempt}", f"waiting {wait:g}s")
             time.sleep(wait)
     raise SystemExit(f"STOP: SQL {tag} exhausted {SQL_MAX_ATTEMPTS} attempts")
+
+
+#: Seconds between checks for a statement whose response the gateway lost.
+PROVEN_POLL_S = 20
+
+
+def _statement_running(marker):
+    rows = sql("select count(*) n from pg_stat_activity where pid <> pg_backend_pid() "
+               f"and state <> 'idle' and position({lit(marker)} in query) > 0;",
+               "proven poll", read_only=True)
+    return int(rows[0]["n"])
+
+
+def sql_proven(query, tag, verify, timeout=900, max_wait=2400, say=print):
+    """Run ONE write whose outcome is proven from database state if the gateway loses it.
+
+    The Management API gateway cuts a request at 120 s (HTTP 524) while the database keeps
+    executing and commits (measured 2026-09-26: prepare, and publish of dense prefix 100).
+    On a lost response this waits for the tagged statement to leave pg_stat_activity, then
+    runs `verify` - a read-only SQL returning one row with a boolean `ok`. Met -> returns
+    None; not met -> stops. The write is NEVER sent twice. With verify=None a lost
+    response stays fatal, exactly as sql() behaves.
+    """
+    marker = f"n5proven:{tag}:{os.getpid()}:{int(time.time() * 1000)}"
+    body = f"/* {marker} */ " + query
+    try:
+        return sql(body, tag, timeout=timeout, gateway_unknown=verify is not None)
+    except SQLGatewayTimeout as e:
+        say(f"{tag}: response lost ({e}); waiting for the statement to finish on the server")
+    deadline = time.time() + max_wait
+    while _statement_running(marker):
+        if time.time() > deadline:
+            raise SystemExit(f"STOP: {tag} still running on the server after {max_wait}s - "
+                             "outcome unknown, not re-sent")
+        time.sleep(PROVEN_POLL_S)
+    row = sql(verify, f"{tag} verify", read_only=True)[0]
+    if not row.get("ok"):
+        raise SystemExit(f"STOP: {tag} response was lost and its post-condition is NOT met "
+                         f"({row}); the statement failed or rolled back - not re-sent.")
+    say(f"{tag}: post-condition verified from the database: {row}")
+    return None
 
 
 def http(url, params=None, method="GET", timeout=TIMEOUT):

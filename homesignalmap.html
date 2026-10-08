@@ -22,7 +22,29 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css"/>
 <!-- Shared shell stylesheet FIRST, so the page's map-specific inline CSS below still wins where it overrides. -->
-<link rel="stylesheet" href="app.css"/>
+<!-- EMBED MODE (?embed=1) — Place Context Maps. A Place page (property.html, the ZIP
+     runtime) iframes THIS document same-origin so the map a resident sees on a Place is
+     Map 1 itself: Map 1's pins, Map 1's type/status/regulatory rows, Map 1's writers.
+     There is no second widget and no extracted module.
+
+     THE CLASS IS SET HERE, IN THE HEAD, BEFORE shell.js RUNS AND BEFORE THE FIRST PAINT.
+     shell.js injects the sidebar and top bar; setting the class from the page runtime
+     (inside HS.onReady) would flash the full chrome inside the iframe first. This is the
+     only place in the document that can be earlier than the chrome it hides. -->
+<script>
+(function(){
+  try {
+    var q = new URL(window.location.href).searchParams;
+    if (q.get("embed") === "1") {
+      document.documentElement.classList.add("hs-embed");
+      // PREVIEW (?embed=1&preview=1) — the homepage's sample map. Layout only: see the
+      // .hs-embed.hs-preview rules below. Never set without embed=1.
+      if (q.get("preview") === "1") document.documentElement.classList.add("hs-preview");
+    }
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="app.css?v=031bef8e"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -81,6 +103,26 @@
      field takes free-form text, so no address SHAPE is demanded here (the same reason the
      no-match copy suggests a city or ZIP rather than prescribing a triple). */
   .search-err{font-size:12.5px;color:var(--violation);margin-top:6px}
+
+  /* "What is changing in my zip code?" — the email sign-up for this ZIP's Bluesky MAPS
+     posts (founder, 2026-09-25). ZIP mode only: an address search is about a home, not a
+     ZIP, and zipmode is the class the page already uses to say which one it is showing.
+     It lives inside .head, so the Place-page embed hides it with the rest of the hero. */
+  /* No width cap: the consent line (~660px at 12.5px) fits on ONE line on desktop (founder,
+     2026-09-26). The old 640px cap wrapped "anytime." onto a second line. It still wraps
+     where the screen is narrower than the sentence, so a phone never scrolls sideways. */
+  .zip-email{display:none;margin:16px 0 4px}
+  body.zipmode .zip-email{display:block}
+  .zip-email-btn{min-height:44px;padding:11px 18px;border:0;border-radius:11px;
+    background:var(--green);color:#fff;font-family:var(--font);font-size:15px;font-weight:700;
+    cursor:pointer}
+  .zip-email-btn:hover{background:var(--green-dark)}
+  .zip-email-btn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
+  .zip-email-btn:disabled{cursor:default;opacity:.7}
+  .zip-email-btn.on{background:#fff;color:var(--green);border:1px solid var(--line);opacity:1}
+  .zip-email-note{font-size:12.5px;color:var(--soft);margin-top:7px}
+  .zip-email-msg{font-size:12.5px;color:var(--violation);margin-top:4px}
+  .zip-email-msg:empty{display:none}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -225,15 +267,29 @@
   .band-h.t-built{background:#00893a}
   .band-h.t-approved{background:#2563EB}
   .band-h.t-proposed{background:#E2772F}
+  /* Lifecycle unknown — the legend's own neutral (HS.LIFECYCLE_HEX.unknown / statusHex.onfile). */
+  .band-h.t-unknown{background:#706468}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
   .rec{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
   .rec .t{font-weight:600;font-size:14px}
   .rec .s{font-size:12.5px;color:var(--soft)}
   .rec .decidedtag{font-weight:700;color:var(--mute)}
+  /* DECISION NOTATION (2026-09-20 contract). A denied application stays in the Proposed
+     rail, so its ruling has to be readable at a glance or the rail implies the ruling
+     never happened. It is a block on its own line, not an inline muted chip, and it is
+     NOT communicated by colour alone — the outcome word is always present in the text. */
+  .rec .decnote{margin-top:3px;font-weight:700;color:#9a2f2f}
+  .rec .decnote .decsrc{font-weight:600}
+  .rec .decunv{margin-top:2px;font-size:11px;color:#5d6f72}
+  .popdec{margin-top:4px;font-weight:700;color:#9a2f2f}
+  .popdec .decsrc{font-weight:600}
+  .popunv{margin-top:2px;font-size:11px;color:#5d6f72}
+  .band-s .histnote{display:block;margin-top:2px;color:#5d6f72}
   .rec .vflag{display:inline-block;margin-top:4px;font-size:11px;color:var(--violation);
     background:#fdecec;border:1px solid #f5c9c9;border-radius:6px;padding:2px 7px}
   .empty{color:var(--mute);font-size:13px;padding:12px 0}
+  .listmore{color:var(--mute);font-size:12.5px;padding:8px 0 2px}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
 
@@ -302,12 +358,12 @@
   /* A radius needs an address-derived HOME centre. ZIP mode has none, so the control is not
      offered there - showing it would invite a circle around a ZIP centre. */
   body.zipmode .radsel{display:none}
-  /* "From home" re-frames the 3D view around the resident's HOME. In ZIP mode there IS no
-     home - a ZIP centroid is a page anchor, not somebody's house - so the control promises a
-     place the page cannot show. Written fail-closed (hidden unless `hashome` is set by a real
-     address search) rather than "hidden in zipmode", so any future no-HOME state inherits the
-     correct behaviour instead of leaking the control. Same standard the radius control already
-     applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED HOME CENTRE." */
+  /* "From this place" re-frames the 3D view around the searched ADDRESS. In ZIP mode there
+     is no address pin - a ZIP centroid is a page anchor, not a saved place - so the control
+     promises a place the page cannot show. Written fail-closed (hidden unless `hashome` is
+     set by a real address search) rather than "hidden in zipmode", so any future no-address
+     state inherits the correct behaviour instead of leaking the control. Same standard the
+     radius control already applies: "A RADIUS REQUIRES AN ADDRESS-DERIVED CENTRE." */
   body:not(.hashome) #homeViewBtn{display:none}
   .radsel .rlbl{font-size:11.5px;color:var(--mute);font-weight:600;margin-right:2px}
   .radsel button{border:1px solid var(--line);background:#f7faf8;font:600 12px var(--font);color:var(--soft);
@@ -476,15 +532,113 @@
   .mapcaption{font-size:12px;color:var(--soft);margin-top:8px;line-height:1.5}
   .mapcaption .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:middle;
     margin:0 3px 0 9px;border:1px solid rgba(0,0,0,.15)}
+
+  /* ===================== EMBED MODE — the hide list ===================== */
+  /* WHAT SURVIVES, and it is the whole point: the map canvas and the three FILTER ROWS,
+     with their existing map key. Those rows are the same DOM ids the full page builds
+     (#mapkey, #mapkeyShapes, #mapkeyReg) driven by the same writers (HS.setCategoryFilter,
+     the stage writer, HS.regulatoryVisible) — CSS hides chrome, it does not re-create a
+     control. Nothing here is a decorative chip.
+
+     CSS ALONE IS SUFFICIENT — shell.js is NOT forked. The one thing display:none cannot
+     do by itself is collapse the sidebar's grid COLUMN, because .app is
+     `grid-template-columns: var(--sidebar) 1fr`, so a hidden #hs-side would still reserve
+     its track and the map would sit in a narrow right-hand column. One extra rule fixes
+     that, which is why no shell change is needed. */
+  .hs-embed .app{grid-template-columns:1fr}
+  .hs-embed #hs-side,
+  .hs-embed #hs-top,
+  .hs-embed .sidebackdrop{display:none !important}
+  /* The page's own chrome: hero, the ADDRESS SEARCH FORM (an embed is anchored to the
+     Place that hosts it — a search box inside it would navigate the iframe away from the
+     Place), and the status line. */
+  .hs-embed .wrap>.head,
+  .hs-embed .wrap>.status{display:none !important}
+  /* Everything below the map: the counters card, the built/approved/proposed bands, the
+     civic band, the Development tracker and its notices, the footer, and the #property
+     dossier. The Place page carries its own copy of this material; the iframe is a MAP. */
+  .hs-embed .grid.stacked>.card.read,
+  .hs-embed .results>.grid.band,
+  .hs-embed .results>.card.read.band,
+  .hs-embed .results>.devtracker,
+  .hs-embed .results>.foot,
+  .hs-embed #property{display:none !important}
+  /* 3D is out of scope for a Place embed, so its controls AND its two canvases go: with
+     #viewSeg hidden there is no way to reach them, and hiding the canvases means a stale
+     one can never sit over the 2D map. */
+  .hs-embed #viewSeg,
+  .hs-embed #map3d,
+  .hs-embed #mapgl{display:none !important}
+  /* THE RADIUS PICKER IS HIDDEN BECAUSE THE EMBED'S RADIUS IS FIXED AT 2 BY THE HOST URL.
+     A visible picker would offer to change a geography the Place page has already stated
+     in its own copy. */
+  .hs-embed #radSel{display:none !important}
+  /* The iframe supplies the frame, so the page inside it drops its own page padding and
+     card chrome — otherwise a Place shows a card inside a card inside a card. */
+  .hs-embed .wrap{padding:0;max-width:none}
+  .hs-embed .card.mapcard{border:0;border-radius:0;box-shadow:none;margin:0}
+  .hs-embed .results{margin:0}
+  .hs-embed body{background:var(--panel)}
+  /* ── THE EMBED IS A FIXED FRAME, SO THE CARD FITS THE FRAME INSTEAD OF OVERFLOWING IT ──
+     MEASURED DEFECT (2026-09-15, reported from a live ZIP page): `.map-frame` is a hard
+     600px and the filter panel is 288px tall at desktop widths (412px at 390px wide), so
+     the embed document stood 957px tall inside a 520px iframe — 437px of overflow, on
+     EVERY embed, at every width. The panel sits ABOVE the map, so the panel was the half
+     that left: Leaflet focuses its own container on any interaction (a zoom click, a
+     marker click), the browser scrolls that 600px container into view, and the document
+     scrolled from 0 to 343 — exactly `.map-frame`'s offset — taking STATUS / PROJECT TYPE
+     / REGULATORY out of the frame. Zoom-out did NOT bring it back, and the next click
+     re-hid it, so the controls read as gone.
+
+     The fix is geometric, and it is scoped to the embed: the card becomes a flex column
+     exactly one frame tall, and the map takes whatever the panel does not. With no
+     document overflow there is nothing to scroll, so no focus-scroll can move the panel
+     out of view. `overflow:hidden` is the belt to that braces — at a width where the
+     panel genuinely cannot fit, the frame clips rather than letting the panel slide away.
+
+     THE PANEL IS NEVER HIDDEN HERE — test/place-context-map.test.mjs pins that the embed
+     hides no filter row, and that pin is a founder decision (the rows are why the iframe
+     replaced HS.buildLive). Where the panel does not fit it scrolls INSIDE ITS OWN BOX,
+     bounded by max-height, so the thing that gives is a scrollbar on the panel and never
+     the panel's presence. Full-page Map 1 is untouched: `.map-frame` keeps its 600px
+     everywhere outside `.hs-embed`, measured unchanged at 1280x900. */
+  .hs-embed,
+  .hs-embed body{height:100%;overflow:hidden}
+  .hs-embed .card.mapcard{display:flex;flex-direction:column;height:100dvh;
+    box-sizing:border-box;min-height:0}
+  /* 45dvh is a ceiling, not a height: at desktop widths the 288px panel is under it and
+     lays out exactly as it always did, with no scrollbar. It binds only where the panel
+     wraps taller than the frame can spare. */
+  .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
+  .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
+
+  /* ===================== PREVIEW (?embed=1&preview=1) ===================== */
+  /* The homepage's sample map (founder, Revised Index Design, 2026-09-30). The fixed-frame
+     rules above fit the card INTO the host's iframe height; the preview turns that around:
+     the document is as tall as its content, so STATUS / PROJECT TYPE / REGULATORY RECORDS and
+     the map key all show with no internal scrollbar, and the host sizes the iframe to this
+     document's scrollHeight. The map canvas has a fixed height: --hs-preview-map-h, which the
+     host sets by its own breakpoint (430px / 400px / 340px), default 430px.
+     LAYOUT ONLY. No control is hidden, renamed, restyled or re-created; no data, marker or
+     filter rule changes. Every rule is scoped to .hs-embed.hs-preview, so full-page Map 1 and
+     every other embed are unchanged. */
+  .hs-embed.hs-preview,
+  .hs-embed.hs-preview body{height:auto;min-height:0;overflow:hidden}
+  .hs-embed.hs-preview .app{min-height:0}
+  .hs-embed.hs-preview .card.mapcard{display:block;height:auto}
+  .hs-embed.hs-preview .maprow{max-height:none;overflow:visible}
+  .hs-embed.hs-preview .map-frame{height:var(--hs-preview-map-h,430px);min-height:0}
+
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
-     whose data-nav matches it. This page is MAPS. It read "dev" from the days when the
-     sidebar's Maps entry pointed at the now-retired maps.html (which owned "maps"), so
-     after that retirement the primary map told every visitor they were in Development &
-     Impact and the Maps item could never light up anywhere. Founder-observed live.
-     Contract asserted by test/nav-identity.test.mjs. -->
-<body data-nav="maps">
+     whose data-nav matches it. Map 1 belongs to EXPLORE (founder navigation plan v3,
+     2026-09-30): it is a contextual Explore tool with no primary item of its own, reached
+     from the "View Development Map" links on the public ZIP page and development.html, and
+     from how-it-works.html. It is still in ZIP_NAV_PAGES and MAP_PAGES. Before v3 it
+     declared "dev" (A-021), and before that a retired "maps" entry. Contract asserted by
+     test/nav-identity.test.mjs. -->
+<body data-nav="explore" data-explore="map">
 <!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
      share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
      the shell owns them now. Page content lives in the <template> below; shell.js moves it into
@@ -528,6 +682,17 @@
            "Browse all development in ZIP NNNNN" self-link, emptying this row), because the
            placeholder now carries the instruction the sentence used to. -->
       <div class="search-err" id="addrErr" role="alert" hidden></div>
+      <!-- "What is changing in my zip code?" — email copies of the Bluesky MAPS posts about
+           THIS ZIP (founder, 2026-09-25). The label is the founder's wording, word for word:
+           "Sign up for emails on what is changing in this zip code" (founder, 2026-09-26; the
+           first label was the topic itself). The TOPIC the sign-up stores is unchanged.
+           The note is filled from HS.MAPS_CONSENT_COPY, the SAME string the sign-up records
+           as its consent audit trail, so what is shown is what is stored. -->
+      <div class="zip-email" id="zipEmail" data-zip="">
+        <button type="button" class="zip-email-btn" id="zipEmailBtn">Sign up for emails on what is changing in this zip code</button>
+        <div class="zip-email-note" id="zipEmailNote"></div>
+        <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
+      </div>
     </div>
 
     <div class="status" id="status"></div>
@@ -536,7 +701,7 @@
       <div class="grid stacked">
         <div class="card mapcard">
           <div class="map-bar">
-            <div class="map-cap">Development around this home</div>
+            <div class="map-cap">Development around this address</div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <div class="viewseg" id="viewSeg">
               <button data-v="2d" class="on">2D map</button>
@@ -634,7 +799,7 @@
                     <button class="c3-btn c3-z" id="zoomInBtn" aria-label="Zoom in" title="Zoom in">+</button>
                   </span>
                   <span class="c3-time" title="Time of day">☀<input type="range" id="todSlider" min="0" max="100" value="64"></span>
-                  <button class="c3-btn" id="homeViewBtn">👁 From home</button>
+                  <button class="c3-btn" id="homeViewBtn">👁 From this place</button>
                 </div>
               </div>
             </div>
@@ -678,7 +843,7 @@
       <div class="grid band">
         <div class="card read">
           <div class="band-h t-built">Operating now</div>
-          <div class="band-s">EPA-registered facilities and completed construction filings, standing today</div>
+          <div class="band-s">Completed construction filings, standing today</div>
           <div id="builtList"></div>
         </div>
         <div class="card read">
@@ -688,22 +853,20 @@
         </div>
         <div class="card read">
           <div class="band-h t-proposed">Proposed</div>
-          <div class="band-s">Hearings and notices you can still weigh in on</div>
+          <!-- The sub-line is written at render time (see propSub below): this category is
+               a BROWSING category and may hold applications that were later decided, so it
+               cannot carry a blanket "you can still weigh in on" claim. -->
+          <div class="band-s" id="propSub">Hearings and notices in this area</div>
           <div id="propList"></div>
         </div>
-      </div>
-
-      <!-- Other civic notices & hearings: real public meetings the county posts (personnel/employee,
-           budgets, tax rates, canvassing, elections) that are NOT land-use development. The engine's
-           v15 classifier tags these relevance:"civic"; they are listed here — clearly separated from
-           the development buckets and excluded from the "proposed" project count — so an item like a
-           "Commissioners Court Employee Hearing" is never presented as proposed development. The band
-           hides itself when there are none (honest empty, never placeholder). -->
-      <div class="card read band" id="civicBand" style="display:none">
-        <div class="band-h" style="background:#64748b">Other civic notices &amp; hearings</div>
-        <div class="band-s">Public meetings in your area that aren't development — budgets, personnel,
-          tax rates, elections and the like. Listed for transparency; not counted as proposed projects.</div>
-        <div id="civicList"></div>
+        <!-- LIFECYCLE UNKNOWN (founder decision, 2026-09-24): on the public record, but the source
+             states no construction or operating stage. The legend's own neutral and its own label,
+             so such a record has a truthful home instead of "Operating now" or no list at all. -->
+        <div class="card read">
+          <div class="band-h t-unknown">Lifecycle unknown</div>
+          <div class="band-s">On the public record, but the source states no construction or operating stage (EPA-registered facilities are here)</div>
+          <div id="unknownList"></div>
+        </div>
       </div>
 
       <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
@@ -720,19 +883,6 @@
           <div id="dtAnchorBody"></div>
         </div>
 
-        <div class="grid band" id="dtNotices" style="display:none">
-          <div class="card read">
-            <div class="band-h" style="background:#0f766e">Notices in your ZIP</div>
-            <div class="band-s" id="dtBucketBSub">Filed with a specific address in this ZIP</div>
-            <div id="dtBucketB"><div class="empty">Loading…</div></div>
-          </div>
-          <div class="card read">
-            <div class="band-h" style="background:#3b5566">County-wide notices</div>
-            <div class="band-s">Apply across Box Elder County — not specific to your ZIP.
-              Shown here, clearly labeled, never hidden.</div>
-            <div id="dtBucketC"><div class="empty">Loading…</div></div>
-          </div>
-        </div>
       </div>
 
       <div class="foot" id="foot"></div>
@@ -752,13 +902,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=eca20492"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
+<script src="lib/map.js?v=f98598d2"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
-<script src="lib/n5-radius.js?v=20260904"></script>
-<script src="lib/zip-authoritative.js?v=20260907b"></script>
+<script src="lib/n5-radius.js?v=f26fcf4f"></script>
+<script src="lib/zip-authoritative.js?v=20261002a"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=61d2fce9"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1059,6 +1212,11 @@ HS.onReady(function(){
   });
   var siteMarkers = [];
   var MAP_SITES = [];              // current sites, shared by the 2D map and both 3D views
+  // Attribution for any NON-HomeSignal national source rendered on this page. OpenStreetMap
+  // is ODbL: displaying its records REQUIRES crediting it, so this is a licence obligation
+  // rather than a nicety. Populated per load from the plane's own source_name values, so a
+  // load that returns no national records shows no credit - never a hardcoded claim.
+  var NATIONAL_SOURCES = [];
   var LAST_DRAW = null;            // {data,sites} of the last render — lets a radius change re-cull/re-frame the ZIP view with no network pull
   var LAST_HOME = { lat:41.5105, lng:-112.0155 };
   var CUR_RADIUS = 1;              // search radius in miles (½ / 1 / 2 / 3 / 5 / 10 / 20)
@@ -1079,6 +1237,7 @@ HS.onReady(function(){
   // covered:null and the page says nothing rather than guessing.
   var COUNTY_SOURCES = null;
   var FAC_UNAVAILABLE = false;                     // EPA read failed for this snapshot (count unknown, not 0)
+  var FAC_UNMEASURED = false;                      // ZIP-mode facility plane has no membership measurement (count unknown, not 0)
   // SEO policy — NATIONWIDE SUBSTANCE GATE (founder-approved 2026-07-14, PLAN.md §11
   // threshold c): index a ZIP page only when the materializer stamped
   // app_community_meta.indexable for this ZIP (pass AND dev-backed OR >=3 facilities —
@@ -1091,7 +1250,7 @@ HS.onReady(function(){
     var m = document.getElementById("robots-meta");
     if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
   }
-  // HomeSignal house logo, reused as the "your home" marker across all three maps.
+  // HomeSignal house logo, reused as the saved-place marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
   function homePinEl(){ var el=document.createElement("div"); el.className="homepin"; el.innerHTML=HOME_SVG; return el; }
   // ONE lifecycle authority. Delegates to the shared resolver (lib/map.js
@@ -1107,17 +1266,37 @@ HS.onReady(function(){
     var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
     return lc || "unknown";   // operating | approved | proposed | unknown — verbatim
   }
-  // ONE lifecycle palette for the 3D aerial view. three.js wants a 0xRRGGBB integer, so this
-  // converts the SAME hex the 2D pins, the GL pins and the legend chip read (HS.LIFECYCLE_HEX
-  // via COLORS) rather than restating it as a literal. Every place a lifecycle colour was
-  // typed out by hand in this view has drifted from the legend at least once — most recently
-  // `unknown`, which was hardcoded to the operating green and therefore claimed a lifecycle
-  // the source never stated. An unrecognised bucket falls back to the neutral, never to a
-  // stage colour: guessing a stage is the failure this bucket exists to prevent.
-  function lc3D(bkt){
-    var hex = String((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468").replace("#","");
-    var n = parseInt(hex, 16);
+  // three.js wants a 0xRRGGBB integer. ONE converter, so a hex from the resolver and a
+  // hex from the lifecycle palette cannot silently diverge in how they become a colour.
+  function hex3D(hex){
+    var h = String(hex || "").replace("#","");
+    var n = parseInt(h, 16);
     return isNaN(n) ? 0x706468 : n;
+  }
+  // Lifecycle-only helper. IT HAS NO CALLER TODAY, and that is the point rather than an
+  // oversight: the 3D aerial BUILDINGS used to be its only caller, and painting by bucket
+  // alone is exactly what made every EPA facility a green "Operating now" block. They now
+  // read the resolver's mk.color — the lifecycle hex for a project, the regulatory purple
+  // for an EPA-only facility. Retained as the ONE named bucket→3D-integer converter, so a
+  // future caller that genuinely has a bucket and no marker cannot restate the palette as
+  // a literal. An unrecognised bucket falls back to the neutral, never to a stage colour.
+  function lc3D(bkt){
+    return hex3D((COLORS && (COLORS[bkt] || COLORS.unknown)) || "#706468");
+  }
+  // THE 3D AERIAL PAINT. Same object the 2D pin and the 3D-satellite pin already read
+  // (HS.resolveTrackerMarker). Painting by lifecycle bucket alone made every EPA facility
+  // a green "Operating now" block, so the legend's "Purple R = regulatory record" was a
+  // lie on this view. The resolver already has the colour: Type shape + lifecycle
+  // colour + purple R for a classifiable EPA record (overlay-on-Type); purple square
+  // for an unmapped regulatory-only location; lifecycle colour for a project (and
+  // for a dual-identity data centre, whose purple R rides as signal).
+  function site3DPaint(p){
+    var mk = HS.resolveTrackerMarker(p, frsRid);
+    return {
+      mk: mk,
+      col: hex3D(mk && mk.color),
+      signal: (HS.visibleSignal ? HS.visibleSignal(mk) : (mk && mk.signal)) || null
+    };
   }
   // Label-chip backgrounds for the 3D aerial view — a dark plate behind white text, echoing
   // the stage. `unknown` gets a NEUTRAL plate for the same reason its pin does; it used to
@@ -1135,10 +1314,14 @@ HS.onReady(function(){
   //     when absent (EPA facilities, area notices, TABS, pre-connector cache rows) fall back to the
   //     coarse page bucket bucketOf(s.type) — the exact field COLORS keys on, so word ≡ colour.
   //   • An EPA FRS facility is the one physical-facility case; callers short-circuit on frsRid()
-  //     BEFORE stageWord (facilityType names the kind, popupHTML says "Facility · operating now").
+  //     BEFORE stageWord (facilityType names the kind; kindLabel appends the resolver's lifecycle
+  //     label — "Lifecycle unknown" when no source states one, never an asserted "operating now").
   var STAGE_WORD = { proposed:"Proposed / hearing", approved:"Approved / permitted",
                      operating:"Recorded / operating", built:"Built / operating" };
-  function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type); }
+  // The SITE rides along with its type (2026-09-24): bucketOf(type) alone rebuilt a bare
+  // {type} with no registry_id, so a cached EPA element's manufactured type='built' was read as
+  // operating in the marker title while the pin (which passes the site) read unknown.
+  function stageOf(s){ return (s && typeof s.bucket==="string" && s.bucket) ? s.bucket : bucketOf(s && s.type, s); }
   function stageWord(s){ return STAGE_WORD[stageOf(s)] || "Official record"; }
   // The one popup/subheader label for any record. EPA FRS facility → the physical-facility line;
   // everything else → its lifecycle stage. Named + exposed (window.__HS_KIND) so verify-development
@@ -1153,20 +1336,38 @@ HS.onReady(function(){
       // and then its stage; where it does not, it says so rather than implying "minor".
       // Data centres only: every other type is byte-for-byte unchanged.
       var mkd = HS.resolveTrackerMarker(s, frsRid);
+      // A DECIDED application's stage word is the browsing category, which on its own
+      // reads as a live state ("Proposed / hearing"). Appending the outcome keeps the
+      // category honest without moving the record out of it.
+      var decd = decisionOf(s);
+      var decSuffix = decd ? (" \u00b7 " + (decd.outcome_label || "decided")) : "";
       if(mkd.significanceApplies && mkd.significance){
-        return mkd.significance.label + " · " + stageWord(s);
+        return mkd.significance.label + " \u00b7 " + stageWord(s) + decSuffix;
       }
-      return stageWord(s);
+      return stageWord(s) + decSuffix;
     }
     // DUAL IDENTITY: a regulated facility whose own EPA record names a data centre reads
     // as what it IS first and what it CARRIES second. The words come from the resolver's
     // category registry, so the popup can never disagree with the symbol drawn.
     var mk = HS.resolveTrackerMarker(s, frsRid);
+    // THE LIFECYCLE WORD IS THE RESOLVER'S, NEVER A LITERAL (2026-09-24). Every facility line
+    // used to end " · operating now" — asserted for every EPA record, because the resolver
+    // used to hard-code it. EPA registration is not operation, so it now reads the marker's
+    // own lifecycleLabel ("Lifecycle unknown" for a record whose source states none), the same
+    // label the pin's colour and the legend chip come from.
+    var lcWord = mk.lifecycleLabel ? " · " + mk.lifecycleLabel : "";
     if(mk.isDataCenter){
       var REG = HS.CATEGORY_REGISTRY;
-      return REG.datacenter.label + " · " + REG.facility.label + " · operating now";
+      return REG.datacenter.label + " · " + REG.facility.label + lcWord;
     }
-    return "Facility · operating now";
+    // Overlay-on-Type, GLOBAL: the pin is the Type; purple is the overlay. The
+    // popup must say the Type first, same order as dual identity, or the map
+    // would still read as "Facility" while the pin is an Industrial triangle.
+    if(mk.overlayOnType){
+      var REGo = HS.CATEGORY_REGISTRY;
+      return (mk.typeLabel || mk.legendLabel) + " · " + REGo.facility.label + lcWord;
+    }
+    return "Facility" + lcWord;
   }
   // STATUS IS NEVER COMMUNICATED BY COLOUR ALONE. Every marker carries a text label of its
   // own — "Proposed data center", "Approved residential" — so the stage is readable to
@@ -1181,11 +1382,58 @@ HS.onReady(function(){
     var stage = MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
     // the same honesty the grey "Lifecycle unknown" chip carries in the legend.
-    return stage ? (stage + " " + type) : (type.charAt(0).toUpperCase() + type.slice(1) + " · lifecycle unknown");
+    // STATUS IS NEVER COLOUR ALONE — and a DECISION is never the pin alone either. A
+    // denied application keeps the Proposed pin, so without this the hover text and the
+    // DOM would read "Proposed data center" about an application a body refused.
+    var dec = decisionOf(s);
+    var suffix = dec ? (" \u00b7 " + (dec.outcome_label || "decided")) : "";
+    return stage ? (stage + " " + type + suffix)
+                 : (type.charAt(0).toUpperCase() + type.slice(1) + " \u00b7 lifecycle unknown" + suffix);
   }
   // The jurisdiction/source line shown under a record. Socrata rows carry no s.src but do carry a
   // s.jurisdiction ("City of Austin"); fall back to it so the line is never blank (page-only, no re-cache).
-  function srcLabel(s){ return (s && (s.src || s.jurisdiction)) || ""; }
+  // National data-centre rows (HS.map1DcSite) carry neither; they name their publisher in
+  // source_name ("Compute Atlas (Edward Kubiak)", "OpenStreetMap"), so that is the last fallback.
+  function srcLabel(s){ return (s && (s.src || s.jurisdiction || s.source_name)) || ""; }
+  // " · <source>", or nothing when a record names no source, so a line never carries a stray dot.
+  function srcPart(s){ var l = srcLabel(s); return l ? " · " + esc(l) : ""; }
+  // ── DECISION HISTORY on the page — every surface reads these, none re-derives ─────
+  // The authority is lib/map.js (HS.decisionOf / decisionNotation / currentStatusLine /
+  // isActiveUndecided), which is itself pinned against the engine's sources/decision.ts
+  // by test/decision-vocabulary-parity.test.mjs. Nothing here decides anything; it only
+  // renders what the resolver already resolved.
+  function decisionOf(s){ return (HS.decisionOf ? HS.decisionOf(s) : null); }
+  // The record's OWN words for what kind of application it is, so the notation can read
+  // "Conditional-use application denied" instead of a generic sentence. Falls back to the
+  // neutral "Application" rather than inventing a permit class.
+  function decisionSubject(s){
+    var raw = (s && (s.type_raw || s.permit_class)) || "";
+    raw = String(raw).trim();
+    if(!raw || raw.length > 48) return "Application";
+    return raw + " application";
+  }
+  // THE PROMINENT SOURCED NOTATION. The source link is part of the notation, never a
+  // separate optional extra: an unsourced decision claim is the thing the anti-fabrication
+  // contract refuses, and HS.decisionOf already returns null without a URL.
+  function decisionNoteHTML(s, cls){
+    var d = decisionOf(s);
+    if(!d) return "";
+    var txt = HS.decisionNotation(d, decisionSubject(s));
+    var href = String(d.source_url || "");
+    var link = href ? " <a class='decsrc' href='"+esc(href)+"' target='_blank' rel='noopener'>official record ↗</a>" : "";
+    return "<div class='"+(cls||"decnote")+"'>"+esc(txt)+link+"</div>";
+  }
+  // THE CURRENT-STATUS QUALIFICATION — shown wherever a reader could otherwise take the
+  // Proposed category as a statement about today. A RECENT FETCH IS NOT PROOF OF A RECENT
+  // DECISION CHECK, so this never consults `data.updated`.
+  function currentStatusHTML(s, cls){
+    // A source's own listing (a national data-centre record) is not a filing, so it never
+    // reads "Application on file" (HS.isSourceOwnRecord, lib/map.js).
+    var own = !!(HS.isSourceOwnRecord && HS.isSourceOwnRecord(s));
+    var line = HS.currentStatusLine
+      ? HS.currentStatusLine(decisionOf(s), (s && s.decision_evidence) || "none", own ? { filing: false } : undefined) : "";
+    return line ? "<div class='"+(cls||"decunv")+"'>"+esc(line)+"</div>" : "";
+  }
   // Facilities (scope "point") pin at their exact EPA-registered coordinates. Development
   // notices (scope "area") are jurisdiction-level — county/city-wide, no street address —
   // and the engine's raw lat/lng on them can't be trusted (its place lookup only knows Box
@@ -1350,7 +1598,7 @@ HS.onReady(function(){
   // The single test for "is this an EPA-registered facility" — a real FRS Registry ID, present on
   // every EPA FRS site and on nothing else (a TABS construction permit is also scope:"point" but
   // has no registry_id). Every EPA affordance — the ECHO violations line, the ECHO link, the
-  // "Facility · operating now" label — keys on THIS, never on scope, so a permit never inherits
+  // "Facility · <lifecycle>" label — keys on THIS, never on scope, so a permit never inherits
   // an EPA-facility affordance. Returns the trimmed id or "".
   function frsRid(s){ return (s && s.registry_id!=null) ? String(s.registry_id).trim() : ""; }
   // Friendly, plain-language building type from the facility name (falls back to its layer).
@@ -1454,13 +1702,20 @@ HS.onReady(function(){
       sigs.sort(function(a,b){ return ENV_TONE_RANK[a.tone]-ENV_TONE_RANK[b.tone]; });
       out = out.concat(sigs);
     }
-    // Baseline for any EPA facility (keyed on the FRS id) that produced no stronger signal — so the
-    // ECHO affordance never disappears, including on cache rows written before the env layer (they
-    // have no s.env; fall back to the legacy s.viol count).
+    // Baseline: a clean EPA record is a positive fact ONLY while compliance tracking is
+    // on — the same rule as HS.fac.signals. An FRS id alone is not a clean record: ECHO
+    // failed, ECHO matched nothing, CWA-only, and tracking-off used to print this line
+    // and made Map 1 disagree with the ZIP page (audit 2026-09-27: 199,409 stored sites).
     if(frsRid(s) && !out.length){
       var lv = s.viol||0;
-      out.push(lv>0 ? { text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" }
-                    : { text:"no recorded EPA violations", tone:"ok" });
+      if(lv>0){
+        out.push({ text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" });
+      } else {
+        var interp = (typeof HS!=="undefined" && HS.fac) ? HS.fac.interpret({epa:epa}) : null;
+        if(interp && interp.tracking===true){
+          out.push({ text:"no recorded EPA violations (compliance tracking on)", tone:"ok" });
+        }
+      }
     }
     return out;
   }
@@ -1495,7 +1750,7 @@ HS.onReady(function(){
     // so "N mi from home" would be distance from a ZIP centroid. Area items' raw e/n
     // come from the engine's untrusted jurisdiction coordinate anyway.
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
+    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var h = envHeadline(s);
     var tyStyle = h ? " style='color:"+envColor(h.tone,true)+"'" : "";
     return "<div class='n'>"+esc(s.label||"")+"</div>"+
@@ -1512,7 +1767,7 @@ HS.onReady(function(){
   // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
   function infoCard3(s){
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
-    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from home");
+    var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var link = s.url || s.record_url || "";
     // Type line: bare facility type for points (env shows in its own block below, not duplicated);
     // jurisdiction framing for area notices.
@@ -1543,10 +1798,6 @@ HS.onReady(function(){
   // render even on a ZIP with no cached development_reports row. parcelLayer holds the resolved
   // parcel polygons; RESOLVED_PARCELS is cached so drawParcels() can (re)draw once the map exists.
   var parcelLayer = null, RESOLVED_PARCELS = null, CURRENT_DEV_ZIP = null;
-  var BOX_ELDER = 'd67c558f-1f04-4811-a565-873ae2afd6f3';
-  var DEV_CATEGORIES = ['Planning, zoning & development',
-                        'Stratos data center project',
-                        'County Commission & county business'];
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   // esc() is a TEXT-NODE escape and leaves quotes alone, which is correct there and unsafe
@@ -1826,6 +2077,11 @@ HS.onReady(function(){
   function run(address){
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
+    // ...and it leaves the ZIP PLACE with it. This is the only in-page Place transition in
+    // the app (every other navigation is a full document load, which resets the declaration
+    // to nothing), so a ZIP declared at boot must be retired HERE or it would outlive the
+    // mode that made it true and keep suppressing the address the resident just searched.
+    if(window.HS && HS.setViewPlaceType) HS.setViewPlaceType('address');
     CUR_ADDRESS = address;
     // A real geocoded HOME now exists, so the HOME-specific view control may appear.
     document.body.classList.add("hashome");
@@ -1838,7 +2094,7 @@ HS.onReady(function(){
     // a radius change re-enters (radSel -> run(CUR_ADDRESS)), and after snapRadiusForAddress()
     // above, so it can never state a radius the search did not use.
     var _cap2 = document.querySelector(".map-cap");
-    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this home"; }
+    if(_cap2){ _cap2.textContent = "Development within " + radiusLabel(CUR_RADIUS) + " of this address"; }
     // THE PAGE'S LARGEST TYPE HAS TO CHANGE MODE TOO — authorized change B.
     // The heading pair, the map caption, the counters and the way back all moved to
     // address-mode wording in #1070. The HERO did not: arriving here from a ZIP view left
@@ -1846,17 +2102,16 @@ HS.onReady(function(){
     // directly above results that say "Showing development within 2 miles of". A resident
     // reads top-down, so the biggest, first thing on the page was still making the
     // whole-ZIP claim over near-home results — measured on main, 2026-09-06: address mode
-    // rendered kicker "Development overview" / H1 "ZIP 78617".
+    // rendered kicker "Development map" / H1 "ZIP 78617".
     // loadZip() already restores all four for the ZIP view, so this is the missing half of
     // a switch that was only ever written in one direction.
-    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Near-home view";
+    var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Address view";
     var _h1A = document.querySelector(".head h1");
     if(_h1A) _h1A.textContent = "Development around this address";
-    var _subA = document.querySelector(".sub");
-    if(_subA){ _subA.textContent = "What's built and what's proposed within the distance you "
-      + "choose around one address — data-center activity, planning hearings and open comment "
-      + "windows, plus nearby regulated facilities for context — every item linked to its "
-      + "official public record."; }
+    // Fix 7: the standfirst names THIS address, same helper the Address dossier uses.
+    // Kind is address-mode (this host), never inferred from the string. H1 still names
+    // the MODE; the radius stays on the map caption so it cannot go stale in the hero.
+    paintMap1PlaceHeading('address', address);
     document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
@@ -1880,8 +2135,16 @@ HS.onReady(function(){
         status("We couldn't find that address. Try a different spelling, or add the city or ZIP.", true);
         return;
       }
+      // SEO plan step 14: one address lookup, counted against the page type the visit
+      // entered through. No address is recorded (lib/data.js HS.logEvent).
+      // A radius change re-runs the same search, so only a NEW address counts.
+      if(window.HS && HS.logEvent && window.__HS_LOOKUP_LOGGED !== address){
+        window.__HS_LOOKUP_LOGGED = address;
+        HS.logEvent("property_lookup", { zip_code: m.zip || null });
+      }
       // HOME is the geocoder's exact returned point, used verbatim as the RPC input.
       var home = { lat: m.lat, lng: m.lng };
+      paintMap1PlaceHeading('address', m.matchedAddress || address);
       status("Pulling public records for " + address + " within " + radiusLabel(radius) + " …");
       // Facilities and area/jurisdiction notices still come from the existing report engine;
       // DEVELOPMENT comes from the canonical N5 corpus. Two independent classes, one page.
@@ -1913,8 +2176,12 @@ HS.onReady(function(){
         // The engine's development counters described ITS development set, which no longer
         // renders in address mode. Drop them so render() recomputes from what is actually on
         // screen; the facilities count is still the engine's and is still accurate.
+        // proposed_active too (2026-09-27): it is the same rule over that same set, and
+        // keeping it made the "New projects proposed" tile count records the map was not
+        // drawing, while leaving out the data-centre pins it was.
         if(data.counts){
           delete data.counts.development; delete data.counts.proposed; delete data.counts.comment_open;
+          delete data.counts.proposed_active;
         }
         N5_NOTE = HS.n5CoverageNote(n5.rows, radiusLabel(radius));
         render(data);
@@ -1942,6 +2209,62 @@ HS.onReady(function(){
     var base = String(best.name).replace(/,\s*[A-Za-z][A-Za-z. ]+$/, '').trim();
     if(/\(\d{5}\)\s*$/.test(base)) return base;
     return base + " (" + zip + ")";
+  }
+
+  // Fix 7: Map 1's standfirst names the geography currently in view, via the same
+  // helper Address and ZIP pages already use. Kind is THIS mode (ZIP-area vs
+  // address-radius), never inferred from the string. An unresolved value withholds
+  // the heading rather than printing "your zip code" or "at undefined".
+  // textContent — the helper does not HTML-escape; callers that inject HTML must.
+  function paintMap1PlaceHeading(kind, value){
+    var el = document.querySelector(".sub");
+    if(!el) return;
+    var heading = (window.HS && typeof HS.placeChangingHeading === 'function')
+      ? HS.placeChangingHeading(kind, value)
+      : '';
+    el.textContent = heading || '';
+  }
+
+  // "What is changing in my zip code?" — the email sign-up for this ZIP's Bluesky MAPS
+  // posts (founder, 2026-09-25). The page only PAINTS: signing in, saving the ZIP to My
+  // Places, writing the selection and reading it back all live in shell.js
+  // (HS.mapsZipEmailSignup / HS.mapsZipEmailState), which is the one path for this sign-up.
+  // The button's LABEL, not the topic: the founder renamed the button on 2026-09-26, and the
+  // topic (HS.MAPS_EMAIL_TOPIC) is what links a sign-up to the posts, so it stays as it was.
+  var ZIP_EMAIL_LABEL = "Sign up for emails on what is changing in this zip code";
+  function setZipEmailSubscribed(on){
+    var btn = $("zipEmailBtn"); if(!btn) return;
+    btn.disabled = !!on;
+    btn.classList.toggle("on", !!on);
+    btn.textContent = on ? "✓ You're signed up" : ZIP_EMAIL_LABEL;
+  }
+  function paintZipEmail(zip){
+    var box = $("zipEmail"), btn = $("zipEmailBtn"), note = $("zipEmailNote"), msg = $("zipEmailMsg");
+    if(!box || !btn || !window.HS || !HS.mapsZipEmailSignup) return;
+    box.dataset.zip = zip;
+    if(note) note.textContent = HS.MAPS_CONSENT_COPY || "";
+    if(msg) msg.textContent = "";
+    setZipEmailSubscribed(false);
+    btn.onclick = function(){
+      var z = box.dataset.zip; if(!z) return;
+      btn.disabled = true; if(msg) msg.textContent = "";
+      var how = HS.mapsZipEmailSignup(z, function(err){
+        if(box.dataset.zip !== z) return;              // the page has moved on to another ZIP
+        if(err){
+          btn.disabled = false;
+          if(msg) msg.textContent = (err && err.friendly) ? err.message : "Couldn't sign you up — please try again.";
+          return;
+        }
+        setZipEmailSubscribed(true);
+      });
+      // The 6-digit sign-in is open and resumes the sign-up itself; leave the button usable.
+      if(how === "auth") btn.disabled = false;
+    };
+    if(HS.mapsZipEmailState){
+      HS.mapsZipEmailState(zip).then(function(st){
+        if(box.dataset.zip === zip && st && st.subscribed) setZipEmailSubscribed(true);
+      }, function(){ /* state unknown: the button keeps offering the sign-up */ });
+    }
   }
 
   function loadZip(zip){
@@ -2000,10 +2323,10 @@ HS.onReady(function(){
         // (indexability is driven by the stamped substance flag, not the state — see loadZip top)
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
         // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
-        // resident sees at a glance they're on the right ZIP page; "Development overview" is
+        // resident sees at a glance they're on the right ZIP page; "Development map" is
         // the small kicker above it.
         var label = zipPlaceLabel(rows, zip);
-        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development overview";
+        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development map";
         var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
         document.title = "Development around " + label + " — HomeSignal";
         // One canvas, two scopes - say so, in six words, rather than letting the caption
@@ -2020,7 +2343,7 @@ HS.onReady(function(){
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
-    $("eyebrow").textContent = "Development overview";
+    $("eyebrow").textContent = "Development map";
     var _h1z = document.querySelector(".head h1"); if(_h1z) _h1z.textContent = "ZIP " + zip;
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
@@ -2028,11 +2351,11 @@ HS.onReady(function(){
     // Elder, which is wrong on every other ZIP page). The radius selector is hidden; ZIP views
     // frame the records' own extent, not a circle the resident widens.
     document.body.classList.add("zipmode");
-    var _sub = document.querySelector(".sub");
-    // Founder copy: one plain line. The long inventory clause it replaced named the record types
-    // (data-center activity, hearings, comment windows, nearby facilities) before the resident had
-    // seen any of them — the page below already labels each of those, so the hero just says why to read it.
-    if(_sub){ _sub.textContent = "See what is changing in your zip code"; }
+    // Fix 7: one plain line naming THIS ZIP — the same helper the ZIP page uses.
+    // Kind is zip-mode (this host). The H1 still names the place ("Del Valle (78617)");
+    // the standfirst names the ZIP the map is rendering.
+    paintMap1PlaceHeading('zip', zip);
+    paintZipEmail(zip);
     // NO helper text under the field in either mode, so ZIP mode has nothing to override.
     // The field carries its own instruction in the placeholder, which reads correctly in both.
     var _cap = document.querySelector(".map-cap");
@@ -2041,7 +2364,11 @@ HS.onReady(function(){
     // BOTH modes, and a second copy of it would be one more string to keep in sync for no gain.
     status("Loading development records for ZIP " + zip + " …");
     var url = SUPABASE_URL + "/rest/v1/development_reports?zip=eq." + encodeURIComponent(zip) +
-              "&select=zip,home_lat,home_lng,counts,sites,paywall,refreshed_at,facilities_unavailable&limit=1";
+              "&select=zip,home_lat,home_lng,counts,paywall,refreshed_at,facilities_unavailable&limit=1";
+    // THE REPORT'S SITES ARE NOT READ RAW ANY MORE. public.zip_mode_report_sites returns its area
+    // notices plus only the facilities the canonical predicate places inside this ZIP, each with
+    // its verdict (docs/zip-membership-canonical.sql §3). The raw array — up to 19.6 MB, mostly
+    // development candidates this page discards — carried every radius-derived EPA facility.
     // BOTH reads, together: the cached report still supplies FACILITIES and area/jurisdiction
     // notices (the EPA national floor is still radius-derived - Session B owns that geography),
     // while DEVELOPMENT comes from authoritative whole-ZIP membership and replaces the report's
@@ -2050,17 +2377,119 @@ HS.onReady(function(){
     Promise.all([
       fetch(url, { headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY } })
         .then(function(r){ return r.ok ? r.json() : []; }),
+      fetch(SUPABASE_URL + "/rest/v1/rpc/zip_mode_report_sites", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
       fetch(ZIP_AUTH_RPC_URL, {
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_zip: zip, p_kind: "development", p_authoritative: true })
-      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+      // NATIONAL DATA-CENTER PLANE. Third plane, and the ONLY one that is not
+      // jurisdiction-gated: national_dc_for_zip asks nothing about registry coverage, so a
+      // record plots in a county with no local permit/planning connector. Local connector
+      // rules are untouched - the two fetches above are unchanged.
+      // It is fetched HERE, inside the same Promise.all, because render() has no re-entry
+      // point: a plane that resolved after render() would never reach the map.
+      //
+      // A FAILED READ IS NOT AN EMPTY ONE. This used to end `.catch(function(){ return []; })`
+      // with a `r.ok ? ... : []` ahead of it, so a 401, a 500, a timeout, a dropped connection
+      // and a malformed body all reached the page as the SAME value a genuinely empty ZIP
+      // produces. HS.nationalPlaneResult classifies the read instead; `records` is still always
+      // an array, so the map renders exactly as it does today either way.
+      // ZIP MEMBERSHIP IS GEOGRAPHY (docs/zip-membership-canonical.sql). This used to call
+      // national_dc_for_zip with p_radius_mi: 5 — a circle around the ZIP centroid — which on
+      // 2026-09-22 drew 7,355 placements outside their ZIP on 1,918 pages and never served 69
+      // records inside their ZIP but beyond 5 miles.
+      // THE ONE DATA-CENTRE CONTRACT (docs/map1-dc-publication.sql, HS.MAP1_DC_RPC): canonical
+      // entities from every onboarded source plus the transitional legacy-OSM population, each
+      // retrieved by the ZCTA polygon's own extent and returned with the canonical verdict.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/" + HS.MAP1_DC_RPC, {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip })
+      })
+        .then(function(r){
+          // .json() rejects on truncated/non-JSON bodies; that is 'malformed', not 'network',
+          // so it is resolved into a body value here rather than thrown to the catch below.
+          return r.json().then(
+            function(b){ return HS.nationalPlaneResult({ http: r.status, body: b }); },
+            function(){  return HS.nationalPlaneResult({ http: r.status, body: null }); }
+          );
+        })
+        .catch(function(){ return HS.nationalPlaneResult({ transportError: true }); })
     ])
       .then(function(both){
-        var rows = both[0], auth = both[1];
+        var rows = both[0], rs = both[1], auth = both[2];
+        var rsSites = HS.zipReportSites(rs);
+        var facMembers = HS.zipFacilityMemberCount(rs);
+        // Published for the verifiers: the tile, the drawn facilities and this count must agree.
+        window.__HS_ZIP_FACILITIES = { status: HS.zipReportOutcome(rs), member: facMembers };
         if(!currentReq(token)) return;      // a newer search (or an address) already owns the page
         ZIP_AUTH = auth;
         var authSites = HS.zipAuthSitesFrom(auth);
+        // The RPC returns ONLY rows that already carry a real source URL, real coordinates
+        // and a displayable status, so nothing unsourced can enter here. These still pass
+        // through render()'s sourced() gate with everything else - no bypass.
+        // HS.map1DcSite puts each row in Map 1's site shape: `bucket`/`type` carry the lifecycle
+        // (from map_status), `use_type` the Type (project_type) and `label` the name — the fields
+        // resolveTrackerMarker reads. The source's own lifecycle word is carried unmodified as
+        // normalized_status/raw_status.
+        var natl = both[3] || HS.nationalPlaneResult(null);
+        // FIX 29 — PROXIMITY IS NOT MEMBERSHIP. national_dc_for_zip selects by a 5-mile
+        // great-circle radius around development_reports.home_lat/home_lng — a ZIP CENTROID.
+        // It may only supply ZIP-page membership where authoritative whole-ZIP geography
+        // exists; otherwise distance to a centroid is the only thing asserting the record is
+        // in this ZIP, which is the substitution zipAuthNote promises the page does not make.
+        // Measured 2026-09-15: 351 of the 706 canonical ZIPs with no ZCTA polygon drew 1,597
+        // placements from 141 records this way. HS.nationalPlaneAdmitted delegates to
+        // HS.zipAuthIsComplete, so there is ONE definition of usable ZIP geography.
+        var natlAdmitted = HS.nationalPlaneAdmitted(auth);
+        // THE OBSERVABLE SIGNAL. Same shape the page already uses for a degraded subsystem
+        // (window.__HS_* read by the verifiers, plus one console.warn — cf. the 3D view's
+        // "[HomeSignal] 3D view unavailable (mode/reason)"). No new framework, no analytics
+        // dependency (this page does not load events.js), no resident-visible change.
+        // `fallback` is what a reader needs to know: the map drew an empty national plane.
+        window.__HS_NATIONAL_PLANE = {
+          plane: "national_dc", zip: zip, status: natl.status, reason: natl.reason,
+          http: natl.http, records: natl.records.length,
+          // A SUCCESSFUL READ THAT IS NOT ADMITTED IS ITS OWN FACT, and it is not a failure:
+          // `status` still reports what the read did, while `admitted` reports whether this
+          // ZIP's geography lets those records claim membership. Collapsing them would make a
+          // refused-by-contract plane indistinguishable from a broken one.
+          admitted: natlAdmitted, admission_basis: HS.zipAuthOutcome(auth),
+          // TRUNCATION IS ITS OWN FACT. A clipped set is a SUCCESSFUL read that is not the
+          // whole set, so it is neither `unavailable` nor a plain `ok` — reporting it as
+          // either is the same dishonesty in a different direction.
+          truncated: !!natl.truncated,
+          fallback: natl.status !== HS.NATIONAL_PLANE_OK, at: new Date().toISOString()
+        };
+        if(natl.status !== HS.NATIONAL_PLANE_OK && window.console && console.warn){
+          console.warn("[HomeSignal] national data-center plane unavailable ("
+            + natl.reason + (natl.http ? "/" + natl.http : "") + ") for ZIP " + zip
+            + " — map rendered without it");
+        }
+        if(natlAdmitted && natl.truncated && window.console && console.warn){
+          console.warn("[HomeSignal] national data-center plane truncated at "
+            + natl.records.length + " records for ZIP " + zip
+            + " — more exist than are shown");
+        }
+        // Gated HERE rather than by hiding markers later: a hidden marker is still a site the
+        // page has accepted as belonging to this ZIP — counted, framed and exported — and the
+        // claim being refused is membership, not visibility.
+        // ONE mapping (HS.map1DcSite, lib/data.js), shared with lib/data.js::nationalDataCenters.
+        // The pin status is the server's map_status; the zip_membership verdict is what
+        // HS.zipModeSites admits on.
+        var natlSites = !natlAdmitted ? [] : natl.records.map(HS.map1DcSite).filter(HS.zipMemberAdmitted);
+        // LICENCE CREDIT — derived ONLY from records that can actually reach the page, each with
+        // its OWN licence (Compute Atlas / Epoch AI CC BY 4.0, OpenStreetMap ODbL). A site with no
+        // source_name, or none of the record_url render()'s sourced() gate requires, is dropped
+        // before anything is drawn, so crediting its source would name a source that supplied
+        // nothing visible. Measured: an array of junk rows survives the object filter and used
+        // to render the literal "Data-centre locations from undefined".
+        NATIONAL_SOURCES = HS.map1DcCredits(natlSites);
         // The cached report's development counters describe ITS centroid-radius development set,
         // which no longer renders in ZIP mode - authoritative whole-ZIP geography replaced it.
         // Leaving them makes the headline tile contradict the map the resident is looking at
@@ -2069,17 +2498,33 @@ HS.onReady(function(){
         // and is still accurate, so it stays. Same guard address mode has always had.
         var zipCounts = rows && rows.length ? (rows[0].counts || {}) : {};
         delete zipCounts.development; delete zipCounts.proposed; delete zipCounts.comment_open;
+        // proposed_active is the active-proposal count over that same radius set, so it goes too
+        // (2026-09-27). It was added after this list was written, and until then the "New
+        // projects proposed" tile read the report's radius count (12,603 of 12,722 cached
+        // reports carry it) instead of the whole-ZIP Proposed set the map draws, which also
+        // left out every proposed data-centre pin.
+        delete zipCounts.proposed_active;
+        // FACILITIES follow the same rule: with the engine's radius-derived counts.facilities gone,
+        // render() counts the facilities it actually DRAWS (its `fac` set) — members of this ZIP by
+        // the canonical predicate — so the tile and the pins are one population by construction.
+        // Unknown (no boundary, failed read) is shown as a dash via facUnmeasured, never as 0.
+        delete zipCounts.facilities;
         if(rows && rows.length){
           var row = rows[0];
           render({ address:"ZIP "+zip, home:{ lat:row.home_lat, lng:row.home_lng },
                    counts:zipCounts,
-                   sites: HS.zipAuthMergeSites(row.sites||[], authSites),
+                   // THE ONE ZIP-MODE DOOR (lib/zip-authoritative.js): every point plane passes on
+                   // canonical membership evidence.
+                   sites: HS.zipModeSites(rsSites, auth, natlSites),
+                   facUnmeasured: facMembers == null,
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
-        } else if(authSites.length){
-          // No cached report row, but the ZIP's own geography is established - render it.
+        } else if(authSites.length || natlSites.length){
+          // No cached report row, but the ZIP's own geography or the national plane is
+          // established - render it. The national half is what lets a county with NO local
+          // permit/planning connector still show real data-center projects.
           render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
-                   sites: authSites, paywall:false, updated:null, facUnavailable:false });
+                   sites: HS.zipModeSites([], auth, natlSites), paywall:false, updated:null, facUnavailable:false });
         } else {
           // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
@@ -2201,7 +2646,19 @@ HS.onReady(function(){
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="approved"; }));
     var prop = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; })
       .concat(dev.filter(function(s){ return bucketOf(s.type)==="proposed"; }));
-    var builtRows = permits.filter(function(s){ return bucketOf(s.type, s)==="operating"; }).concat(fac);
+    // THE "OPERATING NOW" RAIL LISTS WHAT THE LIFECYCLE CONTRACT CALLS OPERATING, AND NOTHING
+    // ELSE (2026-09-24). It used to append EVERY EPA facility unconditionally (`.concat(fac)`),
+    // asserting each one was "standing today" on nothing more than an FRS registration. Facilities
+    // now pass the same bucketOf() test as every permit, so one with no sourced lifecycle
+    // (`unknown`) is not listed as operating. It is still drawn on the map, still counted in the
+    // Regulated facilities tile, and its popup still carries the EPA record and links.
+    var points = permits.concat(fac);
+    var builtRows = points.filter(function(s){ return bucketOf(s.type, s)==="operating"; });
+    // LIFECYCLE UNKNOWN HAS A LIST HOME (founder decision, 2026-09-24). A record whose canonical
+    // lifecycle is unknown — an EPA facility, a permit or an area notice alike — is listed under
+    // the legend's own "Lifecycle unknown" band instead of in no band at all. Membership is the
+    // SAME bucketOf the pin colour and the Stage chips read; it never keys on record kind.
+    var unknownRows = points.concat(dev).filter(function(s){ return bucketOf(s.type, s)==="unknown"; });
     // "Open for public comment" (Task 5) = exactly the records the engine stamped comment_open=true.
     // The page renders these as commentable, so the counter (counts.comment_open) === this set.
     var today = new Date().toISOString().slice(0,10);
@@ -2221,7 +2678,10 @@ HS.onReady(function(){
     // Rendering "0" there is a factual claim we cannot support, so show an em-dash and let
     // updateCovNote() say why. A genuinely-empty ZIP is NOT flagged and still shows a true 0.
     FAC_UNAVAILABLE = ZIP_MODE && !!data.facUnavailable;
-    $("cFac").textContent  = FAC_UNAVAILABLE ? "\u2014"
+    // The facility plane is not a membership measurement (no ZIP boundary, or the facility read
+    // failed): the count is UNKNOWN, shown as the same dash — never the radius-derived number.
+    FAC_UNMEASURED = ZIP_MODE && !!data.facUnmeasured;
+    $("cFac").textContent  = (FAC_UNAVAILABLE || FAC_UNMEASURED) ? "\u2014"
       : ((data.counts && data.counts.facilities) != null ? data.counts.facilities : fac.length);
     // DEVELOPMENT: same rule as facilities above, for the same reason. On a ZIP whose
     // authoritative membership is NOT MEASURED the page deliberately drops radius-derived
@@ -2231,10 +2691,19 @@ HS.onReady(function(){
     // zero we cannot support, and zero-vs-not-measured is precisely the distinction a
     // resident has to be able to draw. Show the unknown as unknown; freshLine says why.
     var DEV_UNMEASURED = ZIP_MODE && !(window.HS && HS.zipAuthIsComplete && HS.zipAuthIsComplete(ZIP_AUTH));
-    // cDev is the PROPOSED counter (its tile reads "New projects proposed nearby") — it must equal the
-    // orange Proposed rail. Read counts.proposed (a projection of the same array); fall back to prop.length.
+    // cDev is the ACTIVE-PROPOSAL counter. Its tile reads "New projects proposed nearby",
+    // which is a claim about applications that are STILL UNDECIDED — so it deliberately no
+    // longer equals the orange Proposed rail, and that gap is the point. The rail is a
+    // BROWSING category and keeps historical proposals (a denied application must stay
+    // findable); the counter is an ELIGIBILITY number and must not describe a refused
+    // application as an active, pending one. It counts the Proposed set this page DRAWS through
+    // the one predicate (HS.isActiveUndecided). Both loaders drop the report's own
+    // counts.proposed_active before render(), because that number describes the report's
+    // radius set, not what is on screen; a caller that passes one on is still honoured.
+    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(prop) : prop.length;
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
-      : ((data.counts && data.counts.proposed)     != null ? data.counts.proposed     : prop.length);
+      : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
+         : propActive);
     $("cOpen").textContent = (data.counts && data.counts.comment_open) != null ? data.counts.comment_open : open.length;
     $("cTot").textContent  = sites.length;
 
@@ -2265,7 +2734,7 @@ HS.onReady(function(){
     // announce itself facilities-only / coverage-coming.
     var devCount = (data.counts && data.counts.development) != null ? data.counts.development : (permits.length + dev.length);
     var facCount = (data.counts && data.counts.facilities)  != null ? data.counts.facilities  : fac.length;
-    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE;
+    FACILITIES_ONLY = ZIP_MODE && devCount === 0 && facCount > 0 && !FAC_UNAVAILABLE && !FAC_UNMEASURED;
     updateCovNote();
 
     // ZIP mode is the records' own extent (ZIP_FRAME in drawMap), not a radius around a centroid.
@@ -2275,21 +2744,62 @@ HS.onReady(function(){
     // Civic notices have no lifecycle stage and only a synthetic (jurisdiction-wide) position, so
     // they are not plotted as development dots — the map shows genuine development + facilities only.
     drawMap(data, sites.filter(function(s){ return !isCivic(s); }));
-    listInto("builtList", builtRows, "No EPA-registered facility on record here.");
+    listInto("builtList", builtRows, "Nothing recorded as operating right now.");
+    listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
-    listInto("propList", prop, "No proposed item on record right now.");
+    // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
+    // heading a reader takes as a statement about now, and the only one that can hold a
+    // decided application. Approved/Operating rails are byte-for-byte unchanged.
+    listInto("propList", prop, "No proposed item on record right now.", { showCurrentStatus: true });
+    // ── DISCLOSE A MIXED BROWSING CATEGORY ─────────────────────────────────────────
+    // The rail's sub-line read "Hearings and notices you can still weigh in on" — an
+    // active claim over every row in it. Once a decided application legitimately sits
+    // here, that sentence is wrong for those rows, so the heading says what the category
+    // actually means. Shown ONLY when the rail really holds one, so a page with none is
+    // unchanged and the sentence never appears without something to explain.
+    var propNote = HS.proposedRailNote ? HS.proposedRailNote(prop) : "";
+    var propSub = $("propSub");
+    if(propSub){
+      propSub.innerHTML = "Hearings and notices in this area"
+        + (propNote ? "<span class='histnote'>" + esc(propNote) + "</span>" : "");
+    }
     // Non-headlined civic list (engine contract): real public hearings that aren't development.
     // Neutral dot + plain date (not a "closes in N days" comment countdown). Band hides when empty.
-    var civicBand = $("civicBand");
-    if(civic.length){ civicBand.style.display = ""; listInto("civicList", civic, "", { dotColor:"#64748b", plainDate:true }); }
-    else { civicBand.style.display = "none"; }
+    // (The civic list band was removed 2026-09-26, founder decision: these notices live on the
+    // ZIP detail page and the Alerts page, which keep only current items.)
 
     var locked = data.counts && data.counts.locked ? data.counts.locked : 0;
     $("foot").innerHTML =
       "Sources: US Census geocoder · county &amp; Utah PMN planning notices · EPA FRS facilities · EPA ECHO compliance records. "+
       "Facility pins sit at their exact EPA-registered locations. County and city notices apply jurisdiction-wide (no fixed address) — their orange/blue dots are placed within the viewed area to show activity, not exact sites; open a dot for the official record. "+
       "Violations are a factual count linked to the official EPA record — not a verdict on any operator." +
+      // ODbL ATTRIBUTION — a licence obligation, rendered only when a national record is
+      // actually on the page, and built from the records' own source_name so it can never
+      // credit a source that supplied nothing. Data-centre pins from this plane are the
+      // source's record, not a HomeSignal permit finding, and say so.
+      (NATIONAL_SOURCES.length
+        ? (" Data-centre locations from " + NATIONAL_SOURCES.join(" · ")
+           + ". These are the sources' own records, not local permit filings;"
+           + " open a pin for the original record.")
+        : "") +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
+    // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
+    // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
+    // overwritten by the next render, and a fit applied before the first render would find
+    // `map` still null. Called here, the boundary is drawn and fitted after the view is set,
+    // on every pass, and it is a no-op until both the polygon and the map exist.
+    applyEmbedBoundary();
+  }
+
+  // The polygon, once read, and the layer currently drawn from it.
+  var EMBED_BOUNDARY = null, EMBED_BOUNDARY_LAYER = null;
+  function applyEmbedBoundary(){
+    if(!EMBED_BOUNDARY || !map || !window.L) return;
+    if(EMBED_BOUNDARY_LAYER){ try { map.removeLayer(EMBED_BOUNDARY_LAYER); } catch(e){} }
+    EMBED_BOUNDARY_LAYER = L.geoJSON(EMBED_BOUNDARY.fc, { style: { color:"#157a49", weight:2,
+      opacity:0.9, fill:true, fillColor:"#157a49", fillOpacity:0.06 } }).addTo(map);
+    var b = EMBED_BOUNDARY.bounds;
+    map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding:[24,24] });
   }
 
   // Reflect the active radius in the #radSel button row (used both on manual clicks and when
@@ -2338,7 +2848,7 @@ HS.onReady(function(){
     if(!HOME_ANCHOR){
       var homeIcon = L.divIcon({ className:"homepin", html:HOME_SVG, iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-16] });
       L.marker([home.lat, home.lng], { icon:homeIcon, zIndexOffset:1000 })
-        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")
+        .bindPopup("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Address</div>")
         .bindTooltip(esc(LAST_ADDR), { direction:"top" }).addTo(layerGroup);
     }
 
@@ -2433,7 +2943,11 @@ HS.onReady(function(){
       { label: "Permit", cat: "industrial", use_type: "Industrial", type: "proposed", layer: "industrial" },
       { label: "DC", cat: "datacenter", use_type: "Data Center", type: "approved", layer: "datacenter" },
       { label: "Homes", cat: "residential", use_type: "Residential", type: "built", layer: "residential" },
-      { label: "EPA", cat: "facility", use_type: "Industrial", type: "built", layer: "industrial", registry_id: "TX-VERIFY" },
+      // Overlay-on-Type: a classifiable EPA record is Type shape + lifecycle colour + R,
+      // never a purple square. Coverage for registry key `facility` is the UNMAPPED
+      // fixture below (no layer / use_type — class fields only; the name is not a Type).
+      { label: "EPA overlay", cat: "industrial", use_type: "Industrial", layer: "industrial", registry_id: "TX-OVERLAY" },
+      { label: "EPA", cat: "facility", registry_id: "TX-VERIFY" },
       { label: "Infra", cat: "infrastructure", use_type: "Infrastructure", type: "approved", layer: "infrastructure" },
       { label: "Comm", cat: "commercial", use_type: "Commercial", type: "proposed", layer: "commercial" },
       { label: "Civic", cat: "civic", use_type: "Civic/Public", type: "approved", layer: "civic" },
@@ -2478,7 +2992,23 @@ HS.onReady(function(){
       var svg = HS.markerSVG(mk.shape, mk.color, "", 14);
       var geom = geomFromSvg(svg);
       if (geom !== mk.shape) fails.push({ label: s.label, err: "tracker-fixture-geometry", want: mk.shape, got: geom });
-      if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex)) {
+      if (s.registry_id && (s.layer || s.use_type)) {
+        // Classifiable EPA: Type shape, LIFECYCLE-UNKNOWN colour, purple R. EPA FRS states no
+        // lifecycle, so an operating green here is an unsourced claim (2026-09-24). A purple
+        // square here is the keep-purple regression this verifier exists to catch.
+        if (!mk.overlayOnType || mk.shape === "square" || mk.color === HS.markerRegistry.facilityHex
+            || !mk.signal || mk.signal.letter !== "R") {
+          fails.push({ label: s.label, err: "tracker-overlay-not-type-plus-r",
+            want: "overlay Type+R", got: mk.shape + " " + mk.color });
+        }
+        if (s.use_type === "Industrial" && mk.shape !== "triangle") {
+          fails.push({ label: s.label, err: "tracker-overlay-industrial-not-triangle", want: "triangle", got: mk.shape });
+        }
+        if (mk.color !== HS.LIFECYCLE_HEX.unknown || mk.lifecycle !== "unknown") {
+          fails.push({ label: s.label, err: "tracker-overlay-not-lifecycle-unknown",
+            want: HS.LIFECYCLE_HEX.unknown, got: mk.color + " " + mk.lifecycle });
+        }
+      } else if (s.registry_id && (mk.shape !== "square" || mk.color !== HS.markerRegistry.facilityHex || mk.signal)) {
         fails.push({ label: s.label, err: "tracker-facility-not-purple-square" });
       }
       if (!s.registry_id && s.use_type === "Industrial" && mk.shape !== "triangle") {
@@ -2709,12 +3239,12 @@ HS.onReady(function(){
   // own row rather than an eighth chip wearing the chips' off-state styling.
   //
   // What the switch owns, exactly:
-  //   ON  — the purple R rides on every qualifying project marker (HS.visibleSignal),
-  //         and regulatory-only locations — a regulatory record with no mapped project
-  //         type — draw their standalone purple square.
-  //   OFF — the R is not drawn and the regulatory-only squares are filtered out. A
-  //         project that happens to carry a regulatory record is NOT hidden by this: it
-  //         keeps its own shape, its own colour and its own Type membership.
+  //   ON  — the purple R rides on every qualifying Type marker (HS.visibleSignal),
+  //         and unmapped regulatory-only locations — a regulatory record whose class
+  //         fields map no project Type — draw their standalone purple square.
+  //   OFF — the R is not drawn and the unmapped squares are filtered out. A
+  //         classifiable EPA record is NOT hidden by this: it keeps its Type shape,
+  //         its operating colour and its Type membership.
   function buildRegulatoryRow(){
     var host = document.getElementById("mapkeyReg");
     var reg = HS.REGULATORY_LEGEND;
@@ -2811,14 +3341,15 @@ HS.onReady(function(){
       envHtml += "<div style='margin-top:3px;font-size:11px;color:#5d6f72'>"+esc(ENV_MATCH_NOTE)+"</div></div>";
     }
     // Label by lifecycle STAGE, not by source class (kindLabel): an EPA FRS facility is the one
-    // physical-facility case ("operating now"); every other record — point or area, TABS/Socrata/
+    // physical-facility case (Type · Regulated facility · its resolved lifecycle label — "Lifecycle
+    // unknown" unless a source states one); every other record — point or area, TABS/Socrata/
     // PMN/future source — reads its true stage, so the subheader can never contradict the dot's
     // colour (the old "any non-FRS point == Permitted construction" mislabelled proposed & operating).
     var kind = kindLabel(s);
     // Real straight-line distance from the home (e/n are miles East/North of the home).
     var dist = siteDistMi(s);
     var distStr = (s.scope==="point" && dist!=null && !ZIP_MODE)
-      ? (dist<0.1 ? " · at this address" : " · "+(Math.round(dist*10)/10)+" mi from home") : "";
+      ? (dist<0.1 ? " · at this address" : " · "+(Math.round(dist*10)/10)+" mi from this address") : "";
     // Honesty note on area dots: their spot on the map is representative, not a site address.
     var approxNote = s.scope==="area"
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>County/city-wide notice — dot placed within the "
@@ -2829,8 +3360,17 @@ HS.onReady(function(){
     var fanNote = (s.scope==="point" && s._fan)
       ? "<div style='margin-top:4px;font-size:11px;color:#5d6f72'>One of "+s._fan+" records at this exact location — markers spread slightly so each is clickable.</div>"
       : "";
+    // THE DECISION, IMMEDIATELY UNDER THE STAGE LINE. A denied application keeps the
+    // Proposed pin (browsing category), so the popup is where the reader learns the
+    // ruling — it has to sit above the source line, not below the environmental block.
+    var decHtml = decisionNoteHTML(s, "popdec");
+    // And, for anything in the Proposed category, what we can honestly say about today.
+    var statusHtml = (bucketOf(s.type, s) === "proposed") ? currentStatusHTML(s, "popunv") : "";
+    // The source line leads with the source; with none to name, the links lose their leading dot.
+    var sl = srcLabel(s);
     return "<div class='pt'>"+esc(s.label)+"</div><div class='pk'>"+kind+distStr+"</div>"+
-      "<div style='margin-top:4px'>"+esc(srcLabel(s))+a+"</div>"+envHtml+approxNote+fanNote;
+      decHtml+statusHtml+
+      "<div style='margin-top:4px'>"+esc(sl)+(sl ? a : a.replace(/^ · /, ""))+"</div>"+envHtml+approxNote+fanNote;
   }
 
   // ONE PROJECT = ONE CARD. The rails are built from SITES, and one project can legitimately own
@@ -2860,8 +3400,10 @@ HS.onReady(function(){
     var el = $(id);
     items = dedupeByProject(items);
     if(!items.length){ el.innerHTML = "<div class='empty'>"+emptyMsg+"</div>"; return; }
-    el.innerHTML = items.slice(0,12).map(function(s, i){
-      var col = opts.dotColor || COLORS[s.type] || "#5d6f72";
+    el.innerHTML = items.slice(0, LIST_CAP).map(function(s, i){
+      // The dot is the record's LIFECYCLE colour — the same bucketOf the pin and the band use —
+      // never its raw `type` (an EPA point's legacy `type:"built"` is not lifecycle evidence).
+      var col = opts.dotColor || COLORS[bucketOf(s.type, s)] || "#5d6f72";
       var link = s.url || s.record_url || "";
       // Property routing (§4.3): a point record with a FILED street address routes to its
       // internal property page — the external record link lives there, where every fact
@@ -2887,7 +3429,18 @@ HS.onReady(function(){
       // countdown — it's resolved, not an open comment window — plus a "decided" marker.
       var mdate = s.meeting_date ? s.meeting_date.slice(0,10) : "";
       var when = mdate ? " · " + ((opts.plainDate || s.decided) ? fmtDate(mdate) : friendlyDeadline(mdate)) : "";
-      var decidedTag = s.decided ? " · <span class='decidedtag'>decided</span>" : "";
+      // A recorded DECISION gets the prominent sourced notation below, so the inline
+      // "decided" chip is kept only for a record that is decided WITHOUT one — an
+      // approval detected from a notice title, which has no outcome object. Showing both
+      // would say the same thing twice in two different registers.
+      var dec = decisionOf(s);
+      var decidedTag = (s.decided && !dec) ? " · <span class='decidedtag'>decided</span>" : "";
+      // The decision, and what we can honestly say about TODAY. The second line is shown
+      // for every PROPOSED-category row, decided or not: that is the universal protection,
+      // and it is the case where decision evidence is UNAVAILABLE that most needs it.
+      var decHtml = decisionNoteHTML(s);
+      var statusHtml = (opts.showCurrentStatus && bucketOf(s.type, s) === "proposed")
+        ? currentStatusHTML(s) : "";
       var dm = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
       var dstr = (dm!=null && dm>=0.1) ? " · "+(Math.round(dm*10)/10)+" mi away" : "";
       // data-ref makes the row's PROJECT IDENTITY observable in the DOM. The card-grain probe
@@ -2897,13 +3450,28 @@ HS.onReady(function(){
       // the rendered row is the fix, and it makes "one project = one card" checkable directly.
       return "<div class='rec' data-ref='"+esc(railKey(s, i))+"'><span class='dot' style='background:"+col+"'></span>"+
         "<div style='flex:1'><div class='t'>"+esc(s.label)+"</div>"+
-        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+" · "+esc(srcLabel(s))+a+"</div>"+v+"</div></div>";
-    }).join("");
+        "<div class='s'>"+esc(tag)+dstr+when+decidedTag+srcPart(s)+a+"</div>"+decHtml+statusHtml+v+"</div></div>";
+    }).join("") + listMoreHTML(items.length);
+  }
+  // A rail shows at most LIST_CAP rows. When it holds more, it says so, rather than reading as
+  // the whole list: on a dense ZIP the Operating rail used to stop at 12 with nothing to say
+  // that more records existed, all of them still drawn on the map (23150: 13 operating data
+  // centres, 12 listed).
+  var LIST_CAP = 12;
+  function listMoreHTML(n){
+    if(n <= LIST_CAP) return "";
+    var rest = n - LIST_CAP;
+    return "<div class='listmore'>Showing " + LIST_CAP + " of " + n + ". The other " + rest
+      + (rest === 1 ? " is" : " are") + " on the map.</div>";
   }
 
   // ===================== 3D AERIAL VIEW (three.js) =====================
   // Same live data as the 2D map (each site carries e/n = miles East/North of home).
-  // Built = solid green block, Approved = solid blue block, Proposed = orange wireframe.
+  // Colour comes from the SAME marker resolver the 2D / satellite pins use: project
+  // blocks keep lifecycle colour (green / blue / orange), a regulatory-only EPA
+  // facility is the regulatory purple, and a dual-identity data centre keeps its
+  // lifecycle colour with the purple R as a subordinate badge. Proposed stays a
+  // wireframe.
   var V3 = { inited:false, active:false };
   function mi(v){ return v*120; }               // 120 scene units per mile
   function roundRect(ctx,x,y,w,h,r){ ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);
@@ -3112,6 +3680,16 @@ HS.onReady(function(){
     (V3.softSites||[]).forEach(function(it){
       var p=drawSoftBox(ctx, it.x, it.z, it.w, it.h, hexCss(it.col), it.wire);
       var cx=(p[4].x+p[6].x)/2, cy=(p[4].y+p[6].y)/2;
+      if(it.signal){
+        var bx=p[6].x, by=p[6].y, s=9;
+        ctx.fillStyle=it.signal.color;
+        ctx.fillRect(bx-s/2, by-s/2, s, s);
+        ctx.fillStyle="#fff";
+        ctx.font="700 8px Inter,system-ui,sans-serif";
+        ctx.textAlign="center"; ctx.textBaseline="middle";
+        ctx.fillText(it.signal.letter || "R", bx, by);
+        ctx.textAlign="start";
+      }
       V3.softHits.push({x:cx, y:cy, s:Math.max(10, it.w*0.35), site:it.site, depth:p[4].depth});
     });
     V3.softHits.sort(function(a,b){ return a.depth-b.depth; });
@@ -3212,7 +3790,7 @@ HS.onReady(function(){
     var pad=new THREE.Mesh(new THREE.CircleGeometry(13,40),new THREE.MeshBasicMaterial({color:0x13b89a,transparent:true,opacity:.40}));pad.rotation.x=-Math.PI/2;pad.position.y=.4;G.add(pad);
     var base=new THREE.Mesh(new THREE.BoxGeometry(11,9,11),new THREE.MeshStandardMaterial({color:0x1f5130,roughness:.6}));base.position.y=4.5;base.castShadow=true;base.receiveShadow=true;G.add(base);
     var roof=new THREE.Mesh(new THREE.ConeGeometry(9.2,6,4),new THREE.MeshStandardMaterial({color:0x2f7d4f,roughness:.6}));roof.position.y=12;roof.rotation.y=Math.PI/4;roof.castShadow=true;G.add(roof);
-    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Your home","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
+    var lbl=lblSprite(String(LAST_ADDR).split(",")[0]||"Saved place","#0F1A1C","#fff");lbl.position.set(0,27,0);G.add(lbl);
   }
 
   // Fixed reference rings: ½, 1, 2, 3, 5, 10, 20 mi — show each that fits inside the framed extent.
@@ -3232,6 +3810,33 @@ HS.onReady(function(){
 
   function build3DFacilities(){
     if(!V3.inited)return;
+    // What this view actually painted. A browser check reads this rather than sampling
+    // pixels (lighting and the canvas fallback both shift the on-screen colour) — so it
+    // must record the value that REACHED THE RENDERER, read back off the object that was
+    // built, never the resolver's mk.color. Reporting the resolver's intent would make
+    // this hook agree with the contract even if the painter ignored it: reverting the
+    // paint line to lc3D(bkt) would still publish purple, and the browser assertions
+    // would pass on the very defect they exist to catch (measured — they did).
+    // Empty until the first successful build.
+    var aerialPaint=[];
+    function noteHex(n){
+      var v = Number(n);
+      if(!isFinite(v) || v < 0) return null;
+      return "#" + ("000000" + (v >>> 0).toString(16)).slice(-6);
+    }
+    function notePaint(p, usedCol, drewBadge){
+      aerialPaint.push({
+        label: String(p.label || "").split(" ·")[0],
+        color: noteHex(usedCol),
+        signal: !!drewBadge
+      });
+    }
+    function stampPaint(){
+      try{
+        window.__HS_AERIAL_PAINT = aerialPaint;
+        if(window.__HS_VERIFY) window.__HS_VERIFY.aerialPaint = aerialPaint;
+      }catch(e){}
+    }
     if(V3.soft){
       var maxD=0;
       V3.softSites=[];
@@ -3245,10 +3850,15 @@ HS.onReady(function(){
         if(!ZIP_MODE && Math.hypot(en[0],en[1])>CUR_RADIUS+0.3)return;
         var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1];
         var dd=Math.hypot(en[0],en[1]); maxD=Math.max(maxD, dd);
-        V3.softSites.push({x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:lc3D(bkt), wire:bkt==="proposed", site:p});
+        var paint=site3DPaint(p);
+        var box={x:mi(en[0]), z:mi(-en[1]), w:w, h:h, col:paint.col, wire:bkt==="proposed", site:p, signal:paint.signal};
+        V3.softSites.push(box);
+        // Read back off the box the canvas path will actually draw, not off `paint`.
+        notePaint(p, box.col, box.signal);
       });
       set3DFrame(maxD);
       V3.softSites.sort(function(a,b){ return (b.z+b.x)-(a.z+a.x); });
+      stampPaint();
       return;
     }
     // Frame the view to where the buildings actually are (not the empty outer radius),
@@ -3278,32 +3888,48 @@ HS.onReady(function(){
       var d=dims[p.layer]||[16,30],w=d[0],h=bkt==="proposed"?Math.min(d[1],26):d[1],x=mi(en[0]),zc=mi(-en[1]);
       var raw=String(p.label||"").split(" ·")[0];
       var name=raw.length>20?raw.slice(0,19).trim()+"…":raw;
+      var paint=site3DPaint(p);
+      var col=paint.col;
       if(bkt==="proposed"){
         // Proposed items are jurisdiction-level and numerous — draw the marker but no floating
         // label (they'd overlap into noise); the name shows on the 2D map and in the list.
-        var pcol=lc3D("proposed");
+        // Colour still comes from the resolver (mk.color), never a restated palette: the old
+        // line `var col = bkt==="approved" ? 0x2563EB : 0x1f5130` painted unknown as operating
+        // green, byte for byte. Proposed projects resolve to the proposed hex; a proposed
+        // record that somehow carried a regulatory identity would take that colour instead.
         var grp=new THREE.Group();grp.position.set(x,0,zc);
         var ge=new THREE.BoxGeometry(w,h,w);ge.translate(0,h/2,0);
-        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:pcol,transparent:true,opacity:.85})));
-        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:pcol,transparent:true,opacity:.10})));
+        grp.add(new THREE.LineSegments(new THREE.EdgesGeometry(ge),new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.85})));
+        grp.add(new THREE.Mesh(ge,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.10})));
         grp.scale.y=Math.max(0.0001,V3.rise);G.add(grp);V3.proposed.push(grp);
+        notePaint(p, grp.children[0].material.color.getHex(), false);
       } else {
         // Operating, approved and lifecycle-UNKNOWN are precise, fewer, and the point of the
-        // view — label these. The colour comes from lc3D (the shared lifecycle palette), NOT
-        // from a hardcoded literal: this line used to read
+        // view — label these. Colour is paint.col from site3DPaint → mk.color, NOT a
+        // hardcoded literal and NOT the lifecycle bucket alone (that is what made every
+        // EPA facility a green "Operating now" block). The quoted old line is the defect:
         //     var col = bkt==="approved" ? 0x2563EB : 0x1f5130;
-        // so `unknown` was painted the operating green EXACTLY, byte for byte — the 3D aerial
-        // said "operating now" about every record whose source states no lifecycle, which is
-        // the one claim the unknown bucket exists to avoid making.
-        var col=lc3D(bkt);
         var bm=new THREE.Mesh(new THREE.BoxGeometry(w,h,w),new THREE.MeshStandardMaterial({color:col,roughness:.7,emissive:0xffce8a,emissiveIntensity:.10}));
         bm.position.set(x,h/2,zc);bm.castShadow=true;bm.receiveShadow=true;bm.userData.site=p;G.add(bm);V3.pickable.push(bm);
         // Friendly building-TYPE label — only when the scene is sparse enough to read;
         // in a dense cluster hover/click shows it instead (see showLabels above).
         if(showLabels){ var lb=lblSprite(facilityType(p),LBL_BG[bkt]||LBL_BG.unknown,"#eaf5f1");lb.position.set(x,h+11,zc);G.add(lb); }
+        var drewBadge=false;
+        if(paint.signal){
+          var rb=lblSprite(paint.signal.letter || "R", paint.signal.color, "#fff");
+          rb.position.set(x+w*0.42, h+5, zc+w*0.42);
+          rb.scale.set(4.2*(rb.userData.asp||1), 4.2, 1);
+          rb.userData.regBadge=true;
+          G.add(rb);
+          drewBadge=true;
+        }
+        // Read back off the mesh that was added to the scene, and off whether the badge
+        // was really drawn — the hook reports the view, not the intent.
+        notePaint(p, bm.material.color.getHex(), drewBadge);
         if(p.viol){var fl=new THREE.Mesh(new THREE.SphereGeometry(3.5,12,12),new THREE.MeshBasicMaterial({color:0xC0392B}));fl.position.set(x,h+6,zc);G.add(fl);}
       }
     });
+    stampPaint();
   }
 
   function resize3D(){ if(!V3.inited)return;var h=document.getElementById("map3d");var w=h.clientWidth||560,ht=h.clientHeight||460;
@@ -3495,13 +4121,13 @@ HS.onReady(function(){
     // Home marker only after an address search — never for a bare ZIP centroid.
     if(!HOME_ANCHOR){
       GL.homeMarker=new maplibregl.Marker({element:homePinEl()}).setLngLat([GL.home.lng,GL.home.lat])
-        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Your home</div>")).addTo(GL.map);
+        .setPopup(new maplibregl.Popup({offset:16}).setHTML("<div class='pt'>"+esc(LAST_ADDR)+"</div><div class='pk'>Address</div>")).addTo(GL.map);
     }
     MAP_SITES.forEach(function(s){
       var ll=siteLL(s);
       if(typeof ll[0]!=="number"||typeof ll[1]!=="number")return;
       if(!mappable(s))return;
-      var bkt=bucketOf(s.type); if(!siteVisible(s))return;
+      var bkt=bucketOf(s.type, s); if(!siteVisible(s))return;
       var approxPt=isApproxPoint(s);
       var el=glMarkerEl(s, approxPt);
       var popup=new maplibregl.Popup({offset:12,maxWidth:"260px"}).setHTML(popupHTML(s));
@@ -4293,54 +4919,6 @@ HS.onReady(function(){
     $("dtAnchorBody").innerHTML = h;
   }
 
-  function renderNoticeList(elId, alerts, meetings, zip, countywide){
-    var el = $(elId); alerts = alerts||[]; meetings = meetings||[];
-    var total = alerts.length + meetings.length;
-    if(!total){
-      el.innerHTML = countywide
-        ? "<div class='empty'>No county-wide development notices on record right now.</div>"
-        : "<div class='empty'>No address-specific development notices filed in ZIP " + esc(zip) + " yet. " +
-          "For a rural ZIP this is expected — the county-wide items are listed alongside.</div>";
-      return;
-    }
-    var badge = countywide ? "<span class='dt-badge'>County-wide</span>" : "";
-    var body = "";
-    meetings.forEach(function(m){
-      var when = m.meeting_date ? " · " + fmtDate(m.meeting_date) : "";
-      var link = m.source_url ? " · " + recordLink({ record_url:m.source_url, scope:"area" }, m.source_url) : "";
-      body += "<div class='rec'><span class='dot' style='background:#0f766e'></span><div style='flex:1'>" +
-        "<div class='t'>" + badge + esc(m.title||"Untitled meeting") + "</div>" +
-        "<div class='s'>" + esc(m.category||"") + when + (m.agency_name?" · "+esc(m.agency_name):"") +
-        (m.location?" · "+esc(m.location):"") + link + "</div></div></div>";
-    });
-    alerts.forEach(function(a){
-      var when = (a.published_at||a.created_at) ? " · " + fmtDate(a.published_at||a.created_at) : "";
-      var link = a.source_url ? " · " + recordLink({ record_url:a.source_url, scope:"area" }, a.source_url) : "";
-      body += "<div class='rec'><span class='dot' style='background:#3b5566'></span><div style='flex:1'>" +
-        "<div class='t'>" + badge + esc(a.title||"Untitled notice") + "</div>" +
-        "<div class='s'>" + esc(a.category||"") + when + (a.agency_name?" · "+esc(a.agency_name):"") +
-        link + "</div></div></div>";
-    });
-    el.innerHTML = "<div class='dt-count'>" + total + " notice" + (total===1?"":"s") + "</div>" +
-                   "<div class='dt-roster'>" + body + "</div>";
-  }
-
-  function renderNotices(zip){
-    var catIn = "in.(" + DEV_CATEGORIES.map(function(c){ return '"'+c.replace(/"/g,'\\"')+'"'; }).join(",") + ")";
-    var aSel = "title,category,agency_name,source_url,published_at,created_at,geo_scope,zip,impact_level";
-    var mSel = "title,category,source_url,meeting_date,location,geo_scope,zip"; // meetings has no agency_name
-    // Bucket (b): address-precise notices in THIS ZIP.
-    Promise.all([
-      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:aSel, order:"created_at.desc" }),
-      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, geo_scope:"eq.address", zip:"eq."+zip, select:mSel, order:"meeting_date.asc" })
-    ]).then(function(r){ renderNoticeList("dtBucketB", r[0], r[1], zip, false); });
-    // Bucket (c): county-wide notices (geo_scope countywide OR null) — cascade, labeled, never hidden.
-    Promise.all([
-      sbFetch("alerts",   { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:aSel, order:"created_at.desc" }),
-      sbFetch("meetings", { community_id:"eq."+BOX_ELDER, category:catIn, or:"(geo_scope.eq.countywide,geo_scope.is.null)", select:mSel, order:"meeting_date.asc" })
-    ]).then(function(r){ renderNoticeList("dtBucketC", r[0], r[1], zip, true); });
-  }
-
   // Create the Leaflet map for the parcel footprint when the ZIP has no cached development_reports
   // row (so drawMap never ran). Mirrors drawMap's base-map setup.
   function ensureParcelMap(lat, lng){
@@ -4423,23 +5001,146 @@ HS.onReady(function(){
         drawParcels();
       });
     });
-    // (b)/(c) notices — only for a Box Elder ZIP (the county whose notices cascade onto this page).
-    sbFetch("communities", { zip_codes:"cs.{"+zip+"}", select:"county" }).then(function(crows){
-      var isBE = (crows||[]).some(function(r){ return (r.county||"").toLowerCase()==="box elder"; });
-      if(!isBE) return; // outside Box Elder → county notices don't apply here
-      renderNotices(zip);
-      $("dtNotices").style.display = ""; $("devTracker").style.display = "";
+    // (b)/(c) ZIP + county-wide notice boxes were removed 2026-09-26 (founder decision): the same
+    // notices live on the ZIP detail page and the Alerts page, which keep only current items.
+  }
+
+  // ===================== EMBED MODE — Place Context Maps =====================
+  // A Place page iframes this document. Two shapes, and only two:
+  //   Address  homesignalmap.html?embed=1&lat=<saved>&lng=<saved>&radius=2
+  //   ZIP      homesignalmap.html?embed=1&zip=<zip>
+  //
+  // ?addr= IS NOT AN EMBED SHAPE. It routes to loadProperty(), the address DOSSIER, which is
+  // a different document with a different job; the Place page already carries that material.
+  //
+  // EMBED ADDRESS SKIPS THE GEOCODER ENTIRELY. property.html holds a SAVED home whose lat/lng
+  // were resolved once, when it was saved. Re-resolving them here would ask the geocoder the
+  // same question a second time and could answer it differently — a Place page whose pin
+  // moves between visits. The point arrives in the URL and is used verbatim as the RPC input,
+  // exactly as run() uses the geocoder's returned point verbatim.
+  function embedRadius(u){
+    var raw = parseFloat(u.searchParams.get("radius"));
+    // THE ALLOWLIST IS THE SERVER'S, NOT A LOCAL PREFERENCE. n5_projects_within_radius raises
+    // 22023 on an off-allowlist radius, and this page would then render an empty result — a
+    // refusal wearing the face of "nothing is near this home". Same guard syncRadiusStops()
+    // applies to the visible picker, applied here because in embed mode there is no picker.
+    if(!isFinite(raw) || !HS.N5_RADII || HS.N5_RADII.indexOf(raw) < 0) return null;
+    return raw;
+  }
+
+  function runEmbedPoint(home, radius){
+    // Address mode, minus the geocode and minus the report engine (see below).
+    ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
+    CUR_ADDRESS = "";
+    CUR_RADIUS = radius;                    // pinned; #radSel is hidden, so nothing can rewrite it
+    setRadiusButton(radius); syncRadiusStops();
+    document.body.classList.remove("zipmode");
+    var token = ++REQ_SEQ;
+    N5_NOTE = "";
+    var _cap = document.querySelector(".map-cap");
+    if(_cap){ _cap.textContent = "Development within " + radiusLabel(radius) + " of this address"; }
+    status("Pulling public records within " + radiusLabel(radius) + " of this address …");
+    // ⚠️ THE EPA FACILITY LAYER IS NOT IN THIS PIPELINE, AND THAT IS A CONSEQUENCE OF THE
+    // URL SHAPE RATHER THAN AN OMISSION. run() gets facilities from the get-address-report
+    // edge function, whose address mode requires an `address` STRING and geocodes it
+    // server-side (index.ts: `if (!address) return 400` then `geocode(address)`); it has no
+    // {lat,lng,radius_mi} shape. Calling it would mean both passing an address the embed
+    // contract does not carry and re-geocoding the saved home, which this mode exists to
+    // avoid. So an embed address map draws the N5 project corpus: real types, real statuses,
+    // real records. The regulatory row is still Map 1's own control over Map 1's own layer —
+    // it simply has no regulatory records to govern here. Stated, not hidden: hiding the row
+    // would be a second filter panel, which is the thing this whole unit refuses to build.
+    n5Radius(home, radius).then(function(rows){
+      if(!currentReq(token)) return;
+      return hydrateProjects(HS.n5SourceKeys(rows)).then(function(projects){
+        if(!currentReq(token)) return;
+        N5_NOTE = HS.n5CoverageNote(rows, radiusLabel(radius));
+        render({ home: home, address: "", sites: HS.n5SitesFrom(rows, projects, home), counts: {} });
+      });
+    }).catch(function(err){
+      if(!currentReq(token)) return;
+      status("Network error reaching the records service. (" + err.message + ")", true);
     });
+  }
+
+  // EMBED ZIP ONLY: draw and fit this ZIP's real ZCTA outline over Map 1's own ZIP view.
+  // Read through public.app_zcta_boundary (SECURITY DEFINER); geo.zcta_boundary is not
+  // readable from a browser and must not be. The polygon is the AREA the Place page is
+  // about, which is why it belongs on a Place embed and not on the full Development page —
+  // ZIP_FRAME, computed from the records' own extent, is deliberately left as it is there.
+  //
+  // NOT MEASURED MEANS NOT DRAWN. Map 1's existing ZIP framing stays exactly as it is; no
+  // circle, no envelope, no bbox of project points stands in for a boundary we do not have.
+  function paintEmbedZipBoundary(zip){
+    if(!window.HS || !HS.sb || !HS.boundaryFC) return;
+    HS.sb().rpc("app_zcta_boundary", { p_zip: zip }).then(function(r){
+      if(r.error || !r.data) return;
+      var payload = r.data;
+      if(payload.status !== "boundary_complete") return;   // not_measured -> Map 1's own framing stands
+      var fc = HS.boundaryFC(payload.geometry);
+      var b = fc ? HS.boundaryBounds(fc) : null;
+      if(!fc || !b) return;                                // a non-area geometry is not a boundary
+      EMBED_BOUNDARY = { fc: fc, bounds: b };
+      applyEmbedBoundary();                                // in case render already ran
+    }).catch(function(){});
   }
 
   // ===================== ZIP-mode boot (the crawlable landing surface) =====================
   // ?addr=<canonical> → property page; ?zip=<zip> or /development/<zip> → cached ZIP report.
   (function boot(){
     var u = new URL(window.location.href);
+    // EMBED FIRST. An embed URL never reaches ?addr=: the dossier is not a map.
+    if(u.searchParams.get("embed") === "1"){
+      var ez = u.searchParams.get("zip");
+      if(ez && /^\d{5}$/.test(ez)){
+        if(window.HS && HS.state) HS.state.zip = ez;
+        if(window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(ez);
+        loadZip(ez);                       // Map 1's own ZIP mode, unchanged
+        paintEmbedZipBoundary(ez);         // plus the real ZCTA outline, embed only
+        return;                            // no loadDevTracker: the tracker is hidden here
+      }
+      var elat = parseFloat(u.searchParams.get("lat")), elng = parseFloat(u.searchParams.get("lng"));
+      var er = embedRadius(u);
+      if(isFinite(elat) && isFinite(elng) && er !== null){
+        runEmbedPoint({ lat: elat, lng: elng }, er);
+      } else {
+        // A malformed embed URL renders NOTHING rather than a default geography. The
+        // sample ZIP fallback below is for a resident who navigated here; an iframe that
+        // asked for a specific place must never be answered with a different one.
+        status("This map needs a location.", true);
+      }
+      return;
+    }
+    // HOMEPAGE HANDOFF (founder, 2026-10-04). index.html cannot put an address in a URL, and this
+    // page has no address route of its own, so the homepage leaves the typed text in this tab's
+    // sessionStorage and navigates here. It is read ONCE and removed before anything else runs,
+    // so a reload or Back never repeats the search. An explicit ?zip= / ?addr= in the URL wins.
+    var handed = "";
+    try {
+      handed = String(sessionStorage.getItem("hs.homeSearchAddress") || "").trim();
+      sessionStorage.removeItem("hs.homeSearchAddress");
+    } catch(_e) { handed = ""; }
+    if(handed && !u.searchParams.get("addr") && !u.searchParams.get("zip")){
+      $("addr").value = handed;
+      run(handed);
+      return;
+    }
     var a = u.searchParams.get("addr");
-    if(a && a.trim()){ loadProperty(a.trim()); return; }
+    // ?addr= is an ADDRESS route. Declared for symmetry with the ZIP branch below, and so a
+    // URL carrying BOTH params can never be read as a ZIP Place: the route asked for a
+    // property record, so the address is the Place being viewed.
+    if(a && a.trim()){
+      if(window.HS && HS.setViewPlaceType) HS.setViewPlaceType('address');
+      loadProperty(a.trim()); return;
+    }
     var z = u.searchParams.get("zip");
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
+    // AN EXPLICIT ROUTE ZIP IS A DECLARED ZIP PLACE — synchronous, before loadZip() issues a
+    // single fetch, so the Viewing control names the ZIP on first paint rather than a saved
+    // Address inside it. Placed HERE and not inside loadZip() on purpose: loadZip also serves
+    // the shell-context fallback below, which is NOT an explicit declaration, and declaring
+    // there would change the chip on a route that named no place.
+    if(z && /^\d{5}$/.test(z) && window.HS && HS.declareRouteZipPlace) HS.declareRouteZipPlace(z);
     // Reuse shell ZIP context when the URL has no ?zip= — never auto-load the sample default.
     if(!z && window.HS && HS.hasViewedZipContext && HS.hasViewedZipContext() && HS.state && /^\d{5}$/.test(String(HS.state.zip))){
       z = String(HS.state.zip);

@@ -82,7 +82,12 @@ for (const p of PAIRS) {
   const moving = [...s2b.proposed, ...s2b.approved];
   const stalled = moving.filter((v) => /hold|stall|suspend|paus|dormant|inactive/i.test(v));
   ok(stalled.length === 0, `${p.state}: no stalled-sounding status is bucketed as proposed/approved`, JSON.stringify(stalled));
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(new Set(all).size === all.length, `${p.state}: no status value is bucketed twice`);
 }
 
@@ -133,8 +138,17 @@ console.log('\n── live-measured specifics ───────────�
     'VT: COMPLETE → operating (occurs only on the lines layer; was unmapped)');
   ok(VT.status_to_bucket.exclude.includes('ON HOLD') && VT.status_to_bucket.exclude.includes('CANCELLED'),
     'VT: ON HOLD + CANCELLED stay excluded — a stalled value must never claim motion');
-  ok(!byId('vtrans-project-locations').status_to_bucket.operating.includes('COMPLETE'),
-    'VT: the POINTS entry is left alone — COMPLETE does not occur there, and adding it would be an unmeasured edit');
+  // ⚠️ THE POINTS ENTRY NOW MAPS IT TOO, 2026-09-11 — and the 2026-08-05 receipt above is
+  // PRESERVED rather than rewritten, because it was true on its date. What changed is the
+  // data: scripts/source-monitor.mjs probed `vtrans-project-locations` (FeatureServer/10,
+  // the POINTS layer, 1,037 rows) in that entry's OWN scope — extra_where ProjectStatus IS
+  // NOT NULL AND ExpectedConstructionStart IS NOT NULL, no recency window — and found
+  // COMPLETE in-window and unmapped, so the connector was DROPPING it. The two entries are
+  // separate layers (points /10, lines /9), so this is not the lines value leaking across.
+  // The earlier "adding it would be an unmeasured edit" was right about the principle and is
+  // now satisfied: the edit IS measured, by the monitor, in the connector's own scope.
+  ok(byId('vtrans-project-locations').status_to_bucket.operating.includes('COMPLETE'),
+    'VT: the POINTS entry maps COMPLETE too — the monitor measured it in-window on layer 10');
 }
 
 console.log();

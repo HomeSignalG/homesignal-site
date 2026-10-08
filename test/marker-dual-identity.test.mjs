@@ -18,6 +18,7 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 
 global.window = { HS: {}, sessionStorage: { _v: null, getItem() { return this._v; }, setItem(k, v) { this._v = v; } } };
 await import('../lib/templates.js');
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 const HS = global.window.HS;
 const frsRid = (s) => (s && s.registry_id != null) ? String(s.registry_id).trim() : '';
@@ -40,9 +41,10 @@ const dual = track(DUAL), plain = track(PLAIN_FAC), proj = track(DC_PROJECT);
 // ── 1-3. The three record kinds resolve to the right primary identity ─────────────
 ok(proj.categoryKey === 'datacenter' && proj.shape === 'octagon' && !proj.isFacility && !proj.signal,
   '1: ordinary Data center project — octagon, no EPA signal');
-ok(plain.categoryKey === 'facility' && plain.shape === 'square'
-   && plain.color === HS.markerRegistry.facilityHex && !plain.signal,
-  '2: ordinary Regulated facility — purple square, unchanged, no secondary symbol');
+ok(plain.categoryKey === 'industrial' && plain.shape === 'triangle'
+   && plain.color !== HS.markerRegistry.facilityHex && plain.signal
+   && plain.signal.letter === 'R' && plain.overlayOnType === true,
+  '2: classifiable EPA (layer industrial) — Type triangle + status colour + purple R');
 ok(dual.categoryKey === 'datacenter' && dual.shape === 'octagon' && dual.isFacility === true
    && dual.isDataCenter === true && dual.shapeRule === 'DUAL:datacenter+facility',
   '3: proven dual identity — PRIMARY identity is Data center, and it is still a facility');
@@ -62,12 +64,16 @@ setOnly('datacenter');
 ok(HS.categoryVisible(dual) === true, '4: Data Center ON / EPA OFF → dual record VISIBLE');
 ok(track(DUAL).shape === 'octagon' && track(DUAL).signal !== null,
   '4b: …still the Data center octagon, and the EPA square is STILL attached');
-ok(HS.categoryVisible(plain) === false, '4c: …an ordinary EPA facility is correctly hidden');
+ok(HS.categoryVisible(plain) === false, '4c: …an industrial EPA overlay is hidden when Industrial is off');
 
 setOnly('facility');
-ok(HS.categoryVisible(dual) === true, '5: Data Center OFF / EPA ON → dual record VISIBLE');
+// ⚖️ INVERTED BY THE 2026-09-15 RULING (regulatory is always an independent OVERLAY).
+// Data center is OFF, so the dual record's base pin is gone with every other data centre.
+// The regulatory switch cannot bring it back — it annotates base pins, it never sources one.
+ok(HS.categoryVisible(dual) === false,
+  '5: Data Center OFF → the dual record is HIDDEN; regulatory ON cannot re-admit it');
 ok(track(DUAL).categoryKey === 'datacenter' && track(DUAL).shape === 'octagon',
-  '5b: …and its primary symbol is STILL Data center — the filter that admitted it does not rename it');
+  '5b: …and its identity is untouched by being filtered out — still the Data center octagon');
 ok(HS.categoryVisible(proj) === false, '5c: …a plain data-centre project is correctly hidden');
 
 setOnly('datacenter', 'facility');
@@ -77,12 +83,20 @@ setOnly();
 ok(HS.categoryVisible(dual) === false, '7: BOTH OFF → not visible');
 ok(HS.allCategoriesOff() === true, '7b: the all-off state is genuinely empty');
 
-// TEST E — the founder's acceptance scenario, stated as its own assertion.
+// ⚖️ TEST E IS SUPERSEDED BY THE 2026-09-15 RULING and is inverted here rather than
+// deleted, because the scenario is still worth asserting — only its verdict moved.
+// "All types off except EPA" is no longer a way to see EPA records: with every Type off
+// there is no base pin for the overlay to ride on, and regulatory may not render one.
+// The record's IDENTITY is asserted unchanged in the same breath, which is the half of
+// the old test that still governs.
 setOnly('facility');
-ok(HS.categoryVisible(dual) === true && track(DUAL).categoryKey === 'datacenter'
+ok(HS.categoryVisible(dual) === false,
+  '8: ALL TYPES OFF + regulatory ON → NOTHING renders; the switch is an overlay, not a source');
+ok(track(DUAL).categoryKey === 'datacenter'
    && track(DUAL).shape === HS.CATEGORY_REGISTRY.datacenter.symbol
    && track(DUAL).signal.shape === HS.CATEGORY_REGISTRY.facility.symbol,
-  '8: ALL TYPES OFF EXCEPT EPA → the data centre remains visible, as a DATA CENTER with its EPA square');
+  '8b: …and the record is STILL a Data center carrying its EPA square — being filtered out '
+  + 'never reclassifies it');
 
 // ── 9-11. One record, one marker — membership is any-of, never a join ─────────────
 setOnly('datacenter', 'facility');
@@ -94,11 +108,18 @@ ok(memberships.length === 2 && memberships.indexOf('datacenter') === 0 && member
 // by emitting a second marker.
 const list = [DUAL, PLAIN_FAC, DC_PROJECT].map(s => track(s));
 const shown = HS.filterByCategory(list);
-ok(shown.length === 3 && shown.filter(x => x.isDataCenter && x.isFacility).length === 1,
+// ⚖️ 3 → 2 under the 2026-09-15 ruling. The state here is setOnly('datacenter','facility'),
+// so Industrial is OFF and PLAIN_FAC is now governed by its own Type chip rather than
+// admitted through `facility` — the same correction §4c above already asserts. The claim
+// under test is UNCHANGED and is still the point: the dual record appears ONCE, not once
+// per matching membership. §13 below still counts 3 with every Type on.
+ok(shown.length === 2 && shown.filter(x => x.isDataCenter && x.isFacility).length === 1,
   '10: both filters on → the dual record appears ONCE in the visible set, not twice');
 setOnly('facility');
-ok(HS.filterByCategory(list).length === 2,
-  '11: EPA only → exactly the two facility-membership records, each once');
+// ⚖️ 2 → 0 under the 2026-09-15 ruling: "EPA only" is not a selectable view of the map.
+// Selecting no Type selects no base pins, and the overlay switch does not add any.
+ok(HS.filterByCategory(list).length === 0,
+  '11: regulatory alone selects NOTHING — it is an overlay, never a membership');
 
 // ── 12-13. Count semantics ───────────────────────────────────────────────────────
 // A category-specific count may legitimately count the record under BOTH categories…
@@ -115,8 +136,9 @@ ok(HS.filterByCategory(list).length === 3,
 ok(dual.popupLabel.indexOf('Data center') < dual.popupLabel.indexOf('Regulated facility')
    && dual.popupLabel.indexOf('Data center') !== -1 && dual.popupLabel.indexOf('Regulated facility') !== -1,
   '14: the popup states BOTH truths, identity first');
-ok(plain.popupLabel.indexOf('Data center') === -1 && plain.popupLabel.indexOf('Regulated facility') !== -1,
-  '14b: an ordinary facility popup is unchanged and claims no data centre');
+ok(plain.popupLabel.indexOf('Data center') === -1 && plain.popupLabel.indexOf('Industrial') !== -1
+   && plain.popupLabel.indexOf('Regulated facility') !== -1,
+  '14b: a classifiable EPA popup states Type · Regulated facility, never a data centre');
 // The popup must not editorialise EPA presence into harm.
 ok(!/pollut|danger|contamin|hazard|toxic|risk/i.test(dual.popupLabel),
   '14c: the EPA signal is stated as a regulatory fact — never as proof of harm');
@@ -130,17 +152,17 @@ ok(!/pollut|danger|contamin|hazard|toxic|risk/i.test(dual.popupLabel),
  ['CYRUSONE POWER POD 7', '110041734317']
 ].forEach(function (r, i) {
   const mk = track({ type: 'built', label: r[0], layer: 'energy', scope: 'point', registry_id: r[1] });
-  ok(mk.categoryKey === 'facility' && !mk.isDataCenter,
+  ok(mk.categoryKey === 'infrastructure' && !mk.isDataCenter,
     '15.' + i + ': "' + r[0] + '" — campus grain: a power pod is not the data centre it powers');
 });
 // Similar name / same operator — CyrusOne runs data centres; that is not evidence about
 // THIS facility. The record's own class field says substation.
 ok(track({ type: 'built', label: 'CYRUSONE CHI 11 SUBSTATION MASS GRADING', layer: 'energy',
-           scope: 'point', registry_id: '110072130291' }).categoryKey === 'facility',
-  '16: operator brand alone never establishes identity — the substation stays a facility');
+           scope: 'point', registry_id: '110072130291' }).categoryKey === 'infrastructure',
+  '16: operator brand alone never establishes identity — the substation is Roads & infrastructure overlay');
 // Proximity-only: a facility sitting at a data centre's coordinates is still not one.
 ok(track({ type: 'built', label: 'ACME PLATING WORKS', layer: 'industrial', scope: 'point',
-           lat: DUAL.lat, lng: DUAL.lng, registry_id: '110000000002' }).categoryKey === 'facility',
+           lat: DUAL.lat, lng: DUAL.lng, registry_id: '110000000002' }).categoryKey === 'industrial',
   '17: identical coordinates to a proven data centre prove nothing — no proximity join');
 
 // ── 18. Geography is untouched ───────────────────────────────────────────────────

@@ -79,16 +79,26 @@ if (files.length < minFiles) {
   process.exit(1);
 }
 
-let failed = 0;
+// AN INSTRUMENT MUST SAY WHICH HALF BROKE. This printed only a COUNT, so a red CI run
+// said "1 test file(s) failed" and nothing else — and the job log is served from a blob
+// host that a restricted network cannot fetch, so the per-suite output is often
+// unreachable. Identifying the suite then means guessing, or pushing commits to bisect a
+// remote. The names cost one line and are the whole answer.
+const failures = [];
 for (const file of files) {
   const path = join(testDir, file);
   console.log('\n=== ' + file + ' ===');
   const res = spawnSync(process.execPath, [path], { stdio: 'inherit', cwd: root });
-  if (res.status !== 0) failed++;
+  // status is null when the child was killed by a signal (OOM, timeout) — that is a
+  // failure too, and reporting it as one is why this tests `!== 0` rather than truthiness.
+  if (res.status !== 0) {
+    failures.push(file + (res.status === null ? ' (signal ' + res.signal + ')' : ''));
+  }
 }
 
-if (failed) {
-  console.error('\n' + failed + ' test file(s) failed');
+if (failures.length) {
+  console.error('\n' + failures.length + ' test file(s) failed:');
+  for (const f of failures) console.error('  - ' + f);
   process.exit(1);
 }
 console.log('\nAll ' + files.length + ' unit test file(s) passed (mode=' + mode + ').');

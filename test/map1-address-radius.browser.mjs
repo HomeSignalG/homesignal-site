@@ -17,6 +17,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0;
 const ok = (c, name, detail) => {
@@ -164,6 +165,7 @@ await page.route('**/*', async (route) => {
     calls.push({ kind: 'hydrate', url });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROJECTS) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, () => ZIP_ROW);
   if (url.includes('/rest/v1/development_reports')) {
     calls.push({ kind: 'zipcache', url });
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW) });
@@ -271,7 +273,7 @@ await page.waitForSelector('.leaflet-popup-content', { timeout: 5000 }).catch(()
 const popup = (await page.textContent('.leaflet-popup-content').catch(() => '')) || '';
 ok(/Caldwell Lane|Riverside Resort/.test(popup),
   'clicking a canonical marker opens the existing Map 1 dossier popup', popup.slice(0, 120));
-ok(/mi from home|at this address/.test(popup), 'the popup carries a distance: ' + popup.slice(0, 100));
+ok(/mi from this address|at this address/.test(popup), 'the popup carries a distance: ' + popup.slice(0, 100));
 ok(!/Facility · operating now/.test(popup),
   'Q — a canonical project is NOT labelled as an EPA facility: ' + popup.slice(0, 100));
 

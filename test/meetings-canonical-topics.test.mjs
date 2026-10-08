@@ -44,8 +44,14 @@ ok(/while \(up && up\.parent_id/.test(q) && /ids\.push\(up\.parent_id\)/.test(q)
 ok(/hops\+\+ < 6/.test(q), 'the chain walk is cycle-capped');
 ok(/from\('meetings'\)[\s\S]*\.in\('community_id', ids\)/.test(q),
   'the query filters on the whole ancestor id set');
-ok(/\.gte\('meeting_date', new Date\(\)\.toISOString\(\)\)/.test(q),
-  'only UPCOMING meetings (meeting_date >= now())');
+// The boundary moved from an INSTANT to the viewer's CALENDAR DATE (2026-09-21). The
+// property this line guards — a past meeting never renders under "Upcoming" — is
+// unchanged and is now pinned harder: test/meetings-upcoming-window.test.mjs asserts
+// yesterday and a 2020 archive row are both excluded, across all three call sites and
+// both languages. `meeting_date` is a DATE (96.3% of rows sit at a local midnight), so
+// comparing it to now() dropped TODAY's meetings at local midnight — before they happened.
+ok(/const cutoff = upcomingCutoffIso\(\);/.test(q) && /\.gte\('meeting_date', cutoff\)/.test(q),
+  'only UPCOMING meetings (meeting_date >= the viewer\'s calendar date)');
 ok(/\.order\('meeting_date', \{ ascending: true \}\)/.test(q),
   'ordered by meeting_date ascending (soonest first)');
 

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>HomeSignal — Development Activity report</title>
+<meta name="description" content="A private Development Activity report shared with you by your agent.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+/* ============================================================================
+   DEVELOPMENT ACTIVITY — THE CLIENT'S PAGE (build step 8 of
+   docs/development-activity-build-steps-100526.md).
+
+   Where a client lands from the private link their agent sent them. Not in navigation, not in the sitemap, noindex, disallowed in
+   robots.txt, linked from nowhere: it is reached only from a share link (shared-report.html#share=<token>). The token rides in the URL
+   FRAGMENT, which a browser never sends to any server; the page reads it, removes it from the address bar, and sends it in a POST body to
+   view-shared-report, the one Development Activity function that needs no sign-in. The page sends no referrer.
+
+   The page decides nothing. Whether the link is usable, and what it opens, is the database's (through view-shared-report); the report is
+   drawn by lib/da-report-view.js, the same view the agent saw. The client sees the brokerage's name and the street address while the
+   private layer keeps it (founder, 2026-10-03), never the agent's name or the label the agent typed, and sees no sign-in, no account and
+   no other report. Every link that opens nothing - unknown, withdrawn, expired - gets ONE message, so the page tells no one whether a
+   link ever existed.
+
+   "Download PDF" is the browser's own print window (choose "Save as PDF"): no PDF is made on a server. The print stylesheet below leaves
+   only the report on the paper.
+   ============================================================================ */
+:root{--bg:#f4f6f4;--panel:#ffffff;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+header.top{padding:16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{max-width:960px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--accent)}
+.go{font:inherit;font-size:14.5px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;min-height:44px}
+.go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.wrap{max-width:960px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:14px}
+#status{margin:0;font-size:15px;min-height:1.5em}
+#status.err{color:var(--red);font-weight:600}
+.notice{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.notice h1{margin:0 0 6px;font-size:18px}
+.notice p{margin:0;color:var(--muted);max-width:65ch}
+.notice p+p{margin-top:8px}
+#rid{margin:0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+#private{margin:0;font-size:12.5px;color:var(--muted);max-width:75ch}
+noscript p{margin:16px;font-weight:600}
+@media print{
+  body{background:#fff;font-size:12.5px}
+  header.top,#status,#private,.notice,noscript{display:none!important}
+  .wrap{max-width:none;padding:0}
+  #rid{color:#444}
+}
+</style>
+</head>
+<body data-state="loading">
+<header class="top">
+  <div class="in">
+    <p class="brand">HOMESIGNAL DEVELOPMENT ACTIVITY</p>
+    <button type="button" class="go" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+  </div>
+</header>
+<main class="wrap">
+  <p id="status" role="status" aria-live="polite">Loading the report…</p>
+  <div id="gone" class="notice" hidden></div>
+  <div id="report"></div>
+  <p id="rid" hidden></p>
+  <p id="private" hidden>This is a private link. Anyone who has it can read this report, so share it only with people you trust. The brokerage that sent it can withdraw it at any time, and it stops working six months after it was made.</p>
+</main>
+<noscript><p>This report needs JavaScript to be shown. Please turn it on, or ask the person who sent you the link for a printed copy.</p></noscript>
+<script src="lib/project-type.js?v=108e00a6"></script>
+<script src="lib/da-report-view.js?v=343cdb93"></script>
+<script>
+(function(){
+  // The public anon key every page carries. This page makes no account and signs no one in; it only lets the browser reach the
+  // project's function gateway. It cannot make or read anything by itself: the link's token is the only credential, and the function
+  // answers only a token the database says is usable.
+  var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
+  var FN = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shared-report';
+  var STASH = 'hs-da-share';
+  var TOKEN = /^[A-Za-z0-9_-]{43}$/;
+  var FRAGMENT = /^#share=([A-Za-z0-9_-]{43})$/;
+  function $(id){ return document.getElementById(id); }
+  function state(s){ document.body.setAttribute('data-state', s); }
+  function say(text, isError){ var s = $('status'); s.textContent = text || ''; s.className = isError ? 'err' : ''; }
+
+  // ---- the link: read from the fragment, then removed from the address bar -----------------------------------------------
+  // The token is kept for this tab only (sessionStorage), so a reload still works; nothing about it is kept anywhere longer.
+  function stash(v){ try { if (v) sessionStorage.setItem(STASH, v); else sessionStorage.removeItem(STASH); } catch (e) {} }
+  function recall(){ try { var v = sessionStorage.getItem(STASH); return v && TOKEN.test(v) ? v : null; } catch (e) { return null; } }
+  function readToken(){
+    var m = FRAGMENT.exec(location.hash || '');
+    if (m) {
+      stash(m[1]);
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      return m[1];
+    }
+    return recall();
+  }
+
+  function notice(title, lines, canRetry){
+    var box = $('gone');
+    box.textContent = '';
+    var h = document.createElement('h1'); h.textContent = title; box.appendChild(h);
+    lines.forEach(function(t){ var p = document.createElement('p'); p.textContent = t; box.appendChild(p); });
+    if (canRetry) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'go'; b.textContent = 'Try again'; b.style.marginTop = '12px';
+      b.addEventListener('click', function(){ start(); });
+      box.appendChild(b);
+    }
+    box.hidden = false;
+  }
+  /** ONE message for every link that opens nothing: unknown, withdrawn, expired or malformed. The page never says which. */
+  function dead(){
+    state('dead'); say('', false);
+    notice('This link doesn’t open a report', ['It may have been withdrawn, or it may have expired. Ask the person who sent it to you for a new link.']);
+  }
+  function missing(){
+    state('missing'); say('', false);
+    notice('Open the link you were sent', ['This page shows a report only when it is opened from the private link your agent sent you. Open that link again, or ask them to send it to you again.']);
+  }
+  function unavailable(){
+    state('error'); say('', false);
+    notice('The report couldn’t be loaded just now', ['Nothing is wrong with your link. Try again in a minute.'], true);
+  }
+
+  function show(body){
+    var V = window.HS && window.HS.daReportView;
+    $('gone').hidden = true;
+    // the client sees no report actions: Compare, Watch, Share and the bar's PDF are the agent's. The page's own button prints.
+    var shown = V && V.mount($('report'), body, {
+      subject: typeof body.address === 'string' ? body.address : '',
+      brokerage: typeof body.brokerage === 'string' ? body.brokerage : '',
+      hide: ['compare', 'watch', 'share', 'pdf']
+    });
+    if (!shown) { $('report').textContent = ''; unavailable(); return; }
+    state('report'); say('', false);
+    if (typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id)) { $('rid').textContent = 'Report ID ' + body.report_id; $('rid').hidden = false; }
+    $('private').hidden = false;
+    $('pdf').hidden = false;
+  }
+
+  async function start(){
+    var token = readToken();
+    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('pdf').hidden = true;
+    if (!token) { missing(); return; }
+    state('loading'); say('Loading the report…', false);
+    var res;
+    var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function(){ ctl.abort(); }, 20000) : null; // a stalled connection ends in the "could not load" message, never a page that says Loading forever
+    try {
+      res = await fetch(FN, {
+        method: 'POST', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ctl ? ctl.signal : undefined,
+        headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON },
+        body: JSON.stringify({ token: token })
+      });
+    } catch (e) { if (timer) clearTimeout(timer); unavailable(); return; }
+    var body = null; try { body = await res.json(); } catch (e) { body = null; }
+    if (timer) clearTimeout(timer);
+    if (res.status === 200 && body && body.status === 'OK') { show(body); return; }
+    if (res.status === 404) { dead(); return; }
+    unavailable();
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    $('pdf').addEventListener('click', function(){ window.print(); });
+    start();
+  });
+})();
+</script>
+</body>
+</html>

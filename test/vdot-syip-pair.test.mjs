@@ -57,7 +57,12 @@ ok(PTS.column_map.case_number === 'UPC' && LIN.column_map.case_number === 'UPC',
     'Claims - RW': 1 };
   for (const e of [PTS, LIN]) {
     const s2b = e.status_to_bucket;
-    const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+    // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+    // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+    // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+    // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+    // seventh bucket cannot break it, which is the whole point of a completeness check.
+    const all = Object.values(s2b).flat();
     ok(all.length === 15 && new Set(all).size === 15, `${e.registry_id}: 15 values, each bucketed once`);
     const missing = Object.keys(LIVE).filter((v) => !all.includes(v));
     ok(missing.length === 0, `${e.registry_id}: every live status is mapped`, JSON.stringify(missing));

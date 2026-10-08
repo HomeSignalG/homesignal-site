@@ -22,6 +22,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 
+import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 let fails = 0;
@@ -135,6 +136,7 @@ await page.route('**/*', async (route) => {
     return route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(ZIP_AUTH[z] || { zip: z, mode: 'development', status: 'not_measured', projects: null, markers: null }) });
   }
+  if (url.includes('/rpc/zip_mode_report_sites')) return fulfillZipModeReport(route, (z) => ZIP_ROW[z] || []);
   if (url.includes('/rest/v1/development_reports'))
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ZIP_ROW[zipOf(url)] || []) });
   if (url.includes('/rest/v1/communities'))
@@ -167,12 +169,14 @@ await page.route('**/*', async (route) => {
 
 // What the shared chrome is telling the resident, right now.
 const chrome = () => page.evaluate(() => {
-  const on = [].slice.call(document.querySelectorAll('.nav a.on'));
-  const el = document.getElementById('locLabel');
+  const on = [].slice.call(document.querySelectorAll('.hs-nav a.on'));
+  // The Viewing chip left the global header (founder, Revised Index Design, 2026-09-30); the
+  // decision it painted is HS.viewingLabel(), the one place the shell still makes it.
+  const vl = (window.HS && HS.viewingLabel) ? HS.viewingLabel() : null;
   return {
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
-    locLabel: el ? el.textContent.trim() : null,
+    locLabel: vl ? vl.text.trim() : null,
     kDev: (document.getElementById('kDev') || {}).textContent || null,
     kFac: (document.getElementById('kFac') || {}).textContent || null,
     totalTileShown: (() => { const t = document.getElementById('ccTot');
@@ -182,13 +186,13 @@ const chrome = () => page.evaluate(() => {
     hero: (document.querySelector('.sub') || {}).textContent || '',
     facMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance !== 'development').length,
     devMarkers: (window.__HS_SITES || []).filter(x => x.scope === 'point' && x.relevance === 'development').length,
-    locTitle: (() => { const w = el && el.closest('.loc'); return w ? (w.getAttribute('title') || '') : ''; })(),
+    locTitle: vl ? (vl.title || '') : '',
     savedHome: (window.HS && HS.state && HS.state.activeProperty)
       ? { address: HS.state.activeProperty.address, zip: HS.state.activeProperty.zip } : null,
     path: location.pathname, search: location.search
   };
 });
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 // Sign-in state cannot be created offline, so the REAL saved home is installed directly into
 // the shipped state and repainted through the shipped path (HS.setViewLabel -> paintTopbar).
 const installSavedHome = (home) => page.evaluate((h) => {
@@ -211,7 +215,9 @@ await waitShell();
 let c = await chrome();
 info('development.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '1 development.html highlights exactly one sidebar item', c.activeLabels);
-ok(c.activeTokens[0] === 'dev', '1 ...and it is Development & Impact', c.activeTokens);
+// RETARGETED (founder navigation plan v3, 2026-09-30). Development left the sidebar; the
+// development list is part of Explore, so Explore is the item it lights.
+ok(c.activeTokens[0] === 'explore', '1 ...and it is Explore (plan v3)', c.activeTokens);
 ok(c.activeTokens.indexOf('maps') < 0, '1 Maps is NOT active on Development & Impact', c.activeTokens);
 
 // ═══ 2. Map 1 identifies itself ═══
@@ -221,8 +227,13 @@ await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeo
 c = await chrome();
 info('homesignalmap.html', c.activeTokens);
 ok(c.activeTokens.length === 1, '2 Map 1 highlights exactly one sidebar item', c.activeLabels);
-ok(c.activeTokens[0] === 'maps', '2 ...and it is Maps', c.activeTokens);
-ok(c.activeTokens.indexOf('dev') < 0, '2 Development & Impact is NOT active on Map 1', c.activeTokens);
+// ⚠️ RETARGETED TWICE. This first asserted `activeTokens[0] === 'maps'` while a Maps sidebar
+// entry existed; A-021 then folded Maps under Development and it asserted 'dev'. The founder
+// navigation plan v3 (2026-09-30) makes the sidebar Explore | My Places | Enterprise, and
+// Map 1 is part of Explore. The thing this section protects is unchanged: Map 1 must light
+// exactly one item, and it must be the section it actually lives in.
+ok(c.activeTokens[0] === 'explore', '2 ...and it is Explore — Map 1 lives under it (plan v3)', c.activeTokens);
+ok(c.activeTokens.indexOf('maps') < 0, '2 there is no Maps item to light any more', c.activeTokens);
 
 // ═══ 6. ...while the proven ZIP contract is untouched ═══
 let z = await page.evaluate(() => ({
@@ -251,25 +262,106 @@ ok(z.devPoints > 0 && z.devPoints === z.authoritative,
   '6 every ZIP development point is authoritative whole-ZIP geometry', z);
 ok(z.distances === 0, '6 no radius distance is attached in ZIP mode', z.distances);
 
-// ═══ 3/4/5. Reaching Maps from other sections ═══
-for (const [origin, label] of [['alerts.html', '3 Alerts'], ['development.html', '4 Development & Impact'],
-                               ['dashboard.html', '5 Dashboard']]) {
+// ═══ 3/4/5. Reaching Map 1 from other sections ═══
+// ⚠️ RETARGETED (A-021), and the retarget is the point rather than a workaround. This loop
+// used to click `.nav a[data-nav="maps"]` from three origins. That entry no longer exists,
+// so the old loop did not merely fail — it TIMED OUT and crashed the whole file, taking
+// sections 6, 7 and 7b down with it. The journey it protects is still real: a resident must
+// be able to reach Map 1 from elsewhere in the product. What changed is the route. The
+// sidebar shortcut is gone BY DESIGN, so that absence is asserted here instead of crashed
+// on, and the two IN-PRODUCT paths A-021 kept are exercised in its place.
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+ok(await page.locator('.hs-nav a[data-nav="maps"]').count() === 0,
+  '3 there is no Maps primary item (A-021, kept by plan v3)');
+// Primary items are the links that carry data-nav; the Explore dropdown (founder,
+// 2026-10-02) adds three sub-entries that carry none.
+ok(await page.locator('.hs-nav a[data-nav]').count() === 3,
+  '3 ...and the primary nav is the three items (plan v3)', await page.locator('.hs-nav a[data-nav]').count());
+ok((await page.locator('.hs-nav a[data-nav]').evaluateAll(as => as.map(a => a.getAttribute('data-nav')))).join('|')
+     === 'explore|props|enterprise',
+  '3 ...Explore, My Places, Enterprise, in that order (plan v3)');
+ok(await page.locator('#hs-explore-sub a').count() === 3 && await page.locator('.hs-nav a').count() === 8,
+  '3 ...plus the Explore dropdown\'s three pages and the Enterprise dropdown\'s two, and nothing else', await page.locator('.hs-nav a').count());
+// The Dashboard is "What's Changed" for the resident's places, so it lights My Places.
+c = await chrome();
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'props',
+  '3 the Dashboard lights My Places (plan v3)', c.activeTokens);
+
+// ═══ 4. The Dashboard is the ALL MY PLACES briefing — it has no map to open ═══
+// RETARGETED (Fix 8). This section used to click a Dashboard "Open full map" control
+// (#dashMapLink) and assert it landed on Map 1. Fix 8 made the Dashboard an account-wide
+// briefing across every monitored place and REMOVED the default map with it, so that
+// control is gone BY DESIGN — exactly like the Maps sidebar entry §3 above asserts the
+// absence of, rather than crashing on. Asserting the removal positively is what keeps this
+// file honest: a deleted assertion would leave the Dashboard's map contract untested, and a
+// restored #dashMapLink would put back UI the approved contract removed.
+//
+// Map 1 itself is NOT untested here — §5 below still drives the public ZIP route to it, so
+// the in-product path this section was protecting survives with one origin instead of two.
+await page.goto(base + '/dashboard.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForSelector('#dashPlaces a, #dashPlaces p', { timeout: 30000 });
+const dash = await page.evaluate(() => {
+  const main = document.querySelector('.cols > div:first-child');
+  const rail = document.querySelector('.cols > div:last-child');
+  const heads = (r) => r ? [...r.querySelectorAll('h2, .p2h')].map((h) => h.innerText.trim()) : [];
+  return {
+    mapLink: document.querySelectorAll('#dashMapLink').length,
+    map: document.querySelectorAll('#dashMap, .leaflet-container, .maplibregl-canvas').length,
+    strip: document.querySelectorAll('#dashStrip').length,
+    main: heads(main), rail: heads(rail),
+    text: document.body.innerText,
+    viewing: (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : ''
+  };
+});
+info('4 Dashboard structure', { main: dash.main, rail: dash.rail, viewing: dash.viewing });
+ok(dash.mapLink === 0, '4 Dashboard has no #dashMapLink — the map control was removed (Fix 8)', dash.mapLink);
+ok(dash.map === 0, '4 ...and renders no map at all', dash.map);
+ok(dash.text.indexOf('Open full map') < 0, '4 ...and no "Open full map" copy survives');
+ok(dash.strip === 0, '4 ...and no #dashStrip KPI row', dash.strip);
+ok(dash.main.join(' | ') === "What\u2019s Changing? | QUALITY-OF-LIFE IMPACT \u00b7 PREMIUM | Official Dates to Know",
+  '4 Dashboard main column is the approved briefing hierarchy', dash.main);
+// The rail is now ONE typed My Places card (Property Addresses / ZIP Codes / Developments),
+// the dormant Development Updates Premium card, then Stay Informed. `heads()` reads `.p2h`
+// as well as `h2`, which is why the Premium card appears here exactly as the main column's
+// Quality-of-Life card does; its text is UPPERCASE because app.css `.p2h` sets
+// text-transform: uppercase and innerText returns RENDERED text.
+ok(dash.rail.join(' | ') === 'My Places | DEVELOPMENT UPDATES · PREMIUM | Stay Informed',
+  '4 ...and the right rail is My Places then Development Updates Premium then Stay Informed',
+  dash.rail);
+ok(/Coming soon/.test(dash.text) && /Get deeper local insights/.test(dash.text),
+  '4 ...with the Premium coming-soon card, not a live Quality-of-Life claim');
+ok(/ALL MY PLACES/.test(dash.viewing) && !/\b\d{5}\b/.test(dash.viewing),
+  '4 Dashboard scope reads ALL MY PLACES and names no ZIP', dash.viewing);
+for (const gone of ['Places Monitored', 'New Changes', 'Need Attention', 'Coming Up',
+                    'Welcome back', 'Good morning', 'High Quality-of-Life Impact',
+                    'High Impact', 'Medium Impact', 'Low Impact', 'Action Needed Soon',
+                    'How to participate', 'Submit a comment', 'Take action'])
+  ok(dash.text.indexOf(gone) < 0, '4 Dashboard no longer renders "' + gone + '"');
+
+// The route chosen is an ANCHOR that exists on a page's default view. development.html's
+// "See it on the map" is deliberately NOT one of them: it lives on the project DETAIL panel,
+// not the list, so reaching it would need a seed project id and would make this journey
+// depend on fixture contents rather than on navigation.
+for (const [origin, selector, label] of [
+  ['community.html', 'a:has-text("View Development Map")',  '5 public ZIP "View Development Map"']
+]) {
   await page.goto(base + '/' + origin + '?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
   await waitShell();
-  const href = await page.getAttribute('.nav a[data-nav="maps"]', 'href');
+  const target = page.locator(selector).first();
+  ok(await target.count() > 0, label + ' -> the control exists');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-    page.click('.nav a[data-nav="maps"]')
+    target.click()
   ]);
   await waitShell();
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 }).catch(() => {});
   c = await chrome();
-  info(label + ' -> Maps', { href, landed: c.path + c.search, active: c.activeTokens });
-  ok(/^homesignalmap\.html/.test(href || ''), label + ' -> the Maps entry points at Map 1', href);
+  info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
   ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
-  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps',
-    label + ' -> Maps is the active item after the page settles', c.activeTokens);
-  ok(c.activeTokens.indexOf('dev') < 0, label + ' -> Development & Impact is NOT active', c.activeTokens);
+  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+    label + ' -> Explore is the active item after the page settles', c.activeTokens);
 }
 
 // ═══ 7. A saved home in Del Valle, a map of Denver ═══
@@ -290,20 +382,90 @@ ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '7 the saved home is still saved (unchanged, still the active property)', c.savedHome);
 ok(/13313 COOMES DR/.test(c.locTitle || ''),
   '7 ...and is still named in the switcher tooltip, one tap away', c.locTitle);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps', '7 Maps is still the active item');
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', '7 Explore is still the active item (plan v3)');
 
-// ═══ 7b. POSITIVE CONTROL — on the home's own ZIP it is still "Your home" ═══
+// ═══ 7b. Map 1 AT AN EXPLICIT ?zip= IS A ZIP PLACE, even on the saved address's own ZIP ═══
+// SUPERSEDES the earlier 7b, which required "Viewing · 13313 COOMES DR" here. That was the
+// same defect the founder reported on the ZIP hub, one page over: an explicit route ZIP is a
+// declaration, and a saved Address that merely sits inside it must not override it. The
+// saved-address default survives only where the route declares nothing — covered behaviourally
+// in test/viewed-place-declaration.test.mjs §4, which does not need a browser.
+// The home is installed AFTER load on purpose: that is the account-hydration moment that used
+// to elect an in-ZIP address as the Place, so this proves the declaration outlives it.
 await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
 await waitShell();
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
 await installSavedHome(SAVED_HOME);
 await page.waitForTimeout(300);
 c = await chrome();
-info('ZIP 78617 with the same saved home', c.locLabel);
-ok(/^Your home · 13313 COOMES DR/.test(c.locLabel || ''),
-  '7b on the home\'s OWN ZIP the control still says "Your home"', c.locLabel);
+info('Map 1 ZIP 78617 with the same saved place', { loc: c.locLabel, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7b Map 1 at an explicit ?zip= does NOT name the saved address inside that ZIP', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7b ...it names the ZIP Place', c.locLabel);
+ok(!/your home/i.test(c.locLabel || ''),
+  '7b the chip does not call the saved address "Your home"', c.locLabel);
+ok(/13313 COOMES DR/.test(c.locTitle || ''),
+  '7b the saved address is still saved and one tap away in the switcher', c.locTitle);
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'zip',
+  '7b ...and the page declared it, rather than the chip inferring it from a label');
+
+// ═══ 7c. ALERTS at an explicit ?zip= is a ZIP Place too ═══
+await page.goto(base + '/alerts.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
+c = await chrome();
+info('Alerts 78617 with the same saved place', { loc: c.locLabel, saved: c.savedHome, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7c Alerts at an explicit ?zip= does NOT name the saved address inside that ZIP', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7c ...it names the ZIP Place', c.locLabel);
+// Assert against the page's OWN active property, never a hard-coded street. These two
+// sections load with ?data=seed, so the app hydrates the seed dataset's saved place over the
+// one installed here; 7b has no seed and keeps the installed one. Both are correct product
+// behaviour — the tooltip names whatever place is actually saved — and a literal address
+// pinned one environment's fixture rather than the behaviour under test.
+ok(!!(c.savedHome && c.savedHome.address && (c.locTitle || '').indexOf(c.savedHome.address) >= 0),
+  '7c the saved address is still saved and one tap away in the switcher',
+  { saved: c.savedHome, title: c.locTitle });
+
+// ═══ 7d. A ZIP PAGE IS A ZIP PLACE — the founder's 2026-09-15 repro ═══
+// "Viewing tells you which of my Places you are looking at. If you are on a zip code page
+// you are obviously viewing a zip code." The 2026-09-04 gate covered the OTHER-ZIP case
+// only, so the ZIP hub for the saved address's OWN ZIP still read "Viewing · 13313 COOMES
+// DR" — the ZIP Place could not be named at all while an address sat inside it.
+await page.goto(base + '/community.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
+c = await chrome();
+info('ZIP hub 78617 with the same saved place', { loc: c.locLabel, saved: c.savedHome, title: c.locTitle });
+ok(c.locLabel && c.locLabel.indexOf('13313 COOMES DR') < 0,
+  '7d the ZIP hub does NOT name the saved address — it is a ZIP Place', c.locLabel);
+ok(/^Viewing ·/.test(c.locLabel || '') && /78617|Del Valle/.test(c.locLabel || ''),
+  '7d ...it names the ZIP Place', c.locLabel);
+ok(!/78617\s*·\s*78617/.test(c.locLabel || ''),
+  '7d ...once, not with the ZIP repeated after its own name', c.locLabel);
+ok(!!(c.savedHome && c.savedHome.address && (c.locTitle || '').indexOf(c.savedHome.address) >= 0),
+  '7d the saved address is still saved and still one tap away in the switcher',
+  { saved: c.savedHome, title: c.locTitle });
 
 // ═══ 8. Address mode still reaches the established experience ═══
+// SELF-CONTAINED NAVIGATION, deliberately. This section used to inherit whichever page the
+// previous one left open, which silently became community.html (no #addr) the moment a ZIP-hub
+// section was inserted above it. A section that depends on its predecessor's final URL breaks
+// on insertion, not on a behaviour change — so it states its own starting point.
+await page.goto(base + '/homesignalmap.html?zip=78617', { waitUntil: 'domcontentloaded' });
+await waitShell();
+await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 });
+// The saved place is part of this section's PRECONDITION, not decoration. paintTopbar's last
+// fallback is the SAMPLE branch, which names the seed community and ignores the view label
+// entirely — so with no saved place AND no myZip the chip reads "Del Valle (Sample Zip Code)"
+// however the view is declared. This section used to inherit the home from the section above
+// it; now that it navigates for itself, it installs it for itself.
+await installSavedHome(SAVED_HOME);
+await page.waitForTimeout(300);
 await page.fill('#addr', '2200 CALDWELL LN, DEL VALLE, TX 78617');
 await page.click('#go');
 await page.waitForFunction(() => (window.__HS_SITES || []).some(s => s.n5_feature_id), null, { timeout: 60000 });
@@ -317,6 +479,13 @@ let a = await page.evaluate(() => ({
 }));
 c = await chrome();
 info('address mode', { ...a, loc: c.locLabel });
+// ZIP -> address, the one IN-PAGE Place transition in the app: entering address mode must
+// retire the ZIP declaration made at boot, or the address just searched would stay suppressed
+// by a ZIP the resident has navigated away from.
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'address',
+  '8 an in-page address search retires the ZIP Place declaration');
+ok(/2200 CALDWELL LN/i.test(c.locLabel || ''),
+  '8 ...and the chip names the searched address', c.locLabel);
 // Radius AND subject, in the heading: "Showing development within <radius> of".
 ok(/^Showing development within .+ of$/.test((a.within || '').trim()),
   '8 address mode states what is shown and the radius it is shown within', a.within);
@@ -348,6 +517,8 @@ ok(back.stale === 0, '9 no address-radius result survives into ZIP mode', back.s
 ok(back.homePins === 0, '9 no HOME pin in ZIP mode');
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   '9 the saved home survived the whole journey', c.savedHome);
+ok(await page.evaluate(() => HS.state.viewPlaceType) === 'zip',
+  '9 ...and the ZIP Place is declared again on the return leg — ZIP -> address -> ZIP is closed');
 
 // ═══ 10. F1 — TWO SCOPES ON ONE SCREEN, NAMED SEPARATELY ═══
 // Development is measured across the whole ZIP. Facilities are an EPA query AROUND the ZIP:
@@ -425,8 +596,8 @@ ok(c.totalTileShown === true,
 ok(!/across this ZIP/i.test(c.kDev || ''), '12d no ZIP-mode scope copy leaks into address mode', c.kDev);
 // The caption sits ON the map canvas, so it names the radius too - a resident reading the pins
 // should not have to look back up at the heading to know what circle they are inside.
-ok(/^Development within .+ of this home$/.test((c.mapCap || '').trim()),
-  '12e the address map caption names the radius, not just "around this home"', c.mapCap);
+ok(/^Development within .+ of this address$/.test((c.mapCap || '').trim()),
+  '12e the address map caption names the radius, not just "around this address"', c.mapCap);
 
 // ── 13. THE TWO MODES ARE NOT A ONE-WAY DOOR ───────────────────────────────────────────
 // run() flips ZIP_MODE in JS and never touches the URL, so before the back control existed a
@@ -484,7 +655,7 @@ ok(bzZip.scopeNoteShown === true,
 // A ZIP centroid is a page anchor, not somebody's house. A control offering to re-frame the
 // view "from home" promises a place the page does not have.
 ok(bzZip.homeBtnShown === false,
-  '13h ZIP mode hides the HOME-specific "From home" control - there is no home here', bzZip);
+  '13h ZIP mode hides the address-specific "From this place" control - there is no saved address here', bzZip);
 
 // ── 14. THE NOT-MEASURED STATE IS SAYABLE OUT LOUD ─────────────────────────────────────
 // Launch-gate task 6: a resident must be able to explain what "not measured" means. The
@@ -501,17 +672,20 @@ const nm = await page.evaluate(() => ({
   dev: (document.getElementById('cDev') || {}).textContent || ''
 }));
 info('not-measured ZIP 84999', nm);
-ok(/not measured yet/i.test(nm.fresh),
-  '14a the page SAYS the ZIP is not measured yet', nm.fresh);
-ok(/will not estimate/i.test(nm.fresh),
-  '14b ...and says it will not estimate from a circle, so 0 is never implied', nm.fresh);
+// 84999 answers status 'not_measured' (no Census area), so since the founder's 2026-10-02
+// wording it says it has no mapped area — never "not measured yet", which is kept for a ZIP
+// waiting on a build (pinned in test/zip-no-mapped-area-copy.test.mjs).
+ok(/ZIP 84999 has no mapped area\. The Census does not draw a boundary for this ZIP code/.test(nm.fresh),
+  '14a the page SAYS the ZIP has no mapped area', nm.fresh);
+ok(/we can't show development records for it/.test(nm.fresh) && !/not measured yet/i.test(nm.fresh),
+  '14b ...and that it cannot show records there, so 0 is never implied', nm.fresh);
 // Matched on the address-mode OFFER, not the literal 'street address' — that phrase named a
 // shape the geocoder never required and left the note. What must not regress is that the
 // not-measured state still points somewhere real, so removing the sentence still fails 14c.
 ok(/\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(nm.fresh),
   '14c ...and offers the address view as the way to get a real answer', nm.fresh);
 // The distinction that matters: not-measured must not read as a measured zero.
-ok(!/^0 projects across/i.test(nm.fresh.trim()),
+ok(!/^0 projects across/i.test(nm.fresh),
   '14d not-measured is never phrased as a measured zero', nm.fresh);
 // THE COUNTER MUST AGREE WITH THE SENTENCE. An unmeasured ZIP drops its radius-derived
 // development rather than passing it off as whole-ZIP, so the surviving count is 0 because we
@@ -548,7 +722,7 @@ const after15 = await page.evaluate(() => ({
 info('radius change', { before: before15, after: after15 });
 ok(/Showing development within 2 miles of/.test(after15.within),
   '15a the heading restates the NEW radius', after15.within);
-ok(/^Development within 2 miles of this home$/.test(after15.cap.trim()),
+ok(/^Development within 2 miles of this address$/.test(after15.cap.trim()),
   '15b the map caption restates the NEW radius too', after15.cap);
 ok(before15.cap.trim() !== after15.cap.trim(),
   '15c ...and it actually CHANGED (not a caption that happens to match)',

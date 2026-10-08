@@ -1,6 +1,7 @@
-// GUARD the consent contract: following an area must NOT set marketing_consent — only the
-// explicit "Email me these alerts" opt-in tap may. Asserts the pure RPC-arg shapes plus the
-// SQL + shell.js source contracts. Run: node test/email-optin.test.mjs
+// GUARD the consent contract: following an area must NOT set marketing_consent.
+// Email consent is an Alerts-page action (signup_complete / enable_area_email_alerts),
+// never the Save/Follow card. Asserts the pure RPC-arg shapes plus the SQL + shell.js
+// source contracts. Run: node test/email-optin.test.mjs
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const fs = require('node:fs');
@@ -54,11 +55,19 @@ ok(/ensureAreaSubscribed[\s\S]*?rpc\('subscribe_area_defaults',[\s\S]*?HS\.follo
 ok(!/ensureAreaSubscribed[\s\S]{0,900}enable_area_email_alerts/.test(shell),
    'ensureAreaSubscribed does NOT call enable_area_email_alerts (no auto-consent on follow)');
 ok(/HS\.enableAreaEmail[\s\S]*?rpc\('enable_area_email_alerts',[\s\S]*?HS\.optinRpcArgs/.test(shell),
-   'HS.enableAreaEmail (the affirmative tap) is the caller of enable_area_email_alerts');
-ok(/optinYes[\s\S]*?onclick[\s\S]*?HS\.enableAreaEmail/.test(shell),
-   'the "Email me these alerts" button is what triggers the opt-in (explicit affirmative)');
-ok(/id="optinYes"[^>]*>✉ Email me these alerts/.test(shell),
-   'the inline card renders an explicit "Email me these alerts" affirmative control');
+   'HS.enableAreaEmail remains the enable_area_email_alerts caller (not the save card)');
+const showFn = (shell.match(/HS\.showAreaOptin = function[\s\S]*?\n  \};/) || [''])[0];
+ok(showFn.length > 0, 'showAreaOptin function body is locatable');
+ok(!/enableAreaEmail/.test(showFn),
+   'the post-save card does NOT call enableAreaEmail (Save/Follow ≠ email alerts)');
+ok(!/optinYes/.test(showFn) && !/Email me these alerts/.test(showFn),
+   'the post-save card has no "Email me these alerts" control');
+ok(!/Emailing you/.test(showFn) && !/Now following development/.test(showFn),
+   'the post-save card never claims email alerts were activated');
+ok(/id="optinAlertsCta"/.test(showFn) && /Choose your alert topics →/.test(showFn),
+   'the post-save card offers the approved Alerts CTA');
+ok(/Want email alerts\?/.test(showFn) && /saved to My Places/.test(showFn),
+   'the post-save card states My Places save + a separate email-alerts invitation');
 
 if (fails) { console.error(`\n${fails} failed`); process.exit(1); }
 console.log('\nAll email-opt-in consent-contract assertions passed.');

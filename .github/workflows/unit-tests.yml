@@ -14,7 +14,8 @@ on:
       - 'test/**'
       - 'scripts/**'
       - 'lib/generated/**'
-      - 'fixtures/gov-feeds/**'
+      - 'lib/zip-coverage.json'
+      - 'docs/maps-coverage/fix4/zip-coverage-internal.json'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - 'supabase/functions/**'
@@ -25,6 +26,12 @@ on:
       - '.gitignore'
       - 'QUEUE.md'
       - '.github/workflows/**'
+      # The capture job's ARM FILE. Without this the `unit` check never registers
+      # on a PR that only arms a capture, so branch protection blocks it forever --
+      # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
+      # job, no schedule, no step, no behaviour change.
+      - '.github/maps-social-capture'
+      - '.github/map1-regulatory-live-arm'
       - '.github/workflows/unit-tests.yml'
   pull_request:
     paths:
@@ -34,7 +41,8 @@ on:
       - 'test/**'
       - 'scripts/**'
       - 'lib/generated/**'
-      - 'fixtures/gov-feeds/**'
+      - 'lib/zip-coverage.json'
+      - 'docs/maps-coverage/fix4/zip-coverage-internal.json'
       - 'scripts/run-unit-tests.mjs'
       - 'topics.canon.json'
       - 'supabase/functions/**'
@@ -47,6 +55,12 @@ on:
       - 'docs/government-feed-onboarding*.md'
       - 'docs/candidates/**'
       - '.github/workflows/**'
+      # The capture job's ARM FILE. Without this the `unit` check never registers
+      # on a PR that only arms a capture, so branch protection blocks it forever --
+      # the same hole this repo already hit on root-level CLAUDE.md. Additive: no
+      # job, no schedule, no step, no behaviour change.
+      - '.github/maps-social-capture'
+      - '.github/map1-regulatory-live-arm'
       - '.github/workflows/unit-tests.yml'
   workflow_dispatch: {}
 
@@ -131,7 +145,11 @@ jobs:
         working-directory: ${{ github.workspace }}/..
         run: |
           npm init -y >/dev/null
-          npm install --no-audit --no-fund playwright@1.56.0
+          # leaflet@1.9.4 is the version the pages load from jsDelivr. The browser suites use a local copy
+          # when one resolves (and the live CDN otherwise), so installing it beside playwright keeps them
+          # from depending on a CDN fetch. Without it home-zip-or-address.browser.test.mjs failed on
+          # "Failed to load resource" (its Leaflet fetch) on several runs.
+          npm install --no-audit --no-fund playwright@1.56.0 leaflet@1.9.4
           npx playwright install --with-deps chromium
       - name: Verify playwright is actually available to the suites
         run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — browser assertions would silently skip');process.exit(1)})"

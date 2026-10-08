@@ -365,8 +365,14 @@ select
 EXPECT_FULL = {"fp_corpus_all": "6809816297333320"}
 
 EXPECT = {
-    "candidates": 9571, "c1": 67, "b1_rows": 56,
-    "b1_fp": "0a8b5fcea3827aac5ed32fbfa2713a46",
+    "candidates": 9571, "c1": 67,
+    # B1 IS NATIONAL AS OF PCM-3. Was 56 / 0a8b5fcea3827aac5ed32fbfa2713a46 (the Box Elder
+    # envelope selection). These two values come from the load receipt of run 34528431806 and
+    # are the SAME fingerprint validate measured before any write, which is what makes them a
+    # measurement rather than a restatement. They were deliberately NOT moved in the code PR:
+    # between merge and load, a B3 probe had to fail closed rather than pass on a lie.
+    "b1_rows": 33791,
+    "b1_fp": "7e927a8ed57b1d787973c5510ee325b1",
     "n_identity": 3172292,
     "guard_md5": "d55a010018cf5c345f4c8051b8a67279",
     "fn_projects_for_zip": "ec1b01ae4485ad2c59b9f946c9d565b6",

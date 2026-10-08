@@ -32,9 +32,13 @@ surfaceBanner('verify-property-page');
 
 const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
 let fail = 0, pass = 0;
+// BOTH branches print on STDOUT. They used to split ✓/✗ across stdout/stderr, and GitHub
+// interleaves the two streams by arrival, so a failure surfaced under the WRONG section heading
+// in the job log — the 2026-09-10 §3 failure appeared beneath the "4)" header and was read as a
+// §4 problem. A verifier whose output misattributes its own failure costs more than it saves.
 const ok = (name, cond, detail) => {
   if (cond) { pass++; console.log(`  ✓ ${name}`); }
-  else { fail++; console.error(`  ✗ ${name}${detail ? `\n     ${detail}` : ''}`); }
+  else { fail++; console.log(`  ✗ ${name}${detail ? `\n     ${detail}` : ''}`); }
 };
 
 // The seeded demo persona, verbatim from seed/delvalle.js. If ANY of these reach a signed-out
@@ -85,11 +89,59 @@ const load = async (url) => {
 
 const live = await load(`${SITE_BASE}/property.html`);
 ok('page renders with no uncaught JS errors', live.errors.length === 0, live.errors.slice(0, 3).join(' | '));
-ok('signed-out visitor gets the honest empty state ("No Saved Place")',
-  /No Saved Place/i.test(live.text),
+// THE EXPECTED COPY IS DERIVED FROM THE SERVED PAGE, NOT PINNED HERE.
+//
+// This assertion used to hardcode /No Saved Place/i. #1140 (the four-container shell / My Places
+// consolidation) renamed that heading to "No Address" and renamed the back button to "← My
+// Places"; the literal here was not renamed with it, so the check went red on a COPY CHANGE while
+// the guard it exists to protect — the page refusing to render a dossier it has no property for —
+// was intact the whole time. A verifier that fails on a rename trains people to ignore it.
+//
+// Reading the SERVED property.html (not the checked-out one) is deliberate. This runs on push AND
+// on a daily schedule against the LIVE site, so a repo-local read would go red for the window
+// between a merge and its Pages deploy. That race is exactly why run #49 PASSED and run #50
+// FAILED on the SAME commit fbd85e4. Comparing the served page against its own rendered output
+// cannot drift that way.
+//
+// It still fails closed: if the `if (!p)` branch or its heading disappears, the first assertion
+// below fails and says so, rather than the check quietly having nothing to compare.
+const propSrc = await (await fetch(`${SITE_BASE}/property.html`)).text();
+const emptyBranch = (propSrc.match(/if\s*\(\s*!p\s*\)[\s\S]{0,400}?<\/h1>/) || [])[0] || '';
+const emptyHeading = (emptyBranch.match(/<h1>([^<]{2,60})<\/h1>/) || [])[1] || '';
+ok('the served property.html still declares an honest empty-state heading',
+  !!emptyHeading,
+  'no `if (!p)` empty-state <h1> found in the served page — the no-property guard may be gone, '
+  + 'or its shape changed. Read property.html before relaxing this; the guard is what stops a '
+  + 'dossier rendering for a visitor who has no saved place.');
+ok(`signed-out visitor gets that honest empty state ("${emptyHeading || '—'}")`,
+  !!emptyHeading && live.text.includes(emptyHeading),
   `body began: ${live.text.slice(0, 160).replace(/\s+/g, ' ')}`);
+// COMMENTS ARE NOT PRESENTATION, AND THIS CHECK MEASURED THE WRONG THING.
+//
+// It matched the marker anywhere in page.content(), which includes inline <script> source.
+// Fix 15 (#1191) added a comment to property.html explaining that a SAMPLE address is not a
+// property — a comment whose whole point is that the persona must NOT be captured — and that
+// comment made this assertion fail. The guard is "is a fabricated home being PRESENTED", and
+// a code comment presents nothing.
+//
+// ⚠️ IT WENT UNSEEN FOR TWO HOURS BECAUSE THIS WORKFLOW RACES ITS OWN DEPLOY. Fix 15's run
+// finished 23:16:05 and its Pages deploy at 23:17:38 — 93 s later — so the green run read the
+// PREVIOUS site. The next push to touch property.html was the first to see the shipped page.
+// This is the same race the comment above §3 already records for runs #49/#50, and it means a
+// green here is only as current as the deploy behind it.
+//
+// Comments are stripped exactly as test/my-places-contract.test.mjs strips them — that file
+// already exists because three assertions in this repo went green off a comment naming the
+// very string they forbade. This is the same failure reached from the other direction.
+// ATTRIBUTES ARE STILL COVERED: stripping comments is not the same as reading rendered text,
+// so a persona in an alt=, value= or title= still fails, which is why live.html is kept.
+const stripComments = (x) => x
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/^\s*\/\/.*$/gm, '');
+const liveNoComments = stripComments(live.html);
 for (const m of PERSONA_MARKERS) {
-  ok(`the seeded demo persona (${m}) does NOT appear`, !live.html.includes(m),
+  ok(`the seeded demo persona (${m}) does NOT appear`, !liveNoComments.includes(m),
     'a fabricated home is being presented to a signed-out visitor');
 }
 
@@ -98,7 +150,11 @@ console.log('\n4) the seed is reachable ONLY by explicit opt-in (proves §3 is n
   // If ?data=seed did NOT change anything, §3's "no persona" result would prove nothing — the
   // marker might simply never render. This is the positive control for that assertion.
   const seeded = await load(`${SITE_BASE}/property.html?data=seed`);
-  const seedShowsPersona = PERSONA_MARKERS.some((m) => seeded.html.includes(m));
+  // Compared on the SAME footing as §3 (comments stripped). If the control read raw HTML while
+  // §3 read stripped HTML, the control could pass on the comment alone and would stop proving
+  // that §3 has a real discriminator — a positive control that measures something the guarded
+  // assertion does not is not a control.
+  const seedShowsPersona = PERSONA_MARKERS.some((m) => stripComments(seeded.html).includes(m));
   ok('?data=seed DOES surface the seeded persona — so §3 tested a real discriminator',
     seedShowsPersona,
     'neither mode shows the persona, so the §3 assertion has no power; find a live seed marker and re-pin');

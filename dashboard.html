@@ -5,46 +5,310 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>HomeSignal — Dashboard</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com; font-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://*.tile.openstreetmap.org; form-action 'self'">
-<link rel="stylesheet" href="app.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<style>#dashMap{height:300px}#dashMap .maplibregl-canvas{border-radius:15px}</style>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=031bef8e">
+<style>
+  /* Dashboard-scoped only — app.css is untouched (Fix 8 §1). */
+  /* §4: main ~70-75%, rail ~25-30%. app.css ships 1.55fr/.95fr (62/38) for the older pages. */
+  .dashpage .cols{grid-template-columns:2.6fr 1fr}
+  /* A grid item defaults to min-width:auto, so a column cannot shrink below the min-content
+     width of its widest row — and the compact rows below deliberately use white-space:nowrap
+     on the type pill and the CTA. Without this the whole page scrolled sideways at 390px
+     (measured), which §4 forbids. min-width:0 lets the column shrink; the rows then wrap. */
+  .dashpage .cols > *{min-width:0}
+  /* FIX 8G monitored-ZIP attribution. Both label variants are in the DOM and the EXISTING
+     900px breakpoint — the page's own wide-desktop boundary — decides which is shown. No
+     runtime text measurement, no layout jump, and `display:none` keeps the inactive variant
+     out of the accessibility tree so exactly one summary is exposed at any width. */
+  .mzip-narrow{display:none}
+  @media(max-width:900px){
+    .dashpage .cols{grid-template-columns:1fr}
+    .mzip-wide{display:none}
+    .mzip-narrow{display:inline}
+  }
+  @media(max-width:560px){
+    /* Stack each row's CTA under its content rather than squeezing the title to nothing. */
+    .dashpage .crow,.dashpage .drow{flex-wrap:wrap}
+    .dashpage .crow .ck{flex:0 0 100%;margin-bottom:2px}
+    .dashpage .crow .cmain,.dashpage .drow .dmain{flex:1 1 100%}
+    .dashpage .crow .cgo,.dashpage .drow .cgo{margin-top:6px}
+    /* The count block is a number and a 250px note side by side, and it is flex:0 0 auto in
+       the header — so at 390px it refuses to shrink and pushes the page sideways. Here it
+       takes a full row of its own and becomes shrinkable; the note drops its fixed width and
+       its left rule, which only reads as a divider when the two sit side by side. */
+    .dashpage .dashcount{padding-top:14px;flex:1 1 100%;min-width:0}
+    .dashpage .dashcount .note{max-width:none;min-width:0;border-left:0;padding-left:0}
+  }
+  .dashhead{display:flex;gap:26px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .dashhead .dhl{min-width:0;flex:1 1 380px}
+  .dashcount{display:flex;gap:18px;align-items:center;flex:0 0 auto;padding-top:4px}
+  .dashcount .n{font-size:34px;font-weight:700;line-height:1;letter-spacing:-.02em}
+  .dashcount .lbl{font-size:11.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin-top:5px}
+  .dashcount .note{max-width:250px;font-size:12px;color:var(--ink-2);line-height:1.45;
+                   border-left:1px solid var(--line);padding-left:18px}
+  @media(max-width:640px){.dashcount .note{border-left:0;padding-left:0}}
+  /* Compact list rows — §5 "not large feature cards". */
+  .crow{display:flex;gap:14px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--line-2)}
+  .crow:last-child{border-bottom:none}
+  /* A FIXED type column, so every title starts at the same x. Without it the pill sizes
+     the column per row ("GOVERNMENT NOTICE" is wider than "DEVELOPMENT") and the titles
+     step in and out — the approved visual reads as aligned columns. */
+  /* 140px, not 132: the widest label ("GOVERNMENT NOTICE") measures 137px, and a pill that
+     overflows its basis pushes its own title out of the column — measured as titles at two
+     x positions, 454 and 449. The column must fit the widest pill for the column to exist. */
+  .crow .ck{flex:0 0 140px}
+  .crow .cv{flex:0 0 auto;color:var(--ink-3);font-size:15px;line-height:1;align-self:center}
+  .ctype{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+         padding:3px 8px;border-radius:5px;white-space:nowrap}
+  .ctype.gov{background:var(--blue-tint);color:var(--blue)}
+  .ctype.dev{background:var(--green-tint);color:var(--green-deep)}
+  .ctype.news{background:var(--amber-tint);color:var(--amber)}
+  .crow .cmain{flex:1 1 auto;min-width:0}
+  .crow .ct{font-size:13.8px;font-weight:600;line-height:1.4}
+  .crow .cmeta{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+  .crow .cgo{flex:0 0 auto;font-size:12px;font-weight:600;color:var(--green);text-decoration:none;
+             white-space:nowrap;display:inline-block;padding:4px 0;margin:-4px 0}
+  .crow .cgo:hover{text-decoration:underline}
+  .crow .cgo:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  /* Official dates — date block + detail. */
+  .drow{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line-2)}
+  .drow:last-child{border-bottom:none}
+  .dblock{flex:0 0 46px;text-align:center;border:1px solid var(--line);border-radius:9px;padding:6px 0;background:#fff}
+  .dblock .m{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+  .dblock .d{font-size:17px;font-weight:700;line-height:1.15;font-variant-numeric:tabular-nums}
+  .drow .dmain{flex:1 1 auto;min-width:0}
+  .drow .dt{font-size:13.8px;font-weight:600;line-height:1.4}
+  .drow .dmeta{font-size:11.5px;color:var(--ink-3);margin-top:3px;display:flex;gap:9px;flex-wrap:wrap}
+  .dwin{color:var(--amber);font-weight:600}
+  .placerow{display:flex;gap:10px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line-2);
+            text-decoration:none;color:inherit}
+  .placerow:last-of-type{border-bottom:none}
+  .placerow:hover{background:#f7f9f7}
+  .placerow:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:8px}
+  .placerow .pmain{flex:1 1 auto;min-width:0}
+  .placerow .pl{font-size:13.3px;font-weight:600;line-height:1.35}
+  .placerow .ps{font-size:11.5px;color:var(--ink-3);margin-top:1px}
+  .placerow .pc{flex:0 0 auto;color:var(--ink-3);font-size:14px}
+  .ptag-kind{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+  /* Unified My Places rail — three typed groups inside ONE card. Deliberately no border,
+     fill, radius or shadow per group: those say "separate object", and the whole point is
+     that these are three types of one collection. A hairline top rule separates them. */
+  /* SECTION SEPARATOR vs ROW DIVIDER — these were the SAME token. `.placerow` draws
+     `border-bottom:1px solid var(--line-2)` and this rule drew `border-top` in the very same
+     `--line-2`, so a boundary between two TYPES was indistinguishable from a boundary between
+     two rows of one type, and the three groups ran together. The section rule now takes the
+     stronger `--line` (#e4e8e4) while rows keep `--line-2` (#eef1ee) — the hierarchy is
+     carried by a token the palette already ships, never by a new colour. */
+  .railgroup + .railgroup{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+  /* THE THREE GROUPS DO NOT SHARE A PARENT, so the adjacent-sibling rule above could only
+     ever reach the second one. #dashPlaces holds the two PLACE groups; Developments lives in
+     #dashFollowing, which Fix 8J hides or removes outright on an unreadable session and so
+     cannot be folded into the same container. `+` cannot cross that boundary, so Developments
+     painted flush against the ZIP group's overflow link — measured 0px, directly beneath a
+     27px boundary, which reads as a continuation of the ZIP list rather than a new section.
+     The separator is therefore declared on the CARRIER as well, with the same three values,
+     so all three boundaries are one boundary. :not([hidden]) is belt-and-braces — a hidden
+     carrier is display:none and paints no rule — but it states that a group nobody can see
+     must not leave a divider behind it. */
+  #dashFollowing:not([hidden]){margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+  /* THE HEADING USED TO RANK BELOW THE ROWS IT INTRODUCES. Measured on production: the
+     heading painted 10.5px/700 in --ink-3 (#83918a) while the record titles under it painted
+     13.3px/600 in --ink (#16211c) — smaller AND paler than its own contents, dressed in the
+     tiny letter-spaced all-caps this card uses for METADATA (.ptag-kind, .dblock .m). It read
+     as a label on the rows rather than a header over them, which is what made the three
+     groups need re-reading to tell apart.
+     It now outranks the record titles on size AND weight, drops the all-caps treatment, and
+     takes the darkest neutral. 700 rather than 600 is deliberate and measured: at 600 it would
+     match the record titles' own weight within 0.2px of their size — a tie, not a rank. */
+  /* THE HEADING IS A TINTED CHIP, the same treatment the DEVELOPMENT tag carries in What's
+     Changing — founder call, so the two green marks on this page read as one system. It reuses
+     `.ctype.dev`'s OWN two tokens (--green-tint / --green-deep) rather than a second green
+     mixed by hand, which is what keeps them from drifting apart later.
+     inline-block, never block: the chip must hug its label the way the reference tag does. A
+     full-width bar would read as a section BANNER and start competing with the card title. */
+  /* ALL-CAPS at the reference tag's OWN tracking (.05em), founder call, so the chip matches
+     DEVELOPMENT in case as well as colour. Note what is carrying the rank now: caps used to be
+     the thing that made this heading read as METADATA, because it was 10.5px and --ink-3 like
+     .ptag-kind. At 13.5px on a filled chip in --green-deep, the case is no longer the
+     discriminator — size, fill and ink are. The pin below moved with it.
+     WEIGHT IS 600, the founder's original spec.
+
+     ⚠️ SIZE IS 10px AND THE METRICS ARE THE REFERENCE TAG'S EXACTLY — 10px / .05em / caps /
+     3px 8px / radius 5px, i.e. `.ctype` above. Founder call after seeing 13.5px live: the chip
+     is meant to BE the DEVELOPMENT tag, not a larger cousin of it.
+     WHAT THIS COSTS, recorded so the next session does not "restore" the larger size believing
+     it is fixing a regression: the original brief asked for the heading to grow 2-3px, and this
+     gives that back. The heading is now 10px against .ptag-kind's 9.5px INSIDE the rows beneath
+     it — half a pixel apart. SIZE IS THEREFORE NO LONGER THE DISCRIMINATOR AT ALL; the filled
+     --green-tint chip is, and .ptag-kind has no fill. That is a real distinction, and it is what
+     the pins now assert. But it is a thinner margin than the 13.5px version carried, and it was
+     chosen deliberately with that tradeoff on the table. */
+  .railgh{display:inline-block;background:var(--green-tint);color:var(--green-deep);
+          font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+          padding:3px 8px;border-radius:5px;margin:0 0 9px}
+  /* The count stays SUBORDINATE inside the chip — same ink at reduced opacity rather than a
+     third colour, so the word leads the glance and the number confirms it. tabular-nums so a
+     changing count cannot resize the chip. */
+  /* No font-size of its own: it inherits the chip's, so the count can never end up LARGER than
+     the label beside it the next time that size moves. It stayed 12.5px while the heading went
+     13.5px -> 10px, which would have inverted them. */
+  .railgc{font-weight:500;color:inherit;opacity:.72;font-variant-numeric:tabular-nums}
+  /* The group's mark, from the nav's own glyph vocabulary (see RAIL_PLACE_GROUPS). It inherits
+     the chip's ink, so the icon can never fall out of step with the label's colour. Fixed
+     width so the three labels begin on one optical line whatever the glyph. */
+  .railic{display:inline-block;width:12px;font-weight:400;color:inherit}
+  .railempty{margin:4px 0 2px}
+  /* The overflow control is a LINK because it navigates — never Fix 8K's in-place button.
+     Own focus-visible ring, since it is a new navigable target. */
+  .railmore{display:inline-block;margin-top:8px;font-size:12px;font-weight:600;
+            color:var(--green);text-decoration:none;padding:4px 0}
+  .railmore:hover{text-decoration:underline}
+  .railmore:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px}
+  /* An unresolved Development is a plain div, not an anchor: no pointer, no hover lift, no
+     chevron — there is no record to open. It stays visible and counted. */
+  .placerow--unresolved{cursor:default}
+  .placerow--unresolved:hover{background:transparent}
+  /* The shared .bt-row link renders 19px tall. app.css stays untouched (Fix 8 §1), so the
+     target is lifted here, on this page only, without moving the text. */
+  .dashpage .bt-row a{display:inline-block;padding:3px 0;margin:-3px 0}
+  .dnote{font-size:12.5px;color:var(--ink-3);margin:0}
+  .dwarn{font-size:12.5px;color:var(--amber);margin:0}
+</style>
 </head>
-<body data-nav="dash">
+<body data-nav="props" data-no-where>
 <template id="hs-content">
-  <div class="page">
+  <div class="page dashpage">
     <div class="ph">
-      <div class="eyebrow">Dashboard</div>
-      <h1 id="dashHi">Welcome back</h1>
-      <p id="dashSub"></p>
+      <div class="dashhead">
+        <!-- THE SHARED PAGE-HEADER SYSTEM, NOT A DASHBOARD COPY OF IT (Fix 8I). app.css
+             .ph .eyebrow / .ph h1 already carry the green uppercase label and the large
+             black headline on Alerts, Development and My Places; the eyebrow's own
+             text-transform is what renders "Dashboard" as DASHBOARD, exactly as those
+             pages write "Alerts" and get ALERTS. No typography is declared here, and the
+             h1's inline margin override is gone so .ph h1's 6px/6px rhythm governs — a
+             near-match with local CSS was the thing to avoid. The resident QUESTION is
+             the h1, matching those pages, so no h1 carries the word "Dashboard". -->
+        <div class="dhl">
+          <div class="eyebrow">Dashboard</div>
+          <h1 id="dashSub"></h1>
+        </div>
+        <div class="dashcount" id="dashCount" hidden>
+          <div>
+            <div class="n" id="dashCountN">—</div>
+            <div class="lbl" id="dashCountLbl">Monitored places</div>
+          </div>
+          <!-- SCOPE DISCLOSURE. The previous line said "that may affect your community",
+               which left the geographic unit unstated; the feeds are anchored on the chain
+               ROOT (app_refresh_zip: community_id = coalesce(_root,_cid)), so one county's
+               notices, meetings and news populate every ZIP beneath it. Naming the ZIP as
+               what the resident monitors and the COUNTY as where records come from is the
+               same correction alerts.html already carries — a page that implies ZIP-origin
+               for county-sourced records is asserting something the data does not say. -->
+          <div class="note">Tracking development, government notices, meetings, and local news for the ZIP codes your monitored places are in. Records are sourced from the county each ZIP belongs to.</div>
+        </div>
+      </div>
     </div>
-    <div class="strip" id="dashStrip"></div>
+
     <div class="cols">
       <div>
-        <div class="block" style="padding:16px 18px">
-          <div class="bt-row"><h2>What's changing around you</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashMapLink">Open full map →</a></div>
-          <div class="mapwrap dash-mapwrap" id="dashMap" style="box-shadow:none" tabindex="0" role="region" aria-label="Map preview — open the full map"></div>
+        <div class="block">
+          <div class="bt-row"><h2>What&rsquo;s Changing?</h2></div>
+          <p class="dnote" id="dashChangingSub" style="margin:-8px 0 12px">Relevant updates across all your monitored places.</p>
+          <!-- ASYNCHRONOUS STATUS, NARROWLY SCOPED. Every failure message on this page is
+               written after load, and until now nothing announced it — a screen-reader user
+               was told nothing while a sighted one saw "we could not read updates". The live
+               region is this ONE empty paragraph, present in the markup BEFORE any content
+               is injected (a region created together with its text is not reliably
+               announced). It is deliberately NOT the list container: wrapping #dashChanging
+               would make Fix 8K's in-place expansion re-announce the whole briefing. -->
+          <p class="dwarn" id="dashChangingStatus" role="status" aria-live="polite" hidden></p>
+          <div id="dashChanging"><p class="dnote">Loading updates&hellip;</p></div>
         </div>
-        <div class="bt-row"><h2 style="font-size:15px;margin:0">Recent activity near you</h2><a href="alerts.html" data-znav="alerts.html" id="dashAllAlerts" style="font-size:12.5px;color:var(--green);text-decoration:none;font-weight:600">All alerts →</a></div>
-        <div id="dashRecent"></div>
+
+        <!-- QUALITY-OF-LIFE IMPACT · PREMIUM
+             Phase 1 proved there is no authoritative Quality-of-Life impact plane, so no
+             label, score, explanation or direction renders anywhere on this page. This card
+             is a ROADMAP STATEMENT and is CONSTANT — it is identical whether every source
+             succeeded or every source failed, because it reports on nothing. A data failure
+             renders as a data failure, never as this card (§7 "Premium is not a data-quality
+             fallback"). Markup reuses app.css .p2/.p2h/.p2t/.p2sub/.inlinebtn — the same
+             component the Community and Property Premium cards already use. -->
+        <div class="block" style="padding:0;border:none;box-shadow:none;background:none">
+          <div class="p2" id="dashQolPremium">
+            <div class="p2h" id="dashQolLabel">Quality-of-Life Impact · Premium</div>
+            <div class="p2sub" id="dashQolAvail">Coming soon</div>
+            <div class="p2t" id="dashQolTitle">Get deeper local insights</div>
+            <div class="p2sub" id="dashQolBody" style="margin-bottom:0">See added context around major development, infrastructure, and civic activity across the places you monitor.</div>
+            <button type="button" class="inlinebtn" id="dashQolCta" style="margin-top:12px">Get Premium access &rarr;</button>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="bt-row"><h2>Official Dates to Know</h2></div>
+          <p class="dwarn" id="dashDatesStatus" role="status" aria-live="polite" hidden></p>
+          <div id="dashDates"><p class="dnote">Loading official dates&hellip;</p></div>
+        </div>
       </div>
+
       <div>
+        <!-- UNIFIED MY PLACES — ONE CARD, THREE TYPED GROUPS.
+             This replaces the two separate rail cards ("My Places" + "Projects"). It is a
+             PRESENTATION consolidation only: the three groups keep three different stores,
+             three identifier types, three destinations and three failure paths.
+
+               Property Addresses -> app_properties        (hydrated at boot, no network read)
+               ZIP Codes          -> app_follows(community) (hydrated at boot, no network read)
+               Developments       -> app_follows(project)   -> app_projects (a network read
+                                                               that is ALLOWED to fail)
+
+             A Development is still NOT a Place: absent from canonicalPlaces, absent from the
+             monitored-place count in the header, absent from queryZips and therefore from
+             every content read. Merging the CARDS must never merge the COLLECTIONS.
+
+             ONE h2 for the card, one Manage link, and h3 per group — three sibling h2 under
+             one card title would break the heading outline, and the group heading is the
+             thing a screen-reader user navigates by.
+
+             THE DEVELOPMENTS GROUP IS REMOVED, NOT EMPTIED, without a real session (Fix 8J):
+             shell.js seeds state.follows from localStorage at module scope regardless of
+             session, and clearAccountLocalState() runs only on an explicit sign-out or an
+             account-id change — never on a session that merely expired. app_projects carries
+             a public anon select policy, so those titles are resolvable on a shared browser.
+             Rendering "Developments · 0" there would assert a fact about an account the page
+             cannot read; removing the node says nothing instead. -->
         <div class="block">
-          <div class="bt-row"><h2>Your Saved Places</h2><a href="properties.html">Manage →</a></div>
-          <div id="dashProps"></div>
-          <button class="addbtn" type="button" style="width:100%;justify-content:center;margin-top:10px" id="dashAddPlace">+ Add a Saved Place</button>
+          <div class="bt-row"><h2>My Places</h2><a href="properties.html" id="dashManagePlaces">Manage &rarr;</a></div>
+          <div id="dashPlaces"></div>
+          <div id="dashFollowing" hidden>
+            <div id="dashFollowingBody"></div>
+          </div>
+        </div>
+        <!-- DEVELOPMENT UPDATES · PREMIUM
+             A separate card BELOW My Places, never nested inside the inventory card and never
+             among the live What's Changing / Official Dates feeds. Like the Quality-of-Life
+             card it is a ROADMAP STATEMENT and is CONSTANT — it reads identically whether
+             every source succeeded or every source failed, because it reports on nothing.
+
+             The copy is future tense throughout. There is no join today from a followed
+             development to an official-record stream: app_follows.target_id is a soft TEXT
+             reference to app_projects, while resolved_project_status is keyed to a different
+             table. Any present-tense claim here ("status changes", "new permits", "upcoming
+             decisions") would describe a capability that does not exist. Markup reuses the
+             shared app.css .p2/.p2h/.p2sub/.inlinebtn Premium component — no Dashboard-local
+             Premium CSS is declared. -->
+        <div class="block" style="padding:0;border:none;box-shadow:none;background:none">
+          <div class="p2" id="dashDevUpdatesPremium">
+            <div class="p2h" id="dashDevUpdatesLabel">Development Updates &middot; Premium</div>
+            <div class="p2sub" id="dashDevUpdatesAvail">Coming soon</div>
+            <div class="p2sub" id="dashDevUpdatesBody" style="margin-bottom:0">We&rsquo;re building a way to follow one development&rsquo;s own official record over time&mdash;the filings, hearings, and decisions that belong to it.</div>
+            <div class="p2sub" id="dashDevUpdatesToday" style="margin-bottom:0">Today, saving a Development to My Places lets you reopen it. It does not send alerts.</div>
+            <button type="button" class="inlinebtn" id="dashDevUpdatesCta" style="margin-top:12px">Get Premium access &rarr;</button>
+          </div>
         </div>
         <div class="block">
-          <div class="bt-row"><h2>Your ZIP Codes</h2><a href="community.html" data-znav="community.html" id="dashZipOpen">Open →</a></div>
-          <div id="dashCommunities"></div>
-        </div>
-        <div class="block" id="dashWatchBlock">
-          <div class="bt-row"><h2>Worth watching nearby</h2><a href="homesignalmap.html" data-znav="homesignalmap.html" id="dashWatchMap">See on map →</a></div>
-          <div class="chips" id="dashWatch"></div>
-        </div>
-        <div class="block">
-          <div class="bt-row"><h2 class="bt" style="margin:0"><a href="alerts.html" data-znav="alerts.html" id="dashMeetingsHead" class="section-link">Upcoming meetings</a></h2></div>
-          <div id="dashMeetings"></div>
+          <div class="bt-row"><h2>Stay Informed</h2></div>
+          <p class="dnote" style="margin:0 0 12px">Choose the places and topics you want HomeSignal alerts about.</p>
+          <a class="inlinebtn" href="alerts.html" id="dashManageAlerts" style="text-decoration:none">Manage your alerts &rarr;</a>
         </div>
       </div>
     </div>
@@ -54,155 +318,534 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
-<script src="lib/map.js?v=eca20492"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
+<script src="lib/dashboard-aggregate.js?v=2aa31001"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=61d2fce9"></script>
 <script>
+// ============================================================================
+// DASHBOARD — ALL MY PLACES INTELLIGENCE BRIEFING (Fix 8)
+//
+// The scope of this page is the resident's CANONICAL MY PLACES membership and nothing
+// else. It never calls HS.ensureViewedZip(), never reads HS.state.zip / myZip /
+// sessionStorage viewZip / the active address / a URL ZIP, and never writes any of them.
+// Every decision that could go silently wrong lives in lib/dashboard-aggregate.js, which
+// test/dashboard-all-places.test.mjs drives directly in Node.
+// ============================================================================
 HS.onReady(async function () {
-  var S = HS.state, home = S.activeProperty, zip = S.zip;
-  var realHome = HS.realHome();
-  var nav = HS.pageHref ? HS.pageHref.bind(HS) : function (p, o) { return HS.navHref(p, (o && o.zip) || zip); };
+  var A = HS.dashAgg;
+  var S = HS.state;
 
-  // Never hang silently: a failed read renders an honest retry state.
-  var c, projects, changes, meetings;
+  // ---- Following: the session gate, run before anything that can fail ----------------
+  // Fix 8J. A followed project is private account data, and this page has no auth gate.
+  // state.follows is seeded from localStorage at module scope whatever the session state, and
+  // clearAccountLocalState() only fires on an explicit sign-out or an account-id change — so
+  // an EXPIRED session still holds the previous resident's project: keys, and app_projects is
+  // anon-readable. The node is REMOVED, not hidden: a hidden h2 still answers
+  // querySelectorAll, which would leave an empty heading in the rail's shape.
+  var followingEl = document.getElementById('dashFollowing');
+  if (followingEl && !(S.session && !S.session.demo)) { followingEl.remove(); followingEl = null; }
+
+  // ---- LEGACY ?zip= — strip it FIRST, before any CTA can be clicked -----------------
+  // Fix 8 D1 removed dashboard.html from ZIP_NAV_PAGES, so sidebar navigation no longer
+  // stamps a ZIP here. One can still ARRIVE: an old bookmark, an external link, or
+  // today.html's redirect (which forwards its query string verbatim).
+  //
+  // It matters for exactly one reason: HS.submitWaitlist falls back to
+  // HSPremiumWaitlist.zipFromLocation(location) when the CTA states no ZIP, and that reads
+  // location.search. Removing the parameter is what makes the fallback find nothing, so a
+  // FEATURE-level Premium lead can never inherit one place's ZIP.
+  //
+  // replaceState, not pushState: the cleaned URL replaces this entry rather than adding
+  // one, so Back still returns wherever the resident came from. Dashboard membership never
+  // read the parameter in the first place — this is about lead attribution.
+  //
+  // ⚠️ DISCLOSED LIMITATION, not silently absorbed: shell.js captures ?zip= into
+  // sessionStorage 'viewZip' and HS.state.zip at MODULE SCOPE (shell.js:176-184), before
+  // boot() and before any page script exists. No Dashboard-side code can prevent that; only
+  // a shared-shell change could, and this authorization excludes one. What is fully
+  // prevented here is what the rule is for: Dashboard membership and Premium attribution.
   try {
-    c = await HS.data.community(S.zip);
-    projects = await HS.data.projects(S.zip, home);
-    changes = await HS.data.changes(S.zip, home);
-    meetings = await HS.data.meetings(S.zip, home);
-  } catch (e) {
-    console.warn('[dashboard] data load failed', e);
-    document.querySelector('.page').innerHTML = '<div class="ph"><h1>We couldn\'t load your dashboard</h1>'
-      + '<p>Your connection may have dropped, or our data service is briefly unavailable.</p></div>'
-      + '<button class="btn primary" onclick="location.reload()">Try again</button>';
+    var cleaned = A.searchWithoutZip(location.search);
+    if (cleaned !== null && window.history && history.replaceState) {
+      history.replaceState(history.state, '', location.pathname + cleaned + (location.hash || ''));
+    }
+  } catch (e) { /* a blocked history write must never break the briefing */ }
+
+  // ---- Dashboard-local scope label -------------------------------------------------
+  // PAGE-LOCAL ONLY. HS.setViewLabel writes state.viewLabel, which is never persisted and
+  // is rebuilt by the shell on every full-page navigation — so it cannot leak to another
+  // page. viewZip, myZip, HS.state.zip and the active address are untouched.
+  HS.setViewLabel('ALL MY PLACES', { precise: true });
+
+  // ---- Canonical My Places membership ----------------------------------------------
+  // The two stores My Places itself manages. HS.onReady resolves after boot() has awaited
+  // hydrateAccountLocation(), so both are already reconciled with the account.
+  var places = A.canonicalPlaces({
+    properties: S.properties,
+    followedZips: HS.followedCommunities ? HS.followedCommunities() : []
+  });
+  var placeCount = places.length;
+
+  // Header. The count is rendered only once membership is known — never a placeholder 0,
+  // which would read as "you monitor nothing" during a load.
+  var countBox = document.getElementById('dashCount');
+  document.getElementById('dashCountN').textContent = String(placeCount);
+  document.getElementById('dashCountLbl').textContent = placeCount === 1 ? 'Monitored place' : 'Monitored places';
+  countBox.hidden = false;
+  // SINGULAR DROPS THE NUMERAL (Fix 8I). "your 1 monitored place" is the shape a
+  // count-plus-plural expression produces by default, and it reads as a system report
+  // rather than a sentence. One place is "your monitored place"; the count only earns its
+  // place in the sentence once there is more than one. The zero state is unchanged.
+  document.getElementById('dashSub').textContent = !placeCount
+    ? 'What’s changing across the places you monitor?'
+    : placeCount === 1
+      ? 'What’s changing across your monitored place?'
+      : ('What’s changing across your ' + placeCount + ' monitored places?');
+
+  // ---- Premium CTA — the existing shared modal, feature-level context ----------------
+  // premiumLeadContext() carries a SOURCE and no other key, so there is no field for a ZIP
+  // or address to arrive in. HS.openPremiumModal clears any previous context before it
+  // binds (shell.js:1879), and the modal, submit handler, validation, idempotency and
+  // Acquisition Dashboard path are all the existing ones — unchanged.
+  document.getElementById('dashQolCta').addEventListener('click', function () {
+    HS.openPremiumModal(A.premiumLeadContext());
+  });
+
+  // ---- Development Updates Premium CTA ------------------------------------------------
+  // The SAME shared opener, the same shared modal, the same canonical waitlist path. Its
+  // context is devUpdatesLeadContext(), which carries a source and nothing else — so no ZIP,
+  // no address and no development id can reach the lead, and the attribution is the feature
+  // rather than one arbitrary place. Opening this modal is the ONLY thing the button does:
+  // it enables no alert, creates no subscription, and never calls ensureAreaSubscribed.
+  document.getElementById('dashDevUpdatesCta').addEventListener('click', function () {
+    HS.openPremiumModal(A.devUpdatesLeadContext());
+  });
+
+  // ---- My Places — the two PLACE groups ---------------------------------------------
+  // §9: no priority counts, no activity counts, no zeros. A row is a label and a
+  // drill-down to that place's own existing destination. Clicking is navigation only — it
+  // never changes Dashboard membership.
+  //
+  // The groups are a VIEW over `places`, the same array canonicalPlaces returned. Nothing
+  // here re-derives membership, and the Developments group below is built from a different
+  // collection entirely — so a Development can never reach queryZips or the header count.
+  function placeHref(p) {
+    return p.kind === 'address'
+      ? ('property.html?id=' + encodeURIComponent(p.placeId))
+      : HS.pageHref('community.html', { zip: p.zip });
+  }
+  // Every row states its TYPE in text, never by colour alone — the kind tag is the same
+  // one My Places' own cards carry, so the two surfaces name a thing identically.
+  function placeRowHTML(p) {
+    return '<a class="placerow" href="' + HS.esc(placeHref(p)) + '">'
+      + '<div class="pmain"><div class="pl">' + HS.esc(p.label) + '</div>'
+      + '<div class="ps"><span class="ptag-kind">' + (p.kind === 'address' ? 'Address' : 'ZIP Code') + '</span>'
+      + (p.sub ? ' &middot; ' + HS.esc(p.sub) : '') + '</div></div>'
+      + '<div class="pc" aria-hidden="true">&rsaquo;</div></a>';
+  }
+  // The count rides INSIDE the heading text, so a screen reader navigating by heading hears
+  // "Addresses (2), heading level 3" — the number arrives with the group rather than as an
+  // orphan after it. The heading is not a link: a group at or under the preview limit hides
+  // nothing, so a heading link would promise a filtered view with nothing in it.
+  //
+  // The glyph is aria-hidden and carries no information the words do not: the heading must
+  // still say "Addresses" to a reader that renders no icon at all. It is a SECOND cue for a
+  // sighted glance, never the only one.
+  function groupHeadingHTML(g) {
+    return '<h3 class="railgh">'
+      + (g.icon ? '<span class="railic" aria-hidden="true">' + HS.esc(g.icon) + '</span>' : '')
+      + HS.esc(g.label)
+      + ' <span class="railgc">(' + g.count + ')</span></h3>';
+  }
+  // An overflow control is an ANCHOR because it navigates — deliberately NOT the in-place
+  // button Fix 8K uses in the main column. Two controls that look alike and behave
+  // differently is the comprehension failure; this one also carries no aria-expanded.
+  // It renders only when something is actually hidden (g.hasOverflow), so the promise it
+  // makes is always keepable.
+  function groupOverflowHTML(g) {
+    if (!g.hasOverflow) return '';
+    return '<a class="railmore" href="' + HS.esc(g.href) + '">' + HS.esc(g.overflowLabel) + '</a>';
+  }
+
+  var placesEl = document.getElementById('dashPlaces');
+
+  if (places.length) {
+    // A group with zero members still renders its heading and an honest one-liner: an
+    // empty ZIP Codes group beside populated Addresses is a true statement about that
+    // type, not a defect — the same rule My Places' per-view empty states already follow.
+    placesEl.innerHTML = A.placeGroups(places).map(function (g) {
+      return '<div class="railgroup" data-group="' + HS.esc(g.kind) + '">'
+        + groupHeadingHTML(g)
+        + (g.count
+            ? g.visible.map(placeRowHTML).join('') + groupOverflowHTML(g)
+            : '<p class="dnote railempty">' + (g.kind === 'address' ? 'No addresses yet.' : 'No ZIP codes yet.') + '</p>')
+        + '</div>';
+    }).join('');
+  } else {
+    // ZERO PLACES: the existing whole-card empty state and the two existing add actions,
+    // unchanged. No generic "Add to My Places" — Address and ZIP Code are two different
+    // writers (a Census geocode vs a coverage lookup) and one button cannot be both.
+    placesEl.innerHTML =
+      '<p class="dnote" style="margin-bottom:12px">Add a place to see changes and official dates across the locations you monitor.</p>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="inlinebtn" type="button" id="dashAddAddress">Add an address</button>'
+      + '<button class="inlinebtn" type="button" id="dashAddZip">Add a ZIP code</button></div>';
+    document.getElementById('dashAddAddress').addEventListener('click', function () { HS.addHome(); });
+    document.getElementById('dashAddZip').addEventListener('click', function () { HS.openLoc(); });
+  }
+
+  // ---- Following --------------------------------------------------------------------
+  // Deliberately BEFORE the zero-places return: a resident can follow a project while
+  // monitoring no Places at all, and this section reports follows, not membership.
+  //
+  // A FAILED READ CANNOT RENDER AS "YOU FOLLOW NOTHING". HS.data.projectsByIds swallows a
+  // PostgREST rejection into an empty array, so a failure and a fully-unresolved set are
+  // indistinguishable here. That is survivable only because the card list is built from the
+  // FOLLOW IDS and not from the returned rows: every id the resident followed gets a card
+  // either way, and one that did not resolve says so instead of vanishing. The count stays
+  // true in both cases.
+  if (followingEl) {
+    var followIds = HS.followedProjectIds ? HS.followedProjectIds() : [];
+    var followRows = [];
+    var followQuery = A.followingQueryIds(followIds);
+    if (followQuery.length) {
+      try {
+        followRows = HS.data.projectsByIds ? await HS.data.projectsByIds(followQuery) : [];
+      } catch (e) {
+        followRows = [];
+        console.warn('[dashboard] following read failed', e);
+      }
+    }
+    // cap = RAIL_PREVIEW_LIMIT so all three groups preview at the same depth. `total` is
+    // still id-derived inside followingCards, so the count below survives a failed read.
+    var following = A.followingCards({ ids: followIds, rows: followRows, cap: A.RAIL_PREVIEW_LIMIT });
+    var devGroup = A.developmentsGroup(following);
+    var followBody = document.getElementById('dashFollowingBody');
+    if (!devGroup.count) {
+      // ZERO DEVELOPMENTS: the group is hidden entirely rather than rendered as
+      // "Developments · 0". There is no add/find action for this type, so an empty state
+      // would offer nothing actionable — and the same node is REMOVED outright when the
+      // session is unreadable, where a zero would be a claim about an account we cannot see.
+      followingEl.hidden = true;
+      followBody.innerHTML = '';
+    } else {
+      followBody.innerHTML = '<div class="railgroup" data-group="development">'
+        + groupHeadingHTML(devGroup)
+        + devGroup.visible.map(function (c) {
+          // The sub-line is the record's own status (or type) and its ZIP — nothing else is
+          // available without asserting currency the data cannot support. See the FOLLOWING
+          // notes in lib/dashboard-aggregate.js for what is refused and why.
+          var sub = c.unresolved
+            ? 'We could not load this development’s details.'
+            : [c.context, c.place].filter(Boolean).join(' · ');
+          var label = '<div class="pmain"><div class="pl">' + HS.esc(c.title) + '</div>'
+            + (sub ? '<div class="ps">' + HS.esc(sub) + '</div>' : '') + '</div>';
+          // AN UNRESOLVED FOLLOW IS NOT A DESTINATION. The row used to be an anchor
+          // unconditionally, and c.zip is absent precisely when the record did not resolve —
+          // so HS.pageHref produced development.html with no ZIP context and the resident
+          // landed on a list about somewhere else. It stays visible and counted (removing it
+          // would make the heading disagree with the rows) but it is a plain div with no
+          // chevron, because there is no record to open. It remains removable from My Places.
+          if (c.unresolved) {
+            return '<div class="placerow placerow--unresolved" data-unresolved="1">' + label + '</div>';
+          }
+          var href = HS.pageHref('development.html', { id: c.id, zip: c.zip });
+          return '<a class="placerow" href="' + HS.esc(href) + '">' + label
+            + '<div class="pc" aria-hidden="true">›</div></a>';
+        }).join('')
+        // AN OVERFLOW MESSAGE THAT PROMISES MORE MUST BE ACTIONABLE. This was a bare <p>
+        // naming a number with no way to reach it; it is now the same anchor the two place
+        // groups use, routed to the existing ?view=projects filter.
+        + groupOverflowHTML(devGroup)
+        + '</div>';
+      followingEl.hidden = false;
+    }
+  }
+
+  // ---- Zero places: nothing to brief on, and that is a true statement ---------------
+  if (!places.length) {
+    document.getElementById('dashChanging').innerHTML =
+      '<p class="dnote">Add an address or a ZIP code and this briefing fills in with what is changing there.</p>';
+    document.getElementById('dashDates').innerHTML =
+      '<p class="dnote">Official meeting dates and comment deadlines appear here once you are monitoring a place.</p>';
     return;
   }
 
-  function mapCtx() {
-    var o = { zip: zip };
-    if (realHome && realHome.id) o.place = realHome.id;
-    return o;
+  // ---- Bounded reads ----------------------------------------------------------------
+  // Query shapes and the reason each is what it is: lib/data.js, "ALL MY PLACES readers".
+  // Every source is caught INDEPENDENTLY: a failed read is recorded as failed and is never
+  // allowed to render as "nothing is happening" — the whole point of sourceAvailability.
+  var zips = A.queryZips(places, A.MAX_QUERY_ZIPS);
+  var capped = A.queryZips(places).length > zips.length;
+
+  function pool(items, size, fn) {          // bounded concurrency — never Promise.all(N)
+    var i = 0, out = new Array(items.length);
+    function next() {
+      if (i >= items.length) return Promise.resolve();
+      var k = i++;
+      return Promise.resolve(fn(items[k])).then(function (v) { out[k] = v; return next(); });
+    }
+    var runners = [];
+    for (var r = 0; r < Math.min(size, items.length); r++) runners.push(next());
+    return Promise.all(runners).then(function () { return out; });
   }
 
-  // FIRST-TIME vs RETURNING: a signed-out visitor has never been here — never
-  // greet them "Welcome back"; lead with what HomeSignal does. With no homes
-  // followed, the subline is an invitation (plus honest sample-ZIP disclosure),
-  // never "0 homes followed".
-  var name = S.session && S.session.name ? S.session.name.split(' ')[0] : '';
-  document.getElementById('dashHi').textContent = S.session
-    ? (name ? 'Welcome back, ' + name : 'Welcome back')
-    : 'See what\'s changing around your home';
-  document.getElementById('dashSub').textContent = S.properties.length
-    ? S.properties.length + ' saved place' + (S.properties.length === 1 ? '' : 's') + ' — here\'s what needs you across them.'
-    : 'Add your home and we\'ll watch official county and permit records around it'
-      + ((HS.isSample && HS.isSample()) ? ' — right now you\'re viewing our sample ZIP code, Del Valle, TX.' : '.');
+  var ok = {};
+  function attempt(key, p) {
+    return Promise.resolve(p).then(function (v) { ok[key] = true; return v; },
+      function (e) { ok[key] = false; console.warn('[dashboard] ' + key + ' read failed', e); return null; });
+  }
 
-  var openCount = changes.filter(function (x) { var d = HS.daysUntil(x.window_closes_at); return d != null && d >= 0; }).length;
-  document.getElementById('dashStrip').innerHTML =
-    HS.tpl.statTileLink(projects.length, 'Projects near you', '', nav('development.html', Object.assign({ sort: 'distance' }, mapCtx())))
-    + HS.tpl.statTileLink(openCount, 'Action windows open', 'accent', nav('alerts.html', Object.assign({ band: 'open' }, mapCtx())))
-    + (c && c.growth_pressure ? HS.tpl.statTileLink('<span style="font-size:19px">' + HS.esc(c.growth_pressure) + '</span>', 'Growth pressure', '', nav('development.html', Object.assign({ lens: 2 }, mapCtx()))) : '')
-    + (c && c.community_score != null ? HS.tpl.statTileLink(c.community_score, 'ZIP Score', 'g', nav('community.html', Object.assign({ focus: 'score' }, mapCtx()))) : '');
+  // FIX 8K. The request limit is now PASSED, not inherited. `changesForZips(zips)` defaulted
+  // to 120 inside lib/data.js, so the page had no owned number to compare a result length
+  // against — and copying `120` here as a second literal is exactly the drift this repo has
+  // been bitten by before (a hand-maintained second copy stops covering whatever the first
+  // one gains next). One constant now travels to the query AND to the cap test, so they
+  // cannot disagree. `.limit(limit || 120)` makes this request byte-identical to the old one.
+  //
+  // `devCapped` is computed INSIDE the pool callback, before the reduce. The concat destroys
+  // per-list lengths, and per-ZIP length is the only evidence that a ZIP had more than
+  // DEV_QUERY_LIMIT development records — after the flatten the signal is unrecoverable.
+  var devCapped = false;
+  var results = await Promise.all([
+    attempt('changes', HS.data.changesForZips(zips, A.CHANGES_QUERY_LIMIT)),
+    attempt('meetings', HS.data.meetingsForZips(zips)),
+    attempt('places', HS.data.communityMetaForZips(zips)),
+    attempt('development', pool(zips, A.QUERY_CONCURRENCY, function (z) {
+      return HS.data.developmentForZip(z, A.DEV_QUERY_LIMIT);
+    }).then(function (lists) {
+      lists.forEach(function (l) {
+        if ((l || []).length >= A.DEV_QUERY_LIMIT) devCapped = true;
+      });
+      return lists.reduce(function (acc, l) { return acc.concat(l || []); }, []);
+    }))
+  ]);
+  var rawChanges = results[0], rawMeetings = results[1], meta = results[2] || {}, rawDev = results[3];
+  var avail = A.sourceAvailability(ok);
 
-  // Stamp ZIP-aware header links (paintNavHrefs runs at boot; re-stamp after we know data).
-  var mapHref = nav('homesignalmap.html', mapCtx());
-  ['dashMapLink', 'dashWatchMap', 'dashAllAlerts', 'dashZipOpen', 'dashMeetingsHead'].forEach(function (id) {
+  // ---- Normalize to one item shape, each carrying its OWN place provenance ----------
+  // FIX 8G. `placeCtx` and `datePlaceCtx` lived here and are gone. They were two
+  // near-duplicate implementations of one rule, and both collapsed to "Affects N of your
+  // places" — a string that could not distinguish ONE monitored ZIP the resident also saved
+  // an address inside from TWO genuinely affected monitored ZIPs. The rule now lives in the
+  // view-model (lib/dashboard-aggregate.js::monitoredZipAttribution) and the page renders a
+  // presentation-safe object; it decides no geography of its own.
+  //
+  // The label map is built ONCE from `meta`, which is already loaded in ONE query for every
+  // monitored ZIP — so no row and no ZIP causes a lookup, and query count is unchanged.
+  var zipLabelMap = A.buildZipLabelMap(zips, meta, places);
+  function attributionHTML(item) {
+    var wide = A.monitoredZipAttribution(item, zips, zipLabelMap, { maxLabels: A.ATTRIBUTION_MAX_LABELS_WIDE });
+    if (!wide.summaryText) return '';
+    var narrow = A.monitoredZipAttribution(item, zips, zipLabelMap, { maxLabels: A.ATTRIBUTION_MAX_LABELS_NARROW });
+    // BOTH variants are emitted and ONE is hidden by the existing 900px breakpoint. There is
+    // no runtime text measurement (forbidden) and no layout jump; `display:none` also keeps
+    // the inactive variant out of the accessibility tree, so a screen reader is offered
+    // exactly one summary at any width — never a hidden duplicate.
+    return '<span class="mzip mzip-wide">' + HS.esc(wide.summaryText) + '</span>'
+      + '<span class="mzip mzip-narrow">' + HS.esc(narrow.summaryText) + '</span>';
+  }
+
+  var items = [];
+  (rawChanges || []).forEach(function (c) {
+    var label = A.typeLabelForChange(c.category);
+    if (!label) return;                     // no authoritative category -> no row
+    items.push({
+      id: c.id, zip: c.zip, title: c.title, category: c.category,
+      source_ref: c.source_ref, occurred_at: c.occurred_at,
+      window_closes_at: c.window_closes_at,
+      typeLabel: label, kind: label === 'Local News' ? 'news' : 'gov',
+      places: A.placesForZip(places, c.zip)
+    });
+  });
+  (rawDev || []).forEach(function (p) {
+    items.push({
+      id: p.id, zip: p.zip, title: p.name, category: 'Development',
+      source_ref: p.source_ref, occurred_at: p.submitted_at,
+      window_closes_at: null, typeLabel: 'Development', kind: 'dev',
+      places: A.placesForZip(places, p.zip)
+    });
+  });
+
+  var deduped = A.dedupeChanges(items);
+
+  // ---- What's Changing ---------------------------------------------------------------
+  // The CTA's zip is ALWAYS the record's own zip, carried with its id from the same source
+  // row — never HS.state.zip, which this page does not read at all.
+  function changeHref(it) {
+    if (it.kind === 'dev') return HS.pageHref('development.html', { zip: it.zip, id: it.id });
+    if (it.kind === 'news') return it.source_ref || null;   // the publisher's own article
+    return HS.pageHref('alerts.html', { zip: it.zip, id: it.id });
+  }
+  var CTA = { dev: 'Review development →', gov: 'View notice →', news: 'Read article →' };
+
+  // Writes the failure text into the section's OWN persistent live region. Text-only and
+  // idempotent: a status that is set twice says the same thing once, and an empty message
+  // hides the node so an assistive technology is never handed an empty announcement.
+  function setStatus(id, msg) {
     var el = document.getElementById(id);
     if (!el) return;
-    if (id === 'dashMeetingsHead') el.href = nav('alerts.html', Object.assign({ category: 'Government & civic' }, mapCtx()));
-    else if (id === 'dashAllAlerts') el.href = nav('alerts.html', mapCtx());
-    else if (id === 'dashZipOpen') el.href = nav('community.html', mapCtx());
-    else el.href = mapHref;
-  });
-
-  // map preview — HS.buildLive is the guarded backbone chain (GL -> Leaflet raster
-  // -> schematic; never throws into this init). NEVER-FAKED rule: the home dot and
-  // home-anchored center exist ONLY for a real resident home in this ZIP — otherwise
-  // the ZIP centroid (app_community_meta.lat/lng) anchors, else the first record.
-  var items = changes.filter(function (x) { return !x.quiet; }).concat(projects)
-    .filter(function (x) { return x.lat && x.lng; }).slice(0, 6);
-  var dashMap = document.getElementById('dashMap');
-  var hasRealHome = !!realHome;
-  var center = (hasRealHome ? { lat: home.lat, lng: home.lng } : null)
-    || (c && c.lat != null && c.lng != null ? { lat: c.lat, lng: c.lng } : null)
-    || (items[0] ? { lat: items[0].lat, lng: items[0].lng } : null);
-
-  function goMapPreview() { location.href = mapHref; }
-  function onMarkerClick(it) {
-    var href = HS.itemNavHref ? HS.itemNavHref(it, zip) : null;
-    if (href) location.href = href;
+    el.textContent = msg || '';
+    el.hidden = !msg;
   }
 
-  HS.buildLive(dashMap, {
-    center: center, items: items, home: hasRealHome ? home : null,
-    interactive: true, zoom: 12.4, radiusMi: 1.5, w: 640, h: 300,
-    itemClick: onMarkerClick,
-    onReady: function (map) {
-      if (map && map.on) {
-        map.on('dragstart', function () { dashMap._hsDragged = true; });
-        map.on('dragend', function () { setTimeout(function () { dashMap._hsDragged = false; }, 0); });
-      }
-    }
-  });
-
-  // The preview surface opens the full map; marker clicks route to the record.
-  dashMap.style.cursor = 'pointer';
-  dashMap.addEventListener('click', function (e) {
-    if (dashMap._hsDragged || e.target.closest('[data-hs-map-item]')) return;
-    goMapPreview();
-  });
-  dashMap.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && !e.target.closest('[data-hs-map-item]')) goMapPreview();
-  });
-
-  var projectIds = new Set(projects.map(function (p) { return p.id; }));
-
-  // recent — ranked by impact; each card opens its alert or project detail.
-  var recent = changes.filter(function (x) { return !x.quiet; })
-    .sort(function (a, b) { return (b.impacts ? b.impacts.length : 0) - (a.impacts ? a.impacts.length : 0); }).slice(0, 2);
-  document.getElementById('dashRecent').innerHTML = recent.map(function (ch) {
-    var href = HS.itemNavHref ? HS.itemNavHref(ch, zip) : null;
-    return HS.tpl.miniCardLink(ch, ch.category, href);
-  }).join('');
-
-  // properties — each row selects that place and opens its property page.
-  document.getElementById('dashProps').innerHTML = S.properties.map(function (p) {
-    return '<a class="swrow swrow-link" href="property.html?id=' + encodeURIComponent(p.id) + '" data-place-id="' + HS.esc(p.id) + '">'
-      + '<div class="miniscore">' + (p.score || '') + '</div>'
-      + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + ' <span style="font-size:10px;color:var(--green);font-weight:700">· ' + HS.esc(String(p.tag || p.label || 'home').toUpperCase()) + '</span></div>'
-      + '<div class="pa">' + HS.esc(p.city) + '</div></div></a>';
-  }).join('');
-  document.getElementById('dashProps').addEventListener('click', function (e) {
-    var row = e.target.closest('[data-place-id]');
-    if (row) HS.selectProperty(row.getAttribute('data-place-id'));
-  });
-
-  document.getElementById('dashAddPlace').addEventListener('click', function () { HS.addHome(); });
-
-  // followed ZIP codes
-  document.getElementById('dashCommunities').innerHTML = HS.communitiesStripHTML({ zipLabels: true });
-
-  // Worth watching nearby — closest REAL project records; each chip opens detail.
-  var watch = projects.slice()
-    .sort(function (a, b) { return (a.distance_mi || 9e9) - (b.distance_mi || 9e9); }).slice(0, 4);
-  if (watch.length) {
-    document.getElementById('dashWatch').innerHTML = watch.map(function (p) {
-      return '<a class="wchip wchip-link" href="' + HS.esc(nav('development.html', { zip: zip, id: p.id })) + '">'
-        + HS.esc(p.name) + (p.dist ? ' · ' + HS.esc(p.dist) : '') + '</a>';
-    }).join('');
+  var changingEl = document.getElementById('dashChanging');
+  if (avail.changes === 'failed' && avail.development === 'failed') {
+    setStatus('dashChangingStatus', 'We could not read updates for your places just now. '
+      + 'This is a loading problem, not an absence of activity — try again shortly.');
+    changingEl.innerHTML = '';
+  } else if (!deduped.length) {
+    if (avail.anyFailed) setStatus('dashChangingStatus', 'Part of this briefing could not be read just now, so this list is incomplete. Try again shortly.');
+    changingEl.innerHTML = avail.anyFailed
+      ? ''
+      : '<p class="dnote">No new government notices, planning records or local news have been filed for your places recently.</p>';
   } else {
-    var wb = document.getElementById('dashWatchBlock'); if (wb) wb.style.display = 'none';
+    // FIX 8K. The row markup below is UNCHANGED — same order, same identity, same Fix 8G
+    // attribution, same per-record CTA and route. The only thing that moved is WHICH slice
+    // of the canonical collection is handed to it, and that decision lives in the view-model.
+    function renderRows(list) {
+      return list.map(function (it) {
+        var href = changeHref(it);
+        var ext = it.kind === 'news';
+        var when = A.fmtCalendarDate(it.occurred_at);
+        return '<div class="crow">'
+          + '<div class="ck"><span class="ctype ' + it.kind + '">' + HS.esc(it.typeLabel) + '</span></div>'
+          + '<div class="cmain"><div class="ct">' + HS.esc(it.title || 'Untitled record') + '</div>'
+          + '<div class="cmeta">' + attributionHTML(it)
+          + (when ? '<span>' + HS.esc(when) + '</span>' : '') + '</div></div>'
+          + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
+              + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + CTA[it.kind] + '</a>' : '')
+          + '<div class="cv" aria-hidden="true">\u203a</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    // COMPLETENESS, NOT COUNT. Four independent limits can hide a record, and any one of
+    // them makes an exact total a claim we cannot support. Tested on the RAW result length,
+    // never the deduped one — dedup can pull a capped 120 back under 120, so a deduped
+    // length below the cap proves nothing. `>=` rather than `===` so a future limit change
+    // still fails safe (toward the modest label) rather than silently asserting a total.
+    var countKnown = !capped
+      && !avail.anyFailed
+      && (rawChanges || []).length < A.CHANGES_QUERY_LIMIT
+      && !devCapped;
+
+    var expanded = false;
+    // The incompleteness notice moved OUT of this innerHTML and into the live region above.
+    // That is what keeps Fix 8K's expansion silent: paint() rewrites #dashChangingList only,
+    // and the status node is not inside it, so toggling never re-announces the briefing.
+    if (avail.anyFailed) setStatus('dashChangingStatus', 'Part of this briefing could not be read just now, so this list may be incomplete.');
+    changingEl.innerHTML = '<div id="dashChangingList"></div>'
+      + '<div id="dashChangingMore"></div>'
+      + (capped ? '<p class="dnote" style="margin-top:10px">Showing updates across your first ' + zips.length + ' places.</p>' : '');
+
+    var listEl = document.getElementById('dashChangingList');
+    var moreEl = document.getElementById('dashChangingMore');
+    // ONE button, created ONCE and never replaced. Re-creating it on each toggle would
+    // destroy the element the resident is standing on, so focus would jump to <body> mid
+    // interaction. Keeping the node alive makes "focus is stable" structural rather than a
+    // restore-focus workaround that has to be remembered on every future edit.
+    var toggleBtn = null;
+
+    function paint() {
+      var view = A.changesPreview(deduped, { expanded: expanded, countKnown: countKnown });
+      listEl.innerHTML = renderRows(view.visible);
+      if (!view.hasControl) return;              // at or under the bound: no control, no count line
+      if (!toggleBtn) {
+        toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'inlinebtn';
+        toggleBtn.id = 'dashChangingToggle';
+        toggleBtn.style.marginTop = '12px';
+        toggleBtn.setAttribute('aria-controls', 'dashChangingList');
+        toggleBtn.addEventListener('click', function () { expanded = !expanded; paint(); });
+        moreEl.appendChild(toggleBtn);
+      }
+      toggleBtn.textContent = view.expanded ? view.collapseLabel : view.expandLabel;
+      toggleBtn.setAttribute('aria-expanded', view.expanded ? 'true' : 'false');
+    }
+    paint();
   }
 
-  document.getElementById('dashMeetings').innerHTML = meetings.length
-    ? meetings.map(function (m) {
-        var href = HS.meetingNavHref ? HS.meetingNavHref(m, zip, projectIds) : null;
-        return HS.tpl.meetingRowLink(m, href);
-      }).join('')
-    : '<p class="quiet" style="font-size:12.5px;margin:0">No upcoming public meetings on file for this ZIP yet.</p>';
+  // ---- Official Dates to Know ---------------------------------------------------------
+  // Meetings carry a TIME only when the source stated one (meetings.meeting_time). The
+  // clock component of meeting_date is a midnight-in-local-zone artifact on 96.3% of
+  // upcoming rows and is never rendered — see lib/dashboard-aggregate.js. No relative
+  // urgency label, no timezone, no participation instruction.
+  var todayYmd = new Date().toISOString().slice(0, 10);
+  // Each expanded row carries the meeting's WHOLE canonical ZIP reach, not just the one
+  // it was expanded onto — so the collapse below re-forms one official date that can name
+  // every monitored ZIP it touches. `zips` is deduped by the view-model before labelling.
+  var mtgItems = (rawMeetings || []).reduce(function (acc, m) {
+    (m.zips || []).forEach(function (z) {
+      acc.push(Object.assign({}, m, { zip: z, sourceZips: m.zips, places: A.placesForZip(places, z) }));
+    });
+    return acc;
+  }, []);
+  var dated = A.officialDateItems({
+    meetings: mtgItems,
+    changes: deduped,
+    todayYmd: todayYmd
+  });
+  // A meeting reaching several of the resident's ZIPs is ONE official date, not three.
+  var seenDate = {};
+  dated = dated.filter(function (d) {
+    var k = d.kind + '\u001f' + String(d.id);
+    if (seenDate[k]) {
+      seenDate[k].places = seenDate[k].places.concat(d.places);
+      // UNION, never concat: a repeated ZIP must not become a repeated label (Fix 8G §9).
+      seenDate[k].sourceZips = A.distinctZips((seenDate[k].sourceZips || []).concat(d.sourceZips || []));
+      return false;
+    }
+    seenDate[k] = d; return true;
+  });
+
+  var MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  function dateBlock(ymd) {
+    var p = String(ymd).split('-');
+    return '<div class="dblock"><div class="m">' + MON[Number(p[1]) - 1] + '</div>'
+      + '<div class="d">' + String(Number(p[2])) + '</div></div>';
+  }
+  var datesEl = document.getElementById('dashDates');
+  if (avail.meetings === 'failed' && avail.changes === 'failed') {
+    setStatus('dashDatesStatus', 'We could not read official dates for your places just now. Try again shortly.');
+    datesEl.innerHTML = '';
+  } else if (!dated.length) {
+    if (avail.anyFailed) setStatus('dashDatesStatus', 'Part of this section could not be read just now, so it is incomplete. Try again shortly.');
+    datesEl.innerHTML = avail.anyFailed
+      ? ''
+      : '<p class="dnote">No upcoming official dates are available right now.</p>';
+  } else {
+    datesEl.innerHTML = dated.slice(0, 8).map(function (d) {
+      var meta2 = [];
+      var ctx = attributionHTML(d);
+      if (ctx) meta2.push(ctx);
+      if (d.kind === 'meeting') {
+        if (d.time) meta2.push('<span>' + HS.esc(d.time) + '</span>');
+        if (d.location) meta2.push('<span>' + HS.esc(d.location) + '</span>');
+      } else {
+        meta2.push('<span class="dwin">Official comment window open</span>');
+        meta2.push('<span>Deadline: ' + HS.esc(A.fmtCalendarDate(d.dateYmd)) + '</span>');
+      }
+      var href = d.kind === 'meeting'
+        ? d.href
+        : HS.pageHref('alerts.html', { zip: d.zip, id: d.id, band: 'open' });
+      var cta = d.kind === 'meeting' ? 'View meeting →' : 'Review official notice →';
+      var ext = d.kind === 'meeting';
+      return '<div class="drow">' + dateBlock(d.dateYmd)
+        + '<div class="dmain"><div class="dt">' + HS.esc(d.title) + '</div>'
+        + '<div class="dmeta">' + meta2.join('') + '</div></div>'
+        + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
+            + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + cta + '</a>' : '')
+        + '<div class="cv" aria-hidden="true">\u203a</div>'
+        + '</div>';
+    }).join('');
+    if (avail.anyFailed) setStatus('dashDatesStatus', 'Part of this section could not be read just now, so it may be incomplete.');
+  }
 });
 </script>
 </body>

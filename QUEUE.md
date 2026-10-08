@@ -40,6 +40,972 @@ per-ZIP/per-source state. Do not mirror queue items into the workbook; two queue
 
 ## RESUME POINT — read this first (updated 2026-08-13)
 
+### 2026-10-01 — ✅ FIX 4: the 706 no-boundary ZIPs are classified — 0 HomeSignal omissions; 704 legitimate, 2 not established
+
+**Classified before changing anything. No HomeSignal data changed.** All 706 stay `not_measured`.
+Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. Per-ZIP record:
+`docs/maps-coverage/fix4/no-boundary-zip-classification.csv`.
+
+- **Split.** Types and the decommissioned flag come from zipcodes 3.0.0, whose base data is
+  unitedstateszipcodes.org's, not USPS's.
+
+  | class | ZIPs |
+  |---|---:|
+  | PO Box | 498 |
+  | unique | 107 |
+  | standard ZIP with no Census ZCTA (31 in New York City) | 52 |
+  | decommissioned in the dataset (19 standard, 20 unique, 8 PO Box) | 47 |
+  | not in the ZIP dataset (84684, 84685): existence not established | 2 |
+  | **HomeSignal omission** | **0** |
+
+  The total is 706: 704 legitimate non-ZCTA ZIPs plus 2 not established.
+- **0 acquisition defects.** `geo.zcta_boundary`'s 33,791 codes are md5-identical (`7e927a8e…`) to
+  Census TIGERweb's 2020 ZCTA set.
+  - It is one check: five layers returned one identical body. It compares codes only, through a route
+    independent of our load path.
+  - 0 of the 706 are in it; positive control 12,016.
+  - The code sets are committed, so it can be re-checked offline.
+- **0 generation defects.** The ACTIVE generation (`n5-national-2026-09-30` at 19:03Z, and 09-29
+  before it) marks exactly these 706 `not_measured` (md5 `7d1bf19a…`), with 0 disagreements.
+- **Kept honest:**
+  - `scripts/fix4_classify_no_boundary_zips.py` is the only place a class is decided.
+  - `test/no-boundary-zip-classification.test.mjs` is in the required `unit` check and runs the
+    classifier's offline self-test.
+  - `no-boundary-zip-classification.yml` regenerates from zipcodes 3.0.0. It is not a required
+    check.
+  - 16 mutations: 15 fail `unit`; the 16th fails only the advisory job.
+- ⛔ **RETRACTED: the "new item" this entry first carried was false.** It said Fix 3's READY/ACTIVATE
+  check trusts `geo.zcta_boundary` to be complete. It does not: the publisher reads the pinned TIGER
+  archive itself, so a deleted or short table disagrees with it and is refused. No guard is needed.
+  See receipt §5.
+- 📌 **Still open (unchanged), the Fix 29 page-eligibility item, in full:**
+  - whether 84684 and 84685 should be pages at all (founder's Gold Master call; existence not
+    established) — ⏸️ **pages WITHHELD 2026-10-03 as UNVERIFIED** (not retired), now `page_mode unverified` in
+    the coverage model; re-audit only after USPS or USPS City State Product verification;
+  - the 47 ZIPs the dataset flags as decommissioned — ✅ **BACK ON THE SITE 2026-10-03 as
+    coverage-limited pages** (founder: the flag is third-party, not USPS; no ZCTA is not "inactive").
+    `docs/maps-coverage/fix4/zip-coverage-internal.json` (computed from the Fix 4 record, never deployed)
+    holds the evidence and `lib/zip-coverage.json` the four-field public model: 28 `specialized_zip`,
+    19 `verification_pending`, none `retired`. Still open: confirming each with USPS — only then may a
+    ZIP become `active` or `retired`;
+  - the 52 active standard ZIPs with no Census ZCTA;
+  - ~~the 706 pages' "not measured yet" wording, which frames a permanent absence as pending.~~
+    ✅ **DONE 2026-10-02 (founder wording, "use this"):** *"ZIP 10048 has no mapped area. The
+    Census does not draw a boundary for this ZIP code — usually because it serves PO boxes or a
+    single organization rather than streets — so we can't show development records for it. Enter
+    a street address to see development around that address."* One owner,
+    `HS.zipNoMappedAreaFact` in `lib/zip-authoritative.js`, on Map 1 and the ZIP / development
+    pages; pinned whole in `test/zip-no-mapped-area-copy.test.mjs`. Only a ZIP waiting on a
+    build (producer status `unknown`) keeps "not measured yet". Not changed: the city pages' short
+    "not yet measured — not counted" tag beside these ZIPs.
+
+  The registry and the page copy were not touched.
+
+### 2026-09-29 — ✅ FIX 3: 94128, 95219 and 99128 have a serving-state row, and a wrong one is now refused
+
+**Scope held to the three ZIPs with a usable boundary and no serving row.** The 706 ZIPs with no
+boundary were not touched. Receipt: `docs/maps-coverage/N5-FIX3-THREE-ZIP-SERVING-GAP-2026-09-29.md`.
+
+- **Why they were omitted:** each is the ONLY canonical ZIP in its ZIP3 prefix (941, 952, 991).
+  The legacy generation's writer (`scripts/n5_unit_a_shadow.py`, retired) built only prefixes
+  that had a phase-1 shard (`select_prefixes()` reads `n5_shard where state='done'`), and wrote
+  `boundary_complete` only for the boundaries it loaded. None of the three prefixes had a phase-1
+  shard, and the separate `not_measured` backfill covered only ZIPs with no boundary. So nothing
+  wrote them: legacy = 12,013 + 706 = **12,719** of 12,722.
+- **The presence half was already repaired** by the generation path (#1336 / #1350): scope =
+  shard prefixes ∪ every canonical prefix, and READY / ACTIVATE refuse on
+  `canonical_zip_without_status`. Both national generations carry 12,722 rows.
+- **Serving since 2026-09-27 15:00Z**, re-measured 2026-09-29 on `n5-national-2026-09-27`:
+  94128 `boundary_complete` 0 · 95219 `boundary_complete` 0 · 99128 `boundary_complete` 1.
+  `app_zip_geography_state`: 12,016 authoritative + 706 not_measured + **0 pending**.
+- **Correct, not just present:** membership was recomputed from the generation's candidate
+  geometry and matches on all three. 94128's 32 source-stated projects all lie 1.0-13.6 km outside
+  its polygon; 95219's one point inside is an unresolved `GEOMETRY_INVALID` record, correctly
+  withheld; 99128's member is a WSDOT line that crosses the polygon.
+- **What this change adds (Part G):** READY / ACTIVATE now also refuse a status that disagrees
+  with `geo.zcta_boundary` (`canonical_zip_status_disagrees_with_boundary`). The publisher labels a
+  ZIP from the TIGER file the loader downloads, so a skipped shape would have published a
+  boundary-bearing ZIP as `not_measured` and passed every existing check. Measured before
+  applying: 0 disagreements in every generation.
+  **Applied 2026-09-29 23:56Z** (`db-sql.yml` run `36647789091`, from `main` `57aa5b6`): live
+  `md5(prosrc)` `66f5995d…` = Part G's post-condition; ACTIVE generation 12,722 rows, 0 disagree.
+  **First real READY + ACTIVATE under it:** `n5-national-2026-09-29`, activated 2026-09-30 12:22Z,
+  12,722 rows, 0 disagree. **Rollback:** `docs/n5-generation-publish-part-g.rollback.sql`. It is
+  generated, fingerprint-proven to restore the pre-Part-G body exactly, and executed in CI by
+  `run_part_g_rollback.py`. A refusal holds the build BUILDING, and `n5_map1_build` reports it
+  after 6 h with no progress. **Not applied: it exists for use only if the check refuses a
+  correct build.**
+- **`verify-map1-zip-states` was red since the first national activation** (runs 90, 91) with one
+  failure, `COVERAGE: no candidate ZIP is currently in the 'pending' state`: the three were the
+  only live members of that state. It now asserts the three resolve to a measured state, and
+  exercises the pending contract by handing the live page the producer's exact `unknown` answer.
+
+### 2026-09-28 — 🔴 FINDING (RECORDED, NOT FIXED): the BIS `recency_expr` admits permits back to 1989 — 89.6% of what it returns is not recent
+
+**This is a finding, not authorised work.** Per Rule 16 it is filed as its own item rather
+than folded into the Future Surroundings Report checkpoint, whose scope is fixed and whose
+sold artifact does not touch this code path. **Nothing here has been changed.** Fixing it
+needs founder authorisation because it is a live consumer surface.
+
+**Where:** `supabase/functions/get-address-report/jurisdiction-registry.json`, the
+`socrata` entry for dataset `ipu4-2q9a` (NYC DOB Permit Issuance, BIS legacy):
+
+```
+"recency_expr": "(substring(issuance_date,7,4)||substring(issuance_date,1,2)||substring(issuance_date,4,2)) >= '{cutoff_compact}'"
+```
+
+**What it assumed.** `issuance_date` is a *text* column. The convention dated 2026-08-02
+reformats it into a sortable `YYYYMMDD` key by slicing the parts out of `MM/DD/YYYY`. That
+was correct when every value in the column had that shape.
+
+**What the column is now.** The publisher has been writing ISO values into it. Measured
+against the live view 2026-09-28: **3,990,689 rows total — 3,881,514 `MM/DD/YYYY` and
+88,238 `YYYY-MM-DD…`.** The slice positions mean nothing on the second shape. For
+`2026-03-01T00:00:00.000` the expression builds the key `3-01206-`, and because the
+comparison is lexical and `3` sorts above `2`, that key clears **any** `{cutoff_compact}`
+beginning with a 2 — i.e. every cutoff this century.
+
+**What that costs, measured 2026-09-28 at a 365-day cutoff (`20250928`):**
+
+| | rows |
+|---|---|
+| admitted by `recency_expr` | 71,681 |
+| genuinely inside the 365-day window | 7,442 |
+| **over-included** | **64,239 (89.6% of what it returns)** |
+| oldest permit the expression admits | **1989-05-11** |
+
+Every one of the 64,239 is an ISO-formatted row. This is not a rounding error at the
+boundary: nine of every ten permits the consumer path calls recent are not.
+
+**There is a green test over this and it cannot see the defect.**
+`test/socrata-text-date-recency.test.ts` passes, and it is a real test — it pins that the
+substring comparison is emitted, that `{cutoff}` is substituted at request time rather than
+frozen, that the older broken ISO comparison is gone rather than merely accompanied, and
+that a blank `recency_expr` falls back to a filter rather than to none. Every one of those
+is about **substitution**. None is about whether the expression the substitution produces
+selects the right rows. It would pass unchanged if the key were pure noise, which for
+88,238 rows it is. Do not read its green as coverage of this finding.
+
+**Why it was not fixed here.** `ipu4-2q9a` is on the NYC V1 allowlist, but
+`get-address-report` is on the EXCLUDE list and contributes nothing to the sold report —
+see `docs/corporate-output-source-rights-audit-2026-09-27.md`. The paid path reads the same
+column with a cast (`issuance_date::floating_timestamp`) and is unaffected; the reasoning,
+and the rejected option of reusing this convention, is written up in
+`docs/corporate-output-nyc-bis-window-defect-2026-09-28.md`. Routing around a defect in a
+second implementation is not resolving it, so it is recorded here against the surface that
+still has it.
+
+**Proposed remedy (NOT AUTHORISED, NOT STARTED).** Replace the substring key with
+`issuance_date::floating_timestamp >= '{cutoff_iso}'`, which is verified working on this
+view in both `$where` and `$order`. Note `date_extract_y` is **not** available on a text
+column here — it returns HTTP 400 on type mismatch. Any other registry entry whose
+`recency_expr` slices a text date has the same exposure the moment its publisher changes
+format; that sweep is also unstarted and unauthorised.
+
+### 2026-09-20 — DECISION HISTORY: code landed on the branch; deploy + backfill separately gated
+
+**State:** implementation complete and COMMITTED on
+`claude/homesignal-decision-history-avkrws`, 223/223 offline suites green, both repos.
+⚠️ The heading deliberately carries no in-flight marker: the FILES have landed, so a
+🟡/"NOT DEPLOYED" heading would trip `test/queue-state-not-stale.test.mjs` for exactly the
+right reason — that detector asks whether a heading's claim matches the tree, and what is
+outstanding here is a gated ACTION, not unwritten code. **Gated and NOT done: merge, edge-function deploy,
+production backfill.** Until the deploy ships, **no production report carries a `decision`
+and nothing a resident sees has changed** — that is the honest read of this item's state.
+
+**Founder contract:** a genuine proposal that was DENIED remains discoverable under
+Proposed with a prominent sourced decision notation; never auto-deleted, never "Canceled",
+an appeal is never an approval. Receipt: `docs/decision-history-contract-2026-09-20.md`.
+Standing answer: `CLAUDE.md` §7.05.
+
+**Pennhurst is the regression case, NOT the scope.** No Pennhurst / Chester County / 19475
+/ data-centre branch exists anywhere in the change.
+
+**The defect, measured:** 294 denial-shaped raw status values across all 239 registry
+entries, **294 of 294 in `exclude`** (which means `continue` in all five connectors) and 0
+in any emitting bucket — so a denied application was DELETED, not mislabelled. Controls:
+emitting buckets carry 681/425/299; `app_projects` held 3,000,229 development rows with
+**0 `Decided`**; a 299-ZIP / 48,342-site sample of `development_reports` carried **0** sites
+with `decided`.
+
+**Shipped in the branch:**
+- `sources/decision.ts` — the one authority; four separations (browsing category · decision
+  + history · current-status verification · eligibility).
+- All five connectors emit `denied`/`withdrawn` instead of dropping; run reports gain
+  `decided_by_status` so "surfaced 12" never reads as "dropped 12".
+- Engine: denial split from withdrawal; `counts.proposed_active` (eligibility) beside
+  `counts.proposed` (browsing) and `counts.proposed_decided`.
+- Page: Map 1 popup/rail/counter/marker title, community page, templates, `impact.js`,
+  N5 radius — all through `lib/map.js`, pinned to the engine by a parity test.
+- Registry: **101 values moved across 53 entries** (62 denied, 39 withdrawn), COMPUTED by
+  `scripts/enable-decision-buckets.mjs`, fingerprint `2165d90e02bfe05652385c48234c47b4`;
+  verified 1,907 pairs before and after, 0 lost, 0 invented. **9 ambiguous values refused**
+  and left excluded, each with a named reason.
+- Social: `maps-eligibility.mjs` gate 2b + `tests/test_maps_decided_not_postable.mjs`, wired
+  into `check-maps-node-gates.yml`.
+- Coverage instrument + dated output: **53 of 240 sources can report a refusal, 187 cannot.**
+
+**Dependencies / what unblocks what:**
+1. **Merge** → nothing resident-visible yet (the engine is deployed separately).
+2. **Deploy `get-address-report`** → new reports start carrying `decision`. `deploy-edge-functions.yml`
+   has no ref/SHA guard and always ships whatever `main` is — check the edge-function tree
+   hash at the ref it actually runs on (CLAUDE.md §Unit 4).
+3. **Backfill** (a ZIP gains a decision only when its report refreshes) → `app_projects`
+   starts carrying `status='Decided'`, and the social gate starts refusing real rows.
+4. **OPTIONAL, separate:** `docs/decision-provenance-migration.sql` — parked, executable,
+   fail-closed, NOT applied. Only needed so `app_projects`-backed cards can NAME the
+   outcome; without it they honestly read `Proposed · decided`.
+
+⚠️ **Expect the Proposed rail to GROW and the Proposed COUNTER to fall on the same page.**
+That is the contract working, not a regression: the rail is the browsing category (which
+now keeps decided applications) and the counter is the eligibility number (which never
+counted them). Anyone reading the two as one number will report it as a bug.
+
+📌 **Not chased, logged per Rule 16:** the 9 ambiguous registry values each need a
+publisher-specific answer rather than a looser rule; widening the outcome vocabulary beyond
+`denied`/`withdrawn` is a founder decision.
+
+---
+
+### 2026-09-15 — ✅ FIX 28 — DATA CENTER TYPE GEOGRAPHIC MEMBERSHIP: MERGED AND LIVE, BOTH HALVES
+
+✅ **MERGED 2026-09-15 as `c2273e8` (#1240).** All four files are on `main`:
+`docs/fix28-datacenter-zip-membership.sql`, `docs/fix28-datacenter-membership-audit.sql`,
+`test/fix28-datacenter-membership.test.mjs` and `test/fixtures/fix28/datacenter-type-inputs.psv`.
+
+🛑 **THIS ENTRY READ "NOT MERGED, NOT DEPLOYED … the PR is open and unmerged" UNTIL 2026-09-19,
+and that is the defect worth recording — not the fix, which was fine.** QUEUE.md's whole job,
+stated in CLAUDE.md, is that it "must never drift from reality". It drifted, about itself, for
+four days. A pre-launch audit then read this entry, believed it, and wrote up "the repo and
+production describe different systems" as a launch-blocking risk. The risk was not real; the
+stale queue entry was. **A doc carrying a receipt is the first place to look and the LAST place
+to trust** — the entry said PR OPEN, and nobody asked GitHub.
+
+**VERIFIED 2026-09-19, both halves, against the primary sources rather than this file:**
+- `git ls-tree origin/main` — all four files present; the DDL landed in `c2273e8`.
+- `pg_trigger` — `trg_development_reports_dc_zip_membership` on `public.development_reports`,
+  user trigger, `tgenabled = 'O'` (enabled), bound to `dev_reports_enforce_dc_zip_membership`.
+- `pg_proc` — all three functions the parked DDL defines exist live:
+  `dev_reports_enforce_dc_zip_membership` (4,585 chars), `map_site_is_datacenter_type` (2,592),
+  `zip_dc_membership_outside` (511).
+
+So the repo and production agree, in substance and not merely in file presence.
+
+Rollback is still one statement:
+`drop trigger trg_development_reports_dc_zip_membership on public.development_reports;`
+(the removed records then return as each ZIP refreshes, ~53 h for a full sweep).
+
+**THE DEFECT, as architecture rather than symptom.** `development_reports` is written by the
+ZIP-mode engine, which RETRIEVES around the ZIP centroid within a radius (`radius_mi: 3`, plus the
+EPA FRS ladder). Retrieval is a CANDIDATE operation. Nothing then decided MEMBERSHIP — the row is
+keyed by ZIP, so every candidate silently became a canonical member. Before the 2026-09-06
+dual-identity and 2026-09-07 overlay-on-Type rulings an EPA data-centre facility drew a purple
+square ("a regulated facility nearby") and the caption's *"nearby facilities for context"* was true
+of it; those rulings gave it the Data center TYPE pin, which is a claim about THIS ZIP. That
+interaction is the root cause, and neither ruling is wrong.
+
+- **BASELINE REPRODUCED EXACTLY, whole corpus, no sampling:** 12,722 ZIP pages · **687** carry a
+  Data center Type dot · **1,178** dots · testable **996** = inside **360** + outside **636** ·
+  **361** ZIP pages with ≥1 outside · max overshoot **13.054 mi** · ZIP 20166 **15 / 4 / 11** ·
+  no usable boundary **706** ZIP pages, of which **153** carry **182** dots (→ **FIX 29**).
+- **AFTER, re-derived from the live cache with the same audit logic:** 542 dots · 371 ZIP pages ·
+  testable 360 · inside 360 · **outside 0** · **ZIP pages with an outside dot 0** · untestable
+  **182 / 153, unchanged**. Original-association retest of all 1,178 frozen identities:
+  **636/636 removed · 360/360 retained · 182/182 untouched · 0 unexplained.**
+- **The fix is ONE trigger on `public.development_reports`**, the same shape as the existing
+  `trg_development_reports_canonical_zip`, because the `*/2` rolling refresh rewrites `sites` from
+  the engine — a data-only repair is undone within minutes. Membership is
+  `ST_Intersects(ST_SetSRID(ST_MakePoint(lng, lat), 4269), geo.zcta_boundary.geom)`, the predicate
+  `geo.zip_authoritative_membership` is already built with. **No buffer, no radius, no centroid,
+  no tolerance.**
+- 🔑 **THE TYPE PROJECTION IS PROVEN EQUAL TO THE SHIPPED CLASSIFIER, NOT ASSUMED.**
+  `public.map_site_is_datacenter_type()` mirrors `HS.trackerSiteItem` → `HS.resolveMarker`
+  branch for branch; `test/fix28-datacenter-membership.test.mjs` runs the REAL `lib/map.js` over
+  every distinct production input (426, fingerprint `73541120b71351703d6fcde9b0988e1c` recomputed
+  in the database) and gets **0 disagreements**. Classification is not changed by Fix 28 and the
+  test is what says so.
+- ⚠️ **THE FIRST AFTER-AUDIT WAS WRONG AND WAS REPLACED, NOT REINTERPRETED.** Its record identity
+  fell back to `record_url`, and dataset-precision sources (MassDOT, Chicago, Phoenix, San Jose,
+  Memphis) give EVERY record the same `record_url` — so it matched a different record and reported
+  **255 of 636 still attributed**. A per-record identity is (label, lat, lng) within the ZIP; on
+  that the answer is 0. **A wrong instrument reports a plausible number, which is the whole reason
+  the baseline had to be reproduced before anything was changed.**
+- ⚠️ **PERFORMANCE WAS A REAL DEFECT AND IS MEASURED, NOT ASSERTED.** The first trigger called the
+  full predicate once per site: **11,713 ms on ZIP 20166 (3,532 sites)**, against a refresh that
+  writes ~240 rows/hour. A count-first pass plus a cheap `position()` superset (proven to select
+  the identical 1,178 dots) takes it to **352 ms**, and a row with nothing to correct never pays
+  for a rebuild.
+- **Fresh vs cached parity, on the REAL engine path, not a simulation:** a live
+  `get-address-report` run for 20166 returned 17 Data-centre points (5 in / 12 out) and
+  `dev_refresh_collect()` stored **5, 0 outside**, with `counts.facilities` 28 == 28 stored
+  facility sites. 133 ZIPs written by the cron path in the same window: **0 outside**.
+- **Downstream inherits, proven rather than assumed.** `app_refresh_zip` reads
+  `development_reports.sites`, so `app_projects` — which feeds the Place page, the Dashboard and
+  `app_projects_for_zip` — carries **0 of the 636 and 100% of the retained** after the 361
+  affected ZIPs were re-materialized.
+- ⚠️ **SCOPE, STATED SO IT IS NOT MISTAKEN FOR COMPLETENESS: the same defect exists for every
+  OTHER Type and is untouched.** On the shard-0 affected ZIPs alone, **31,254 non-data-centre
+  points are still outside their own ZIP boundary**. That is the over-reach control (a zero would
+  have meant the gate reached past Data center) and it is also the honest size of the remaining
+  work. Not Fix 28.
+- 🔗 **ADJACENT DEFECT — HALF OF IT IS NOW FIX 29, WHICH MERGED WHILE THIS WAS IN FLIGHT (#1238,
+  `3a1da30`). Read the two together, not as rivals.** `public.national_dc_for_zip` is a pure
+  centroid + 5-mile radius read: 9,966 (ZIP, record) attributions over 2,418 ZIP pages, **8,952
+  outside the ZIP polygon** (measured 2026-09-15, before either fix). **Fix 29 took the
+  NON-POLYGON half** — 1,597 placements on 351 of the 706 boundary-less ZIP pages, refused at the
+  page's data boundary by `HS.nationalPlaneAdmitted` → `HS.zipAuthIsComplete`. **They do not
+  collide:** different plane (live RPC vs cached `development_reports.sites`), different
+  population (the 706 vs the 996 testable), different layer (page JS vs DB trigger). Verified
+  after Fix 29 merged: Fix 28's firewall reads **706 / 153 / 182, unchanged**, and polygon-backed
+  Data center points are **361, 0 outside**.
+- 📌 **STILL OPEN, and neither one is Fix 28 or Fix 29: (a)** the remaining **8,369** national-plane
+  placements sit on POLYGON-backed ZIP pages and are still admitted by centroid distance, never
+  polygon-tested; **(b)** those records render as *Other project*, not Data center — verified with
+  the real classifier, `HS.resolveTrackerMarker(...)` returns `typeKey:'other'`
+  (`FALLBACK:other`), because the page builds them with `name`/`type` while `HS.trackerSiteItem`
+  reads `label`/`use_type`/`layer`. Fixing (b) would move *Other project* geography, which is why
+  it was not bundled here.
+  - ✅ **(b) IS FIXED (2026-09-27, PR #1393) — a field mapping, nothing else.** `HS.map1DcSite`
+    now fills `use_type` (from `project_type`), `label` (from `project_name`) and `bucket` / `type`
+    (the lifecycle key of `map_status`, via `HS.canonicalLifecycle`). Moving these pins out of
+    *Other project* is the intended outcome. Measured on production over all 12,722 registry ZIPs:
+    before the fix, **1,816 of 1,816** rows on 757 ZIP pages drew as Other project / Lifecycle
+    unknown with no name; after it (the shipped code run over those production rows), 1,816 of
+    1,816 draw as Data center in their own lifecycle (Operating 1,481 · Approved 183 · Proposed
+    152). The live probe read 28 of 28 on the deterministic sample. No SQL, identity, dedupe, geography or OSM
+    change. (a) is the membership read #1315 replaced; see CLAUDE.md §7.09.
+  - ✅ **Four follow-on defects fixed (2026-09-27, founder: "fix defects"):** the "Application on
+    file" line on proposed national pins, the blank source line, lists cut at 12 with nothing
+    said, and the "New projects proposed" tile reading the report's radius `proposed_active`.
+    See CLAUDE.md §7.09.
+  - ✅ **Six MAPS drafts re-shot 2026-09-27** (`maps-social-image.yml` run `36339216006`,
+    `recapture=true`, dispatched from `main` at `bd7a7af` at 18:03:21Z, after the live
+    `homesignalmap.html` was checked byte-identical to the repo): `5aca7ffc-2473-4e4c-b00e-d5ee01adcfc8`
+    (20904), `c6245e38-386f-434e-88b0-d32aab4fd984` (60607), `491380a5-259e-4c63-b7a7-96d914eb9c36`
+    (64153), `532ff7fe-a30d-4653-9768-816e35e869c7` (85008), `a41fb90e-049d-4e71-babc-5ef2f8a27f18`
+    (85034), `f89ea810-1b98-47ce-9c21-550c42768d6a` (97702). Each row's `evidence.visual.captured_at`
+    (18:04:22–18:04:39Z) and its stored file's `updated_at` are after the dispatch; all six are
+    still drafts and pass both approval checks. 97702 is now a pinned map of its own project
+    instead of a ZIP map (see CLAUDE.md §7.09).
+  - 📌 **Left for the ingest cleanup job:** `maps/97702/zip-1iivwwic4mzo.png` is referenced by 0 of
+    58 MAPS rows after the re-shoot. It is removed by `homesignal-ingest`'s dispatch-only
+    `cleanup-social-images.yml`, not by this repo.
+- 📌 **§14 REPRESENTATIVE POINTS, reported separately and NOT used to weaken membership:** 102 of
+  the 1,178 dots are non-native derived points — `massdot-highway-projects` 97 (POLYLINE
+  path-midpoint), `ctdot-project-work-areas` 3 and `fort-worth-zoning-cases` 2 (polygon shoelace
+  centroid), all via `featurePoint()`. MassDOT is 85 testable / 3 inside / 82 outside, which is
+  what a line's midpoint does. `geo_precision` says `point` for all of them, so the stored record
+  does NOT record its own derivation — that is the gap a source-geometry contract would close.
+- 📌 **70 distinct source records lose their last Data-centre ZIP page** (of 243 removed records,
+  173 survive elsewhere). Of the 70: **60** are physically inside a ZIP that IS a HomeSignal page
+  and were simply never retrieved there, **9** fall in a ZCTA that is not one of the 12,722, and
+  **1** is in no ZCTA at all. Fix 28 removes the false attribution; putting each record on the
+  page it belongs to is POSITIVE attribution and is engine-retrieval work.
+
+### 2026-09-15 — ✅ FIX 29 — CLOSED AND ARCHIVED: proximity is not membership, and 351 ZIP pages stopped claiming it
+
+⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `3a1da30` (#1238), deployed by
+`pages` run **35036041000** on the merge SHA, and confirmed on the LIVE site with a non-polygon and a
+polygon-backed control taken the same way before and after. Every number below is a receipt.
+
+⚖️ **THE CONTRACT: a ZIP page represents ZIP GEOGRAPHY.** A centroid may position a map; it may never
+decide whether a project belongs to a ZIP. Where HomeSignal cannot establish ZIP polygon geography, it
+does not substitute centroid proximity for membership.
+
+- 🔑 **THE DEFECT WAS MEMBERSHIP, NOT THE BOUNDARY IMPORT — and the audit that found it is the reason
+  this shipped small.** The 706 non-polygon ZIPs are real (12,722 pages · 12,016 resolve · 706 do not),
+  but the adversarial audit cleared every recovery theory: upstream-exists-but-unresolved **0**, import
+  defect **0**, vintage gap **0**, join/normalization defect **0**. Census TIGERweb answered **0/706**
+  for the missing cohort against a **706/706** control, and `geo.zcta_boundary`'s 33,791 rows equal the
+  publisher's own layer count exactly. **Do not attempt to manufacture or recover 706 polygons.**
+- **What was actually wrong:** `public.national_dc_for_zip(p_zip, p_radius_mi => 5)` takes
+  `home_lat/home_lng` from `development_reports` — a ZIP CENTROID — and selects national data-centre
+  records within a 5-mile great-circle radius. `homesignalmap.html` concatenated those `natlSites`
+  unconditionally, so on a page with no whole-ZIP geography **distance to a centroid was the only thing
+  asserting a record was in that ZIP**. Measured: **351 of the 706 pages drew 1,597 placements from just
+  141 records** — on the same map as the page's own promise that it *"will not estimate it from a circle
+  around the ZIP centre"*.
+- **The guard is one predicate, and it DELEGATES rather than defining.** `HS.nationalPlaneAdmitted`
+  calls the existing `HS.zipAuthIsComplete`, so there is exactly ONE definition of "usable ZIP
+  geography" and nothing to keep in sync. ⛔ **Do not re-implement it as
+  `zipAuthOutcome(...) === 'complete'`** — that second copy was written, caught and reverted during the
+  build, and `test/fix29-national-plane-membership.test.mjs` §D now refuses it by name.
+- **It reads the payload the page ALREADY fetched**, so it costs no request and works for anonymous
+  visitors. `public.app_zcta_boundary` states polygon availability more directly and is **not
+  anon-executable**, so it cannot gate an anonymous page load. The substitute is sound because it was
+  cross-tabbed with **zero contradictory rows**: `boundary_complete` holds for exactly the 12,013
+  canonical ZIPs carrying a polygon, `not_measured` for exactly the 706 that do not.
+- **Gated at the DATA boundary, not by hiding markers.** A refused record never becomes a site, so it
+  cannot reach `render()`, `MAP_SITES`, the counts, the three map views, the ODbL credit or
+  `__HS_SITES`. A hidden marker is still a site the page has accepted as belonging to the ZIP, and
+  membership is the claim being refused. **Fails closed** — an `unavailable` read refuses too.
+- **PRODUCTION RECEIPTS (`verify-map1-card-grain`, `site_base=https://homesignal.net`, same probe both
+  times — baseline run `35035906157` pre-deploy, run `35036245903` post-deploy):**
+
+  | control | before | after |
+  |---|---|---|
+  | **60105** non-polygon (`not_measured`) | page **21** dev sites · **21** carrying no project identity · 79 leaflet markers · 4 FAIL | page **0** · **0** · 58 markers · **all 7 PASS/CLEAN** |
+  | **20151** polygon-backed (`boundary_complete`) | page **46** · relation 24 · **22** without identity | page **46** · relation 24 · **22** without identity — **byte-identical** |
+
+  60105's authoritative relation is EMPTY, and it was drawing 21 development sites anyway. The 79 → 58
+  marker drop is exactly the 21 removed.
+- 🔑 **THE PROBE MEASURED THE POPULATION INDEPENDENTLY, AND AGREED TO THE RECORD.** It counts
+  centroid/radius records as *development sites carrying no project identity* — a different instrument
+  from the SQL — and returned **21** for 60105 and **22** for 20151, exactly the counts predicted from
+  the database before the baseline was read. Table-wide: placements **9,966 → 8,369**, which is
+  `9,966 − 1,597` exactly; **admitted on the 706 = 0**; polygon-backed unchanged at **8,369**; collateral
+  on polygon ZIPs **0**.
+- ⚠️ **THE POST-DEPLOY PROBE STILL EXITS RED, AND THAT IS CORRECT — READ THE NUMBERS, NOT THE BADGE.**
+  Its 4 remaining failures are all 20151's, because its 22 legitimately-admitted national records carry
+  no `app_projects` identity. That is a pre-existing tension between the national plane and the
+  card-grain invariant, it is **Fix 28 / card-grain territory**, and Fix 29 neither causes nor fixes it.
+  Run total went 8 → 4 and **60105 contributed 0**.
+- ⚠️ **TWO DATA-CENTRE POPULATIONS. DO NOT COMBINE THEM.** **182 canonical records across 153** of the
+  706 (`app_projects`, the `lib/map.js` classifier) are UNTOUCHED and remain **UNTESTABLE** for polygon
+  containment while no boundary exists. The **1,597 placements / 351 ZIPs / 141 records** were the
+  centroid/radius plane. The 182 are not the 1,597, and neither is canonical membership for the other.
+- **FIX 28 NON-INTERFERENCE, verified rather than asserted:** Fix 28 concerns dots outside an EXISTING
+  polygon — ZIPs that HAVE one, which is exactly the case this gate ADMITS. 20151 still draws all 22 of
+  its national records post-deploy, so that population is intact and independently testable; nothing was
+  globally hidden, and the gate performs no containment test (asserted in the suite).
+- ⚠️ **`verify` (`verify-map1-zip-states`) was RED before this branch existed and is red still.** It
+  runs against production (`SITE_BASE: https://homesignal.net`); all 8 recent runs on `main` are
+  `failure`, including run #73 on `eb393e6` before the branch. Its 5 assertions are ZIP-mode COPY on
+  08005/01001/01009, none of it touched here. **Not caused by Fix 29 and not fixed by it.**
+- **Deployment source is still GitHub Actions** — checked the way CLAUDE.md §5 requires: **no
+  "pages build and deployment" run exists on the merge SHA**, and the deployed bytes were read back
+  from `https://homesignal.net/homesignalmap.html` (HTTP 200, 309,689 bytes) carrying
+  `var natlAdmitted = …`, the gated `natlSites`, the `admitted`/`admission_basis` signal, and **zero**
+  occurrences of the old ungated form.
+- **Tests:** `test/fix29-national-plane-membership.test.mjs` — 21 checks (A non-polygon · B polygon ·
+  C proximity-alone · D no-centroid-fallback · E classifier untouched, plus Fix 28 non-interference and
+  a no-fabrication guard), proven load-bearing by **5 mutations measured on EXIT CODE**.
+  `test/national-plane-failure-visibility.test.mjs` §7d was **SPLIT, not relaxed**: the mapped source
+  must still be `natl.records` and the only guard permitted in front of it is the admission flag, so a
+  read-outcome fallback still fails (mutation-verified).
+- **Scope held:** no `geo.zcta_boundary` mutation · no geometry created · no centroid/radius replacement
+  · no ZIP-page deletion · no ZIP-membership rewrite outside this path · no Data center classifier
+  change · no Fix 30/31 work.
+- 📌 **NOT taken, deliberately, and each its own unit:** the 64 stale geography-export states; the 3 ZIPs
+  with no `geo.maps_zip_geography_status` row (94128, 95219, 99128 — ✅ closed by FIX 3, 2026-09-29,
+  entry at the top of the resume point); page-eligibility for the 21
+  obsolete members (19 retired + 84684/84685) and the 52 active-STANDARD/no-ZCTA ZIPs; and the
+  architecture finding that the system still conflates PAGE EXISTS with POLYGON EXPECTED — 685 of the
+  706 will never have a ZCTA polygon, so `not_measured` frames a permanent absence as pending.
+  *(2026-10-01, FIX 4: the 706 are now classified per ZIP with evidence. Reconciled, not
+  corrected: "685" was 706 minus the 21 obsolete pages set aside, and "19 retired" was the
+  decommissioned STANDARD ZIPs; the dataset flags 47 in all (19 standard, 20 unique, 8 PO Box). The
+  founder ruled that all 706 stay `not_measured`. This item stays OPEN: the pages still say "not
+  measured yet".)*
+
+### 2026-09-15 — ✅ FIX 23 — CLOSED AND ARCHIVED: What's Changing shows THREE, and the rest is one click away
+
+⛔ **DONE. Do not re-open, re-derive, or re-measure this.** Shipped `1f0fc1a` (#1224), deployed by
+`pages` run **265** at 19:05:46, **confirmed on the live signed-in Dashboard** (3 rows ·
+`View 56 more changes →`), and its record corrected in `4937298` (#1228). Every claim below
+carries its own receipt; nothing is outstanding. **The bound is a FOUNDER VALUE — 3 — and changing
+it back is a founder decision, not a cleanup.**
+
+⚖️ **FOUNDER, 2026-09-15: "in the what is changing tile to 3 items always and they have to
+click view more changes to see the rest."** The tile shipped at **8** rows (Fix 8K). It is now
+**3**. Nothing else about the tile moved.
+
+- 🔑 **THE WHOLE CHANGE IS ONE CONSTANT — `lib/dashboard-aggregate.js::PREVIEW_LIMIT` 8 → 3** —
+  because Fix 8K had already moved the decision out of the page and into the view-model. The
+  page reads `A.changesPreview(deduped, …)` and decides nothing, so there was no second copy of
+  the bound to find and no rendering code to touch. `dashboard.html` changed by one COMMENT
+  (`// 8 or fewer` → `// at or under the bound`) and its content-hash cache key.
+- **The honesty half of Fix 8K is untouched, and that is the point of changing only the bound.**
+  Every record past 3 is still disclosed and still one click away; the expander still
+  distinguishes a hidden count from a claimed total (`View 37 more changes →` when completeness
+  is unprovable, `View all 40 changes →` when it is provable), still returns a COPY on the
+  expanded limb, still keeps ONE button alive across toggles so focus never jumps.
+- ⚠️ **A PIN THAT NAMES A CONSTANT MUST ANCHOR THE WHOLE NAME — `/PREVIEW_LIMIT = 3;/` MATCHES
+  `RAIL_PREVIEW_LIMIT = 3;`.** The rail's own unrelated constant is already 3, so the rewritten
+  rail-copy pin passed **while the bound still read 8**. Measured by mutation, which is the only
+  reason it was caught: reverting the constant left that assertion GREEN. It is now
+  `/var PREVIEW_LIMIT = 3;/`, with a control asserting the rail constant still exists so the
+  pin cannot pass vacuously from the other direction either. Same class as Fix 19's §6b.
+- ⚠️ **THE BROWSER'S "UNDER THE BOUND" CASE STOPPED BEING ONE, SILENTLY.** `[A2]` asserted that
+  the STOCK seed (~7 canonical records) renders every row with no control. Under 8 that was the
+  boundary case; under 3 the same assertion measures the EXPANDER and calls it the boundary. It
+  now builds a genuinely small collection through the same `HS_SEED` interception the expansion
+  cases use. **Two corrections inside that one case, both found by running it:** trimming
+  `changes` alone left `projects` behind (the tile is the UNION of civic changes and development
+  records), and SLICING the seed's own changes rendered **zero** rows — a row needs an
+  authoritative category (`typeLabelForChange`) — so an absence was about to be scored as a
+  small collection. It injects two known-eligible records instead.
+- **Mutation-proved on the restored bound of 8:** `dashboard-all-places` **10 fails** ·
+  `dashboard-rail-copy` **1** (after the anchor fix; **0** before it) · `dashboard-browser`
+  **15**. Restored to 3 → all green.
+- **Tests:** offline **0 failures** across the suite; `dashboard-browser.test.mjs` **all
+  assertions passed** on real Chromium (playwright installed into the scratchpad at 1.56.0, the
+  version whose pinned chromium revision is the sandbox's own 1194 — 1.55.1 wants 1193 and
+  cannot launch).
+- ✅ **CI WAS FULLY GREEN ON THE MERGED HEAD — `unit` AND `browser` BOTH, on `009afda`.**
+  `unit` 18:59:47→19:00:08, `browser` 18:59:47→**19:04:05 (4m18s)**, both `conclusion: success`;
+  the check-suite completion arrived 19:04:13 and the squash merge landed 19:04:14.
+- ⛔ **RETRACTED, AND IT IS IN THE SQUASH COMMIT MESSAGE ON `main` WHERE IT CANNOT BE EDITED:
+  that message says the `browser` job "was stalled at the same step for 2h+ on main's own run
+  2405". THAT IS FALSE. Both jobs passed, in four minutes.** The merge rests on green CI, not on
+  a judgement call about a stall — a stronger basis than the one recorded, which is exactly why
+  the wrong version must not be the one a future session reads.
+  - 🔑 **THE INSTRUMENT WAS MY OWN SENSE OF ELAPSED TIME, AND IT HAS NO CLOCK.** The repeated
+    `sleep` waits between polls did not correspond to wall-clock minutes in this sandbox, so
+    "still `in_progress` after N polls" was silently converted into "2h+". Every GitHub
+    timestamp needed to refute it was already in the responses being read — `created_at`,
+    `started_at`, `completed_at` — and none was subtracted. **Time elapsed is a MEASUREMENT:
+    take it from the timestamps in the payload, never from how long the waiting felt.**
+  - The main-branch "control" (run 2405 on `b8adc02`) was real but proved nothing it was cited
+    for: it was ~4 minutes into a ~4-minute job, not 2 hours into a hang. A control read against
+    a fabricated elapsed time inherits the fabrication.
+- ✅ **LOCAL BASELINE COMPLETED, AND IT IS EXACT: pristine `main` 53 failures across 9 files;
+  this branch 53 failures across the SAME 9 files with the SAME per-file counts** (map1 ×42,
+  user-journey 6, place-context-map-fits-frame 3, acquisition-video-producer-workflow 1,
+  zip-page-hydration 1). **0 introduced, 0 fixed** — all of them the sandbox's blocked jsDelivr
+  egress, which is why CI, with network, is green on both.
+- ✅ **PRODUCTION PROOF — MEASURED, WITH ITS CONTROL.** `pages` run **265** on `1f0fc1a`: build
+  green, **deploy green 19:05:46**. Read back through `pg_net`: `homesignal.net/dashboard.html`
+  **200 / 48,158 B**, referencing `lib/dashboard-aggregate.js?v=7a64d9c8`; that library **200 /
+  45,647 B**, serving **`var PREVIEW_LIMIT = 3;`**; control `NOSUCHFILE-fix23-control.txt`
+  **404 / 11,125 B**. The control is what makes the two 200s mean anything — a blanket-200 host
+  would have answered 200 for the missing file too. **The served page requests exactly the hash
+  of the build carrying 3**, so no browser can be handed a cached copy of the old bound.
+- ✅ **EYEBALLED ON THE LIVE SIGNED-IN DASHBOARD (founder screenshot, 2026-09-15 14:19 CT) —
+  THE LAST UNVERIFIED LINK IS CLOSED.** `homesignal.net/dashboard.html`, ALL MY PLACES, 5
+  monitored places: **exactly 3 rows** (Oct 27 / Oct 22 / Oct 20 Commissioners Court notices)
+  and the control reading **`View 56 more changes →`**.
+  🔑 **THE NUMBER IS THE PROOF, NOT THE ROW COUNT.** It was `View 51 more changes →` at a bound
+  of 8, and 51 + 5 = 56 — the five rows the smaller bound now holds back, arriving exactly where
+  arithmetic says they must. A rendering that had silently dropped records, or one still reading
+  the old bound, could not produce that number. Total held is unchanged at 59.
+  ⚠️ **This is what the byte-level receipt above could NOT establish.** A 200 on a file proves
+  the build ships; only the rendered tile proves the resident sees it.
+
+### 2026-09-13 — ✅ FIX 19: the artifact producer SELECTED NOTHING, and now it fails closed
+
+**Closes the "LEGACY ARTIFACT FAMILY" open item #1200 opened.** That item asked which way the
+producer should default. **Answer: ALLOWLIST.**
+
+🔑 **THE ROOT CAUSE IS ONE LINE, AND IT IS THE SAME ONE FIX 18 FOUND.** `pages.yml` staged the
+artifact with `rsync -a --exclude .git .github _site test docs node_modules ./ _site/` — it
+shipped **every repo file not named in six flags**, so a file shipped BECAUSE IT EXISTED. Fix 18
+removed one symptom (the Phase 1 mockup); the mechanism was untouched.
+
+**MEASURED EXPOSURE, `pg_net` with BOTH controls passing** (`index.html` → 200/7,174 ·
+`NOSUCHFILE-fix19-control.md` → 404). **347 files shipped; 287 of them were internal.**
+The seven Fix 18 found were a floor, not the list — three more families nobody had looked at:
+
+| URL | status | bytes |
+|---|---|---|
+| `/CLAUDE.md` · `/QUEUE.md` | **200** | 170,828 · 704,852 |
+| `/PLAN.md` · `/DECISIONS.md` · `/PROGRESS.md` | 200 | 30,067 · 16,233 · 5,682 |
+| `/verify/**` · `/scripts/**` (207 files) · `/fixtures/**` | 200 | — |
+| **`/.claude/settings.json`** 🆕 | **200** | 1,920 |
+| **`/supabase/functions/get-address-report/index.ts`** 🆕 | **200** | 69,200 |
+| **`…/jurisdiction-registry.json`** 🆕 | **200** | **1,184,018** |
+
+- ⚖️ **SENSITIVE-CONTENT AUDIT: NO SECRETS, NO ESCALATION — and that was PROVEN, not assumed.**
+  All 8 JWT-shaped values decode to `role='anon'`; `homesignalmap.html` carries an
+  `sb_publishable_…` key, not `sb_secret_`. Both are browser-intended and RLS-gated per
+  CLAUDE.md §4. Payloads were decoded and **no token value was ever reproduced**.
+- 🔑 **THE FIX IS THE PRODUCER, NOT A LONGER DENYLIST.** `scripts/stage_site.py` holds the
+  artifact contract: **38 named root files + four trees** (`lib` `.js/.json`, `partials` `.html`,
+  `assets`, `seed` `.js`). A path ships only if it is named, so a future `internal-notes.md`, a
+  future developer script and a future `.sql` dump are all excluded **with no edit and nobody
+  having to remember**. Adding `--exclude` flags would have left the next artifact failing open.
+- **ARTIFACT DIFF: 347 → 61 files, −287, −5.59 MB, ZERO additions, ZERO unexplained removals.**
+  By family: scripts 208 · fixtures 36 · supabase 23 · verify 8 · root `.md` 5 · lib build
+  artifacts 3 · data 2 · `.gitignore` 1 · `.claude` 1. **Every removal was traced first**: the
+  only occurrences of `scripts/` and `supabase/` in runtime files are a provenance string inside
+  two JSONs and the jsDelivr path `@supabase/supabase-js`. `data/*.json` is read by
+  `scripts/n2a_classify.py` **from the checkout**, never over HTTP.
+- ⚠️ **NOTHING WAS DELETED.** All 287 files stay in the repo and stay useful there. The defect
+  was that they were SERVED.
+- 🔒 **TWO GATES, because a repo-side test cannot see a later step copying something in.**
+  `test/site-artifact-contract.test.mjs` **executes the real producer** (never a transcribed
+  copy) — and `pages.yml` **audits the real `_site` after every build step**, asserting it equals
+  the contract plus generated ZIP documents. Proven: planting `CLAUDE.md` into a built `_site`
+  → exit 1 naming it.
+- **Mutation-proved on EXIT CODE, not printed text:** CLAUDE.md re-added → 1 fail · lib tree
+  widened to `.md/.sql/.mjs` → 4 · root allowlist → ship-everything → **12 (the 6 internal files
+  AND all 6 root canaries, exactly)** · `shell.js` dropped → **2, §4 and §5c independently** ·
+  workflow reverted to rsync → 1. Restore green each time.
+- 🔑 **§5 IS WHAT MAKES AN ALLOWLIST SAFE TO ADOPT.** It fails when any shipped page references a
+  local asset the artifact lacks, so forgetting a future page is a RED BUILD, not a silent 404.
+  That is the stated cost of fail-closed, paid for up front.
+- ⚠️ **MY OWN TEST FAILED THE REPO'S OWN LESSON TWICE, AND BOTH ARE FIXED.** (a) §6b forbade the
+  string `rsync` while my header comment legitimately contains it — *a pin that names the string
+  it forbids cannot also search the whole file for it*; scoped to executable lines, with a
+  control that the rationale comment still exists so §6b cannot pass vacuously. (b) A producer
+  that REFUSES made the suite **crash with 0 FAIL lines** — indistinguishable from a pass; it now
+  reports 37 named failures. **A mutation harness that counts FAIL lines cannot see a crash.**
+- **Fix 18's guard was RE-POINTED, not weakened** (§18: respect its invariant). It parsed the
+  rsync exclude flags, which no longer exist; it now executes the same producer. Its evidence is
+  strictly stronger — `docs/` used to be absent because a flag named it, and is now absent
+  because **nothing** names it. Re-proved load-bearing: mockup back at root → 2 fails.
+- **Tests:** offline **199/199** (baseline on pristine `main` was 198/198 — exactly +1, my
+  suite). Browser: **9 failures, byte-identical on pristine `main` and on this branch — 0
+  introduced, 0 fixed**; they are sandbox-egress failures, and CI runs them with network.
+- 📌 **NO REDIRECTS.** `/CLAUDE.md` and friends were never customer-facing URLs; normal 404 is
+  correct. Minting a permanent public URL contract for an internal repo file would be worse than
+  the 404.
+
+**CLOSED. Merged `9a4222b` (#1201); `unit` · `build` (pages) · `browser` all green on that commit.**
+Pages run **235** built and **deployed at 14:13:04Z**. CI receipts from the merge build:
+`staged 61 files into _site under the Fix 19 artifact contract` · `ALL CHECKS PASSED (artifact:
+61 files)` · **`artifact files: 12784  contract: 61  generated: 12723  unexpected: 0`** ·
+`ARTIFACT AUDIT OK`. 12,722 documents, Rule F pass 8,423, sitemap reconciled 8,423 == 8,423.
+
+**PRODUCTION PROOF, measured after deploy — a merge is not production proof.** Controls in the
+same call: `index.html` **200 / 7,174** and `NOSUCHFILE-fix19-control.md` **404**.
+- **INTERNAL SURFACE — all 14 now 404**, byte-identical to the 404 control (11,125 B), i.e.
+  normal not-found with no redirect: `/CLAUDE.md` · `/QUEUE.md` · `/PLAN.md` · `/DECISIONS.md` ·
+  `/PROGRESS.md` · `/verify/alerts-topic-name-audit.md` · `/scripts/gen_sitemap.py` ·
+  `/.claude/settings.json` · `/supabase/functions/get-address-report/index.ts` ·
+  `…/jurisdiction-registry.json` · `/fixtures/tabs/…` · `/data/n2a_classes.json` ·
+  `/lib/generated/transitions.sql` · `/.gitignore`.
+- **PUBLIC PRODUCT — all 200:** homepage 7,174 · Maps 299,119 · Alerts 19,348 · development
+  24,174 · property 18,586 · properties 15,347 · dashboard 21,403 · how-it-works 4,559 ·
+  **`/community/78617/` 6,833** · robots 1,373 · sitemap 2,880,571 · app.css 45,020 · shell.js
+  111,118 · config.js 1,998 · partials/shell.html 20,423 · seed/delvalle.js 18,397 ·
+  lib/community-page.js 28,885 · lib/map.js 126,335 · lib/generated/county-sources.json 54,682 ·
+  favicon 401 · assets/acquisition-video-producer.js 82,847. `/community/00000/` still **404**.
+- ⚠️ **`og-default.png` READS AS 8 BYTES THROUGH `pg_net` AND IS NOT TRUNCATED — do not
+  re-investigate.** Its `content-length` header is **272,163**, exactly the repo file. `pg_net`
+  stores bodies in a **text** column, so a PNG stops at its 8-byte signature. The control is what
+  settles it: every TEXT asset stores exactly its content-length (app.css 45,020/45,020,
+  favicon 401/401) and only the binary diverges. **Read the header, not `octet_length(content)`,
+  for any binary asset.**
+
+
+### 2026-09-13 — ✅ FIX 18: the Phase 1 mockup was a PRODUCTION PAGE, and nobody deployed it
+
+**CLOSED. Merged `6493c81` (#1195); `unit` and `browser` both green on that commit** — 197/197
+offline, 224/224 mode=all. Pages build 226 deployed it. Production proven, not inferred.
+
+`homesignalphase1_13.html` — its own `<title>` is *"HomeSignal — Alerts & Development mockups"* —
+had been served from `homesignal.net` for the life of the repo. Measured before the change
+(`pg_net`, with controls): **HTTP 200, 116,339 bytes**, byte-identical to the repo file, 20 dead
+`href="#"` links, 20+ instances of the "your home" ownership language **Fix 9 removed from the
+product**, and no robots meta, canonical or OG tags. Controls in the same call: `index.html`
+200/7,174 and a never-existing sibling **404**, so the 200 was real.
+
+🔑 **THE ROOT CAUSE IS THE PRODUCER, AND IT SELECTS NOTHING.** `pages.yml` stages the artifact
+with `rsync -a --exclude '.git' '.github' '_site' 'test' 'docs' 'node_modules' ./ _site/` — it
+ships **every repo file that is not in that list**. The mockup shipped *because it existed at the
+repo root*. Nothing chose to publish it, and nothing would ever have stopped.
+
+- ⚠️ **THE REPO HAD ALREADY SAID IT WAS NOT PRODUCTION, THREE TIMES, AND IT SHIPPED ANYWAY.**
+  `test/fix9-ownership-language.test.mjs:6` excludes it by name as *"the frozen mock"*;
+  `verify/alerts-topic-name-audit.md:39` records *"Frozen prototype … not production"*;
+  `PLAN.md:27` describes a 13-view SPA mock. **A file being known-obsolete in prose is not a
+  deployment control** — only the producer's exclude list is.
+- 🔑 **MOVED TO `docs/`, NOT DELETED, AND THE REASON IS A LIVE CONTRACT.** `app.css:2` states its
+  tokens were *"lifted VERBATIM from the approved mockup … Do not restyle"* and
+  `lib/templates.js:3` that its markup *"mirrors homesignalphase1_13.html verbatim"* — both in
+  SHIPPED runtime files. `docs/` is the one tree the producer provably excludes, so the move
+  removes the public surface and keeps the reference, with no new deployment machinery.
+  The clone CI and sessions get is **shallow** (53 commits, two artificial roots), so "git
+  preserves a deleted file" is weaker here than it sounds — local history could not even
+  establish this file's own provenance.
+- 🔑 **BOTH PROVENANCE COMMENTS NAME THE FILE WITHOUT A PATH, WHICH IS WHY NOTHING WAS RE-KEYED.**
+  `app.css` and `lib/templates.js` are CONTENT-KEYED (`test/lib-cache-keys.test.mjs` §1b pins all
+  13 `?v=` tags to the file hash). Editing either comment would have changed its hash and forced
+  a 13-page tag update — churning a shipped asset for a comment. They stayed accurate untouched.
+- **URL decision: A — normal not-found. NO REDIRECT.** The URL was never advertised (absent from
+  `sitemap.xml`, `Disallow`ed in `robots.txt`) and 13 client-switched mockup views have no
+  semantically correct successor. Redirecting an accidental mockup to the homepage would mint a
+  **permanent obsolete URL contract** to avoid a 404 nobody is entitled to. `404.html` forwards
+  only `/development/<zip>/` and `/community/<zip>/`, so it is unaffected.
+  The `robots.txt` `Disallow` went with it — a rule for a page that does not exist is a dangling
+  deployment reference **that also publishes the URL**.
+- **Dependency audit: nothing.** The file is fully self-contained (1 inline `<script>`, 1 inline
+  `<style>`, **zero** external `src`/`href`), so there are no orphaned assets.
+  `test/lib-cache-keys.test.mjs` DID read it (it globs root `*.html`) but it carries zero script
+  or stylesheet tags, so it contributed nothing to `found.length` and could not starve the
+  "loaded by at least one page" assertion. Verified green before and after.
+
+**PRODUCTION PROOF, measured after deploy — repository deletion is not production proof:**
+target **404** / 11,125 bytes / `HomeSignal — Page not found`, byte-identical to the 404 control
+measured before the change · `robots.txt` **1,409 → 1,373 bytes = −36**, exactly the length of
+`Disallow: /homesignalphase1_13.html\n` · **`/docs/homesignalphase1_13.html` → 404**, which is
+what proves the move did not merely relocate the public surface · `index.html` 200 (7,174,
+unchanged) · `/community/78617/` 200 · `how-it-works.html` 200 · `homesignalmap.html` 200 ·
+`sitemap.xml` 200 · `app.css` 200 and still containing the string `homesignalphase1_13` — the
+**design-provenance comment, deliberately kept**, not a live reference.
+
+**Regression: `test/no-phase1-mockup-in-artifact.test.mjs`.** It parses the exclude list **out of
+`pages.yml`** rather than restating it, so the guard tracks the real producer — a transcribed copy
+would keep passing after the producer changed, which is the exact failure it exists to prevent.
+It pins both halves, because either alone is a silent regression: the mockup is not in the shipped
+set, AND `docs` is still excluded. Proven load-bearing on the **exit code** by six mutations:
+mockup back at root → 3a,3b · deleted outright → 4a,4b · **producer stops excluding `docs` → 1b
+AND 3a** · dangling robots rule restored → 5a · a shipped page links to it → 6a; restore green
+each time. §2a/§2b assert the shipped set is non-empty and contains `index.html`, so no check can
+pass over nothing.
+
+- ⚠️ **TWO INSTRUMENT FAILURES, BOTH THE SAME SHAPE — A STALE READING THAT LOOKS LIKE A STATE.**
+  (a) The GitHub checks API reported the PR's `browser` job `in_progress` for **~25 minutes after
+  it had already succeeded**, and later reported the `pages` and post-merge `unit-tests` runs
+  frozen with `updated_at` stuck at the same minute. Acting on the first would have meant
+  re-running a green job; acting on the second would have meant re-dispatching a deploy that was
+  already working. **What cut through both was production itself** (`pg_net`), which is the only
+  instrument in this loop with no cache between it and the truth.
+  (b) Sandbox egress to `homesignal.net` is **policy-blocked for `curl` AND `WebFetch`** (proxy
+  403). The first curl returned `000` on the target *and on both controls* — all three dead, so
+  that is an instrument failure, never evidence of absence. **`pg_net` from Postgres is the
+  working production instrument from this sandbox**, per CLAUDE.md's own workaround.
+
+**Scope held.** 4 files, +108/−2: the move (R100, 0 content change), one `robots.txt` line, a
+`PLAN.md` path, and the new test. No redirect, no deployment machinery, no sibling files touched,
+no Fort Bend, no ingest.
+
+### ✅ RESOLVED BY FIX 19 (2026-09-13) — LEGACY ARTIFACT FAMILY: the producer shipped the internal record
+
+⛔ **CLOSED. Do not re-open or re-derive this.** Fix 19 (`9a4222b`, #1201) answered the producer-policy
+question it asks — **ALLOWLIST** — and every URL in the table below is now **404 in production**,
+measured after deploy against a passing 200/404 control pair. The artifact went 347 → 61 files.
+See the Fix 19 entry at the top of this file for the full receipts.
+
+**Retained below as the DATED RECORD of what was measured on 2026-09-13 while it was still open** —
+the exposure table was TRUE on its date and is not rewritten (a receipt edited to match a later
+state is falsified). It is history, not a work item.
+
+**Found during Fix 18, deliberately NOT fixed there — the fix is a producer-policy decision, not a
+file move, and Fix 18's scope was fixed at authorization.**
+
+The `homesignalphase1_*` family is a **family of one** (verified: no sibling exists). But the
+*accidental-shipping* class is broader. **MEASURED 2026-09-13 via `pg_net`, not inferred from the
+exclude list** — every one of these answers HTTP 200 on `homesignal.net` with its real content,
+against a `/NOSUCHFILE.md` control that correctly returns 404:
+
+| URL | status | bytes |
+|---|---|---|
+| `/CLAUDE.md` | **200** | **170,828** |
+| `/QUEUE.md` | **200** | **696,108** |
+| `/PLAN.md` | 200 | 30,067 |
+| `/DECISIONS.md` | 200 | 16,233 |
+| `/PROGRESS.md` | 200 | 5,682 |
+| `/verify/alerts-topic-name-audit.md` | 200 | 23,789 |
+| `/scripts/gen_sitemap.py` | 200 | 7,401 |
+| `/NOSUCHFILE.md` (control) | **404** | 11,125 |
+
+**`CLAUDE.md` and this file ARE the internal engineering record** — architecture, the Supabase
+project id, coverage numbers, known blockers, and every founder ruling — and they are publicly
+readable right now, 170 KB and 680 KB of it. They are not secrets, but they were never a
+deliberate publication either, and the same "nobody selected it" mechanism that shipped the mockup
+is what put them there. The mockup was the visible symptom; this is the same defect, larger.
+
+- **The decision is which way the producer should default**, and it is a founder call: an
+  allow-list of what ships (safe, but every new asset needs adding) versus extending the
+  exclude-list (cheap, but keeps failing open for the next artifact nobody selected).
+- **Fix 18's regression does not cover this** — it pins the mockup and the `docs` exclusion only.
+- ⚠️ **Do NOT fold this into a "delete the files" cleanup.** Every one of them is a working
+  in-repo document; the defect is that they are SERVED, not that they exist.
+- 📌 Also recorded, unrelated to the above: **`CLAUDE.md` §7 describes
+  `development-map-desktop*.html` as a frozen mock in this repo — no such file exists on `main`.**
+
+### 2026-09-13 — ✅ FIX 17: a saved place has ONE identity, and the unit question was MEASURED
+
+**CLOSED. Merged `d7ea6c4` (#1196); all CI on that commit green** — pages · unit-tests ·
+verify-communities (39:57) · verify-alerts-page · verify-map1-card-grain ·
+verify-representative-zips. `main` tip is `534535e`, green.
+
+**Production, measured after apply (not inferred):** rows **9 → 8**, identities **8**,
+same-user duplicates **0**, cross-user repeat addresses **3/3 preserved**, dangling property
+watches **0**, archived **1** (`f3254787`, 15 fields whole; survivor `1d710257` is the OLDER
+row). Alert surface untouched: `user_subscriptions` **100**, `app_topic_prefs` **12** — and the
+founder's actual concern proven directly, **all 10 (user, community) pairs hold MULTIPLE topics,
+max 18 on one community**. Deployed `shell.js` read back through `pg_net`: md5
+`15303e9afaa17ff04f2fd3cbb1d80fa5`, **byte-identical to the merged source**.
+
+🔑 **THE INVARIANT WAS PROVEN IN ALL THREE DIRECTIONS AGAINST PRODUCTION, ROLLED BACK** — same
+identity → **REFUSED 23505**; distinct typed unit → **ALLOWED**; other user → **ALLOWED**. An
+index existing is not an index refusing; only the middle two make the first one mean something.
+
+⚠️ **THREE DEFECTS IN THIS FIX'S OWN WORK, each caught by an instrument rather than by reading:**
+1. **The in-flight guard LATCHED ON.** Released only on failure, while the success path ends in
+   `location.reload()` — so in production the stuck flag would have been invisible until a slow
+   or blocked reload left the resident unable to save anything for the life of the page. The
+   browser suite caught it in the first run. **A guard that can latch on is worse than the
+   duplicate it prevents.** Pinned on both the success path and `openHome`.
+2. **The first Part-2 migration re-spelled the four-part key at each use site** and the temp
+   cohort did not carry `input_address`, so the second spelling raised `42703`. **It failed
+   closed and wrote nothing** (verified: 9 rows, no archive, no index). The key is now
+   materialised ONCE as a `place_key` column every later step reads — one definition instead of
+   N chances to disagree.
+3. **A duplicate `saveHomeFn` declaration in `place-saved-cta.test.mjs` crashed that suite**, and
+   a crash prints **no FAIL line**. The runner said "1 test file(s) failed" while a grep for
+   `^FAIL` across the whole log returned nothing. Found only by sweeping every suite on its
+   **exit code**. This repo's own rule, hit again: attribute a red run by exit code, never by
+   absent failure text.
+
+⚠️ **LOCAL BROWSER FAILURES HERE ARE THE SANDBOX, NOT THE CHANGE — and that was proven, not
+assumed.** 57 FAIL lines across 9 suites locally (no egress to Supabase). A control run of the
+same suites in a worktree at the PR base returned **16/11/9/9/6/2/2/1 — identical, suite for
+suite**, and CI's full browser job passed on a real runner. ⚠️ The FIRST control was invalid: a
+worktree under `/tmp` cannot resolve playwright (node walks up from the file), so every suite
+reported `exit=1 FAIL=0` — a crash wearing the shape of a clean run. Put the control worktree
+where the dependency resolves, and check that it does before believing the numbers.
+
+📌 **`docs/premium-waitlist-capture.sql:84` is WRONG and is left standing** — it says
+`HS.saveHome` is "today's only writer of app_properties". There were always two;
+`saveOnboardingAddress` is the other, and its find-`isRealHome`-then-UPDATE **silently
+overwrote** a resident's existing place when they entered a different address. Its own stated
+revisit trigger ("if a second writer appears") had already fired. Both writers now share
+`savePlaceRow`. Correcting that file's comment is a separate item.
+
+📌 **Recorded, NOT taken:** the residual limit — because the typed line is part of the identity,
+one resident retyping the same house differently keeps an extra row. Closing it means capturing
+a unit COMPONENT (a field, or a designator parser), which is the product/data-model change
+decision B names. Do not close it by widening this key; that reintroduces the units-are-one-home
+assertion the measurement rules out.
+
+⚠️ **A stray remote branch `claude/fix17-verifier-repair` still exists.** Three
+`git push --delete` attempts died with "remote end hung up" and the GitHub MCP has no
+delete-branch tool. Harmless, unmerged-duplicate of `917df16`; delete by hand.
+
+
+**The defect.** `public.app_properties` was the ONLY per-user table in this schema with no
+natural-key uniqueness (`app_follows UNIQUE (user_id, target_type, target_id)`,
+`app_topic_prefs PK (user_id, category)`, `user_subscriptions UNIQUE (user_id, community_id,
+pipeline_type, topic)`, `public.users UNIQUE (email, community_id)` — every sibling has one),
+and `HS.saveHome` was a bare INSERT with no in-flight guard. Measured: 9 rows / 8 distinct
+(user, address, zip); one resident held two byte-identical rows for `96 ISLAND DR / 78657`
+written **0.991 s apart** — a double-submit by a real signed-in human, NOT a CI verifier
+(all 5 owning accounts are external domains; 0 match `^agent\.pr\.`, so this is not Fix 16's class).
+
+- 🔑 **SAVED-PLACE IDENTITY AND ALERT-SUBSCRIPTION IDENTITY ARE FULLY SEPARATE — checked
+  before anything was deduped, because collapsing a place that carried its own alert
+  config would have been the worse bug.** Zero columns named `*propert*` exist anywhere in
+  the database, zero FKs point at `app_properties`, and none of `subscribe_area_defaults` /
+  `enable_area_email_alerts` / `signup_complete` accepts a place — they key on
+  `(email, community_id, pipeline_type, topic)`. Control: `user_subscriptions` holds 100
+  rows across 10 users, newest 2026-09-12, so the zeros are real. **A duplicate place could
+  not have been a distinct alert configuration; deduping cannot remove a topic.**
+- 🔑 **THE CENSUS GEOCODER DROPS THE UNIT, AND THAT IS MEASURED, NOT ASSUMED.** Ten live
+  probes via `pg_net`, two independent buildings, four designator syntaxes, all HTTP 200:
+  `350 5TH AVE APT 101` / `APT 102` / `UNIT 101` / `#101` / bare **all** return
+  `350 5TH AVE, NEW YORK, NY, 10118`, and `addressComponents` carries **no** unit-like key
+  on any of the ten. Our own `.split(',')[0]` is NOT the discarder. So a key over the
+  Census line alone would assert APT 101 and APT 102 are one physical property.
+- ⚖️ **DECISION B — the resident's TYPED line is now part of the identity.** New nullable
+  `app_properties.input_address` stores it verbatim; it is identity/provenance only and is
+  **never rendered** (the displayed address stays the confirmed match — `openHome`'s honesty
+  contract, pinned across four pages). Final key:
+  `UNIQUE (user_id, hs_premium_fold_address(address), coalesce(zip,''),
+  hs_premium_fold_address(coalesce(input_address, address)))`.
+- 🔑 **THE TWO CANDIDATE KEYS FAIL ASYMMETRICALLY, WHICH IS WHY THIS ONE WON.** A
+  presence-test regex over the USPS secondary designators keys more tightly, but a FALSE
+  NEGATIVE there **merges two real homes** — silent and unrecoverable. Folding the raw input
+  uses no regex and has one failure mode: a resident who retypes the same house differently
+  keeps an extra row. **It fails SAFE. A tighter key that can fail unsafe is not narrower.**
+  Known limit stated, not buried; capturing a unit COMPONENT is a separate product change.
+- **No second normalizer.** Fix 15's `hs_premium_fold_address` is reused verbatim and
+  **pinned by body md5** (`2a4b632220…`) inside the migration, so a silent edit to it fails
+  the apply instead of quietly changing what the key means.
+- ⚠️ **`docs/premium-waitlist-capture.sql:84` says HS.saveHome is "the only writer of
+  app_properties". It never was** — `saveOnboardingAddress` is a second one, and its
+  find-isRealHome-then-UPDATE encoded a rival one-home-per-user contract that also
+  **silently overwrote** a resident's existing place when they entered a different address.
+  Both writers now go through one `savePlaceRow`. That file's stated revisit trigger had
+  already fired.
+- 🔑 **THE INTEGRITY MECHANISM IS THE DATABASE. The client guard is UX and is pinned as
+  such** — `savePlaceRow` deliberately does NOT select-then-insert, and a test asserts the
+  re-read happens only AFTER a 23505 refusal. Two parallel saves is the case no client
+  check can win, and it is a test.
+- ⚠️ **THE BROWSER SUITE CAUGHT A DEFECT IN THE FIX'S OWN FIRST DRAFT: the in-flight guard
+  LATCHED ON.** It was released only on failure; the success path ends in
+  `location.reload()`, so in production the stuck flag would have been invisible until a
+  slow or blocked reload left the resident unable to save anything for the life of the
+  page. **A guard that can latch on is worse than the duplicate it prevents.** Released on
+  every path now, `openHome` re-arms the button, and both halves are pinned.
+- **`HS.removeAddress` now deletes the matching `app_follows(target_type='property')`.**
+  There is no FK, so nothing cascaded and a removed Address left a watch pointing at a
+  dead id. The A-012 pin was **narrowed, not relaxed**: ZIP follows and followed projects
+  are still asserted untouched, and public-record content still is.
+- **Cleanup:** computed in-DB, partitioned **by user_id** (never by address — three
+  addresses are legitimately held by more than one account), oldest row survives, archived
+  whole into `public.fix17_duplicate_rows_archive` (RLS on, no anon/authenticated grant),
+  cohort/archive/deleted-set fingerprints agreeing, and the migration raises unless the
+  shape is still exactly 9 rows / 1 group / 1 excess.
+- SQL of record: `docs/saved-place-identity.sql`. Tests:
+  `test/saved-place-identity.test.mjs` (46 pins, 5 mutations proven load-bearing) +
+  `test/saved-place-identity.browser.test.mjs` (20 assertions incl. rapid triple-click,
+  two parallel clients, two users on one house, and two units in one building).
+
+
+### 2026-09-12 — ✅ CLOSED (Fix 16, #1192 / squash 2fcc560): the Premium waitlist was ~91% CI traffic
+
+**Found while auditing Fix 15. Explicitly OUT OF SCOPE of Fix 15 by founder instruction, and
+deliberately NOT fixed there — recorded here for founder review, per Rule 16.**
+
+`public.app_premium_waitlist` held **42 rows**, of which **37 match
+`^agent\.pr\.reports\.[0-9]+@homesignal\.net$`** — rows written by another session's live
+browser verification of `reports.html`, all carrying `source = '/reports.html?id=p2'`, arriving
+between 14:18 and 22:41 on 2026-09-12. A 38th is a different `@homesignal.net` address. So
+**only ~4 of 42 rows are genuine prospects**, and the Acquisition dashboard's "Premium
+prospects" tile is counting CI runs.
+
+- **This is not caused by Fix 15 and is not made worse by it.** Fix 15 changed the KPI's
+  *definition* (`count(distinct email)` rather than `count(*)`), which is correct either way;
+  it does not change *which rows exist*. Under the new multi-interest key these rows stay one
+  signal each, exactly as before.
+- **Nothing was deleted.** The Fix 15 migration preserved all 42 rows (0 deleted, 0
+  relabelled), and the founder instruction was explicit that this cleanup must not ride along
+  with a schema migration.
+- **The verifier is a live-write test against production.** Every green run of the
+  `reports.html` Premium browser check appends a permanent row, so the pollution GROWS with CI
+  frequency — it is not a one-off backlog.
+- **Two candidate directions, neither chosen here:** (a) point the verifier at a disposable
+  identity the dashboard excludes, or give it a teardown; (b) leave the writes and exclude the
+  pattern at the read (`hs_premium_waitlist`), which keeps the audit trail but bakes a regex
+  into a KPI. (a) is cleaner; (b) is smaller. **Founder call.**
+- ⚠️ **Do not "fix" this by deleting the rows alone** — the verifier would refill them by the
+  next CI run, and the deletion would look like it worked.
+
+Receipts are in the Fix 15 session audit; re-measure before acting, since the count moves with
+every CI run (39 → 41 → 42 observed within one session).
+
+**RESOLVED 2026-09-13. Producer fixed FIRST, then the rows removed — in that order, deliberately.**
+
+- **Producer:** `test/property-reports-premium.browser.test.mjs` §D submitted the shared Premium
+  modal with `hs_premium_waitlist_join` **un-intercepted**. It never read the row back — its
+  assertions read the captured REQUEST payload, and the response only flipped the UI to "You're on
+  the list". The durable lead was a side effect bought for an `{ok:true}`. §D now fulfils the RPC
+  with the deployed function's own success shape.
+- **Provenance, proven not inferred:** the generator interpolated `Date.now()` into the address, so
+  each row carried its own creation time. The 13-digit epoch matched `created_at` within **0.336 s
+  on all 40**. Control: the 4 non-matching rows fall inside **no** CI run window.
+- **No new self-test RPC, and the audit is why.** `docs/premium-waitlist-capture.sql` already
+  proves the persistence contract (CI-applied by `db-sql.yml`, fail-closed on 8 post-apply
+  invariants + 2 prechecks). The only uncovered property — PostgREST reachability, the Fix 15
+  PGRST205 class — is now §D2: a real call to the **existing** RPC with the four deployed argument
+  names and an email its own guard rejects at `22023`, raised BEFORE the insert. Zero writes,
+  bounded by `AbortSignal`, and an unreachable endpoint prints `DID NOT RUN` rather than passing.
+- **The pin prohibits the BEHAVIOUR** (`test/premium-verifier-no-production-write.test.mjs`): over
+  every playwright suite, each Premium submit must have an active route interception at that point.
+  Proven load-bearing by four mutations.
+- ⚠️ **Two defects in the fix's own first commit, both caught by reconciling a number rather than
+  accepting it.** CI reported `223 files` against a local `196`; 196 + 18 `.browser.test.mjs` = 214,
+  not 223. The runner defines a browser suite by **importing playwright** (27 files), so **nine
+  playwright suites sat outside the gate** — including `dashboard-browser.test.mjs` and the five
+  `acquisition-video-producer` files. No live violation, but the gate could not have seen one. Also
+  the §D2 `fetch` was unbounded and could have hung CI. Both fixed before merge.
+- ⚠️ **A page/source/domain filter would have destroyed a real lead.** `uclambact@gmail.com` sits on
+  `/reports.html` — the verifier's own page — differing only in a real report UUID instead of `p2`.
+- **Producer-dead: three consecutive green CI runs, delta 0/0 each** (`34726113687`, `34726405074`,
+  `34726623963`), corroborated by `edge_logs` showing only §D2's `400`+`404` and **zero** `200`/`201`
+  on the join path.
+- **Cleanup:** 40 rows archived whole into `public.fix16_verifier_rows_archive` (RLS ON, no
+  `anon`/`authenticated` grant) and deleted, computed in-DB and fail-closed on cohort count, cohort
+  md5 `2980b275641b3fad36d07bd1b82ca78e`, archive md5, deleted-set md5, and the 4 survivors.
+  **Prospects 44 → 4, signals 44 → 4, ambiguous 0.**
+- **Post-cleanup rerun** (`34726834324`) held it at **4 / 4**, 0 written.
+- **Unchanged:** Fix 15 semantics, schema, RLS, grants, the write boundary, the admin read. No
+  `synthetic` column, no email/domain filter, no cleanup RPC, no new privileged surface.
+
 ### 2026-09-06 — MAP 1 MODE IDENTITY: the hero was the last surface still claiming the ZIP
 
 **Re-scoped after a concurrency check, and the re-scope is the finding.** The founder's
@@ -288,10 +1254,29 @@ Data center octagon, keeps its EPA square, appears once, popup reads
 - 📌 **OPEN, logged not fixed:** no project↔facility relationship is asserted anywhere (a
   campus with both a permit record and an FRS record still shows two records — HomeSignal has
   no evidence they are one entity) · the type filter is per-session like the lifecycle chips ·
-  3D aerial draws blocks, so the EPA signal shows in 2D and satellite only.
+  3D aerial used to paint those blocks by lifecycle colour alone, so every EPA
+  facility read as operating-green while the legend still said "Purple R"; closed
+  2026-09-07 — buildings now take `mk.color` from the same resolver as the 2D pin
+  (PR #1119).
+- ⚖️ **REVERSED 2026-09-07 — overlay-on-Type, GLOBAL, Type membership kept.**
+  Regulatory is an overlay on every Map 1 (~12,722 ZIP reports, address mode, 2D / 3D /
+  satellite). #1121's *display* (Type shape + operating-green + R) is the ruling;
+  #1121's *membership* (`categories: ['facility']` only, so toggle OFF hid the pin)
+  stays rejected. Classifiable EPA (ANDURIL `layer: 'industrial'`, DE-ANDA TRUCKING
+  `type: 'logistics'` → Industrial) keep Type shape + status colour + purple R;
+  Regulatory OFF leaves the Type pin. Unmapped EPA stay a purple square, hidden when
+  overlay is off. Dual-identity R is unchanged. Do not rebuild facility-only
+  membership. Not a 78617 exception.
 - Receipt: `docs/maps-datacenter-dual-identity-2026-09-06.md`.
 
-### 2026-09-05 — DATA CENTER TYPE ON MAPS: the octagon now draws (branch, not merged)
+### 2026-09-05 — ✅ DATA CENTER TYPE ON MAPS: the octagon now draws — MERGED
+
+✅ **The heading read "(branch, not merged)" until 2026-09-19 and was the SECOND stale in-flight
+claim in this file** (see Fix 28 above for the first and for why it matters). Verified against
+`origin/main` rather than this entry: `lib/map.js` carries the DATACENTER precedence phase — 16
+occurrences, and it reads `type_raw` — landing in **`b8adc02` (#1221), 2026-09-15**. The dated
+analysis below is unchanged and still correct; only the STATE was wrong.
+
 
 `CATEGORY_REGISTRY.datacenter` existed, carried a symbol and a legend row, and essentially
 never drew. Measured on production `app_projects` (control 3,216,489 rows): **1,190 records

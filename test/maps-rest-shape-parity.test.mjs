@@ -29,6 +29,7 @@ const check = (name, cond, detail) => {
 
 global.window = {};
 window.HS = {};
+await import(join(root, 'lib/project-type.js'));
 await import(join(root, 'lib/map.js'));
 const HS = window.HS;
 const REG = HS.CATEGORY_REGISTRY;
@@ -144,14 +145,15 @@ console.log('\n-- regulated facility stays distinct from data center --');
 {
   const fac = HS.resolveMarker(CORPUS.find((r) => r.name === 'SAND HILL ENERGY CENTER'));
   const dc = HS.resolveMarker(CORPUS.find((r) => r.name === 'ZYDECO DATA CENTER'));
-  check('facility renders the registry square', fac.shape === REG.facility.symbol && fac.shape === 'square');
+  check('classifiable facility renders the Type triangle, not the purple square',
+    fac.shape === REG.industrial.symbol && fac.shape === 'triangle' && fac.signal);
   check('data center renders the registry octagon', dc.shape === REG.datacenter.symbol && dc.shape === 'octagon');
   check('the two are visually different', fac.shape !== dc.shape);
   // and both survive into the rest layer
   const dcF = fc.features.find((f) => f.properties.id === 'r23');
   const facF = fc.features.find((f) => f.properties.id === 'r24');
   check('data center keeps the octagon in the REST layer', dcF && dcF.properties.shape === 'octagon');
-  check('facility keeps the square in the REST layer', facF && facF.properties.shape === 'square');
+  check('classifiable facility keeps the Type shape in the REST layer', facF && facF.properties.shape === 'triangle');
 }
 
 console.log('\n-- Street / Satellite / Focus agree on shape --');

@@ -19,7 +19,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fail++; console.error('FAIL —', m); } };
 
 // ---- ONE shared implementation (CLAUDE.md §0) -------------------------------------------
-ok(/<script src="lib\/community-page\.js"><\/script>/.test(legacy),
+ok(/<script src="lib\/community-page\.js(?:\?v=[a-f0-9]+)?">\s*<\/script>/.test(legacy),
    'community.html loads the ONE shared runtime rather than carrying its own copy');
 ok(!/HS\.onReady\(async function/.test(legacy),
    'community.html no longer inlines a second implementation of the page');
@@ -50,8 +50,14 @@ const notCovered = rt.slice(rt.indexOf('if (!status) {'), rt.indexOf('var c = me
 ok(!/dropSsr\(\);/.test(notCovered),
    'the not-covered and coverage-coming branches KEEP the build-time Alerts block');
 ok(/keepSsrAbove\(\);/.test(notCovered), '...explicitly, via keepSsrAbove()');
-ok((rt.match(/dropSsr\(\);/g) || []).length === 1,
-   'the SSR block is dropped exactly once — on the branch that re-renders the same Alerts populations');
+// Two branches re-render the same Alerts populations (government notices, meetings, local news):
+// the standard page, and the ZIP-coverage page for a ZIP with no Census-drawn area (2026-10-03),
+// which draws them under its coverage panel. Neither may drop what it does not redraw.
+ok((rt.match(/dropSsr\(\);/g) || []).length === 2,
+   'the SSR block is dropped exactly twice — only on the two branches that re-render the same Alerts populations');
+const covBranch = rt.slice(rt.indexOf("if (covHit && covHit.mode !== 'standard') {"), rt.indexOf('// DATA-QUALITY GATE'));
+ok(/dropSsr\(\);/.test(covBranch) && /localNewsSection\(covNews\)/.test(covBranch) && /covNotices/.test(covBranch),
+   '...and the coverage branch that drops it redraws the notices, meetings and news it removes');
 const full = rt.slice(rt.indexOf('var c = meta;'));
 for (const [re, what] of [[/HS\.data\.changes\(/, 'government notices'], [/HS\.data\.meetings\(/, 'upcoming meetings'],
                           [/HS\.data\.news\(/, 'local news']]) {

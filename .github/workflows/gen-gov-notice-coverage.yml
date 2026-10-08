@@ -22,6 +22,15 @@ name: Regenerate the Government Notices coverage artifact
 # is the second half of the same fence.
 on:
   workflow_dispatch:
+  # DAILY, because this artifact drifted for 13 DAYS and nothing noticed. It was last
+  # regenerated 2026-09-09 and only ran again on 2026-09-22 because a human dispatched it.
+  # In that window 80020 claimed a Government Notices source it did not have (a county
+  # re-parent moved it to a feedless root), and 28 Collin County TX pages UNDER-claimed
+  # coverage they really had. Both directions were silent. A scheduled run cannot push to
+  # main (branch protection, correctly), so on main it REPORTS instead — see the guard in
+  # the commit step. Detection was the missing half; the fix path already worked.
+  schedule:
+    - cron: '43 5 * * *'
   push:
     branches:
       - "claude/**"
@@ -102,6 +111,26 @@ jobs:
             echo "coverage set unchanged — nothing to commit (timestamp churn discarded)"
             git checkout -- lib/generated/gov-notice-coverage.json
             exit 0
+          fi
+          # Reaching here means the COVERAGE SET MOVED. On main that is the scheduled
+          # run finding drift, and it must fail loudly: branch protection refuses a direct
+          # push (observed, run 35675946363 — "Changes must be made through a pull
+          # request"), so attempting one would surface as a confusing push error rather
+          # than as "the artifact is stale". Fail with the remedy instead.
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "::error title=GN coverage artifact is STALE::production no longer matches lib/generated/gov-notice-coverage.json. Regenerate it on a branch and open a PR: dispatch this workflow with ref=claude/<branch>, then PR the commit it pushes."
+            node -e '
+              const { execSync } = require("child_process");
+              const prev = JSON.parse(execSync("git show HEAD:lib/generated/gov-notice-coverage.json").toString());
+              const next = require("./lib/generated/gov-notice-coverage.json");
+              const p = new Set(prev.configured_zips), n = new Set(next.configured_zips);
+              const removed = [...p].filter(z => !n.has(z)), added = [...n].filter(z => !p.has(z));
+              console.log("committed configured:", prev.configured_zips.length,
+                          "-> production:", next.configured_zips.length);
+              console.log("removed (" + removed.length + "):", removed.join(" ") || "(none)");
+              console.log("added   (" + added.length   + "):", added.join(" ")   || "(none)");
+            '
+            exit 1
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -1,0 +1,70 @@
+name: payment-event-ledger-suite
+
+# THE PAYMENT-EVENT LEDGER (docs/payment-event-ledger.sql; Development Activity plan Order M, step M0).
+# A PR-TRIGGERED CHECK, NOT A JOB: it has no schedule, no push trigger and no manual trigger, nothing calls the ledger, and it is
+# not applied to production. It runs the SHIPPED SQL against a DISPOSABLE Postgres:
+#   1. the ledger passes its suite — once (a replay is a DUPLICATE and a reused key for a different event is refused), in order
+#      (the processor's time decides, arrival never does), a closed status mapping (an unknown word is 'unknown', never
+#      'active'), append-only, locked to the system, row-level security on, an exact allow-list of what can be stored, and
+#      nothing else touched (a stand-in subscriptions table carries a trap that raises on any touch);
+#   2. the file applies twice with an identical definition;
+#   3. its ROLLBACK block removes every object it made, leaves the stand-in subscriptions table untouched, and re-applies to an
+#      identical definition;
+#   4. two REAL concurrent sessions: a retry racing the original records once, and an older event racing a newer one is not
+#      reported as the latest;
+#   5. every prohibited mutation of the SQL, each of which MUST fail the stage that owns it.
+# The offline half (test/payment-event-ledger-structure.test.mjs) runs in unit-tests.yml with every other offline suite.
+#
+# This workflow holds NO Supabase credential and refuses to run if one is present: it can only ever address the disposable container.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/payment-event-ledger.sql'
+      - 'test/payment_event_ledger_pg/**'
+      - 'test/payment-event-ledger-structure.test.mjs'
+      - '.github/workflows/payment-event-ledger-suite.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: payment_event_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The ledger passes; it applies twice; it rolls back exactly; two concurrent sessions agree; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: payment_event_disposable
+        run: |
+          set -o pipefail
+          bash test/payment_event_ledger_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/pel.log

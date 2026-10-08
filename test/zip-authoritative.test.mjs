@@ -126,8 +126,13 @@ ok(HS.zipAuthSitesFrom(MEASURED_ZERO).length === 0, 'D2 measured-zero also yield
 const noteNM = HS.zipAuthNote(NOT_MEASURED, '01004', []);
 const noteMZ = HS.zipAuthNote(MEASURED_ZERO, '01009', []);
 ok(noteNM !== noteMZ, 'D3 ...but the two are DESCRIBED differently, which is the whole point');
-ok(/not measured yet/i.test(noteNM), 'D4 the unmeasured ZIP says it is not measured', noteNM);
-ok(/will not estimate/i.test(noteNM), 'D5 ...and says we will not estimate it from a circle', noteNM);
+// A ZIP with no Census area says so (founder wording 2026-10-02, pinned whole in
+// test/zip-no-mapped-area-copy.test.mjs); only a ZIP still waiting on a build says "not measured yet".
+ok(/^ZIP 01004 has no mapped area\./.test(noteNM), 'D4 a no-boundary ZIP says it has no mapped area', noteNM);
+ok(!/not measured yet/i.test(noteNM), 'D5 ...and never that it is "not measured yet"', noteNM);
+const notePending = HS.zipAuthNote(UNKNOWN, '01004', []);
+ok(/not measured yet/i.test(notePending) && /will not estimate/i.test(notePending),
+  'D5b a ZIP still waiting on a build keeps "not measured yet" and the no-circle promise', notePending);
 ok(/No qualifying development/i.test(noteMZ) && /whole ZIP/i.test(noteMZ),
   'D6 the measured-zero ZIP claims a real whole-ZIP measurement', noteMZ);
 ok(/2 projects across the whole of ZIP 78617/.test(HS.zipAuthNote(COMPLETE, '78617', sites)),
@@ -153,13 +158,18 @@ ok(one && one.lat === 30.1745 && one.lng === -97.6134 && one.spanMi === 0.4,
 console.log('\nE. merge: authoritative development replaces radius-derived development');
 const report = [
   { scope: 'point', relevance: 'development', label: 'centroid-radius permit' },   // must go
-  { scope: 'point', relevance: 'facility', label: 'EPA facility', registry_id: '110000' }, // must stay
+  // THE FACILITY PLANE PASSES ONLY ON THE SERVER'S VERDICT (public.zip_mode_report_sites).
+  { scope: 'point', label: 'EPA facility', registry_id: '110000', zip_membership: 'member' },       // stays
+  { scope: 'point', label: 'EPA facility outside', registry_id: '110001', zip_membership: 'outside' }, // must go
+  { scope: 'point', label: 'EPA facility unstamped', registry_id: '110002' },                        // must go
   { scope: 'area', relevance: 'development', label: 'county-wide hearing' }        // must stay
 ];
 const merged = HS.zipAuthMergeSites(report, sites);
 ok(!merged.some(s => s.label === 'centroid-radius permit'),
   'E1 the cached report\'s own development points are replaced');
-ok(merged.some(s => s.label === 'EPA facility'), 'E2 EPA facilities are preserved untouched');
+ok(merged.some(s => s.label === 'EPA facility'), 'E2 a facility with a member verdict is preserved untouched');
+ok(!merged.some(s => s.label === 'EPA facility outside') && !merged.some(s => s.label === 'EPA facility unstamped'),
+  'E2b a facility verdicted outside, or carrying no verdict at all, is NOT admitted (fails closed)');
 ok(merged.some(s => s.label === 'county-wide hearing'), 'E3 area/jurisdiction notices are preserved');
 ok(merged.length === 2 + sites.length, 'E4 nothing else is lost', merged.length);
 ok(HS.zipAuthMergeSites(report, []).every(s => s.label !== 'centroid-radius permit'),
@@ -170,8 +180,8 @@ console.log('\nF. page wiring');
 const page = readFileSync(new URL('../homesignalmap.html', import.meta.url), 'utf8');
 ok(/lib\/zip-authoritative\.js/.test(page), 'F1 the page ships the library');
 ok(/rpc\/app_zip_projects_markers/.test(page), 'F2 ZIP mode calls the authoritative RPC');
-ok(/HS\.zipAuthSitesFrom\(/.test(page) && /HS\.zipAuthMergeSites\(/.test(page),
-  'F3 ZIP mode builds and merges authoritative sites');
+ok(/HS\.zipAuthSitesFrom\(/.test(page) && /HS\.zipModeSites\(/.test(page),
+  'F3 ZIP mode builds and merges authoritative sites (through the one ZIP-mode door)');
 ok(/HS\.zipAuthNote\(/.test(page), 'F4 the honest note is rendered');
 ok(/body\.zipmode \.radsel\{display:none\}/.test(page),
   'F5 the radius control is not offered in ZIP mode');

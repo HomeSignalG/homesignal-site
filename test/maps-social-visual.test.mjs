@@ -15,8 +15,18 @@ const WF = readFileSync(new URL('../.github/workflows/maps-social-image.yml', im
 // screenshot path"), so those checks run against the CODE with comments stripped — a doc
 // comment mentioning a forbidden concept is not the same as using it.
 const GEN_CODE = GEN
-  .replace(/\/\*[\s\S]*?\*\//g, ' ')
+// ⚠️ The block-comment strip must not fire inside a URL: homesignalmap.html's CSP carries
+// `https://*.tile.openstreetmap.org`, whose `/*` opened a phantom comment swallowing 2,297
+// bytes of that file's head — so an absence-pin over the CSP or the head scripts passed by
+// reading nothing. Requiring the opener not to follow `:` or `/` keeps every real comment.
+  .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1 ')
   .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
+// The Data Center map-state policy lives in its own SHIPPED module, which the generator
+// injects into the captured browser. It is stripped the same way and for the same reason.
+const strip = (src) => src
+  .replace(/(^|[^:/])\/\*[\s\S]*?\*\//g, '$1 ')
+  .split('\n').map((l) => l.replace(/(^|\s)\/\/.*$/, '')).join('\n');
+const POLICY_CODE = strip(readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8'));
 
 let n = 0, bad = 0;
 const ok = (cond, msg) => { n++; if (cond) console.log('PASS — ' + msg); else { bad++; console.log('FAIL — ' + msg); } };
@@ -84,8 +94,37 @@ ok(/live coordinates differ from the draft evidence/.test(GEN),
 ok(/record_kind !== 'development'/.test(GEN), 'facilities can never be captured');
 
 // ── surrounding development is not hidden ────────────────────────────────────────────
-ok(!/display:\s*none[^}]*marker|hideMarkers|removeLayer|clearLayers/.test(GEN),
+// ⚠️ THIS READS `GEN_CODE`, NOT `GEN`, and that is this file's own stated rule applied to a
+// line that had missed it: the check is about what the generator DOES, and the raw text also
+// matches a COMMENT that merely names the forbidden call. It failed exactly that way when the
+// Data Center Theme work added a comment explaining that Leaflet nulls `m._map` on
+// removeLayer — an explanation of the page's behaviour, not a call in this module.
+ok(!/display:\s*none[^}]*marker|hideMarkers|removeLayer|clearLayers/.test(GEN_CODE),
   'the generator never hides other markers to make a cleaner picture');
+// THE ONE SANCTIONED NARROWING, and why it is not a breach of the rule above. A MAPS · Data
+// Center Theme capture puts Map 1's PROJECT TYPE row into a Data-center-only state. That is
+// NOT the generator hiding markers: it operates the product's OWN filter control, the control
+// is inside the captured frame, and its checkmarks therefore DISCLOSE the narrowing to anyone
+// looking at the image. The rule this file protects is that a picture must not be quietly
+// cleaned up; a visible, resident-operable filter is the opposite of quiet. Asserted rather
+// than assumed — the narrowing must happen through a change event on the page's own checkbox,
+// never by touching the map.
+// The manoeuvre now lives in lib/maps-capture-policy.js and the generator INJECTS it, so the
+// pin reads that module: asserting against the generator alone would go green while the
+// shared implementation — the one the capture actually runs — was gutted.
+ok(/dispatchEvent\(new Event\('change'/.test(POLICY_CODE),
+  'the theme filter is applied through the page\u2019s OWN control, not by editing the map');
+ok(/addScriptTag\(\{ content: POLICY_SRC \}\)/.test(GEN_CODE),
+  'and the generator reaches it by injecting the SHIPPED module, not by re-typing it');
+// ALL THREE DIMENSIONS are operated, and all three controls are inside the captured frame —
+// so the checkmarks in the image disclose the whole narrowing, not a third of it.
+ok(/#mapkey \.stagechip\[data-stage="/.test(POLICY_CODE)
+  && /#mapkeyShapes \.typechip\[data-cat="/.test(POLICY_CODE)
+  && /getElementById\('regToggleBox'\)/.test(POLICY_CODE),
+  'STATUS, PROJECT TYPE and REGULATORY are each operated through their own visible control');
+ok(!/layerGroup|\.addTo\(|L\.marker|setStyle/.test(GEN_CODE)
+  && !/layerGroup|\.addTo\(|L\.marker|setStyle/.test(POLICY_CODE),
+  'and neither the generator nor the policy ever touches Leaflet layers itself');
 ok(/leaflet-control-container\{display:none/.test(GEN),
   'only Leaflet’s own zoom control is hidden for the shot');
 
@@ -100,24 +139,73 @@ ok(/content_family=eq\.MAPS/.test(GEN), 'it selects MAPS rows only');
 ok(/status=eq\.draft/.test(GEN), 'it selects drafts only');
 
 // ── the publication hold ─────────────────────────────────────────────────────────────
-for (const forbidden of ['approved_at', 'scheduled_slot', 'published_at', 'bsky_uri', "'approved'", "'published'"]) {
-  ok(!new RegExp(forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(GEN),
-    `the generator never writes ${forbidden}`);
+// ⚠️ NARROWED 2026-09-20, from "never MENTIONS these columns" to "never WRITES them", and
+// the narrowing is what the change required rather than what it wanted. The capture run now
+// RE-READS `status`/`approved_at`/`scheduled_slot`/`published_at` on every row it touched
+// and raises if one stopped being a draft — a stronger guarantee than never naming them,
+// and one a mention-ban makes impossible to write. So the ban moves to where writes happen.
+const PATCH_SITES = (GEN.match(/method: 'PATCH'/g) || []).length;
+ok(PATCH_SITES > 0, `the generator has ${PATCH_SITES} PATCH site(s) to check`);
+ok((GEN.match(/JSON\.stringify\(assertWriteScope\(/g) || []).length === PATCH_SITES,
+  'EVERY PATCH body goes through assertWriteScope — a new write path cannot skip the gate');
+ok(/const WRITABLE = \['image_bucket_path', 'evidence'\];/.test(GEN),
+  'and the writable set is exactly image_bucket_path + evidence');
+// ⚠️ `status` IS DELIBERATELY NOT IN THIS LIST, and leaving it out is not a weakening.
+// `evidence.visual.status` is a different field that lives INSIDE the one jsonb column this
+// job may write, and a mention-ban cannot tell the two apart — it would fail on the nested
+// one while proving nothing about the column. The social_posts.status column is covered
+// twice over and more strongly: by the exact WRITABLE pair asserted above, and by the
+// post-run re-read asserted below.
+for (const forbidden of ['approved_at', 'scheduled_slot', 'published_at', 'bsky_uri']) {
+  ok(!new RegExp(`${forbidden}:\\s`).test(GEN.replace(/select=[^'"`]*/g, '')),
+    `the generator never assigns ${forbidden} in an object literal`);
 }
-ok(!/schedule:/.test(WF), 'the capture workflow has NO schedule — automatic generation stays off');
-// The trigger is a push scoped to ONE branch and ONE path (the arm file) while this lives
-// on a feature branch — workflow_dispatch cannot reach a workflow that is not on main. What
-// must hold is that it can never become ambient: no schedule, never on main's branch list,
-// and a push of ordinary code cannot fire it.
-ok(/workflow_dispatch/.test(WF), 'it is dispatchable once it reaches main');
-ok(/paths: \['\.github\/maps-social-arm'\]/.test(WF),
-  'the push trigger fires ONLY on the arm file, so a code push cannot start a capture');
-ok(!/branches: \[main\]|branches:\s*\n\s*- main/.test(WF), 'it is never triggered on main');
-ok(/ARMING GATE/.test(WF) && /EXPECTED_ARM/.test(WF), 'and arm-gated before it touches production');
+// The forbidden columns may still be READ. That read is the post-run proof, so assert it
+// exists rather than merely tolerating it — otherwise deleting the proof would go unnoticed
+// and the narrowing above would have bought nothing.
+ok(/proveNothingApproved/.test(GEN) && /REFUSING TO REPORT SUCCESS/.test(GEN),
+  'the run re-reads the rows it touched and RAISES if any left draft state');
 
-// ── founder review distinguishes real from fallback ──────────────────────────────────
+// ── the trigger: recurring, bounded, and still switchable off ────────────────────────
+// ⚖️ CHANGED 2026-09-20. This block used to assert `!/schedule:/` — that the job could not
+// run on its own. That assertion was correct about the hold and wrong about where the hold
+// lives: the job last ran 2026-09-04 and 40 of 49 MAPS drafts had no image, including every
+// Data Center Theme candidate, which cannot be approved without one. The hold on PUBLICATION
+// is now enforced by the write scope above (and by publish-worker reading status='approved'
+// only), so the schedule is what the founder asked for and the assertions move to BOUNDING it.
+ok(/schedule:/.test(WF) && /cron:/.test(WF), 'the capture workflow runs on a schedule');
+ok(/workflow_dispatch/.test(WF), 'and is still dispatchable on demand');
+ok(/concurrency:/.test(WF) && /cancel-in-progress: false/.test(WF),
+  'runs never overlap, so a slow run cannot be stacked by the next fire');
+ok(/--limit "\$\{\{ inputs\.limit \|\| '\d+' \}\}"/.test(WF),
+  'every run is hard-capped by --limit, scheduled fires included');
+ok(/ENABLE GATE/.test(WF) && /EXPECTED_ENABLE/.test(WF),
+  'and a standing switch can still stop every future run');
+ok(/if \[ ! -r \.github\/maps-social-capture \]/.test(WF),
+  'the switch FAILS CLOSED — a missing file stops the job rather than defaulting it on');
+// Scoped to the DECLARATION, not to the string. The workflow header quotes its own
+// superseded wording so a reader can see what changed, and this repo keeps such receipts;
+// a pin that forbade the characters would force deleting the history to satisfy it.
+ok(!/^\s*EXPECTED_ARM:/m.test(WF),
+  'the one-shot arm token is gone: no per-run re-arm is needed any more');
+
+// ── founder review distinguishes the FOUR capture states ─────────────────────────────
+// ⚖️ WIDENED from two. "Real" vs "fallback" could not say whether a missing picture meant
+// nobody had tried yet, our screenshot failed, or the project cannot be photographed — and
+// a reader who cannot tell those apart is one step from reading the last as "no data
+// centres here", which is a claim about the world made out of an instrument failure.
 ok(/REAL MAP VISUAL/.test(DASH), 'founder review shows an explicit REAL MAP VISUAL state');
-ok(/NO PROJECT-SPECIFIC VISUAL/.test(DASH), 'and an explicit fallback state');
+ok(/AWAITING MAP CAPTURE/.test(DASH), 'an explicit not-yet-attempted state');
+ok(/CAPTURE FAILED/.test(DASH), 'an explicit capture-failure state');
+// ⚖️ 2026-10-01: for a post about a project, "ineligible" means its own pin cannot be shown
+// yet, and no ZIP map stands in for it (founder ruling). The badge says that.
+ok(/PROJECT PIN CAN\\u2019T BE SHOWN YET/.test(DASH), 'an explicit ineligible state');
+ok(/IMAGE OUT OF DATE/.test(DASH), 'and an explicit state for an image that no longer matches its draft');
+for (const s of ['CAPTURE FAILED', 'PROJECT PIN CAN\\u2019T BE SHOWN YET']) {
+  const i = DASH.indexOf(s);
+  ok(i > -1 && /not a finding about this ZIP/.test(DASH.slice(i, i + 400)),
+    `"${s}" is stated as an instrument fact, never as a finding about the ZIP`);
+}
 ok(/createSignedUrl\('?social-images'?|from\('social-images'\)/.test(DASH),
   'the preview reads the private bucket through a signed URL');
 ok(/function visualStatus\(p\)\{[\s\S]{0,300}content_family!=='MAPS'/.test(DASH),

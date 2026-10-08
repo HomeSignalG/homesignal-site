@@ -95,3 +95,38 @@ export function unreachableRows(drift) {
       reason: d.unreachableReason || 'reader returned null; no reason captured',
     }));
 }
+
+// A status/type column may be an ARRAY of field names. `column_map` arrays JOIN — the
+// connector's readCol (sources/arcgis.ts) drops blanks, trims each part and joins with a
+// SINGLE SPACE — so the value the connector actually buckets is the joined string, and a
+// probe that reads one field asks a different question (Rule 13). Registry-wide exactly one
+// entry is array-valued today (kytc-syp-highway-plan) and it was UNREACHABLE every run,
+// because `encodeURIComponent(['A','B'])` sends `A,B` as a single onStatisticField and
+// ArcGIS rejects it.
+export const fieldList = (field) => (Array.isArray(field) ? field : [field]);
+
+// Reproduces sources/arcgis.ts::readCol EXACTLY for the array case. Pinned by
+// test/source-monitor-unreachable-reason.test.mjs against the shipped connector's semantics —
+// a different separator here would manufacture drift on every row of a national source.
+export function joinFieldValues(attrs, fields) {
+  if (fields.length === 1) return attrs[fields[0]];
+  const parts = fields.map((c) => attrs[c]).filter((v) => v != null && String(v).trim() !== '').map((v) => String(v).trim());
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+// WHY a read failed, in words, from what the response actually said. `jget` already carries
+// the status and a body snippet and ArcGIS reports failures IN BAND on HTTP 200; every
+// caller was throwing all of it away and returning a bare null, so the report could only ever
+// say "returned null". "Could not read" and "read and found nothing" must never be
+// indistinguishable — that is the rule this monitor exists to enforce, applied to itself.
+export function describeFailure(r) {
+  if (!r) return 'no response object';
+  if (r.ok && r.json?.error) {
+    const err = r.json.error;
+    const detail = Array.isArray(err.details) && err.details.length ? ` — ${String(err.details[0]).slice(0, 160)}` : '';
+    return `ArcGIS in-band error ${err.code ?? '?'}: ${String(err.message || '').slice(0, 160)}${detail}`;
+  }
+  if (r.status === 0) return `request failed before a response: ${String(r.text || '').slice(0, 120)}`;
+  if (r.status === 429) return 'HTTP 429 rate limited (jget retries 5xx and network errors, NOT 429)';
+  return `HTTP ${r.status}: ${String(r.text || '').slice(0, 160)}`;
+}

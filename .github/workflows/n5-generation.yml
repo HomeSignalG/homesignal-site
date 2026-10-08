@@ -1,0 +1,132 @@
+# N5 GEOGRAPHY GENERATION — the lifecycle the 544-shard build never had.
+#
+# The original national build completed on 2026-09-05 and stopped, because its unit of work
+# was "build every ZIP3 prefix once" and every prefix reached done. Nothing failed; there
+# was simply nothing that would ever run again. This workflow is that something.
+#
+# The scheduled `work` tick now also PUBLISHES a candidate once every shard is done
+# (scripts/n5_publish.py -> geo.n5_gen_publish_prefix, docs/n5-generation-publish.sql) and
+# records its unresolved outcomes. Everything it writes belongs to the BUILDING generation,
+# which Map 1 never reads; the database refuses writes to any other generation.
+#
+# AUTO LIFECYCLE (founder instruction 2026-09-29: "swap automatically once checks pass").
+# A scheduled tick, or a dispatch with auto=1, runs MODE=work with AUTO_LIFECYCLE=1: it opens
+# the next national generation when none is building (at most one per 20 h, only with a whole
+# build's disk above the floor) and, once a build is complete, calls READY then ACTIVATE.
+# Both decisions belong to geo.n5_generation_mark_ready() / geo.n5_generation_activate(),
+# which re-derive every condition and raise on any gap — a refusal turns the tick red and
+# the generation stays where it is. The database's pg_cron also dispatches this workflow
+# hourly with auto=1, because GitHub's own schedule drops ticks on this repo.
+name: n5-generation
+
+on:
+  schedule:
+    # HOURLY, and a scheduled tick uses its whole 50-minute budget (MAX_SHARDS below).
+    # MEASURED 2026-09-26: the national generation's shards average ~45 s and a publish
+    # prefix ~20 s, so each tick finishes ~60 shards or ~150 prefixes - the build completes
+    # on its own in well under a day. The previous 2-hourly tick took 4 shards, so a build
+    # advanced only while someone dispatched runs by hand, and it sat idle ~12.5 h overnight
+    # on 2026-09-25/26. With no BUILDING generation the tick is a one-query no-op; the
+    # concurrency group below queues at most one tick behind a running one.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'status | open | work | publish | unresolved | reconcile | ready | prove | prove_dry | activate | rollback | fail | discard'
+        required: true
+        default: 'status'
+      generation:
+        description: 'generation id (blank = discover the single BUILDING one)'
+        required: false
+        default: ''
+      max_shards:
+        description: 'shards per invocation'
+        required: false
+        default: '4'
+      chunks:
+        description: 'chunk keys (blank = the generation own shard prefixes)'
+        required: false
+        default: ''
+      reason:
+        description: 'rollback / fail: why (required for those modes)'
+        required: false
+        default: ''
+      auto:
+        description: '1 = work tick also opens the next build and runs READY/activate when complete'
+        required: false
+        default: ''
+
+concurrency:
+  # ONE orchestrator at a time. This is belt-and-braces, not the control: geo.n5_claim_shard
+  # uses FOR UPDATE SKIP LOCKED, so two runs interleave safely even if this were removed.
+  # A workflow-level lock cannot protect against a hand-run script; the database one can.
+  group: n5-generation
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    # Bounded so a wedged shard cannot hold the lane. The lease in n5_claim_shard is what
+    # releases the shard afterwards; this only bounds the runner.
+    # MAX_SECONDS (3000 s) stops new work from STARTING; a publish that starts just before it
+    # may run up to its own budget (scripts/n5_publish.py, 5400 s). 150 min covers both, so the
+    # runner is still waiting when that prefix commits. Pinned by scripts/test_heavy_gateway.py.
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # The pre-activation proof renders Map 1 in Chromium (scripts/n5_preactivation_browser.mjs).
+      # The orchestrator installs playwright + Chromium itself, and only on a tick that proves.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Orchestrate
+        id: orchestrate
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MODE: ${{ github.event.inputs.mode || 'work' }}
+          GENERATION: ${{ github.event.inputs.generation || '' }}
+          MAX_SHARDS: ${{ github.event.inputs.max_shards || '200' }}
+          CHUNKS: ${{ github.event.inputs.chunks }}
+          REASON: ${{ github.event.inputs.reason }}
+          AUTO_LIFECYCLE: ${{ github.event_name == 'schedule' && '1' || github.event.inputs.auto || '' }}
+          MAX_SECONDS: '3000'
+          # PROVISIONED disk, read from the Supabase dashboard 2026-09-29: 36 GB (binary - the
+          # dashboard's 19.99 GB "used" equals pg_database_size 18.78 GiB + WAL 1.00 GiB, so
+          # 36 GB = 36,864 MiB), minus a 512 MiB margin for the System share the formula does
+          # not subtract. It was 24,370 (the 2026-09-25 24 GB reading); left stale, the next
+          # build would have seen ~4 GB free and halted at the floor. The 2,048 MB floor
+          # (DISK_FLOOR_MB) is unchanged. FALLBACK ONLY since 2026-10-01: n5_shard reads the
+          # provisioned size from the Supabase disk config on every run, so a resize needs no
+          # edit here. This value is used only when that read fails (the run log says which).
+          DISK_TOTAL_MB: '36352'
+          WORKER: gh-${{ github.run_id }}-${{ github.run_attempt }}
+        run: python scripts/n5_orchestrate.py
+
+      # SEO FRESHNESS (2026-10-07). Activating or rolling back a generation changes which projects
+      # Map 1 serves, and the Development SEO (Rule D) plane scores exactly that membership - so
+      # the published plane is stale from this moment. Ask the plane's OWN refresh workflow in
+      # homesignal-ingest to run now; it publishes the plane and then asks pages for a freshness
+      # build. Nothing is re-scored here. Needs a fine-grained token with Actions: write on
+      # HomeSignalG/homesignal-ingest as the INGEST_DISPATCH_TOKEN secret; without it the plane
+      # simply refreshes at its daily 05:30 UTC run, as before. Never fails the orchestration.
+      - name: Ask homesignal-ingest to refresh the Rule D plane
+        if: ${{ steps.orchestrate.outputs.n5_serving_changed != '' }}
+        continue-on-error: true
+        env:
+          INGEST_DISPATCH_TOKEN: ${{ secrets.INGEST_DISPATCH_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${INGEST_DISPATCH_TOKEN:-}" ]; then
+            echo "INGEST_DISPATCH_TOKEN is not configured: the Rule D plane will refresh at its daily run."
+            exit 0
+          fi
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+            "https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/refresh-development-seo-plane.yml/dispatches" \
+            -H "Authorization: Bearer $INGEST_DISPATCH_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d '{"ref":"main","inputs":{"live":"true","publish":"true"}}') || CODE=000
+          echo "refresh-development-seo-plane dispatch: HTTP $CODE"
+          test "$CODE" = "204"

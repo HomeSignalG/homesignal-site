@@ -64,16 +64,31 @@ ok(ENTRY.column_map.file_date === 'APPLIED' && ENTRY.file_date_kind === 'filed',
 // ── 2. Status vocabulary — all 21 live values bucketed exactly once ──────────────
 {
   const s2b = ENTRY.status_to_bucket;
-  const all = [...s2b.proposed, ...s2b.approved, ...s2b.operating, ...s2b.exclude];
+  // EVERY bucket, read generically. The old form spread four bucket names by hand, so
+  // when `denied`/`withdrawn` were added (2026-09-20) this completeness check silently
+  // started UNDER-counting the publisher's vocabulary and reported a real, fully-mapped
+  // entry as incomplete. Reading Object.values makes the assertion self-maintaining: a
+  // seventh bucket cannot break it, which is the whole point of a completeness check.
+  const all = Object.values(s2b).flat();
   ok(all.length === 21 && new Set(all).size === 21,
     `all 21 live STATUS values bucketed exactly once (got ${all.length}, ${new Set(all).size} distinct)`);
   ok(s2b.operating.includes('FINALED') && s2b.operating.includes('FINALED WITH CO'),
     'FINALED + FINALED WITH CO → operating (the two largest buckets, 10,873 + 794)');
   ok(s2b.approved.includes('ISSUED'), 'ISSUED → approved (7,408)');
-  ok(s2b.exclude.includes('VOID') && s2b.exclude.includes('WITHDRAWN') && s2b.exclude.includes('DENIED')
-     && s2b.exclude.includes('CANCELLED') && s2b.exclude.includes('EXPIRED')
-     && s2b.exclude.includes('OUT OF JURISDICTION'),
-    'dead statuses excluded — a denied or voided permit is not a development record');
+  // ⚖️ SUPERSEDED 2026-09-20 — this assertion used to read "dead statuses excluded — a
+  // denied or voided permit is not a development record", and it pinned the defect. A
+  // DENIED permit IS a record: the application was really made and really refused, and a
+  // resident searching the address has to be able to find that. Dropping it made the
+  // refusal indistinguishable from the application never existing. VOID / CANCELLED /
+  // EXPIRED are unchanged — those are administrative lapses, not rulings, and surfacing
+  // them under a decision heading would assert a ruling nobody made.
+  ok(s2b.exclude.includes('VOID') && s2b.exclude.includes('CANCELLED')
+     && s2b.exclude.includes('EXPIRED') && s2b.exclude.includes('OUT OF JURISDICTION'),
+    'administrative non-decisions still excluded — void/cancelled/expired are not rulings');
+  ok(s2b.denied && s2b.denied.includes('DENIED') && !s2b.exclude.includes('DENIED'),
+    'DENIED → denied, not exclude — a refused application stays discoverable with its decision');
+  ok(s2b.withdrawn && s2b.withdrawn.includes('WITHDRAWN') && !s2b.exclude.includes('WITHDRAWN'),
+    'WITHDRAWN → withdrawn — the applicant pulling it is a different fact from a refusal');
   // HOLD started as `proposed` here and the stalled-status lint rejected it, correctly:
   // a permit on hold is not progressing, and bucketing it as proposed claims motion it
   // does not have. Pinned so it cannot drift back without this assertion failing first.

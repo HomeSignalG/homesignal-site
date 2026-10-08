@@ -1,0 +1,202 @@
+name: n5-generation-publish-suite
+
+# EXECUTABLE PostgreSQL + PostGIS proof for docs/n5-generation-publish.sql — the checked,
+# generation-scoped path onto Map 1. It runs the SHIPPED migration, verbatim, against a
+# production pre-state (test/n5_generation_pg/fixture_prestate.sql: the live definitions read
+# back 2026-09-25) and proves the 17 required behaviours plus the write guard, anon access and
+# view options. Then it breaks each critical invariant on purpose and requires the suite to go
+# red — a mutation that survives fails this job.
+#
+# The target is a THROWAWAY service container created for this job and destroyed with it.
+# It holds no credentials, can reach no Supabase project, and nothing here touches production.
+#
+# Since 2026-09-25 it also applies PART D (docs/n5-generation-publish-part-d.sql) and runs
+# test/n5_generation_pg/run_lifecycle.py: the REAL orchestrator, shard and publish code driven
+# end to end (open -> work -> prepare -> publish -> unresolved -> ready -> activate). The suite
+# alone proved the database functions and went green over a lifecycle that could not run.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/n5-generation-publish.sql'
+      - 'docs/n5-generation-publish-part-d.sql'
+      - 'docs/n5-generation-publish-part-f.sql'
+      - 'docs/n5-generation-publish-part-g.sql'
+      - 'docs/n5-generation-publish-part-g.rollback.sql'
+      - 'docs/n5-generation-publish-part-h.sql'
+      - 'docs/n5-generation-publish-part-h.rollback.sql'
+      - 'scripts/n5_preactivation_browser.mjs'
+      - 'docs/maps-coverage/fix4/no-boundary-zip-classification.csv'
+      - 'docs/map1-zip-read-char5.sql'
+      - 'docs/map1-zip-read-char5.rollback.sql'
+      - 'docs/map1-representative-newest.sql'
+      - 'docs/map1-representative-newest.rollback.sql'
+      - 'docs/map1-representative-pick.sql'
+      - 'docs/map1-representative-pick.rollback.sql'
+      - 'docs/map1-zip-read-generation.sql'
+      - 'docs/map1-zip-read-generation.rollback.sql'
+      - 'test/n5_generation_pg/**'
+      - 'test/n5-generation-publish.test.mjs'
+      - 'scripts/n5_orchestrate.py'
+      - 'scripts/n5_publish.py'
+      - 'scripts/n5_shard.py'
+      - 'scripts/n3_pilot.py'
+      - 'scripts/test_heavy_gateway.py'
+      - 'scripts/test_n5_auto_lifecycle.py'
+      - 'scripts/test_disk_size.py'
+      - 'scripts/n5_candidate_bounding.py'
+      - '.github/workflows/n5-generation-publish-suite.yml'
+      - '.github/workflows/n5-generation.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    # Production runs PostgreSQL 17 (measured 2026-09-03); 16 is kept so the suite is not
+    # proven on one major only.
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - postgis/postgis:16-3.4
+          - postgis/postgis:17-3.5
+    name: publish-suite (${{ matrix.image }})
+    services:
+      postgres:
+        image: ${{ matrix.image }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: n5_publish_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          set -euo pipefail
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: a Supabase credential is visible to this job."
+            exit 1
+          fi
+
+      - name: Install the driver (CI-only; the repo stays dependency-free)
+        run: pip install --quiet psycopg2-binary
+
+      - name: Run the executable publication suite (base + mutations)
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_suite.py 2>&1 | tee /tmp/n5-publish-suite.log
+
+      - name: Run the END-TO-END lifecycle through the real orchestrator (open -> activate)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_lifecycle.py 2>&1 | tee /tmp/n5-lifecycle.log
+
+      - name: Run Map 1's ZIP-read index proof (docs/map1-zip-read-char5.sql, base + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_char5.py 2>&1 | tee /tmp/map1-char5.log
+
+      - name: Run Map 1's newest-record proof (docs/map1-representative-newest.sql, base + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_representative.py 2>&1 | tee /tmp/map1-representative.log
+
+      - name: Run Map 1's stored-pick proof (docs/map1-representative-pick.sql, base + cost + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_pick.py 2>&1 | tee /tmp/map1-pick.log
+
+      - name: Run Map 1's generation-read proof (docs/map1-zip-read-generation.sql, base + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_generation.py 2>&1 | tee /tmp/map1-generation.log
+
+      - name: Run Part G's rollback proof (undo, refuse twice, re-apply)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_part_g_rollback.py 2>&1 | tee /tmp/part-g-rollback.log
+
+      - name: Run Part H's apply + rollback proof (the pre-activation proof onto production's state)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_part_h.py 2>&1 | tee /tmp/part-h.log
+
+      - name: Run the gateway-timeout guard (a lost 524 response is proven, never re-sent)
+        if: always()
+        run: python3 scripts/test_heavy_gateway.py
+
+      - name: Run the auto-lifecycle guard (open daily, READY then ACTIVATE only when complete)
+        if: always()
+        run: python3 scripts/test_n5_auto_lifecycle.py
+
+      - name: Run the disk-size guard (read from Supabase, the setting only as a fallback)
+        if: always()
+        run: python3 scripts/test_disk_size.py
+
+      - name: Run the STATIC wiring guards (same commit, no database)
+        if: always()
+        run: node test/n5-generation-publish.test.mjs
+
+      - name: Part G and its rollback are exactly what the generator writes from Part D (no hand edits)
+        if: always()
+        run: python3 test/n5_generation_pg/build_part_g.py --check
+
+      - name: Part H and its rollback are exactly what the generator writes from Part D (no hand edits)
+        if: always()
+        run: python3 test/n5_generation_pg/build_part_h.py --check
+
+      - name: Publish the receipt
+        if: always()
+        run: |
+          {
+            echo '## N5 generation publication — executable receipt'
+            echo '```'
+            grep -E '^(BASE|KILLED|SURVIVED|FAIL)' /tmp/n5-publish-suite.log || echo '(no log)'
+            grep -E '^(END-TO-END|FAIL)' /tmp/n5-lifecycle.log || echo '(no lifecycle log)'
+            grep -E '^(MAP1-CHAR5|KILLED|SURVIVED|FAIL)' /tmp/map1-char5.log || echo '(no map1-char5 log)'
+            grep -E '^(PART-G-ROLLBACK|FAIL)' /tmp/part-g-rollback.log || echo '(no part-g-rollback log)'
+            grep -E '^(MAP1-GENERATION|KILLED|SURVIVED|FAIL)' /tmp/map1-generation.log || echo '(no map1-generation log)'
+            grep -E '^(PART-H|FAIL)' /tmp/part-h.log || echo '(no part-h log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

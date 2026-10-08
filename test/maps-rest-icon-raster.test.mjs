@@ -40,12 +40,15 @@ const check = (name, cond, detail) => {
 
 const STATUS_HEX = '#c47a1a';          // the canonical "Proposed" orange
 const mapjs = readFileSync(join(root, 'lib/map.js'), 'utf8');
+// lib/map.js requires the canonical Type authority to be loaded first (2026-09-24 extraction).
+const ptjs = readFileSync(join(root, 'lib/project-type.js'), 'utf8');
 const browser = await chromium.launch({ headless: true });
 let results;
 try {
   const page = await browser.newPage();
   await page.setContent('<!doctype html><html><body></body></html>');
   await page.addScriptTag({ content: 'window.HS = {};' });
+  await page.addScriptTag({ content: ptjs });
   await page.addScriptTag({ content: mapjs });
   results = await page.evaluate(async (hex) => {
     const HS = window.HS, px = 44, out = [];

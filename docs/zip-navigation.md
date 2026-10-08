@@ -19,6 +19,81 @@ Precedence at boot:
 
 Assigning `HS.state.zip = '…'` re-paints the top bar and re-stamps ZIP-aware links.
 
+## Ownership — who may change what (Fix 6)
+
+Three concepts, kept separate:
+
+| concept | question | store |
+|---|---|---|
+| **Saved places** | what places does this resident care about? | `app_properties` (Addresses) + `app_follows` / `myCommunities` (ZIP Codes) — **never merged** |
+| **Viewed place** | what are they looking at right now? | `HS.state.zip` |
+| **Current tool** | which HomeSignal section are they in? | the three primary items: Explore · My Places · Enterprise (founder navigation plan v3, 2026-09-30) |
+
+> A place-selection action may change place state. A tool-navigation action may change
+> tool state. Neither may implicitly change the other. **Account hydration may update
+> saved-place collections, but it must never silently change the place being viewed.**
+
+**Account hydration is not a place-selection.** `syncFollowsFromAccount()` used to assign
+`state.zip = _serverFollowZips[0]`, so `app_follows` ROW ORDER silently replaced the place
+the resident had chosen — `alerts.html?zip=84301` hydrated and then rendered 75009. The
+decision now lives in `myZipAfterFollowSync` (below) and has no viewed-ZIP return value at
+all, so the boundary is structural rather than a convention. `hydrateAccountLocation()`
+likewise no longer elects `properties[0]` as the active Address; any election is gated on
+the property being in the viewed ZIP.
+
+Only these may change the viewed place, and each is an **explicit** resident action:
+`followCommunity` · `switchProperty` · `switchZip` · a `?zip=` navigation ·
+**opening an Address dossier**.
+
+**The Address dossier is a place-selection.** `property.html?id=` is about ONE Address, so
+once it resolves a real `p` with a 5-digit `p.zip` it writes the viewed ZIP from it
+(`HS.state.zip = p.zip`) and the setter re-stamps all tool chrome. Without that write the
+sidebar, the bell and in-page links stamped whatever leftover session geography the tab
+held: from the Coomes dossier (78617) Alerts opened **78657**, a different place.
+`selectProperty` writes `activePropId` only — it has never set geography.
+
+- The ADDRESS's ZIP wins here, deliberately **not** `ensureViewedZip(p.zip)`: this page's
+  identity is `?id=`, so a stray `?zip=` must not outrank the Address on screen.
+- It writes the **viewed** ZIP only, never `myZip` — opening a dossier is not a re-homing.
+- `property.html` is **not** in `ZIP_NAV_PAGES` (it is addressed by `?id=`), and Alerts stays
+  area-scoped: this routes geography, it does not create per-address Alerts.
+
+**A project (or facility) dossier names its listed street in Viewing.** `development.html?id=`
+is ZIP-scoped for the list, but a specific record is one location. Once that record resolves,
+the page writes the viewed ZIP from `p.zip` when it is a 5-digit ZIP and, when `p.address` is
+present, calls `HS.setViewLabel(address, { precise: true })` — the same chip path the Address
+dossier uses. Without the precise label the chip stays `ZIP #####` (or a saved home in that
+ZIP via Gate 4) even when My Places already shows the street from the same field. Missing
+address stays absent: no reverse-geocode, no `note`, no lat/lng promoted to a street. This
+does not write `myZip`, does not insert `app_properties`, and does not add projects to the
+Viewing switcher (Addresses + ZIP Codes stay the two Place types).
+
+### The helpers
+
+- **`HS.ensureViewedZip(pageZip)`** — THE ONE re-assertion, called by every ZIP-scoped page
+  *before* it fetches. Resolution: explicit page ZIP → established viewed ZIP → `DEFAULT_ZIP`.
+  `pageZip` is for a canonical document whose ZIP is in its **path** (`/community/<zip>/`
+  declares it as `<body data-zip>`); it ranks WITH `?zip=`, because ranking it below `myZip`
+  would render a visitor's saved area on a document about a different ZIP.
+- **`HS.navTo(page)`** — click-time navigation for shell chrome that is not an `<a>` (the
+  bell). Resolves through `navHref` at the click, so it can never carry a stale ZIP.
+- **`myZipAfterFollowSync({myZip, serverFollowZips, localFollowZips})`** — may FILL an absent
+  `myZip` (first-follow initialization, cross-device onboarding); may never REPLACE an
+  established one; returns no viewed ZIP.
+- **`HS.homeFor(zip, home)`** (`lib/data.js`) — the ONE distance/home anchor gate: a saved
+  Address anchors a fetch only on its own ZIP. Every `HS.data.*` function routes through it,
+  so a foreign Address can never become "near home".
+
+A ZIP-only Place has no Address: `switchZip` clears a conflicting `activePropId` /
+`hs:activeProp` (the **pointer** only — the saved row survives; removal is `HS.removeAddress`).
+
+**Sidebar = which section. Viewing = which place.** `community.html` is the public ZIP hub and,
+since plan v3, lights **Explore** (`data-nav="explore"`; it used to declare `comm` and light
+nothing). The lit item names a section, never a place, so the Viewing control names the place from the
+community's own metadata (`Bear River City · 84301`), falling back to the bare ZIP when
+metadata is absent. That is an AREA label, so a saved address in the viewed ZIP still
+reads `Viewing · <street>`.
+
 ## How to link
 
 **Use `HS.navHref(page, HS.state.zip)` or `data-znav` on an anchor** — never hand-build
@@ -34,8 +109,17 @@ location.href = HS.navHref('maps.html', HS.state.zip);
 
 `paintNavHrefs()` (called from `paintTopbar`) stamps:
 
-- Sidebar links listed in `ZIP_NAV_PAGES`
+- Sidebar links listed in `ZIP_NAV_PAGES` — **none since plan v3**: the three primary items
+  (`index.html`, `properties.html`, `development-activity.html`) are section links and carry
+  no `?zip=`. The rule stays, so a ZIP-routed page added to the sidebar later is stamped.
 - Any `#hs-slot a[data-znav]` in-page link
+- Exception (dormant since plan v3): on a Development dossier (`development.html?id=`), a
+  `development.html` link keeps that `id`. It was written for the Development SIDEBAR item,
+  which plan v3 removed, so no link on the dossier reaches it today. The dossier's
+  **Back to development** button returns to the ZIP list.
+
+`ZIP_NAV_PAGES` itself is unchanged by plan v3: `alerts.html`, `development.html`,
+`homesignalmap.html` and `community.html` left the menu but are still ZIP-routed pages.
 
 `ZIP_NAV_PAGES` and helpers live in **`lib/view-zip.js`** (canonical); `shell.js` mirrors
 them when the module is not loaded directly.
@@ -65,9 +149,21 @@ from the geocoded `data.address` (same regex as `get-address-report`) and sets
 
 ## Regression tests
 
-`test/navigation-zip.test.mjs` — run via `node scripts/run-unit-tests.mjs`.
+Run via `node scripts/run-unit-tests.mjs`.
+
+- `test/navigation-zip.test.mjs` — resolution, `navHref`/`pageHref`, map cross-links
+- `test/navigation-hydration.test.mjs` — hydration may not own the viewed place (Gate 1)
+- `test/navigation-tool-preserves-place.test.mjs` — tool nav preserves place (Gate 2)
+- `test/navigation-viewing-switch.test.mjs` — the Viewing control switches place (Gate 3)
+- `test/navigation-place-identity.test.mjs` — tool vs place in the UI (Gate 4)
+- `test/navigation-history.test.mjs` — Back/Forward restore a coherent place
+- `test/navigation-address-dossier-zip.test.mjs` — the Address dossier owns tool-nav geography
+- `test/navigation-project-dossier-view.test.mjs` — a project dossier names its listed street in Viewing
+- `test/nav-identity.test.mjs` — the plan v3 sidebar: three items, and the section each page lights (owns that pin)
+- `test/navigation-v3.browser.test.mjs` — the same, rendered and signed in: no dashboard bounce, the active-item matrix, the support footer
 
 ## Related
 
-- Phase 3 analysis: `docs/phase3-navigation-analysis.md`
+- Phase 3 analysis: `docs/phase3-navigation-analysis.md` — **historical (pre-NAV-01);
+  read it as a dated record, not as current architecture**
 - NAV-01 implementation history: `docs/beta-backlog.md`

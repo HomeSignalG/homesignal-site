@@ -11,7 +11,9 @@ const {
   pageHref,
   hasViewedZipContext,
   ZIP_NAV_PAGES,
-  MAP_PAGES
+  MAP_PAGES,
+  placeSavedLabel,
+  alertsHrefForSavedPlace
 } = require('../lib/view-zip.js');
 
 let fails = 0;
@@ -52,6 +54,10 @@ ok(navHref('homesignalmap.html', '84101').indexOf('78617') === -1,
   'navHref does not substitute the sample ZIP when a different ZIP is passed');
 ok(navHref('homesignalmap.html', DEF) === 'homesignalmap.html?zip=78617',
   'navHref encodes an explicitly passed default ZIP');
+ok(alertsHrefForSavedPlace({ zip: '84101' }) === navHref('alerts.html', '84101'),
+  'saved-place Alerts CTA reuses navHref (ZIP context)');
+ok(placeSavedLabel({ zip: '84101', name: 'Salt Lake City' }) === 'Salt Lake City (84101)',
+  'saved-place ZIP label is name + ZIP');
 ok(pageHref('alerts.html', { zip: '84101', band: 'open' }) === 'alerts.html?zip=84101&band=open',
   'pageHref preserves zip + deep-link params');
 
@@ -119,12 +125,21 @@ ok(/hasViewedZipContext/.test(devMapHtml),
   'homesignalmap boot reuses shell ZIP context (no sample auto-load)');
 ok(/HS\.navHref\('homesignalmap\.html',\s*S\.zip\)/.test(devPage),
   'development.html "See it on the map" uses HS.navHref with active ZIP');
-ok(/data-znav="homesignalmap\.html"/.test(dash),
-  'dashboard map links use data-znav');
-ok(/nav\('homesignalmap\.html',\s*mapCtx\(\)\)/.test(dash),
-  'dashboard map click preserves ZIP via pageHref/navHref');
-ok(/data-znav="homesignalmap\.html"/.test(today),
-  'today.html Map link uses data-znav');
+// FIX 8: the Dashboard map preview is REMOVED (§4 "no default Dashboard map"; §17 authorises
+// its removal). There is no Dashboard map link left to preserve a ZIP through, so the old
+// pins are replaced by the positive fact that no map is rendered there at all. Every OTHER
+// page's map links are still pinned above and below this line.
+ok(!/data-znav="homesignalmap\.html"/.test(dash) && !/id="dashMap"/.test(dash),
+  'Fix 8 dashboard.html renders no map and no map link — All My Places has no single centre');
+ok(!/maplibre|leaflet/i.test(dash),
+  'Fix 8 dashboard.html loads no map library at all');
+// A-020 (Phase 8): today.html is now a redirect stub, pinned the way maps.html already is.
+// Its "Map -" link is gone WITH the page; Dashboard's "Open full map -" was already the
+// same path, which is why retiring it added no new map route.
+ok(/window\.location\.replace\('\/dashboard\.html'/.test(today) && !/<template id="hs-content">/.test(today),
+  'today.html is a redirect stub to the Dashboard, not a second one-pager');
+ok(/var q = window\.location\.search \|\| '';/.test(today),
+  'today.html carries the query string across the redirect');
 // No active runtime entry point may still send a resident to the retired map.
 [['development.html', devPage], ['dashboard.html', dash], ['today.html', today],
  ['partials/shell.html', fs.readFileSync(new URL('../partials/shell.html', import.meta.url), 'utf8')],

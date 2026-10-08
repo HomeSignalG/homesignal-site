@@ -209,7 +209,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button></nav>
   <main>
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -223,6 +223,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-acquisition"></div>
     <div class="tab" id="tab-videoproducer"></div>
     <div class="tab" id="tab-bluesky"></div>
+    <div class="tab" id="tab-premium"></div>
+    <div class="tab" id="tab-arearequests"></div>
   </main>
   <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -262,6 +264,22 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   </div>
 </div>
 
+<!-- The SHIPPED Map 1 classifier. The Bluesky MAPS theme filter derives membership from
+     HS.resolveMarker so the dashboard and the map can never disagree about what a Data
+     center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
+     define functions on window.HS and touch no DOM at load. -->
+<script src="lib/project-type.js?v=108e00a6"></script>
+<script src="lib/map.js?v=f98598d2"></script>
+<script src="lib/maps-social-theme.js?v=0d9ae778"></script>
+<!-- WHICH MAP IMAGE BELONGS TO WHICH DRAFT. The same module scripts/maps-social-image.mjs
+     loads, so the capture job and this approval gate cannot disagree about whether the
+     picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
+     because the binding key includes the theme, which that lib derives. -->
+<script src="lib/maps-capture-policy.js?v=1491d6a2"></script>
+<script src="lib/maps-capture-binding.js?v=a13ed577"></script>
+<!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
+     serialize; it touches no post, no queue state and no approval. -->
+<script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -458,6 +476,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireZipBehavior();
     wireAcqMetrics();
     wireBluesky();
+    wirePremiumWaitlist();
+    wireAreaRequests();
     stalenessBanner(p.meta);
   }
 
@@ -516,6 +536,156 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Community</th><th style="text-align:right">Requests</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>'):'<div class="muted">No coverage requests yet.</div>')+
     '</div>';
   }
+  // ---- PREMIUM WAITLIST (gated RPC hs_premium_waitlist). The canonical store is
+  //      public.app_premium_waitlist; anon holds NO privilege on it, so this read is
+  //      SECURITY DEFINER + dashboard_admins, exactly like the other live tabs.
+  //      Gate 5: the overview KPI and the lead log come from ONE call over ONE table,
+  //      so the headline number and the rows below it cannot drift apart. ----
+  // TWO AXES, BECAUSE ONE PERSON CAN NOW HOLD SEVERAL PREMIUM INTERESTS.
+  // "Premium prospects" KEEPS ITS BUSINESS MEANING — it is people, and it now reads the
+  // RPC's `prospects` (count(distinct email)) rather than `total` (count(*)). Those two
+  // were necessarily EQUAL while UNIQUE(email) stood, so the tile was accidentally right;
+  // once one email can carry a ZIP interest AND a property interest, `total` silently
+  // becomes a count of signals. Pointing the tile at `prospects` is what stops the label
+  // drifting away from the number. `total` is surfaced beside it, named for what it is.
+  // Both come from ONE call over ONE table, so headline and rows cannot disagree.
+  function premiumKpis(w){
+    return '<div class="grid" style="margin-bottom:14px">'+
+      liveTile('Premium prospects', w.prospects||0, 'distinct people — canonical app_premium_waitlist')+
+      liveTile('Interest signals', w.total||0, 'one per person per ZIP / property / feature')+
+      liveTile('Last 7 days', w.last_7d||0, (w.last_30d||0)+' in last 30 days')+
+      liveTile('With ZIP context', w.with_zip||0, 'captured only where the URL or the viewed Address stated a ZIP')+
+      liveTile('Property leads', w.with_address||0, 'signed up while viewing a specific address')+
+    '</div>';
+  }
+  // ONE Premium-interest area, TWO contexts (Fix 15). A ZIP Community Profile lead and a
+  // property/address lead are the same intent — "tell me when Premium launches" — arriving
+  // from different places, so they share this tab and this canonical table. What tells them
+  // apart is the pair of context columns the lead itself carries: Source (the interest, e.g.
+  // "ZIP Community Profile" / "Property Insights") and Place (the address when the CTA was on
+  // a property dossier, otherwise the ZIP). Neither is inferred here — a row that states
+  // nothing renders an em dash rather than a guess, and older rows predating the labels still
+  // carry the page URL as their Source.
+  function premiumPlace(r){
+    if (r && r.address) return esc(r.address);
+    if (r && r.zip) return 'ZIP '+esc(r.zip);
+    return '<span class="muted">—</span>';
+  }
+  function premiumWaitlistCard(w){
+    w=w||{};
+    var rows=(w.rows||[]).map(function(r){
+      var when=r.created_at?esc(String(r.created_at).replace('T',' ').slice(0,16)):'—';
+      return '<tr><td>'+esc(r.email||'—')+'</td>'+
+        '<td class="muted" style="font-variant-numeric:tabular-nums">'+when+'</td>'+
+        '<td class="muted">'+(r.source?esc(r.source):'—')+'</td>'+
+        '<td style="font-variant-numeric:tabular-nums">'+(r.zip?esc(r.zip):'—')+'</td>'+
+        '<td>'+premiumPlace(r)+'</td></tr>';
+    }).join('');
+    var capped=(w.rows||[]).length>=(w.row_limit||500);
+    return '<div class="card"><h3>Premium waitlist <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Every Premium interest, newest first — <b>one row per person per interest</b>, so the same email can appear more than once with different places. Repeat submissions of the SAME interest do not add a row. Source says which Premium surface they came from — "ZIP Community Profile" or "Property Insights"; rows from before those labels show the page URL instead. Place names the specific address for a property lead, or the ZIP otherwise. ZIP appears only where the URL or the viewed Address itself stated one — it is never inferred.</p>'+
+      premiumKpis(w)+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Email</th><th>Joined</th><th>Source</th><th>ZIP</th><th>Place / Interest</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        (capped?'<p class="sub" style="margin-top:8px">Showing the newest '+(w.row_limit||500)+'. The count above is unfiltered.</p>':''))
+        :'<div class="muted">No Premium prospects yet.</div>')+
+    '</div>';
+  }
+  async function wirePremiumWaitlist(){
+    var tab=$('tab-premium'); if(!tab) return;
+    try{
+      var r=await window.hsClient.rpc('hs_premium_waitlist');
+      if(r.error || !r.data){
+        tab.innerHTML='<div class="card"><h3>Premium waitlist</h3><p class="sub">Could not load the waitlist just now.</p></div>';
+        return;
+      }
+      tab.innerHTML=premiumWaitlistCard(r.data);
+      // Gate 5 — the same payload also supplies the overview tile on tab 1.
+      var exec=$('tab-exec');
+      if(exec && !document.getElementById('acq-premium-kpi')){
+        var box=document.createElement('div'); box.id='acq-premium-kpi';
+        box.innerHTML='<div class="card"><h3>Premium demand <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+          '<p class="sub">Interest in paid Premium, from the same canonical record as the Premium Waitlist tab.</p>'+
+          premiumKpis(r.data)+'</div>';
+        exec.appendChild(box);
+      }
+    }catch(e){}
+  }
+
+  // ---- AREA REQUESTS (gated RPC hs_community_requests). Canonical store is
+  //      public.community_requests; anon holds NO privilege on it, so this read
+  //      is SECURITY DEFINER + dashboard_admins, exactly like Premium Waitlist.
+  //      THIS is where to look when a ZIP goes live: filter to that ZIP and
+  //      email everyone on the list. Gate 5: KPI + lead log are ONE call. ----
+  function areaRequestKpis(w){
+    var filter=w.filter_zip;
+    return '<div class="grid" style="margin-bottom:14px">'+
+      liveTile('Area requests', w.total||0, 'canonical community_requests')+
+      liveTile('Last 7 days', w.last_7d||0, (w.last_30d||0)+' in last 30 days')+
+      liveTile('Distinct ZIPs', w.distinct_zips||0, filter?('showing '+filter):'uncovered-ZIP asks')+
+    '</div>';
+  }
+  function areaRequestsCard(w){
+    w=w||{};
+    var rows=(w.rows||[]).map(function(r){
+      var when=r.created_at?esc(String(r.created_at).replace('T',' ').slice(0,16)):'—';
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+(r.requested_zip?esc(r.requested_zip):'—')+'</td>'+
+        '<td>'+esc(r.email||'—')+'</td>'+
+        '<td class="muted" style="font-variant-numeric:tabular-nums">'+when+'</td>'+
+        '<td class="muted">'+(r.source?esc(r.source):'—')+'</td></tr>';
+    }).join('');
+    var capped=(w.rows||[]).length>=(w.row_limit||500);
+    var emails=(w.rows||[]).map(function(r){ return r.email; }).filter(Boolean);
+    var copyBox=emails.length
+      ? '<p class="sub" style="margin-top:10px">When this ZIP goes live, email these '+emails.length+' people. Copy-ready list:</p>'+
+        '<textarea id="areaReqEmails" readonly rows="4" style="width:100%;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)">'+esc(emails.join('\n'))+'</textarea>'
+      : '';
+    var zipCounts=(w.by_zip||[]).slice(0,12).map(function(a){
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+esc(a.zip||'?')+'</td>'+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+(a.count||0)+'</td></tr>';
+    }).join('');
+    return '<div class="card"><h3>Area requests <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">Everyone who asked to be told when an uncovered ZIP goes live. Filter to a ZIP to get the email list for that launch. Source is the page the request came from (coverage_modal, onboarding, homepage_zip, or a referral stamp).</p>'+
+      areaRequestKpis(w)+
+      '<div class="field" style="display:flex;gap:8px;align-items:center;margin:0 0 14px;flex-wrap:wrap">'+
+        '<label for="areaReqZip" class="sub" style="margin:0">ZIP to notify</label>'+
+        '<input id="areaReqZip" inputmode="numeric" maxlength="5" placeholder="e.g. 90025" value="'+(w.filter_zip?esc(w.filter_zip):'')+'" style="width:8em;padding:6px 10px;border:1px solid var(--line);border-radius:8px">'+
+        '<button type="button" class="winbtn" id="areaReqFilter">Show this ZIP</button>'+
+        '<button type="button" class="winbtn" id="areaReqAll">Show all</button>'+
+      '</div>'+
+      (zipCounts && !w.filter_zip?('<div style="overflow-x:auto;margin-bottom:14px"><table class="tbl"><thead><tr><th>ZIP</th><th style="text-align:right">Requests</th></tr></thead><tbody>'+zipCounts+'</tbody></table></div>'):'')+
+      (rows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ZIP</th><th>Email</th><th>Requested</th><th>Source</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+        (capped?'<p class="sub" style="margin-top:8px">Showing the newest '+(w.row_limit||500)+'. The count above is unfiltered.</p>':'')+
+        copyBox)
+        :'<div class="muted">No coverage requests yet.</div>')+
+    '</div>';
+  }
+  function paintAreaRequests(data){
+    var tab=$('tab-arearequests'); if(!tab) return;
+    tab.innerHTML=areaRequestsCard(data);
+    var zipEl=$('areaReqZip');
+    var go=function(z){ wireAreaRequests(z); };
+    if($('areaReqFilter')) $('areaReqFilter').onclick=function(){ go(zipEl && zipEl.value); };
+    if($('areaReqAll')) $('areaReqAll').onclick=function(){ go(''); };
+    if(zipEl) zipEl.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); go(zipEl.value); } };
+  }
+  async function wireAreaRequests(zip){
+    var tab=$('tab-arearequests'); if(!tab) return;
+    var z=(zip==null)?'':String(zip).trim();
+    if(z && !/^\d{5}$/.test(z)) z='';
+    try{
+      var args={ p_limit: 500 };
+      if(z) args.p_zip=z;
+      var r=await window.hsClient.rpc('hs_community_requests', args);
+      if(r.error || !r.data){
+        tab.innerHTML='<div class="card"><h3>Area requests</h3><p class="sub">Could not load area requests just now. If this is a new deploy, apply docs/community-requests-capture.sql in the SQL editor first.</p></div>';
+        return;
+      }
+      paintAreaRequests(r.data);
+    }catch(e){
+      tab.innerHTML='<div class="card"><h3>Area requests</h3><p class="sub">Could not load area requests just now.</p></div>';
+    }
+  }
+
   async function wireAcqLive(){
     var host=$('tab-exec'); if(!host) return;
     try{
@@ -671,25 +841,175 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // The founder is therefore looking at the object itself, not at a URL the browser
   // resolved separately, which is what makes the parity claim true rather than likely.
   // The bucket stays PRIVATE and no service key ever reaches the page.
-  var _bskyBlobUrl = {};   // post id -> object URL for its own image
-  var _bskyImgOk   = {};   // post id -> the exact image RENDERED (onload fired)
+  var _bskyBlobUrl = {};   // post id + image path -> object URL for THAT image
+  var _bskyImgOk   = {};   // post id + image path -> the exact image RENDERED (onload fired)
+  // ⚠️ KEYED ON THE IMAGE PATH, NOT ON THE ROW ID. A re-capture writes a NEW object
+  // (the path carries the binding key's fingerprint), so a cache keyed on `p.id` alone would
+  // hand back the blob of the SUPERSEDED picture and report it rendered — the founder would
+  // approve the old map believing they had seen the new one. Keying on the path means a new
+  // image is a cache MISS by construction.
+  function _bskyImgKey(p){ return String(p && p.id) + '|' + String((p && p.image_bucket_path) || ''); }
+  // ⚠️ THE QUEUE CACHE MUST BE DECLARED INSIDE THIS REGION, not above it. It used to sit
+  // with the edit modal ~250 lines below; `var` hoisting made that work in the page, but
+  // test/maps-preview-render.test.mjs EXTRACTS from `var _bskyBlobUrl = {};` to
+  // `// VISUAL STATUS.` and runs that slice in a real browser, so the approval gate's
+  // reference pointed at a symbol the harness never received (`_bskyRows is not defined`,
+  // which HANGS that test rather than failing it). Declaring it one line ABOVE the slice's
+  // first line does not fix that — the boundary is `var _bskyBlobUrl`, exactly.
+  var _bskyRows = {};      // post id -> the full row, for the gate and the edit modal
 
   // A MAPS draft that carries an image_bucket_path WILL publish with that image, so
   // the founder must have seen it before approving.
+  // ⚖️ EVERY MAPS POST PUBLISHES WITH A MAP, so every MAPS post is image-gated: the
+  // Approve button renders LOCKED and the founder must have seen the exact image first.
+  //
+  // 🗑️ IT USED TO REQUIRE `&& p.image_bucket_path`, which made the lock conditional on the
+  // very thing being checked — a MAPS draft with NO image got no `data-gate="image"`, so
+  // `bskyLockApprove` returned at its first line and the button rendered ENABLED. Measured
+  // 2026-09-21: 27 of 55 MAPS drafts carry no image, so that was the common case.
   function mapsImageRequired(p){
-    return !!(p && p.content_family === 'MAPS' && p.image_bucket_path);
+    return !!(p && p.content_family === 'MAPS');
+  }
+  // ---------------------------------------------------------------------------
+  // THEME. Derived live from lib/maps-social-theme.js, which asks the SHIPPED Map 1
+  // classifier. No `theme` column exists and none is read: the inputs are the immutable
+  // candidate-time evidence already on the row.
+  function bskyTheme(p){
+    return (window.HS && HS.mapsSocialThemeKey) ? HS.mapsSocialThemeKey(p) : null;
+  }
+  // THE DATA CENTER THEME CONTRACT IS STRICTER THAN THE REST OF MAPS, and deliberately.
+  // An ordinary MAPS draft with no screenshot still publishes honestly as a link card
+  // whose OpenGraph image belongs to the destination page. A Data Center Theme post does
+  // not: its whole promise is "here is the record, on the real map, with Data center
+  // selected". Falling back to the generic card would ship the campaign hook with a
+  // picture that shows no data centre at all. So for this theme the Map 1 capture is
+  // MANDATORY — a missing image blocks approval rather than degrading the post.
+  // ⚖️ AN ABSENCE POST IS INCLUDED — FOUNDER RULING, 2026-09-21, stated three times before
+  // it was implemented: **every MAPS post gets a map, even when there is no data centre.**
+  //
+  // 🛑 THIS EXCLUDED IT, AND THE PARAGRAPH THAT JUSTIFIED THE EXCLUSION IS KEPT BELOW AS THE
+  // DATED RECORD, because the reasoning error is the lesson. It read: "an ABSENCE post is a
+  // Data Center Theme post with NO PROJECT, so there is nothing on the map to photograph …
+  // requiring the mandatory capture of it would block Approve forever on the one post in the
+  // campaign that answers the question honestly when the answer is 'none'." Every clause is
+  // true except the one that matters: "no PROJECT to photograph" is not "no MAP to
+  // photograph". The ZIP's Map 1 page renders either way, and that page — Data center the
+  // only type selected, showing no recent filings — is precisely what the absence post is
+  // about. Nothing blocks forever: the capture worker photographs these rows now
+  // (scripts/maps-social-image.mjs::captureAbsence).
+  //
+  // ⚠️ THE COST IS REAL AND IS THE POINT: until a capture lands, an absence draft is NOT
+  // approvable. That is the ruling — a post without its map does not go out — not a side
+  // effect to be engineered around.
+  function bskyIsAbsence(p){
+    return !!(window.HS && HS.mapsSocialIsAbsence && HS.mapsSocialIsAbsence(p));
+  }
+  // The theme whose capture carries an ADDITIONAL burden of proof — that the picture shows
+  // the required Map 1 filter state. NOT the map requirement, which is universal and lives
+  // in HS.mapsMapGateBlock below.
+  //
+  // 🗑️ `dcThemeImageMandatory` CARRIED BOTH QUESTIONS AND THAT WAS THE DEFECT: because it
+  // was one expression, "is a map required at all" was only ever asked of one theme.
+  // Measured 2026-09-21: 29 of 55 MAPS drafts carry no theme and 26 of those no image, and
+  // nothing at any surface required one of them.
+  function dcThemeMapPolicyApplies(p){
+    return bskyTheme(p) === 'datacenter';
+  }
+  // THE UNIVERSAL GATE. FAILS CLOSED: if lib/maps-capture-binding.js did not load we cannot
+  // tell whether this post has its map, so every MAPS approval blocks. A gate that assumes
+  // the best when its own rule is missing is not a gate.
+  function bskyMapGateBlock(p){
+    if(!p || p.content_family !== 'MAPS') return '';
+    if(!(window.HS && HS.mapsMapGateBlock)){
+      return 'The Map capture rules (lib/maps-capture-binding.js) did not load, so whether '
+        + 'this post has its map cannot be established. Approve is blocked until the page '
+        + 'loads that module \u2014 reload, and report it if it persists.';
+    }
+    return HS.mapsMapGateBlock(p) || '';
+  }
+  // \u2500\u2500 IS THE STORED IMAGE STILL THIS DRAFT'S IMAGE? \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // From lib/maps-capture-binding.js, the SAME module the capture job uses, so "bound"
+  // means one thing across the pipeline. FAILS CLOSED: if that lib did not load, nothing
+  // is bound and every image-gated approval blocks. A gate that assumes the best when its
+  // own rule is missing is not a gate.
+  function bskyCaptureBound(p){
+    return !!(window.HS && HS.mapsCaptureBound && HS.mapsCaptureBound(p));
+  }
+  function bskyCaptureState(p){
+    return (window.HS && HS.mapsCaptureState) ? HS.mapsCaptureState(p) : null;
+  }
+  function bskyStateCopy(s){
+    return (window.HS && HS.mapsCaptureStateCopy) ? HS.mapsCaptureStateCopy(s) : '';
+  }
+  // The single reason a post cannot be approved right now, or '' when it can.
+  // ONE function, used by both the button and the click handler, so the two can never
+  // disagree about whether approval is allowed.
+  function bskyApprovalBlockReason(p){
+    if(!p) return '';
+    // A STALE IMAGE IS WORSE THAN NO IMAGE, because it renders \u2014 so the founder would see
+    // a real Map 1 screenshot, approve it, and publish a picture of the draft as it USED
+    // to be. This runs first and applies to every MAPS post, theme or not.
+    if(p.content_family==='MAPS' && p.image_bucket_path && !bskyCaptureBound(p)){
+      // ── WHICH THING MOVED? SAY THE RIGHT ONE. ─────────────────────────────────────
+      // Two different facts land here and they have different remedies. If the draft's own
+      // inputs moved, the picture is of an older PROJECT STATE. If the draft is unchanged
+      // and only the Data Center MAP-STATE POLICY moved, the project has not changed at all
+      // and saying it has sends the founder hunting a data problem that does not exist.
+      // The discriminator is the capture KEY: equal key + failing policy evidence means the
+      // policy moved, nothing else.
+      var vv=(p.evidence&&p.evidence.visual)||{};
+      var keyNow=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(p):null;
+      var policyOnly = !!keyNow && vv.capture_key === keyNow
+        && !!(window.HS&&HS.mapsDcCapturePolicyCopy);
+      if(policyOnly){
+        return (HS.mapsDcCapturePolicyCopy(vv) || 'The stored screenshot no longer satisfies '
+          + 'the current Data Center map-state policy.')
+          + '\n\nApprove is blocked until a fresh capture under the current policy exists. '
+          + 'The capture job picks this up automatically on its next run.';
+      }
+      return 'The stored Map image for this post was captured for DIFFERENT draft details '
+        + 'than it carries now (its project coordinates, type, status, name or theme have '
+        + 'moved since). Approving would publish a picture of an older version of this '
+        + 'draft.\n\nApprove is blocked until a fresh capture matching the current draft '
+        + 'exists. The capture job picks this up automatically on its next run.';
+    }
+    // ⚖️ THE UNIVERSAL MAP REQUIREMENT. Every MAPS post — project-backed or not, themed
+    // or not, an absence answer or a filing — publishes with a map, so every MAPS post is
+    // blocked here until it has one that is bound to it right now.
+    //
+    // ⚠️ THE STATE SENTENCE IS NOT DECORATION. "We could not photograph it" and "this ZIP
+    // has no data centres" are different facts, and a gate that shows only "no screenshot"
+    // invites the founder to read the second out of the first. Each state names the
+    // instrument; none of them makes a claim about what is or is not in the ZIP.
+    var mapBlock = bskyMapGateBlock(p);
+    if(mapBlock){
+      // The Data Center addendum says WHY there is no degraded fallback for that theme. It
+      // changes the sentence, never the verdict — the verdict above is already universal.
+      return mapBlock + (dcThemeMapPolicyApplies(p)
+        ? '\n\nThis is a MAPS \u00b7 Data Center Theme post: its picture must also prove the '
+          + 'required Map 1 filter state (every STATUS on, Data center the only PROJECT '
+          + 'TYPE, REGULATORY off), so there is no degraded card it could fall back to.'
+        : '');
+    }
+    if(mapsImageRequired(p) && !_bskyImgOk[_bskyImgKey(p)]){
+      return 'This post would publish the Map image stored at\n' + p.image_bucket_path +
+        '\n\nThat image has not displayed in this preview, so you would be approving '
+        + 'something you have not seen. Approve is blocked until it renders.';
+    }
+    return '';
   }
   function bskyReleaseBlobs(){
     for (var k in _bskyBlobUrl){ try{ URL.revokeObjectURL(_bskyBlobUrl[k]); }catch(e){} }
     _bskyBlobUrl = {}; _bskyImgOk = {};
   }
   function bskyImageBlobUrl(p){
-    if (_bskyBlobUrl[p.id]) return Promise.resolve(_bskyBlobUrl[p.id]);
+    var _k = _bskyImgKey(p);
+    if (_bskyBlobUrl[_k]) return Promise.resolve(_bskyBlobUrl[_k]);
     return window.hsClient.storage.from('social-images').download(p.image_bucket_path)
       .then(function(r){
         if (r.error || !r.data) return null;
         var u = URL.createObjectURL(r.data);
-        _bskyBlobUrl[p.id] = u;
+        _bskyBlobUrl[_k] = u;
         return u;
       })
       .catch(function(){ return null; });
@@ -710,7 +1030,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var img = document.createElement('img');
       img.alt = '';                                  // decorative here; see payload panel
       if (imgAttrs) img.setAttribute('style', imgAttrs);
-      img.onload  = function(){ _bskyImgOk[p.id] = true; if (onSettled) onSettled(true); };
+      img.onload  = function(){ _bskyImgOk[_bskyImgKey(p)] = true; if (onSettled) onSettled(true); };
       img.onerror = function(){
         host.innerHTML = '<div class="muted" style="font-size:12px;color:var(--persist)">'+
           'Image downloaded but failed to render.</div>';
@@ -725,7 +1045,31 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   function bskyApplyApprovalGate(id){
     var btn = document.querySelector('[data-post="'+id+'"] button[data-act="approve"]');
     if (!btn || btn.getAttribute('data-gate') !== 'image') return;
-    var ok = !!_bskyImgOk[id];
+    var row = _bskyRows[id] || null;
+    // ⚖️ UNIVERSAL: ANY MAPS post without a current bound map can never unlock in this
+    // session. This read `dcThemeImageMandatory(row)`, so the button silently stayed
+    // unlockable for every non-Data-Center draft — the same scoping defect as the reason
+    // function, in the half that actually greys the control. ONE predicate now, shared with
+    // `bskyApprovalBlockReason`, so the button and the click handler cannot disagree.
+    //
+    // Three cases, not two: no capture at all (nothing to render), a capture that belongs
+    // to older draft details (it WOULD render, and rendering it is how a stale picture gets
+    // approved), and a capture whose recorded scope this draft cannot claim.
+    if (row && bskyMapGateBlock(row)) {
+      btn.disabled = true; btn.style.opacity = '0.45'; btn.style.cursor = 'not-allowed';
+      var rv=(row.evidence&&row.evidence.visual)||{};
+      var rScope=(window.HS&&HS.mapsCaptureStoredScope)?HS.mapsCaptureStoredScope(rv,row):null;
+      var rKey=(window.HS&&HS.mapsCaptureKey)?HS.mapsCaptureKey(row,rScope):null;
+      var pfx = dcThemeMapPolicyApplies(row) ? 'Data Center Theme: ' : 'Every MAPS post publishes with a map. ';
+      btn.title = !row.image_bucket_path
+        ? (pfx + 'no Map 1 screenshot has been captured for it yet \u2014 a project map when its '
+           + 'record can be pinned, otherwise the map of the ZIP.')
+        : ((rKey && rv.capture_key === rKey)
+          ? (pfx + 'the stored screenshot does not satisfy the current map-state policy (all statuses on, Data center only, Regulatory off). The draft has NOT changed. Awaiting a fresh capture.')
+          : (pfx + 'the stored screenshot was captured for different draft details, or records a scope this draft cannot claim. Awaiting a fresh capture.'));
+      return;
+    }
+    var ok = !!(row && _bskyImgOk[_bskyImgKey(row)]);
     btn.disabled = !ok;
     btn.style.opacity = ok ? '1' : '0.45';
     btn.style.cursor  = ok ? 'pointer' : 'not-allowed';
@@ -743,12 +1087,43 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         : ' &nbsp;·&nbsp; <span style="color:var(--persist)">no image yet</span>';
     }
     var v=(p.evidence&&p.evidence.visual)||{};
-    if(p.image_bucket_path && v.status==='REAL_MAP_VISUAL'){
+    // FOUR STATES, SHOWN AS FOUR. Collapsing them was how a capture failure could be read
+    // off the queue as a finding about the ZIP. Derived from the row by the shipped module,
+    // never from the stored `state` alone — a row claiming READY whose image is gone or
+    // whose inputs have moved reports as awaiting capture here too.
+    var st=bskyCaptureState(p);
+    var S=(window.HS&&HS.MAPS_CAPTURE_STATES)||{};
+    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
+    // ⚠️ A REASON FROM A SUPERSEDED VERDICT MUST NOT BE PRINTED UNDER THE CURRENT ONE.
+    // Absence rows written before the 2026-09-21 ruling carry
+    // `failure_reason: "the draft carries no project_id, so there is nothing to photograph"`
+    // beside `state: CAPTURE_INELIGIBLE`. The state machine now discounts that stamp and
+    // derives AWAITING, so printing the old sentence would put the exact wording the
+    // founder corrected underneath the corrected status — a contradiction in one line.
+    // Scoped to that combination: a CURRENT failure reason still prints, on every state.
+    if(st!==v.state) why='';
+    if(st===S.READY){
       return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
     }
-    var why=v.failure_reason?(' — '+esc(v.failure_reason)):'';
-    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">NO PROJECT-SPECIFIC VISUAL · '+
-      'generic link-card fallback'+why+'</span>';
+    if(st===S.INELIGIBLE){
+      // ⚖️ For a post about a project this means its own pin cannot be shown yet, and no ZIP
+      // map stands in for it (founder ruling 2026-10-01). Approve stays blocked.
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">PROJECT PIN CAN\u2019T BE SHOWN YET · '+
+        'a capture limitation, not a finding about this ZIP'+why+'</span>';
+    }
+    if(st===S.FAILED){
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">CAPTURE FAILED · '+
+        'our screenshot did not work, not a finding about this ZIP'+why+
+        (v.attempts?(' · attempt '+esc(String(v.attempts))):'')+'</span>';
+    }
+    // WAITING — including an image that exists but no longer matches the draft, which is a
+    // capture that is owed again rather than one that failed.
+    if(p.image_bucket_path){
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">IMAGE OUT OF DATE · '+
+        'captured for earlier draft details, awaiting a fresh capture</span>';
+    }
+    return ' &nbsp;·&nbsp; <span style="color:var(--persist)">AWAITING MAP CAPTURE · '+
+      'not yet attempted'+why+'</span>';
   }
 
   // The proposed image itself. Read from the PRIVATE social-images bucket through a
@@ -767,9 +1142,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var v=(p.evidence&&p.evidence.visual)||{};
     return '<div style="margin:0 0 10px"><div id="'+esc(id)+'" '+
       'style="min-height:20px"><div class="muted" style="font-size:12px">Loading map preview…</div></div>'+
+      // The caption says what the picture IS OF, read from the stored scope: a project pin,
+      // or the whole ZIP (only right for a post with no project). It used to say "framed on
+      // the project's own coordinates" under every picture, including ZIP maps.
       (v.page_url?('<div class="muted" style="font-size:11.5px;margin-top:4px">Captured from '+
-        esc(v.page_url)+' · framed on the project\u2019s own coordinates ('+
-        esc(String(v.framed_zoom||''))+'× zoom) · no home marker, no radius ring</div>'):'')+
+        esc(v.page_url)+' · '+
+        ((window.HS&&HS.mapsCaptureStoredScope&&HS.mapsCaptureStoredScope(v,p)==='zip')
+          ? 'a map of the whole ZIP, no project pin'
+          : ('framed on the project\u2019s own coordinates ('+esc(String(v.framed_zoom||''))+'× zoom)'))+
+        ' · no home marker, no radius ring</div>'):'')+
       '</div>';
   }
 
@@ -793,11 +1174,29 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<div><span class="muted">Evidence tier:</span> '+prec+'</div>'+
         row('Registry', e.registry_id)+
         row('Why it qualified', e.eligibility_reason)+
+        // The theme derivation, so the founder can see WHY a row is in this bucket.
+        // `theme_decided_by` is the ingest-time record; the LIVE value beside it is what
+        // the dashboard filter actually used. They agree unless the classifier has moved,
+        // and showing both is what would make that visible instead of silent.
+        // Guarded like bskyTheme: if lib/maps-social-theme.js failed to load, this row is
+        // simply absent. A review card must never fail to render because a helper is
+        // missing — the founder would lose the whole fact-check surface over a 404.
+        row('Theme (live, from Map 1)',
+            (window.HS && HS.mapsSocialThemeLabel) ? HS.mapsSocialThemeLabel(bskyTheme(p)) : null)+
+        row('Theme evidence at candidate time', e.theme_decided_by)+
         row('Dedupe identity', e.dedupe_key)+
         row('Visual', (e.visual&&e.visual.status)||'none')+
         (e.visual&&e.visual.note?('<div class="muted" style="margin-top:4px">'+esc(e.visual.note)+'</div>'):'')+
+        // ⚠️ THE ZIP COMES FROM THE ROW COLUMN, NOT FROM THE EVIDENCE COPY.
+        // `social_posts.zip` is the authoritative, non-null, first-class ZIP (59 of 59 in
+        // production). `evidence.map_zip` is a redundant copy that the absence branch did
+        // not write, so this line rendered a blank label for every absence draft while the
+        // real value sat in a column the card was not reading. A redundant copy is fine as
+        // a receipt; it is not fine as the thing a human reads. `map_zip_label` is still
+        // preferred because it carries the PLACE NAME — the label the town hashtag was
+        // derived from — and `p.zip` is the floor beneath it, never a blank.
         (e.map_destination?('<div><span class="muted">Map 1 destination:</span> <a href="'+esc(e.map_destination)+
-          '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||e.map_zip)+' ↗</a></div>'):'')+
+          '" target="_blank" rel="noopener" style="color:var(--accent)">'+esc(e.map_zip_label||p.zip||'')+' ↗</a></div>'):'')+
         (e.geography_note?('<div style="margin-top:6px;color:var(--muted);border-left:3px solid var(--persist);'+
           'padding-left:8px">'+esc(e.geography_note)+'</div>'):'')+
       '</div></details>';
@@ -813,6 +1212,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var fam=(p.content_family==='MAPS')
       ? '<span class="tile-tag" style="background:#e7f0fb;color:#1d4f8a;border:1px solid #b9d3f0">MAPS · development</span>'
       : '<span class="tile-tag" style="background:#eef3ef;color:#2f5a44;border:1px solid #cadcd2">ALERTS · community intelligence</span>';
+    // THEME chip — makes the theme obvious without redesigning the card. It is a
+    // SUBORDINATE label beside the family, never in place of it: the row is still a MAPS
+    // candidate and is still fact-checked as one.
+    var thKey=bskyTheme(p);
+    if(thKey){
+      fam += ' <span class="tile-tag" style="background:#f3ecfb;color:#5a3a8a;border:1px solid #d8c6ef">'+
+        esc(String(HS.mapsSocialThemeLabel(thKey)||'').toUpperCase())+'</span>';
+    }
     return '<div class="card" data-post="'+esc(p.id)+'" style="margin-bottom:12px">'+
       '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">'+
         '<div>'+fam+' '+statusTag+' <span class="muted" style="font-size:12px">'+esc(p.tile)+' · '+when+'</span></div>'+
@@ -839,6 +1246,293 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<button class="bsky-btn" data-act="skip" style="background:#fbeceb;color:#c23b34">Skip</button>'+
       '</div></div>';
   }
+  // ---------------------------------------------------------------------------
+  // BLUESKY POSTS > FAMILY > THEME. A VIEW, never a state change: these two variables
+  // decide WHICH rows are listed and nothing else. No row is written, no status moves,
+  // and switching filters cannot alter a draft.
+  var _bskyFamily='all';      // 'all' | 'MAPS' | 'ALERTS'
+  var _bskyTheme=null;        // null = All Maps; otherwise a theme key
+  function bskyNavBtn(scope,val,label,count,active){
+    return '<button class="bsky-nav-btn" data-scope="'+scope+'" data-val="'+esc(String(val))+'" '+
+      'style="border:1px solid '+(active?'var(--accent)':'var(--line)')+';'+
+      'background:'+(active?'var(--accent)':'var(--panel2)')+';color:'+(active?'#fff':'var(--ink)')+';'+
+      'border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;'+
+      (active?'font-weight:600;':'')+'">'+esc(label)+
+      ' <span style="opacity:.75;font-variant-numeric:tabular-nums">'+esc(String(count))+'</span></button>';
+  }
+  /**
+   * Render the family row and, when MAPS is active, the theme row beneath it.
+   * COUNTS ARE PASSED IN from the same partition that produced the listed rows, so a
+   * count can never drift from what the founder sees. Nothing here is hard-coded.
+   */
+  function bskyRenderNav(counts){
+    var host=document.getElementById('bsky-nav'); if(!host) return;
+    var fam='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-right:2px">Bluesky posts</span>'+
+      bskyNavBtn('family','all','All',counts.all,_bskyFamily==='all')+
+      bskyNavBtn('family','MAPS','MAPS',counts.maps,_bskyFamily==='MAPS')+
+      bskyNavBtn('family','ALERTS','ALERTS',counts.alerts,_bskyFamily==='ALERTS')+
+      '</div>';
+    // The theme row appears only UNDER MAPS and is indented, so the hierarchy reads as
+    // "a theme within MAPS" rather than as a third content family beside it.
+    var themes='';
+    if(_bskyFamily==='MAPS'){
+      var chips=bskyNavBtn('theme','','All Maps',counts.maps,!_bskyTheme);
+      var list=(window.HS&&HS.MAPS_SOCIAL_THEMES)||[];
+      for(var i=0;i<list.length;i++){
+        chips+=bskyNavBtn('theme',list[i].key,list[i].label,counts.themes[list[i].key]||0,_bskyTheme===list[i].key);
+      }
+      themes='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 0 18px;'+
+        'padding-left:12px;border-left:2px solid var(--line)">'+
+        '<span class="muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-right:2px">Maps themes</span>'+
+        chips+'</div>';
+    }
+    host.innerHTML=fam+themes;
+  }
+  // ---- POST ZIP ORDER (MAPS > Data Center Theme only) -------------------------
+  // ONE INPUT CONTROL. The founder uploads a CSV of ZIPs in the order they want Data
+  // Center Theme drafts created; this panel validates it, persists the ORDER, and shows
+  // back exactly what was stored. It creates nothing, approves nothing, schedules
+  // nothing and publishes nothing — the existing generator reads the list on its next
+  // run and every downstream contract is untouched.
+  //
+  // IT IS SCOPED TO THE THEME, not to MAPS. Rendering it under "All Maps" would imply it
+  // orders every MAPS theme, which it does not.
+  var _zipOrder = { rows: [], loaded: false, error: '' };
+  // The button's own state. `busy` survives only in memory; `msg` is the last outcome
+  // and is re-rendered with the panel so it is not lost to a refresh.
+  var _zipGen = { busy: false, msg: '', bad: false };
+
+  function zipOrderVisible(){ return _bskyFamily==='MAPS' && _bskyTheme==='datacenter'; }
+
+  async function zipOrderLoad(){
+    try{
+      var r = await window.hsClient.from('maps_dc_zip_order')
+        .select('founder_position,zip,uploaded_at').order('founder_position',{ascending:true});
+      if(r.error){ _zipOrder.error = r.error.message||'unavailable'; _zipOrder.rows=[]; }
+      else { _zipOrder.rows = r.data||[]; _zipOrder.error=''; }
+    }catch(e){ _zipOrder.error='unavailable'; _zipOrder.rows=[]; }
+    _zipOrder.loaded = true;
+  }
+
+  /** Download a generated text file. No network — the bytes are built in the page. */
+  function zipOrderDownload(name, text){
+    try{
+      var b=new Blob([text],{type:'text/csv'}); var u=URL.createObjectURL(b);
+      var a=document.createElement('a'); a.href=u; a.download=name;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(u); }, 1000);
+    }catch(e){ alert('Download failed.'); }
+  }
+
+  /**
+   * Per-ZIP status, derived ONLY from the queue rows already loaded for this render.
+   * ⚖️ 2026-09-21: the panel's action now CREATES AND REFRESHES (founder requirement).
+   * The page itself still creates nothing and refreshes nothing — it holds the anon key and a
+   * founder session, so it asks a SECURITY DEFINER RPC to dispatch the existing workflow, and
+   * the engine does both halves through ONE shared decision (homesignal-ingest
+   * bluesky/lib/maps-refresh.mjs). No second generator, no copy rule in the browser.
+   *
+   * Nothing is fetched and nothing is inferred: a ZIP with no MAPS Data Center Theme post
+   * in the queue shows a dash, never a guess like "no qualifying project" — only the
+   * generator knows that, and it reports it in its own run log.
+   */
+  function zipOrderStatusMap(queueRows){
+    var m={};
+    (queueRows||[]).forEach(function(p){
+      if(p.content_family!=='MAPS' || !p.zip) return;
+      if(bskyTheme(p)!=='datacenter') return;
+      var cur=m[p.zip];
+      // approved outranks draft in the display, so a ZIP that has moved on says so.
+      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft \u2014 will refresh');
+    });
+    return m;
+  }
+
+  function zipOrderRender(queueRows){
+    var host=document.getElementById('bsky-zip-order'); if(!host) return;
+    if(!zipOrderVisible()){ host.innerHTML=''; return; }
+    var rows=_zipOrder.rows||[];
+    var stat=zipOrderStatusMap(queueRows);
+    var head='<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'+
+      '<strong style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">Post ZIP order</strong>'+
+      (rows.length?('<span class="muted" style="font-size:12px">'+rows.length+' ZIP'+(rows.length===1?'':'s')+
+        (rows[0].uploaded_at?(' · uploaded '+new Date(rows[0].uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})):'')+
+        '</span>'):'')+'</div>'+
+      '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created. Running the action also refreshes existing drafts on these ZIPs.</p>';
+
+    // GENERATE is FIRST and is the only accented control here, because it is the only one
+    // that WRITES. The rest move a CSV around. It is hidden when the list is empty rather
+    // than disabled-with-a-tooltip: with no list the underlying run is the NATIONAL scan,
+    // which this button must never be able to start (the RPC refuses it too -- both, because
+    // a UI-only guard is one refactor away from being the only guard).
+    var btns='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+      (rows.length?('<button class="bsky-btn" data-zo="generate"'+
+        (_zipGen.busy?' disabled style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
+                     :' style="background:var(--accent);color:#fff"')+
+        '>'+(_zipGen.busy?'Working\u2026':('Create + refresh drafts for these '+rows.length+' ZIPs'))+
+        '</button>'):'')+
+      '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
+      '<button class="bsky-btn" data-zo="template">Download template</button>'+
+      (rows.length?'<button class="bsky-btn" data-zo="current">Download current list</button>':'')+
+      '<input type="file" id="zo-file" accept=".csv,text/csv" style="display:none">'+
+      '</div>'+
+      // Carried in state, not written straight to the DOM, so a queue re-render cannot
+      // silently erase the only report of what the last click did.
+      (_zipGen.msg?('<div id="zo-gen-status" class="muted" style="font-size:12px;margin:-4px 0 10px;'+
+        'color:'+(_zipGen.bad?'var(--bad,#a12)':'inherit')+'">'+esc(_zipGen.msg)+'</div>'):'');
+
+    var body;
+    if(_zipOrder.error){
+      body='<div class="muted">Ordered list unavailable ('+esc(_zipOrder.error)+').</div>';
+    } else if(!rows.length){
+      body='<div class="muted">No ordered list yet. The generator uses its normal '+
+           'nationwide selection until you upload one.</div>';
+    } else {
+      var li='';
+      for(var i=0;i<rows.length;i++){
+        var z=rows[i].zip, st=stat[z]||'';
+        li+='<div style="display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--line)">'+
+          '<span class="muted" style="min-width:26px;text-align:right;font-variant-numeric:tabular-nums">'+rows[i].founder_position+'</span>'+
+          '<span style="font-variant-numeric:tabular-nums;font-weight:600">'+esc(z)+'</span>'+
+          (st?('<span class="tile-tag '+(st==='Approved'?'t-real':'t-persist')+'" style="margin-left:auto">'+esc(st)+'</span>'):'')+
+          '</div>';
+      }
+      body='<div id="zo-list" style="max-height:260px;overflow:auto;font-size:13px">'+li+'</div>';
+    }
+    host.innerHTML='<div style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel2)">'+
+      head+btns+body+'</div>';
+
+    var f=document.getElementById('zo-file');
+    if(f) f.addEventListener('change', zipOrderFileChosen);
+  }
+
+  /**
+   * Ask the engine to draft posts for the ordered ZIPs.
+   *
+   * THIS PAGE NEVER DISPATCHES ANYTHING ITSELF. It holds the anon key and a founder session,
+   * no GitHub credential, and per the panel's own contract it "creates nothing". So the click
+   * calls a SECURITY DEFINER RPC that re-checks the caller and dispatches the existing
+   * workflow server-side -- the same split as hs_set_maps_dc_zip_order and
+   * hs_approve_social_post. No new generator, no second copy of the selection rules.
+   *
+   * ⚠️ ACCEPTED, NOT A BUG: a dispatch is ENQUEUED synchronously and ANSWERED later, because
+   * pg_net is asynchronous. Reporting "sent" on the RPC returning would be reporting that we
+   * queued a request, not that GitHub took it -- and a dead token answers 401 seconds later.
+   * So the outcome is read back, and `pending` is displayed as its own state rather than
+   * being rounded up to success.
+   */
+  async function zipOrderGenerate(){
+    var n=(_zipOrder.rows||[]).length;
+    if(!n){ return; }                    // no list => the national scan; never from this button
+    // ⚖️ FOUNDER REQUIREMENT 2026-09-21 — this action CREATES and REFRESHES, so the
+    // confirm says both. The old wording promised creation only, which is what the button
+    // did; a resident-facing surface is not the only place a stale promise costs something.
+    if(!confirm('Create and refresh draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
+                'The engine reads this list in your order and, for each ZIP, drafts at most '+
+                'one post from real Map 1 project records \u2014 and brings any existing '+
+                'unpublished draft up to the current wording and fact-checking rules.\n\n'+
+                'It writes DRAFTS only \u2014 nothing is approved, scheduled or posted, and an '+
+                'already-approved post is never rewritten.\n\n'+
+                'Runs take about a minute. Some posts may still need a Map screenshot '+
+                'afterwards, so \u201cfinished\u201d does not always mean \u201cready to approve\u201d.')) return;
+    _zipGen.busy=true; _zipGen.bad=false;
+    _zipGen.msg='Requesting a run\u2026';
+    zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+    try{
+      var r=await window.hsClient.rpc('hs_request_maps_dc_generation');
+      if(r.error){
+        // The RPC's refusals are all self-describing (empty list, cool-off, missing token,
+        // not authorized), so its own message is shown rather than a generic failure.
+        _zipGen.busy=false; _zipGen.bad=true;
+        _zipGen.msg='Not started: '+(r.error.message||'the request was refused.');
+        zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+        return;
+      }
+      _zipGen.msg='Run requested \u2014 waiting for GitHub to answer\u2026';
+      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+      zipGenPoll(0);
+    }catch(err){
+      _zipGen.busy=false; _zipGen.bad=true;
+      _zipGen.msg='Not started: the request could not be sent.';
+      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+    }
+  }
+
+  /** Read back what GitHub actually said. Bounded -- an unanswered request is reported, not spun on. */
+  function zipGenPoll(tries){
+    setTimeout(async function(){
+      var st=null;
+      try{
+        var r=await window.hsClient.rpc('hs_maps_dc_generation_status');
+        st=(r && !r.error && r.data && r.data[0]) ? r.data[0] : null;
+      }catch(e){ st=null; }
+      if(st && st.state==='pending' && tries<4){ zipGenPoll(tries+1); return; }
+      _zipGen.busy=false;
+      if(!st){
+        _zipGen.bad=true; _zipGen.msg='Run requested, but its outcome could not be read.';
+      } else if(st.state==='accepted'){
+        _zipGen.bad=false;
+        // ⚠️ "ACCEPTED" IS NOT "READY", AND NEITHER IS "FINISHED". The run reports its own
+        // created / updated / unchanged / held / awaiting-image counts on its Actions summary;
+        // this message must not imply that every post it touched can be approved. A held draft
+        // and a draft awaiting its Map screenshot both finish the run without being publishable.
+        _zipGen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. It creates missing '+
+                    'drafts and refreshes existing ones (about a minute) \u2014 reload to see them. '+
+                    'Check the run\u2019s own summary for anything it held or that still needs a '+
+                    'Map screenshot; finishing is not the same as being ready to approve.';
+      } else if(st.state==='pending'){
+        _zipGen.bad=true;
+        _zipGen.msg='Run requested, but GitHub has not answered yet. Check the workflow before retrying.';
+      } else {
+        _zipGen.bad=true;
+        _zipGen.msg='GitHub did not accept the run'+
+                    (st.http_status?(' (HTTP '+st.http_status+')'):'')+': '+(st.detail||'no detail');
+      }
+      await refreshBluesky();            // re-render, and pick up any drafts already written
+    }, tries===0 ? 4000 : 6000);
+  }
+
+  async function zipOrderFileChosen(e){
+    var file=e.target.files && e.target.files[0]; if(!file) return;
+    e.target.value='';                                   // so the same file can be re-picked
+    var text=await file.text();
+    var parsed=(window.HS&&HS.parseZipOrderCsv) ? HS.parseZipOrderCsv(text) : null;
+    if(!parsed){ alert('The ZIP-order parser did not load. Reload the page and try again.'); return; }
+    if(!parsed.ok){
+      // EVERY problem, not just the first, so one fix-and-re-upload clears the file.
+      alert('This file was not accepted, so your current order is unchanged:\n\n'+
+            parsed.errors.slice(0,12).join('\n')+
+            (parsed.errors.length>12?('\n…and '+(parsed.errors.length-12)+' more.'):''));
+      return;
+    }
+    var note=parsed.warnings.length?('\n\n'+parsed.warnings.join('\n')):'';
+    if(!confirm('Save this order for future Data Center Theme draft creation?\n\n'+
+                parsed.zips.length+' ZIP'+(parsed.zips.length===1?'':'s')+', starting '+
+                parsed.zips.slice(0,3).join(', ')+(parsed.zips.length>3?'…':'')+
+                '\n\nThis replaces the ordered list only. Existing drafts, approved, '+
+                'scheduled and published posts are not changed.'+note)) return;
+    try{
+      // ONE TRANSACTION server-side. A half-completed replace cannot leave an empty list.
+      var r=await window.hsClient.rpc('hs_set_maps_dc_zip_order',{p_zips:parsed.zips});
+      if(r.error){ alert('Save failed, your current order is unchanged: '+(r.error.message||'')); return; }
+    }catch(err){ alert('Save failed, your current order is unchanged.'); return; }
+    await zipOrderLoad();
+    refreshBluesky();
+  }
+
+  function zipOrderAction(act){
+    if(act==='generate'){ zipOrderGenerate(); return; }
+    if(act==='upload'){ var f=document.getElementById('zo-file'); if(f) f.click(); return; }
+    if(act==='template'){
+      zipOrderDownload('homesignal-zip-order-template.csv', HS.zipOrderTemplateCsv()); return;
+    }
+    if(act==='current'){
+      var zips=(_zipOrder.rows||[]).map(function(r){ return r.zip; });
+      zipOrderDownload('homesignal-zip-order.csv', HS.zipOrderToCsv(zips)); return;
+    }
+  }
+
   async function refreshBluesky(){
     var host=$('tab-bluesky'); if(!host) return;
     var body=document.getElementById('bsky-queue'); if(!body) return;
@@ -862,7 +1556,34 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         liveTile('ALERTS · community', rows.length-nMaps, 'from notices / meetings')+
         liveTile('Queued today', qToday, 'new drafts')+
         liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post');
-      body.innerHTML=rows.length?rows.map(blueskyRow).join(''):'<div class="muted">No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.</div>';
+      // ONE PARTITION drives both the counts and the listed rows (§"count and displayed
+      // rows MUST derive from the same queue result so they cannot drift").
+      var buckets=(window.HS&&HS.mapsSocialThemeBuckets)
+        ? HS.mapsSocialThemeBuckets(rows)
+        : { all: rows.filter(function(p){return p.content_family==='MAPS';}), byTheme:{} };
+      var counts={ all: rows.length, maps: buckets.all.length,
+                   alerts: rows.length-buckets.all.length, themes:{} };
+      var tl=(window.HS&&HS.MAPS_SOCIAL_THEMES)||[];
+      for(var ti=0;ti<tl.length;ti++){
+        counts.themes[tl[ti].key]=(buckets.byTheme[tl[ti].key]||[]).length;
+      }
+      bskyRenderNav(counts);
+      // The ordered-ZIP panel is part of the Data Center Theme view. Load it lazily —
+      // only when that theme is actually selected — so the other tabs pay nothing.
+      if(zipOrderVisible() && !_zipOrder.loaded) await zipOrderLoad();
+      zipOrderRender(rows);
+      var visible;
+      if(_bskyFamily==='MAPS'){
+        visible=_bskyTheme ? (buckets.byTheme[_bskyTheme]||[]) : buckets.all;
+      } else if(_bskyFamily==='ALERTS'){
+        visible=rows.filter(function(p){return p.content_family!=='MAPS';});
+      } else {
+        visible=rows;
+      }
+      var emptyMsg = rows.length
+        ? 'No posts match this filter. The queue holds '+rows.length+' post(s) — switch the filter above to see them.'
+        : 'No posts in the queue. A quiet day is valid — the generator drafts only real, source-backed candidates.';
+      body.innerHTML=visible.length?visible.map(blueskyRow).join(''):'<div class="muted">'+esc(emptyMsg)+'</div>';
       var stamp=document.getElementById('bsky-stamp'); if(stamp) stamp.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     }catch(e){ body.innerHTML='<div class="muted">Queue error.</div>'; }
   }
@@ -873,13 +1594,32 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         // MAPS post configured to publish an image must never be approved on a preview
         // that failed to show it.
         var gr=_bskyRows[id]||null;
-        if(mapsImageRequired(gr) && !_bskyImgOk[id]){
-          alert('This post would publish the Map image stored at\n'+gr.image_bucket_path+
-                '\n\nThat image has not displayed in this preview, so you would be approving '+
-                'something you have not seen. Approve is blocked until it renders.');
+        var block=bskyApprovalBlockReason(gr);
+        if(block){ alert(block); return; }
+        // \u26a0\ufe0f APPROVE THE PAYLOAD YOU READ, NOT THE ROW ID. Passing only p_id
+        // approves whatever the row holds AT THE MOMENT OF THE CLICK, and between this
+        // queue's last refresh and that click a recompose job, a repair script or another
+        // tab can have rewritten post_text, swapped the image or changed the destination.
+        // The server compares each of these against the stored row and refuses on any
+        // difference (SQLSTATE 40001), so a stale review fails loudly instead of silently
+        // approving text nobody read.
+        var claims=await window.hsClient.rpc('hs_social_claim_check',{p_id:id});
+        if(!claims.error && claims.data && claims.data.length){
+          alert('This draft does not satisfy the claim contract, so it cannot be approved:\n\n'
+            + claims.data.join('\n')
+            + '\n\nNothing was changed. A draft composed before the contract needs refreshing. '
+            + 'If this ZIP is in the Data Center Theme list above, press \u201cCreate + refresh '
+            + 'drafts\u201d \u2014 it refreshes existing drafts too, but ONLY on the ZIPs in that '
+            + 'list. For any other ZIP, run Actions \u2192 Recompose MAPS drafts.');
           return;
         }
-        var r=await window.hsClient.rpc('hs_approve_social_post',{p_id:id});
+        var r=await window.hsClient.rpc('hs_approve_social_post',{
+          p_id:id,
+          p_reviewed_revision: (gr&&gr.revision!=null)?gr.revision:null,
+          p_reviewed_text: gr?gr.post_text:null,
+          p_reviewed_image_path: gr?(gr.image_bucket_path||''):null,
+          p_reviewed_embed_uri: gr?((gr.embed&&gr.embed.uri)||''):null
+        });
         if(r.error){ alert('Approve failed: '+(r.error.message||'')); return; }
       } else if(act==='skip'){
         var r2=await window.hsClient.from('social_posts').update({status:'skipped'}).eq('id',id);
@@ -893,7 +1633,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
   // ---- Bluesky edit modal (real textarea — a native prompt() box is too small
   // to show a multi-line, near-300-char post with its \n\n hashtag block) -------
-  var bskyEditId=null, _bskyRows={};
+  var bskyEditId=null;   // _bskyRows is declared with the queue state above
   function bskyEditCountUpdate(){
     var ta=$('bsky-edit-textarea'); var n=graphemeLen(ta.value);
     var c=$('bsky-edit-count'); c.textContent=n+'/300'; c.className='bsky-edit-count'+(n>300?' over':'');
@@ -921,10 +1661,18 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         'letter-spacing:.04em;padding-top:1px">'+esc(k)+'</div>'+
         '<div style="flex:1;font-size:12px;'+(warn?'color:var(--persist)':'')+'">'+v+'</div></div>';
     };
+    // "none" WAS TRUE AND STILL MISLEADING. It described the payload correctly and said
+    // nothing about whether an image was coming, so a draft awaiting its first capture and
+    // a draft that can never have one read identically. The state is named here for the
+    // same reason it is named in the queue row.
+    var pst = bskyCaptureState(p);
+    var PS = (window.HS&&HS.MAPS_CAPTURE_STATES)||{};
     var imgLine = p.image_bucket_path
       ? ('<span id="bsky-payload-imgstate">resolving…</span> &nbsp;<span class="muted">'+
-         esc(p.image_bucket_path)+'</span>')
-      : '<span style="color:var(--persist)">none — nothing is attached to this post</span>';
+         esc(p.image_bucket_path)+'</span>'
+         + (pst===PS.READY ? '' : ' <span style="color:var(--persist)">· NOT BOUND to this draft’s current details</span>'))
+      : ('<span style="color:var(--persist)">none attached yet — '
+         + esc(bskyStateCopy(pst) || 'awaiting capture') + '</span>');
     return '<div style="margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">'+
       '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);'+
       'margin-bottom:2px">Exact payload the publisher will send</div>'+
@@ -1016,14 +1764,72 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     ta.focus();
   }
   function closeBskyEdit(){ $('bsky-edit-overlay').style.display='none'; bskyEditId=null; }
+  // \u26a0\ufe0f FREE TEXT DOES NOT INHERIT A VALIDATION. This modal writes post_text
+  // straight to PostgREST under the owner's RLS policy, so it never touches the composer
+  // and nothing here can vouch for what was typed. Two consequences, both enforced rather
+  // than advised:
+  //
+  //   \u2022 an edit to an APPROVED row sends it back to `draft` in the SAME update. The
+  //     database refuses to keep an approval over a changed payload (the publication
+  //     guard), so doing anything else would simply fail \u2014 this makes the intent
+  //     explicit and tells the founder it now needs re-approval.
+  //   \u2022 after the write, the server's own claim gate is read back and reported. The
+  //     text is NOT rewritten and the edit is NOT reverted: an edit the founder made is
+  //     theirs, and the gate's job is to stop it being APPROVED, not to overrule it.
   async function saveBskyEdit(){
     if(!bskyEditId) return;
     var next=$('bsky-edit-textarea').value;
     var n=graphemeLen(next);
     if(n>300){ alert('Too long: '+n+'/300 graphemes.'); return; }
+    var row=_bskyRows[bskyEditId]||null;
+    var wasApproved=!!(row&&row.status==='approved');
+    if(wasApproved && !confirm('This post is APPROVED. Editing its text withdraws that '
+      + 'approval and returns it to draft for re-review.\n\nContinue?')) return;
+    var body=wasApproved
+      ? { post_text:next, status:'draft', scheduled_slot:null, approved_at:null }
+      : { post_text:next };
     try{
-      var r=await window.hsClient.from('social_posts').update({post_text:next}).eq('id',bskyEditId);
+      // ── OPTIMISTIC CONCURRENCY. THE DATABASE DECIDES, ATOMICALLY WITH THE WRITE. ──────
+      // `wasApproved` is read from the row this modal LOADED, and a founder can leave an
+      // editor open for minutes while a recompose run rewrites the copy or an approval
+      // lands. Keying the write on `id` alone lets this overwrite whatever the row became.
+      //
+      // ⚠️ TWO PREDICATES, BECAUSE NEITHER ONE COVERS THE OTHER — measured, not assumed.
+      // `social_posts_bump_revision` bumps `revision` only when the PAYLOAD moves
+      // (post_text / embed / image / source_url / hashtags / evidence), by design, so that
+      // a metrics refresh does not force a re-review. A pure draft -> approved flip
+      // therefore leaves `revision` UNCHANGED. So:
+      //   • revision  catches "someone rewrote the text under me" (recompose, refresh job)
+      //   • status    catches "someone approved it under me" (the approval race)
+      // The status expected is the one this modal was opened against: an approved row is
+      // being deliberately withdrawn to draft, a draft row must still be a draft.
+      //
+      // This is the same shape the capture job already uses
+      // (`?id=eq.<id>&status=eq.draft&revision=eq.<n>`) — consistent, not novel.
+      //
+      // `.select('id')` is load-bearing: without a returned representation a PATCH that
+      // matched NOTHING and one that changed the row are indistinguishable, and the modal
+      // would report a save it never performed.
+      var q=window.hsClient.from('social_posts').update(body)
+        .eq('id',bskyEditId)
+        .eq('status', wasApproved?'approved':'draft');
+      if(row && typeof row.revision==='number') q=q.eq('revision', row.revision);
+      var r=await q.select('id');
       if(r.error){ alert('Edit failed: '+(r.error.message||'')); return; }
+      if(!r.data || !r.data.length){
+        alert('NOTHING WAS SAVED — this post changed while the editor was open.\n\n'
+          + 'It was approved, published, or rewritten by a refresh since you opened it, so '
+          + 'your text was NOT written over the newer version.\n\n'
+          + 'The list will reload; re-open the post and re-apply your edit if you still '
+          + 'want it.');
+        closeBskyEdit(); refreshBluesky(); return;
+      }
+      var chk=await window.hsClient.rpc('hs_social_claim_check',{p_id:bskyEditId});
+      if(!chk.error && chk.data && chk.data.length){
+        alert('Saved \u2014 and this text does NOT satisfy the claim contract, so it cannot '
+          + 'be approved as written:\n\n' + chk.data.join('\n')
+          + '\n\nYour words were kept exactly as typed. Nothing was rewritten.');
+      }
       closeBskyEdit();
       refreshBluesky();
     }catch(e){ alert('Edit error.'); }
@@ -1047,10 +1853,31 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<span id="bsky-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
         '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
         '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
+        '<div id="bsky-nav" style="margin:0 0 14px"></div>'+
+        '<div id="bsky-zip-order" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
       host.appendChild(card);
       host.addEventListener('click', function(e){
+        // Filter chips first — they change the VIEW only and never reach blueskyAction.
+        var nav=e.target.closest && e.target.closest('.bsky-nav-btn');
+        if(nav){
+          var scope=nav.getAttribute('data-scope'), val=nav.getAttribute('data-val');
+          if(scope==='family'){
+            _bskyFamily=val;
+            // Leaving MAPS clears the theme, so the theme can never silently narrow a
+            // family it is not a theme of.
+            if(val!=='MAPS') _bskyTheme=null;
+          } else if(scope==='theme'){
+            _bskyTheme = val || null;
+          }
+          refreshBluesky();
+          return;
+        }
         var btn=e.target.closest && e.target.closest('.bsky-btn'); if(!btn) return;
+        // POST ZIP ORDER controls live outside any [data-post] wrapper and must be handled
+        // before the post-action lookup, which would otherwise bail out on them.
+        var zo=btn.getAttribute('data-zo');
+        if(zo){ zipOrderAction(zo); return; }
         var wrap=btn.closest('[data-post]'); if(!wrap) return;
         blueskyAction(wrap.getAttribute('data-post'), btn.getAttribute('data-act'));
       });

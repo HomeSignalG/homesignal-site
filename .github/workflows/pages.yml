@@ -15,9 +15,11 @@ name: pages
 # DEPLOYMENT RELIABILITY (2026-09-06). Two defects, which have to be fixed together:
 #
 #   1. The push filter named the ZIP GENERATOR's inputs while "Stage the static site"
-#      rsyncs the WHOLE repo minus .github/docs/test/node_modules into the artifact.
+#      rsynced the WHOLE repo minus .github/docs/test/node_modules into the artifact.
 #      339 of 344 shipped files - index.html, app.css, homesignalmap.html,
 #      partials/shell.html, every lib/*.js - could merge to main and never deploy.
+#      (That rsync is GONE as of Fix 19 - see "Stage the static site" below - but the
+#      push filter it motivated is still the thing keeping deploys reliable.)
 #
 #   2. `concurrency: pages-build` was ONE group shared by every run on every ref. GitHub
 #      keeps only the newest PENDING run per group, so a branch run queued behind a main
@@ -36,15 +38,37 @@ name: pages
 # breaks, main does not deploy, so catching it before merge is part of deploying reliably.
 # Its ref is refs/pull/N/merge, a different concurrency group, so it cannot starve main.
 
+# INDEXNOW / SEMANTIC FRESHNESS (2026-10-07). The same build that writes the documents also
+# writes `sitemaps/page-state.json`: one semantic fingerprint per canonical URL
+# (scripts/page_semantics.py, ONE authority, rendered by gen_zip_pages.py itself). Before
+# anything is built, the PREVIOUS LIVE state is captured from the live site; the candidate is
+# compared with it; the difference is the IndexNow notification set and it drives a truthful
+# sitemap <lastmod>. Order is fixed: capture baseline -> build -> gates -> deploy -> prove the
+# new bytes are live -> notify. A notification failure is its own job, after `deploy`, and
+# cannot undo a valid deployment. Full record: docs/indexnow-seo-freshness.md.
+#
+# FRESHNESS RUNS. `freshness` (a dispatch input, or the half-hourly schedule) builds exactly as
+# usual but publishes ONLY when the semantic state differs from the live one, or when the live
+# build is from another commit. Every other trigger deploys as before.
 on:
   workflow_dispatch:
+    inputs:
+      freshness:
+        description: 'publish only if a public page changed (the event-driven path)'
+        type: boolean
+        default: false
+      reseed:
+        description: 'ignore the live page state: publish this one as the new baseline, notify nothing'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
-      # Everything the artifact ships. The three negations mirror the rsync --exclude flags
-      # in "Stage the static site" below, so the trigger and the artifact cannot drift apart
-      # as the repo grows. Patterns are evaluated in order and the last match wins, so the
-      # re-included paths below survive their tree's exclusion.
+      # A deliberate SUPERSET of what the artifact ships. Since Fix 19 the artifact is an
+      # allowlist (scripts/stage_site.py), which is strictly narrower than this filter, so
+      # the trigger can only ever over-fire — it rebuilds and redeploys an identical
+      # artifact. That is the safe direction: under-firing is the Fix 18-era defect where
+      # 339 of 344 shipped files could merge to main and never deploy.
       - '**'
       - '!.github/**'
       - '!docs/**'
@@ -54,22 +78,57 @@ on:
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
+      - 'test/site-artifact-contract.test.mjs'
+      - 'test/dev-seo-ssr-type-adapter.test.mjs'
       - 'test/fixtures/zip-pages.json'
+      - 'test/fixtures/development_seo_plane.json'
+      - 'test/city-pages.test.mjs'
+      - 'test/fixtures/city-pages/**'
+      - 'test/project-pages.test.mjs'
+      - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   pull_request:
     paths:
+      - 'scripts/stage_site.py'
+      - 'test/site-artifact-contract.test.mjs'
+      - 'test/bsky-did-document.test.mjs'
+      - '.well-known/did.json'
       - 'scripts/gen_zip_pages.py'
+      - 'scripts/page_semantics.py'
+      - 'scripts/indexnow.py'
+      - 'test/indexnow-*.test.mjs'
+      - 'scripts/annotate-dev-seo-ssr.mjs'
       - 'scripts/prove-zip-pages.mjs'
+      - 'lib/project-type.js'
+      - 'test/dev-seo-ssr-type-adapter.test.mjs'
+      # The pure control-resolution core the proof runs on, and now also the producer of the
+      # membership the DEPLOYED twin reads. A lib-only change that never ran this build could
+      # ship an artifact whose controls file the live monitor cannot use.
+      - 'scripts/lib/zip-page-controls.mjs'
       - 'lib/community-page.js'
+      - 'lib/zip-coverage.json'
+      - 'docs/maps-coverage/fix4/zip-coverage-internal.json'
+      - 'scripts/build_zip_coverage.py'
+      - 'shell.js'
       - 'community.html'
       - '404.html'
       - 'test/zip-pages-seo.test.mjs'
       - 'test/zip-pages-no-point.test.mjs'
       - 'test/community-page-contract.test.mjs'
       - 'test/fixtures/zip-pages.json'
+      - 'test/fixtures/development_seo_plane.json'
+      - 'test/city-pages.test.mjs'
+      - 'test/fixtures/city-pages/**'
+      - 'test/project-pages.test.mjs'
+      - 'data/development_seo_plane.json'
       - '.github/workflows/pages.yml'
   schedule:
-    - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F
+    - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F or Rule D
+    # FRESHNESS tick: reads the same read model as the daily build and publishes only if a public
+    # page changed. GitHub drops scheduled runs on this repo, so this is a floor, not the trigger
+    # of record: the ingest workflows and n5-generation dispatch `freshness` when they have
+    # something to show (docs/indexnow-seo-freshness.md §Triggers).
+    - cron: '12,42 * * * *'
 
 permissions:
   contents: read
@@ -85,37 +144,171 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read        # carry-over: read earlier runs' IndexNow job results and stored deltas
+    outputs:
+      proceed: ${{ steps.decide.outputs.proceed }}
+      submit_count: ${{ steps.decide.outputs.submit_count }}
+    env:
+      # true only for a freshness-triggered run (dispatch input, or the half-hourly tick).
+      FRESHNESS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.freshness == true) || (github.event_name == 'schedule' && github.event.schedule != '40 6 * * *')) && 'true' || 'false' }}
+      RESEED: ${{ (github.event_name == 'workflow_dispatch' && inputs.reseed == true) && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Stage the static site
-        run: |
-          mkdir -p _site
-          # everything that ships today, minus VCS/CI/dev-only trees
-          rsync -a --exclude '.git' --exclude '.github' --exclude '_site' \
-                   --exclude 'test' --exclude 'docs' --exclude 'node_modules' \
-                   ./ _site/
-
-      - name: Generate one document per canonical ZIP
+      # BEFORE anything is built or deployed. After the deploy the live file IS the new state, so
+      # this is the only moment the previous one can be read. Cache-busted, validated, and a read
+      # failure fails the build rather than being mistaken for a first run (a first run notifies
+      # nothing). 404 = no baseline yet = seed.
+      - name: Capture the previous LIVE page state (baseline)
         run: |
           set -euo pipefail
-          python3 scripts/gen_zip_pages.py --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
+          python3 scripts/page_semantics.py fetch-baseline --out "$RUNNER_TEMP/baseline-page-state.json"
+
+      - name: Stage the static site
+        run: |
+          set -euo pipefail
+          # FIX 19: an ALLOWLIST, not the old six-flag rsync denylist. scripts/stage_site.py
+          # holds the artifact contract and is the only producer; a path ships only if it is
+          # named there, so internal files fail CLOSED instead of shipping by default.
+          python3 scripts/stage_site.py --src . --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
+
+      - name: Fetch the published Rule D plane
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          URL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-plane.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$URL" -o data/development_seo_plane.json; then
+            echo "ERROR: could not fetch the published Rule D plane — refusing to treat Rule D as empty"
+            exit 1
+          fi
+          CURL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-cities.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$CURL" -o data/development_seo_cities.json; then
+            echo "ERROR: could not fetch the published city pages' data — refusing to drop city pages"
+            exit 1
+          fi
+          PURL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-seo-projects.json'
+          if ! curl -fsSL --retry 3 --retry-delay 2 "$PURL" -o data/development_seo_projects.json; then
+            echo "ERROR: could not fetch the published project pages' data — refusing to drop project pages"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json, sys
+          from datetime import datetime, timezone
+          p = json.load(open("data/development_seo_plane.json"))
+          c = json.load(open("data/development_seo_cities.json"))
+          pj = json.load(open("data/development_seo_projects.json"))
+          if p.get("identity") != "base_project_key":
+              sys.exit("ERROR: fetched plane identity is not base_project_key")
+          raw = p.get("generated_at") or ""
+          try:
+              ts = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+          except ValueError:
+              sys.exit("ERROR: fetched plane has no parseable generated_at")
+          age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
+          if age > 36:
+              sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > 36h)")
+          if not isinstance(c.get("cities"), dict):
+              sys.exit("ERROR: fetched city data has no cities object — refusing to drop city pages")
+          if c.get("generated_at") != raw:
+              sys.exit(f"ERROR: city data is from run {c.get('generated_at')}, plane from {raw}")
+          if not isinstance(pj.get("projects"), dict) or not pj["projects"]:
+              sys.exit("ERROR: fetched project data has no projects — refusing to drop project pages")
+          if pj.get("generated_at") != raw:
+              sys.exit(f"ERROR: project data is from run {pj.get('generated_at')}, plane from {raw}")
+          print("fetched Rule D plane generated_at", raw, "age_h", round(age, 2),
+                "eligible_n", p.get("eligible_n"), "held_n", p.get("held_n"),
+                "city_n", len(c["cities"]), "project_n", len(pj["projects"]),
+                "project_held", (pj.get("census") or {}).get("held_sources"))
+          PY
+
+      - name: Generate one document per canonical ZIP
+        env:
+          HS_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          EXTRA=""
+          if [ "$RESEED" = "true" ]; then EXTRA="--reseed"; fi
+          python3 scripts/gen_zip_pages.py --out _site \
+            --baseline "$RUNNER_TEMP/baseline-page-state.json" \
+            --delta-out "$RUNNER_TEMP/indexnow-delta.json" $EXTRA | tee -a "$RUNNER_TEMP/receipts.txt"
+
+      # `deploy` precedes `indexnow`, so a failed notification leaves its pages live and inside the
+      # NEXT baseline: they would never differ again. Pick them up from the earlier run's stored
+      # delta, so a notification outage self-heals on the next build with no one asked to act.
+      - name: Carry over notifications an earlier IndexNow job did not send
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/indexnow.py carry-over --delta "$RUNNER_TEMP/indexnow-delta.json"
+
+      # One decision, from the delta the generator just wrote. A freshness run with nothing new to
+      # publish stops here (every later step is gated on it): no Playwright, no upload, no deploy.
+      - name: Decide whether this run publishes
+        id: decide
+        run: |
+          set -euo pipefail
+          python3 scripts/page_semantics.py decide --delta "$RUNNER_TEMP/indexnow-delta.json" \
+            --freshness "$FRESHNESS" --sha "$GITHUB_SHA" --reseed "$RESEED" | tee -a "$GITHUB_OUTPUT"
+
+      # The verification file is the one deliberately public use of the key. main only: a
+      # pull_request run never writes it. Absent secret = skipped, and the deployment is unaffected.
+      - name: Publish the IndexNow key file (main only)
+        if: steps.decide.outputs.proceed == 'true'
+        env:
+          INDEXNOW_KEY: ${{ github.ref == 'refs/heads/main' && secrets.INDEXNOW_KEY || '' }}
+        run: python3 scripts/indexnow.py write-key --out _site
 
       - name: Build gates
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           test -f _site/zip-pages-manifest.json
-          DOCS=$(find _site/community -mindepth 2 -name index.html | wc -l)
+          DOCS=$(find _site/community -mindepth 2 -maxdepth 2 -name index.html | wc -l)
           echo "generated documents: $DOCS"
           # every generated path is a 5-digit canonical ZIP directory, nothing else
           BAD=$(find _site/community -mindepth 1 -maxdepth 1 -type d \
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
+          # ZIP COVERAGE (founder, 2026-10-03): every ZIP in lib/zip-coverage.json keeps a document
+          # (a ZIP with no Census-drawn area is not proven inactive), the model ships (shell.js
+          # reads it), the model equals what the classification record derives, and the documents
+          # plus the USPS-confirmed retired ZIPs (none today) are exactly the canonical registry.
+          python3 scripts/build_zip_coverage.py --check
+          python3 - <<'PY'
+          import json, os
+          man = json.load(open('_site/zip-pages-manifest.json'))
+          cov = json.load(open('_site/lib/zip-coverage.json'))['zips']
+          assert man['coverage_zips'] and set(man['coverage_zips']) <= set(cov), 'the build did not use the shipped model'
+          # PUBLIC MODEL HYGIENE (founder, 2026-10-03): what browsers receive carries page behavior only.
+          # No provenance, no review notes, no vendor detail; the full record stays internal.
+          import re
+          raw = open('_site/lib/zip-coverage.json', encoding='utf-8').read()
+          bad = re.findall(r'third_party_flag|decommission|verification_notes|postal_status(?:_source|_verified_at)?|source_md5|source_class|unitedstateszipcodes', raw, re.I)
+          assert not bad, f'internal provenance reached the browser-delivered model: {sorted(set(bad))}'
+          assert all(sorted(e) == ['map_coverage', 'page_mode', 'zip_code', 'zip_type'] for e in cov.values()), 'public coverage entries must be exactly the four public fields'
+          assert not os.path.exists('_site/docs'), 'docs/ (the internal coverage record) must not ship'
+          missing = [z for z in man['coverage_zips'] if not os.path.exists(f'_site/community/{z}/index.html')]
+          assert not missing, f'coverage ZIPs with no document: {missing}'
+          # ZIPs with NO page: USPS-verified retired (none today) and unverified (84684, 84685; founder 2026-10-03)
+          retired = man['retired_zips'] + man['unverified_zips']
+          assert sorted(man['unverified_zips']) == ['84684', '84685'], f"unverified ZIPs changed: {man['unverified_zips']}"
+          present = [z for z in retired if os.path.exists(f'_site/community/{z}')]
+          assert not present, f'documents were written for ZIPs with no page: {present}'
+          sm = open('_site/sitemap.xml', encoding='utf-8').read()
+          listed = [z for z in retired if f'/community/{z}/' in sm or f'zip={z}' in sm]
+          assert not listed, f'ZIPs with no page are in the sitemap: {listed}'
+          assert man['documents'] + len(retired) == man['canonical_registry'], \
+              f"documents {man['documents']} + no-page {len(retired)} != registry {man['canonical_registry']}"
+          print(f"ZIP coverage: {len(man['coverage_zips'])} limited-coverage ZIPs all have a document; "
+                f"{len(retired)} retired; {man['documents']} documents + {len(retired)} = {man['canonical_registry']}")
+          PY
           echo "artifact size: $(du -sh _site | cut -f1)"
           # SITEMAP RECONCILIATION — the advertised set must BE the index-eligible set.
           python3 - <<'PY'
@@ -124,65 +317,213 @@ jobs:
           sm = open('_site/sitemap.xml', encoding='utf-8').read()
           zips = re.findall(r'<loc>[^<]*/community/(\d{5})/</loc>', sm)
           assert not re.search(r'community\.html\?zip=', sm), 'legacy community URL still advertised'
-          assert sorted(zips) == man['indexable_zips'], 'sitemap != Rule F pass set'
-          assert len(zips) == man['rule_f_pass'], 'sitemap count != Rule F pass count'
-          assert 'homesignalmap.html?zip=' in sm, 'development sitemap half was destroyed'
-          print(f"sitemap reconciled: {len(zips)} community URLs == rule_f_pass {man['rule_f_pass']}")
+          assert sorted(zips) == man['indexable_zips'], 'sitemap != indexable set (Rule F OR Rule D)'
+          assert len(zips) == len(man['indexable_zips']), 'sitemap count != indexable count'
+          # INVERTED 2026-09-19, and it is the SAME rule this gate already states one line
+          # up: the advertised set must BE the index-eligible set. This line used to guard
+          # the development half's PRESENCE under page-purpose separation, which assumed the
+          # two halves were two sets of documents. They are not. Measured against production:
+          # every homesignalmap.html?zip= URL serves a byte-identical document (Pages selects
+          # by PATH and ignores the query string), ships `noindex, nofollow`, and canonicalises
+          # to the ZIP-less URL — so advertising 11,718 of them contradicted this gate's own
+          # premise. Restoring the advertisement means making those URLs real documents
+          # (/development/<zip>/), and this assertion is what should be replaced then.
+          assert 'homesignalmap.html?zip=' not in sm, \
+              'noindex development URLs are still advertised in the sitemap'
+          assert man['sitemap_dev_urls_removed'] >= 0, 'manifest must record the removal count'
+          # CITY PAGES (plan step 9): every city document written is advertised, and only those.
+          import os
+          written = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                           for r, _, fs in os.walk('_site/city') if 'index.html' in fs)
+          cities = re.findall(r'<loc>https://homesignal\.net(/city/[a-z]{2}/[a-z0-9-]+/)</loc>', sm)
+          assert written == man['city_pages'], 'city documents != manifest city_pages'
+          assert sorted(cities) == man['city_pages'], 'sitemap city URLs != city pages written'
+          assert len(cities) == len(set(cities)), 'duplicate city URL in the sitemap'
+          print(f"city pages reconciled: {len(written)} documents == sitemap {len(cities)}")
+          # PROJECT PAGES (plan step 12): every project document written is advertised, only those.
+          pwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                            for r, _, fs in os.walk('_site/project') if 'index.html' in fs)
+          projs = re.findall(r'<loc>https://homesignal\.net(/project/[a-z0-9-]+/[a-z0-9-]+/)</loc>', sm)
+          assert pwritten == man['project_pages'], 'project documents != manifest project_pages'
+          assert sorted(projs) == man['project_pages'], 'sitemap project URLs != project pages written'
+          assert len(projs) == len(set(projs)), 'duplicate project URL in the sitemap'
+          assert pwritten, 'no project pages written'
+          print(f"project pages reconciled: {len(pwritten)} documents == sitemap {len(projs)}")
+          # GUIDE PAGES (plan step 13): a fixed, small set; every one written is advertised.
+          gwritten = sorted('/' + os.path.relpath(r, '_site').replace(os.sep, '/') + '/'
+                            for r, _, fs in os.walk('_site/guides') if 'index.html' in fs)
+          guides = re.findall(r'<loc>https://homesignal\.net(/guides/[a-z0-9-]+/)</loc>', sm)
+          assert gwritten == man['guide_pages'], 'guide documents != manifest guide_pages'
+          assert sorted(guides) == man['guide_pages'], 'sitemap guide URLs != guide pages written'
+          assert len(gwritten) == 2, f'expected the two guides, found {gwritten}'
+          print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
+          # FAMILY SITEMAPS (plan step 14): each family is exactly its own set, and together
+          # they cover exactly the generated URLs sitemap.xml advertises.
+          main_gen = set(re.findall(r'<loc>https://homesignal\.net(/(?:community|city|project|guides)/[^<]+)</loc>', sm))
+          fam_union = set()
+          expect = {'zip-alerts': None, 'zip-development': None, 'city': man['city_pages'],
+                    'project': man['project_pages'], 'guide': man['guide_pages']}
+          for name, want in expect.items():
+              fx = open(f'_site/sitemaps/{name}.xml', encoding='utf-8').read()
+              locs = re.findall(r'<loc>https://homesignal\.net([^<]+)</loc>', fx)
+              assert len(locs) == len(set(locs)) == man['family_sitemaps'][name], f'{name} count'
+              if want is not None:
+                  assert sorted(locs) == want, f'{name} sitemap != its pages'
+              assert set(locs) <= main_gen, f'{name} advertises a URL sitemap.xml does not'
+              fam_union |= set(locs)
+          assert fam_union == main_gen, 'family sitemaps do not cover sitemap.xml exactly'
+          print("family sitemaps reconciled:", man['family_sitemaps'])
+          print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
+                f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+community/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
+      - name: Artifact contract gate (Fix 19)
+        if: steps.decide.outputs.proceed == 'true'
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          node test/site-artifact-contract.test.mjs | tail -6
+
+      # The Bluesky custom-feed generator resolves did:web:homesignal.net from this site. A
+      # drifted or missing /.well-known/did.json makes every HomeSignal feed read as offline to
+      # every subscriber, with nothing else on the site failing — so it gates the deploy.
+      - name: Bluesky feed-generator DID document
+        if: steps.decide.outputs.proceed == 'true'
+        run: node test/bsky-did-document.test.mjs
+
+      - name: Audit the REAL artifact (Fix 19)
+        if: steps.decide.outputs.proceed == 'true'
+        # The gate above proves the producer. This proves the ARTIFACT — the actual _site
+        # tree after every build step has written into it, which is what GitHub Pages
+        # uploads. A repo-side test cannot see a later step copying something in, so the
+        # thing that ships is inspected directly rather than inferred from the thing that
+        # made it.
+        run: |
+          set -euo pipefail
+          exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
+          python3 - <<'PY'
+          import os, subprocess, sys
+          contract = set(subprocess.run(
+              [sys.executable, 'scripts/stage_site.py', '--src', '.', '--list-only'],
+              capture_output=True, text=True, check=True).stdout.split())
+          actual = set()
+          for root, _, files in os.walk('_site'):
+              for f in files:
+                  actual.add(os.path.relpath(os.path.join(root, f), '_site').replace(os.sep, '/'))
+          # everything the build legitimately ADDS to the staged contract
+          def generated(p):
+              return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
+                      or p.startswith('city/') or p.startswith('project/')
+                      or p.startswith('guides/') or p.startswith('sitemaps/'))
+          unexpected = sorted(p for p in actual - contract if not generated(p))
+          # an empty audit is not a clean audit
+          assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
+          assert 'index.html' in actual, 'index.html absent from the real artifact'
+          print(f'artifact files: {len(actual)}  contract: {len(contract)}  '
+                f'generated: {len(actual) - len(contract)}  unexpected: {len(unexpected)}')
+          if unexpected:
+              print('UNEXPECTED FILES IN THE PUBLISHED ARTIFACT:')
+              for p in unexpected[:40]:
+                  print('   ', p)
+              sys.exit(1)
+          # and the internal families, named, against the real tree
+          for bad in ('CLAUDE.md', 'QUEUE.md', 'PLAN.md', 'DECISIONS.md', 'PROGRESS.md', '.gitignore'):
+              assert bad not in actual, f'{bad} is in the published artifact'
+          for tree in ('scripts/', 'verify/', 'fixtures/', 'supabase/', 'data/', '.claude/', 'docs/', 'test/'):
+              hit = [p for p in actual if p.startswith(tree)]
+              assert not hit, f'{tree} shipped: {hit[:5]}'
+          print('ARTIFACT AUDIT OK — the published tree is the contract plus generated ZIP documents')
+          PY
+
+      # The key may exist in the artifact in exactly one place: indexnow.txt.
+      - name: IndexNow artifact hygiene (the key appears only in indexnow.txt)
+        if: steps.decide.outputs.proceed == 'true'
+        env:
+          INDEXNOW_KEY: ${{ github.ref == 'refs/heads/main' && secrets.INDEXNOW_KEY || '' }}
+        run: python3 scripts/indexnow.py check-artifact --dir _site
+
       - name: Confirm no generated HTML is tracked by git
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           if git ls-files --error-unmatch community/ >/dev/null 2>&1; then
             echo 'ERROR: community/ is tracked in git — generated output must never be committed'
             exit 1
           fi
+          if git ls-files --error-unmatch city/ >/dev/null 2>&1; then
+            echo 'ERROR: city/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
+          if git ls-files --error-unmatch project/ >/dev/null 2>&1; then
+            echo 'ERROR: project/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
+          if git ls-files --error-unmatch guides/ >/dev/null 2>&1; then
+            echo 'ERROR: guides/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
           echo "git is clean of generated ZIP documents"
 
       - name: Offline gates for the generated documents
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
-          for t in zip-pages-seo zip-pages-no-point community-page-contract; do
+          for t in zip-pages-seo zip-pages-no-point community-page-contract city-pages project-pages; do
             echo "--- test/$t.test.mjs"
             node "test/$t.test.mjs" | tail -3
           done
 
       - name: Install Playwright (chromium)
+        if: steps.decide.outputs.proceed == 'true'
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
 
       - name: Candidate crawler proof (initial HTML + JS + Googlebot UAs)
+        if: steps.decide.outputs.proceed == 'true'
         env:
           SITE_DIR: _site
-          # FROZEN CONTROLS — classes A-J, re-derived from live data 2026-09-04 14:26-14:35Z
-          # and pinned here so a reclassification by normal ingestion is a visible one-line
-          # replacement. 07010 was the prior unit's "Alerts PASS + development FAIL" control
-          # and has since become development PASS (its map page qualified); 01034 Granville
-          # MA replaces it in that class. See docs/alerts-seo-build-2026-09-04.md.
-          #   A 01001 Agawam MA        Alerts PASS + development PASS
-          #   B 01034 Granville MA     Alerts PASS + development FAIL (Alerts alone qualifies)
-          #   C 01002 Amherst MA       Alerts FAIL + development PASS (development cannot)
-          #   D 02543 Woods Hole MA    Alerts FAIL + development FAIL
-          #   E 01001                  Rule F carried by local news only
-          #   F 04401 Bangor ME        weather present, still under Rule F
-          #   G 02543                  honest-empty
-          #   H 22030 Fairfax VA       60 notices fanned out from one jurisdiction
-          #   J 28468 Sunset Beach NC  19,536 development records - no point may leak
+          # CONTROLS — classes A-J. Only point_dense is still PINNED, and only because
+          # "the densest development ZIP leaks no point/radius string" is a strictly stronger
+          # claim than "some page leaks none": deriving it would replace the worst case with
+          # an average one. Everything else is DERIVED from the build each run and asserted
+          # NON-EMPTY, so drift substitutes and reports instead of reddening the build.
+          #
+          # WHY THIS STOPPED BEING FROZEN. Pinned controls rotted three times — 07010, then
+          # 01002 Amherst MA and 04401 Bangor ME on 2026-09-11 — every time by NORMAL
+          # INGESTION, as real content pushed a ZIP across Rule F. rule_f_pass read 8,291 /
+          # 8,380 / 8,372 across three builds, TWO OF THEM ON THE SAME COMMIT. Each rot went
+          # red, and a red pages build means the site does not update.
+          #
+          # The argument for freezing was that a control derived from the build it tests
+          # cannot catch a build-wide misclassification, because the class comes back empty
+          # and its assertion passes over nothing. That premise is true; the conclusion is
+          # not. Asserting the class is NON-EMPTY covers exactly that case, and is now done.
+          # Pinned selection was never the only way to get the property — only the way that
+          # also turned ordinary ingestion into an outage.
           CONTROLS: >-
-            {"pass_dev_pass":"01001","pass_dev_fail":"01034","fail_dev_pass":"01002",
-             "fail_dev_fail":"02543","local_news":"01001","weather_thin":"04401",
-             "honest_empty":"02543","fanout":"22030","point_dense":"28468"}
+            {"point_dense":"28468"}
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           node scripts/prove-zip-pages.mjs
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.decide.outputs.proceed == 'true'
         with:
           path: _site
+
+      # The notification set, computed BEFORE the deploy from the pre-deploy live baseline. The
+      # indexnow job downloads exactly this; nothing is recomputed after the deployment.
+      - name: Keep the semantic delta (the IndexNow set)
+        if: steps.decide.outputs.proceed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-delta
+          path: ${{ runner.temp }}/indexnow-delta.json
+          retention-days: 30
 
       - name: Report build stats
         if: always()
@@ -201,6 +542,7 @@ jobs:
           print('documents       :', m['documents'])
           print('rule F pass     :', m['rule_f_pass'])
           print('rule F fail     :', m['rule_f_fail'])
+          print('rule D pass     :', m.get('rule_d_pass'))
           print('indexable zips  :', len(m['indexable_zips']))
           print('html files      :', n)
           print('uncompressed    : %.1f MB' % (tot/1048576))
@@ -211,8 +553,9 @@ jobs:
           echo "----- END BUILD STATS -----"
 
   deploy:
-    # Only main deploys. Requires the repository Pages Source = "GitHub Actions".
-    if: github.ref == 'refs/heads/main'
+    # Only main deploys. Requires the repository Pages Source = "GitHub Actions". A freshness run
+    # with nothing to publish does not deploy (needs.build.outputs.proceed).
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.proceed == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -224,3 +567,39 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # NOTIFY, AFTER the deployment and never before it. Runs only when `deploy` succeeded and the
+  # delta names at least one URL. It proves the live site serves the candidate state, the key
+  # file and the exact bytes of a sample of the changed pages, and only then POSTs the
+  # precomputed set. If IndexNow is down this job goes red; the deployed site is untouched.
+  indexnow:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.deploy.result == 'success' && needs.build.outputs.submit_count != '0'
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: indexnow-delta
+          path: delta
+      - name: Verify the new build is live, then notify IndexNow
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: |
+          set -euo pipefail
+          python3 scripts/indexnow.py notify --delta delta/indexnow-delta.json --receipt "$RUNNER_TEMP/indexnow-receipt.json"
+      - name: Keep the sanitized receipt and the submitted URLs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-receipt
+          path: |
+            ${{ runner.temp }}/indexnow-receipt.json
+            delta/indexnow-delta.json
+          retention-days: 90

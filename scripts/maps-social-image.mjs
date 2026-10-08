@@ -27,6 +27,7 @@
 // Usage:
 //   node scripts/maps-social-image.mjs --list
 //   node scripts/maps-social-image.mjs --limit 5 [--dry] [--ids <uuid,uuid>]
+//   node scripts/maps-social-image.mjs --ids <uuid,uuid> --recapture   (re-shoot named drafts)
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY), BASE.
 
 import { chromium } from 'playwright';
@@ -36,10 +37,15 @@ import path from 'node:path';
 // The SHIPPED site builder, loaded exactly as the page loads it and in the page's order, so
 // this module cannot carry a second copy of the rendering rules.
 globalThis.window = globalThis.window || globalThis;
-for (const f of ['../lib/map.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
+for (const f of ['../lib/project-type.js', '../lib/map.js', '../lib/maps-social-theme.js', '../lib/maps-capture-policy.js', '../lib/maps-capture-binding.js', '../lib/residential-qualify.js', '../lib/n5-radius.js', '../lib/zip-authoritative.js']) {
   (0, eval)(fs.readFileSync(new URL(f, import.meta.url), 'utf8'));
 }
 const HS = globalThis.window.HS;
+
+// The four capture states, from the SHIPPED module the Acquisition Dashboard reads. Taken
+// from it rather than re-declared here, so the job and the approval gate cannot come to
+// hold different opinions about what "ready" means.
+const { WAITING, READY, FAILED, INELIGIBLE } = HS.MAPS_CAPTURE_STATES;
 
 
 
@@ -54,6 +60,14 @@ const val = (f, d) => { const i = argv.indexOf(f); return i > -1 && argv[i + 1] 
 const DRY = has('--dry');
 const LIMIT = parseInt(val('--limit', '5'), 10);
 const ONLY_IDS = (val('--ids', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
+// --recapture re-shoots the NAMED drafts even when their picture is still bound (see
+// HS.mapsCaptureDue). It is for a fix to Map 1 itself, which no binding key can see, and it
+// is refused without --ids: a whole-queue re-shoot is never one flag away.
+const RECAPTURE = has('--recapture');
+if (RECAPTURE && !ONLY_IDS.length) {
+  console.error('REFUSING --recapture without --ids: name the drafts to re-shoot.');
+  process.exit(2);
+}
 const OUT_DIR = val('--out', '/tmp/maps-social-images');
 
 // 1200x630 — the ratio HomeSignal already ships (og-default.png is 1200x630) and the ratio
@@ -69,20 +83,216 @@ const ZOOM = parseInt(val('--zoom', '15'), 10);
 // coordinate. ~1.1 m at the equator: this is an identity test, not a proximity search.
 const COORD_EPS = 1e-5;
 
+// ── MAPS · DATA CENTER THEME CAPTURE STATE ───────────────────────────────────────────
+//
+// WHAT CHANGES FOR A THEME POST, and nothing else does: the SHIPPED "Data center" PROJECT
+// TYPE control is the only one left checked (with every STATUS on and REGULATORY off). Since
+// 2026-09-22 the embed mode and the PRODUCT-CARD clip are NOT theme-specific — every MAPS
+// capture uses them (see CARD_CLIP). Marker targeting, the popup, the halo, the home-marker
+// refusal and the coordinate checks are the same code on both paths.
+//
+// EMBED MODE IS A REAL PRODUCT MODE, NOT A SCREENSHOT HACK. `?embed=1` is what the Place
+// page already uses to host Map 1 in an iframe (homesignalmap.html sets `hs-embed` in the
+// document head, before first paint). It hides the global sidebar, the global top bar, the
+// address SEARCH FORM, the radius picker, the 3D controls and everything below the map —
+// exactly the chrome a social capture must exclude — and its `.card.mapcard` becomes a flex
+// column one frame tall, so the filter panel and the map FIT 1200x630 instead of overflowing
+// it. Reusing it means the framing is the product's own, and a future change to the embed
+// layout moves this capture with it rather than leaving a private copy behind.
+const EMBED_PARAM = 'embed=1';
+
+// ── THE POLICY MODULE, INJECTED INTO THE THROWAWAY BROWSER ───────────────────────────
+// lib/maps-capture-policy.js is the ONE definition of the map state a Data Center Theme
+// screenshot must show. It is injected here rather than copied, so this job and
+// test/maps-datacenter-capture-state.browser.test.mjs drive IDENTICAL code — a test that
+// re-typed the manoeuvre would pass while production stayed broken, which is exactly what
+// the previous browser suite did.
+//
+// `addScriptTag` (not `eval`): homesignalmap.html's CSP is
+// `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net` — inline is allowed and
+// `unsafe-eval` is not. Injected into this throwaway DOM only, never into the deployed
+// site, the same established pattern as the selection halo.
+const POLICY_SRC = fs.readFileSync(new URL('../lib/maps-capture-policy.js', import.meta.url), 'utf8');
+
+/**
+ * Put Map 1 into the Data Center Theme capture state, THROUGH THE REAL CONTROLS.
+ *
+ * Every status control on, Data center the only PROJECT TYPE, the REGULATORY overlay off —
+ * all three dimensions, because a filter panel in a screenshot is a claim about WHICH
+ * RECORDS ARE ON SCREEN and three dimensions decide that. The previous version set ONE of
+ * them and published whatever the other two happened to be.
+ *
+ * Nothing here writes a filter value directly and nothing fakes a chip's appearance: each
+ * control's own checkbox gets `.checked` plus a `change` event, which runs the page's own
+ * setStage / setType / setRegulatory -> applyFilter. The checkmarks in the image are the
+ * controls' real state.
+ */
+async function applyDataCenterCapturePolicy(page, targetKey) {
+  return page.evaluate(
+    ([key]) => window.HS.mapsDcCaptureApplyPolicy({ targetKey: key }),
+    [targetKey],
+  );
+}
+
+/**
+ * The panel sections the founder-approved capture must actually contain. Asserted from the
+ * RENDERED DOM before the shutter, so a layout change that pushes a section out of frame
+ * fails the capture instead of silently shipping a cropped card.
+ */
+async function panelSectionsInFrame(page) {
+  return page.evaluate(() => {
+    const vh = window.innerHeight, vw = window.innerWidth;
+    const inFrame = (el) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= vh + 1 && r.right <= vw + 1;
+    };
+    const byText = (sel, txt) => Array.from(document.querySelectorAll(sel))
+      .find((e) => (e.textContent || '').trim().toUpperCase() === txt) || null;
+    return {
+      card_header: inFrame(document.querySelector('.card.mapcard .map-cap')),
+      card_header_text: (document.querySelector('.card.mapcard .map-cap')?.textContent || '').trim(),
+      status: inFrame(byText('.mapkey-hd', 'STATUS')),
+      project_type: inFrame(byText('.mapkey-hd', 'PROJECT TYPE')),
+      regulatory: inFrame(byText('.mapkey-hd', 'REGULATORY RECORDS')),
+      map_key: inFrame(document.getElementById('mapkeyNote')),
+      map: inFrame(document.querySelector('.card.mapcard .map-frame')),
+      // Chrome that must NOT be in a social capture. Embed mode removes it; this proves it.
+      sidebar_hidden: !document.querySelector('#hs-side')
+        || getComputedStyle(document.querySelector('#hs-side')).display === 'none',
+      // The horizontal header and the shared footer replaced the sidebar (Revised Index
+      // Design, #1562), so sidebar_hidden now passes with nothing to look at. Kept under its
+      // historical name (it is stored in panel_in_frame); this is the check that still sees.
+      site_chrome_hidden: ['hs-top', 'hs-footer'].every((id) => {
+        const el = document.getElementById(id);
+        return !el || getComputedStyle(el).display === 'none';
+      }),
+      search_form_hidden: !document.querySelector('.wrap>.head')
+        || getComputedStyle(document.querySelector('.wrap>.head')).display === 'none',
+    };
+  });
+}
+
+// ── EVERY MAPS CAPTURE IS THE CARD — FOUNDER REQUIREMENT (2026-09-22) ────────────────
+// The founder saw ordinary MAPS drafts on the Acquisition Dashboard as a bare map with no
+// STATUS / PROJECT TYPE / REGULATORY panel, while the Data Center Theme drafts carried it,
+// and asked for the Data Center framing on the MAPS posts too. Until then an ordinary capture
+// clipped to `#map`. Now both paths clip to the Map 1 PRODUCT CARD in the shipped embed mode;
+// the theme decides only the FILTER STATE the card is photographed in.
+//
+// ⚠️ AN ORDINARY CAPTURE SETS NO FILTERS. It photographs the page's own default control
+// state (the capture context clears the persisted filter keys before every page — see
+// main()), and it RECORDS that state from the controls themselves, so the checkmarks visible
+// in the image are accounted for in the evidence rather than assumed. Choosing a filter state
+// for ordinary posts would be a new product decision; showing the default is not.
+//
+// The frame is part of the capture KEY (lib/maps-capture-binding.js MAP1_CARD_FRAME), so an
+// existing bare-map image stops counting as bound and is re-taken on the next run.
+const CARD_CLIP = '.card.mapcard';
+
+/**
+ * Assert the Map 1 card — header, all three control sections, the map key and the map — is
+ * inside the frame, that embed mode actually hid the global chrome, and read the controls.
+ * FAILS CLOSED: a section out of frame, surviving chrome, or controls the page did not render
+ * cleanly all refuse the capture rather than shipping a picture missing its panel.
+ */
+async function cardInFrame(page) {
+  const panel = await panelSectionsInFrame(page);
+  // A cropped card is a card that no longer proves what it is there to prove, so a section
+  // out of frame refuses the capture instead of shipping a picture missing its controls.
+  const missing = ['card_header', 'status', 'project_type', 'regulatory', 'map']
+    .filter((k) => !panel[k]);
+  if (missing.length) {
+    return { ok: false, reason: `the Map 1 card does not fit the frame — out of view: ${missing.join(', ')}` };
+  }
+  if (!panel.sidebar_hidden || !panel.site_chrome_hidden || !panel.search_form_hidden) {
+    return { ok: false, reason: 'embed mode did not take: global chrome is still rendered' };
+  }
+  const controls = await page.evaluate(() => window.HS.mapsDcCaptureReadControls());
+  if (!controls || (controls.problems && controls.problems.length)) {
+    return { ok: false, reason: `the Map 1 panel controls could not be read: ${((controls && controls.problems) || ['no reading']).join('; ')}` };
+  }
+  return { ok: true, panel, controls: { statuses: controls.statuses, types: controls.types, regulatory: controls.regulatory } };
+}
+
 async function api(pathname, init) {
   const r = await fetch(`${SB}/rest/v1/${pathname}`, { ...init, headers: { ...H, ...(init?.headers || {}) } });
   if (!r.ok) throw new Error(`${init?.method || 'GET'} ${pathname} -> ${r.status} ${await r.text()}`);
   return r.status === 204 ? null : r.json();
 }
 
-/** MAPS drafts still without a project-specific visual. ALERTS rows are never selected. */
-async function pendingDrafts() {
+/**
+ * ONLY these two columns may ever be written by this module.
+ *
+ * The arm gate this job used to carry existed to keep "automatic MAPS generation and
+ * publication are held" true. Running on a schedule does not touch that hold — but the
+ * hold must stop resting on the job being hard to start, so it is enforced HERE, in the
+ * one place every write goes through. Approval, scheduling and publication live in
+ * `status`, `approved_at`, `scheduled_slot` and `published_at`; none of them is writable
+ * from this module, and a patch body naming any other column throws before it is sent.
+ */
+const WRITABLE = ['image_bucket_path', 'evidence'];
+
+function assertWriteScope(body) {
+  const keys = Object.keys(body || {});
+  const bad = keys.filter((k) => !WRITABLE.includes(k));
+  if (bad.length) {
+    throw new Error(`REFUSING WRITE: this module may only set ${WRITABLE.join(', ')} — `
+      + `patch body also named ${bad.join(', ')}. Approval/scheduling/publication are not `
+      + 'this job\'s to move.');
+  }
+  return body;
+}
+
+// ── BOUNDED RETRY ──────────────────────────────────────────────────────────────────────
+// The ladder and the due-predicate live in lib/maps-capture-binding.js, NOT here. They are
+// the answer to "which drafts does a run touch", which has to be identical in the runner
+// and in anything that audits the queue — and a predicate that only exists inside a script
+// that imports playwright and calls main() at module load cannot be executed by a test.
+// Taking them from the shipped module is what makes the retry behaviour provable offline.
+const { MAX_ATTEMPTS, INELIGIBLE_RETRY_HOURS } = HS.MAPS_CAPTURE_RETRY;
+const nextAttemptAt = (attempts) => HS.mapsCaptureNextAttemptAt(attempts);
+
+/**
+ * Drafts that need a capture on THIS run, newest first, hard-capped at LIMIT.
+ *
+ * DUPLICATE PROTECTION IS THE BINDING KEY, not the presence of a path. A draft whose
+ * stored image is bound to its current inputs is skipped — that is the common case and it
+ * costs one comparison, no browser and no request. A draft whose inputs have MOVED is
+ * re-selected even though it has a path, which is the case the old selector could not see.
+ *
+ * The read is deliberately wider than the work: PostgREST cannot express "capture_key
+ * inside evidence differs from a value computed in JS", so the filtering that needs the
+ * shipped classifier happens here, and LIMIT is applied AFTER it. `--ids` bypasses the
+ * retry clock (an operator naming a row has already decided) but never the write scope.
+ */
+async function selectDrafts() {
   const idFilter = ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '';
-  return api('social_posts?select=id,zip,post_text,evidence,image_bucket_path,status,content_family'
-    + `&content_family=eq.MAPS&status=eq.draft&image_bucket_path=is.null${idFilter}`
+  const rows = await api('social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family,revision'
+    + `&content_family=eq.MAPS&status=eq.draft${idFilter}`
     // Newest first. A freshly generated candidate is the one worth a picture, and it is also
     // the one most likely to be in its ZIP's authoritative set — the two moved together.
-    + `&order=created_at.desc&limit=${LIMIT}`);
+    + '&order=created_at.desc&limit=500');
+
+  const now = Date.now();
+  const due = [];
+  const skipped = { bound: 0, backoff: 0, exhausted: 0 };
+  for (const d of rows) {
+    // THE SHIPPED PREDICATE, not a second opinion about it.
+    const verdict = HS.mapsCaptureDue(d, now, { ignoreClock: ONLY_IDS.length > 0, recapture: RECAPTURE });
+    if (!verdict.due) {
+      // Reported separately so "already has its picture", "waiting out a backoff" and "has
+      // burned its attempt budget" never read as one number.
+      if (Object.prototype.hasOwnProperty.call(skipped, verdict.skip)) skipped[verdict.skip]++;
+      continue;
+    }
+    due.push(d);
+    if (due.length >= LIMIT) break;
+  }
+  console.log(`maps-social-image: ${rows.length} MAPS draft(s) read · `
+    + `${skipped.bound} already bound · ${skipped.backoff} inside backoff · `
+    + `${skipped.exhausted} past ${MAX_ATTEMPTS} attempts (long floor) · ${due.length} due this run`);
+  return due;
 }
 
 /**
@@ -111,11 +321,18 @@ async function authoritativePresence(zip, sourceKey) {
   // hunt for a marker that does not exist. Running the same builder here is what keeps one
   // definition of the rendered set instead of two.
   const sites = HS.zipAuthSitesFrom(j);
+  // THE CONTENT MAP 1 PRINTS FOR THIS PIN. The reader returns one entry per source_key and
+  // the page builds the popup from it, so this is what the picture's popup will say. It is
+  // compared with the post's own record before anything is photographed
+  // (HS.mapsPinRecordMismatch).
+  const entry = Array.isArray(j?.projects)
+    ? (j.projects.find((p) => p && p.project_ref === sourceKey) || null) : null;
   return {
     status: j?.status || 'unknown',
     markers: markers ? markers.length : null,
     rendered: sites.length,
     present: sites.some((s) => s && s.zip_project_ref === sourceKey),
+    entry,
   };
 }
 
@@ -126,6 +343,7 @@ async function authoritativePresence(zip, sourceKey) {
  */
 async function liveProject(projectId) {
   const rows = await api(`app_projects?select=id,zip,name,type,status,lat,lng,record_kind,source_key,provenance`
+    + `,${HS.MAPS_PIN_RECORD_FIELDS.join(',')}`
     + `&id=eq.${encodeURIComponent(projectId)}&limit=1`);
   return rows[0] || null;
 }
@@ -136,9 +354,14 @@ function nearly(a, b) { return typeof a === 'number' && typeof b === 'number' &&
  * Capture one project. Returns { ok, reason, file? } — a failure is always a reason, never
  * a substitute image.
  */
-async function capture(page, draft, proj) {
-  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}`;
+async function capture(page, draft, proj, theme) {
+  // EVERY MAPS capture is the Map 1 PRODUCT CARD, so it opens the page in the shipped embed
+  // mode (founder requirement 2026-09-22 — see CARD_FRAME_REQUIRED). The theme only decides
+  // which FILTER STATE the card is photographed in, never whether the card is in the frame.
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // THE POLICY MODULE RIDES WITH THE PAGE, never a copy of it in this file.
+  await page.addScriptTag({ content: POLICY_SRC });
 
   // The page exposes its drawn markers for exactly this purpose (see homesignalmap.html:
   // "Lets the offline browser proof open a specific marker's real popup instead of
@@ -152,6 +375,34 @@ async function capture(page, draft, proj) {
       && Array.isArray(window.siteMarkers) && window.siteMarkers.length > 0,
     { timeout: 60000 },
   ).catch(() => {});
+  // THE FILTER GOES ON BEFORE THE MARKER IS LOCATED, not after: applyFilter() changes what is
+  // on the map, so anything measured first could be stale by the shutter.
+  //
+  // ⚠️ AND `window.siteMarkers` IS NOT THE VISIBLE SET. An earlier version of this comment
+  // claimed that finding the project in that array after filtering proved it belonged to the
+  // Data center bucket. IT PROVES NOTHING: Map 1's applyFilter() keeps every marker in the
+  // array and only adds it to or removes it from the Leaflet layer group, so array membership
+  // is byte-identical before and after. Measured in a real browser —
+  // test/maps-datacenter-capture-state.browser.test.mjs — where the Residential control stays
+  // in `siteMarkers` and leaves the map. ON THE MAP is `m._map`, which Leaflet nulls on
+  // removeLayer, and that is what `markerOnMap` below asserts.
+  //
+  // ⚠️ THE POLICY IS APPLIED WITH NO TARGET, ON PURPOSE. ZIP mode issues the cached report and
+  // the authoritative whole-ZIP read TOGETHER, and the authoritative merge — the one carrying
+  // `zip_project_ref` — can land after a first pass has already settled. Asking the policy to
+  // judge "is the target drawn?" here would turn that race into a capture failure with a
+  // truthful-sounding but WRONG reason ("not shown under this policy") for a project the page
+  // simply had not drawn yet. So this step sets and settles the three control dimensions; the
+  // target's own visibility is waited for below and then ASSERTED at the shutter, where it is
+  // a statement about the image.
+  let policyApply = null;
+  if (theme === 'datacenter') {
+    policyApply = await applyDataCenterCapturePolicy(page, null);
+    if (!policyApply.ok) {
+      return { ok: false, reason: `Data Center map-state policy could not be applied: ${policyApply.reason}` };
+    }
+  }
+
   // Then wait for THIS PROJECT's marker specifically. A count that has stopped changing is
   // not the same as the right draw having happened: ZIP mode issues the cached report and
   // the authoritative whole-ZIP read together, and the authoritative merge — the one that
@@ -160,11 +411,17 @@ async function capture(page, draft, proj) {
   // authoritative set, the marker must appear; waiting for the marker itself removes the
   // race instead of guessing at a duration. Measured: settling on the count captured 1 of 7,
   // because six reads landed on the pre-authoritative draw.
+  //
+  // For a theme capture it waits for the marker to be ON THE MAP, not merely present in
+  // `window.siteMarkers` — the filter is already applied by now, and array membership is
+  // byte-identical either side of it, so the weaker condition would be satisfied by a marker
+  // the map is not showing.
   await page.waitForFunction(
-    (key) => (window.siteMarkers || []).some(
-      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key,
+    ([key, needOnMap]) => (window.siteMarkers || []).some(
+      (x) => x && x.s && (x.s.zip_project_ref || x.s.source_id) === key
+        && (!needOnMap || !!(x.m && x.m._map)),
     ),
-    proj.source_key,
+    [proj.source_key, theme === 'datacenter'],
     { timeout: 90000, polling: 700 },
   ).catch(() => {});
 
@@ -204,12 +461,53 @@ async function capture(page, draft, proj) {
     };
   }, [proj.source_key]);
 
+  // THE DRAWN PIN MUST CARRY THIS RECORD'S NAME. The record comparison already ran on the
+  // reader's content before the browser opened; this is the same question asked of the
+  // marker the page actually drew, so a page that drew different content than the reader
+  // returned a moment earlier is refused rather than photographed.
+  if (found.found && (proj.name || '') !== found.label) {
+    return {
+      ok: false,
+      reason: `the pin Map 1 drew is labelled ${JSON.stringify(found.label.slice(0, 80))}, not `
+        + `${JSON.stringify(String(proj.name || '').slice(0, 80))}, so it does not show this post's record`,
+    };
+  }
+
   if (!found.found) {
+    if (theme === 'datacenter') {
+      return {
+        ok: false,
+        reason: 'the project has no marker on Map 1 with the Data center PROJECT TYPE filter '
+          + `selected (${found.total} markers drawn). The queue and the map disagree about this `
+          + 'record, so no image is produced rather than a picture of some other project.',
+      };
+    }
     return {
       ok: false,
       reason: `no drawn marker for this project (${found.total} markers drawn, `
         + `${found.sites} sites rendered, authoritative set present: ${found.authoritative}, `
         + `project present in it: ${found.inCache})`,
+    };
+  }
+
+  // IS IT ACTUALLY DRAWN? The framing step below already fails when a marker carries no
+  // `_map`, so a filtered-out target was always refused rather than captured — but it was
+  // refused with "could not reach the Leaflet map from the marker", which names a plumbing
+  // fault for what is really a FILTER verdict. Asking here turns that into the precise
+  // reason, and for a theme capture it is the one check that proves the project survives the
+  // Data center filter — i.e. that the post and its picture are about the same record.
+  const onMap = await page.evaluate(([idx]) => {
+    const hit = (window.siteMarkers || [])[idx];
+    return !!(hit && hit.m && hit.m._map);
+  }, [found.idx]);
+  if (!onMap) {
+    return {
+      ok: false,
+      reason: theme === 'datacenter'
+        ? 'the project is drawn on this ZIP but is NOT shown under the Data center PROJECT '
+          + 'TYPE filter, so Map 1 does not place it in the Data center bucket. No image is '
+          + 'produced rather than a halo around a marker the map is not showing.'
+        : 'the project has a marker but Map 1 is not currently showing it (filtered out)',
     };
   }
 
@@ -279,24 +577,185 @@ async function capture(page, draft, proj) {
     return { ok: false, reason: `the target could not be made identifiable (popup: ${clean.popupOpen}, halo: ${clean.haloPresent})` };
   }
 
-  // Suppress only chrome that is not the map: page header/nav/footer sit outside #map, so
-  // clipping to #map already excludes them. Leaflet's own zoom control is the one control
-  // inside the frame and is hidden for the shot.
+  // Suppress only chrome that is not the map: embed mode hides the page header/nav/footer
+  // (asserted by cardInFrame). Leaflet's own zoom control is the one control inside the map
+  // and is hidden for the shot.
   await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
   await page.waitForTimeout(1200);   // let the framed tiles settle
 
-  const el = await page.$('#map');
-  if (!el) return { ok: false, reason: 'no #map element' };
+  // THE SHUTTER TARGET IS THE MAP 1 PRODUCT CARD, ON EVERY PATH. The card's controls are what
+  // say WHICH records are on screen: a Data Center image has to show that Data center is the
+  // selected PROJECT TYPE, and an ordinary image shows the page's own STATUS / PROJECT TYPE /
+  // REGULATORY state (founder requirement 2026-09-22; it used to clip to the bare `#map`).
+  const cardCheck = await cardInFrame(page);
+  if (!cardCheck.ok) return { ok: false, reason: cardCheck.reason };
+  const { panel, controls } = cardCheck;
+
+  // ── RE-READ THE CONTROLS AND THE DRAWN LAYER, AT THE SHUTTER ───────────────────────
+  // ⚠️ THE READING TAKEN WHEN THE FILTER WAS APPLIED IS NOT A STATEMENT ABOUT THE IMAGE.
+  // Between there and here the capture calls `map.setView(...)`, opens the marker's popup
+  // and injects a stylesheet — each of which re-enters the page and any of which could, in
+  // principle, run a handler that moves a control or redraws the layer. So the policy is
+  // verified AGAIN, immediately before `el.screenshot()`, and a failure refuses the capture
+  // rather than saving an image whose panel and whose markers disagree with the record.
+  let policyRecord = null;
+  if (theme === 'datacenter') {
+    const verify = await page.evaluate(
+      ([key]) => window.HS.mapsDcCaptureVerifyAtShutter(key),
+      [proj.source_key],
+    );
+    if (!verify.ok) {
+      return { ok: false, reason: `the Data Center map state did not hold to the shutter: ${verify.reason}` };
+    }
+    policyRecord = await page.evaluate(
+      ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
+      // The scope this capture ACTUALLY shot. The record builder defaults to 'project' when
+      // told nothing, which stamped every ZIP-map fallback as a project capture and made the
+      // enforced SQL guard demand a target the ZIP map never sought (64165, 2026-09-22).
+      [policyApply, { ...verify, scope: 'project' }],
+    );
+    // The row will only be treated as bound if this record validates, so validating it HERE
+    // — before an image is written or uploaded — turns a would-be silently-unusable capture
+    // into a named refusal. The SHIPPED validator, never a second opinion about it.
+    const ev = HS.mapsDcCapturePolicyEvidence({ capture_policy: policyRecord });
+    if (!ev.ok) {
+      return { ok: false, reason: `the measured map state does not satisfy policy ${HS.MAPS_DC_CAPTURE_POLICY.key}: ${ev.problems.join('; ')}` };
+    }
+  }
+
+  const sel = CARD_CLIP;
+  const el = await page.$(sel);
+  if (!el) return { ok: false, reason: `no ${sel} element` };
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const file = path.join(OUT_DIR, `${draft.zip}-${String(proj.id).slice(0, 8)}.png`);
   await el.screenshot({ path: file });
 
   return {
-    ok: true, file,
+    ok: true, file, clip: sel,
     marker: { label: found.label, lat: found.site_lat, lng: found.site_lng,
       of: found.total, how: found.how, fanned: found.fanned, delta_m: found.delta_m },
     framed: { zoom: framed.zoom, center: framed.center },
     checks: clean,
+    theme: theme || null,
+    policyRecord,
+    panel,
+    controls,
+  };
+}
+
+// ⚖️ EVERY POST GETS A MAP, INCLUDING THE "NO DATA CENTER" ONE — FOUNDER RULING, 2026-09-21,
+// stated three times before it was implemented. This function is why it kept being lost.
+//
+// 🔑 THE ERROR WAS ONE SUBSTITUTION: "there is no PROJECT to photograph" was read as "there
+// is no MAP to photograph". They are different facts. A ZIP's Map 1 page exists and renders
+// whether or not a data centre has ever been filed there, and a screenshot OF THAT PAGE is a
+// real screenshot of a real page — so the founder's "no fake graphics, EVER" rule is
+// satisfied in full. Nothing is drawn that the page did not draw. What the absence post's
+// picture shows is the ZIP's own map with the Data center PROJECT TYPE selected and no
+// data-centre markers on it, which is precisely what the post says in words.
+//
+// The capture is the project capture MINUS the marker work, never a different picture:
+// same URL, same embed card, same Data Center map-state policy, same home-pin veto, same
+// panel-in-frame assertions, same clip target, same shutter. `applyDataCenterCapturePolicy`
+// was ALREADY called with a null target (see capture()), and
+// `mapsDcCaptureVerifyAtShutter` already guards its target check with `if (targetKey && …)`,
+// so both halves of the policy run unchanged here with no target — still refusing the shot
+// if any non-data-centre development, any regulatory-only marker or any regulatory badge is
+// on the map at the shutter.
+//
+// ⛔ THERE IS NO HALO AND NO POPUP, and that is not a weaker capture — it is the correct
+// one. A halo means "this marker is the subject"; an absence post's subject is the ABSENCE,
+// so haloing anything would point at a record the post is not about. The project path's
+// `popupOpen && haloPresent` assertion is therefore not relaxed here, it is INAPPLICABLE,
+// and asserting it would refuse every absence capture forever.
+//
+// ⚠️ FRAMING IS THE PAGE'S OWN. The project path calls `map.setView(project coords)`; there
+// are no project coords here, so nothing is set and ZIP mode's own `zipFitRadius` framing
+// stands. That is the same view a resident opening the link would see, which is the honest
+// frame for a post whose subject is the whole ZIP.
+async function captureAbsence(page, draft, theme) {
+  const url = `${BASE}/homesignalmap.html?zip=${encodeURIComponent(draft.zip)}&${EMBED_PARAM}`;
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.addScriptTag({ content: POLICY_SRC });
+
+  // Wait for the page to have ISSUED its reads, not for markers to exist — zero drawn
+  // markers is the expected and correct outcome here, so waiting on a non-empty
+  // `siteMarkers` would time out on exactly the ZIPs this exists to photograph.
+  await page.waitForFunction(
+    () => Array.isArray(window.__HS_SITES),
+    { timeout: 60000 },
+  ).catch(() => {});
+
+  let policyApply = null;
+  if (theme === 'datacenter') {
+    policyApply = await applyDataCenterCapturePolicy(page, null);
+    if (!policyApply.ok) {
+      return { ok: false, reason: `Data Center map-state policy could not be applied: ${policyApply.reason}` };
+    }
+  }
+
+  // ⛔ NO `drew` FLOOR. The project path refuses when the map drew no markers, because a
+  // project capture with nothing drawn cannot contain its subject. An absence capture's
+  // subject IS the empty result, so a marker count of zero is the success case and a floor
+  // here would invert the whole rule.
+
+  const clean = await page.evaluate(() => ({
+    homePins: document.querySelectorAll('.homepin').length,
+    vectorPaths: document.querySelectorAll('#mapInner path.leaflet-interactive').length,
+    markersDrawn: (window.siteMarkers || []).length,
+    markersOnMap: (window.siteMarkers || []).filter((x) => x && x.m && x.m._map).length,
+    sites: (window.__HS_SITES || []).length,
+  }));
+  // The home pin is the veto for the same reason as the project path: a broadcast post has
+  // no home and no radius.
+  if (clean.homePins > 0) return { ok: false, reason: 'refused: a home marker is on the map' };
+
+  await page.addStyleTag({ content: '.leaflet-control-container{display:none!important}' });
+  await page.waitForTimeout(1200);
+
+  const cardCheck = await cardInFrame(page);
+  if (!cardCheck.ok) return { ok: false, reason: cardCheck.reason };
+  const { panel, controls } = cardCheck;
+
+  let policyRecord = null;
+  if (theme === 'datacenter') {
+    // NULL TARGET, DELIBERATELY. Every other invariant in this verifier still runs and can
+    // still refuse the shot; only the "is the target still drawn" limb is skipped, because
+    // there is no target. See the guard at lib/maps-capture-policy.js:463.
+    const verify = await page.evaluate(() => window.HS.mapsDcCaptureVerifyAtShutter(null));
+    if (!verify.ok) {
+      return { ok: false, reason: `the Data Center map state did not hold to the shutter: ${verify.reason}` };
+    }
+    policyRecord = await page.evaluate(
+      ([a, v]) => window.HS.mapsDcCapturePolicyRecord(a, v),
+      // ZIP scope, always: this path frames the ZIP and seeks no target. See the project path.
+      [policyApply, { ...verify, scope: 'zip' }],
+    );
+    const ev = HS.mapsDcCapturePolicyEvidence({ capture_policy: policyRecord });
+    if (!ev.ok) {
+      return { ok: false, reason: `the measured map state does not satisfy policy ${HS.MAPS_DC_CAPTURE_POLICY.key}: ${ev.problems.join('; ')}` };
+    }
+  }
+
+  const sel = CARD_CLIP;
+  const el = await page.$(sel);
+  if (!el) return { ok: false, reason: `no ${sel} element` };
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  // Keyed on the DRAFT, not a project — there isn't one, and inventing a project-shaped
+  // name for a file that is about a ZIP is how the next reader concludes it has a project.
+  const file = path.join(OUT_DIR, `${draft.zip}-nodc-${String(draft.id).slice(0, 8)}.png`);
+  await el.screenshot({ path: file });
+
+  return {
+    ok: true, file, clip: sel,
+    // `marker` and `framed` are ABSENT rather than null-filled: this image has no marker
+    // subject and no imposed frame, and a present-but-empty field reads as a failed lookup.
+    absence: true,
+    checks: clean,
+    theme: theme || null,
+    policyRecord,
+    panel,
+    controls,
   };
 }
 
@@ -312,17 +771,293 @@ async function upload(objectPath, file) {
   return objectPath;
 }
 
+/**
+ * ONE FINISH PATH FOR BOTH CAPTURE KINDS — record a failure, name the object, upload, attach.
+ *
+ * 🔑 THIS IS SHARED ON PURPOSE, AND THE REASON IS THE SAME ONE THAT MADE THE ABSENCE POST GO
+ * UNPHOTOGRAPHED FOR SO LONG: the two kinds differ ONLY in what is in front of the lens.
+ * Everything after the shutter — the FAILED record, the key-fingerprinted object path, the
+ * dry-run short circuit, upload-before-attach, and the refusal to write over a row that moved
+ * mid-capture — is one implementation. A second copy would agree today and drift silently,
+ * which is exactly how a rule ends up true on one path and false on the other.
+ *
+ * `proj` is NULL for an absence capture, and every place that would have read it has a named
+ * absence form rather than a blank — see `attach()` and the object path below.
+ */
+async function finishCapture(d, label, r, proj, results) {
+  const theme = r.theme || null;
+  // WHAT THE PICTURE IS OF, fixed here so the key, the object name, the stored evidence and
+  // a refusal record cannot disagree about it. `proj` is null for every ZIP-scope capture —
+  // the absence answer and the four record-shaped demotions alike.
+  const scope = proj ? 'project' : 'zip';
+
+  if (!r.ok) {
+    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, r.reason, theme, scope);
+    results.push({ id: d.id, label, ok: false, state: FAILED, reason: r.reason, theme,
+      ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
+    return;
+  }
+
+  // ⚖️ THE CANONICAL DEVELOPMENT TYPE IS RECORDED WITH THE PICTURE, OR THE PICTURE IS NOT
+  // RECORDED. `evidence.visual.type_key` is what the Bluesky custom feeds read for TYPE
+  // membership (homesignal-ingest public.bsky_feed_skeleton), so it is decided HERE, by the
+  // shipped Map 1 resolver this job already loads — never by the generator's port, never by a
+  // feed. A draft whose stamped theme disagrees with Map 1's Type for the same record is
+  // refused before upload: its copy, its map and its feed would otherwise say different things.
+  const typeProblem = HS.mapsSocialTypeProblem(d);
+  if (typeProblem) {
+    const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, FAILED, typeProblem, theme, scope);
+    results.push({ id: d.id, label, ok: false, state: FAILED, reason: typeProblem, theme,
+      ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
+    return;
+  }
+
+  // THE OBJECT PATH CARRIES THE BINDING KEY'S OWN FINGERPRINT, so a re-capture after the
+  // draft moved writes a NEW object instead of silently overwriting the old one through
+  // `x-upsert`. Two consequences worth having: `image_bucket_path` changes when the picture
+  // changes, which is what makes the dashboard's per-row blob cache correct; and the
+  // superseded image survives, so a capture can be compared with the one it replaced.
+  //
+  // The subject segment is the project id, or a literal when the picture is of the ZIP.
+  // A project-shaped placeholder there would read to the next person as a project id that
+  // has stopped resolving, which is a different and much worse fact.
+  //
+  // 🔑 THERE ARE THREE VALUES, NOT TWO, AND THE THIRD IS THE ONE THAT IS EASY TO MISS.
+  // `nodc` says the draft NAMES NO PROJECT — true of an absence post and FALSE of a
+  // project-backed row whose pin could not be drawn. Those are different claims: one is
+  // "we looked and there is nothing here", the other is "there is something here and the
+  // map could not put a dot on it". Collapsing them would file a real project's fallback
+  // under a name asserting the project does not exist. `zip_scope_reason` distinguishes
+  // them on the row; this makes the stored OBJECT say it too, so a reader listing the
+  // bucket does not have to join back to `social_posts` to find out what they are looking
+  // at. (This third value is #1283's, arrived at independently and adopted here — that PR
+  // and this one solved the same branch and each had one half of the identity right: it
+  // named the object correctly while keying it at project scope, and this keyed it at ZIP
+  // scope while naming it `nodc`.)
+  const subject = proj ? String(proj.id) : (r.zip_scope_reason ? 'zip' : 'nodc');
+  const objectPath = `maps/${d.zip}/${subject}-${keyStamp(d, scope)}.png`;
+
+  if (DRY) {
+    results.push({ id: d.id, label, ok: true, dry: true, state: READY, file: r.file,
+      ...(r.absence ? { absence: true } : { marker: r.marker }) });
+    return;
+  }
+
+  // THE UPLOAD LANDS FIRST AND IS HARMLESS ON ITS OWN. The object path carries this draft's
+  // own key fingerprint, so an orphan object is unreferenced bytes — it is not a picture
+  // attached to a row, and nothing reads the bucket except through `image_bucket_path`.
+  // Uploading after a successful attach would be worse: the row would name an object that
+  // does not exist yet.
+  await upload(objectPath, r.file);
+  const wrote = await attach(d, objectPath, r, proj, scope);
+  if (!wrote.ok) {
+    // The row moved while we were photographing it. Report it, leave the previous image and
+    // the previous evidence untouched, and let the next run re-select it against whatever the
+    // draft is NOW. Forcing the write is the one thing that must not happen here.
+    console.warn(`maps-social-image: ${d.id} — SKIPPED (stale): the draft changed during this `
+      + `capture (status or revision ${d.revision} moved). Nothing was written; the uploaded `
+      + `object ${objectPath} is unreferenced.`);
+    results.push({ id: d.id, label, ok: false, state: WAITING, stale: true,
+      reason: 'the draft changed during this capture; the result was not attached' });
+    return;
+  }
+  results.push({ id: d.id, label, ok: true, state: READY, path: objectPath,
+    ...(r.absence ? { absence: true } : { marker: r.marker, framed: r.framed }) });
+}
+
+// ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — FOUNDER RULING
+// 2026-10-01. When Map 1 cannot pin the project (the row is gone, is not a development
+// record, has no coordinates, has moved away from the draft, or is not drawn in this ZIP),
+// the draft gets NO picture and the reason is recorded. No ZIP map stands in for it: six
+// project posts went out on a ZIP map (five of them naming the wrong ZIP) and were deleted
+// from Bluesky the same day. A draft with no picture cannot be approved, so the founder
+// sees the reason on the dashboard instead of a picture that shows something else.
+//
+// 🛑 SUPERSEDES the 2026-09-21/22 "PROJECT MAP -> ZIP MAP" fallback that stood here, which
+// photographed the whole ZIP for these drafts. Posts with NO project are untouched: they
+// still get the map of their ZIP through `captureAbsence`, and are correct as they are.
+//
+// CAPTURE_INELIGIBLE is the state that means exactly this ("cannot be photographed on its
+// ZIP page yet"), and its long retry floor brings the row back in case the record becomes
+// drawable. It is kept at module scope so its body can be executed offline.
+async function projectPinRefusal(d, label, results, why, mismatch) {
+  const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+  const reason = `The project's own pin could not be shown on Map 1: ${why}. A post about a `
+    + 'project must show its own pin with its popup open (founder ruling 2026-10-01), so no '
+    + 'ZIP map stands in for it.';
+  // ANY picture this draft still holds can no longer be said to show its record, so it is
+  // unbound here (record_match false), not merely left as it was. `record_mismatch` carries
+  // the comparison's own words when that is the reason, for the dashboard.
+  const extra = { record_match: false, ...(mismatch ? { record_mismatch: mismatch } : {}) };
+  const w = DRY ? { ok: true, rows: 0 } : await recordOutcome(d, INELIGIBLE, reason, theme, 'project', extra);
+  results.push({ id: d.id, label, ok: false, state: INELIGIBLE, reason, theme,
+    ...(w.ok ? {} : { stale: true, note: 'the draft changed during this run; nothing was written' }) });
+}
+
+/**
+ * --stamp-types: record the canonical Map 1 Development Type on drafts that ALREADY hold a
+ * current capture, without re-photographing them. The one-time backfill for captures taken
+ * before `visual.type_key` existed, and a no-op on any row that already carries it.
+ *
+ * Same decision as a live capture (HS.mapsSocialTypeKey / HS.mapsSocialTypeProblem), same
+ * write (guardedPatch: draft-only, revision-pinned, evidence-only). Only READY rows are touched,
+ * because a type stamped beside a picture that is not bound would say the picture proves it.
+ * A row with a type problem is REPORTED and left alone — the next real capture refuses it.
+ */
+async function stampTypes() {
+  const q = 'social_posts?select=id,zip,tile,post_text,evidence,image_bucket_path,status,content_family,revision'
+    + '&content_family=eq.MAPS&status=eq.draft&order=id.asc&limit=5000'
+    + (ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '');
+  const rows = await api(q);
+  const tally = { examined: 0, not_ready: 0, already: 0, problem: 0, stamped: 0, stale: 0 };
+  for (const d of rows) {
+    tally.examined++;
+    if (HS.mapsCaptureState(d) !== READY) { tally.not_ready++; continue; }
+    const v = (d.evidence && d.evidence.visual) || {};
+    const key = HS.mapsSocialTypeKey(d);
+    const problem = HS.mapsSocialTypeProblem(d);
+    if (problem) { tally.problem++; console.log(`  PROBLEM ${d.id} zip=${d.zip}: ${problem}`); continue; }
+    if (v.type_key === key && v.type_label === HS.mapsSocialTypeLabel(key)) { tally.already++; continue; }
+    console.log(`  ${DRY ? 'would stamp' : 'stamp'} ${d.id} zip=${d.zip} type_key=${key}`);
+    if (DRY) { tally.stamped++; continue; }
+    const w = await guardedPatch(d, {
+      evidence: { ...(d.evidence || {}), visual: { ...v, type_key: key, type_label: HS.mapsSocialTypeLabel(key) } },
+    });
+    w.ok ? tally.stamped++ : tally.stale++;
+  }
+  console.log(`stamp-types ${DRY ? '(DRY) ' : ''}${JSON.stringify(tally)}`);
+  const parts = tally.not_ready + tally.already + tally.problem + tally.stamped + tally.stale;
+  if (parts !== tally.examined) throw new Error(`stamp-types partition ${parts} != examined ${tally.examined}`);
+  if (tally.problem) process.exitCode = 1;
+}
+
+/**
+ * --stamp-record-match: Map 1 step (a) for pictures taken BEFORE the record check existed.
+ *
+ * A picture of a project records `record_match` only since 2026-10-02, and without it the
+ * picture is not bound (lib/maps-capture-binding.js). This pass checks the pictures that
+ * already exist instead of re-photographing them, and needs two things to agree:
+ *
+ *   1. the PICTURE: the name its popup showed (`visual.marker_label`, recorded at the
+ *      shutter) is this post's record's name; and
+ *   2. MAP 1 NOW: the content the reader returns for this pin matches this post's record on
+ *      every field (HS.mapsPinRecordMismatch, the same rule a live capture uses).
+ *
+ * Both agree -> `record_match: true`, evidence only. Map 1 now differs -> a draft is refused
+ * (record_match false, CAPTURE_INELIGIBLE), exactly as a live capture would refuse it.
+ * Only the picture is out of date -> nothing is written; the draft stays unbound and the
+ * next capture run re-photographs it.
+ *
+ * APPROVED ROWS. The founder approved an exact payload, and the approval binds it by
+ * hs_social_payload_fingerprint (post text, link, embed, image path, hashtags). Evidence is
+ * not in that fingerprint, so writing `record_match` moves neither the payload nor the
+ * status; the write pins status=approved and the revision, and the row is re-read
+ * afterwards to prove every fingerprint input is unchanged. An approved row that fails
+ * either check is never written: the run reports it and fails.
+ */
+async function stampRecordMatch() {
+  const FP = ['status', 'post_text', 'source_url', 'embed_kind', 'embed', 'image_bucket_path', 'hashtags'];
+  const q = 'social_posts?select=id,zip,tile,post_text,source_url,embed_kind,embed,hashtags,evidence,'
+    + 'image_bucket_path,status,content_family,revision'
+    + '&content_family=eq.MAPS&status=in.(draft,approved)&order=id.asc&limit=5000'
+    + (ONLY_IDS.length ? `&id=in.(${ONLY_IDS.join(',')})` : '');
+  const rows = await api(q);
+  const tally = { examined: 0, no_project: 0, not_project_picture: 0, already: 0, stamped: 0,
+    picture_stale: 0, refused: 0, approved_failed: 0, stale: 0 };
+  const results = [];
+  const touchedApproved = [];
+  for (const d of rows) {
+    tally.examined++;
+    const pid = d.evidence && d.evidence.project_id;
+    const v = (d.evidence && d.evidence.visual) || {};
+    if (!pid) { tally.no_project++; continue; }
+    if (!d.image_bucket_path || HS.mapsCaptureStoredScope(v, d) !== 'project') { tally.not_project_picture++; continue; }
+    if (v.record_match === true || v.record_match === 'true') { tally.already++; continue; }
+    const label = `${d.zip} ${d.evidence.project_name || ''}`.trim();
+    const proj = await liveProject(pid);
+    const auth = proj ? await authoritativePresence(d.zip, proj.source_key) : null;
+    const now = !proj ? 'the project row is no longer in app_projects'
+      : !auth.present ? `the project is not drawn on its ZIP's Map 1 page (status ${auth.status})`
+        : HS.mapsPinRecordMismatch(auth.entry, proj);
+    const pictureOk = !!proj && typeof v.marker_label === 'string' && v.marker_label === (proj.name || '');
+    console.log(`  ${d.status} ${d.id} zip=${d.zip} map1_now=${now ? 'DIFFERS' : 'matches'} picture=${pictureOk ? 'matches' : 'differs'}${now ? ` -- ${now}` : ''}`);
+    if (now || !pictureOk) {
+      if (d.status === 'approved') { tally.approved_failed++; continue; }
+      if (now) {
+        tally.refused++;
+        if (!DRY) await projectPinRefusal(d, label, results, now, now);
+      } else {
+        tally.picture_stale++;
+      }
+      continue;
+    }
+    if (DRY) { tally.stamped++; continue; }
+    const visual = { ...v, record_match: true, record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: new Date().toISOString(), record_checked_by: 'stamp-record-match' };
+    const w = await guardedPatch(d, { evidence: { ...d.evidence, visual } }, d.status);
+    if (!w.ok) { tally.stale++; continue; }
+    tally.stamped++;
+    if (d.status === 'approved') touchedApproved.push(d);
+  }
+  // PROVE THE APPROVED PAYLOADS DID NOT MOVE. Every input of hs_social_payload_fingerprint,
+  // and the status, re-read from the database and compared with what was read before.
+  if (touchedApproved.length) {
+    const after = await api(`social_posts?select=id,${FP.join(',')}&id=in.(${touchedApproved.map((d) => d.id).join(',')})`);
+    for (const d of touchedApproved) {
+      const a = after.find((x) => x.id === d.id);
+      const moved = FP.filter((f) => JSON.stringify(a && a[f]) !== JSON.stringify(d[f]));
+      if (!a || moved.length) {
+        throw new Error(`REFUSING TO REPORT SUCCESS: approved row ${d.id} changed ${moved.join(', ') || 'unreadable'}`);
+      }
+    }
+    console.log(`stamp-record-match: ${touchedApproved.length} approved row(s) re-read; status and every payload-fingerprint input unchanged`);
+  }
+  console.log(`stamp-record-match ${DRY ? '(DRY) ' : ''}${JSON.stringify(tally)}`);
+  const parts = tally.no_project + tally.not_project_picture + tally.already + tally.stamped
+    + tally.picture_stale + tally.refused + tally.approved_failed + tally.stale;
+  if (parts !== tally.examined) throw new Error(`stamp-record-match partition ${parts} != examined ${tally.examined}`);
+  if (tally.approved_failed) {
+    console.error(`stamp-record-match: ${tally.approved_failed} APPROVED post(s) show a different record or could not be checked; nothing was written to them`);
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   if (!SB || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.');
-  const drafts = await pendingDrafts();
-  console.log(`maps-social-image: ${drafts.length} MAPS draft(s) without a project-specific visual`);
-  if (has('--list')) { for (const d of drafts) console.log(` ${d.id} zip=${d.zip} ${d.evidence?.project_name}`); return; }
-  if (!drafts.length) return;
+  if (has('--stamp-types')) { await stampTypes(); return; }
+  if (has('--stamp-record-match')) { await stampRecordMatch(); return; }
+  const drafts = await selectDrafts();
+  if (has('--list')) {
+    for (const d of drafts) {
+      console.log(` ${d.id} zip=${d.zip} state=${HS.mapsCaptureState(d)} ${d.evidence?.project_name}`);
+    }
+    return;
+  }
+  if (!drafts.length) { await proveNothingApproved(); return; }
 
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: IMG_W, height: IMG_H },
     deviceScaleFactor: SCALE,
+  });
+  // ── EACH CAPTURE STARTS FROM THE PRODUCT'S OWN DEFAULT STATE ───────────────────────
+  // lib/map.js persists the PROJECT TYPE and REGULATORY selections in `sessionStorage`
+  // (`hs.map.categoryFilters`) and this job reuses ONE browser context for every draft in a
+  // run, so without this the SECOND capture inherits the FIRST's filter state. That is not
+  // hypothetical: the shipped Mesa evidence records `type_filter_before` byte-identical to
+  // `type_filter_after` (datacenter true, six falses) — a "before" no fresh page can produce.
+  // For a theme capture the policy overwrites all three dimensions anyway, so what this
+  // protects is the ORDINARY MAPS capture that follows one, which sets no filters at all and
+  // would otherwise be photographed through the previous draft's Data-center-only view.
+  //
+  // It clears the CAPTURE browser's own ephemeral session, never a resident's: this context
+  // is created and destroyed inside this function, and nothing here touches localStorage or
+  // any stored preference of the deployed site.
+  await ctx.addInitScript(() => {
+    try {
+      window.sessionStorage.removeItem('hs.map.categoryFilters');
+      window.sessionStorage.removeItem('hs.map.statusFilters');
+    } catch (e) { /* storage blocked -> the page already falls back to its defaults */ }
   });
   const page = await ctx.newPage();
   const results = [];
@@ -330,14 +1065,50 @@ async function main() {
   for (const d of drafts) {
     const pid = d.evidence?.project_id;
     const label = `${d.zip} ${d.evidence?.project_name || ''}`.trim();
-    if (!pid) { results.push({ id: d.id, label, ok: false, reason: 'draft carries no project_id' }); continue; }
+
+    // ⚖️ CAPTURE_INELIGIBLE IS LIVE AGAIN (founder ruling 2026-10-01): it is what a post
+    // about a project records when Map 1 cannot pin that project. See projectPinRefusal().
+    // (From 2026-09-21 to 2026-10-01 those drafts were demoted to a ZIP map instead, and
+    // this state was only ever a historical stamp.)
+
+    // ⚖️ AN ABSENCE DRAFT IS PHOTOGRAPHED, NOT REFUSED — FOUNDER RULING (2026-09-21).
+    // This branch used to read `await ineligible('the draft carries no project_id, so there
+    // is nothing to photograph')` and `continue`, and that sentence is the one the founder
+    // was reading off the Acquisition Dashboard. It states a true fact about PROJECTS and
+    // draws a false conclusion about MAPS: the ZIP's Map 1 page renders either way, and the
+    // post's whole subject is that page. See captureAbsence() for why this is still a real
+    // screenshot of a real page and not a fabrication.
+    if (!pid) {
+      const themeA = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
+      let ra;
+      try { ra = await captureAbsence(page, d, themeA); }
+      catch (e) { ra = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
+      // A refusal returns `{ok:false, reason}` and nothing else, so the theme is carried in
+      // here rather than read off the result — otherwise a FAILED absence row would be
+      // recorded with no theme and the dashboard could not tell which queue it belongs to.
+      if (ra.theme === undefined) ra.theme = themeA || null;
+      await finishCapture(d, label, ra, null, results);
+      continue;
+    }
+
+    // ⚖️ A POST ABOUT A PROJECT SHOWS THAT PROJECT'S OWN PIN, POPUP OPEN — founder ruling
+    // 2026-10-01, superseding the 2026-09-21 "PROJECT MAP -> ZIP MAP" fallback that stood
+    // here. The five branches below are statements about the RECORD: it is gone, it is not
+    // a development row, it has no coordinates, it has moved away from the draft, or the
+    // ZIP's authoritative set does not contain it. Each now leaves the draft with no picture
+    // and the reason recorded (CAPTURE_INELIGIBLE), which keeps Approve blocked.
+    //
+    // ⛔ A genuine INSTRUMENT failure (the browser crashed, Map 1 would not load, the shutter
+    // could not verify the controls) still returns `{ok:false}` from `capture*()` and is
+    // still recorded as CAPTURE_FAILED by `finishCapture`.
+    const pinRefusal = (why) => projectPinRefusal(d, label, results, why);
 
     const proj = await liveProject(pid);
-    if (!proj) { results.push({ id: d.id, label, ok: false, reason: 'project row no longer in app_projects' }); continue; }
-    if (proj.record_kind !== 'development') { results.push({ id: d.id, label, ok: false, reason: 'not a development record' }); continue; }
-    if (proj.lat == null || proj.lng == null) { results.push({ id: d.id, label, ok: false, reason: 'project has no coordinates' }); continue; }
+    if (!proj) { await pinRefusal('the project row is no longer in app_projects'); continue; }
+    if (proj.record_kind !== 'development') { await pinRefusal('the live row is not a development record'); continue; }
+    if (proj.lat == null || proj.lng == null) { await pinRefusal('the project has no coordinates, so Map 1 draws no marker for it'); continue; }
     if (!nearly(proj.lat, d.evidence?.lat) || !nearly(proj.lng, d.evidence?.lng)) {
-      results.push({ id: d.id, label, ok: false, reason: 'live coordinates differ from the draft evidence' });
+      await pinRefusal('the live coordinates differ from the draft evidence, so a pin would not be of this draft');
       continue;
     }
 
@@ -346,97 +1117,352 @@ async function main() {
       const why = auth.status !== 'boundary_complete'
         ? `the ZIP's authoritative whole-ZIP boundary is not complete (status: ${auth.status}), so Map 1 renders no development for it`
         : `the project is not in the ZIP's authoritative development set (${auth.markers} markers there)`;
-      results.push({ id: d.id, label, ok: false, reason: why });
-      if (!DRY) await recordFailure(d, why);
+      await pinRefusal(why);
       continue;
     }
+
+    // ⚖️ MAP 1 STEP (a): THE PIN MUST SHOW THIS POST'S OWN RECORD. Map 1 draws one pin per
+    // source_key; where several records share a key its popup can show another one. Compared
+    // on content, before the browser opens (HS.mapsPinRecordMismatch).
+    const mismatch = HS.mapsPinRecordMismatch(auth.entry, proj);
+    if (mismatch) { await projectPinRefusal(d, label, results, mismatch, mismatch); continue; }
+    const recordCheckedAt = new Date().toISOString();
+
+    // THEME — from the SHIPPED predicate the Acquisition Dashboard uses, so the image this
+    // row gets is decided by the same rule that put the row in the Data Center Theme queue.
+    const theme = HS.mapsSocialThemeKey ? HS.mapsSocialThemeKey(d) : null;
 
     let r;
-    try { r = await capture(page, d, proj); }
+    try { r = await capture(page, d, proj, theme); }
     catch (e) { r = { ok: false, reason: `capture threw: ${String(e.message || e).slice(0, 160)}` }; }
 
-    if (!r.ok) {
-      results.push({ id: d.id, label, ok: false, reason: r.reason });
-      if (!DRY) await recordFailure(d, r.reason);
-      continue;
-    }
-
-    const objectPath = `maps/${d.zip}/${String(proj.id)}.png`;
-    if (DRY) { results.push({ id: d.id, label, ok: true, dry: true, file: r.file, marker: r.marker }); continue; }
-    r.authMarkers = auth.markers;
-    await upload(objectPath, r.file);
-    await attach(d, objectPath, r, proj);
-    results.push({ id: d.id, label, ok: true, path: objectPath, marker: r.marker, framed: r.framed });
+    if (r.theme === undefined) r.theme = theme || null;
+    if (r.ok) { r.authMarkers = auth.markers; r.recordMatch = true; r.recordCheckedAt = recordCheckedAt; }
+    await finishCapture(d, label, r, proj, results);
   }
 
   await browser.close();
   console.log(JSON.stringify(results, null, 2));
   const okN = results.filter((x) => x.ok).length;
-  console.log(`maps-social-image: ${okN} real map visual(s), ${results.length - okN} honest failure(s)`);
+  const byState = (s) => results.filter((x) => x.state === s).length;
+  console.log(`maps-social-image: ${okN} real map visual(s) · ${byState(FAILED)} capture failure(s) · `
+    + `${byState(INELIGIBLE)} ineligible — none of which is a finding about a ZIP`);
+  if (!DRY) await proveNothingApproved(results.map((x) => x.id));
 }
 
-/** Attach the image to THIS draft and record what the visual actually is. */
-async function attach(draft, objectPath, r, proj) {
+/**
+ * A short, stable stamp of the binding key for use inside an object name.
+ *
+ * Object paths are not a place for a 120-character readable key, so this is the one spot
+ * where a digest is right. It is NOT the binding record — `evidence.visual.capture_key`
+ * holds the readable key and is what every comparison uses. This only has to make two
+ * different keys produce two different file names.
+ */
+function keyStamp(draft, scope) {
+  // AT THE SCOPE ACTUALLY SHOT. Hashing the draft's widest scope would give a project-keyed
+  // file name to a ZIP-scope picture and — worse — would not MOVE when the ZIP key moves,
+  // so a superseded ZIP capture would be overwritten in place instead of landing beside its
+  // replacement. The path has to follow the binding record.
+  const key = HS.mapsCaptureKey(draft, scope) || '';
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < key.length; i++) {
+    h1 = Math.imul(h1 ^ key.charCodeAt(i), 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + key.charCodeAt(i), 0x85ebca6b) >>> 0;
+  }
+  return (h1.toString(36) + h2.toString(36)).slice(0, 12);
+}
+
+/**
+ * RE-READ THE ROWS THIS RUN TOUCHED AND PROVE IT MOVED NOTHING IT MAY NOT MOVE.
+ *
+ * `assertWriteScope` refuses a bad patch body before it is sent; this asks the DATABASE
+ * afterwards, which is the only instrument that can catch a write this module did not know
+ * it made.
+ *
+ * ⚠️ SCOPED TO THE ROWS THIS RUN TOUCHED, NEVER TO THE WHOLE QUEUE. Asserting that NO MAPS
+ * row anywhere carries approval state would be true today — 0 of 49 are approved — and
+ * would turn this job red the first time the founder legitimately approves one. A guard
+ * that fails on the system working correctly gets switched off, and then it is not a guard.
+ * The selector only ever returns `status=draft`, so every id here was a draft before the
+ * run; still being one after it is the actual invariant.
+ *
+ * It RAISES. A capture job that has approved something has done the one thing the hold
+ * exists to prevent, and a green run that merely mentioned it in a log would be worse than
+ * a red one.
+ */
+async function proveNothingApproved(ids) {
+  if (!ids || !ids.length) { console.log('maps-social-image: approval-scope check — 0 rows touched, nothing to re-read'); return; }
+  const rows = await api('social_posts?select=id,status,approved_at,scheduled_slot,published_at'
+    + `&id=in.(${ids.join(',')})&limit=500`);
+  const moved = rows.filter((r) => r.status !== 'draft' || r.approved_at || r.scheduled_slot || r.published_at);
+  console.log(`maps-social-image: approval-scope check re-read ${rows.length} touched row(s) — `
+    + `${moved.length} left draft state`);
+  if (moved.length) {
+    for (const m of moved) console.error(`  ${m.id} status=${m.status} approved_at=${m.approved_at} scheduled=${m.scheduled_slot} published=${m.published_at}`);
+    throw new Error('REFUSING TO REPORT SUCCESS: a row this capture run touched no longer '
+      + 'reads as a draft. Capture must never move approval, scheduling or publication.');
+  }
+}
+
+// ── THE ATTACH IS CONDITIONAL, IN ONE STATEMENT ──────────────────────────────────────
+//
+// A capture reads a draft, spends 30-90 seconds in a browser, and then writes. In that
+// window the row can legitimately move: the founder can approve it, a recompose can rewrite
+// its text, another run can attach a newer image. A read followed by an unconditional write
+// is not a guard — it is a race with a comment on it.
+//
+// So every write this module makes carries its preconditions IN THE `WHERE` CLAUSE, which
+// PostgREST expresses as filters on the PATCH. One statement, evaluated by Postgres:
+//
+//   id       — this draft
+//   status   — STILL a draft. Approval is not this job's to move, and an approved row's
+//              payload fingerprint is bound to the image it was approved with, so writing a
+//              new image under it would break that binding (the publication guard would then
+//              refuse to publish at all).
+//   revision — STILL the revision the capture was planned against. `social_posts_bump_revision`
+//              increments it whenever post_text, embed, embed_kind, image_bucket_path,
+//              source_url, hashtags or evidence changes, so equality here means NOTHING this
+//              module merges from its snapshot has moved underneath it.
+//
+// `return=representation` is what makes the refusal VISIBLE: zero rows back means a
+// precondition failed. The run reports the draft as skipped/stale and leaves the old image
+// and the old evidence exactly as they are. It never re-reads and retries, and it never
+// drops a filter to make the write land.
+async function guardedPatch(draft, body, status = 'draft') {
+  // `status` is pinned in the WHERE clause, never moved. Only --stamp-record-match passes
+  // anything but 'draft', and it writes evidence alone (see stampRecordMatch).
+  if (status !== 'draft' && status !== 'approved') throw new Error(`guardedPatch: status ${status}`);
+  const q = `social_posts?id=eq.${draft.id}&status=eq.${status}&revision=eq.${Number(draft.revision)}`;
+  const rows = await api(q, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(assertWriteScope(body)),
+  });
+  const n = Array.isArray(rows) ? rows.length : 0;
+  return { ok: n === 1, rows: n };
+}
+
+/** Attach the image to THIS draft and record what the visual actually is.
+ *
+ * 🔑 `scope` IS A REQUIRED ARGUMENT, NOT A RE-DERIVATION, and it is validated on entry.
+ * It used to be neither: the visual literal referenced a bare `scope`, which is a local of
+ * `finishCapture` and was never in this function's scope, while the capture key twenty
+ * lines further down re-derived it as `r.scope || (proj ? 'project' : 'zip')` — a second
+ * way to answer a question `finishCapture` had already answered, with `r.scope` never set
+ * by anything. The first of those threw `ReferenceError: scope is not defined` on the very
+ * first production ZIP fallback; the second would have gone on quietly agreeing with the
+ * real answer until the day it did not.
+ *
+ * ⚠️ NO OFFLINE TEST CAUGHT IT, and the reason is worth keeping: this module exports
+ * nothing and runs `main()` on import, so every test of it in this repo is a grep over its
+ * source. A structural pin cannot see an unbound identifier. The guard below turns that
+ * class of mistake into an immediate, named error instead of a ReferenceError raised deep
+ * inside an object literal, and `test/maps-capture-attach-executes.test.mjs` now actually
+ * RUNS this function.
+ */
+async function attach(draft, objectPath, r, proj, scope) {
+  if (scope !== 'project' && scope !== 'zip') {
+    throw new Error(`attach: scope must be 'project' or 'zip', got ${JSON.stringify(scope)} `
+      + '— finishCapture computes it once and must pass it through');
+  }
   const visual = {
-    kind: 'map1_zip_screenshot',
+    kind: r.absence ? 'map1_zip_screenshot_no_project' : 'map1_zip_screenshot',
+    // ⚖️ SCOPE IS RECORDED ON THE VISUAL ITSELF, so a reader of the row knows what the
+    // picture is OF without parsing the policy block or the key. This is the half of the
+    // honesty contract #1278 had and #1280 dropped: measured 2026-09-21, all 18 live
+    // absence captures carry no scope anywhere, so the enforced map-state guard defaulted
+    // them to `project` and demanded a target that cannot exist.
+    //
+    // ⛔ A ZIP CAPTURE MUST NEVER BE READ BACK AS PROOF THAT A PARTICULAR PROJECT APPEARED,
+    // which is exactly what an unlabelled picture beside a project-bearing row invites.
+    scope,
+    ...(r.zip_scope_reason ? { zip_scope_reason: r.zip_scope_reason } : {}),
     status: 'REAL_MAP_VISUAL',
+    // THE CANONICAL MAP 1 DEVELOPMENT TYPE (a CATEGORY_REGISTRY key) and Map 1's own label for
+    // it — the Bluesky feeds' TYPE authority. finishCapture has already refused a draft for
+    // which this is null or disagrees with the stamped theme, so both are always present here.
+    type_key: HS.mapsSocialTypeKey(draft),
+    type_label: HS.mapsSocialTypeLabel(HS.mapsSocialTypeKey(draft)),
     bucket: 'social-images',
     path: objectPath,
     captured_at: new Date().toISOString(),
     page_url: `${BASE}/homesignalmap.html?zip=${draft.zip}`,
-    project_lat: proj.lat,
-    project_lng: proj.lng,
-    marker_lat: r.marker.lat,
-    marker_lng: r.marker.lng,
-    marker_label: r.marker.label,
-    matched_by: r.marker.how,
-    marker_display_fanned: r.marker.fanned,
-    marker_vs_stored_point_m: r.marker.delta_m,
-    markers_on_map: r.marker.of,
-    framed_zoom: r.framed.zoom,
-    authoritative_zip_status: 'boundary_complete',
-    authoritative_markers_in_zip: r.authMarkers,
+    // ⚖️ THE PROJECT BLOCK IS ABSENT ON AN ABSENCE CAPTURE, never null-filled — the same
+    // convention the theme block below already uses, and for the same reason: a
+    // present-but-empty `marker_lat` reads as a lookup that failed, while its absence reads
+    // as what it is, a picture with no project subject. An absence capture that emitted
+    // `project_lat: null` would also make `attach` the one place in this pipeline claiming a
+    // project exists for a draft that has none.
+    ...(r.absence ? {
+      subject: 'zip_no_qualifying_project',
+      markers_drawn: r.checks.markersDrawn,
+      markers_on_map: r.checks.markersOnMap,
+      sites_rendered: r.checks.sites,
+    } : {
+      project_lat: proj.lat,
+      project_lng: proj.lng,
+      marker_lat: r.marker.lat,
+      marker_lng: r.marker.lng,
+      marker_label: r.marker.label,
+      matched_by: r.marker.how,
+      marker_display_fanned: r.marker.fanned,
+      marker_vs_stored_point_m: r.marker.delta_m,
+      markers_on_map: r.marker.of,
+      framed_zoom: r.framed.zoom,
+      authoritative_zip_status: 'boundary_complete',
+      authoritative_markers_in_zip: r.authMarkers,
+      popup_open: r.checks.popupOpen,
+      popup_text: r.checks.popupText,
+      halo_present: r.checks.haloPresent,
+      // Map 1 step (a): the pin's content was compared with this post's record before the
+      // shutter (HS.mapsPinRecordMismatch) and the drawn pin carried the record's name.
+      // Anything but an explicit true leaves the picture unbound.
+      record_match: r.recordMatch === true,
+      record_checked_fields: HS.MAPS_PIN_RECORD_FIELDS,
+      record_checked_at: r.recordCheckedAt || null,
+    }),
     home_markers: r.checks.homePins,
     vector_paths: r.checks.vectorPaths,
-    popup_open: r.checks.popupOpen,
-    popup_text: r.checks.popupText,
-    halo_present: r.checks.haloPresent,
     width: IMG_W, height: IMG_H, device_scale: SCALE,
-    note: 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
-      + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
-      + 'radius ring and no home marker, and both absences are asserted before the shutter. '
-      + 'Surrounding development is left visible. Nothing is drawn, moved or invented.',
+    // THE FRAME, ON EVERY CAPTURE. Every MAPS image is the Map 1 card in embed mode (founder
+    // requirement 2026-09-22), so these are no longer theme-only. `panel_controls` is the
+    // STATUS / PROJECT TYPE / REGULATORY state read off the controls at the shutter — for a
+    // Data Center capture it agrees with `capture_policy`; for an ordinary one it is the
+    // page's own default, recorded so the checkmarks in the image are accounted for.
+    clip: r.clip,
+    embed_mode: true,
+    frame: HS.MAPS_CAPTURE_FRAME,
+    panel_in_frame: r.panel,
+    card_header_text: r.panel && r.panel.card_header_text,
+    panel_controls: r.controls,
+    // THEME CAPTURE EVIDENCE. Present only on a theme capture; absent (not false, not
+    // null-filled) on a plain MAPS capture, so the two shapes stay distinguishable.
+    ...(r.theme ? {
+      theme: r.theme,
+      // THE MEASURED MAP STATE — all three filter dimensions, read off the controls
+      // themselves and off the drawn Leaflet layer, so the checkmarks visible in the image
+      // and the markers visible in the image are both accounted for. Built by the SHIPPED
+      // lib/maps-capture-policy.js, which is also what validates it on the way back out.
+      capture_policy: r.policyRecord,
+      // Kept under their historical names so anything already reading them keeps working.
+      // They are the TYPE half of `capture_policy`, not a second measurement.
+      type_filter_before: r.policyRecord && r.policyRecord.observed_before
+        && r.policyRecord.observed_before.types,
+      type_filter_after: r.policyRecord && r.policyRecord.applied && r.policyRecord.applied.types,
+      theme_note: 'Captured in the shipped embed mode (?embed=1) and clipped to the Map 1 '
+        + 'product card under map-state policy ' + HS.MAPS_DC_CAPTURE_POLICY.key + ': all four '
+        + 'STATUS controls on, Data center the only PROJECT TYPE, the REGULATORY overlay OFF — '
+        + 'set THROUGH THE REAL CONTROLS (a change event on each control\'s own checkbox, which '
+        + 'runs the page\'s setStage/setType/setRegulatory and its applyFilter). '
+        // The located-marker sentence is the project path's, and it is the only part of this
+        // note that an absence capture cannot honestly say. The policy itself ran in full —
+        // only its "is the target still drawn" limb is inapplicable with no target.
+        + (r.absence
+          ? 'No target marker was sought, because this capture\'s subject is the absence of '
+            + 'one; every other limb of the policy ran and the controls plus the drawn layer '
+            + 'were re-read at the shutter. '
+          : 'The project\'s marker was located AFTER that policy was applied and the controls '
+            + 'plus the drawn layer were re-read at the shutter. ')
+        + 'No control state is faked and no marker is drawn '
+        + 'by this module. This records what the CONTROLS said; it is not a digest of the PNG.',
+    } : {}),
+    // ⚠️ THE NOTE BRANCHES BECAUSE IT IS EVIDENCE, NOT DECORATION. The project sentence names
+    // a popup, a halo and a project-coordinate frame; an absence capture has none of the
+    // three, so reusing it here would put three false statements in the one field whose job
+    // is to say what was actually photographed. Same rule as the fields above.
+    note: r.absence
+      ? 'Screenshot of the live Map 1 ZIP page in the ZIP\'s own default framing, with no '
+        + 'marker singled out, no popup opened and no halo drawn — because this post\'s '
+        + 'subject is the ABSENCE of a qualifying project, not any one record. ZIP mode draws '
+        + 'no radius ring and no home marker, and both absences are asserted before the '
+        + 'shutter. A marker count of zero here is the page\'s own result, photographed as it '
+        + 'rendered. Nothing is drawn, moved or invented.'
+      : 'Screenshot of the live Map 1 ZIP page, framed on the project\'s own coordinates '
+        + 'with its real marker popup open and a screen-pixel selection halo. ZIP mode draws no '
+        + 'radius ring and no home marker, and both absences are asserted before the shutter. '
+        + 'Surrounding development is left visible. Nothing is drawn, moved or invented.',
   };
-  await api(`social_posts?id=eq.${draft.id}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      image_bucket_path: objectPath,
-      evidence: { ...(draft.evidence || {}), visual },
-    }),
+  // THE BINDING RECORD. `capture_key` is what every later reader compares against the
+  // draft's own inputs, so the picture can never quietly outlive the draft it was taken
+  // for. `state` is the founder-facing fact; the historical `status` literal is kept above
+  // so nothing that already tests for REAL_MAP_VISUAL changes behaviour.
+  visual.state = READY;
+  // AT THE SCOPE THIS CAPTURE ACTUALLY RECORDED. The draft's own widest scope is only where
+  // the attempt STARTED; a project-bearing draft demoted to the ZIP would otherwise be
+  // stamped with a project key it was never given, and be unbound forever.
+  visual.capture_key = HS.mapsCaptureKey(draft, scope);
+  visual.attempts = 0;
+  visual.next_attempt_at = null;
+  // A success clears the previous failure text rather than leaving it beside a real image,
+  // where the next reader would have to work out which one is current.
+  delete visual.failure_reason;
+  delete visual.failed_at;
+
+  return guardedPatch(draft, {
+    image_bucket_path: objectPath,
+    evidence: { ...(draft.evidence || {}), visual },
   });
 }
 
-/** A failure is recorded on the draft; the factual text/link draft is left intact. */
-async function recordFailure(draft, reason) {
+/**
+ * Record a non-success on the draft. The factual text/link draft is left intact.
+ *
+ * FAILED and INELIGIBLE are written as different states with different retry clocks,
+ * because they are different facts: one says our instrument did not work, the other says
+ * this project cannot be photographed on its ZIP page as things stand. Neither is ever a
+ * statement that the ZIP has no development — see the copy in lib/maps-capture-binding.js.
+ */
+// `scope` is the scope the attempt was MADE at, passed in rather than re-derived: on a
+// thrown capture there is no result object to read it from, and re-deriving it from the
+// draft alone would key the refusal at `project` for a ZIP attempt — so the key-moved
+// release in `mapsCaptureDue` would fire every run and the backoff would never hold.
+async function recordOutcome(draft, state, reason, theme, scope, extra) {
   const prev = draft.evidence || {};
-  await api(`social_posts?id=eq.${draft.id}`, {
-    method: 'PATCH',
-    headers: { Prefer: 'return=minimal' },
-    body: JSON.stringify({
+  const prevVisual = { ...(prev.visual || {}), ...(extra || {}) };
+  // An ineligible outcome does not burn an attempt: attempts measure how often our capture
+  // was tried and failed, and no number of retries fixes a project that is not in the ZIP's
+  // authoritative set. It gets the long floor instead.
+  const attempts = state === FAILED ? ((prevVisual.attempts || 0) + 1) : (prevVisual.attempts || 0);
+  const nextAt = state === FAILED
+    ? nextAttemptAt(attempts)
+    : new Date(Date.now() + INELIGIBLE_RETRY_HOURS * 3600 * 1000).toISOString();
+  return guardedPatch(draft, {
       evidence: {
         ...prev,
         visual: {
-          ...(prev.visual || {}),
+          ...prevVisual,
+          state,
+          attempts,
+          next_attempt_at: nextAt,
+          // The draft's inputs AT THE MOMENT OF THE REFUSAL. If they move, the key moves,
+          // and the row is re-selected immediately instead of waiting out a backoff that
+          // was set against a state of the world that no longer holds.
+          attempted_key: HS.mapsCaptureKey(draft, scope),
           status: 'NO_PROJECT_SPECIFIC_VISUAL',
           failure_reason: reason,
           failed_at: new Date().toISOString(),
-          note: 'No project-specific Map 1 visual could be produced truthfully. The draft keeps '
-            + 'its factual text and its Map 1 link; the generic OpenGraph link card remains the '
-            + 'publication fallback and is NOT a project-specific map preview.',
+          theme: theme || null,
+          // ONE SENTENCE THAT NAMES THE INSTRUMENT, stored beside the reason so the
+          // distinction survives into anything that later reads this row. Neither state's
+          // copy can be read as "no data centres here": that inference is exactly what a
+          // conflated failure state invites, and it would be a claim about the world
+          // manufactured out of a screenshot that did not happen.
+          state_note: HS.mapsCaptureStateCopy(state),
+          // THE FALLBACK SENTENCE IS NOT TRUE OF A THEME POST, so it is not written for one.
+          // A MAPS · Data Center Theme post publishes the Map 1 capture or it does not
+          // publish: its hook asks about a data centre, and a generic OpenGraph card shows
+          // none. The Acquisition Dashboard reads this same fact off image_bucket_path and
+          // blocks Approve, so the note and the gate agree.
+          note: theme
+            ? 'No Map 1 visual could be produced truthfully for this MAPS \u00b7 Data Center Theme '
+              + 'candidate. There is NO generic fallback for this theme: approval is blocked in '
+              + 'the Acquisition Dashboard until a real capture of the exact project exists.'
+            : 'No Map 1 visual could be produced truthfully for this MAPS post. Every MAPS post '
+              + 'publishes with its map or not at all (a post about a project with that project\'s '
+              + 'own pin, popup open): approval is blocked in the Acquisition Dashboard until a '
+              + 'real capture exists.',
         },
       },
-    }),
   });
 }
 

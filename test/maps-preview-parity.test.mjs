@@ -40,15 +40,19 @@ ok('no service-role key is present in the page',
 
 // --------------------------------------------------- rendered, not merely resolved
 ok('_bskyImgOk is set only inside an img.onload handler',
-  /img\.onload\s*=\s*function\(\)\{\s*_bskyImgOk\[p\.id\]\s*=\s*true/.test(DASH));
+  /img\.onload\s*=\s*function\(\)\{\s*_bskyImgOk\[_bskyImgKey\(p\)\]\s*=\s*true/.test(DASH));
 ok('an image error path clears nothing and reports the failure',
   /img\.onerror/.test(DASH) && /failed to render/.test(DASH));
 ok('object URLs are revoked before each re-render',
   /revokeObjectURL/.test(DASH) && /bskyReleaseBlobs\(\);\s*\/\//.test(DASH));
 
 // ------------------------------------------------------------- CASE B isolation
-// Each post's blob is keyed by its own id, so one draft can never show another's image.
-ok('blob cache is keyed per post id', /_bskyBlobUrl\[p\.id\]/.test(DASH));
+// Each post's blob is keyed by its own id AND its own image path, so one draft can never show
+// another's image — and, since a re-capture writes a NEW object path, a draft can never show
+// its OWN superseded image either. Keying on the id alone was the second of those defects.
+ok('blob cache is keyed per post id AND image path',
+  /function _bskyImgKey\(p\)\{ return String\(p && p\.id\) \+ '\|' \+ String\(\(p && p\.image_bucket_path\) \|\| ''\); \}/.test(DASH)
+  && /_bskyBlobUrl\[_k\]/.test(DASH) && !/_bskyBlobUrl\[p\.id\]/.test(DASH));
 ok('the modal drops a late callback that belongs to a different post',
   /if\(bskyEditId!==pid\) return;/.test(DASH));
 
@@ -61,10 +65,35 @@ ok('no placeholder/stand-in image is ever substituted',
 // ------------------------------------------------------------- STEP 6 fail-closed
 ok('the Approve button renders LOCKED for an image-bearing MAPS draft',
   /data-gate="image" disabled/.test(DASH));
+// ⚠️ REWRITTEN, NOT RELAXED. This used to pin the LITERAL inline expression
+// `if(mapsImageRequired(gr) && !_bskyImgOk[id]){ … return;` inside the click handler. That
+// expression moved into ONE shared `bskyApprovalBlockReason`, which the button gate and the
+// click handler both call — so the two can no longer disagree, which is a strictly stronger
+// form of the property this line exists to protect. Both halves are asserted: the handler
+// really does re-check and return, AND the original image rule is really still inside the
+// shared function. Pinning only the first half would let the rule be gutted while the
+// handler kept calling an empty gate.
 ok('the click handler re-checks the gate (button state alone is not the control)',
-  /if\(mapsImageRequired\(gr\) && !_bskyImgOk\[id\]\)\{[\s\S]{0,400}?return;/.test(DASH));
+  /var block=bskyApprovalBlockReason\(gr\);[\s\S]{0,120}?if\(block\)\{[\s\S]{0,80}?return;/.test(DASH));
+// ⚠️ THE WINDOW WAS THE BUG, NOT THE RULE. This pinned the rule within 1,600 characters of
+// the function's opening brace; adding two earlier checks to the same gate in 2026-09
+// pushed it past that and turned the line red while the rule sat there untouched. A pin
+// whose failure mode is "someone added code above it" reports edits, not regressions. It
+// now extracts the function's actual body and asks whether the rule is IN it, which is the
+// property the line was always trying to state.
+const gateBody = (() => {
+  const m = DASH.match(/function bskyApprovalBlockReason\(p\)\{([\s\S]*?)\n  \}/);
+  return m ? m[1] : '';
+})();
+ok('…and the shared gate still carries the original image rule',
+  gateBody.length > 0 && /mapsImageRequired\(p\) && !_bskyImgOk\[_bskyImgKey\(p\)\]/.test(gateBody));
+// ⚖️ RE-ANCHORED — the scope test is the FAMILY, and it no longer rides on
+// `&& p.image_bucket_path`. That conjunction made the map requirement conditional on the
+// image it was meant to require. What must stay true is that ALERTS is untouched, which is
+// the property this line was always about.
 ok('the gate is scoped to MAPS and does not touch ALERTS',
-  /content_family === 'MAPS' && p\.image_bucket_path/.test(DASH));
+  /content_family === 'MAPS'/.test(DASH)
+  && /if\(!p \|\| p\.content_family !== 'MAPS'\) return '';/.test(DASH));
 
 // ------------------------------------------------- payload parity vs the REAL publisher
 if (!existsSync(WORKER_PATH)) {

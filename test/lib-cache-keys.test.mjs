@@ -31,7 +31,31 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // the same class of silent failure, and #1089's search fix was the first to ship behind
 // exactly that risk. Its tags are written as src="shell.js" on the 14 pages and as
 // src="/shell.js" by the generator (which carries <base href="/">), so §1 matches both.
-const CONTENT_KEYED = ['lib/map.js', 'lib/templates.js', 'shell.js'];
+// lib/dashboard-aggregate.js joined the set with Fix 8. It is the Dashboard's whole
+// view-model — membership, dedup identity, meeting-time safety, Premium state — so a fix
+// in it that a browser never fetches is exactly the silent class this file exists to stop.
+// lib/maps-capture-binding.js joined the set when the MAPS capture became recurring. It
+// decides whether a stored map image is still bound to its draft, on BOTH sides — the
+// capture job and the Approve gate. A fix in it that a warm browser never fetches would
+// leave the dashboard unlocking Approve on a binding rule the capture no longer uses,
+// which is precisely the disagreement it exists to prevent.
+// The three NYC V1 libs joined the set with the Future Surroundings Report. They are the
+// whole sold artifact — the allowlist, the SODA client, and the derived surfaces — so a
+// fix in one of them that a warm browser never fetches would leave a paid report built on
+// a stale allowlist or a stale query window. That is the silent class this file exists to
+// stop, and it is the reason the report page keys them rather than joining KNOWN_KEYLESS.
+// lib/landing.js joined the set with the navigation plan v3 (2026-09-30) and LEFT it with the
+// Revised Index Design (founder, 2026-09-30): index.html no longer loads it or calls
+// HS.landingFor (the file itself is unchanged), and no page loads it, so there is no tag whose
+// key could go stale. If a page loads it again, add it back here.
+// lib/da-report-view.js joined the set with its first page, the private review page (Development Activity build
+// step 4). It is the whole customer report layout, so a fix in it that a warm browser never fetches would show the
+// founder an old layout while the tests prove the new one.
+// lib/da-report-compare.js joined the set with its one page, the customer page (Development Activity build step 10). It is the whole
+// side-by-side comparison, so a fix in it that a warm browser never fetches would show an agent an old comparison.
+const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
+  'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -54,14 +78,14 @@ CONTENT_KEYED.forEach((rel) => {
     + (wrong.length ? ` — stale: ${wrong.map((w) => w.page + ' (' + w.key + ')').join(', ')}` : ''));
 });
 
-// §2 — the KEYLESS set may not grow. Nine other libs carry no ?v= at all, which is the
+// §2 — the KEYLESS set may not grow. Other libs carry no ?v= at all, which is the
 // same latent defect: a fix in one of them would ship, deploy green, and never reach a
 // browser that already has the file. They are NOT keyed here — that is a product-wide
 // change nobody asked for, in a session that has already produced several surprises, and
 // each one needs the same check for hard-coded URL references that caught
 // scripts/verify-map-markers.mjs. So the set is PINNED at its measured membership: a NEW
-// keyless lib fails immediately, and closing the existing nine stays a deliberate act.
-// ⚠️ MEASURED, NOT FIXED — the nine are listed so this is a record, not a silence.
+// keyless lib fails immediately, and closing a remaining keyless lib stays a deliberate act.
+// ⚠️ MEASURED, NOT FIXED — the remaining keyless scripts are listed so this is a record, not a silence.
 // ⚠️ WIDENED from `lib/*.js` to EVERY same-origin script. The original sweep could only
 // ever see lib/, so a keyless script anywhere else was not "known" — it was invisible.
 // shell.js was keyless on all 14 pages for the life of the repo and this pin reported
@@ -69,7 +93,7 @@ CONTENT_KEYED.forEach((rel) => {
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
   'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
-  'lib/community-page.js', 'lib/coverage-copy.js', 'lib/why.js', 'lib/landing.js',
+  'lib/coverage-copy.js', 'lib/why.js',
   'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
 // A leading "/" is the generator's absolute form, not a different file (same rule as
@@ -111,6 +135,109 @@ ok(key('lib/map.js') !== key('lib/templates.js'),
 const stale = createHash('sha256').update(readFileSync(join(root, 'lib/map.js')) + 'x').digest('hex').slice(0, 8);
 ok(stale !== key('lib/map.js'),
   '4b: a one-byte change produces a different key, which is what makes §1b unforgettable');
+
+// §5 — THE GENERATOR'S KEYS ARE LITERALS, AND NOTHING WAS CHECKING THEM.
+// scripts/gen_zip_pages.py writes the <script> tags for every canonical
+// /community/<zip>/ document as hardcoded strings. §1 scans committed *.html only, and
+// the generated documents are never committed (they exist only inside the Pages
+// artifact), so a shell.js edit left the generator pinning the PREVIOUS key with nothing
+// failing — measured: a Fix 6 edit staled it and the suite stayed green. Returning
+// visitors would then keep the cached old runtime on the ZIP pages while every other
+// page got the new one. The file comment above already claimed §1 "matches both"; this
+// is the assertion that makes that true.
+const gen = readFileSync(join(root, 'scripts/gen_zip_pages.py'), 'utf8');
+const genRe = /src="\/([a-z0-9/-]+\.js)\?v=([0-9a-f]{8})"/g;
+let g, seen = 0;
+while ((g = genRe.exec(gen))) {
+  seen++;
+  ok(g[2] === key(g[1]),
+    `5a: generator tag /${g[1]} carries its current content hash (?v=${key(g[1])}, found ${g[2]})`);
+}
+// The floor is the set the GENERATED ZIP DOCUMENT actually loads, named explicitly rather
+// than derived from CONTENT_KEYED.length. Those are different sets and always were: the ZIP
+// document does not load lib/map.js, and Fix 8 added lib/dashboard-aggregate.js, which is the
+// Dashboard's view-model and has no business on a public ZIP page. Deriving the floor from the
+// whole keyed set made adding ANY page-specific keyed lib fail this check for the wrong reason —
+// it would read as "the generator went stale" when the generator is correct.
+const GENERATOR_KEYED = ['lib/templates.js', 'lib/premium-waitlist.js', 'lib/community-request.js',
+                         'shell.js', 'lib/community-page.js'];
+ok(seen >= GENERATOR_KEYED.length,
+  `5b: the generator scan actually matched tags (${seen} >= ${GENERATOR_KEYED.length}) — a regex that stops matching must not read as clean`);
+GENERATOR_KEYED.forEach((rel) => ok(new RegExp('src="/' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\?v=' + key(rel) + '"').test(gen),
+  `5c: the generated ZIP document loads ${rel} at its current hash`));
+
+// §6 — THE STYLESHEET WAS OUTSIDE EVERY SECTION ABOVE, AND THAT IS HOW THE CHIPS SHIPPED
+// HALF-DRESSED. §1/§2/§3/§5 all match `.js` only — §2's sweep is literally
+// /<script\s+src="…\.js"/ — so a `<link rel="stylesheet">` could never appear in `keyless`
+// no matter how stale it was. app.css carried NO key on all 13 committed hosts and in the
+// generator for the life of the repo, and this suite reported nothing: the same
+// "absence that reads as a pass" §2 was widened to prevent, one tag type over.
+//
+// WHAT IT COST, and why CSS is worse than JS here rather than better. #1189 put the
+// top-bar Place chips' markup in partials/shell.html and their rules in app.css. shell.js
+// fetches that partial with `cache: 'no-store'`, so the MARKUP always arrives fresh while
+// the STYLESHEET could come from cache — the one combination that cannot self-correct. A
+// returning visitor then got the new spans with no rules to hide them, because
+// `.top .topadd .topadd-short{display:none}` lives only in app.css, and the chips read
+// "＋ Add an addressAddress" / "＋ Add a zip codeZIP" with no chip styling at all.
+// A hard refresh hid it, which is exactly why it could be shipped and reviewed as green.
+const STYLE_KEYED = ['app.css'];
+// Pinned at its measured membership, like §2: app.css is the ONLY same-origin stylesheet in
+// the repo, so this set is EMPTY and a new unkeyed one fails immediately. The three
+// jsDelivr sheets (leaflet, maplibre-gl) are versioned in their own URL and are not ours
+// to key — the same carve-out §2 makes for absolute script sources.
+const KNOWN_KEYLESS_STYLE = new Set();
+
+STYLE_KEYED.forEach((rel) => {
+  const want = key(rel);
+  const found = [];
+  pages.forEach((p) => {
+    const src = readFileSync(join(root, p), 'utf8');
+    const re = new RegExp('href="/?' + rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\?v=([^"]*))?"', 'g');
+    let m;
+    while ((m = re.exec(src))) found.push({ page: p, key: m[2] || null });
+  });
+  ok(found.length > 0, `6a: ${rel} is actually linked by at least one page (${found.length} tags)`);
+  const wrong = found.filter((f) => f.key !== want);
+  ok(wrong.length === 0,
+    `6b: all ${found.length} ${rel} tags carry its content hash ?v=${want}`
+    + (wrong.length ? ` — stale: ${wrong.map((w) => w.page + ' (' + w.key + ')').join(', ')}` : ''));
+});
+
+// 6c — no NEW keyless same-origin stylesheet, by the same logic as §2a.
+const keylessStyle = new Set();
+pages.forEach((p) => {
+  const src = readFileSync(join(root, p), 'utf8');
+  const re = /<link[^>]*rel="stylesheet"[^>]*href="(?!https?:)([^"?]+\.css)"/g;
+  let m;
+  while ((m = re.exec(src))) keylessStyle.add(localSrc(m[1]));
+});
+const unexpectedStyle = [...keylessStyle].filter((f) => !KNOWN_KEYLESS_STYLE.has(f));
+ok(unexpectedStyle.length === 0,
+  '6c: no keyless same-origin stylesheet has appeared'
+  + (unexpectedStyle.length ? ' — ' + unexpectedStyle.join(', ') : ` (${KNOWN_KEYLESS_STYLE.size} known, pinned)`));
+
+// 6d — the generator writes its stylesheet tag as a hardcoded string too, and the
+// generated /community/<zip>/ documents are never committed, so §6b cannot see them.
+// This is §5's lesson applied to the sheet: a ZIP page kept the cached old CSS while
+// every other page got the new one.
+const genStyleRe = /href="\/([a-z0-9/-]+\.css)\?v=([0-9a-f]{8})"/g;
+let gs, seenStyle = 0;
+while ((gs = genStyleRe.exec(gen))) {
+  seenStyle++;
+  ok(gs[2] === key(gs[1]),
+    `6d: generator tag /${gs[1]} carries its current content hash (?v=${key(gs[1])}, found ${gs[2]})`);
+}
+ok(seenStyle === STYLE_KEYED.length,
+  `6e: the generator stylesheet scan matched every keyed sheet (${seenStyle}/${STYLE_KEYED.length}) — a regex that stops matching must not read as clean`);
+
+// 6f — control, so §6b is derived from THIS file rather than any file: the sheet and the
+// runtime hash differently, and a one-byte change moves the sheet's key.
+ok(key('app.css') !== key('shell.js'),
+  '6f: app.css and shell.js hash differently — the key really is this file\'s content');
+const staleCss = createHash('sha256').update(readFileSync(join(root, 'app.css')) + 'x').digest('hex').slice(0, 8);
+ok(staleCss !== key('app.css'),
+  '6g: a one-byte CSS change produces a different key, which is what makes 6b unforgettable');
 
 console.log(fails === 0 ? '\nALL PASS' : '\n' + fails + ' FAILURE(S)');
 process.exit(fails ? 1 : 0);

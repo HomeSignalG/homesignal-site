@@ -1,0 +1,139 @@
+name: dc-osm-layer-apply
+
+# C3a: applies docs/dc-osm-layer-apply.sql (the OpenStreetMap layer's address check: the OSM extraction
+# branch, dc_osm_derived_point, the ONE queue reading it, dc_osm_address_check) to production, once,
+# from main, through scripts/dc-osm-layer-apply.sh -- the same discipline as dc-atlas-admission-apply.yml:
+#
+#   * the committed artifact runs byte for byte (psql \i, sha256 pinned in the script);
+#   * lock_timeout 5s / statement_timeout 2min asserted inside the applying session;
+#   * refused inside the :25/:35 resolver window, with any DC session active, or with any lock held;
+#   * in-transaction drift guard (every function it reads or replaces still fingerprints to main@800b9a3,
+#     the queue is the pre-C3a view, no OSM view exists) and post-condition (OSM NOT admitted);
+#   * afterwards every dc_% view/function + the Map 1 reader must equal a replica of main's DDL.
+#
+# OpenStreetMap stays a SEPARATE layer: nothing here merges it into canonical tables, moves a pin, or
+# changes the Map 1 reader. The `offline` job proves the script against a disposable stand-in first
+# (drift refusal, bounded lock wait, success with Map 1 unmoved, second-apply refusal, rollback,
+# second-rollback refusal, re-apply). `apply` / `rollback` run only on a manual dispatch from main that
+# types the confirmation string exactly.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'APPLY-OSM-LAYER-C3A applies the OSM layer check; ROLLBACK-OSM-LAYER-C3A removes it (anything else runs the offline proof only)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/dc-osm-layer-apply.sh'
+      - 'docs/dc-osm-layer-apply.sql'
+      - 'docs/dc-osm-layer-rollback.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'docs/dc-step3b-canonical-geography.sql'
+      - 'test/dc_osm_layer_pg/**'
+      - '.github/workflows/dc-osm-layer-apply.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-osm-layer-apply
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      # PINNED to the commit this tool was APPLIED from (C3a OSM layer check). The DDL of record has moved on
+      # since, so the proof runs against the DDL it was written for; the artifacts are frozen
+      # (the builder's --check verifies their sha256 on every commit).
+      - uses: actions/checkout@v4
+        with:
+          ref: e647a096ffcb3f4215d27c9282ce2561a62c59e0
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The artifact is what its generator emits from the DDL of record
+        run: python3 test/dc_osm_layer_pg/build_apply.py --check
+      - name: Offline proof of the OSM layer apply script
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_osm_layer_pg/apply_offline.sh
+
+  apply:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY-OSM-LAYER-C3A'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: APPLY the OSM layer check in production
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-osm-layer-apply.sh
+
+  rollback:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ROLLBACK-OSM-LAYER-C3A'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ROLL BACK the OSM layer check in production
+        env:
+          DCO_MODE: rollback
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-osm-layer-apply.sh

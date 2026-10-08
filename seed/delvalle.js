@@ -133,7 +133,7 @@ window.HS_SEED = (function () {
     { id:'chg-datacenter', category:'Development', related_project_id:'proj-datacenter',
       lens:'safety', confidence:'High', occurred_at:'2026-06-18',
       window_closes_at:'2026-07-19', lat:30.1832, lng:-97.5996,
-      title:'A ~300,000 sq ft data center is proposed in the SH-130 corridor near your home',
+      title:'A ~300,000 sq ft data center is proposed in the SH-130 corridor near this place',
       plain_language:"facilities this size draw heavily on local water and power and add truck traffic on your route to SH-71 — but they lift the tax base. It's still in application, so public input shapes the outcome.",
       impacts:[
         {k:'traffic', dir:'up', label:'Traffic', bad:true},
@@ -142,7 +142,7 @@ window.HS_SEED = (function () {
         {k:'cost', dir:'up', label:'Tax base', bad:false}],
       source_ref:'https://www.traviscountytx.gov/tnr/development-services',
       why:{ source:'Travis County TNR development filing + Commissioners Court agenda',
-            rank:'within ~1.5 mi of your home, touches 3 tracked priorities, comment window still open',
+            rank:'within ~1.5 mi of this place, touches 3 tracked priorities, comment window still open',
             confidence:'High — matched across two public records' },
       approx:true, note:'exact filing # and hearing date are prototype placeholders pending the county feed' },
 

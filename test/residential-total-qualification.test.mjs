@@ -16,6 +16,7 @@ let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 
 global.window = { HS: {} };
+await import('../lib/project-type.js');
 await import('../lib/map.js');
 await import('../lib/tracker-marker.js').catch(() => {});
 await import('../lib/residential-qualify.js');

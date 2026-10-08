@@ -4,38 +4,141 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>HomeSignal — Saved Place</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
-<link rel="stylesheet" href="app.css">
+<title>HomeSignal — Address</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=031bef8e">
 </head>
-<body data-nav="props">
+<body data-nav="explore">
 <template id="hs-content"><div class="page" id="propPage"></div></template>
 
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Canonical owner of ZIP geography semantics: lib/data.js::rpcAllRows classifies
+     app_projects_for_zip's {unavailable, zip_geography_status} envelope through
+     HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
+     verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
+<script src="lib/zip-authoritative.js?v=20261002a"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=5f556744"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
 <script src="lib/impact.js"></script>
-<script src="shell.js?v=d6e6818c"></script>
+<!-- NO MAP LIBRARIES ON THIS PAGE. The Address context map is an IFRAME of
+     homesignalmap.html, so lib/map.js, lib/residential-qualify.js and lib/n5-radius.js
+     load inside THAT document, which already loads all three. PCM-1 needed them here
+     because it drew the map itself; nothing on this page draws a map any more, and
+     carrying them would be a second copy of a runtime that lives one frame away. -->
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=61d2fce9"></script>
 <script>
 HS.onReady(async function () {
   var S = HS.state;
   var id = new URLSearchParams(location.search).get('id');
-  var p = S.properties.find(function(x){return x.id===id;}) || S.activeProperty;
-  if (p) HS.selectProperty(p.id);
   var page = document.getElementById('propPage');
-  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← All Saved Places</button><div class="ph"><h1>No Saved Place</h1></div>'; return; }
+  // ?id= is an identity, not a suggestion. reports.html already refuses the
+  // `|| activeProperty` fallback; inheriting it here showed a DIFFERENT Address
+  // (or, when render then threw, a blank slot) for a typed or stale id.
+  var p = id
+    ? (S.properties || []).find(function (x) { return String(x.id) === String(id); })
+    : S.activeProperty;
+  if (p) HS.selectProperty(p.id);
+  if (!p) { page.innerHTML = '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button><div class="ph"><h1>No Address</h1></div>'; return; }
+  // THIS DOSSIER OWNS THE VIEWED GEOGRAPHY. Opening an Address is a PLACE-SELECTION,
+  // not a browse: the page is about THIS Address, so the app's viewed ZIP must be its ZIP.
+  // Without this write, state.zip kept whatever leftover session geography the tab carried
+  // and paintNavHrefs / HS.navTo stamped the sidebar and the bell with it — so Alerts from
+  // the Coomes dossier (78617) opened 78657 / Horseshoe Bay, a different geography.
+  // selectProperty above only writes activePropId; it has never set geography.
+  //
+  // Same writer the Viewing switcher already uses for an Address (shell.js::focusZip), and
+  // the setter itself re-paints the top bar and re-stamps every ZIP-scoped link, so no href
+  // is hand-built here.
+  //
+  // The ADDRESS's ZIP wins — deliberately NOT HS.ensureViewedZip(p.zip). This page's identity
+  // is ?id=, so a stray ?zip= in the URL must never outrank the Address on screen.
+  // It writes the VIEWED zip ONLY, never myZip: opening a dossier is not a re-homing, and
+  // NAV-01's "browsing never overwrites the resident's saved area" still holds.
+  if (p.zip && /^\d{5}$/.test(String(p.zip))) HS.state.zip = String(p.zip);
+  if (typeof HS.setViewLabel === 'function') HS.setViewLabel(p.address, { precise: true });
+  // THIS DOSSIER IS AN ADDRESS PLACE, AND IT KNOWS WHICH ONE. Declared by id, so the Place
+  // switcher's check mark lands on THIS Address rather than falling through to the ZIP that
+  // contains it. The precise label above already makes the chip read the address; this is the
+  // same fact stated declaratively, for the control that needs the identity and not the text.
+  if (typeof HS.setViewPlaceType === 'function') HS.setViewPlaceType('address', p.id);
 
-  var projects = HS.withDistance(await HS.data.projects(S.zip, p), p)
+  function numCoord(v) {
+    if (v == null || v === '') return null;
+    var n = Number(v);
+    return (typeof n === 'number' && isFinite(n)) ? n : null;
+  }
+  var latN = numCoord(p.lat), lngN = numCoord(p.lng);
+  if (latN != null && lngN != null) p = Object.assign({}, p, { lat: latN, lng: lngN });
+
+  function dataZipFor(home) {
+    var z = String((home && home.zip) || '').replace(/\D/g, '').slice(0, 5);
+    return /^\d{5}$/.test(z) ? z : (S.zip || '');
+  }
+  function identityHtml(home) {
+    return '<button class="backbtn" onclick="location.href=\'properties.html\'">← My Places</button>'
+      + '<div class="ph"><div class="eyebrow">' + HS.esc(HS.placeDisplayTag(home, 'Address')) + '</div><h1>' + HS.esc(home.address) + '</h1>'
+      + '<p>' + HS.esc(home.city) + ', ' + HS.esc(home.state) + ' ' + HS.esc(home.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>';
+  }
+  function failHtml(msg) {
+    return identityHtml(p)
+      + '<p style="padding:16px 22px;color:var(--ink-3)">' + HS.esc(msg) + '</p>'
+      + '<button class="btn" style="margin:0 22px 24px" onclick="location.reload()">Try again</button>';
+  }
+
+  // Paint the Address FIRST. Nearby records used to run before any innerHTML, so a
+  // throw or a hang in projects()/changes()/envRisk left #propPage empty — the
+  // production "click 96 Island Drive and nothing comes up" failure. The header
+  // is this page's identity; the records can fail honestly underneath it.
+  page.innerHTML = identityHtml(p)
+    + '<p style="padding:16px 22px;color:var(--ink-3)" id="propLoading">Loading nearby records…</p>';
+
+  var zip = dataZipFor(p);
+  var projects = [], changes = [], env = null;
+  try {
+    var loaded = await Promise.all([
+      HS.data.projects(zip, p),
+      HS.data.changes(zip, p),
+      HS.data.envRisk(zip)
+    ]);
+    projects = loaded[0] || [];
+    changes = loaded[1] || [];
+    env = loaded[2];
+  } catch (e) {
+    console.warn('[property] data load failed', e);
+    page.innerHTML = failHtml('Could not load nearby records. Try again.');
+    return;
+  }
+
+  try {
+  // `.sort()` returns the same array, and HS.withDistance now carries the read's verdict
+  // across the `.map()` it does, so `projects.complete`/`.outcome` survive both — see
+  // lib/data.js::withDistance for why that had to be fixed there rather than here.
+  projects = HS.withDistance(projects, p)
     .sort(function(a,b){return (a.distance_mi||9e9)-(b.distance_mi||9e9);});
-  var changes = HS.withDistance(await HS.data.changes(S.zip, p), p);
-  var env = await HS.data.envRisk(S.zip);
-  var near = projects.slice(0, 3);
+  // A COUNT IS A CLAIM. `app_projects_for_zip` refuses a ZIP whose whole-ZIP geography is
+  // not established ({unavailable:true, zip_geography_status}) and lib/data.js carries that
+  // verdict through; without consulting it the "Nearby projects" vital printed a confident
+  // 0 over a ZIP nobody has measured. Map 1 already settled the presentation for exactly
+  // this state — it prints an em dash rather than a number it cannot stand behind
+  // (homesignalmap.html: `$("cDev").textContent = DEV_UNMEASURED ? "—"`). Fail closed:
+  // the test is for the VALUE 'complete', never for the absence of a failure.
+  var devReadComplete = projects.complete === true
+    && ((projects && projects.outcome) || 'unavailable') === 'complete';
+  changes = HS.withDistance(changes, p);
+  var near = projects.slice(0, 3).map(function (pr) {
+    return Array.isArray(pr.impact_dimensions) ? pr
+      : Object.assign({}, pr, { impact_dimensions: [] });
+  });
 
   var risk = env ? ['flood','wildfire','heat'].map(function (k) {
-    var r = env[k]; var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
+    var r = env[k];
+    if (!r) return '';
+    var color = r.tone==='green-2'?'var(--green-2)':r.tone==='blue'?'var(--blue)':'var(--amber)';
     var label = k==='heat'?'Extreme heat':k.charAt(0).toUpperCase()+k.slice(1);
     return '<div class="rk"><div class="rkl">' + label + '</div><div class="rkv" style="color:' + color + '">' + HS.esc(r.label) + '</div>'
       + '<div class="track" style="margin-top:7px"><div class="fill" style="width:' + r.pct + '%;background:' + color + '"></div></div></div>';
@@ -45,20 +148,93 @@ HS.onReady(async function () {
     return { date: HS.fmtDate(ch.occurred_at, {year:'numeric',month:'long',day:'numeric'}), title: ch.title, future:false };
   });
 
-  var openAlerts = changes.filter(function(x){return HS.daysUntil(x.window_closes_at)>=0 && (x.distance_mi||9e9)<=5;}).length;
+  // "Active alerts" is a count of OPEN comment windows, so a record with no window at all
+  // must not be one. HS.daysUntil returns null when window_closes_at is absent and
+  // `null >= 0` is TRUE in JavaScript, so the bare comparison counted every window-less
+  // record. Guarded the same way shell.js:2034 and alerts.html:272 already do.
+  // (The distance gate is left as is and reported separately — no app_changes row carries
+  // coordinates, so it currently excludes everything on its own.)
+  var openAlerts = changes.filter(function (x) {
+    var d = HS.daysUntil(x.window_closes_at);
+    return d != null && d >= 0 && (x.distance_mi || 9e9) <= 5;
+  }).length;
+
+  // ── ADDRESS CONTEXT MAP — Map 1, embedded ─────────────────────────────────────────────
+  // PLACE MAPS ARE MAP 1. The iframe loads homesignalmap.html itself, chrome-stripped, so
+  // this Address gets Map 1's pins and Map 1's type/status/regulatory rows rather than an
+  // orientation widget with none of them. The PCM-1 helpers that used to live here —
+  // pcmRows / pcmSites / pcmNote / pcmPaint and their HS.buildLive call — are deleted, not
+  // kept alongside: the RPC read, the marker cap and the ring are all things Map 1 already
+  // does, and doing them twice is the second implementation this unit exists to remove.
+  //
+  // GEOGRAPHY IS STILL POINT-CENTERED on the Address's OWN coordinates. app_properties
+  // lat/lng are written only from a Census-confirmed match by the two writers that exist -
+  // HS.saveHome and saveOnboardingAddress - and BOTH refuse to save an address the geocoder
+  // could not pin, so a saved Address always carries a real point. No point means NO MAP,
+  // never a substituted one: not the ZIP centroid, not the first nearby record.
+  //
+  // THE POINT IS HANDED OVER, NOT RE-RESOLVED. It was geocoded once, when the Address was
+  // saved; asking the geocoder again could answer differently and move a Place's pin
+  // between visits. ?embed=1&lat=&lng=&radius=2 carries it verbatim.
+  var PCM_RADIUS_MI = 2;      // founder, 2026-09-10; also in HS.N5_RADII, which the RPC mirrors
+
+  function pcmHasPoint(x) {
+    return !!x && typeof x.lat === 'number' && typeof x.lng === 'number'
+        && isFinite(x.lat) && isFinite(x.lng);
+  }
+  // The handoff. homesignalmap.html?zip=<the ADDRESS's ZIP> is the only Development deep link
+  // that exists today: Map 1's address mode is entered by form submit and never changes the
+  // URL, and ?addr= is the property_reports dossier (1 cached row), not address mode.
+  // Inventing an address-mode parameter would mean touching Map 1 and is not authorized.
+  // NO data-znav ON PURPOSE: that attribute lets the shell re-stamp the href with the app's
+  // ACTIVE zip, which is not necessarily this Address's zip.
+  // A DEMO OR SAMPLE PLACE GETS NO MAP. The predicate is EXACTLY the demo-exclusion half and
+  // deliberately NOT HS.isRealHome: that also requires label === 'home', which is the right
+  // test for "WHICH of my places is my residence" and the wrong one here — this page is
+  // already about THIS Address, so that clause would suppress the map on a genuine saved
+  // Address that simply carries a different label.
+  //
+  // THE MAP LIVES IN THE LEFT COLUMN OF .cols, NOT AS A FULL-WIDTH SIBLING ABOVE IT.
+  // PCM-1's position is still "between the address identity header and What's changing" —
+  // that is the first cell of the left column. A full-width iframe (clamp 320–520px) above
+  // .cols pushed "Generate property report" below the fold on a 1280×720 laptop. Demo/seed
+  // Addresses skip the map, so a seed-only browser pass cannot see this; production saved
+  // homes always have a real point and always get the map. Reports stays out of the sidebar
+  // (A-021); the CTA stays where it is, just findable again. Its destination is still the
+  // shipped reports.html Premium waitlist (#1177), not a generated report.
+  var realAddress = pcmHasPoint(p) && !p.sample && !p.demo;
+  // Heading binds to THIS Address — the same `p` whose saved lat/lng the iframe
+  // carries. Kind is 'address' because this host is always address-radius, never
+  // inferred from the string. p.address is the saved display line; do not substitute
+  // p.zip / city / a followed place.
+  var placeHeading = HS.placeChangingHeading('address', p.address);
+  var contextMap = realAddress
+    ? '<div class="block" id="propContext">'
+      + '<div class="bt-row place-changing">'
+      + (placeHeading ? '<h2 id="propPlaceHeading">' + HS.esc(placeHeading) + '</h2>' : '')
+      + '<a href="' + HS.esc(HS.navHref('homesignalmap.html', p.zip)) + '" id="propMapOpen">Open in Development →</a></div>'
+      + '<iframe id="propMapFrame" title="Development within ' + PCM_RADIUS_MI + ' miles of this address" '
+        + 'loading="lazy" '
+        + 'style="width:100%;height:clamp(560px,58vw,720px);border:1px solid var(--line);'
+        + 'border-radius:12px;display:block" '
+        + 'src="homesignalmap.html?embed=1&amp;lat=' + encodeURIComponent(p.lat)
+        + '&amp;lng=' + encodeURIComponent(p.lng)
+        + '&amp;radius=' + PCM_RADIUS_MI + '"></iframe>'
+      + '</div>'
+    : '';
+
 
   page.innerHTML =
-    '<button class="backbtn" onclick="location.href=\'properties.html\'">← All Saved Places</button>'
-    + '<div class="ph"><div class="eyebrow">' + HS.esc(p.tag||p.label) + '</div><h1>' + HS.esc(p.address) + '</h1>'
-    + '<p>' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + ' — everything changing around this specific address, and what it means for its value.</p></div>'
-    + '<div class="cols"><div>'
-    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="development.html">All projects →</a></div>'
+    identityHtml(p)
+    + '<div class="cols" id="propCols"><div>'
+    + contextMap
+    + '<div class="block"><div class="bt-row"><h2>What\'s changing near this property</h2><a href="' + HS.esc(HS.navHref('development.html', p.zip)) + '">All projects →</a></div>'
     + near.map(function (pr) {
         return '<div class="card mini" style="border-left-color:' + HS.barColor(pr) + ';margin-bottom:10px">'
-          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(pr.status.toLowerCase()) + '</span>'
+          + '<span class="lens"><span class="sw ' + HS.esc(pr.lens||'value') + '"></span>' + HS.esc(pr.dist||'') + ' · ' + HS.esc(String(pr.status || '').toLowerCase()) + '</span>'
           + '<h3>' + HS.esc(pr.name) + '</h3>'
           + HS.tpl.devImpactBlock(pr)
-          + '<p class="sowhat"><b>Effect on this home:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
+          + '<p class="sowhat"><b>Effect at this address:</b> ' + HS.esc(pr.sowhat||'') + '</p>'
           + '<div class="impacts">' + HS.tpl.impactChips(pr.impact_dimensions) + '</div></div>';
       }).join('')
     + '</div>'
@@ -66,22 +242,79 @@ HS.onReady(async function () {
     + '<p style="font-size:11px;color:var(--ink-3);margin:10px 0 0">From the flood-zone, wildfire and climate data we track for this area.</p></div>'
     + '<div class="block"><h2 class="bt">This property\'s timeline</h2><div class="thread">' + HS.tpl.thread(thread) + '</div></div>'
     + '</div><div>'
+    + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
+    + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
+    // A-019 sent this at dashboard.html#dashReports, whose "Property Intelligence Report"
+    // row links to itself — so the click generated nothing and explained nothing. It now
+    // opens the public-beta in-progress state, carrying THIS Address's id on the app's own
+    // ?id= property route so "Back to property" returns here and not to some other Address.
+    // The label is unchanged, deliberately: what is wrong is the answer, not the offer.
+    // Current shipped label is "Generate property report" (#1156 / #1177), not title case.
+    // This block leads the right rail on purpose: Property vitals used to sit above it, and
+    // with the context map in the left column that still left the CTA 4px below a 1280×720
+    // laptop viewport (measured). Actions first, vitals second.
+    + '<button class="btn" id="propReportBtn" onclick="location.href=\'reports.html?id=' + encodeURIComponent(p.id) + '\'">Generate property report</button>'
+    + '</div></div>'
     + '<div class="block"><h2 class="bt">Property vitals</h2>'
     + '<div style="display:flex;align-items:center;gap:15px;margin-bottom:12px">' + HS.tpl.scoreRing(p.score)
     + '<div><div style="font-size:13px;color:var(--ink-2)">Property score</div><div style="font-size:13px;color:var(--green);font-weight:700">' + HS.esc(p.score_trend||'') + '</div></div></div>'
     + '<div class="vital"><span class="vl">Value outlook · 12 mo</span><span class="vv" style="color:var(--green)">+' + p.value_outlook + '%</span></div>'
     + '<div class="vital"><span class="vl">Insurance outlook</span><span class="vv">' + HS.esc(p.insurance_outlook||'Stable') + '</span></div>'
-    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + near.length + '</span></div>'
+    + '<div class="vital"><span class="vl">Nearby projects</span><span class="vv">' + (devReadComplete ? near.length : '—') + '</span></div>'
     + '<div class="vital"><span class="vl">Active alerts</span><span class="vv">' + openAlerts + '</span></div></div>'
-    + '<div class="block"><h2 class="bt">What you can do</h2><div class="doact">'
-    + '<button class="btn primary" onclick="HS.toggleFollow(this,\'property\',\'' + p.id + '\')">Watch this property</button>'
-    + '<button class="btn" onclick="location.href=\'reports.html\'">Generate property report</button>'
-    + '</div></div>'
-    + '<div class="p2"><div class="p2h"><span>🔒</span> Phase 2 — unlocked by new feeds</div><div class="p2sub">Layout ready; activates with these sources.</div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Total cost of ownership</div><div class="d">Taxes, insurance, utilities, upkeep</div></div><span class="feed">+ assessor / tax</span></div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Insurance comparison</div><div class="d">Quotes &amp; savings by carrier</div></div><span class="feed">+ insurance</span></div>'
-    + '<div class="p2i"><div style="flex:1"><div class="t">Document vault</div><div class="d">Deed, permits, warranties</div></div><span class="feed">+ uploads</span></div></div>'
+    // ── PREMIUM (Fix 15) ──────────────────────────────────────────────────────────────
+    // WAS: "Phase 2 — unlocked by new feeds" / "Layout ready; activates with these
+    // sources", with a "+ assessor / tax"-style feed chip on each row. That is the
+    // engineering roadmap talking to itself on a page a resident reads — it names our
+    // ingestion plan, not a product they can want. Nothing is implemented here: total
+    // cost of ownership, insurance comparison and the document vault remain FUTURE
+    // Premium capabilities, and "Coming soon" keeps the card from implying otherwise.
+    //
+    // The CTA is the SHARED Premium waitlist — the same modal and the same
+    // hs_premium_waitlist_join write path the ZIP Community Profile card uses. There is
+    // no second modal, no second form and no second table. What is new is the CONTEXT:
+    // this CTA states its own source, ZIP and street line, so Acquisition can tell a
+    // property lead from a ZIP one and say WHICH property. Values come from THIS
+    // dossier's own `p` — the Address the page is about — never from viewing state.
+    + '<div class="p2" id="propPremium"><div class="p2h"><span>🔒</span> Premium</div>'
+    + '<div class="p2sub">Coming soon</div>'
+    + '<div class="p2t">Get deeper property insights</div>'
+    + '<div class="p2sub">Unlock total cost of ownership, insurance comparisons, document vault and more.</div>'
+    + '<button type="button" class="inlinebtn" id="propPremiumBtn" style="margin-top:12px">Get Premium access →</button></div>'
     + '</div></div>';
+
+  // THE CONTEXT IS HANDED OVER IN A CLOSURE, NOT INTERPOLATED INTO AN ATTRIBUTE.
+  // The first version of this built `onclick="HS.openPremiumModal({…,address:' +
+  // JSON.stringify(p.address) + '})"`. JSON.stringify emits DOUBLE quotes, and the
+  // onclick attribute is double-quoted, so the browser read the handler only as far as
+  // `…{source:'Property Insights',zip:` and the button did nothing. Source-grep tests
+  // passed the whole time — rendering the fragment and reading the attribute back is
+  // what caught it. A closure also means an address containing an apostrophe (O'BRIEN)
+  // or any other quote needs no escaping at all, and no property value is ever parsed
+  // as code. Values are THIS dossier's own `p` — the Address this page is about.
+  //
+  // A SAMPLE ADDRESS IS NOT A PROPERTY. Under ?demo=1 preview (HS.data.properties stamps
+  // `sample: true` on the seeded persona) this dossier shows 4400 Wildhorse Trail — a
+  // demo home the visitor does not own. Their Premium interest is real and is still
+  // captured under "Property Insights"; the place context is not, so it stays ABSENT
+  // rather than recording a seeded address as the property that generated the lead.
+  // Same predicate the context map already uses to decide a real Address.
+  var premiumBtn = document.getElementById('propPremiumBtn');
+  if (premiumBtn) {
+    premiumBtn.addEventListener('click', function () {
+      var demo = !!(p.sample || p.demo);
+      HS.openPremiumModal({
+        source: 'Property Insights',
+        zip: demo ? null : p.zip,
+        address: demo ? null : p.address
+      });
+    });
+  }
+  } catch (e) {
+    console.warn('[property] render failed', e);
+    page.innerHTML = failHtml('Could not display this Address. Try again.');
+  }
+
 });
 </script>
 </body>

@@ -1,74 +1,114 @@
-<!-- HomeSignal shared shell — full frame (sidebar + top bar) + all modals, with a
-     #hs-slot where each page's content drops in. Injected identically into every page
-     by shell.js (hard rule: byte-identical menu). Markup lifted from the approved mockup;
-     nav hrefs point at the real pages. -->
-<div class="sidebackdrop" id="sidebackdrop"></div>
+<!-- HomeSignal shared shell — the header, the footer and every modal, with a #hs-slot where
+     each page's content drops in. Injected identically into every page by shell.js (hard
+     rule: byte-identical menu). Nav hrefs point at the real pages. -->
 <div class="app">
 
-<aside class="side" id="hs-side">
-  <a class="logo" href="index.html"><span class="mk" style="background:var(--green)"><svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span> <span>Home<span style="color:var(--green-2)">Signal</span></span></a>
-  <nav class="nav" id="hs-nav">
-    <a href="today.html"       data-nav="today"><span class="ic">◎</span> Today's Priorities</a>
-    <a href="dashboard.html"   data-nav="dash"><span class="ic">▦</span> Dashboard</a>
-    <a href="alerts.html"      data-nav="alerts"><span class="ic">◐</span> Alerts</a>
-    <a href="development.html" data-nav="dev"><span class="ic">◈</span> Development &amp; Impact</a>
-    <a href="homesignalmap.html" data-nav="maps"><span class="ic">◉</span> Maps</a>
-    <a href="properties.html"  data-nav="props"><span class="ic">⌂</span> Saved Places</a>
-    <a href="community.html"   data-nav="comm" id="hs-nav-comm"><span class="ic">◍</span> Zip Code Activity</a>
-    <!-- Reports is hidden for the public beta: its report list isn't interactive
-         yet and the preview makes claims ("impact model", "updated today") the
-         product doesn't back. Re-enable when the page is production-ready. -->
-  </nav>
-  <div class="grow"></div>
-  <div class="upsell">
-    <div class="t">Get the full picture</div>
-    <div class="d">Premium reports, property intelligence &amp; more.</div>
-    <button type="button" onclick="HS.openModal('premiumModal')">Go Premium</button>
+<!-- THE HORIZONTAL HEADER (founder, Revised Index Design, 2026-09-30). It replaced the left
+     sidebar and the old top bar. The three primary items are navigation plan v3's (Explore |
+     My Places | Enterprise); this layout is the later decision on how they are shown.
+       Explore = index.html. community.html, homesignalmap.html (Map 1), development.html,
+         property.html, reports.html and every generated /community/<zip>/ page declare
+         data-nav="explore" and light it.
+       My Places = properties.html. dashboard.html ("What's Changed") and alerts.html ("Alert
+         Settings") declare data-nav="props"; properties.html links both.
+       Enterprise = development-activity.html, which declares data-nav="enterprise".
+     The active item names the SECTION a page belongs to, not the page that linked to it.
+     Support pages (How It Works, About, Contact, Privacy, Terms) light nothing.
+     ONE nav element serves both widths. At 1024px and wider it is the horizontal row; at
+     1023px and narrower it is the panel the Menu button opens. There is no second copy.
+     Left the header, and kept: the Viewing switcher (HS.openSwitcher), Add an address
+     (HS.addHome), Add a zip code (HS.openLoc), the notification bell (alerts.html) and Go
+     Premium (the premiumModal). My Places carries the add buttons and both links.
+     Do not re-add Dashboard, Alerts, Development, About, a search icon or Sign up here. -->
+<header class="hs-header" id="hs-top">
+  <div class="hs-header__inner">
+    <a class="hs-brand" href="index.html"><span class="hs-brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span style="color:var(--green-2)">Signal</span></span></a>
+    <nav class="hs-nav" id="hs-nav" aria-label="Primary">
+      <!-- THE EXPLORE DROPDOWN (founder, 2026-10-02): Explore's three pages, under these
+           names. "Quality of Life Impact" is development.html (it was "What's being built —
+           and how it impacts you"); "Development Map" is Map 1; "Activity" is the ZIP page.
+           The entries carry no data-nav, so they never light a primary item, and shell.js
+           stamps the viewed ZIP on them like any #hs-nav link to a ZIP_NAV_PAGES page.
+           Wide: hovering Explore opens a menu under it (founder, 2026-10-02: "if you hover
+           over explore the drop down should be obvious"); the chevron beside Explore also
+           opens it, for touch and keyboard, and then a click outside or Escape closes it.
+           Compact (the Menu panel): the three are listed under Explore, always shown.
+           Each page names its entry with body[data-explore], and that entry is marked. -->
+      <div class="hs-navgroup" id="hs-explore">
+        <a href="index.html" data-nav="explore">Explore</a>
+        <button type="button" class="hs-navcaret" id="hs-explore-toggle" aria-label="Explore pages" aria-expanded="false" aria-controls="hs-explore-sub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="hs-navsub" id="hs-explore-sub">
+          <a href="development.html" data-sub="qol">Quality of Life Impact</a>
+          <a href="homesignalmap.html" data-sub="map">Development Map</a>
+          <a href="community.html" data-sub="activity">Activity</a>
+        </div>
+      </div>
+      <a href="properties.html" data-nav="props">My Places</a>
+      <!-- THE ENTERPRISE DROPDOWN (founder, 2026-10-05): "My reports" is how an agent gets back to
+           the reports page (development-activity-reports.html), which no other page linked. It is
+           built exactly like the Explore dropdown (same classes, same open/close behaviour).
+           "Enterprise" itself still goes to development-activity.html. The entries carry no
+           data-nav, so they never light a primary item. -->
+      <div class="hs-navgroup" id="hs-enterprise">
+        <a href="development-activity.html" data-nav="enterprise">Enterprise</a>
+        <button type="button" class="hs-navcaret" id="hs-enterprise-toggle" aria-label="Enterprise pages" aria-expanded="false" aria-controls="hs-enterprise-sub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="hs-navsub" id="hs-enterprise-sub">
+          <a href="development-activity.html" data-sub="overview">Enterprise overview</a>
+          <a href="development-activity-reports.html" data-sub="reports">My reports</a>
+        </div>
+      </div>
+    </nav>
+    <div class="hs-header__actions">
+      <button class="hs-header__share" type="button" id="hs-share" onclick="HS.openModal('shareModal')">Share</button>
+      <button class="hs-header__signin" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
+      <button class="avatar hs-header__avatar" type="button" id="hs-avatar" title="Account" aria-label="Account" onclick="HS.onAvatar()">··</button>
+      <button class="hs-header__menu" type="button" id="hs-menubtn" aria-label="Menu" aria-expanded="false" aria-controls="hs-nav" onclick="HS.toggleMenu()">☰</button>
+    </div>
   </div>
-  <div class="sidefoot">
-    <a href="contact.html">Contact</a>
-    <span class="dot">·</span>
-    <a href="privacy.html">Privacy</a>
-  </div>
-</aside>
+</header>
 
 <div class="main">
-<div class="top" id="hs-top">
-  <button class="menubtn" type="button" aria-label="Menu" onclick="HS.toggleMenu()">☰</button>
-  <div class="loc" onclick="HS.openSwitcher()"><span class="pin">◉</span> <span id="locLabel">—</span> <span style="color:var(--ink-3)">▾</span></div>
-  <div class="sp"></div>
-  <button class="sharebtn" type="button" onclick="HS.openModal('shareModal')">⤴ Share</button>
-  <button class="ib" type="button" aria-label="Notifications" onclick="location.href='alerts.html'">◔<span class="badge hidden" id="hs-bell-badge">0</span></button>
-  <button class="sharebtn" type="button" id="hs-signin" style="display:none" onclick="HS.openAuth()">Sign in</button>
-  <div class="avatar" id="hs-avatar" title="Account" onclick="HS.onAvatar()">··</div>
-</div>
-
   <div id="hs-slot"><!-- page content injected here --></div>
-  </div><!-- /.main -->
+</div><!-- /.main -->
+
+<!-- THE ONE SHARED FOOTER. Support links live here, never in the primary nav. Terms is a
+     section of privacy.html (terms.html is a retired redirect that drops the #terms anchor).
+     Hidden in Map 1's embed mode (.hs-embed), like the header. No data-nav: these links never
+     light a primary item. -->
+<footer class="hs-footer" id="hs-footer">
+  <nav class="hs-footer__links" aria-label="Site information">
+    <a href="how-it-works.html">How It Works</a>
+    <a href="about.html">About</a>
+    <a href="contact.html">Contact</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="privacy.html#terms">Terms</a>
+  </nav>
+</footer>
 </div><!-- /.app -->
 
-<!-- ======= LOCATION / REQUEST COMMUNITY MODAL ======= -->
+<!-- ======= LOCATION / REQUEST ZIP CODE MODAL ======= -->
 <div class="overlay" id="locModal" onclick="if(event.target===this)HS.closeModal('locModal')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="locModalTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('locModal')" aria-label="Close">✕</button>
-      <span class="mbadge">◉ Your community</span>
-      <h3 id="locModalTitle">Change your community</h3>
-      <p class="msub">Enter a ZIP code to open what's changing around that area.</p>
+      <span class="mbadge">◉ Your zip code</span>
+      <h3 id="locModalTitle">Add a zip code</h3>
+      <p class="msub">Enter a ZIP code to save it and open what's changing around that area.</p>
     </div>
     <div class="mbody">
       <div id="locForm">
         <div class="field">
           <input id="locZip" inputmode="numeric" maxlength="5" placeholder="Enter ZIP (e.g., 78617)" onkeydown="if(event.key==='Enter')HS.findCommunity()">
-          <button class="mbtn" type="button" onclick="HS.findCommunity()">Find my community</button>
+          <button class="mbtn" type="button" onclick="HS.findCommunity()">Add this zip code</button>
         </div>
       </div>
       <div id="locRequest" class="hidden">
         <div style="background:var(--amber-tint);border:1px solid #f0dcbd;border-radius:10px;padding:12px 14px;font-size:13px;color:var(--amber);margin-bottom:14px"><b>We're not in <span id="reqZipLabel">—</span> yet</b> — but we'd love to add it. Add your email and we'll notify you the moment it goes live.</div>
         <div class="field" style="flex-direction:column;gap:10px">
           <input id="reqEmail" type="email" placeholder="Your email" onkeydown="if(event.key==='Enter')HS.submitRequest()">
-          <button class="mbtn" type="button" onclick="HS.submitRequest()">Request my community</button>
+          <button class="mbtn" type="button" id="reqSubmit" onclick="HS.submitRequest()">Request my zip code</button>
         </div>
+        <div id="locRequestError" class="mnote hidden" role="alert" aria-live="polite" style="color:#c23b34"></div>
         <div class="mnote">We'll only email you when your area goes live. No spam.</div>
       </div>
       <div id="locDone" class="success hidden"><div class="ck">✓</div><h4 id="locDoneH">Request received</h4><p id="locDoneP">We'll email you the moment it's live.</p></div>
@@ -100,51 +140,58 @@
   </div>
 </div>
 
-<!-- ======= PROPERTY SWITCHER MODAL ======= -->
+<!-- ======= PLACE SWITCHER MODAL =======
+     The Viewing chip is the global focus control for BOTH Place types.
+     Addresses (app_properties) and ZIP Codes (app_follows) stay distinct —
+     two labeled lists, two existing add workflows, no generic "+ Add a Place". -->
 <div class="overlay" id="switcherModal" onclick="if(event.target===this)HS.closeModal('switcherModal')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="switcherTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('switcherModal')" aria-label="Close">✕</button>
-      <span class="mbadge">⌂ Your Saved Places</span>
-      <h3 id="switcherTitle">Switch zip code</h3>
+      <span class="mbadge">⌂ My Places</span>
+      <h3 id="switcherTitle">Switch place</h3>
       <p class="msub" id="switcherSub">Pick one to focus the app on it.</p>
     </div>
     <div class="mbody">
       <div id="switcherList"><!-- filled by shell.js --></div>
-      <button class="mbtn" type="button" style="width:100%;margin-top:12px" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add a Saved Place</button>
+      <div class="swacts">
+        <button class="addbtn" type="button" id="switcherAddAddress" onclick="HS.closeModal('switcherModal');HS.addHome()">+ Add Address</button>
+        <button class="addbtn" type="button" id="switcherAddZip" onclick="HS.closeModal('switcherModal');HS.openLoc()">+ Add ZIP Code</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ======= ADD YOUR HOME MODAL (the ONE writer of app_properties) =======
+<!-- ======= ADD ADDRESS MODAL (the ONE writer of app_properties) =======
      Honesty rules: we save ONLY the U.S. Census geocoder's confirmed match,
-     shown back to the resident for explicit confirmation — never raw input,
-     never a guessed point. Signed-in only (RLS: owner-only rows). -->
+     shown back for explicit confirmation — never raw input, never a guessed
+     point. Signed-in only (RLS: owner-only rows). Fix 9: this is a saved
+     place, not an assumed home. -->
 <div class="overlay" id="homeModal" onclick="if(event.target===this)HS.closeModal('homeModal')">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="homeTitle">
     <div class="mhead">
       <button class="mclose" type="button" onclick="HS.closeModal('homeModal')" aria-label="Close">✕</button>
-      <span class="mbadge">⌂ Your home</span>
-      <h3 id="homeTitle">Add your home</h3>
-      <p class="msub">Enter your address. We confirm it against U.S. Census address records and only pin the confirmed match.</p>
+      <span class="mbadge">⌂ Address</span>
+      <h3 id="homeTitle">Add an address</h3>
+      <p class="msub">Enter an address. We confirm it against U.S. Census address records and only pin the confirmed match.</p>
     </div>
     <div class="mbody">
       <div id="homeForm">
         <div class="field" style="flex-direction:column;gap:10px">
           <input id="homeAddr" type="text" autocomplete="street-address" placeholder="123 Main St, Del Valle, TX" onkeydown="if(event.key==='Enter')HS.findHome()">
-          <button class="mbtn" type="button" onclick="HS.findHome()">Find my address</button>
+          <button class="mbtn" type="button" onclick="HS.findHome()">Find this address</button>
         </div>
-        <div class="mnote" id="homeMsg">Your address is stored on your account only — never shared, never public.</div>
+        <div class="mnote" id="homeMsg">This address is stored on your account only — never shared, never public.</div>
       </div>
       <div id="homeConfirm" class="hidden">
         <div style="background:#eaf4ee;border:1px solid #cfe5d7;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px"><b>Confirmed:</b> <span id="homeMatched">—</span></div>
         <div class="field" style="flex-direction:column;gap:10px">
-          <button class="mbtn" type="button" onclick="HS.saveHome()">Save as my home</button>
+          <button class="mbtn" type="button" id="homeSaveBtn" onclick="HS.saveHome()">Save this place</button>
           <button class="mbtn" type="button" style="background:transparent;color:var(--ink);border:1px solid var(--line)" onclick="document.getElementById('homeConfirm').classList.add('hidden');document.getElementById('homeForm').classList.remove('hidden')">Edit address</button>
         </div>
         <div class="mnote" id="homeConfirmMsg"></div>
       </div>
-      <div id="homeDone" class="success hidden"><div class="ck">✓</div><h4>Home saved</h4><p>Reloading with your home on the map…</p></div>
+      <div id="homeDone" class="success hidden"><div class="ck">✓</div><h4>Place saved</h4><p>Reloading with this place on the map…</p></div>
     </div>
   </div>
 </div>
@@ -185,11 +232,19 @@
       <div id="premiumForm">
         <div class="field">
           <input id="premiumEmail" type="email" placeholder="you@email.com" onkeydown="if(event.key==='Enter')HS.submitWaitlist()">
-          <button class="mbtn" type="button" onclick="HS.submitWaitlist()">Notify me</button>
+          <button class="mbtn" type="button" id="premiumSubmit" onclick="HS.submitWaitlist()">Notify me</button>
         </div>
+        <!-- Shown ONLY when the canonical store refused the write. The entered address
+             stays in the field above so the retry costs the visitor nothing. -->
+        <div id="premiumError" class="mnote hidden" role="alert" aria-live="polite" style="color:#c23b34"></div>
         <div class="mnote">We'll only email you about Premium availability. No spam — unsubscribe anytime.</div>
       </div>
-      <div id="premiumDone" class="success hidden">
+      <!-- The failure path already announces (#premiumError is role="alert"); the SUCCESS
+           path did not, so a screen-reader user who submitted heard nothing back. role=
+           "status" is the polite counterpart and is the smallest safe change: the node
+           already exists in the markup and is only unhidden after confirmed persistence, so
+           there is no second announcement and no other Premium entry point changes. -->
+      <div id="premiumDone" class="success hidden" role="status" aria-live="polite">
         <div class="ck">✓</div>
         <h4>You're on the list</h4>
         <p>We'll email you the moment Premium launches.</p>
@@ -207,7 +262,7 @@
         <span class="onb-badge">◉ Welcome</span>
         <h2 class="onb-title" id="onbWelcomeTitle" tabindex="-1">Welcome to HomeSignal</h2>
         <p class="onb-sub">Let's personalize your experience.</p>
-        <p class="onb-body">HomeSignal monitors development, government activity, local news, and quality-of-life changes that may affect your property.</p>
+        <p class="onb-body">HomeSignal monitors development, government activity, local news, and quality-of-life changes around places you follow.</p>
         <button type="button" class="onb-btn" id="onbWelcomeBtn">Get started</button>
       </section>
 
@@ -253,7 +308,7 @@
             <b>We're not in <span id="onbUncoveredZip">—</span> yet</b> — add your email and we'll notify you when your area goes live.
           </div>
           <input id="onbReqEmail" type="email" placeholder="Your email" class="onb-input">
-          <button type="button" class="onb-btn onb-btn-secondary" id="onbReqBtn">Request my community</button>
+          <button type="button" class="onb-btn onb-btn-secondary" id="onbReqBtn">Request my zip code</button>
         </div>
       </section>
 

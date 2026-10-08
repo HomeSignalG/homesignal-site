@@ -2,8 +2,12 @@
 //
 // The offline twin (test/user-journey.browser.test.mjs) proves the rules against fixtures.
 // This proves the PRODUCT: it opens homesignal.net in a real browser and walks the journey
-// the founder walked when they found both defects — Alerts -> Maps, Development -> Maps,
-// a ZIP that is not the saved home's ZIP, an address search, and back to a ZIP.
+// the founder walked when they found both defects — reaching Map 1 from the ZIP page and from
+// the development list, a ZIP that is not the saved home's ZIP, an address search, and back to
+// a ZIP. Navigation identity follows the founder's plan v3 (2026-09-30): the sidebar is
+// Explore | My Places | Enterprise, and every Explore page (the ZIP page, the development list,
+// Map 1) lights Explore. There is no Maps or Development sidebar item to click any more; Map 1
+// is reached from the in-page "View Development Map" links.
 //
 // Read-only. It signs nothing in, writes nothing, and makes only the calls the pages
 // themselves make. The one thing it injects is a saved home into the page's own in-memory
@@ -36,12 +40,15 @@ const errors = [];
 page.on('pageerror', e => errors.push(String(e).slice(0, 200)));
 
 const chrome = () => page.evaluate(() => {
-  const on = [].slice.call(document.querySelectorAll('.nav a.on'));
-  const el = document.getElementById('locLabel');
+  const on = [].slice.call(document.querySelectorAll('.hs-nav a.on'));
+  // The Viewing chip left the header (Revised Index Design, #1562); its decision is still
+  // HS.viewingLabel(), the same text the chip used to paint.
+  const vl = (window.HS && HS.viewingLabel) ? HS.viewingLabel() : null;
   return {
+    navTokens: [].slice.call(document.querySelectorAll('.hs-nav a')).map(a => a.getAttribute('data-nav')),
     activeTokens: on.map(a => a.getAttribute('data-nav')),
     activeLabels: on.map(a => a.textContent.trim().replace(/\s+/g, ' ')),
-    locLabel: el ? el.textContent.trim() : null,
+    locLabel: vl ? vl.text.trim() : null,
     kDev: (document.getElementById('kDev') || {}).textContent || null,
     kFac: (document.getElementById('kFac') || {}).textContent || null,
     totalTileShown: (() => { const t = document.getElementById('ccTot');
@@ -56,7 +63,7 @@ const chrome = () => page.evaluate(() => {
     path: location.pathname, search: location.search
   };
 });
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 60000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 60000 });
 const waitMap = () => page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 90000 });
 const installSavedHome = () => page.evaluate((h) => {
   HS.state.properties = [h];
@@ -71,24 +78,25 @@ console.log('MAP 1 — LIVE USER JOURNEY (navigation identity + location context
 info('base', BASE); info('zip', ZIP); info('other zip', OTHER_ZIP); info('address', ADDRESS);
 console.log('='.repeat(78));
 
-// ── A. Development & Impact identifies itself ───────────────────────────────────────────
+// ── A. The development list is part of Explore ──────────────────────────────────────────
+const V3_NAV = 'explore|props|enterprise';
 await page.goto(BASE + '/development.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 let c = await chrome();
-info('development.html', c.activeTokens);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'dev',
-  'A Development & Impact is the ONLY active item on development.html', c.activeLabels);
-ok(c.activeTokens.indexOf('maps') < 0, 'A Maps is NOT active there', c.activeTokens);
+info('development.html', { nav: c.navTokens, active: c.activeTokens });
+ok(c.navTokens.join('|') === V3_NAV, 'A the header nav is Explore, My Places, Enterprise', c.navTokens);
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+  'A Explore is the ONLY active item on development.html', c.activeLabels);
 
-// ── B. Map 1 identifies itself ──────────────────────────────────────────────────────────
+// ── B. Map 1 is part of Explore ─────────────────────────────────────────────────────────
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 c = await chrome();
-info('homesignalmap.html', c.activeTokens);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps',
-  'B Maps is the ONLY active item on Map 1', c.activeLabels);
-ok(c.activeTokens.indexOf('dev') < 0, 'B Development & Impact is NOT active on Map 1', c.activeTokens);
+info('homesignalmap.html', { nav: c.navTokens, active: c.activeTokens });
+ok(c.navTokens.join('|') === V3_NAV, 'B the same three header items on Map 1', c.navTokens);
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+  'B Explore is the ONLY active item on Map 1', c.activeLabels);
 
 // ── E. ...and the proven ZIP contract is untouched ──────────────────────────────────────
 const z = await page.evaluate(() => ({
@@ -112,24 +120,25 @@ ok(z.devPoints > 0 && z.devPoints === z.authoritative,
   'E every ZIP development point is authoritative whole-ZIP geometry', z);
 ok(z.distances === 0, 'E no radius distance in ZIP mode', z.distances);
 
-// ── C / D. Reaching Maps from other sections ────────────────────────────────────────────
-for (const [origin, label] of [['alerts.html', 'C Alerts'], ['development.html', 'D Development & Impact']]) {
+// ── C / D. Reaching Map 1 from the ZIP page and from the development list ──────────────
+const MAP_LINK = '#hs-slot a[data-znav="homesignalmap.html"]';
+for (const [origin, label] of [['community.html', 'C ZIP page'], ['development.html', 'D Development list']]) {
   await page.goto(BASE + '/' + origin + '?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await waitShell();
-  const href = await page.getAttribute('.nav a[data-nav="maps"]', 'href');
+  await page.waitForSelector(MAP_LINK, { timeout: 60000 });
+  const href = await page.getAttribute(MAP_LINK, 'href');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 }),
-    page.click('.nav a[data-nav="maps"]')
+    page.click(MAP_LINK)
   ]);
   await waitShell();
   await waitMap().catch(() => {});
   c = await chrome();
-  info(label + ' -> Maps', { href, landed: c.path + c.search, active: c.activeTokens });
-  ok(/homesignalmap\.html/.test(href || ''), label + ' -> the Maps entry points at Map 1', href);
+  info(label + ' -> Map 1', { href, landed: c.path + c.search, active: c.activeTokens });
+  ok(href === 'homesignalmap.html?zip=' + ZIP, label + ' -> "View Development Map" carries the viewed ZIP', href);
   ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
-  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps',
-    label + ' -> Maps is active once the page settles', c.activeTokens);
-  ok(c.activeTokens.indexOf('dev') < 0, label + ' -> Development & Impact is NOT active', c.activeTokens);
+  ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
+    label + ' -> Explore is still the active item once the page settles', c.activeTokens);
 }
 
 // ── F. A saved home in Del Valle, a map of Denver ───────────────────────────────────────
@@ -147,16 +156,18 @@ ok(new RegExp(OTHER_ZIP).test(c.locLabel || ''), 'F ...and names the ZIP on scre
 ok(!!(c.savedHome && c.savedHome.address === '13313 COOMES DR'),
   'F the saved home is preserved, unchanged', c.savedHome);
 
-// positive control: on the home's OWN ZIP it still reads "Your home"
+// positive control: on the saved place's OWN ZIP it still names that address as Viewing
 await page.goto(BASE + '/homesignalmap.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await waitShell();
 await waitMap();
 await installSavedHome();
 await page.waitForTimeout(500);
 c = await chrome();
-info('ZIP ' + ZIP + ' with the same saved home', c.locLabel);
-ok(/^Your home · 13313 COOMES DR/.test(c.locLabel || ''),
-  'F POSITIVE CONTROL — on the home\'s own ZIP the control still says "Your home"', c.locLabel);
+info('ZIP ' + ZIP + ' with the same saved place', c.locLabel);
+ok(/^Viewing · 13313 COOMES DR/.test(c.locLabel || ''),
+  'F POSITIVE CONTROL — on the saved place\'s own ZIP the control says "Viewing · <street>"', c.locLabel);
+ok(!/your home/i.test(c.locLabel || ''),
+  'F the chip does not call the saved address "Your home"', c.locLabel);
 
 // ── G. Address mode still reaches the established experience ────────────────────────────
 await page.fill('#addr', ADDRESS);
@@ -178,7 +189,7 @@ ok(a.radiusVisible === true, 'G the radius control is available in address mode'
 ok(a.homePins === 1, 'G HOME is pinned at the geocoded address', a.homePins);
 ok(a.canonical > 0, 'G canonical radius results render', a.canonical);
 ok(/CALDWELL/i.test(c.locLabel || ''), 'G the current view follows the searched address', c.locLabel);
-ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'maps', 'G Maps is still the active item', c.activeTokens);
+ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore', 'G Explore is still the active item', c.activeTokens);
 
 // ── H. ZIP -> address -> ZIP ────────────────────────────────────────────────────────────
 await page.goto(BASE + '/homesignalmap.html?zip=' + OTHER_ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });

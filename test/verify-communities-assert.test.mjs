@@ -9,9 +9,16 @@
 // evidence"). The comparison was extracted into a pure core so both outcomes can be driven here.
 //
 // The two that matter are opposites, and BOTH must hold or the guard is worthless:
-//   • the flag really changed mid-walk  -> re-check against the fresh row, do NOT fail;
-//   • the flag did not change           -> STILL FAIL. A re-read must never become the way a real
+//   • the row really changed mid-walk   -> re-check against the fresh row, do NOT fail;
+//   • the row did not change            -> STILL FAIL. A re-read must never become the way a real
 //                                          defect gets dismissed.
+//
+// ⚖️ RETARGETED 2026-09-11. Both the guard's trigger and the assertion it guards used to be about
+// ROBOTS vs app_community_meta.indexable. #1023 made robots build-time authoritative on the
+// canonical /community/<zip>/ document and deleted community.html's client-side setIndexable(),
+// so the legacy dynamic page is now permanently `noindex, nofollow` and reflects no flag at all.
+// The contract this file pins is therefore: the dynamic page may NEVER advertise itself, and the
+// guard's trigger is the half of the row the page still reflects — data_quality vs isPass.
 // Run: node scripts/run-unit-tests.mjs   (or: node test/verify-communities-assert.test.mjs)
 import { assertCommunityRow, indexable } from '../scripts/lib/verify-communities-assert.mjs';
 
@@ -25,7 +32,8 @@ const INDEX = 'index, follow';
 const NOINDEX = 'noindex, nofollow';
 
 const row = (over = {}) => ({ zip: '97212', name: 'Portland (97212)', state: 'OR', data_quality: 'pass', indexable: true, ...over });
-const page = (over = {}) => ({ robots: INDEX, isPass: true, isCoverage: false, isNotCovered: false, h1: 'Portland 97212', recordLinks: ['https://example.gov/rec/1'], ...over });
+// DEFAULT IS NOINDEX, because that is what the shipped page hardcodes.
+const page = (over = {}) => ({ robots: NOINDEX, isPass: true, isCoverage: false, isNotCovered: false, h1: 'Portland 97212', recordLinks: ['https://example.gov/rec/1'], ...over });
 
 // A fetchFresh that records whether it was called at all.
 function fresh(value) { let calls = 0; return { fn: async () => { calls++; return value; }, calls: () => calls }; }
@@ -37,53 +45,74 @@ async function main() {
 
   console.log('\n1) THE GUARD FIRES — the flag really changed mid-walk (the Portland case)');
   {
-    // Snapshot said indexable=true; the page noindexed; the CURRENT row says false. Page is right.
-    const f = fresh({ data_quality: 'pass', indexable: false });
-    const r = await assertCommunityRow(row({ indexable: true }), page({ robots: NOINDEX }), f.fn);
-    ok('no failure — the page matched the CURRENT flag', r.fails.length === 0, r.fails.join(' | '));
+    // Snapshot said pass; the page rendered the coverage state; the CURRENT row says
+    // coverage_coming. The page is right and the snapshot was stale.
+    const f = fresh({ data_quality: 'coverage_coming', indexable: false });
+    const r = await assertCommunityRow(row({ data_quality: 'pass' }),
+      page({ isPass: false, isCoverage: true }), f.fn);
+    ok('no failure — the page matched the CURRENT row', r.fails.length === 0, r.fails.join(' | '));
     ok('reRead reported', r.reRead === true);
     ok('the substitution is logged, not silent', r.notes.some((n) => /meta changed mid-walk/.test(n)), JSON.stringify(r.notes));
-    ok('the note names both transitions', r.notes.some((n) => /indexable true -> false/.test(n)));
+    ok('the note names both transitions', r.notes.some((n) => /data_quality pass -> coverage_coming/.test(n)));
     ok('fetchFresh was called exactly once', f.calls() === 1);
   }
   {
-    // The OTHER direction: snapshot false, page indexed, current row says true. (97232.)
+    // The OTHER direction: snapshot coverage_coming, page rendered records, current row pass.
     const f = fresh({ data_quality: 'pass', indexable: true });
-    const r = await assertCommunityRow(row({ indexable: false }), page({ robots: INDEX }), f.fn);
+    const r = await assertCommunityRow(row({ data_quality: 'coverage_coming', indexable: false }),
+      page({ isPass: true }), f.fn);
     ok('opposite direction also clears', r.fails.length === 0 && r.reRead === true, r.fails.join(' | '));
   }
 
   console.log('\n2) THE GUARD DOES NOT EXCUSE A REAL DEFECT — flag unchanged, still fails');
   {
-    // The re-read returns the SAME values: the page genuinely contradicts the current flag.
+    // The re-read returns the SAME values: the page genuinely contradicts the current row.
     const f = fresh({ data_quality: 'pass', indexable: true });
-    const r = await assertCommunityRow(row({ indexable: true }), page({ robots: NOINDEX }), f.fn);
+    const r = await assertCommunityRow(row(), page({ isPass: false, isCoverage: true }), f.fn);
     ok('still FAILS', r.fails.length === 1, JSON.stringify(r.fails));
-    ok('fails with the substance-gate message', /substance-flagged page is NOT indexable/.test(r.fails[0] || ''), r.fails[0]);
+    ok('fails with the expected-a-PASS-page message', /expected a PASS page/.test(r.fails[0] || ''), r.fails[0]);
     ok('reRead NOT reported (nothing changed)', r.reRead === false);
     ok('fetchFresh was consulted', f.calls() === 1);
   }
   {
-    // Thin page that indexes anyway, flag unchanged -> must stay a failure.
-    const f = fresh({ data_quality: 'pass', indexable: false });
-    const r = await assertCommunityRow(row({ indexable: false }), page({ robots: INDEX }), f.fn);
-    ok('pass-but-thin indexable page still FAILS', /must stay noindex/.test(r.fails[0] || ''), JSON.stringify(r.fails));
-  }
-  {
     // fetchFresh unavailable (null row back) must NOT swallow the failure.
     const f = fresh(null);
-    const r = await assertCommunityRow(row({ indexable: true }), page({ robots: NOINDEX }), f.fn);
+    const r = await assertCommunityRow(row(), page({ isPass: false, isCoverage: true }), f.fn);
     ok('an unreadable re-read fails closed', r.fails.length === 1 && r.reRead === false, JSON.stringify(r.fails));
+  }
+
+  console.log('\n2b) THE LEGACY DYNAMIC PAGE MAY NEVER ADVERTISE ITSELF (the #1023 rule)');
+  {
+    // The flag is irrelevant: robots is build-time authoritative on /community/<zip>/, and
+    // community.html hardcodes noindex. An index directive here means something re-introduced
+    // a client-side promoter — exactly what #1023 removed.
+    for (const flag of [true, false]) {
+      const r = await assertCommunityRow(row({ indexable: flag }), page({ robots: INDEX }), null);
+      ok(`indexable=${flag}: an INDEXABLE dynamic page fails`,
+        /legacy dynamic page is INDEXABLE/.test(r.fails[0] || ''), JSON.stringify(r.fails));
+    }
+    const r = await assertCommunityRow(row({ indexable: true }), page(), null);
+    ok('...and a substance-flagged page that is correctly noindex PASSES — the old rule inverted',
+      r.fails.length === 0, JSON.stringify(r.fails));
   }
 
   console.log('\n3) THE GUARD IS NARROW — it is not consulted when there is no disagreement');
   {
     const f = fresh({ data_quality: 'pass', indexable: false });
-    const r = await assertCommunityRow(row({ indexable: true }), page({ robots: INDEX }), f.fn);
+    const r = await assertCommunityRow(row({ indexable: true }), page(), f.fn);
     ok('agreeing row+page: no re-read, no failure', f.calls() === 0 && r.fails.length === 0 && r.reRead === false);
   }
   {
-    // A coverage_coming row never reaches the guard (its branch is a different gate).
+    // ⚠️ THE OLD TRIGGER WOULD HAVE FIRED HERE ON EVERY SUBSTANCE-FLAGGED ROW, FOREVER:
+    // indexable=true vs a permanently-noindex page. That is ~11,689 REST round-trips a run
+    // and a guard whose firing carries no information. It must stay silent.
+    const f = fresh({ data_quality: 'pass', indexable: true });
+    const r = await assertCommunityRow(row({ indexable: true }), page(), f.fn);
+    ok('a noindex page under a TRUE dev-gate flag does NOT trigger a re-read', f.calls() === 0);
+    ok('...and does not fail', r.fails.length === 0, JSON.stringify(r.fails));
+  }
+  {
+    // A coverage_coming row that renders coverage never disagrees, so the guard is not consulted.
     const f = fresh({ data_quality: 'pass', indexable: true });
     const r = await assertCommunityRow(row({ data_quality: 'coverage_coming', indexable: false }),
       page({ robots: NOINDEX, isPass: false, isCoverage: true }), f.fn);

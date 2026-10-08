@@ -102,7 +102,21 @@
       n = parseInt(n, 10);
       return (n >= 0 && n <= 2 && !isNaN(n)) ? n : 0;
     };
-    HS.ZIP_NAV_PAGES = ['today.html', 'dashboard.html', 'alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
+    // Mirrors lib/view-zip.js (canonical). Follow sync may INITIALIZE an absent myZip
+    // and may never replace an established one; it returns no viewed ZIP by design.
+    HS.myZipAfterFollowSync = function (opts) {
+      opts = opts || {};
+      const cur = opts.myZip;
+      if (cur && /^\d{5}$/.test(String(cur))) return null;
+      const list = (opts.serverFollowZips || []).concat(opts.localFollowZips || []);
+      for (let i = 0; i < list.length; i++) {
+        const z = list[i] == null ? '' : String(list[i]);
+        if (/^\d{5}$/.test(z)) return z;
+      }
+      return null;
+    };
+    // Mirrors lib/view-zip.js::ZIP_NAV_PAGES — dashboard.html excluded (Fix 8 D1); see there.
+    HS.ZIP_NAV_PAGES = ['alerts.html', 'development.html', 'homesignalmap.html', 'community.html'];
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};
@@ -119,6 +133,37 @@
     };
   }
 
+  // Post-save confirmation helpers (canonical copy: lib/view-zip.js — keep in sync).
+  // SAVE/FOLLOW adds the place to My Places. Email alerts are configured on Alerts.
+  if (!HS.placeSavedLabel) {
+    HS.placeSavedLabel = function (info) {
+      info = info || {};
+      var zip = String(info.zip || '').trim();
+      var address = String(info.address || '').trim();
+      if (address) return address;
+      var name = String(info.name || '').trim();
+      if (name && zip && name.indexOf(zip) !== -1) return name;
+      if (name && zip) return name + ' (' + zip + ')';
+      return name || zip || '';
+    };
+  }
+  if (!HS.alertsHrefForSavedPlace) {
+    HS.alertsHrefForSavedPlace = function (info) {
+      info = info || {};
+      var zip = String(info.zip || '').trim();
+      return HS.navHref('alerts.html', /^\d{5}$/.test(zip) ? zip : null);
+    };
+  }
+  HS.announcePlaceSaved = function (info, willNavigate) {
+    if (!info) return;
+    if (!info.zip && !info.address && !info.name) return;
+    if (willNavigate) {
+      try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {}
+    } else {
+      HS.showAreaOptin(info);
+    }
+  };
+
   // ------------------------------------------------------------------ state --
   const LS = {
     get(k, d) { try { return JSON.parse(localStorage.getItem('hs:' + k)) ?? d; } catch (e) { return d; } },
@@ -128,9 +173,17 @@
     get(k) { try { return sessionStorage.getItem('hs:' + k); } catch (e) { return null; } },
     set(k, v) { try { if (v == null) sessionStorage.removeItem('hs:' + k); else sessionStorage.setItem('hs:' + k, String(v)); } catch (e) {} }
   };
+  // AN EMBEDDED MAP IS NOT THE VISITOR'S BROWSING CONTEXT. Map 1's embed mode
+  // (homesignalmap.html?embed=1, class hs-embed set in its <head> before this file runs) is
+  // iframed by other pages, and a same-origin iframe shares this tab's sessionStorage. The
+  // homepage's sample map (?embed=1&preview=1&zip=78657) would otherwise write 78657 as the
+  // tab's viewed ZIP on every visit, so the visitor's next page would open a ZIP they never
+  // chose. An embed reads the tab's context like any page; it never writes it, and it never
+  // opens the onboarding flow (the host page owns that).
+  const IS_EMBED = document.documentElement.classList.contains('hs-embed');
   function captureUrlViewZip() {
     const z = HS.parseZipParam(location.search);
-    if (z) SS.set('viewZip', z);
+    if (z && !IS_EMBED) SS.set('viewZip', z);
     return z;
   }
   let _zip = HS.resolveViewedZip({
@@ -149,6 +202,16 @@
     // activeProperty (the saved home) and from zip (the viewed area's code). Never persisted.
     viewLabel: '',
     viewLabelPrecise: false,   // true when viewLabel names a searched address, not an area
+    // WHICH PLACE TYPE THE CURRENT PAGE IS ABOUT — '' | 'zip' | 'address'. The Viewing
+    // control answers "which of my Places am I looking at", so the page that IS a Place
+    // says so; the chip must never infer it from whether a text label happened to load.
+    // In-memory like viewLabel: a fresh page declares its own Place or declares nothing.
+    viewPlaceType: '',
+    // ...and WHICH one, when the page can name it. 'address' alone cannot tell "viewing my
+    // saved Address h1" from "viewing an address I just searched that is not a saved Place"
+    // — Map 1's search declares the same type — and the switcher's check mark has to tell
+    // them apart or it would tick a saved home the resident is not looking at.
+    viewPlaceId: null,
     topicPrefs: {},   // hydrated in boot() — server for signed-in, localStorage for anonymous
     get activeProperty() {
       // Never a demo/sample home — see lib/data.js::pickActiveProperty (config.js:14-20).
@@ -162,7 +225,7 @@
       z = String(z).trim();
       if (!/^\d{5}$/.test(z) || z === _zip) return;
       _zip = z;
-      SS.set('viewZip', z);
+      if (!IS_EMBED) SS.set('viewZip', z);
       paintTopbar();
     },
     enumerable: true,
@@ -198,19 +261,29 @@
     const tail = [p.city, [p.state, p.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
     return [p.address, tail].filter(Boolean).join(', ');
   };
-  // Is this row the resident's OWN home (never a demo/sample property)?
-  // app_properties rows are written with label:'home'; the seed's designated
-  // home is tagged 'Your home' (pure-seed preview only). Live-demo rows carry
-  // sample:true and are never presented as the visitor's own home.
+  // Is this row the account's designated saved address (never a demo/sample property)?
+  // INTERNAL: app_properties rows are written with label:'home'; the seed's designated
+  // address is tagged 'Your home' (pure-seed preview only). Those stored values are
+  // identifiers, not user-facing copy (Fix 9). Live-demo rows carry sample:true and
+  // are never presented as the visitor's own place.
   HS.isRealHome = function (p) {
     return !!(p && !p.sample && !p.demo
       && (p.label === 'home' || p.tag === 'home' || p.tag === 'Your home'));
   };
-  // The active property IFF it's a real (non-sample) home located in the ZIP being
-  // viewed — the ONE test for "may I anchor the map / pin 'Your home' here". Returns
-  // null for a sample home, a home in a different ZIP, or none. Single source: maps /
-  // dashboard + the shared where-line all call this (no per-page copies — guarded by
-  // test/realhome.test.mjs).
+  // User-facing tag for a saved address. Stored 'Your home' / 'home' / 'my home'
+  // values are NOT shown — they assume residency. Type vocabulary stays Address
+  // (A-002); Rental/Family and other non-ownership tags pass through.
+  HS.placeDisplayTag = function (p, fallback) {
+    var raw = p && (p.tag || p.label);
+    if (!raw) return fallback || 'Address';
+    if (/^(your home|my home|home)$/i.test(String(raw).trim())) return fallback || 'Address';
+    return String(raw);
+  };
+  // The active property IFF it's a real (non-sample) saved address located in the ZIP
+  // being viewed — the ONE test for "may I anchor the map / pin this place here".
+  // Returns null for a sample row, an address in a different ZIP, or none. Single
+  // source: maps / dashboard + the shared where-line all call this (no per-page
+  // copies — guarded by test/realhome.test.mjs). Geography contract unchanged (Fix 6).
   HS.realHome = function () {
     var p = state.activeProperty;
     return (p && HS.isRealHome(p) && p.zip === state.zip) ? p : null;
@@ -246,6 +319,21 @@
   }
   // Read seam for the (later, schema-gated) conversion-stamp step.
   HS.referral = function () { return LS.get('referral', null); };
+  // Which page type this visit entered through (HS.entryFrom, lib/data.js), once per
+  // browser tab session. HS.logEvent stamps it on every event, so an address lookup or
+  // an alert sign-up can be counted against the page type Search Console reports on.
+  function captureEntry() {
+    try {
+      if (SS.get('entry')) return;
+      if (typeof HS.entryFrom !== 'function') return;
+      SS.set('entry', JSON.stringify(HS.entryFrom(location.pathname, document.referrer, location.host)));
+    } catch (e) { /* attribution must never break the page */ }
+  }
+  // lib/data.js carries no cache key, so a warm browser can pair this shell.js with an
+  // older lib/data.js that has no HS.logEvent. A sign-up that saved must still say so.
+  function logEvent(type, payload) {
+    try { if (typeof HS.logEvent === 'function') HS.logEvent(type, payload); } catch (e) { /* never */ }
+  }
   // Compact provenance token for a conversion row's `source` column, alongside the
   // existing hand-set tokens ('homepage_zip', 'contact_page'). Prefixed 'ref:' so
   // analytics can tell referral-attributed rows from page-provenance rows at a
@@ -261,10 +349,149 @@
   HS.ready = new Promise(r => (_resolveReady = r));
   HS.onReady = (fn) => HS.ready.then(fn);
 
+  // ------------------------------------------------------------ ZIP coverage --
+  // Founder, 2026-10-03. Replaces the 2026-10-01 "withheld ZIP pages" list. A ZIP with no
+  // Census-drawn area (PO-box, single-organization and similar ZIPs) is NOT proven inactive, and
+  // the "decommissioned" flag that put 47 of them on that list came from a third-party dataset,
+  // not USPS. So those ZIPs stay on the site, and the page says only what is true: it has no
+  // ZIP-wide map or ZIP-wide development records, and an address search is the way in.
+  //
+  // lib/zip-coverage.json is the PUBLIC model (scripts/build_zip_coverage.py derives it from an internal
+  // record that is never deployed; the public file carries page behavior only); the Pages build reads
+  // the same file. A ZIP with no entry is a standard page. page_mode:
+  //   standard             the normal page
+  //   specialized_zip      coverage panel, no map or ZIP-wide records
+  //   verification_pending the same, worded as "being verified"
+  //   retired              a neutral unavailable page; the build writes it only for a ZIP whose
+  //                        retirement the internal record shows as USPS-verified
+  //   unverified           a ZIP whose existence could not be confirmed (founder, 2026-10-03: 84684,
+  //                        84685): no page, a noindex notice that says only that, no redirect
+  // Anything we cannot place fails SAFE to verification_pending, never to a made-up boundary.
+  HS.ZIP_COVERAGE_URL = 'lib/zip-coverage.json';
+  // The mode is DECIDED once, by scripts/build_zip_coverage.py, which also refuses a model whose
+  // modes are not in this list or whose standard entry lacks a Census area. This only READS it;
+  // a value it does not know (a model nobody built) fails SAFE to verification_pending.
+  HS.ZIP_PAGE_MODES = ['standard', 'specialized_zip', 'verification_pending', 'retired', 'unverified'];
+  HS.zipCoverageMode = function (entry) {
+    if (!entry) return 'standard';
+    return HS.ZIP_PAGE_MODES.indexOf(entry.page_mode) >= 0 ? entry.page_mode : 'verification_pending';
+  };
+  // Pure. The coverage hit (if any) for the ZIP this page would show: {zip, entry, mode, copy}.
+  // The URL's ?zip= and a page's own declared ZIP count on every page; the viewed ZIP (saved or
+  // carried in the session) counts only on a page that draws the viewed ZIP.
+  HS.zipCoverageFor = function (opts) {
+    opts = opts || {};
+    const doc = opts.coverage;
+    if (!doc || !doc.zips) return null;
+    const cands = [opts.urlZip, opts.pageZip];
+    if (opts.onZipPage) cands.push(opts.viewedZip);
+    for (let i = 0; i < cands.length; i++) {
+      const z = cands[i] == null ? '' : String(cands[i]);
+      if (!/^\d{5}$/.test(z) || !Object.prototype.hasOwnProperty.call(doc.zips, z)) continue;
+      const entry = doc.zips[z];
+      const mode = HS.zipCoverageMode(entry);
+      if (mode === 'standard') continue;
+      return { zip: z, entry: entry, mode: mode, copy: (doc.copy || {})[mode] || null };
+    }
+    return null;
+  };
+  // 'community' pages draw their own coverage panel (lib/community-page.js); 'map' pages are
+  // the ZIP-map pages and show the panel instead of a map; anything else is untouched.
+  HS.zipCoveragePageKind = function (path) {
+    path = String(path || '');
+    if (/\/community\/\d{5}\/?$/.test(path)) return 'community';
+    const base = path.split('/').pop() || 'index.html';
+    if (base === 'community.html') return 'community';
+    if (base === 'development.html' || base === 'homesignalmap.html') return 'map';
+    return null;
+  };
+  HS.isZipPagePath = function (path) {
+    path = String(path || '');
+    if (/\/community\/\d{5}\/?$/.test(path)) return true;
+    const base = path.split('/').pop() || 'index.html';
+    return (HS.ZIP_NAV_PAGES || []).indexOf(base) >= 0;
+  };
+  function escHtml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  // The coverage panel: ONE renderer for the shell's map pages and the legacy community page.
+  // (scripts/gen_zip_pages.py writes the same words into the generated document; the copy comes
+  // from the same JSON, and test/zip-coverage.test.mjs fails if the two ever differ.)
+  // It states no count, no "0 projects" and no empty-search sentence: nothing here says a
+  // ZIP-wide search happened, because none can.
+  HS.zipCoveragePanelHTML = function (hit) {
+    const c = hit && hit.copy; if (!c) return '';
+    const z = hit.zip;
+    const sub = function (t) { return String(t).split('{zip}').join(z); };
+    // An unverified ZIP has no page, so its notice carries the heading itself, offers one link (the
+    // home page, no ZIP carried) and never points at that ZIP's own document or its neighbours.
+    const unv = hit.mode === 'unverified';
+    return '<section class="zcov" id="hs-zip-coverage" data-zip-coverage="' + escHtml(hit.mode) + '" data-zip="' + escHtml(z) + '">'
+      + (unv ? '<h1>' : '<h2>') + escHtml(sub(c.title)) + (unv ? '</h1>' : '</h2>')
+      + c.body.map(function (p) { return '<p style="margin:10px 0 0">' + escHtml(sub(p)) + '</p>'; }).join('')
+      + '<p class="zcov-cta" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">'
+      + '<a class="inlinebtn" id="zcovAddress" style="text-decoration:none" href="' + (unv ? '/' : '/?near=' + encodeURIComponent(z) + '#homeSearch') + '">' + escHtml(c.primary_cta) + '</a>'
+      + (unv || !c.secondary_cta ? '' : '<a class="inlinebtn" id="zcovNearby" style="text-decoration:none" href="/community/' + encodeURIComponent(z) + '/#zip-nearby">' + escHtml(c.secondary_cta) + '</a>')
+      + '</p></section>';
+  };
+  // The browser's model carries no place name (only page behavior), so the heading is the ZIP alone.
+  HS.zipCoverageLabel = function () { return ''; };
+  // Modes with NO page of their own: the notice replaces the page everywhere the ZIP is drawn.
+  HS.zipCoverageNoPage = function (mode) { return mode === 'retired' || mode === 'unverified'; };
+  // A list that cannot be read fails OPEN: the page draws as a standard page, whose own "this ZIP
+  // has no mapped area" sentence is already honest for a ZIP with no boundary. One small
+  // same-origin file must not take every ZIP page down. The build still writes the same documents.
+  async function loadZipCoverage() {
+    try {
+      const r = await fetch(HS.ZIP_COVERAGE_URL, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const doc = await r.json();
+      return (doc && doc.zips && typeof doc.zips === 'object') ? doc : null;
+    } catch (e) {
+      console.warn('ZIP coverage model could not be read; pages draw as standard pages', e);
+      return null;
+    }
+  }
+  // Started as the script loads, so the read runs alongside the shell's own fetches.
+  const _zipCoverageP = loadZipCoverage();
+  // The page a visitor gets in place of a map page (or for a retired ZIP): the panel inside the
+  // normal shell, so search and navigation still work. It never resolves HS.ready, so no map or
+  // development code runs. Robots: a ZIP-keyed map URL is not a canonical page (the document at
+  // /community/<zip>/ is), so it is noindex; its canonical points there.
+  function renderZipCoverage(hit) {
+    SS.set('viewZip', null);   // never carry this ZIP onto the next page
+    let robots = document.querySelector('meta[name="robots"]');
+    if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
+    robots.content = HS.zipCoverageNoPage(hit.mode) ? 'noindex, nofollow' : 'noindex, follow';
+    document.querySelectorAll('link[rel="canonical"]').forEach(function (l) { l.remove(); });
+    if (!HS.zipCoverageNoPage(hit.mode)) {
+      const cl = document.createElement('link'); cl.rel = 'canonical';
+      cl.href = '/community/' + encodeURIComponent(hit.zip) + '/'; document.head.appendChild(cl);
+    }
+    document.title = String(hit.copy.page_title).split('{zip}').join(hit.zip);
+    const label = HS.zipCoverageLabel(hit);
+    // The notice for a ZIP that could not be confirmed carries its own heading (the founder's words);
+    // every other mode shows the ZIP as the heading and the panel below it.
+    const html = '<div class="page" id="hs-zip-coverage-page" data-zip-coverage-page="' + escHtml(hit.mode) + '"><div class="ph">'
+      + '<div class="eyebrow">ZIP Codes</div>' + (hit.mode === 'unverified' ? '' : '<h1>' + escHtml(hit.zip) + (label ? ' · ' + escHtml(label) : '') + '</h1>')
+      + HS.zipCoveragePanelHTML(hit)
+      + '</div></div>';
+    const slot = $('hs-slot');
+    if (slot) slot.innerHTML = html;
+    else document.body.innerHTML = html;
+  }
+
   // -------------------------------------------------------------- modals -----
   let _lastFocus = null;
   HS.openModal = function (id) {
     const el = $(id); if (!el) return;
+    // CONTEXT ISOLATION (Fix 15). The Premium modal is ONE shared modal reached from
+    // several CTAs, so a context bound by an earlier click must never survive into a
+    // later one. Clearing on the GENERIC entry means the only way a signup carries a
+    // property or a ZIP label is HS.openPremiumModal, below, which re-binds AFTER this
+    // runs. An unbound open falls back to the page URL, exactly as it always has.
+    if (id === 'premiumModal') HS.premiumContext = null;
     _lastFocus = document.activeElement;
     el.classList.add('show');
     const f = el.querySelector('input,button,[tabindex]'); if (f) f.focus();
@@ -316,6 +543,13 @@
     LS.set('accountUid', null);
     state.activePropId = null;
     _serverFollowZips = [];
+    // Project follows are account-scoped (app_follows target_type=project).
+    // Drop only those keys so a later sign-in cannot inherit — or PUSH — another
+    // account's project follows. Property watches and change-notify keys stay
+    // in localStorage (their restore contract is unchanged).
+    const keptFollows = [...state.follows].filter(k => String(k).indexOf('project:') !== 0);
+    state.follows = new Set(keptFollows);
+    LS.set('follows', keptFollows);
   }
 
   function ensureAccountScope() {
@@ -345,15 +579,26 @@
     }
     ensureAccountScope();
     await syncFollowsFromAccount();
+    await syncProjectFollowsFromAccount();
     state.properties = await HS.data.properties();
     const validIds = new Set(state.properties.map(p => p.id));
     if (state.activePropId && !validIds.has(state.activePropId)) {
       state.activePropId = null;
       LS.set('activeProp', null);
     }
-    if (!state.activePropId && state.properties[0]) {
-      state.activePropId = state.properties[0].id;
-      LS.set('activeProp', state.activePropId);
+    // Hydrate may refresh the saved-address COLLECTION; it must not elect an active
+    // address that silently redefines the viewed place. Electing properties[0] made a
+    // Celina home the active context while the URL said 84301 — the same ownership
+    // defect as the follow-order assignment above, reached through the other store.
+    // Elect only a property ALREADY in the viewed ZIP, which is the condition
+    // HS.realHome() applies anyway, so an out-of-ZIP election never bought anything
+    // it is now losing.
+    if (!state.activePropId) {
+      const inView = state.properties.find(p => p && String(p.zip) === String(state.zip));
+      if (inView) {
+        state.activePropId = inView.id;
+        LS.set('activeProp', inView.id);
+      }
     }
     await refreshServerFollowZips();
     _accountHydrated = true;
@@ -491,47 +736,46 @@
   }
 
   async function saveOnboardingAddress(addr) {
-    const O = window.HSOnboarding;
-    let m = null, unavailable = false;
-    try {
-      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: addr } });
-      if (r.error) unavailable = true;
-      else m = (r.data && r.data.match) || null;
-    } catch (e) { unavailable = true; }
-    if (unavailable) throw new Error("The address service couldn't be reached — please try again in a minute.");
-    if (!m || !m.zip) {
-      throw new Error("We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.");
-    }
-    if (!O.validCoords(m.lat, m.lng)) {
-      throw new Error("We couldn't confirm a valid location for that address — try again or enter your ZIP code instead.");
-    }
+    // The one resolver (HS.resolveAddress, below) owns the call and its three honest
+    // failure messages; onboarding only saves what it confirmed.
+    const res = await HS.resolveAddress(addr);
+    if (!res.ok) throw new Error(res.message);
+    const m = res.match;
     const row = {
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
       city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home'
+      lat: m.lat, lng: m.lng, label: 'home',
+      input_address: String(addr || '').trim() || null
     };
-    const existing = (state.properties || []).find(p => HS.isRealHome(p));
-    let saved = null;
-    if (existing) {
-      const upd = await HS.sb().from('app_properties').update(row)
-        .eq('id', existing.id).eq('user_id', state.session.user.id).select().single();
-      if (upd.error || !upd.data) throw new Error("Couldn't save your home — please try again.");
-      saved = upd.data;
-    } else {
-      const ins = await HS.sb().from('app_properties').insert(row).select().single();
-      if (ins.error || !ins.data) throw new Error("Couldn't save your home — please try again.");
-      saved = ins.data;
-    }
+    // FIX 17 — onboarding uses the SAME saved-place contract as HS.saveHome.
+    //
+    // It used to find whichever row was isRealHome and UPDATE it, which encoded a
+    // one-home-per-user identity that saveHome's unconditional INSERT contradicted.
+    // Two writers, two contracts, neither enforced — the condition Fix 17 removes.
+    //
+    // The UPDATE branch is not merely redundant, it was destructive: a resident who
+    // already had a saved Address and typed a DIFFERENT one here had the first place
+    // silently overwritten. My Places holds many Addresses, so the honest outcome is a
+    // second place, and a repeat of the SAME place is now idempotent at the database.
+    const saveRes = await savePlaceRow(row);
+    if (!saveRes.data) throw new Error("Couldn't save this place — please try again.");
+    const saved = saveRes.data;
     LS.set('activeProp', saved.id);
     state.activePropId = saved.id;
     state.properties = await HS.data.properties();
     if (!state.properties.find(p => p.id === saved.id)) {
-      throw new Error("Your home saved but could not be verified — please try again.");
+      throw new Error("Place saved but could not be verified — please try again.");
     }
+    _onbOptin = {
+      zip: m.zip,
+      kind: 'address',
+      address: String(m.matchedAddress || row.address || '').trim(),
+      placeId: saved.id
+    };
     if (await HS.data.isCovered(m.zip)) {
       await persistCommunityFollow(m.zip);
-      _onbOptin = await HS.ensureAreaSubscribed(m.zip, false, true, true);
+      await HS.ensureAreaSubscribed(m.zip, false, true, true);
     }
     state.zip = m.zip;
     paintTopbar();
@@ -542,7 +786,9 @@
     const covered = await HS.data.isCovered(zip);
     if (!covered) return { covered: false, zip: zip };
     await persistCommunityFollow(zip);
-    _onbOptin = await HS.ensureAreaSubscribed(zip, false, true, true);
+    const followed = HS.followedCommunities().find(c => String(c.zip) === String(zip));
+    _onbOptin = { zip: zip, kind: 'zip', name: (followed && followed.name) || '' };
+    await HS.ensureAreaSubscribed(zip, false, true, true);
     paintTopbar();
     return { covered: true, zip: zip };
   }
@@ -651,12 +897,32 @@
   };
 
   HS.submitOnboardingRequest = async function () {
-    const el = onbEl('onbReqEmail'), e = el && el.value.trim();
-    if (!e || e.indexOf('@') < 1) { if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    const el = onbEl('onbReqEmail'), btn = onbEl('onbReqBtn');
+    const R = window.HSCommunityRequest;
+    if (!R) { onbMsg('We could not save your email just now. Please try again in a moment.', true); return; }
+    const email = R.normalizeEmail(el && el.value);
+    if (!email) {
+      if (el) { el.style.borderColor = '#c23b34'; el.focus(); }
+      onbMsg('Enter a valid email address so we can reach you.', true);
+      return;
+    }
+    const zip = R.normalizeZip(onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent);
+    if (!zip) { onbMsg('That ZIP code does not look right — check it and try again.', true); return; }
     if (el) el.style.borderColor = '';
-    const row = { email: e, zip: (onbEl('onbUncoveredZip') && onbEl('onbUncoveredZip').textContent) || '' };
-    const ref = HS.referralToken(); if (ref) row.source = ref;
-    await persistEmail('community_requests', row);
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    const source = (typeof HS.referralToken === 'function' && HS.referralToken()) || 'onboarding';
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('community_requests', { email: email, requested_zip: zip, source: source })
+      : await R.submit({ client: HS.sb(), email: email, zip: zip, source: source });
+    if (btn) { btn.disabled = false; btn.textContent = 'Request my zip code'; }
+    if (!res.ok) {
+      onbMsg(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : 'We could not save your email just now. Please try again in a moment.', true);
+      if (el) el.focus();
+      return;
+    }
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
     onbMsg('Request received — we will email you when your area goes live.');
     if (onbEl('onbUncovered')) onbEl('onbUncovered').classList.add('hidden');
   };
@@ -700,14 +966,38 @@
     if (reqEmail) reqEmail.addEventListener('keydown', function (e) { if (e.key === 'Enter') HS.submitOnboardingRequest(); });
   }
 
-  HS.toggleMenu = function () {
-    document.querySelector('.side').classList.toggle('open');
-    $('sidebackdrop').classList.toggle('show');
-  };
-  function closeMenu() {
-    const s = document.querySelector('.side'); if (s) s.classList.remove('open');
-    const b = $('sidebackdrop'); if (b) b.classList.remove('show');
+  // THE COMPACT MENU (1023px and narrower). The header's one nav element becomes a panel
+  // under the header; the Menu button opens and closes it. It closes after a navigation,
+  // on Escape, and on a click outside the header. At 1024px and wider the CSS shows the nav
+  // as the horizontal row whatever this class says, so a stale open state cannot hide it.
+  function setMenuOpen(open) {
+    const head = $('hs-top'); if (!head) return;
+    head.classList.toggle('menu-open', !!open);
+    const btn = $('hs-menubtn'); if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
+  HS.toggleMenu = function () {
+    const head = $('hs-top');
+    setMenuOpen(!(head && head.classList.contains('menu-open')));
+  };
+  function closeMenu() { setMenuOpen(false); }
+
+  // THE EXPLORE DROPDOWN (founder, 2026-10-02). On wide screens hovering Explore opens the
+  // menu of Explore's three pages (Quality of Life Impact, Development Map, Activity) in CSS;
+  // the chevron beside Explore opens and closes it here, for touch and keyboard, and a click
+  // outside it, Escape or picking an entry closes it. In the compact Menu panel the CSS
+  // always lists the three under Explore, so this class changes nothing there.
+  // The Enterprise dropdown (founder, 2026-10-05; "Enterprise overview", "My reports") is the
+  // same control, so both groups share these three functions, keyed by the group's id.
+  function setNavGroupOpen(id, open) {
+    const g = $(id); if (!g) return;
+    g.classList.toggle('open', !!open);
+    const b = $(id + '-toggle'); if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  function setExploreOpen(open) { setNavGroupOpen('hs-explore', open); }
+  HS.toggleExplore = function () {
+    const g = $('hs-explore');
+    setExploreOpen(!(g && g.classList.contains('open')));
+  };
 
   // -------------------------------------------------------------- session ----
   async function bootSession() {
@@ -722,10 +1012,14 @@
       state.session = { user: { id: u.id, email: u.email }, demo: true, name: u.name, initials: u.initials };
     }
   }
-  HS.requireAuth = function (thenLabel) {
+  // `afterAuth` (optional) is the action to RESUME once the 6-digit code is verified,
+  // e.g. Map 1's "What is changing in my zip code?" sign-up. Without it, verifying the
+  // code navigated to location.pathname, dropping ?zip= and the Bluesky utm_* — so the
+  // tap that asked for the sign-in was simply lost.
+  HS.requireAuth = function (thenLabel, afterAuth) {
     if (state.session && !state.session.demo) return true;
     // open the in-page email sign-in / sign-up modal (no redirect)
-    HS.openAuth();
+    HS.openAuth(afterAuth);
     return false;
   };
   HS.onAvatar = function () {
@@ -743,11 +1037,17 @@
   // signs in a returning one. On success we bounce to ?return= (or reload) so the
   // now-persisted Supabase session is picked up by bootSession().
   let _authStep = 'email', _authEmail = '';
+  // The action to resume after a successful verify. Set ONLY by the control that
+  // opened the modal and CLEARED by every other open: an abandoned intent must never
+  // fire on a later, unrelated sign-in — for an email sign-up that would be consent
+  // the resident did not give at that moment.
+  let _afterAuth = null;
   function authMsg(t, err) {
     const m = $('authMsg'); if (!m) return;
     m.textContent = t || ''; m.style.color = err ? '#c23b34' : '';
   }
-  HS.openAuth = function () {
+  HS.openAuth = function (afterAuth) {
+    _afterAuth = typeof afterAuth === 'function' ? afterAuth : null;
     _authStep = 'email'; _authEmail = '';
     const e = $('authEmail'), c = $('authCode'), b = $('authSubmitBtn');
     if (e) { e.value = ''; e.classList.remove('hidden'); }
@@ -758,10 +1058,17 @@
     if ($('authForm')) $('authForm').classList.remove('hidden');
     if ($('authDone')) $('authDone').classList.add('hidden');
     authMsg('New here? Entering your email creates your free account — no password, no spam.', false);
+    // The sign-in can be asked for from INSIDE another modal (the Alerts topic picker's Save).
+    // Every overlay has the same z-index, so the later one in the page paints on top, and the
+    // picker comes after the sign-in in partials/shell.html: the sign-in opened BEHIND it and
+    // could not be clicked. Moving it to the end of its parent keeps it on top of its caller.
+    const am = $('authModal');
+    if (am && am.parentNode) am.parentNode.appendChild(am);
     HS.openModal('authModal');
     setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
   };
-  HS.authReset = function () { HS.openAuth(); };
+  // "Use a different email" restarts the SAME sign-in, so it keeps the pending action.
+  HS.authReset = function () { HS.openAuth(_afterAuth); };
   HS.authSubmit = async function () {
     if (!window.supabase) { authMsg('Sign-in is unavailable right now — please try again.', true); return; }
     const btn = $('authSubmitBtn');
@@ -779,11 +1086,20 @@
         await hydrateAccountLocation();
         HS.paintTopicCounts();
         paintTopbar();
+        // Resume the action that asked for this sign-in (Map 1's ZIP email sign-up). It
+        // runs BEFORE the onboarding check, so the ZIP it saves to My Places counts as the
+        // resident's location; its own control reports success or failure on the page.
+        const resume = _afterAuth; _afterAuth = null;
+        if (resume) {
+          try { await resume(); } catch (e) { console.warn('after-auth', e); }
+        }
         setTimeout(() => {
           HS.closeModal('authModal');
           const back = new URLSearchParams(location.search).get('return');
           if (HS.needsOnboarding && HS.needsOnboarding()) {
             HS.startOnboarding();
+          } else if (resume) {
+            // The resumed action owns this page: stay on it, with ?zip= and utm_* intact.
           } else {
             location.href = back ? decodeURIComponent(back) : location.pathname;
           }
@@ -814,23 +1130,152 @@
     document.dispatchEvent(new CustomEvent('hs:property', { detail: { id } }));
   };
   // Switcher-modal path: pages compute their home-anchored data (pin, header
-  // address, distances) once at load, so switching focus reloads the current
-  // page to rebuild everything for the newly active home (same pattern as
-  // saveHome). Only on an actual change — re-picking the active home just
-  // closes the modal. Other selectProperty callers must NOT reload: property
-  // cards navigate right after selecting, and property.html syncs the active
-  // home during page load (a reload there would loop).
+  // address, distances) once at load, so switching focus rebuilds the current
+  // page for the newly active home (same pattern as saveHome). Only on an
+  // actual change — re-picking the active home just closes the modal. Other
+  // selectProperty callers must NOT reload: property cards navigate right after
+  // selecting, and property.html syncs the active home during page load (a
+  // reload there would loop).
+  //
+  // Focusing an Address also focuses its ZIP: the Viewing chip is a Place
+  // switcher, and an Address in 78617 is not a way to keep browsing 75009.
+  // That write to myZip is an explicit pick, not a browse — NAV-01's
+  // "viewing must not overwrite myZip" still holds for URL/session navigation.
+  function currentShellPage() {
+    const parts = (location.pathname || '').split('/').filter(Boolean);
+    const file = parts[parts.length - 1] || '';
+    if (/\.html$/i.test(file)) return file;
+    if (parts[0] === 'community') return 'community.html';
+    return 'dashboard.html';
+  }
+  function focusHref(zip) {
+    const page = currentShellPage();
+    if (page === 'property.html') return HS.navHref('properties.html', zip);
+    return HS.navHref(page, zip);
+  }
+  function afterAddZipHref(zip) {
+    const page = currentShellPage();
+    if (page === 'index.html' || page === 'contact.html' || page === 'about.html'
+        || page === 'how-it-works.html' || page === 'privacy.html') {
+      return HS.navHref('community.html', zip);
+    }
+    return focusHref(zip);
+  }
+  function focusZip(zip) {
+    zip = String(zip);
+    LS.set('myZip', zip);
+    state.zip = zip;
+  }
+  // Drop the active-Address POINTER when that Address is not in the place being
+  // switched to. Never deletes the row — removal is HS.removeAddress alone (A-012).
+  function clearActivePropIfForeign(zip) {
+    const cur = (state.properties || []).find(x => String(x.id) === String(state.activePropId));
+    if (cur && String(cur.zip) !== String(zip)) {
+      state.activePropId = null;
+      LS.set('activeProp', null);
+    }
+  }
   HS.switchProperty = function (id) {
-    const changed = id !== state.activePropId;
+    const p = (state.properties || []).find(x => String(x.id) === String(id));
+    const zip = p && /^\d{5}$/.test(String(p.zip)) ? String(p.zip) : null;
+    const changed = id !== state.activePropId || (zip && zip !== String(state.zip));
     HS.selectProperty(id);
     HS.closeModal('switcherModal');
-    if (changed) location.reload();
+    if (!changed) return;
+    // On the Address dossier, reload keeps the OLD ?id= and a cross-ZIP pick used
+    // to dump the resident on My Places. The click is "open THIS Address".
+    const page = currentShellPage();
+    if (page === 'property.html' && p) {
+      if (zip && zip !== String(state.zip)) focusZip(zip);
+      location.href = 'property.html?id=' + encodeURIComponent(p.id);
+      return;
+    }
+    if (zip && zip !== String(state.zip)) {
+      focusZip(zip);
+      location.href = focusHref(zip);
+      return;
+    }
+    location.reload();
   };
+  // ZIP Codes are a DIFFERENT Place type (app_follows / myCommunities). This
+  // focuses the app on an already-followed ZIP — it does not write an Address,
+  // does not unfollow the others, and does not open the Census home flow.
+  HS.switchZip = function (zip) {
+    zip = String(zip || '');
+    if (!/^\d{5}$/.test(zip)) return;
+    const changed = zip !== String(state.zip);
+    HS.closeModal('switcherModal');
+    if (!changed) return;
+    // A ZIP-only Place has no Address, so the previously active one must stop being the
+    // active CONTEXT — otherwise a resident who moves from their Celina Address to
+    // Bear River City (84301) is still carrying Celina as the app's home identity.
+    // This clears the POINTER only: the app_properties row stays saved, still lists in
+    // My Places and in this very menu, and is one tap away. It does not unfollow a ZIP,
+    // does not write an Address, and never invents one for a ZIP-only Place.
+    // (The distance/home anchor is separately protected at the data layer by
+    // lib/data.js::homeFor, which anchors only on a home IN the fetched ZIP.)
+    clearActivePropIfForeign(zip);
+    focusZip(zip);
+    location.href = focusHref(zip);
+  };
+  // ------------------------------------------- viewed place, re-asserted ------
+  // THE ONE re-assertion of the viewed place, called by every ZIP-scoped page before
+  // it fetches. Gate 1 stops account hydration from stealing state.zip; this is the
+  // defence in depth that makes the page's own URL authoritative at the MOMENT OF THE
+  // FETCH, so any future async step between boot and render cannot quietly redefine
+  // the page's geography. It is a shared helper on purpose — the alternative was
+  // copying lib/community-page.js's URL reset into four pages, i.e. four per-page
+  // geography rules that drift.
+  //
+  // Resolution is the DOCUMENTED one and nothing else:
+  //   explicit page ZIP (?zip=, or a path-based ZIP the page declares) -> the
+  //   established viewed ZIP (resolveViewedZip: myZip -> session viewZip) -> DEFAULT_ZIP.
+  //
+  // pageZip is for a canonical document whose ZIP is in its PATH, not its query string
+  // (/community/<zip>/ declares it as <body data-zip>). It ranks WITH ?zip= because it
+  // is that document's URL identity — ranking it below myZip would render a resident's
+  // saved area on a page that is about a different ZIP.
+  HS.ensureViewedZip = function (pageZip) {
+    const explicit = HS.parseZipParam(location.search)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    const z = HS.resolveViewedZip({
+      urlZip: explicit,
+      myZip: LS.get('myZip', null),
+      sessionViewZip: SS.get('viewZip'),
+      defaultZip: CFG.DEFAULT_ZIP
+    });
+    if (z && z !== String(state.zip)) state.zip = z;   // setter re-paints + re-stamps nav
+    return String(state.zip);
+  };
+
+  // Click-time navigator for shell chrome that is NOT an <a> (the bell). Resolving
+  // through HS.navHref at the moment of the click means it can never carry a stale ZIP
+  // the way a string baked into partials/shell.html at inject time would — and it keeps
+  // the ban on hand-built '?zip=' concatenation intact.
+  HS.navTo = function (page) { location.href = HS.navHref(page, state.zip); };
+
   function paintNavHrefs() {
     if (!HS.ZIP_NAV_PAGES || !HS.navHref) return;
     const zip = state.zip;
+    // On a project/facility dossier the Development sidebar used to stamp
+    // development.html?zip= only, dropping ?id=. Clicking the already-lit
+    // Development item then opened the ZIP list (or, with no zip, leftover
+    // myZip) and Viewing fell off Pearce Lane back to a ZIP code.
+    // Keep the record id on THAT one link so the click stays on the dossier.
+    // Alerts/Dashboard stay zip-only. "Back to development" is still the list.
+    let dossierId = null;
+    if (currentShellPage() === 'development.html') {
+      try {
+        const id = new URLSearchParams(location.search).get('id');
+        if (id) dossierId = String(id);
+      } catch (e) { dossierId = null; }
+    }
     const stamp = (a, base) => {
       if (!base || HS.ZIP_NAV_PAGES.indexOf(base) < 0) return;
+      if (base === 'development.html' && dossierId && HS.pageHref) {
+        a.setAttribute('href', HS.pageHref('development.html', { zip: zip, id: dossierId }));
+        return;
+      }
       a.setAttribute('href', HS.navHref(base, zip));
     };
     const nav = document.getElementById('hs-nav');
@@ -853,8 +1298,37 @@
   // searched street address) rather than the area they are browsing. A precise view
   // outranks the saved home even inside the home's own ZIP: someone who searches
   // 2200 Caldwell Ln must not be told they are looking at 13313 Coomes Dr just because
-  // both sit in 78617. An AREA label does not outrank it — on your home's own ZIP the
-  // control still says "Your home", which is the affordance residents rely on.
+  // both sit in 78617. An AREA label does not outrank it — on a saved address's own ZIP
+  // the control still names that address as what is being viewed.
+  // A PAGE THAT IS A PLACE DECLARES IT — synchronously, before any fetch. The ZIP hub is
+  // the ZIP Place's own page, so landing on it IS viewing that ZIP Place (founder, 2026-09-15:
+  // "Viewing tells you which of my Places you are looking at — on a zip code page you are
+  // obviously viewing a zip code"). Declared here rather than derived from the view LABEL
+  // because the label arrives two awaits later, and a chip that named the saved address until
+  // the metadata landed would still be wrong, just briefly.
+  HS.setViewPlaceType = function (type, id) {
+    const t = type == null ? '' : String(type);
+    const i = id == null || id === '' ? null : String(id);
+    if (t === state.viewPlaceType && i === state.viewPlaceId) return;
+    state.viewPlaceType = t;
+    // Always written, never merged: declaring a ZIP Place must clear a previously declared
+    // Address id rather than leave it behind to be read against the wrong type.
+    state.viewPlaceId = i;
+    paintTopbar();
+  };
+  // A ROUTE THAT NAMES A ZIP IS A DECLARATION OF THE ZIP PLACE — the shared form of the
+  // rule the ZIP hub applies, for TOOL pages (Alerts, Map 1) that are scoped to a ZIP but
+  // are not themselves a Place. Resolution is deliberately the SAME contract as
+  // HS.ensureViewedZip: the query string's ?zip=, or a ZIP the page declares from its own
+  // PATH (/development/<zip>). EXPLICIT ONLY, and that is the whole point — a tool reached
+  // with no ZIP in its route has declared nothing, so the saved address still supplies the
+  // default context there, exactly as before. Returns the declared ZIP, or null.
+  HS.declareRouteZipPlace = function (pageZip) {
+    const explicit = (HS.parseZipParam ? HS.parseZipParam(location.search) : null)
+      || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
+    if (explicit) HS.setViewPlaceType('zip');
+    return explicit || null;
+  };
   HS.setViewLabel = function (label, opts) {
     const t = label == null ? '' : String(label).trim();
     const precise = !!(opts && opts.precise);
@@ -865,39 +1339,62 @@
   };
   function viewedLabel() { return state.viewLabel || ('ZIP ' + state.zip); }
 
-  function paintTopbar() {
+  // THE VIEWING LABEL — which place the page is showing. It used to be painted into the
+  // Viewing chip in the top bar. The horizontal header (founder, Revised Index Design,
+  // 2026-09-30) took that chip out of the global chrome; residents switch places from My
+  // Places. The DECISION is kept, in one place, so a future surface (or a page that carries
+  // its own #locLabel) names the place the same way. HS.viewingLabel() returns
+  // { text, title }; paintTopbar paints #locLabel only where a page still has one.
+  function viewingChip() {
     const p = state.activeProperty;
+    // CURRENT GEOGRAPHY is always "Viewing · …" (Fix 9). A saved address in the
+    // viewed ZIP is named as the thing in view — never as "your home". The full
+    // logged address (street, city, state ZIP) rides in the hover tooltip.
+    //
+    // SAVED ADDRESS IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
+    // print the saved address on every page regardless of what the page was showing,
+    // so a Del Valle address browsing ?zip=80210 read as the Denver page's location
+    // (founder-observed on production, 2026-09-04). The address is named as the
+    // current context only when the page is actually showing its ZIP — the same
+    // gate HS.realHome() already applies to the page-level context line. Otherwise
+    // the control names the CURRENT VIEW. Nothing about the saved place changes:
+    // it stays saved, stays active, and stays one tap away in the switcher.
+    //
+    // ...AND A ZIP PAGE IS A ZIP PLACE (founder-observed on production 2026-09-15, at
+    // /community.html?zip=78617 reading "Viewing · 13313 COOMES DR"). The 2026-09-04 gate
+    // fixed the OTHER ZIP only; inside the address's own ZIP the address still won, so a
+    // resident holding an address in 78617 could never see the ZIP Place "Del Valle (78617)"
+    // named — not by opening its page, not by tapping its chip, because those chips are
+    // plain links and hydrate re-elects any in-ZIP address as the active one on every load.
+    // A page that IS a Place declares it (HS.setViewPlaceType) and that declaration wins.
+    // The address stays saved, stays the active property, and still anchors home-relative
+    // data; only the question "which Place am I looking at" is answered by the page.
+    const myZip = LS.get('myZip', null);
+    const homeIsCurrent = !!(p && String(p.zip) === String(state.zip)
+      && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
+    const text = (p && homeIsCurrent)
+      ? ('Viewing · ' + p.address)
+      : ((p || myZip)
+        ? ('Viewing · ' + viewedLabel())
+        : (HS.isSample()
+          ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
+          : ('Viewing · ' + viewedLabel())));
+    const title = p
+      ? (homeIsCurrent
+        ? ('Viewing ' + HS.homeAddressLine(p) + ' — tap to switch')
+        : ('Viewing ' + viewedLabel() + ' — a saved place is still '
+           + HS.homeAddressLine(p) + '. Tap to switch.'))
+      : 'Tap to set your area';
+    return { text: text, title: title };
+  }
+  HS.viewingLabel = function () { return viewingChip(); };
+
+  function paintTopbar() {
     if ($('locLabel')) {
-      // A saved home is labeled AS the home ("Your home · <street>") — a bare
-      // street line never said which address the app had on file. The full
-      // logged address (street, city, state ZIP) rides in the hover tooltip.
-      //
-      // SAVED HOME IS NOT THE SAME THING AS WHERE YOU ARE. This control used to
-      // print the saved home on every page regardless of what the page was showing,
-      // so a resident with a Del Valle home browsing ?zip=80210 read
-      // "Your home · 13313 COOMES DR" beside a Denver map — two locations side by
-      // side with nothing saying which one the page was about (founder-observed on
-      // production, 2026-09-04). The home is named as the current context only when
-      // the page is actually showing its ZIP — the same gate HS.realHome() already
-      // applies to the page-level context line. Otherwise the control names the
-      // CURRENT VIEW. Nothing about the saved home changes: it stays saved, stays
-      // active, and stays one tap away in the switcher (and the tooltip still names it).
-      const myZip = LS.get('myZip', null);
-      const homeIsCurrent = !!(p && String(p.zip) === String(state.zip) && !state.viewLabelPrecise);
-      $('locLabel').textContent = (p && homeIsCurrent)
-        ? ((HS.isRealHome(p) ? 'Your home · ' : '') + p.address)
-        : ((p || myZip)
-          ? ('Viewing · ' + viewedLabel())
-          : (HS.isSample()
-            ? ((window.HS_SEED ? window.HS_SEED.community.name : '—') + ' (Sample Zip Code)')
-            : ('Viewing · ' + viewedLabel())));
+      const chip = viewingChip();
+      $('locLabel').textContent = chip.text;
       const locWrap = $('locLabel').closest('.loc');
-      if (locWrap) locWrap.title = p
-        ? (homeIsCurrent
-          ? ((HS.isRealHome(p) ? 'Your home: ' : '') + HS.homeAddressLine(p) + ' — tap to switch')
-          : ('Viewing ' + viewedLabel() + ' — your saved home is still '
-             + HS.homeAddressLine(p) + '. Tap to switch.'))
-        : 'Tap to set your area';
+      if (locWrap) locWrap.title = chip.title;
     }
     const av = $('hs-avatar');
     if (av) {
@@ -913,11 +1410,14 @@
   // -------------------------------------------- page-header context line ------
   // Say up front WHICH address (or area) the page is about, on every app page
   // with a .ph header — ONE shared injector (a new page gets it for free; a
-  // page that must not carry it sets data-no-where on <body>). A real saved
-  // property IN the viewed ZIP shows its full logged address; otherwise the
-  // viewed area — never a demo/sample address presented as the visitor's own
-  // (the same never-faked gate the maps use). Idempotent: pages that rebuild
-  // their .ph dynamically (development.html) just call it again after painting.
+  // page that must not carry it sets data-no-where on <body>). Dashboard sets
+  // that opt-out: the Viewing chip already names the geography, so a second
+  // #phWhere line would duplicate it. Other .ph pages keep the context line.
+  // A real saved property IN the viewed ZIP shows its full logged address;
+  // otherwise the viewed area — never a demo/sample address presented as the
+  // visitor's own (the same never-faked gate the maps use). Idempotent: pages
+  // that rebuild their .ph dynamically (development.html) just call it again
+  // after painting.
   HS.paintWhereLine = async function () {
     try {
       const ph = document.querySelector('#hs-slot .ph');
@@ -931,33 +1431,76 @@
       }
       const p = HS.realHome();
       if (p) {
-        const tag = HS.isRealHome(p) ? 'Your home' : (p.tag || p.label || 'Saved place');
-        el.textContent = '⌂ ' + tag + ' · ' + HS.homeAddressLine(p);
+        el.textContent = 'Viewing · ' + HS.homeAddressLine(p);
       } else {
         let c = null;
         try { c = HS.data ? await HS.data.community(state.zip) : null; } catch (e) {}
-        el.textContent = c ? ('◍ ' + c.name + (c.state ? ', ' + c.state : '')
+        el.textContent = c ? ('Viewing · ' + c.name + (c.state ? ', ' + c.state : '')
+          + (c.zip ? ' ' + c.zip : '')
           + (HS.isSample() ? ' — (Sample Zip Code)' : '')) : '';
       }
       el.style.display = el.textContent ? '' : 'none';
     } catch (e) { /* a missing context line must never break the page */ }
   };
 
+  // A-002 / A-010 — the Viewing chip lists BOTH Place types from their EXISTING
+  // stores, kept visually distinct. It never merges them, never writes a ZIP
+  // into app_properties, and never offers a generic "+ Add a Place".
   HS.openSwitcher = function () {
     const list = $('switcherList'); if (!list) return;
-    $('switcherSub').textContent = "You're following " + state.properties.length + " saved place" +
-      (state.properties.length === 1 ? '' : 's') + '. Pick one to focus the app on it.';
-    list.innerHTML = state.properties.map(p => `
-      <div class="swrow ${p.id === state.activePropId ? 'active' : ''}" onclick="HS.switchProperty('${p.id}')">
-        <div class="miniscore">${p.score || ''}</div>
-        <div class="pinfo"><div class="pt">${HS.esc(p.address)}</div>
-          <div class="pa">${HS.esc(HS.isRealHome(p) ? 'Your home' : (p.tag || p.label))} · ${HS.esc(p.city)}, ${HS.esc(p.state)} ${HS.esc(p.zip)}</div></div>
-        ${p.id === state.activePropId ? '<span class="chk">✓</span>' : ''}
-      </div>`).join('');
+    const addresses = state.properties || [];
+    const zips = HS.followedCommunities ? HS.followedCommunities() : [];
+    const n = addresses.length + zips.length;
+    if ($('switcherTitle')) $('switcherTitle').textContent = 'Switch place';
+    if ($('switcherSub')) {
+      $('switcherSub').textContent = n
+        ? ('You have ' + n + ' place' + (n === 1 ? '' : 's') + '. Pick one to focus the app on it.')
+        : 'Add an Address or a ZIP Code to focus the app on it.';
+    }
+    const home = state.activeProperty;
+    const homeIsCurrent = !!(home && String(home.zip) === String(state.zip)
+      && state.viewPlaceType !== 'zip' && !state.viewLabelPrecise);
+    // THE CHECK MARK MEANS "THE PLACE YOU ARE VIEWING", NOT "THE ZIP THAT CONTAINS YOUR
+    // ACTIVE ADDRESS". On the Address dossier those differed: the page declares no ZIP and
+    // sets a PRECISE label, so homeIsCurrent went false and the tick fell through to the ZIP
+    // row while the chip correctly read "Viewing · 13313 COOMES DR". A page that knows which
+    // saved Place it is showing now says so by id, and the tick follows that.
+    // An Address declared WITHOUT an id (Map 1's address search — a searched address is not a
+    // saved Place) deliberately keeps the old behaviour: no saved address is ticked, because
+    // none of them is what is on screen.
+    const viewedAddrId = state.viewPlaceType === 'address' ? (state.viewPlaceId || null) : null;
+    const typeChip = function (label) {
+      return '<span class="swtype">' + HS.esc(label) + '</span>';
+    };
+    const addrRows = addresses.length ? addresses.map(p => {
+      const on = viewedAddrId
+        ? String(p.id) === String(viewedAddrId)
+        : (p.id === state.activePropId && homeIsCurrent);
+      return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchProperty(\'' + p.id + '\')">'
+        + '<div class="miniscore">' + (p.score || '') + '</div>'
+        + '<div class="pinfo"><div class="pt">' + HS.esc(p.address) + '</div>'
+        + '<div class="pa">' + typeChip('Address') + ' · '
+        + HS.esc(HS.placeDisplayTag(p, 'Address'))
+        + ' · ' + HS.esc(p.city) + ', ' + HS.esc(p.state) + ' ' + HS.esc(p.zip) + '</div></div>'
+        + (on ? '<span class="chk">✓</span>' : '')
+        + '</div>';
+    }).join('') : '<div class="swempty">No Addresses yet. Add an address and we\'ll watch official records around it.</div>';
+    const zipRows = zips.length ? zips.map(z => {
+      const on = String(z.zip) === String(state.zip) && !homeIsCurrent && !viewedAddrId;
+      return '<div class="swrow' + (on ? ' active' : '') + '" onclick="HS.switchZip(\'' + HS.esc(String(z.zip)) + '\')">'
+        + '<div class="miniscore">◍</div>'
+        + '<div class="pinfo"><div class="pt">' + HS.esc(z.name || ('ZIP ' + z.zip)) + '</div>'
+        + '<div class="pa">' + typeChip('ZIP Code') + ' · ' + HS.esc(z.zip)
+        + (z.state ? (', ' + HS.esc(z.state)) : '') + '</div></div>'
+        + (on ? '<span class="chk">✓</span>' : '')
+        + '</div>';
+    }).join('') : '<div class="swempty">No ZIP Codes yet. Follow a ZIP Code to watch a whole community.</div>';
+    list.innerHTML = '<div class="swsec">Addresses (' + addresses.length + ')</div>' + addrRows
+      + '<div class="swsec">ZIP Codes (' + zips.length + ')</div>' + zipRows;
     HS.openModal('switcherModal');
   };
 
-  // -------------------------------------------------- your home ---------------
+  // -------------------------------------------------- saved address -----------
   // The ONE writer of app_properties (nothing else in the app writes it).
   // Geocoder: the U.S. Census one-line locator — free, keyless, the same source
   // the engine uses server-side. HONESTY RULES:
@@ -967,15 +1510,19 @@
   //   * signed-in only (app_properties is RLS'd to the owner). Signed-out users
   //     get the sign-in modal — the nudge doubles as the signup prompt.
   let _homeMatch = null;
+  let _homeInput = null;   // FIX 17 — the resident's TYPED line; the only unit-bearing value (Census drops APT/UNIT/STE/#)
   HS.openHome = function () {
-    if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding a home needs the live site.'); return; }
+    if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding an address needs the live site.'); return; }
     if (!state.session || state.session.demo) {
       HS.openAuth();
       const sub = $('authSub');
-      if (sub) sub.textContent = 'Sign in first — then add your home address to see what’s changing around it.';
+      if (sub) sub.textContent = 'Sign in first — then add an address to see what’s changing around it.';
       return;
     }
     _homeMatch = null;
+    _homeInput = null;
+    _savingHome = false;
+    const sb0 = $('homeSaveBtn'); if (sb0) { sb0.disabled = false; sb0.removeAttribute('aria-busy'); }
     $('homeForm').classList.remove('hidden');
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.add('hidden');
@@ -993,62 +1540,216 @@
     if (state.session && !state.session.demo) HS.openHome();
     else if (HS.openLoc) HS.openLoc();
   };
+  // THE ONE ADDRESS RESOLVER. Every place that turns a typed address into a confirmed
+  // point asks this function: the homepage Explore search, HS.findHome() (Add an address)
+  // and saveOnboardingAddress(). It is the only caller of the geocode-address edge function
+  // in this file. Via that function because the Census API sends no CORS headers, so the
+  // browser can't call it directly (found live 2026-07-16: a perfectly valid address failed
+  // for every visitor). The function returns {match} or a 502 'geocoder_unavailable', so a
+  // service outage and a genuine no-match get DIFFERENT honest messages.
+  //
+  // It never throws for an expected outcome. It returns exactly one of:
+  //   { ok: true,  match: { matchedAddress, lat, lng, zip, city, state } }
+  //   { ok: false, reason: 'unavailable',    message: … }   the service could not be reached
+  //   { ok: false, reason: 'no_match',       message: … }   the Census could not confirm it
+  //   { ok: false, reason: 'invalid_coords', message: … }   confirmed, but not a usable point
+  // It saves nothing and changes no state: saving is each caller's own explicit step.
+  // A valid point is lib/onboarding.js's validCoords, the one definition of that rule. If
+  // that library cannot be loaded, no point can be confirmed valid, so the answer is
+  // invalid_coords rather than a point nobody checked.
+  const RESOLVE_MESSAGES = {
+    unavailable: "The address service couldn't be reached — please try again in a minute.",
+    no_match: "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.",
+    invalid_coords: "We couldn't confirm a valid location for that address — try again or enter your ZIP code instead."
+  };
+  function resolveFailure(reason) { return { ok: false, reason: reason, message: RESOLVE_MESSAGES[reason] }; }
+  HS.resolveAddress = async function (address) {
+    let m = null;
+    try {
+      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: address } });
+      if (r.error) return resolveFailure('unavailable');
+      m = (r.data && r.data.match) || null;
+    } catch (e) { return resolveFailure('unavailable'); }
+    const zip = m && m.zip != null ? String(m.zip) : '';
+    if (!m || !/^\d{5}$/.test(zip)) return resolveFailure('no_match');
+    try { await loadOnboardingLib(); } catch (e) { /* judged below */ }
+    const O = window.HSOnboarding;
+    if (!O || !O.validCoords(m.lat, m.lng)) return resolveFailure('invalid_coords');
+    return {
+      ok: true,
+      match: {
+        matchedAddress: m.matchedAddress || '', lat: m.lat, lng: m.lng, zip: zip,
+        city: m.city || null, state: m.state || null
+      }
+    };
+  };
   HS.findHome = async function () {
     const el = $('homeAddr'), q = el.value.trim();
     if (q.length < 8 || q.indexOf(' ') < 0) { el.style.borderColor = '#c23b34'; el.focus(); return; }
     el.style.borderColor = '';
     $('homeMsg').textContent = 'Looking up the official address…';
-    // Via the geocode-address edge function — the Census API sends no CORS
-    // headers, so the browser can't call it directly (found live 2026-07-16:
-    // a perfectly valid address failed for every visitor). The function
-    // returns {match} or a 502 'geocoder_unavailable', so a service outage
-    // and a genuine no-match get DIFFERENT honest messages.
-    let m = null, unavailable = false;
-    try {
-      const r = await HS.sb().functions.invoke('geocode-address', { body: { address: q } });
-      if (r.error) unavailable = true;
-      else m = (r.data && r.data.match) || null;
-    } catch (e) { unavailable = true; }
-    if (unavailable) {
-      $('homeMsg').textContent = "The address service couldn't be reached — please try again in a minute.";
-      return;
-    }
-    if (!m || m.lat == null || m.lng == null || !m.zip) {
-      $('homeMsg').textContent = "We couldn't confirm that address against U.S. Census records — try a different spelling, or add the city or ZIP.";
-      return;
-    }
+    const res = await HS.resolveAddress(q);
+    if (!res.ok) { $('homeMsg').textContent = res.message; return; }
+    const m = res.match;
     _homeMatch = m;
+    _homeInput = q;
     $('homeMatched').textContent = m.matchedAddress || q;
     $('homeForm').classList.add('hidden');
     $('homeConfirm').classList.remove('hidden');
   };
+  // FIX 17 — THE ONE SAVED-PLACE WRITE, IDEMPOTENT BY IDENTITY.
+  //
+  // Both writers (this and saveOnboardingAddress) go through here, so the saved-place
+  // contract has ONE definition. Before Fix 17 they disagreed: saveHome INSERTed
+  // unconditionally while onboarding UPDATEd whichever row was isRealHome — many-places
+  // versus one-home-per-user, neither enforced. Measured cost: one resident held two
+  // byte-identical rows for 96 ISLAND DR, written 0.991 s apart.
+  //
+  // THE INTEGRITY MECHANISM IS THE DATABASE, NOT THIS FUNCTION. The unique index
+  // app_properties_user_place_key (docs/saved-place-identity.sql) is what makes two
+  // simultaneous saves produce one row; a select-then-insert here would lose that race
+  // and is deliberately NOT what this does. This function's job is to turn the conflict
+  // into an honest success — a repeat save returns the place the resident already has,
+  // rather than an error for a thing that did work.
+  //
+  // input_address is the string the resident TYPED. The Census locator drops secondary
+  // unit designators (measured: APT 101, APT 102, UNIT 101 and #101 all return the same
+  // matchedAddress), so the typed line is the only unit-bearing value in the flow and it
+  // is part of the identity. It is stored for identity/provenance and NEVER rendered —
+  // the address shown back is still the confirmed match, per openHome's honesty contract.
+  // 23505 is Postgres unique_violation, which PostgREST passes through as error.code.
+  // Declared INSIDE the function, not as a module const: savePlaceRow is reached by
+  // saveOnboardingAddress, which appears EARLIER in this file and therefore relies on
+  // function hoisting — a hoisted function that closed over a `const` declared below it
+  // would be a temporal-dead-zone hazard the day anything calls it during module setup.
+  function isDuplicateRowError(e) {
+    if (!e) return false;
+    const DUP_CODE = '23505';
+    return String(e.code || '') === DUP_CODE
+      || /duplicate key value|app_properties_user_place_key/i.test(String(e.message || ''));
+  }
+  async function savePlaceRow(row) {
+    let r = null;
+    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
+    if (r && r.data && !r.error) return { data: r.data, existed: false };
+    if (!r || !isDuplicateRowError(r.error)) return { data: null, existed: false, error: (r && r.error) || new Error('save failed') };
+    // The row is already ours. Re-read it under RLS — never another account's.
+    let q = null;
+    try {
+      q = await HS.sb().from('app_properties').select('*')
+        .eq('user_id', row.user_id).eq('address', row.address)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    } catch (e) { q = { error: e }; }
+    if (q && q.data && !q.error) return { data: q.data, existed: true };
+    return { data: null, existed: false, error: (q && q.error) || new Error('save failed') };
+  }
+
+  let _savingHome = false;
   HS.saveHome = async function () {
     const m = _homeMatch; if (!m || !state.session) return;
+    // In-flight guard. UX only — it stops the second click from ever leaving the browser,
+    // but it is not what guarantees one row (two tabs never see this flag).
+    if (_savingHome) return;
+    _savingHome = true;
+    const btn = $('homeSaveBtn'); if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    // Released on EVERY exit path, success included. An earlier draft released it only on
+    // failure — the success path ends in location.reload(), so in production the stuck flag
+    // was invisible; the browser suite caught it immediately, and a blocked or slow reload
+    // would have left the resident unable to save anything else for the life of the page.
+    // A guard that can latch ON is a worse defect than the one it was added to prevent.
+    const release = function () {
+      _savingHome = false;
+      const b = $('homeSaveBtn'); if (b) { b.disabled = false; b.removeAttribute('aria-busy'); }
+    };
     $('homeConfirmMsg').textContent = 'Saving…';
     const row = {
       user_id: state.session.user.id,
       address: String(m.matchedAddress || '').split(',')[0],
       city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home'
+      lat: m.lat, lng: m.lng, label: 'home',
+      input_address: _homeInput || null
     };
-    let r = null;
-    try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
-    if (!r || r.error || !r.data) {
-      $('homeConfirmMsg').textContent = "Couldn't save your home — please try again.";
+    const r = await savePlaceRow(row);
+    if (!r.data) {
+      $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
+      release();
       return;
     }
+    if (r.existed) $('homeConfirmMsg').textContent = 'This address is already in My Places.';
     LS.set('activeProp', r.data.id);
+    HS.announcePlaceSaved({
+      zip: m.zip,
+      kind: 'address',
+      address: String(m.matchedAddress || row.address || '').trim(),
+      placeId: r.data.id
+    }, true);
     // Focus the app on the home's area when it's covered (same follow the ZIP flow does).
     try {
       if (await HS.data.isCovered(m.zip)) {
         let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
         HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
-        await HS.ensureAreaSubscribed(m.zip, true);   // register the digest floor (page reloads below)
+        await HS.ensureAreaSubscribed(m.zip, true, true);   // digest floor only; card already announced
       }
     } catch (e) {}
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.remove('hidden');
+    release();
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
+  };
+
+  // A-012 REMOVE ADDRESS — the one basic management function that did not exist.
+  //
+  // It removes ONLY the user's own saved/monitored Address relationship: a single
+  // app_properties row, matched on BOTH id and user_id. Everything else is deliberately
+  // untouched, because a "remove" that quietly took more than it named would be the exact
+  // collateral-deletion failure A-012 is written to prevent:
+  //   * alerts / app_changes / app_projects — public-record content, not the user's to delete
+  //   * app_follows and myCommunities — ZIP Code follows are a DIFFERENT Place type with
+  //     their own remove (HS.unfollowCommunity). Removing an Address never unfollows a ZIP,
+  //     even when saveHome originally followed that ZIP as a side effect.
+  //   * any other user's rows — the user_id match is defence in depth; RLS is the real gate.
+  //
+  // A DEMO session is refused. The seeded persona's sample homes are not a saved
+  // relationship anyone owns, so offering to "remove" one would be theatre.
+  //
+  // Returns true/false rather than throwing, so the caller can report an honest failure
+  // instead of optimistically removing the card from the DOM.
+  HS.removeAddress = async function (id) {
+    if (!id) return false;
+    if (!state.session || state.session.demo) return false;
+    if (CFG.DATA_SOURCE !== 'supabase' || !HS.sb) return false;
+    let r = null;
+    try {
+      r = await HS.sb().from('app_properties').delete()
+        .match({ id: id, user_id: state.session.user.id });
+    } catch (e) { r = { error: e }; }
+    if (r && r.error) return false;
+    // FIX 17 — the property WATCH is part of this Address's lifecycle, so it goes with it.
+    // app_follows.target_id is TEXT with no foreign key, so nothing cascades: before this,
+    // removing a watched Address left a dangling app_follows(target_type='property') row
+    // pointing at an id that no longer exists. Scoped to target_type='property' and this
+    // id alone — a ZIP Code follow is a DIFFERENT Place type with its own remove
+    // (HS.unfollowCommunity) and a followed PROJECT is not a Place at all; neither is
+    // touched. Failure here is logged, never fatal: the Address really was removed, and
+    // reporting that as a failure would be the dishonest half of A-012.
+    try {
+      await HS.sb().from('app_follows').delete()
+        .match({ user_id: state.session.user.id, target_type: 'property', target_id: String(id) });
+    } catch (e) { console.warn('remove-address follow cleanup', e); }
+    if (state.follows && state.follows.delete) {
+      state.follows.delete('property:' + id);
+      LS.set('follows', [...state.follows]);
+    }
+    state.properties = (state.properties || []).filter(p => String(p.id) !== String(id));
+    // If the removed Address was the active one, fall back to another saved Address; with
+    // none left, clear it and let the app's existing area default (myZip / DEFAULT_ZIP)
+    // take over. Never refuse to remove the last Address.
+    if (String(state.activePropId) === String(id)) {
+      state.activePropId = state.properties[0] ? state.properties[0].id : null;
+      LS.set('activeProp', state.activePropId);
+    }
+    paintTopbar();
+    return true;
   };
 
   // -------------------------------------------------- location / community ----
@@ -1056,13 +1757,16 @@
     $('locForm').classList.remove('hidden');
     $('locRequest').classList.add('hidden');
     $('locDone').classList.add('hidden');
+    locRequestError('');
     const z = $('locZip'); z.value = ''; z.style.borderColor = '';
     // First-run onboarding right after sign-up gets welcoming, save-oriented copy.
-    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your community" : 'Change your community';
+    // Every other opener is an ADD (the dashed chip, Dashboard / My Places / Viewing
+    // "+ Add ZIP Code"). Switching among already-saved ZIPs is Switch place, not this modal.
+    if ($('locModalTitle')) $('locModalTitle').textContent = onboarding ? "You're in — set your zip code" : 'Add a zip code';
     const sub = document.querySelector('#locModal .msub');
     if (sub) sub.textContent = onboarding
-      ? "Enter your ZIP code to save your area and open what's changing around your home."
-      : "Enter a ZIP code to open what's changing around that area.";
+      ? "Enter your ZIP code to save your area and open what's changing around it."
+      : "Enter a ZIP code to save it and open what's changing around that area.";
     HS.openModal('locModal');
     setTimeout(() => { if (z) z.focus(); }, 50);
   };
@@ -1072,12 +1776,15 @@
     el.style.borderColor = '';
     const covered = await HS.data.isCovered(z);
     if (covered) {
-      // Looking up a covered ZIP follows it: saves it to Your communities and makes
+      // Looking up a covered ZIP follows it: saves it to Your zip codes and makes
       // it the primary area, so the Del Valle sample stops showing everywhere.
       let meta = null; try { meta = await HS.data.community(z); } catch (e) {}
       HS.followCommunity({ zip: z, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
-      await HS.ensureAreaSubscribed(z, true);   // register the digest floor (redirect below)
-      location.href = 'community.html?zip=' + z;
+      HS.announcePlaceSaved({ zip: z, kind: 'zip', name: (meta && meta.name) || '' }, true);
+      await HS.ensureAreaSubscribed(z, true, true);   // digest floor only; card already announced
+      // Stay on the tool that opened Add (Alerts stays Alerts, Address → My Places).
+      // Homepage / contact "find my community" still opens the ZIP page.
+      location.href = afterAddZipHref(z);
     } else {
       $('reqZipLabel').textContent = z;
       $('locForm').classList.add('hidden');
@@ -1085,19 +1792,54 @@
     }
   };
   HS.submitRequest = async function () {
-    const el = $('reqEmail'), e = el.value.trim();
-    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
+    const el = $('reqEmail'), btn = $('reqSubmit');
+    const R = window.HSCommunityRequest;
+    // A missing module is an outage, not a bad address — say the right thing.
+    if (!R) { locRequestError('We could not save your email just now. Please try again in a moment.'); return; }
+    const email = R.normalizeEmail(el ? el.value : '');
+    if (!email) { locRequestError('Enter a valid email address so we can reach you.'); if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    const zip = R.normalizeZip($('reqZipLabel') && $('reqZipLabel').textContent);
+    if (!zip) { locRequestError('That ZIP code does not look right — check it and try again.'); return; }
+    if (el) el.style.borderColor = '';
+    locRequestError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
     // Referral stamp: carry the first-touch source onto the area-request row
     // (community_requests.source — same column submit-public-form stamps with
-    // 'homepage_zip'). Only set when a first touch exists; absent stays absent.
-    const row = { email: e, zip: $('reqZipLabel').textContent };
-    const ref = HS.referralToken(); if (ref) row.source = ref;
-    await persistEmail('community_requests', row);
+    // 'homepage_zip'). Coverage-modal provenance when no first touch exists.
+    const source = (typeof HS.referralToken === 'function' && HS.referralToken()) || 'coverage_modal';
+    // Seed/preview mode has no database by construction. Production is DATA_SOURCE='supabase'.
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('community_requests', { email: email, requested_zip: zip, source: source })
+      : await R.submit({
+          client: HS.sb(),
+          email: email,
+          zip: zip,
+          source: source
+        });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Request my zip code'; }
+    if (!res.ok) {
+      locRequestError(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : res.reason === 'invalid_zip'
+          ? 'That ZIP code does not look right — check it and try again.'
+          : 'We could not save your email just now. Please try again in a moment.');
+      if (el) el.focus();
+      return;
+    }
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('community_request_submitted'); } catch (err) {}
     $('locRequest').classList.add('hidden');
     $('locDoneH').textContent = 'Request received';
-    $('locDoneP').textContent = "We'll email you the moment " + $('reqZipLabel').textContent + ' is live on HomeSignal.';
+    $('locDoneP').textContent = "We'll email you the moment " + zip + ' is live on HomeSignal.';
     $('locDone').classList.remove('hidden');
   };
+  function locRequestError(msg) {
+    const box = $('locRequestError');
+    if (!box) return;
+    box.textContent = msg || '';
+    box.classList.toggle('hidden', !msg);
+  }
 
   // -------------------------------------------------- followed communities ----
   // The visitor's saved communities (shown on Dashboard + Communities). The primary
@@ -1140,30 +1882,33 @@
     const zip = btn.dataset.zip;
     if (HS.isFollowingCommunity(zip)) {
       HS.unfollowCommunity(zip);
-      btn.textContent = '＋ Follow this community'; btn.classList.remove('following');
+      btn.textContent = '＋ Follow this zip code'; btn.classList.remove('following');
     } else {
       HS.followCommunity({ zip: zip, name: btn.dataset.name, state: btn.dataset.state });
       btn.textContent = '✓ Following'; btn.classList.add('following');
-      HS.ensureAreaSubscribed(zip, false);   // follow (no consent) + show the inline email opt-in card
+      HS.announcePlaceSaved({ zip: zip, kind: 'zip', name: btn.dataset.name || '' }, false);
+      HS.ensureAreaSubscribed(zip, false, true);   // digest floor only; card already announced
     }
     paintTopbar();
     const strip = document.getElementById('dashCommunities') || document.getElementById('commStrip');
-    if (strip) strip.innerHTML = HS.communitiesStripHTML();
+    if (strip) {
+      // Dashboard has its own "+ Add ZIP Code" addbtn; do not also restore the dashed chip.
+      const hideAdd = strip.id === 'dashCommunities';
+      strip.innerHTML = HS.communitiesStripHTML(hideAdd ? { zipLabels: true, hideAdd: true } : {});
+    }
   };
 
   // Bridge the app -> digest system. Following an area (save-home, ZIP lookup, or the
   // community Follow button) registers the resident in public.users/user_subscriptions
-  // — the tables digest.py actually emails from — so "following your community" delivers
-  // alerts instead of only updating app state (the CH-class gap: app rows but 0 digest
-  // rows -> no email). The NARROW floor: development/land-use + hearings, but ONLY the
-  // labels this community really carries (word-for-word from its cascaded
-  // government_topics), so we never subscribe to a topic with no feed. Purely ADDITIVE
-  // (subscribe_area_defaults, ON CONFLICT DO NOTHING) — it can never delete a topic the
-  // user already chose (unlike signup_complete, which reconciles-to-exact). No silent
-  // subscription: on success the resident sees a confirmation naming what they'll get.
+  // so a LATER Alerts-page consent can deliver. The NARROW floor: development/land-use
+  // + hearings, but ONLY the labels this community really carries (word-for-word from
+  // its cascaded government_topics). Purely ADDITIVE (subscribe_area_defaults, ON
+  // CONFLICT DO NOTHING) — it can never delete a topic the user already chose (unlike
+  // signup_complete, which reconciles-to-exact). marketing_consent stays false.
+  // SAVE/FOLLOW ≠ EMAIL: the post-save card never claims this floor enabled alerts.
   const AREA_DEFAULT_TOPICS = ['Planning, zoning & development', 'County Commission & county business'];
-  // The exact wording the resident affirms when they tap "Email me these alerts" — stored
-  // on the users row (marketing_consent_copy) as the audit trail of what they agreed to.
+  // Consent copy for enable_area_email_alerts if that RPC is invoked elsewhere.
+  // The post-save card does not display or affirm this copy.
   const AREA_CONSENT_COPY = 'Email me new development & hearing alerts for this ZIP. No spam · unsubscribe anytime.';
   HS.ensureAreaSubscribed = async function (zip, willNavigate, suppressUi, throwOnError) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return null;
@@ -1195,8 +1940,8 @@
       console.warn('area-subscribe', e);
       return null;
     }
-    // Surface the inline email opt-in card. Reload/redirect callers stash a one-shot flag
-    // boot() renders on the destination page; in-place callers render immediately.
+    // Callers that already announced via announcePlaceSaved pass suppressUi so this
+    // floor write cannot present follow as "emailing you".
     const info = { zip: zip, communityId: ct.rootId, topics: labels };
     if (!suppressUi) {
       if (willNavigate) { try { sessionStorage.setItem('hs:areaOptin', JSON.stringify(info)); } catch (e) {} }
@@ -1204,24 +1949,25 @@
     }
     return info;
   };
-  // The inline EMAIL OPT-IN card — a persistent, deliberately-tapped affirmative (never a
-  // disappearing toast, per the founder consent decision). Shown after a covered follow.
-  // Tapping "Email me these alerts" is the ONLY action that sets marketing_consent.
+  // Post-save card: the place is in My Places. Email alerts are configured on Alerts.
+  // Navigation only — never calls enableAreaEmail / enable_area_email_alerts.
   HS.showAreaOptin = function (info) {
-    if (!info || !info.zip) return;
+    if (!info) return;
+    const label = HS.placeSavedLabel(info);
+    if (!label) return;
     let box = $('hsOptin');
     if (!box) { box = document.createElement('div'); box.id = 'hsOptin'; document.body.appendChild(box); }
     box.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;'
       + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
+    const href = HS.alertsHrefForSavedPlace(info);
     box.innerHTML =
-      '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Now following development &amp; hearings in ' + HS.esc(info.zip) + '</div>'
-      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">' + HS.esc(AREA_CONSENT_COPY) + '</div>'
+      '<div id="optinTitle" style="font-weight:700;color:var(--ink,#12261d)">✓ ' + HS.esc(label) + ' saved to My Places</div>'
+      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">Want email alerts? '
+      + '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="color:var(--green,#157a49);font-weight:700;text-decoration:underline">Choose your alert topics →</a></div>'
       + '<div style="display:flex;gap:10px;align-items:center">'
-      +   '<button type="button" id="optinYes" style="background:var(--green,#157a49);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer">✉ Email me these alerts</button>'
       +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
       + '</div>';
-    $('optinYes').onclick = function () { HS.enableAreaEmail(info); };
     $('optinNo').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; };
   };
   // The affirmative: the ONLY caller of enable_area_email_alerts, the ONLY writer of
@@ -1241,9 +1987,95 @@
       const sub = $('optinSub'); if (sub) sub.textContent = "Couldn't save — please try again.";
       return;
     }
+    logEvent('alert_signup_area', { zip_code: info.zip, community_id: info.communityId });
     const box = $('hsOptin');
     if (box) box.innerHTML = '<div style="font-weight:700;color:var(--ink,#12261d)">✓ Emailing you development &amp; hearings for '
       + HS.esc(info.zip) + '.</div><div style="color:var(--ink-3,#5a6b63);margin-top:4px">Unsubscribe anytime.</div>';
+  };
+
+  // ------------------------------------ "What is changing in my zip code?" (Map 1) ----
+  // Founder, 2026-09-25: a button on Map 1 signs a resident up for email copies of the
+  // Bluesky MAPS posts about THAT ZIP. Every step is an existing canonical path:
+  //   1. sign-in is the shell's own 6-digit code; the sign-up RESUMES after the code is
+  //      verified (HS.requireAuth's afterAuth) instead of being lost to a navigation;
+  //   2. the ZIP is saved to My Places by persistCommunityFollow — the follow writer
+  //      onboarding uses — which is also what keeps a brand-new resident out of the
+  //      non-dismissible first-time setup screen. The county "digest floor" that the
+  //      Follow button also writes (subscribe_area_defaults) is deliberately NOT written:
+  //      this tap files nothing on the county identity, so an existing county
+  //      subscriber's row is left exactly as it was;
+  //   3. the selection is written by enable_area_email_alerts, the one ADDITIVE consent
+  //      writer, on the ZIP's own community row, alert consent only (HS.mapsOptinRpcArgs);
+  //   4. the control's state is read back from my_alert_subscriptions — the same
+  //      canonical state digest_recipients resolves through (UI = DELIVERY).
+  // The consent sentence is ONE string: the page renders MAPS_CONSENT_COPY and the RPC
+  // records that same string as the audit trail, so what was shown is what is stored.
+  const MAPS_CONSENT_VERSION = '2026-09-25';
+  const MAPS_CONSENT_COPY =
+    "We'll email you when HomeSignal posts about what's changing in this ZIP code. No spam · Unsubscribe anytime.";
+  HS.MAPS_CONSENT_COPY = MAPS_CONSENT_COPY;
+
+  // { signedIn, subscribed } for this ZIP's maps selection, read from the canonical view.
+  // Scoped by the ZIP community's id — never by users.zip_code equality.
+  // lib/data.js carries no cache key, so for a few minutes after a deploy a browser can
+  // pair this shell.js with the previous lib/data.js. Detect that instead of throwing.
+  function mapsHelpersLoaded() {
+    return !!(HS.data && typeof HS.data.zipCommunity === 'function'
+              && typeof HS.mapsOptinRpcArgs === 'function' && HS.MAPS_EMAIL_STREAM);
+  }
+  HS.mapsZipEmailState = async function (zip) {
+    const out = { signedIn: !!(state.session && !state.session.demo), subscribed: false };
+    if (!out.signedIn || CFG.DATA_SOURCE !== 'supabase' || !HS.sb || !mapsHelpersLoaded()) return out;
+    const zc = await HS.data.zipCommunity(zip);
+    if (!zc) return out;
+    const res = await HS.sb().from('my_alert_subscriptions')
+      .select('community_id, stream, subscribed')
+      .eq('community_id', zc.id).eq('stream', HS.MAPS_EMAIL_STREAM);
+    if (res.error) throw res.error;
+    out.subscribed = (res.data || []).some(r => r && r.subscribed === true);
+    return out;
+  };
+
+  // A message written for residents. Anything else (a database or network error) is
+  // shown by the page as a generic "please try again", never verbatim.
+  function friendlyError(msg) { const e = new Error(msg); e.friendly = true; return e; }
+  async function mapsZipEmailWrite(zip) {
+    zip = String(zip || '').trim();
+    if (!/^\d{5}$/.test(zip)) throw friendlyError('This page is not a ZIP code page.');
+    if (!state.session || state.session.demo || !HS.sb) throw friendlyError('Sign in to get these emails.');
+    if (!mapsHelpersLoaded()) throw friendlyError('Please refresh the page and try again.');
+    const zc = await HS.data.zipCommunity(zip);
+    if (!zc) throw friendlyError("Email updates aren't available for this ZIP code yet.");
+    // (2) My Places. persistCommunityFollow needs the onboarding helpers to tell an
+    // already-saved follow (success) from a real failure; they load at boot, and this
+    // makes sure of it.
+    try { await loadOnboardingLib(); } catch (e) { /* the follow reports its own failure */ }
+    await persistCommunityFollow(zip);
+    // (3) The selection — the one additive consent writer, alert consent only.
+    const r = await HS.sb().rpc('enable_area_email_alerts',
+      HS.mapsOptinRpcArgs(state.session.user.email, zc.id, zip,
+        MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS.referral()));
+    if (r && r.error) throw new Error(r.error.message || 'Could not save your email sign-up.');
+    // (4) Read it back: the control says what DELIVERY will do, never what we hoped.
+    const st = await HS.mapsZipEmailState(zip);
+    if (!st.subscribed) throw friendlyError('Your sign-up did not save — please try again.');
+    logEvent('alert_signup_maps', { zip_code: zip, community_id: zc.id });
+    paintTopbar();
+    return st;
+  }
+
+  // The button. Signed out, it opens the 6-digit sign-in and the sign-up resumes after
+  // the code is verified. onResult(err, state) lets the page repaint its control.
+  HS.mapsZipEmailSignup = function (zip, onResult) {
+    const done = typeof onResult === 'function' ? onResult : function () {};
+    const run = function () {
+      return mapsZipEmailWrite(zip).then(
+        function (st) { done(null, st); return st; },
+        function (e) { done(e || new Error('Could not save your email sign-up.')); throw e; });
+    };
+    if (!HS.requireAuth('maps-zip-email', run)) return 'auth';
+    run().catch(function (e) { console.warn('maps-zip-email', e); });
+    return 'saving';
   };
   // Chip row of followed ZIP codes (+ an add button), reused across pages.
   HS.communitiesStripHTML = function (opts) {
@@ -1254,11 +2086,12 @@
       HS.esc(c.name || ('ZIP ' + c.zip)) + '</a>').join('');
     const emptyLabel = opts.zipLabels
       ? 'No ZIP codes yet.'
-      : 'No communities yet.';
+      : 'No zip codes yet.';
     const addLabel = opts.zipLabels ? '＋ Add a ZIP Code' : '＋ Add a zip code';
     const empty = list.length ? '' : '<span class="quiet" style="font-size:12.5px;margin-right:8px">' + emptyLabel + '</span>';
-    return '<div class="chips">' + empty + chips +
-      '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button></div>';
+    const add = opts.hideAdd ? ''
+      : '<button class="wchip" type="button" onclick="HS.openLoc()" style="cursor:pointer;border-style:dashed">' + addLabel + '</button>';
+    return '<div class="chips">' + empty + chips + add + '</div>';
   };
 
   // -------------------------------------------------- topic prefs (hydrate) -----
@@ -1280,11 +2113,39 @@
     }
     const uid = state.session.user.id;
     try {
-      const res = await HS.sb().from('app_topic_prefs')
+      // CANONICAL READ. The three deliverable categories come from
+      // public.my_alert_subscriptions -- the same state public.digest_recipients
+      // resolves through -- so what this UI shows and what the digest delivers
+      // are one answer, per place. app_topic_prefs is still read, but ONLY for
+      // 'dev', which has no delivery pipeline. Scoped to the current place
+      // because subscriptions are per (user, community): merging places here
+      // would show a resident topics that another place's page will deliver.
+      // ONE read, then the place is chosen IN MEMORY. RLS already scopes
+      // my_alert_subscriptions to this resident, so fetching their rows costs one
+      // round trip and adds no second thing that can fail. Resolving the ZIP to a
+      // community is a HINT passed into selectPlaceRows, never the gate: it is a
+      // network call, and letting it decide meant a transient failure rendered "no
+      // topics selected" for a resident who has them -- the UI-says-off /
+      // delivery-says-on disagreement this model exists to end, reintroduced
+      // through an error path.
+      const zip = String(state.zip || '').trim();
+      const res = await HS.sb().from('my_alert_subscriptions')
+        .select('community_id, zip_code, stream, topic, origin, sort_order');
+      if (res.error) throw res.error;
+      let communityId = null;
+      try {
+        const ct = (HS.data && HS.data.communityGovTopics)
+          ? await HS.data.communityGovTopics(zip) : null;
+        communityId = (ct && ct.rootId) || null;
+      } catch (e) { communityId = null; }
+      const canonical = util.topicPrefsFromCanonicalRows(
+        util.selectPlaceRows(res.data, { communityId: communityId, zip: zip }));
+      const localRes = await HS.sb().from('app_topic_prefs')
         .select('category, topics, share_consent')
         .eq('user_id', uid);
-      if (res.error) throw res.error;
-      state.topicPrefs = util.hydrateSignedInPrefs(res.data);
+      if (localRes.error) throw localRes.error;
+      state.topicPrefs = util.mergeCanonicalWithLocal(
+        canonical, util.hydrateSignedInPrefs(localRes.data));
       cacheTopicPrefs(state.topicPrefs, uid);
     } catch (e) {
       console.warn('topic-prefs hydrate', e);
@@ -1348,7 +2209,12 @@
     $('tmCount').textContent = n + ' topic' + (n === 1 ? '' : 's') + ' selected';
   }
   HS.saveTopics = async function () {
-    if (!HS.requireAuth('save-topics')) return;
+    // Signed out, Save opens the sign-in and FINISHES THIS SAVE once the code is verified.
+    // The picks are still in the open topic modal (the sign-in stacks on top of it) and the
+    // page keeps its ?zip= (the MAPS confirmation email links here as alerts.html?zip=).
+    // Without the resume, a verified code sent the resident to location.pathname: ?zip=
+    // dropped and the picks gone, so they had to choose again, possibly on another ZIP.
+    if (!HS.requireAuth('save-topics', HS.saveTopics)) return;
     const chips = [...document.querySelectorAll('#tmGrid .tchip.on span:last-child')].map(s => s.textContent);
     const cats = HS.data.topicCategories();
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
@@ -1365,6 +2231,7 @@
       if (m) m.textContent = "Couldn't save your alerts — please try again. (" + ((e && e.message) || 'save error') + ')';
       return;
     }
+    logEvent('alert_signup_topics', { topic: TCUR });
     HS.paintTopicCounts();
     $('tmForm').classList.add('hidden');
     $('tmDoneMsg').textContent = "You'll be alerted about " + chips.length + ' ' + cats[TCUR].title.toLowerCase() + ' topic' + (chips.length === 1 ? '' : 's') + '.';
@@ -1413,23 +2280,122 @@
   }
 
   // -------------------------------------------------- premium waitlist --------
+  // The success state is shown ONLY after the canonical store confirms the write.
+  // This used to insert into 'premium_waitlist' — a table that does not exist in
+  // production (PostgREST answers PGRST205) — swallow the rejection, and show
+  // "You're on the list" regardless. Every Premium lead ever offered was lost.
+
+  // THE ACQUISITION CONTEXT OF A PREMIUM SIGNUP IS OWNED BY THE CTA THAT OPENED THE
+  // MODAL — never by viewing state. Deliberately NOT read anywhere below: state.zip
+  // (which falls back to HS_CONFIG.DEFAULT_ZIP, a sample), state.activeProperty, the
+  // first My Places follow, or a previously-viewed property. A resident who looks at
+  // 96 ISLAND DR, navigates to ZIP 78617 and then clicks the ZIP Premium CTA must be
+  // recorded against the ZIP, and the reverse must be recorded against the address.
+  //
+  //   HS.openPremiumModal({ source: 'Property Insights', zip: p.zip, address: p.address })
+  //
+  // Any field left out stays absent and falls back to the page URL / zipFromLocation —
+  // it is never filled in from somewhere else.
+  HS.premiumContext = null;
+  HS.openPremiumModal = function (ctx) {
+    // openModal clears the context first, so the bind has to follow it. That ordering
+    // is what makes a stale context structurally impossible rather than merely unlikely.
+    HS.openModal('premiumModal');
+    const W = window.HSPremiumWaitlist;
+    if (!ctx || !W) return;
+    HS.premiumContext = {
+      source: W.normalizeSource(ctx.source),
+      zip: W.normalizeZip(ctx.zip),
+      address: W.normalizeAddress(ctx.address)
+    };
+  };
+
   HS.submitWaitlist = async function () {
-    const el = $('premiumEmail'), e = el.value.trim();
-    if (!e || e.indexOf('@') < 1) { el.style.borderColor = '#c23b34'; el.focus(); return; }
-    await persistEmail('premium_waitlist', { email: e });
+    const el = $('premiumEmail'), btn = $('premiumSubmit');
+    const W = window.HSPremiumWaitlist;
+    // A missing module is an outage, not a bad address — say the right thing.
+    if (!W) { waitlistError("We could not save your email just now. Please try again in a moment."); return; }
+    const email = W.normalizeEmail(el ? el.value : '');
+    if (!email) { waitlistError('Enter a valid email address so we can reach you.'); if (el) { el.style.borderColor = '#c23b34'; el.focus(); } return; }
+    if (el) el.style.borderColor = '';
+    waitlistError('');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+
+    // The CTA's own context wins; each field falls back independently to the page URL
+    // convention that every unbound surface still uses.
+    const ctx = HS.premiumContext || {};
+    const fallbackSource = location.pathname + (location.search || '');
+    const lead = {
+      email: email,
+      source: ctx.source || fallbackSource,
+      zip: ctx.zip || W.zipFromLocation(location),
+      address: ctx.address || null
+    };
+
+    // Seed/preview mode has no database by construction, and every other persistence
+    // in that mode is the same local queue. Production is DATA_SOURCE='supabase'.
+    const res = (CFG.DATA_SOURCE !== 'supabase' || !HS.sb)
+      ? await persistEmail('app_premium_waitlist', lead)
+      : await W.submit(Object.assign({ client: HS.sb() }, lead));
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Notify me'; }
+    if (!res.ok) {
+      // The entered address is deliberately left in the field so a retry costs nothing.
+      waitlistError(res.reason === 'invalid_email'
+        ? 'That email address does not look right — check it and try again.'
+        : "We could not save your email just now. Please try again in a moment.");
+      if (el) el.focus();
+      return;
+    }
+    // Conversion is recorded only after confirmed persistence, and is measurement
+    // only — app_premium_waitlist remains the record of the lead itself.
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('premium_waitlist_joined'); } catch (err) {}
     $('premiumForm').classList.add('hidden');
     $('premiumDone').classList.remove('hidden');
   };
 
+  function waitlistError(msg) {
+    const box = $('premiumError');
+    if (!box) return;
+    box.textContent = msg || '';
+    box.classList.toggle('hidden', !msg);
+  }
+
   // -------------------------------------------------- follows / watch ---------
+  // Project-follow copy is the Fix 1 contract. Do not reuse these strings for
+  // ZIP follows (toggleFollowCommunityBtn), property watches, or Notify.
+  HS.PROJECT_FOLLOW_ADD = 'Add to My Places to follow';
+  HS.PROJECT_FOLLOW_ON = '✓ Following in My Places';
+  HS.isFollowing = function (type, id) {
+    if (type == null || id == null || id === '') return false;
+    return state.follows.has(type + ':' + id);
+  };
+  HS.followedProjectIds = function () {
+    const ids = [];
+    state.follows.forEach(function (k) {
+      const s = String(k);
+      if (s.indexOf('project:') === 0) ids.push(s.slice('project:'.length));
+    });
+    return ids;
+  };
+  HS.unfollowProject = function (id) {
+    if (id == null || id === '') return Promise.resolve();
+    state.follows.delete('project:' + id);
+    LS.set('follows', [...state.follows]);
+    return persistFollow('project', id, false);
+  };
   HS.toggleFollow = function (btn, type, id) {
     if (!HS.requireAuth('follow')) return;
     const key = type + ':' + id;
-    if (state.follows.has(key)) { state.follows.delete(key); btn.textContent = btn.dataset.follow || 'Follow'; }
-    else {
+    if (state.follows.has(key)) {
+      state.follows.delete(key);
+      btn.textContent = btn.dataset.follow || (type === 'project' ? HS.PROJECT_FOLLOW_ADD : 'Follow');
+    } else {
       state.follows.add(key);
       btn.dataset.follow = btn.textContent;
-      btn.textContent = (type === 'property') ? 'Watching ✓' : 'Following ✓';
+      btn.textContent = (type === 'property') ? 'Watching ✓'
+        : (type === 'project') ? HS.PROJECT_FOLLOW_ON
+        : 'Following ✓';
     }
     LS.set('follows', [...state.follows]);
     persistFollow(type, id, state.follows.has(key));
@@ -1457,7 +2423,7 @@
   function buildShare() {
     const grid = $('shareGrid'); if (!grid) return;
     $('shareUrl').textContent = shareUrl().replace(/^https?:\/\//, '');
-    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around your home on HomeSignal');
+    const u = encodeURIComponent(shareUrl()), x = encodeURIComponent('See what’s changing around a place you follow on HomeSignal');
     grid.innerHTML = SHARE.map((s, i) => {
       const href = s.u ? s.u(u, x) : '#';
       const tag = s.u ? 'a' : 'button';
@@ -1491,9 +2457,18 @@
   }
 
   // -------------------------------------------------- persistence seam --------
+  // Returns { ok } — and callers MUST branch on it. A Supabase insert reports a
+  // PostgREST rejection by RESOLVING with { error }, not by throwing, so the old
+  // bare try/catch treated a permission denial, a missing table and a constraint
+  // violation as success. Every failure mode is now collapsed into ok:false.
   async function persistEmail(table, row) {
-    if (CFG.DATA_SOURCE !== 'supabase') { LS.set('pending:' + table, [...(LS.get('pending:' + table, [])), row]); return; }
-    try { await HS.sb().from(table).insert(row); } catch (e) { console.warn('persist', table, e); }
+    if (CFG.DATA_SOURCE !== 'supabase') { LS.set('pending:' + table, [...(LS.get('pending:' + table, [])), row]); return { ok: true, queued: true }; }
+    try {
+      const res = await HS.sb().from(table).insert(row);
+      if (!res || typeof res !== 'object') { console.warn('persist', table, 'no result'); return { ok: false }; }
+      if (res.error) { console.warn('persist', table, res.error.message || res.error); return { ok: false, error: res.error }; }
+      return { ok: true };
+    } catch (e) { console.warn('persist', table, e); return { ok: false, error: e }; }
   }
   async function persistFollow(type, id, on) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
@@ -1517,19 +2492,51 @@
   async function injectShell() {
     const root = document.createElement('div');
     root.id = 'hs-app-root';
-    const html = await fetch('partials/shell.html').then(r => r.text());
+    const html = await fetch('partials/shell.html', { cache: 'no-store' }).then(r => r.text());
     root.innerHTML = html;
     // move page content (from <template id="hs-content">) into the slot
     const tpl = $('hs-content');
     const slot = root.querySelector('#hs-slot');
     if (tpl && slot) slot.appendChild(tpl.content.cloneNode(true));
     document.body.insertBefore(root, document.body.firstChild);
-    $('sidebackdrop').addEventListener('click', closeMenu);
-    // active nav
+    // active nav: the page's <body data-nav> names its section. One item at most, and the
+    // Enterprise item only on the Enterprise page.
     const nav = document.body.dataset.nav;
-    if (nav) { const a = document.querySelector('.nav a[data-nav="' + nav + '"]'); if (a) a.classList.add('on'); }
-    // close menu on nav click (mobile)
-    document.querySelectorAll('.nav a').forEach(a => a.addEventListener('click', closeMenu));
+    if (nav) {
+      const a = document.querySelector('.hs-nav a[data-nav="' + nav + '"]');
+      if (a) { a.classList.add('on'); a.setAttribute('aria-current', 'page'); }
+    }
+    // close the compact menu on a nav click, on Escape, and on a click outside the header
+    document.querySelectorAll('.hs-nav a').forEach(a => a.addEventListener('click', closeMenu));
+    document.addEventListener('keydown', function (e) {
+      const head = $('hs-top');
+      if (e.key !== 'Escape' || !head || !head.classList.contains('menu-open')) return;
+      closeMenu();
+      const btn = $('hs-menubtn'); if (btn) btn.focus();
+    });
+    document.addEventListener('click', function (e) {
+      const head = $('hs-top');
+      if (head && head.classList.contains('menu-open') && !head.contains(e.target)) closeMenu();
+    });
+    // the nav dropdowns (Explore, Enterprise): a button toggles one; an entry, Escape or a click outside closes it
+    ['hs-explore', 'hs-enterprise'].forEach(function (id) {
+      const btn = $(id + '-toggle');
+      if (btn) btn.addEventListener('click', function () {
+        const g = $(id);
+        setNavGroupOpen(id, !(g && g.classList.contains('open')));
+      });
+      document.querySelectorAll('#' + id + '-sub a').forEach(a => a.addEventListener('click', () => setNavGroupOpen(id, false)));
+      document.addEventListener('keydown', function (e) {
+        const g = $(id);
+        if (e.key !== 'Escape' || !g || !g.classList.contains('open')) return;
+        setNavGroupOpen(id, false);
+        if (btn) btn.focus();
+      });
+      document.addEventListener('click', function (e) {
+        const g = $(id);
+        if (g && g.classList.contains('open') && !g.contains(e.target)) setNavGroupOpen(id, false);
+      });
+    });
   }
 
   // Cross-device sync of followed communities. On a signed-in boot, merge the
@@ -1557,13 +2564,23 @@
       }
     }
     LS.set('myCommunities', local);
-    if (_serverFollowZips.length) {
-      LS.set('myZip', _serverFollowZips[0]);
-      state.zip = _serverFollowZips[0];
-    } else if (!LS.get('myZip', null) && local[0]) {
-      LS.set('myZip', String(local[0].zip));
-      state.zip = String(local[0].zip);
-    }
+    // SAVED PLACES ONLY — follow sync must NEVER decide the VIEWED place.
+    // It used to assign the viewed ZIP from account-follow ROW ORDER on every
+    // signed-in boot, so a resident who opened alerts.html?zip=84301 hydrated and
+    // then rendered whichever ZIP happened to sort first in app_follows.
+    // community.html survived only because lib/community-page.js re-reads the URL
+    // after hydrate; Dashboard / Alerts / Development had no such reset.
+    // The viewed place is resolved ONCE at boot by resolveViewedZip
+    // (?zip= -> myZip -> session viewZip -> DEFAULT_ZIP) and afterwards changes only
+    // on an explicit place-selection (followCommunity / switchProperty / switchZip).
+    // The decision lives in lib/view-zip.js::myZipAfterFollowSync, which has no
+    // viewed-ZIP return value at all. See docs/zip-navigation.md.
+    const initZip = HS.myZipAfterFollowSync({
+      myZip: LS.get('myZip', null),
+      serverFollowZips: _serverFollowZips,
+      localFollowZips: local.map(c => c && c.zip)
+    });
+    if (initZip) LS.set('myZip', initZip);
     // push: local-only follows -> account
     for (const c of local) {
       if (!acctZips.has(String(c.zip))) {
@@ -1573,9 +2590,66 @@
     await refreshServerFollowZips();
   }
 
+  // Project follows share app_follows with ZIP follows, but they are a different
+  // target_type and a different in-memory key (`project:<id>` on state.follows).
+  // ZIP sync above never reads that type — which is why a persisted project follow
+  // did not restore after reload/sign-in. Same bidirectional merge as communities:
+  // pull account rows this device hasn't seen, push local-only rows up. Server and
+  // localStorage stay one contract, not a second source of truth. Property watches
+  // and change-notify keys are untouched.
+  async function syncProjectFollowsFromAccount() {
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return;
+    let rows;
+    try {
+      const res = await HS.sb().from('app_follows').select('target_id').eq('target_type', 'project');
+      if (res.error) return;
+      rows = res.data || [];
+    } catch (e) { return; }
+    const local = new Set();
+    state.follows.forEach(function (k) {
+      const s = String(k);
+      if (s.indexOf('project:') === 0) local.add(s.slice('project:'.length));
+    });
+    const acct = new Set();
+    (rows || []).forEach(function (r) {
+      const id = r && r.target_id != null ? String(r.target_id) : '';
+      if (!id) return;
+      acct.add(id);
+      if (!local.has(id)) state.follows.add('project:' + id);
+    });
+    LS.set('follows', [...state.follows]);
+    for (const id of local) {
+      if (!acct.has(id)) {
+        try {
+          await HS.sb().from('app_follows').insert({
+            user_id: state.session.user.id, target_type: 'project', target_id: id
+          });
+        } catch (e) {}
+      }
+    }
+  }
+
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
+    captureEntry();             // which page type this visit entered through
     await injectShell();
+    // A ZIP with no standard page (lib/zip-coverage.json): a map page shows the coverage panel
+    // and stops here, so no map or development code runs; the community page draws the same
+    // panel itself (lib/community-page.js reads HS.zipCoverageDoc). A retired or unverified ZIP stops anywhere.
+    // On a map page only the URL's ?zip= decides, so an address search (lat/lng, addr) near one of
+    // these ZIPs is never replaced: addresses are searched as addresses, never as ZIP geography.
+    HS.zipCoverageDoc = await _zipCoverageP;
+    const kind = HS.zipCoveragePageKind(location.pathname);
+    const qs = new URLSearchParams(location.search);
+    const addressSearch = ['lat', 'lng', 'addr', 'address'].some(function (k) { return qs.has(k); });
+    const covHit = HS.zipCoverageFor({
+      coverage: HS.zipCoverageDoc,
+      urlZip: HS.parseZipParam(location.search),
+      pageZip: document.body && document.body.dataset ? document.body.dataset.zip : null,
+      viewedZip: kind === 'map' ? null : state.zip,
+      onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)
+    });
+    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
@@ -1586,13 +2660,13 @@
     paintBell();
     // legacy deep link: /index.html?signin=1 (or any page) opens the sign-in modal
     if (!state.session && new URLSearchParams(location.search).get('signin') === '1') HS.openAuth();
-    // One-shot: a covered save-home / ZIP lookup that navigated here left the email
-    // opt-in card to render once the new page settled (follow ≠ consent — explicit tap).
+    // One-shot: a save-home / ZIP lookup that navigated here left the
+    // "saved to My Places" card to render once the new page settled.
     try {
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
-    if (HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
+    if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     _resolveReady(HS);
   }
 

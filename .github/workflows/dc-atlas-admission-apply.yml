@@ -1,0 +1,140 @@
+name: dc-atlas-admission-apply
+
+# STAGE 10: applies docs/dc-atlas-admission-apply.sql (ADMIT Atlas: compute_atlas/facilities joins
+# epoch_ai/data_centers in dc_derived_address_admitted) to production, once, from main, through
+# scripts/dc-atlas-admission-apply.sh -- the same discipline as dc-atlas-phase-a-apply.yml:
+#
+#   * the committed artifact runs byte for byte (psql \i, sha256 pinned in the script);
+#   * lock_timeout 5s / statement_timeout 2min asserted inside the applying session;
+#   * refused inside the :25/:35 resolver window, with any DC session active, or with any lock held;
+#   * in-transaction drift guard (the live switch must still be Phase A's) and post-condition;
+#   * afterwards every dc_% view/function + the Map 1 reader must equal a replica of main's DDL.
+#
+# The `offline` job proves the script against a disposable stand-in first (drift refusal, bounded
+# lock wait with a held row, success, second-apply refusal). The `apply` job runs only on a manual
+# dispatch from main that types the confirmation string exactly. Map 1 moves at the next hourly
+# resolver run; stage 11 compares it with the stage 8 dry run (run 36253526398).
+#
+# APPLIED 2026-09-26 18:48 UTC (run 36263746674) and verified by stage 11. The `rollback` job withdraws
+# the admission with docs/dc-atlas-admission-rollback.sql (DCA_MODE=rollback), proven offline by the
+# same `offline` job (rollback, Map 1 restored after one resolver run, second rollback refused).
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'ADMIT-ATLAS-STAGE-10 admits Atlas; ROLLBACK-ATLAS-STAGE-10 withdraws it (anything else runs the offline proof only)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/dc-atlas-admission-apply.sh'
+      - 'docs/dc-atlas-admission-apply.sql'
+      - 'docs/dc-atlas-admission-rollback.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'test/dc_atlas_validation_pg/**'
+      - '.github/workflows/dc-atlas-admission-apply.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-atlas-admission-apply
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      # PINNED to the commit this tool was APPLIED from (stage 10 admission). The DDL of record has moved on
+      # since, so the proof runs against the DDL it was written for; the artifacts are frozen
+      # (the builder's --check verifies their sha256 on every commit).
+      - uses: actions/checkout@v4
+        with:
+          ref: c19821671ae923c8bd92183f78c0b97a42f01174
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The artifact is what its generator emits from the DDL of record
+        run: python3 test/dc_atlas_validation_pg/build_admission.py --check
+      - name: Offline proof of the admission apply script
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_atlas_validation_pg/admission_apply_offline.sh
+
+  apply:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ADMIT-ATLAS-STAGE-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ADMIT ATLAS in production
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-atlas-admission-apply.sh
+
+  rollback:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ROLLBACK-ATLAS-STAGE-10'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ROLL BACK the Atlas admission in production
+        env:
+          DCA_MODE: rollback
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-atlas-admission-apply.sh

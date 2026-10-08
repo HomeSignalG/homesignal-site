@@ -1,0 +1,173 @@
+name: dc-verdict-apply
+
+# C7: the shared derived-point verdict also rejects a match whose street direction contradicts the query
+# (300 S Fish Lake Rd matched as 300 N) and a query with no house number ('31st Avenue East'). One function,
+# dc_derived_point_verdict (docs/dc-verdict-apply.sql). The OSM check reads it live; canonical placements
+# follow at the next :35 dc_resolve_geography run. No pin moves.
+#
+# THE AUTOMATED GATE decides (founder, 2026-09-26: "no manual human review", "automated checks"):
+#   offline  (every PR + dispatch) the gate and the apply script proven on a disposable stand-in:
+#            gate passes on the real artifact and REFUSES a consistently wrong one; drift, bounded lock
+#            wait, apply, repeat refusal, rollback byte for byte, re-apply (test/dc_verdict_pg/offline.sh);
+#   gate     (dispatch from main) scripts/dc-verdict-gate.sh on TODAY's production data, production only
+#            read, the change applied to a replica and both resolvers run: every flip is the rule's
+#            prediction, every Map 1 change reads a flipped address, no pin moved, identity unchanged;
+#   apply    needs BOTH, in the SAME run, and the typed confirmation APPLY-VERDICT-C7;
+#   rollback needs offline and ROLLBACK-VERDICT-C7.
+# A dispatch with any other confirm string runs offline + gate only: the rehearsal on production data.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'APPLY-VERDICT-C7 gates then applies; ROLLBACK-VERDICT-C7 withdraws it; anything else runs the offline proof + the gate (rehearsal) only'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/dc-verdict-apply.sh'
+      - 'scripts/dc-verdict-gate.sh'
+      - 'docs/dc-verdict-apply.sql'
+      - 'docs/dc-verdict-rollback.sql'
+      - 'docs/dc-verdict-gate.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'docs/dc-step3b-canonical-geography.sql'
+      - 'docs/map1-dc-publication.sql'
+      - 'test/dc_verdict_pg/**'
+      - 'test/dc_osm_layer_pg/suite.sql'
+      - '.github/workflows/dc-verdict-apply.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-verdict-apply
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The artifact is what its generator emits from the DDL of record
+        run: python3 test/dc_verdict_pg/build_verdict.py --check
+      - name: Offline proof of the gate and the apply script
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/dc_verdict_pg/offline.sh
+
+  gate:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm != 'ROLLBACK-VERDICT-C7'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      # the replica the change is rehearsed on (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: THE GATE on today's production data (production only read; the change applied to a replica)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-verdict-gate.sh
+
+  apply:
+    needs: [offline, gate]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY-VERDICT-C7'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: APPLY the C7 verdict change in production
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-verdict-apply.sh
+
+  rollback:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ROLLBACK-VERDICT-C7'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ROLL BACK the C7 verdict change in production
+        env:
+          DCO_MODE: rollback
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-verdict-apply.sh

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>HomeSignal Development Activity</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://data.cityofnewyork.us; form-action 'self'">
+<link rel="stylesheet" href="app.css?v=031bef8e">
+<style>
+  .fsr { max-width: 820px; margin: 0 auto; padding: 28px 18px 64px; }
+  .fsr h1 { font-size: 28px; margin: 0 0 8px; }
+  .fsr .sub { color: var(--ink-2); margin: 0 0 22px; }
+  .fsr form { display: grid; gap: 10px; grid-template-columns: 1fr 140px 120px auto; align-items: end; margin-bottom: 22px; }
+  .fsr label { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 4px; }
+  .fsr input, .fsr select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .fsr .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0 22px; }
+  .fsr table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .fsr th, .fsr td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .fsr .miss, .fsr .note, .fsr .attr, .fsr .excl { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .fsr .id { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+  .fsr .workspace { margin-top: 28px; }
+  .fsr .workspace a { display: block; margin: 4px 0; }
+  .fsr .scope { margin: 0 0 6px; }
+  .fsr details.fingerprint { margin: 12px 0; }
+  .fsr details.fingerprint summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  .fsr-nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 22px; }
+  /* `.fsr-nav { display: flex }` above would win over the UA `[hidden]` rule. */
+  .fsr-nav[hidden] { display: none; }
+  .fsr-nav button[aria-current="page"] { font-weight: 700; }
+  @media (max-width: 720px) {
+    .fsr form { grid-template-columns: 1fr; }
+  }
+  @media print {
+    .fsr form, .fsr .actions, .fsr .workspace, .fsr-nav, .fsr-scale { display: none !important; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="fsr">
+  <div class="eyebrow">HOMESIGNAL DEVELOPMENT ACTIVITY · NEW YORK CITY</div>
+  <h1>Development activity on the record near this property</h1>
+  <p class="scope"><b>Planned, approved, permitted and changing development found in HomeSignal's covered official sources.</b></p>
+  <p class="sub">This report focuses on development activity and change. It is not an inventory of existing schools, parks, businesses, buildings, or neighborhood amenities. No scores, outlooks, or predicted effects.</p>
+
+  <!-- HomeSignal's own working views (coverage, listing, portfolio, usage) carry pilot and
+       verdict bookkeeping that is not for a client. They stay out of the customer report and
+       are reached with ?audience=internal. This is presentation, not access control. -->
+  <div id="fsrInternalBanner" class="note" hidden><b>Internal view.</b> Not for clients.</div>
+  <nav class="fsr-nav" aria-label="Internal views" hidden>
+    <button type="button" class="btn" data-view="report" aria-current="page">Report</button>
+    <button type="button" class="btn" data-view="coverage">Coverage</button>
+    <button type="button" class="btn" data-view="listing">Listing</button>
+    <button type="button" class="btn" data-view="portfolio">Portfolio</button>
+    <button type="button" class="btn" data-view="usage">Usage</button>
+  </nav>
+
+  <div id="fsrReportView">
+    <form id="fsrForm">
+      <div>
+        <label for="fsrAddress">Address</label>
+        <input id="fsrAddress" name="address" required autocomplete="street-address" placeholder="1 Centre Street">
+      </div>
+      <div>
+        <label for="fsrZip">ZIP</label>
+        <input id="fsrZip" name="zip" inputmode="numeric" pattern="[0-9]{5}" placeholder="10007">
+      </div>
+      <div>
+        <label for="fsrRadius">Radius</label>
+        <select id="fsrRadius" name="radius_mi">
+          <option value="0.25">0.25 mi</option>
+          <option value="0.5" selected>0.5 mi</option>
+          <option value="1">1 mi</option>
+        </select>
+      </div>
+      <button type="submit" class="btn primary" id="fsrGo">Build report</button>
+    </form>
+
+    <div id="fsrStatus" class="note" hidden></div>
+    <div id="fsrOut" hidden></div>
+
+    <div class="workspace">
+      <h2>Recent reports</h2>
+      <p class="sub">This browser only. A share link rebuilds the report from the same buyer inputs.</p>
+      <div id="fsrRecent"></div>
+    </div>
+  </div>
+
+  <div id="fsrCoverageView" class="fsr-scale" hidden></div>
+  <div id="fsrListingView" class="fsr-scale" hidden></div>
+  <div id="fsrPortfolioView" class="fsr-scale" hidden></div>
+  <div id="fsrUsageView" class="fsr-scale" hidden></div>
+</div>
+
+<script src="lib/nyc-v1-report.js?v=fb620ded"></script>
+<script src="lib/nyc-v1-soda.js?v=33a0a6c8"></script>
+<script src="lib/fsr-scale.js?v=9829eee6"></script>
+<script>
+(function () {
+  var form = document.getElementById('fsrForm');
+  var status = document.getElementById('fsrStatus');
+  var out = document.getElementById('fsrOut');
+  var recent = document.getElementById('fsrRecent');
+  var KEY = 'hs_nyc_v1_reports';
+  var Scale = window.HSFsrScale;
+  var lastReport = null;
+  var currentView = 'report';
+  // The customer report is the default audience. ?audience=internal opens HomeSignal's own
+  // working views. That is presentation, not access control: nothing in them is secret.
+  var INTERNAL = new URLSearchParams(location.search).get('audience') === 'internal';
+  // Standard client disclosure, verbatim from the plan (Step 7). It rides in the rendered
+  // report so print and PDF carry it too.
+  var DISCLOSURE = 'HomeSignal summarizes selected official public records available to its covered sources. It may not include every project or change and is not a substitute for independent property, municipal, title, zoning, legal, inspection, or other professional due diligence.';
+  document.querySelector('.fsr-nav').hidden = !INTERNAL;
+  document.getElementById('fsrInternalBanner').hidden = !INTERNAL;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function setStatus(msg, show) {
+    status.hidden = !show;
+    status.textContent = msg || '';
+  }
+
+  function persist() {
+    return window.localStorage;
+  }
+
+  function remember(report) {
+    var list = [];
+    try { list = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (_e) { list = []; }
+    list = list.filter(function (x) { return x.report_id !== report.report_id; });
+    list.unshift({
+      report_id: report.report_id,
+      address: report.buyer.address,
+      zip: report.buyer.zip,
+      radius_mi: report.radius_mi,
+      generated_at: report.generated_at
+    });
+    sessionStorage.setItem(KEY, JSON.stringify(list.slice(0, 20)));
+    paintRecent();
+  }
+
+  function paintRecent() {
+    var list = [];
+    try { list = JSON.parse(sessionStorage.getItem(KEY) || '[]'); } catch (_e) { list = []; }
+    if (!list.length) {
+      recent.textContent = 'None in this session.';
+      return;
+    }
+    recent.innerHTML = list.map(function (x) {
+      var href = 'future-surroundings-report.html?' + new URLSearchParams({
+        address: x.address, zip: x.zip || '', radius_mi: String(x.radius_mi || 0.5)
+      }).toString();
+      return '<a href="' + esc(href) + '">' + esc(x.address) + (x.zip ? ' ' + esc(x.zip) : '') + ' · ' + esc((x.report_id || '').slice(0, 12)) + '</a>';
+    }).join('');
+  }
+
+  function shareUrl(report) {
+    return location.origin + location.pathname + '?' + new URLSearchParams({
+      address: report.buyer.address,
+      zip: report.buyer.zip || '',
+      radius_mi: String(report.radius_mi)
+    }).toString();
+  }
+
+  function showView(name) {
+    // A customer never lands on an internal view, whatever the URL says.
+    if (!INTERNAL && name !== 'report') name = 'report';
+    currentView = name;
+    document.getElementById('fsrReportView').hidden = name !== 'report';
+    document.getElementById('fsrCoverageView').hidden = name !== 'coverage';
+    document.getElementById('fsrListingView').hidden = name !== 'listing';
+    document.getElementById('fsrPortfolioView').hidden = name !== 'portfolio';
+    document.getElementById('fsrUsageView').hidden = name !== 'usage';
+    document.querySelectorAll('.fsr-nav button').forEach(function (btn) {
+      btn.setAttribute('aria-current', btn.getAttribute('data-view') === name ? 'page' : 'false');
+    });
+    if (name === 'coverage') paintCoverage();
+    if (name === 'listing') paintListing();
+    if (name === 'portfolio') paintPortfolio();
+    if (name === 'usage') paintUsage();
+  }
+
+  function paintCoverage() {
+    var matrix = Scale.coverageMatrix();
+    var html = '<h2>Coverage-quality matrix</h2>';
+    html += '<p class="sub">Assemblable markets: ' + esc(matrix.assemblable_market_ids.join(', ') || 'none') +
+      '. Signed paid pilots: ' + esc(matrix.signed_paid_pilots) + '. Verdict: ' + esc(matrix.verdict) + '.</p>';
+    html += '<table><thead><tr><th>Market</th><th>Assemblable</th><th>Geography</th><th>Publisher data</th></tr></thead><tbody>';
+    matrix.markets.forEach(function (m) {
+      var pubs = (m.publisher_data || []).map(function (p) {
+        return (p.source || p.dataset_id || '') + ' · ' + (p.classification || '');
+      }).join('; ');
+      html += '<tr><td>' + esc(m.market) + '</td><td>' + (m.assemblable ? 'yes' : 'no') + '</td>' +
+        '<td>' + esc((m.geography && (m.geography.source || m.geography.classification)) || '') + '</td>' +
+        '<td>' + esc(pubs) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    html += '<div class="note">Seattle permits stay CLEARED WITH ATTRIBUTION. Seattle Addresses (MAF) is a federated ArcGIS pointer and stays HOLD. NYC V1 is the only assemblable market.</div>';
+    document.getElementById('fsrCoverageView').innerHTML = html;
+  }
+
+  function paintListing() {
+    var el = document.getElementById('fsrListingView');
+    if (!lastReport) {
+      el.innerHTML = '<h2>Listing-level summary</h2><p class="sub">Build a report first. The listing is derived only from that NYC V1 object.</p>';
+      return;
+    }
+    var sum = Scale.listingSummary(lastReport);
+    Scale.recordUse(persist(), { kind: 'listing', report_id: lastReport.report_id });
+    var html = '<h2>Listing-level summary</h2>';
+    html += '<p class="id">derived_from ' + esc(sum.derived_from) + '</p>';
+    html += '<div class="note"><b>' + esc(sum.listing.buyer_address) +
+      (sum.listing.buyer_zip ? ', ' + esc(sum.listing.buyer_zip) : '') + '</b><br>';
+    if (sum.listing.addresspointid) {
+      html += 'AddressPoint ' + esc(sum.listing.addresspointid) + ' · ' +
+        esc(sum.listing.published_address) + ' · nearby ' + esc(sum.nearby_count);
+    } else {
+      html += 'No AddressPoint match. Nearby 0.';
+    }
+    html += '</div>';
+    if (sum.nearest) {
+      html += '<p>Nearest on the record: ' + esc(sum.nearest.type) + ' · ' + esc(sum.nearest.address) +
+        ' at ' + esc(sum.nearest.distance_mi) + ' mi — ' + esc(sum.nearest.stage) +
+        ', ' + esc(sum.nearest.status) + ' (' + esc(sum.nearest.source) + ').</p>';
+    }
+    var stages = Object.keys(sum.by_stage || {});
+    if (stages.length) {
+      html += '<p>By stage: ' + stages.map(function (s) {
+        return esc(s) + ' ' + esc(sum.by_stage[s]);
+      }).join(' · ') + '</p>';
+    }
+    html += '<div class="note">' + esc(sum.investigate) + '</div>';
+    el.innerHTML = html;
+  }
+
+  function paintPortfolio() {
+    var el = document.getElementById('fsrPortfolioView');
+    var list = Scale.listPortfolio(persist());
+    var sum = Scale.summarizePortfolio(persist());
+    var html = '<h2>Portfolio</h2>';
+    html += '<p class="sub">' + esc(sum.count) + ' stored reports. Unique AddressPoints: ' +
+      esc(sum.unique_addresspoints) + '. Nearby total: ' + esc(sum.nearby_total) +
+      '. Signed paid pilots: ' + esc(sum.signed_paid_pilots) + '.</p>';
+    if (!list.length) {
+      html += '<p>None stored in this browser. Add a built report from the Report view.</p>';
+    } else {
+      html += '<ul>';
+      list.forEach(function (x) {
+        var href = 'future-surroundings-report.html?' + new URLSearchParams({
+          address: x.address, zip: x.zip || '', radius_mi: String(x.radius_mi || 0.5)
+        }).toString();
+        html += '<li><a href="' + esc(href) + '">' + esc(x.address) + (x.zip ? ' ' + esc(x.zip) : '') +
+          '</a> · ' + esc((x.report_id || '').slice(0, 12)) +
+          ' · nearby ' + esc(x.nearby_count) +
+          ' <button type="button" class="btn" data-remove="' + esc(x.report_id) + '">Remove</button></li>';
+      });
+      html += '</ul>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll('[data-remove]').forEach(function (btn) {
+      btn.onclick = function () {
+        Scale.removeFromPortfolio(persist(), btn.getAttribute('data-remove'));
+        paintPortfolio();
+      };
+    });
+  }
+
+  function paintUsage() {
+    var sum = Scale.usageSummary(persist());
+    var html = '<h2>Report use</h2>';
+    html += '<div class="note"><b>Signed paid pilots: ' + esc(sum.signed_paid_pilots) +
+      '.</b> ' + esc(sum.note) + '</div>';
+    html += '<p>Local events: ' + esc(sum.events) + '. Distinct report ids: ' +
+      esc(sum.distinct_report_ids) + '. Verdict: ' + esc(sum.verdict) + '.</p>';
+    var kinds = Object.keys(sum.by_kind || {});
+    if (kinds.length) {
+      html += '<ul>';
+      kinds.forEach(function (k) {
+        html += '<li>' + esc(k) + ': ' + esc(sum.by_kind[k]) + '</li>';
+      });
+      html += '</ul>';
+    }
+    document.getElementById('fsrUsageView').innerHTML = html;
+  }
+
+  // The JSON keeps the publisher's date string verbatim. Only the display is
+  // normalized, because one view stores dates as text MM/DD/YYYY and another as
+  // an ISO timestamp.
+  function showDate(raw) {
+    var s = String(raw || '');
+    var iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    var us = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (us) return us[3] + '-' + us[1] + '-' + us[2];
+    return s;
+  }
+
+  // States the coverage the report actually achieved, not the window it asked for.
+  // If a dataset hit the row cap, its real reach is named instead of the window.
+  function coverageNote(report) {
+    var ds = report.data_state || {};
+    var cov = ds.coverage || {};
+    var ids = Object.keys(cov);
+    var html = '';
+    if (ds.coverage_complete && ids.length) {
+      html += '<p class="sub">Every allowlisted Department of Buildings record the publisher'
+        + ' places inside this radius, dated ' + esc(ds.window_start) + ' or later ('
+        + esc(ds.window_days) + ' days). Records are matched on the publisher\u2019s own'
+        + ' coordinates, not on a ZIP field.</p>';
+    } else {
+      var capped = ids.filter(function (id) { return cov[id].capped; });
+      html += '<p class="sub"><b>Partial coverage.</b> ' + esc(capped.length) + ' of '
+        + esc(ids.length) + ' record sets returned more rows than this report reads, so for'
+        + ' those the radius is covered only back to the date shown, not the full '
+        + esc(ds.window_days) + ' days:</p><ul class="sub">';
+      capped.forEach(function (id) {
+        html += '<li>' + esc(id) + ' \u2014 reaches back to ' + esc(cov[id].oldest)
+          + ' (' + esc(cov[id].fetched) + ' rows read)</li>';
+      });
+      html += '</ul>';
+    }
+    if ((ds.silent_datasets || []).length) {
+      html += '<p class="miss"><b>' + esc(ds.silent_datasets.join(', ')) + '</b> returned no'
+        + ' records in this radius and window. That is credited above but contributed'
+        + ' nothing to this report.</p>';
+    }
+    return html;
+  }
+
+  function render(report) {
+    lastReport = report;
+    var html = '';
+    html += '<p>Buyer-supplied: ' + esc(report.buyer.address) + (report.buyer.zip ? ', ' + esc(report.buyer.zip) : '') + '</p>';
+
+    if (report.status === 'address_miss' || !report.property) {
+      // A miss only means "not on the record" if every candidate was read. If the
+      // candidate read was capped, the right point may just not be in the rows, and
+      // saying "no match" would state a finding the report does not have.
+      if (report.data_state && report.data_state.address_points_capped) {
+        html += '<div class="miss"><b>Could not be determined.</b> This house number has more'
+          + ' published address points than this report reads (' + esc(report.data_state.address_point_candidates)
+          + '), so a match cannot be ruled out. Add a ZIP or borough and run it again. This is'
+          + ' not a finding that the address is absent.</div>';
+      } else {
+        html += '<div class="miss"><b>No match for this address.</b> The City’s published address points do not include it, and this report does not guess a location. Check the spelling, or add a ZIP or borough, and run it again.</div>';
+      }
+    } else if (report.status === 'address_ambiguous') {
+      html += '<div class="miss"><b>More than one published address matched.</b> Add a ZIP or borough. The report does not pick a building.</div>';
+    } else {
+      var p = report.property;
+      html += '<div class="note"><b>On the record:</b> ' + esc(p.house_number + ' ' + p.full_street_name) +
+        ', ZIP ' + esc(p.zipcode) + '. AddressPoint ' + esc(p.addresspointid) +
+        '. Pin ' + esc(p.lat) + ', ' + esc(p.lng) + '. Radius ' + esc(report.radius_mi) + ' mi.</div>';
+
+      if (!report.nearby.length) {
+        html += '<p>No allowlisted Department of Buildings rows with publisher coordinates in that radius in the last ' +
+          esc((report.data_state && report.data_state.window_days) || 365) + ' days.</p>';
+        html += coverageNote(report);
+      } else {
+        html += '<h2>Department of Buildings records near this property</h2>';
+        if (report.nearby_truncated) {
+          html += '<p class="sub">Showing the ' + esc(report.nearby.length) + ' closest of ' +
+            esc(report.nearby_matched) + ' allowlisted records in this radius.</p>';
+        }
+        html += coverageNote(report);
+        html += '<table><thead><tr><th>Distance</th><th>On the record</th><th>Stage</th><th>Status</th><th>Date</th><th>Source</th></tr></thead><tbody>';
+        report.nearby.forEach(function (row) {
+          html += '<tr><td>' + esc(row.distance_mi) + ' mi (' + esc(row.east_mi) + ' E, ' + esc(row.north_mi) + ' N)</td>' +
+            '<td>' + esc(row.type) + ' · ' + esc(row.address) + (row.zip ? ' ' + esc(row.zip) : '') +
+            '<br><a href="' + esc(row.record_url) + '">' + esc(row.case_number || row.dataset_id) + '</a></td>' +
+            '<td>' + esc(row.stage) + '</td>' +
+            '<td>' + esc(row.status) + '</td>' +
+            '<td>' + esc(row.date_label) + ' ' + esc(showDate(row.date)) + '</td>' +
+            '<td>' + esc(row.source) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+    }
+
+    html += '<div class="note">' + esc(report.investigate) + '</div>';
+    html += '<div class="attr"><b>Attribution</b><ul>';
+    report.attribution.forEach(function (a) {
+      html += '<li>' + esc(a.source) + ' — ' + esc(a.name) + ' (' + esc(a.dataset) + '). ' +
+        esc(a.version) + '. Modifications: ' + esc(a.modifications) + '</li>';
+    });
+    html += '</ul></div>';
+    html += '<div class="note disclosure">' + esc(DISCLOSURE) + '</div>';
+    // The exclusions are a rights-gate record (which stacks this report does not call).
+    // They stay in the JSON; only HomeSignal's own view lists them.
+    if (INTERNAL) {
+      html += '<div class="excl"><b>This report excludes</b><ul>';
+      report.exclusions.forEach(function (x) { html += '<li>' + esc(x) + '</li>'; });
+      html += '</ul></div>';
+    }
+    // Saying only what the hash can carry. It fingerprints this content, so it answers
+    // "are these two files the same report". It is not a signature, it is not unique to
+    // one issuance, and re-running this address later will not reproduce it. It sits in a
+    // collapsed advanced block at the end, not ahead of the records.
+    html += '<details class="fingerprint"><summary>Report fingerprint (advanced)</summary>';
+    html += '<p class="id">report_id ' + esc(report.report_id) + '</p>';
+    html += '<p class="sub">A fingerprint of the records above. It is not a receipt and'
+      + ' not a signature. Two reports with the same id hold the same data; re-running this'
+      + ' address later gives a different id, because the City’s records move. To'
+      + ' check it, take the downloaded JSON as delivered, remove <code>report_id</code>'
+      + ' and <code>generated_at</code>, and SHA-256 what is left.</p></details>';
+
+    html += '<div class="actions">' +
+      '<button type="button" class="btn" id="fsrPrint">Print / PDF</button>' +
+      '<button type="button" class="btn" id="fsrShare">Copy share link</button>' +
+      '<button type="button" class="btn" id="fsrJson">Download JSON</button>' +
+      (INTERNAL ? '<button type="button" class="btn" id="fsrPortfolioAdd">Add to portfolio</button>' : '') +
+      '</div>';
+
+    out.hidden = false;
+    out.innerHTML = html;
+    document.getElementById('fsrPrint').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'print', report_id: report.report_id });
+      window.print();
+    };
+    document.getElementById('fsrShare').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'share', report_id: report.report_id });
+      navigator.clipboard.writeText(shareUrl(report));
+    };
+    document.getElementById('fsrJson').onclick = function () {
+      Scale.recordUse(persist(), { kind: 'json', report_id: report.report_id });
+      var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'future-surroundings-' + report.report_id.slice(0, 12) + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    var portfolioAdd = document.getElementById('fsrPortfolioAdd');
+    if (portfolioAdd) portfolioAdd.onclick = function () {
+      Scale.addToPortfolio(persist(), report);
+      Scale.recordUse(persist(), { kind: 'portfolio_add', report_id: report.report_id });
+    };
+    remember(report);
+  }
+
+  function run(address, zip, radius) {
+    setStatus('Retrieving AddressPoint and Department of Buildings rows from NYC Open Data…', true);
+    out.hidden = true;
+    return window.HSNycV1Soda.loadReport(address, zip, radius).then(function (report) {
+      setStatus('', false);
+      Scale.recordUse(persist(), { kind: 'build', report_id: report.report_id });
+      render(report);
+      return report;
+    }).catch(function (err) {
+      setStatus('Could not retrieve the allowlisted NYC Open Data views. ' + (err && err.message ? err.message : ''), true);
+    });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var address = document.getElementById('fsrAddress').value;
+    var zip = document.getElementById('fsrZip').value;
+    var radius = Number(document.getElementById('fsrRadius').value);
+    var u = new URL(location.href);
+    u.searchParams.set('address', address);
+    if (zip) u.searchParams.set('zip', zip); else u.searchParams.delete('zip');
+    u.searchParams.set('radius_mi', String(radius));
+    history.replaceState({}, '', u);
+    showView('report');
+    run(address, zip, radius);
+  });
+
+  document.querySelectorAll('.fsr-nav button').forEach(function (btn) {
+    btn.onclick = function () { showView(btn.getAttribute('data-view')); };
+  });
+
+  paintRecent();
+  var q = new URLSearchParams(location.search);
+  if (q.get('view')) showView(q.get('view'));
+  if (q.get('address')) {
+    document.getElementById('fsrAddress').value = q.get('address');
+    document.getElementById('fsrZip').value = q.get('zip') || '';
+    if (q.get('radius_mi')) document.getElementById('fsrRadius').value = q.get('radius_mi');
+    run(q.get('address'), q.get('zip') || '', Number(q.get('radius_mi') || 0.5));
+  }
+})();
+</script>
+</body>
+</html>

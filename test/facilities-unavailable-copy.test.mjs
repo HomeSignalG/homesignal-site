@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = readFileSync(join(root, 'homesignalmap.html'), 'utf8');
+const community = readFileSync(join(root, 'lib/community-page.js'), 'utf8');
 const failures = [];
 
 // the flag has to actually be fetched, or the page can never know
@@ -24,7 +25,10 @@ if (!/facUnavailable\s*:\s*!!row\.facilities_unavailable/.test(src)) {
 if (!/FAC_UNAVAILABLE\s*=\s*ZIP_MODE\s*&&\s*!!data\.facUnavailable/.test(src)) {
   failures.push('FAC_UNAVAILABLE is not derived from the server flag alone');
 }
-if (!/\$\("cFac"\)\.textContent\s*=\s*FAC_UNAVAILABLE\s*\?\s*"\\u2014"/.test(src)) {
+// (FAC_UNMEASURED joins it 2026-09-22: a ZIP-mode facility plane that is not a membership
+// measurement is an unknown count too — docs/zip-membership-canonical.sql §3. The EPA-outage
+// NOTE stays keyed on FAC_UNAVAILABLE alone, pinned above.)
+if (!/\$\("cFac"\)\.textContent\s*=\s*\(FAC_UNAVAILABLE \|\| FAC_UNMEASURED\)\s*\?\s*"\\u2014"/.test(src)) {
   failures.push('#cFac does not render an em-dash when the EPA read failed');
 }
 // the note must exist and must take precedence over the facilities-only note
@@ -65,9 +69,28 @@ if (/FAC_UNAVAILABLE\s*=\s*[^;]*facilities\s*===?\s*0/.test(src)
     + 'are CORRECT zeros and must keep rendering 0');
 }
 
+// COMMUNITY ZIP STRIP — same honesty rule as Map 1. The tile used to print the
+// materializer's component score even when the overlay was unknown, so a refused
+// EPA read with no stored markers read as "0 Regulated facilities".
+if (!/var facTotal = metaCount\('regulated facilities', facilities\.length\);/.test(community)) {
+  failures.push('community-page no longer computes facTotal from the facility plane');
+}
+if (!/cov\.facilities_unavailable === true/.test(community)
+    || !/cov\.regulatory_overlay_state === 'overlay_unknown'/.test(community)) {
+  failures.push('community-page does not treat facilities_unavailable / overlay_unknown as unknown');
+}
+if (!/var facTile = facUnknown \? '\\u2014' : facTotal/.test(community)
+    || !/statTile\(facTile, 'Regulated facilities'/.test(community)) {
+  failures.push('community-page strip does not render an em-dash when the EPA read failed');
+}
+if (/facUnknown\s*=\s*[^;]*facTotal\s*===?\s*0/.test(community)
+    || /facUnknown\s*=\s*[^;]*facCount\s*===?\s*0/.test(community)) {
+  failures.push('community-page infers unknown from a zero count — rural empties must keep 0');
+}
+
 if (failures.length) {
   console.error(failures.map((f) => `FAIL — ${f}`).join('\n'));
   process.exit(1);
 }
 console.log('facilities-unavailable: em-dash + note driven by the server flag alone; '
-  + 'zero-count inference absent; note takes precedence.');
+  + 'zero-count inference absent; note takes precedence; community strip matches.');
