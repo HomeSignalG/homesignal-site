@@ -770,14 +770,38 @@ def _dev_items(items):
     return f'<section class="zsec"><h2>Development</h2><ul>' + "".join(li) + "</ul></section>"
 
 
-def _items(items, heading, empty, kind):
+# A weather alert's stored URL is the NWS API (raw GeoJSON, and a 404 once the API forgets the alert), so the
+# crawlable list opens the readable NWS forecast page for the page's own ZIP instead - the same rule, host and page
+# as lib/templates.js (recordHref); test/card-link-kinds.test.mjs fails if the two drift. The stored source_ref is
+# untouched. A page worded as the alert would be false: the NWS ZIP page shows the ZIP's CURRENT hazards, which are
+# not necessarily this alert, so the link carries a plain note saying what it opens.
+WEATHER_ZIP_PAGE = "https://forecast.weather.gov/zipcity.php?inputstring="
+WEATHER_NOTE = "Weather.gov forecast for this ZIP (may not list this alert)"
+
+
+def _weather_host(u):
+    """The same test lib/templates.js applies (the PARSED host, lower-cased, trailing dot dropped): a stored
+    api.weather.gov URL is a weather alert whatever the alerts table calls its agency."""
+    try:
+        pu = urllib.parse.urlparse((u or "").strip())
+        h = (pu.hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return pu.scheme in ("http", "https") and h == WEATHER_AGENCY
+
+
+def _items(items, heading, empty, kind, zip_code=""):
     if not items:
         return f'<section class="zsec"><h2>{esc(heading)}</h2><p class="quiet">{esc(empty)}</p></section>'
     li = []
     for it in items:
         t, u = esc(it["title"]), safe_url(it.get("url"))
+        note = ""
+        if kind == "wx" or _weather_host(it.get("url")):
+            u = WEATHER_ZIP_PAGE + zip_code if re.fullmatch(r"[0-9]{5}", zip_code or "") else None
+            note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
         when = esc(it.get("date") or "")
-        inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>' if u else t
+        inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
         li.append(f'<li>{inner}{f" <time>{when}</time>" if when else ""}</li>')
     return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
 
@@ -785,7 +809,7 @@ def _items(items, heading, empty, kind):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=031bef8e">\n'
+APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=5e5acb5b">\n'
 
 
 def coverage_panel(p):
@@ -909,10 +933,11 @@ def render(p, built):
                  "No upcoming public meetings on file for this ZIP yet.", "um")
         + _items(ln_show, "Local news",
                  "No qualifying local news on file for this ZIP yet.", "ln")
-        + (_items(wx, "Weather alerts", "", "wx") if wx else "")
+        + (_items(wx, "Weather alerts", "", "wx", z) if wx else "")
         + f'<p class="quiet">Compiled from official public records on '
           f'<time datetime="{esc(built)}">{esc(built)}</time>. Every item links to its '
-          f'source record; nothing on this page is generated or inferred.</p>'
+          f'source record{", except weather alerts, which link to the National Weather Service forecast for this ZIP" if wx else ""}; '
+          f'nothing on this page is generated or inferred.</p>'
         + links
         + '</main>')
 
@@ -979,7 +1004,7 @@ def render(p, built):
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
-        '<script src="/lib/templates.js?v=49ae3c36"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=6b61281a"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -996,7 +1021,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=61d2fce9"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=67435c86"></script>\n'
+        '<script src="/lib/community-page.js?v=8861dadd"></script>\n'
         "</body>\n</html>\n")
 
 
