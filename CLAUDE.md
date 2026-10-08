@@ -2295,8 +2295,22 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
       accepts only the NEWEST proof, only if it passed, only against the generation STILL serving, and
       recomputes the data half. A failed proof stops the tick red and leaves the generation READY; the
       next tick proves again. `prove_dry` rehearses the browser half on real data and records nothing.
-    - Proofs: `run_suite.py` P0–P10 (+ M23–M29), `run_lifecycle.py` E13b–E26, `run_part_h.py`,
+    - Proofs: `run_suite.py` P0–P10 (+ M23–M29), `run_lifecycle.py` E13b–E27, `run_part_h.py`,
       `run_map1_generation.py`, `test/n5-preactivation-browser.browser.test.mjs` (6 probe mutations killed).
+    - ✅ **LIVE 2026-10-08, and the first real switch passed it.** Applied in order, each read back:
+      the reader split (ledger `20261008155253 map1_zip_read_generation`, stored text = the file,
+      md5 `49ef1a03…`; reader `83f36dcc…`, `n5_zip_projects_markers_at` `0c8b9f8f…`), then Part H
+      (ledger `20261008155407 n5_generation_publish_part_h`, md5 `0a54d2a6…`; activate `6e7ce8ad…`,
+      problems `95eb269f…`, record_proof `b8164d98…`; proof table RLS on, 0 visitor grants).
+      `n5-national-2026-10-08` then went READY → proof #1 **passed** 20:18:41Z against 10-07
+      (`problems {}`, browser 16 ZIPs, 0 mismatches, 4 changed; declared list md5 `7d1bf19a…`) →
+      ACTIVE 20:19:19Z (tick run `37834527002`). After: the public reader equals 10-08's answer on
+      6/6 checked ZIPs and differs from 10-07's on 5 of them (control).
+    - ⚠️ **`prove_dry`'s reader-parity control first compared the BASELINE with the public reader**,
+      so its first run (`37804664654`) failed on exactly the 8 ZIPs that changed 10-06 → 10-07 while
+      the browser half passed 16/16. It now compares the serving generation (#1722, E27); `prove`
+      was never affected, since there the baseline is the serving generation. While a build runs, a
+      queued `prove_dry` is usually replaced by the next tick in the one-run concurrency queue.
   - **Disk:** the provisioned size is READ from the Supabase Management API
     (`/v1/projects/<ref>/config/disk`, `attributes.size_gb` GiB, minus 512 MiB) once per run, so
     an autoscale resize needs no edit (founder, 2026-10-01: "i can not be doing this for years").
