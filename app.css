@@ -78,7 +78,8 @@
   a.stat-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
   a.card-link:hover,a.card-link:focus-visible{transform:translateY(-2px);box-shadow:var(--shadow)}
   a.card-link:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-  .srclabel{display:block;margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
+  .srclabel{display:block;margin-top:8px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+  .srclabel.wx{text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
   .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
   a.wchip-link{text-decoration:none;color:inherit;transition:background .12s ease,border-color .12s ease}
   a.wchip-link:hover,a.wchip-link:focus-visible{background:var(--green-tint);border-color:#cbe7d5}

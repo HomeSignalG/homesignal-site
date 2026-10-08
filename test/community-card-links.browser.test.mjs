@@ -116,7 +116,7 @@ const cardOf = (page, marker) => page.evaluate((m) => {
   if (cards.length !== 1) return { n: cards.length };
   const c = cards[0], lab = c.querySelector('.srclabel');
   return { n: 1, tag: c.tagName, href: c.getAttribute('href'), target: c.getAttribute('target'), rel: c.getAttribute('rel'),
-           label: lab ? lab.textContent.replace(/\s+/g, ' ').trim() : null, nestedLinks: c.querySelectorAll('a').length };
+           label: lab ? lab.textContent.replace(/\s+/g, ' ').trim() : null, srOnly: [].slice.call(c.querySelectorAll('.sr-only')).map(x => x.textContent).join(' '), nestedLinks: c.querySelectorAll('a').length };
 }, marker);
 
 const ZIP = '01001';
@@ -129,12 +129,12 @@ ok(dataset.n === 1 && dataset.tag === 'A' && dataset.href === 'https://apps-secu
   'a dataset-precision Development card is a link to its own URL, in a new tab, safely', dataset);
 ok(dataset.label && /^Source data/.test(dataset.label), 'it carries the "Source data" label', dataset);
 ok(dataset.nestedLinks === 0, 'the label is not a nested link', dataset);
-ok(record.n === 1 && record.tag === 'A' && record.href === 'https://www.example.test/devscreen/Case/C14-2026-0061' && record.label === null,
+ok(record.n === 1 && record.tag === 'A' && record.href === 'https://www.example.test/devscreen/Case/C14-2026-0061' && record.label === null && /opens in a new tab/.test(record.srOnly || ''),
   'a record-precision card is a link with NO label', record);
 ok(nolink.n === 1 && nolink.tag === 'DIV' && nolink.href === null && nolink.label === null,
   'a dataset-precision row with no URL is a plain card: no link and no label', nolink);
 ok(wx.n === 1 && wx.tag === 'A' && wx.href === NWS_PAGE(ZIP) && wx.target === '_blank', 'a weather alert card opens the NWS forecast page for the page\'s own ZIP', wx);
-ok(wx.label && /Weather\.gov forecast for this ZIP/.test(wx.label), 'it says what it opens (the ZIP forecast), not the alert', wx);
+ok(wx.label && /Weather\.gov forecast for this ZIP \(may not list this alert\)/.test(wx.label), 'it says what it opens (the ZIP forecast) and that it may not list the alert', wx);
 ok(news.n === 1 && news.tag === 'A' && news.href === 'https://gazette.example.test/library' && news.label === null, 'an ordinary news card is a link with no label', news);
 ok(gov.n === 1 && gov.tag === 'A' && gov.href === 'https://gov.example.test/n1' && gov.label === null, 'a government notice card is a link with no label', gov);
 
@@ -174,7 +174,8 @@ await page.close();
 // THE CRAWLABLE DOCUMENT: weather alerts there open the same readable page, never the raw API
 const staticHtml = readFileSync(join(out, 'community', ZIP, 'index.html'), 'utf8');
 const wxSection = (staticHtml.match(/<h2>Weather alerts<\/h2>[\s\S]*?<\/ul>/) || [''])[0];
-ok(wxSection.includes('href="' + NWS_PAGE(ZIP) + '"') && /Weather\.gov forecast for this ZIP/.test(wxSection), 'the generated page\'s weather list opens the NWS ZIP page, with its note', wxSection.slice(0, 300));
+ok(wxSection.includes('href="' + NWS_PAGE(ZIP) + '"') && /Weather\.gov forecast for this ZIP \(may not list this alert\)/.test(wxSection), 'the generated page\'s weather list opens the NWS ZIP page, with its note', wxSection.slice(0, 300));
+ok(/Every item links to its source record, except weather alerts, which link to the National Weather Service forecast for this ZIP; nothing on this page is generated or inferred\./.test(staticHtml), 'the crawlable footer no longer claims every item links to its source record when weather alerts are listed');
 ok(!/api\.weather\.gov/i.test(staticHtml.replace(/<script[\s\S]*?<\/script>/g, '')), 'the generated page links the raw weather API nowhere');
 
 console.log('='.repeat(78));
