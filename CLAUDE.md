@@ -2445,8 +2445,13 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
     - ⛔ **NOTHING IS `retired` OR `active` WITHOUT USPS EVIDENCE.** The validator refuses either on a
       third-party flag, and `retired` only with `postal_status_source = usps_verified` and a date. That check
       runs on the INTERNAL record, which is the only place the evidence exists; the public file then
-      carries just `page_mode: retired`. Shell, build and live verifier all fail SAFE to
-      `verification_pending` for anything they cannot place.
+      carries just `page_mode: retired`. **The mode is decided ONCE, in `build_zip_coverage.py`**
+      (`validate_public` refuses a mode outside the vocabulary and a `standard` entry with no Census
+      area); `gen_zip_pages.py` reads it, and `shell.js` and the live verifier only check it is a known
+      value, failing SAFE to `verification_pending` for one nobody built (2026-10-08: it used to be
+      re-decided in three places). **The public file ships only the copy for modes in use, and the
+      word "retired" is refused in it while no ZIP is retired** (the dormant text stays in the internal
+      record).
     - **What a visitor gets:** `/community/<zip>/` keeps its normal URL, HTTP 200 and its usual Rule F
       robots/sitemap decision (never noindex merely for lacking a ZCTA). The page shows the founder's
       coverage panel plus its government notices, meetings and local news; **no ZIP map, no stat tiles,

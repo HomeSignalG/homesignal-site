@@ -121,26 +121,32 @@ ok(S.meta_description === 'Information for ZIP code {zip}. This is a specialized
   '3h meta descriptions');
 
 // ── §4 one rule for the page mode ───────────────────────────────────────────────────────
-console.log('§4 shell.js, gen_zip_pages.py and the live verifier decide the page mode identically');
+console.log('§4 the page mode is decided ONCE, in the build; the two browser-side readers only read it');
 const shell = read('shell.js');
-const fnSrc = (shell.match(/HS\.zipCoverageMode = function \(entry\) \{[\s\S]*?\n  \};/) || [''])[0];
+const fnSrc = (shell.match(/HS\.ZIP_PAGE_MODES = [\s\S]*?HS\.zipCoverageMode = function \(entry\) \{[\s\S]*?\n  \};/) || [''])[0];
 ok(fnSrc.length > 0, '4a shell.js defines HS.zipCoverageMode');
 const HS = {}; new Function('HS', fnSrc)(HS);
 const live = await import('../scripts/lib/zip-coverage-live.mjs');
 const cases = [...Object.values(PUB), undefined,
-  { page_mode: 'standard', map_coverage: 'zcta' }, { page_mode: 'standard', map_coverage: 'address_only' },
+  { page_mode: 'standard', map_coverage: 'zcta' },
   { page_mode: 'retired' }, { page_mode: 'unverified' }, { page_mode: 'specialized_zip', map_coverage: 'address_only' },
   { page_mode: 'mystery', map_coverage: 'none' }, {}];
-const pyModes = JSON.parse(py(['-c', 'import sys,json; sys.path.insert(0,"scripts"); import gen_zip_pages as g; print(json.dumps([g.coverage_mode(e) for e in json.loads(sys.argv[1])]))',
-  JSON.stringify(cases.map((c) => c ?? null))]).stdout);
 const jsModes = cases.map((c) => HS.zipCoverageMode(c));
 const liveModes = cases.map((c) => live.coverageMode(c));
-ok(JSON.stringify(jsModes) === JSON.stringify(pyModes) && JSON.stringify(jsModes) === JSON.stringify(liveModes),
-  '4b all three agree on every entry and on the edge cases', { js: jsModes.slice(-7), py: pyModes.slice(-7) });
+ok(JSON.stringify(jsModes) === JSON.stringify(liveModes), '4b shell.js and the live verifier read every entry, and every edge case, the same way', { js: jsModes.slice(-6), live: liveModes.slice(-6) });
 ok(HS.zipCoverageMode(undefined) === 'standard' && HS.zipCoverageMode({ page_mode: 'standard', map_coverage: 'zcta' }) === 'standard', '4c no entry, or a ZCTA standard entry, is a standard page');
-ok(HS.zipCoverageMode({ page_mode: 'mystery' }) === 'verification_pending', '4d anything it cannot place fails SAFE to verification_pending');
+ok(HS.zipCoverageMode({ page_mode: 'mystery' }) === 'verification_pending', '4d a value nobody built fails SAFE to verification_pending');
 ok(HS.zipCoverageMode({ page_mode: 'retired' }) === 'retired' && !ZIPS.some((z) => HS.zipCoverageMode(PUB[z]) === 'retired'),
   '4e the browser honours page_mode retired; the BUILD alone decides it (a third-party flag cannot reach it: 2b-2d), and none of the 47 is retired');
+ok(!/def coverage_mode\b/.test(read('scripts/gen_zip_pages.py')) && /modes = \{z: e\["page_mode"\]/.test(read('scripts/gen_zip_pages.py')),
+  '4f gen_zip_pages.py has no decision of its own: it reads the validated page_mode');
+{
+  const chk = (entry) => py(['-c', 'import sys,json; sys.path.insert(0,"scripts"); import build_zip_coverage as z\n'
+    + 'd=json.load(open(sys.argv[1])); d["zips"]["78769"].update(json.loads(sys.argv[2]))\n'
+    + 'try:\n z.validate_public(d); print("VALID")\nexcept ValueError as x: print("REFUSED:",x)', join(root, 'lib/zip-coverage.json'), JSON.stringify(entry)]).stdout.trim();
+  ok(/^REFUSED/.test(chk({ page_mode: 'standard', map_coverage: 'none' })), '4g the build refuses a standard page without a Census area (the rule the readers used to repeat)');
+  ok(/^REFUSED/.test(chk({ page_mode: 'mystery' })), '4h the build refuses a page_mode outside the vocabulary');
+}
 
 // ── §5 the build ────────────────────────────────────────────────────────────────────────
 console.log('§5 the build writes a document for every one of them');
@@ -332,6 +338,12 @@ console.log('§9 the browser-delivered model has no provenance, no notes and no 
   // and no code that reaches the browser reads a provenance field
   const browserCode = ['shell.js', 'lib/community-page.js', 'index.html'].map(read).join('\n');
   ok(!/postal_status|verification_notes|third_party|zcta_20(10|20)_status|source_md5/.test(browserCode), '9p no browser-delivered code refers to a provenance field');
+  // only the copy a visitor can reach ships, and the word "retired" ships only while a ZIP is retired
+  ok(JSON.stringify(Object.keys(doc.copy).sort()) === JSON.stringify(['specialized_zip', 'unverified', 'verification_pending']), '9q the public copy holds only the modes in use (no dormant retired text)', Object.keys(doc.copy));
+  ok(!/retired/i.test(pubRaw), '9r the word "retired" is nowhere in the browser file while no ZIP is retired');
+  ok(/REFUSED/.test(pub('d["copy"]["retired"]={"title":"x","body":["x"],"primary_cta":"x"}')), '9s a dormant copy block for a mode nobody uses is refused');
+  ok(/REFUSED/.test(pub('del d["copy"]["unverified"]')), '9t a mode in use with no copy is refused');
+  ok(/REFUSED/.test(pub('d["_doc"]="this ZIP is retired"')), '9u the word retired anywhere in the file is refused while no ZIP is retired');
   // and the generated documents carry none of it
   rmSync(site, { recursive: true, force: true }); gen();   // §6 left the retired-fixture build in place
   const gh = MOD.map((z) => readFileSync(join(site, 'community', z, 'index.html'), 'utf8')).join('\n');
