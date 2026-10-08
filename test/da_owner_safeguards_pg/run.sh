@@ -80,6 +80,19 @@ scenarios() {
   ok "$([ "$got" = "30" ] && echo 1 || echo 0)" "S4 eight real sessions racing one client's minute admit EXACTLY thirty of 160" "admitted=$got"
   got="$(P -tA -c "select used from public.share_view_window where bucket='client' and subject='$CL' and window_secs=60")"
   ok "$([ "$got" = "30" ] && echo 1 || echo 0)" "S5 and the client's minute reads exactly 30" "used=$got"
+  # (2b) the same overlap for the client's minute, so the lock is proven by construction and not by a race that may or may not happen: the minute holds 29;
+  # A takes the 30th and HOLDS its transaction for three seconds; B asks one second later. With the lock B WAITS, sees 30 and is refused. Without it B reads 29 and is let in.
+  rm -f "$d"/*
+  local CL2='00000000000000000000000000000000000000c2' T4='2034-01-01 00:00:00+00'
+  for j in $(seq 1 29); do echo "select allowed from public.share_view_claim_at('$CL2', null, '$T4');"; done > "$d/fill.sql"
+  P -tA -f "$d/fill.sql" > "$d/fill.txt" 2>&1
+  printf 'begin;\nselect allowed from public.share_view_claim_at(%s, null, %s);\nselect pg_sleep(3);\ncommit;\n' "'$CL2'" "'$T4'" > "$d/a.sql"
+  P -tA -f "$d/a.sql" > "$d/a.txt" 2>"$d/a.err" &
+  sleep 1
+  P -tA -c "select allowed from public.share_view_claim_at('$CL2', null, '$T4')" > "$d/b.txt" 2>"$d/b.err" || true
+  wait
+  got="$(P -tA -c "select used from public.share_view_window where bucket='client' and subject='$CL2' and window_secs=60")"
+  ok "$([ "$(grep -c '^t$' "$d/fill.txt")" = "29" ] && [ "$(grep -m1 -E '^[tf]$' "$d/a.txt")" = "t" ] && [ "$(head -1 "$d/b.txt")" = "f" ] && [ "$got" = "30" ] && echo 1 || echo 0)" "S4b a client's 30th and 31st requests that overlap: the first is let in, the second WAITS for it and is refused, and the minute reads exactly 30" "a=$(grep -m1 -E '^[tf]$' "$d/a.txt") b=$(head -1 "$d/b.txt") used=$got"
   # (3) two owners remove the same agent AT THE SAME TIME, on purpose and not left to timing: owner A removes the agent and HOLDS the transaction open
   # for three seconds; owner B asks one second later. With the row lock B WAITS for A, then re-reads, finds it already done and answers false. Without it B
   # reads the agent as active, tries to end the membership too, and the membership guard raises: an error, not a clean false.
