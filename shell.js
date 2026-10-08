@@ -368,12 +368,13 @@
   //                        84685): no page, a noindex notice that says only that, no redirect
   // Anything we cannot place fails SAFE to verification_pending, never to a made-up boundary.
   HS.ZIP_COVERAGE_URL = 'lib/zip-coverage.json';
+  // The mode is DECIDED once, by scripts/build_zip_coverage.py, which also refuses a model whose
+  // modes are not in this list or whose standard entry lacks a Census area. This only READS it;
+  // a value it does not know (a model nobody built) fails SAFE to verification_pending.
+  HS.ZIP_PAGE_MODES = ['standard', 'specialized_zip', 'verification_pending', 'retired', 'unverified'];
   HS.zipCoverageMode = function (entry) {
     if (!entry) return 'standard';
-    if (entry.page_mode === 'retired' || entry.page_mode === 'unverified') return entry.page_mode;
-    if (entry.page_mode === 'standard' && entry.map_coverage === 'zcta') return 'standard';
-    if (entry.page_mode === 'specialized_zip') return 'specialized_zip';
-    return 'verification_pending';
+    return HS.ZIP_PAGE_MODES.indexOf(entry.page_mode) >= 0 ? entry.page_mode : 'verification_pending';
   };
   // Pure. The coverage hit (if any) for the ZIP this page would show: {zip, entry, mode, copy}.
   // The URL's ?zip= and a page's own declared ZIP count on every page; the viewed ZIP (saved or

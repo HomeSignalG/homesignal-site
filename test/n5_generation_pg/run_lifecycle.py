@@ -39,6 +39,14 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import run_suite as R  # noqa: E402  - the fixture, seed, parts and helpers: one copy
+import run_map1_representative as REP  # noqa: E402  (production's Map 1 reader chain)
+import run_map1_pick as PICK  # noqa: E402
+
+_REAL_RUN = subprocess.run  # the orchestrator's subprocess.run is replaced for shards below
+GEN_READ_DOC = os.path.join(ROOT, "docs", "map1-zip-read-generation.sql")
+STUB_BROWSER = [sys.executable, os.path.join(HERE, "stub_browser.py")]
+# The fixture's canonical ZIPs with no boundary (11199), as the orchestrator reads a declared list.
+DECLARED_CSV = os.path.join(os.environ.get("TMPDIR", "/tmp"), "n5_e2e_declared.csv")
 
 GEN = "gen-e2e"
 FAILS = []
@@ -116,7 +124,9 @@ class Env:
 
     def orchestrator(self, mode, **env):
         os.environ.update({"MODE": mode, "GENERATION": GEN, "MAX_SHARDS": "10",
-                           "MAX_SECONDS": "3000", "WORKER": "e2e-worker", **env})
+                           "MAX_SECONDS": "3000", "WORKER": "e2e-worker",
+                           "PROOF_BROWSER_CMD": " ".join(STUB_BROWSER),
+                           "DECLARED_NO_BOUNDARY_CSV": DECLARED_CSV, **env})
         import n5_orchestrate as O
         O = importlib.reload(O)
         O.sql = self.n3.sql
@@ -124,7 +134,10 @@ class Env:
         return O
 
     def run_shard_inprocess(self, argv, env=None, **kw):
-        """What mode_work's subprocess would do, in-process so the seams apply."""
+        """What mode_work's subprocess would do, in-process so the seams apply. The proof's
+        browser step is a real subprocess (the stub), never a shard."""
+        if "--input" in argv:
+            return _REAL_RUN(argv, env=env, **kw)
         os.environ.update(env or {})
         import n5_shard as S
         S = importlib.reload(S)
@@ -165,6 +178,14 @@ def build_db():
     for st in d_b:
         R.q(c, st)
     R.q(c, d_c)
+    # production's Map 1 reader, built the way run_map1_pick.py builds it: char5 -> the stored
+    # pick -> the generation read
+    R.q(c, open(REP.CHAR5).read())
+    REP.to_production_az(c)
+    PICK.apply(c)
+    R.q(c, open(GEN_READ_DOC).read())
+    with open(DECLARED_CSV, "w") as f:
+        f.write("zip,class\n11199,fixture_no_boundary\n")
     return c
 
 
@@ -247,6 +268,17 @@ def main():
     env.orchestrator("ready").mode_ready()
     ok("E13 READY through the one completeness definition",
        R.q1(c, "select state from geo.n5_generation where generation_id=%s", (GEN,)) == "READY")
+    ok("E13b READY alone does not activate: ACTIVATE refuses a generation with no proof",
+       _raises_db(lambda: env.orchestrator("activate").mode_activate(), "no pre-activation proof"))
+    ok("E13c Map 1 still serves the legacy generation after the refused activation", R.map_snapshot(c) == pre)
+    env.orchestrator("prove").mode_prove()
+    pf = R.q(c, "select passed, baseline_generation_id, declared_no_boundary, browser from geo.n5_generation_proof "
+                "where generation_id=%s order by proof_id desc limit 1", (GEN,))
+    ok("E13d prove: the orchestrator rendered every fixture ZIP under both generations and recorded a passed proof "
+       "against the serving legacy generation, with the declared no-boundary list read from its file",
+       pf and pf[0]["passed"] is True and pf[0]["baseline_generation_id"] == R.LEGACY
+       and pf[0]["declared_no_boundary"] == ["11199"] and pf[0]["browser"].get("zips_checked") == 5
+       and pf[0]["browser"].get("differing_zips", 0) >= 1, pf)
     env.orchestrator("activate").mode_activate()
     ok("E14 activation switches Map 1: the MOVED point, P4 (legacy reject) and cross-prefix P3/P11 all served",
        R.refs(c, "11101") == ["dev:P1", "dev:P2", "dev:P5"] and R.refs(c, "11102") == ["dev:P2", "dev:P4"]
@@ -279,6 +311,9 @@ def main():
 
     auto_tick("gen-auto-b-")
     g2 = R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'")
+    ok("E17b the unattended tick proved before it activated (a passed proof against the generation it replaced)",
+       R.q1(c, "select count(*) from geo.n5_generation_proof where generation_id=%s and passed and baseline_generation_id=%s",
+            (g2, GEN)) == 1, g2)
     ok("E17 one unattended tick opened, built, READY'd and activated a new generation",
        g2 and g2.startswith("gen-auto-b-")
        and R.q1(c, "select predecessor_generation_id from geo.n5_generation where generation_id=%s", (g2,)) == GEN
@@ -312,11 +347,59 @@ def main():
     ok("E24 retirement is idempotent: a second pass finds nothing to do",
        O.retire_superseded() == 0)
 
+    # ---------------------------------------------------------------- A PROOF THAT FAILS
+    os.environ["STUB_BROWSER_RESULT"] = "fail"
+    served = R.map_snapshot(c)
+    stopped = _raises(lambda: auto_tick("gen-auto-d-"), "did not pass")
+    g4 = R.q1(c, "select generation_id from geo.n5_generation where generation_id like 'gen-auto-d-%%'")
+    ok("E25 a failed browser proof stops the unattended tick red: the new generation stays READY, "
+       "the failed proof is recorded, and Map 1 keeps serving the third generation",
+       stopped and R.q1(c, "select state from geo.n5_generation where generation_id=%s", (g4,)) == "READY"
+       and R.q1(c, "select count(*) from geo.n5_generation_proof where generation_id=%s and not passed", (g4,)) == 1
+       and R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'") == g3
+       and R.map_snapshot(c) == served, g4)
+    os.environ.pop("STUB_BROWSER_RESULT", None)
+    O = env.orchestrator("work", GENERATION="", AUTO_LIFECYCLE="1")
+    O.mode_work()
+    ok("E26 the next tick proves the waiting READY generation again and activates it once the proof passes",
+       R.q1(c, "select generation_id from geo.n5_generation where state='ACTIVE'") == g4
+       and R.q1(c, "select count(*) from geo.n5_generation_proof where generation_id=%s and passed", (g4,)) == 1, g4)
+
+    # ------------------------------------------- THE REHEARSAL AGAINST A NON-SERVING BASELINE
+    # prove_dry takes any baseline. Its reader-parity control must still compare the SERVING
+    # generation with the public reader; comparing the baseline failed production's first
+    # rehearsal (run 37804664654) on exactly the ZIPs that changed.
+    O = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY)
+    zips = O.proof_sample(g4, R.LEGACY)
+    differs = [z for z in zips if R.q1(c, "select geo.n5_zip_projects_markers_at(%s,%s,'development') "
+                                          "is distinct from public.app_zip_projects_markers(%s,'development',true)",
+                                       (R.LEGACY, z, z))]
+    proofs = R.q1(c, "select count(*) from geo.n5_generation_proof")
+    ok("E27 control: the rehearsal's sample holds a ZIP whose baseline answer differs from what Map 1 serves",
+       len(differs) > 0, (zips, differs))
+    try:
+        dry, why = O.mode_prove_dry(), None
+    except SystemExit as e:
+        dry, why = None, str(e)
+    ok("E27 prove_dry against a non-serving baseline passes and records nothing",
+       dry == 0 and R.q1(c, "select count(*) from geo.n5_generation_proof") == proofs, why)
+
     c.close()
     R.drop_db("n5gen_e2e")
     print("=" * 60)
     print(f"END-TO-END: {'FAIL' if FAILS else 'PASS'} — {len(FAILS)} failing check(s)")
     return 1 if FAILS else 0
+
+
+def _raises_db(fn, match):
+    """A gate refusal arrives as the SQL error the local seam raises, not as SystemExit."""
+    try:
+        fn()
+    except SystemExit as e:
+        return match in str(e)
+    except Exception as e:  # noqa: BLE001 - the seam raises whatever the driver raised
+        return match in str(e)
+    return False
 
 
 def _raises(fn, match):

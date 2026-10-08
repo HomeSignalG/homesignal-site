@@ -220,6 +220,7 @@ console.log('§6 a confirmed-retired ZIP');
 {
   const m = JSON.parse(JSON.stringify(MODEL));
   m.zips[PEND] = { ...m.zips[PEND], page_mode: 'retired' };       // the build derives this only from a USPS-verified internal entry (offline test §6)
+  m.copy.retired = INTERNAL.copy.retired;                          // and ships its copy only then; the dormant text lives in the internal record
   m.zips['48391'] = { ...m.zips['48391'], page_mode: 'mystery' };  // a mode the page cannot place
   modelBody = JSON.stringify(m);
   for (const path of [`/community.html?zip=${PEND}`, `/alerts.html?zip=${PEND}`, `/homesignalmap.html?zip=${PEND}`]) {

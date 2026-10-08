@@ -138,22 +138,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_zip_coverage as zcov   # the model's own validator (one definition of its invariants)
 
 
-def coverage_mode(entry):
-    """The page a ZIP gets. MUST equal shell.js HS.zipCoverageMode (pinned by
-    test/zip-coverage.test.mjs, which runs both over every entry). A ZIP with no entry is
-    standard. Anything this cannot place fails SAFE to verification_pending, never to a
-    made-up boundary."""
-    if entry is None:
-        return "standard"
-    if entry.get("page_mode") in ("retired", "unverified"):
-        return entry["page_mode"]
-    if entry.get("page_mode") == "standard" and entry.get("map_coverage") == "zcta":
-        return "standard"
-    if entry.get("page_mode") == "specialized_zip":
-        return "specialized_zip"
-    return "verification_pending"
-
-
 def load_zip_coverage(path=COVERAGE_PATH):
     """The ZIP coverage model (lib/zip-coverage.json, founder 2026-10-03). A missing or
     malformed model is an error, never an empty one: an empty model would silently turn every
@@ -1010,7 +994,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=3316971d"></script>\n'
+        '<script src="/shell.js?v=61d2fce9"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=67435c86"></script>\n'
         "</body>\n</html>\n")
@@ -1870,7 +1854,9 @@ def main():
     # canonical, or a typo would change nothing while the build reported success (a fixture is a
     # small slice of the registry, so it is only intersected).
     coverage = load_zip_coverage(a.zip_coverage)
-    modes = {z: coverage_mode(e) for z, e in coverage["zips"].items()}
+    # The mode is decided ONCE, where the model is built (scripts/build_zip_coverage.py), and
+    # load_zip_coverage has just validated it: this reads it, it does not re-decide it.
+    modes = {z: e["page_mode"] for z, e in coverage["zips"].items()}
     nonstandard = {z for z, m in modes.items() if m != "standard"}
     retired = {z for z, m in modes.items() if m == "retired"}
     unverified = {z for z, m in modes.items() if m == "unverified"}

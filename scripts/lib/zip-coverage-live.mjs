@@ -7,14 +7,13 @@
 // the (non-canonical) URL the verifier loads is noindex. Any OTHER ZIP showing a panel is a
 // failure, so a panel can never stand in for a broken standard page.
 
-// Mirrors shell.js HS.zipCoverageMode and scripts/gen_zip_pages.py coverage_mode (one rule;
-// test/zip-coverage.test.mjs runs all three over every entry).
+// Reads the mode the build decided, exactly as shell.js HS.zipCoverageMode does (the build, in
+// scripts/build_zip_coverage.py, is the only place a mode is decided; test/zip-coverage.test.mjs
+// runs both readers over every entry and over values the build would refuse).
+const PAGE_MODES = ['standard', 'specialized_zip', 'verification_pending', 'retired', 'unverified'];
 export function coverageMode(entry) {
   if (!entry) return 'standard';
-  if (entry.page_mode === 'retired' || entry.page_mode === 'unverified') return entry.page_mode;
-  if (entry.page_mode === 'standard' && entry.map_coverage === 'zcta') return 'standard';
-  if (entry.page_mode === 'specialized_zip') return 'specialized_zip';
-  return 'verification_pending';
+  return PAGE_MODES.indexOf(entry.page_mode) >= 0 ? entry.page_mode : 'verification_pending';
 }
 
 export async function loadDeployedCoverage(siteBase) {
