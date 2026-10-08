@@ -1,0 +1,36 @@
+name: supabase-js-pin-probe
+
+# One-time, read-only, dispatch-only (founder go, 2026-10-08: "lock every page to one exact, checked version").
+# Every page loads https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2, which means "whatever 2.x is newest today".
+# The sandbox cannot reach the CDN, so this runs on a GitHub runner and PRINTS what to pin: the exact version that
+# "@2" resolves to right now, and the sha384 integrity value of the file the CDN serves for that exact version.
+# It writes nothing, holds no secret and changes nothing.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve @2 and compute the integrity value of the exact file
+        run: |
+          set -euo pipefail
+          resolved="$(curl -fsS "https://data.jsdelivr.com/v1/packages/npm/@supabase/supabase-js/resolved?specifier=2")"
+          echo "resolver answer: $resolved"
+          ver="$(printf '%s' "$resolved" | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')"
+          echo "RESOLVED VERSION: $ver"
+          for spec in "2" "$ver"; do
+            url="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@$spec"
+            curl -fsS -D "/tmp/h-$spec.txt" -o "/tmp/f-$spec.js" "$url"
+            h="$(openssl dgst -sha384 -binary "/tmp/f-$spec.js" | openssl base64 -A)"
+            echo "URL: $url"
+            echo "  bytes: $(wc -c < "/tmp/f-$spec.js")  content-type: $(grep -i '^content-type' "/tmp/h-$spec.txt" | tr -d '\r')"
+            echo "  INTEGRITY: sha384-$h"
+          done
+          if cmp -s "/tmp/f-2.js" "/tmp/f-$ver.js"; then echo "SAME BYTES: @2 and @$ver are identical today"; else echo "DIFFERENT BYTES: @2 and @$ver differ"; fi
+          # the same file again, to prove the value is stable between two reads
+          curl -fsS "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@$ver" | openssl dgst -sha384 -binary | openssl base64 -A | sed 's/^/  SECOND READ: sha384-/'; echo

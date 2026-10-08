@@ -21,7 +21,7 @@ Each pull request is squash-merged after CI is green. Steps 3 to 7 (report wordi
 ## Needs you (not mine to do in code)
 
 - A. Supabase: is "confirm email" required for sign-up? (Settings, Authentication.) Decides whether the admin-email finding is real.
-- B. The "240 sources cleared" registry against the build-steps doc and ruling R7. A legal call.
+- ~~B. The "240 sources cleared" registry against the build-steps doc.~~ SETTLED by the founder's ruling R7 (2026-10-04, `docs/development-activity-founder-ruling-r7-2026-10-04.md`): all 240 sources may appear in a paid report. Closed on the founder's instruction 2026-10-08; it is not an open question and is not to be raised again.
 - C. Health-monitor checks and a kill switch for the report and billing paths: these live in the ingest repo and the database, so they need your go.
 - D. Owner removes an agent / withdraws invites; rate limit on the share-link endpoint; one open checkout at a time: each needs a database change, so they need your go.
 - F. Pin supabase-js to an exact version (step 8). Needs a runner that can reach the CDN to read the version and its hash; I can set that up as a one-time workflow when you say go.
