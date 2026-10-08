@@ -79,6 +79,13 @@ header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(
 header.top .in{max-width:960px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
 header.top h1{margin:0;font-size:20px}
 header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
+/* THE WAY BACK TO THE SITE (founder, 2026-10-05: "so they can get back to this page"; this is the other direction). This page has no site header
+   by design, so before this row an agent who arrived from the header's Enterprise > My reports had no link off it. Two plain same-site links, inside
+   header.top so the print rule below hides them with it. */
+header.top .sitenav{flex:0 0 100%;display:flex;gap:18px;margin:-8px 0 0}
+header.top .sitenav a{display:inline-flex;align-items:center;min-height:44px;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}
+header.top .sitenav a:hover{text-decoration:underline}
+header.top .sitenav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
 .who{font-size:13px;color:var(--muted)}
 .who button{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
 .wrap{max-width:960px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:18px}
@@ -194,6 +201,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 <body>
 <header class="top">
   <div class="in">
+    <nav class="sitenav" aria-label="HomeSignal site"><a href="index.html">HomeSignal</a><a href="development-activity.html">Enterprise</a></nav>
     <div>
       <h1>Development Activity reports</h1>
       <p class="meta">Type a U.S. property address to see the official development records within half a mile of it.</p>
