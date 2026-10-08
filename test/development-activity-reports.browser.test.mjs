@@ -1785,6 +1785,32 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await ctx.close();
 }
 
+// ---- 14. audit fix 8 (2026-10-07): the sign-in dialog is operable from the keyboard ---------------------------------------------------------------
+{
+  const { ctx, page } = await open({ w: world({ trial: null }), signedIn: false });
+  const overlay = () => page.$eval('#auth-overlay', (e) => getComputedStyle(e).display);
+  await page.click('#signin');
+  ok((await overlay()) === 'flex', '14a the sign-in dialog opens');
+  await page.keyboard.press('Escape');
+  ok((await overlay()) === 'none', '14b Escape closes it');
+  await page.click('#signin');
+  await page.fill('#auth-email', 'agent@example.test');
+  await page.click('#auth-submit');
+  await page.waitForSelector('#auth-code', { state: 'visible' });
+  ok((await page.$eval('#auth-back-link', (e) => e.tagName)) === 'BUTTON', '14c "Use a different email" is a real button');
+  let outside = 0;
+  for (let i = 0; i < 12; i++) { await page.keyboard.press('Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
+  ok(outside === 0, '14d Tab stays inside the dialog while it is open', outside);
+  for (let i = 0; i < 12; i++) { await page.keyboard.press('Shift+Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
+  ok(outside === 0, '14e so does Shift+Tab', outside);
+  await page.focus('#auth-back-link');
+  await page.keyboard.press('Enter');
+  ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
+  await page.keyboard.press('Escape');
+  ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);

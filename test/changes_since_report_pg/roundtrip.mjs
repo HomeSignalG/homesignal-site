@@ -49,7 +49,7 @@ async function pgrest(url, init = {}) {
 }
 async function translate(url, init = {}) {
   const u = new URL(url); requests.push({ path: u.pathname, search: u.search, method: init.method || 'GET' });
-  if (u.pathname === '/auth/v1/user') return init.headers.Authorization === 'Bearer user-token' ? json({ email: 'founder@example.com' }) : json({ msg: 'no' }, 401);
+  if (u.pathname === '/auth/v1/user') return init.headers.Authorization === 'Bearer user-token' ? json({ email: 'founder@example.com', email_confirmed_at: '2026-10-01T00:00:00Z' }) : json({ msg: 'no' }, 401);
   if (u.pathname === '/rest/v1/dashboard_admins') return json(u.searchParams.get('email') === 'eq.founder@example.com' ? [{ email: 'founder@example.com' }] : []);
   const rpcM = /^\/rest\/v1\/rpc\/(report_private_context_need_(open|close))$/.exec(u.pathname);
   if (rpcM) {

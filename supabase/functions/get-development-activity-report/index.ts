@@ -8,8 +8,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import rights from '../_shared/report-rights.json' with { type: 'json' };
 import { makeDeps } from './data.ts';
 import { makeHandler } from './handler.ts';
+import { withSafeLog } from '../_shared/safe-log.ts';
 
 const url = Deno.env.get('SUPABASE_URL') ?? '';
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-Deno.serve(makeHandler(makeDeps({ url, serviceKey, rights }, (input, init) => fetch(input, init))));
+// one fixed-text log line per request (name, status, milliseconds): _shared/safe-log.ts. Nothing from the request or the answer is ever logged.
+Deno.serve(withSafeLog('get-development-activity-report', makeHandler(makeDeps({ url, serviceKey, rights }, (input, init) => fetch(input, init))), (line) => console.log(line), () => Date.now()));

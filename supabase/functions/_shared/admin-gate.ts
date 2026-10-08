@@ -14,7 +14,7 @@ export const MAX_BODY_BYTES = 4096;
 export const ALLOWED_ORIGINS = ['https://homesignal.net', 'https://www.homesignal.net'];
 
 export type AdminGateDeps = {
-  authenticate: (token: string) => Promise<{ email: string; id?: string } | null>;
+  authenticate: (token: string) => Promise<{ email: string; id?: string; confirmed?: boolean } | null>;
   isAdmin: (email: string) => Promise<boolean>;
 };
 
@@ -60,13 +60,17 @@ export async function authorizeAdmin(req: Request, deps: AdminGateDeps): Promise
 }
 
 /** A signed-in user, and whether the allow-list names them. Shared by both gates, so neither can authenticate differently. */
-async function identify(req: Request, deps: AdminGateDeps): Promise<Response | { user: { email: string; id?: string }; admin: boolean }> {
+async function identify(req: Request, deps: AdminGateDeps): Promise<Response | { user: { email: string; id?: string; confirmed?: boolean }; admin: boolean }> {
   const auth = req.headers.get('authorization') ?? '';
   const token = /^Bearer\s+(\S+)$/i.exec(auth)?.[1];
   if (!token) return reply(req, { error: 'unauthorized' }, 401);
-  let user: { email: string; id?: string } | null;
+  let user: { email: string; id?: string; confirmed?: boolean } | null;
   try { user = await deps.authenticate(token); } catch { return reply(req, { error: 'unavailable' }, 502); }
   if (!user || !user.email) return reply(req, { error: 'unauthorized' }, 401); // includes the public anon key: it has no user
+  // An email the person has not proved they own is never matched against the allow-list or a trial (audit fix 11, 2026-10-07). `confirmed` is set by
+  // the real reader from the auth user's email_confirmed_at, and is false when that is absent, so a missing field fails closed there. Where a caller
+  // does not supply it at all (a test stand-in) the gate asks nothing more, which is why only an explicit false refuses here.
+  if (user.confirmed === false) return reply(req, { error: 'unauthorized' }, 401);
   let admin: boolean;
   try { admin = await deps.isAdmin(user.email); } catch { return reply(req, { error: 'unavailable' }, 502); }
   return { user, admin };

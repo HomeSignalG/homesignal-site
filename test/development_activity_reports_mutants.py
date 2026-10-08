@@ -24,6 +24,7 @@ SRC = 'test/development-activity-reports.test.mjs'
 BRO = 'test/development-activity-reports.browser.test.mjs'
 FNT = 'test/development-activity-trial-function.test.mjs'
 GEN = 'test/single-customer-generation-path.test.mjs'
+CONF = 'test/report-confirmed-email-gate.test.mjs'
 M = {}
 
 
@@ -83,6 +84,13 @@ m('reads_ids_leak', "      return { role: r.role, replayed: r.replayed };", '   
 m('reads_outage_called_unusable', "        throw new DataUnavailable('evaluation_invite_redeem');", "        throw new InviteUnusable('evaluation_invite_redeem');", [FNT], READS)
 m('reads_no_shape_check', "      if (!r || (r.role !== 'owner' && r.role !== 'agent') || typeof r.replayed !== 'boolean') throw new DataUnavailable('shape');\n", '', [FNT], READS)
 m('gate_expiry_ignored', "  if (t.status === 'active' && !t.expired) return 'active';", "  if (t.status === 'active') return 'active';", [FNT], GATE)
+# ---- page safety and the confirmed-email gate (audit fixes 8 and 11, 2026-10-07) ---------------------------------------------------------------
+m('late_report_shown_after_sign_out', "    if (epochAtAsk !== sessionEpoch) { attempt = null; return; }", "")
+m('epoch_not_bumped_on_sign_out', " sessionEpoch++;", "")
+m('escape_does_not_close_sign_in', "if (e.key === 'Escape') { e.preventDefault(); pendingRun = false; closeAuth(); return; }", "")
+m('different_email_is_a_dead_anchor', '<button type="button" class="auth-link" id="auth-back-link">Use a different email</button>', '<a id="auth-back-link">Use a different email</a>')
+m('unconfirmed_email_passes_gate', "  if (user.confirmed === false) return reply(req, { error: 'unauthorized' }, 401);", "", [CONF], GATE)
+m('missing_confirmation_reads_as_confirmed', "const confirmed = typeof u.email_confirmed_at === 'string' && u.email_confirmed_at !== '';", "const confirmed = true;", [CONF], 'supabase/functions/_shared/service-rest.ts')
 
 
 def run(tests):
