@@ -30,7 +30,7 @@ def check(name, cond):
 
 
 def world(ready=(), building=(), newest=None, exists=False, free=10000.0, complete=False,
-          ready_raises=False, auto=True, generation="", requeue=False):
+          ready_raises=False, auto=True, generation="", requeue=False, prove_raises=False):
     """Stub every database read the auto path makes; record every lifecycle call."""
     log = []
 
@@ -59,6 +59,11 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
         if ready_raises:
             raise SystemExit("STOP: INV-1 gap")
 
+    def fake_prove(gen):
+        log.append(("prove", gen))
+        if prove_raises:
+            raise SystemExit(f"STOP: the pre-activation proof for {gen} did not pass")
+
     o.sql = fake_sql
     o.say = lambda *a, **k: None
     o.AUTO_LIFECYCLE = auto
@@ -71,6 +76,7 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
     o.shards_unfinished = lambda gen: 0 if complete else 3
     o.unpublished_prefixes = lambda gen: [] if complete else ["100"]
     o.ready = fake_ready
+    o.prove = fake_prove
     o.activate = lambda gen: log.append(("activate", gen))
     o.retire_superseded = lambda: log.append(("retire",))
     return log
@@ -83,7 +89,17 @@ def old(h, state="ACTIVE"):
 # 1. a READY generation is activated first, and the tick does nothing else
 log = world(ready=["g-ready"])
 o.mode_work()
-check("READY left over -> activated, then keep-two retirement", log == [("activate", "g-ready"), ("retire",)])
+check("READY left over -> proved again, activated, then keep-two retirement",
+      log == [("prove", "g-ready"), ("activate", "g-ready"), ("retire",)])
+
+# 1b. a READY generation whose proof fails is NOT activated and the tick stops red
+log = world(ready=["g-ready"], prove_raises=True)
+try:
+    o.mode_work()
+    check("READY left over, proof fails -> stop", False)
+except SystemExit as e:
+    check("READY left over, proof fails -> stop", "did not pass" in str(e))
+check("READY left over, proof fails -> never activated", log == [("prove", "g-ready")])
 
 # 2. two READY -> hard stop
 log = world(ready=["a", "b"])
@@ -123,8 +139,16 @@ check("opens when no generation exists yet", ("open", TODAY) in log)
 # 4. finish: complete -> READY then ACTIVATE; incomplete -> neither
 log = world(building=["g1"], complete=True)
 o.mode_work()
-check("complete build -> READY then ACTIVATE",
-      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("activate", "g1"), ("retire",)])
+check("complete build -> READY, then the proof, then ACTIVATE",
+      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("prove", "g1"), ("activate", "g1"), ("retire",)])
+log = world(building=["g1"], complete=True, prove_raises=True)
+try:
+    o.mode_work()
+    check("complete build, proof fails -> stop", False)
+except SystemExit as e:
+    check("complete build, proof fails -> stop", "did not pass" in str(e))
+check("complete build, proof fails -> READY but never ACTIVATE",
+      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("prove", "g1")])
 log = world(building=["g1"], complete=False)
 o.mode_work()
 check("incomplete build -> no READY, no ACTIVATE", log == [("retire",), ("publish", "g1")])
@@ -177,8 +201,10 @@ check("explicit GENERATION: halted shards are not requeued", not any(e[0] == "re
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
 check("free disk comes from n5_shard.disk_free_mb (the shard floor's own formula)",
       "from n5_shard import disk_free_mb, DISK_FLOOR_MB" in src)
-check("auto_finish calls ready() before activate()",
-      src.index("    ready(gen)\n    activate(gen)") > src.index("def auto_finish"))
+check("auto_finish calls ready(), then prove(), then activate()",
+      src.index("    ready(gen)\n    prove(gen)\n    activate(gen)") > src.index("def auto_finish"))
+check("a READY generation left by an earlier tick is proved again before it is activated",
+      "            prove(pending[0])\n            activate(pending[0])" in src)
 wf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".github", "workflows",
                        "n5-generation.yml")).read()
 check("schedule ticks run with AUTO_LIFECYCLE=1",

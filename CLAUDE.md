@@ -2273,6 +2273,30 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - **Alarm:** `n5_map1_build` in `pipeline_health_tick()` (homesignal-ingest #637): fails on a
     build with no progress for 6 h, on no build running while the serving map was captured
     > 72 h ago, and on two builds in flight at once.
+  - ⚖️ **FIX 5 (2026-10-08): READY IS NOT ENOUGH — A GENERATION SWITCHES ONLY WITH A PASSED
+    PRE-ACTIVATION PROOF** (founder: "prove it before activation … do not activate simply because
+    Steps 1–4 are fixed"). The tick now runs READY → **prove** → ACTIVATE.
+    - **Data half** (`geo.n5_generation_preactivation_problems`, Part D D14): prefix receipts equal the
+      rows they describe and no row sits outside one; no status row outside the registry, and every
+      boundary_complete status declares its own membership count; the canonical ZIPs without a
+      boundary are EXACTLY the declared Fix 4 list (`docs/maps-coverage/fix4/no-boundary-zip-classification.csv`,
+      read by the orchestrator, never transcribed); no member on an unmeasured ZIP; every (ZIP,
+      project) the serving generation shows and the candidate does not is explained (moved, an
+      unresolved outcome, or left the capture). Measured 2026-10-08 on 10-07 vs 10-06: all 0, controls
+      584 receipts · 706 declared (md5 `7d1bf19a…`, equal to the CSV) · 1,000 exits (771 left the
+      capture + 212 POINT_REJECTED).
+    - **Browser half** (`scripts/n5_preactivation_browser.mjs`): ~16 sample ZIPs (changed ones first,
+      one unmeasured, then a deterministic spread) rendered in the real `homesignalmap.html` under BOTH
+      generations; each render must equal what the shipped builder makes from that generation's
+      answer, by identity and position, and the page's difference must equal the answers'. Answers are
+      read through `geo.n5_zip_projects_markers_at`, the one function Map 1's reader itself calls
+      (`docs/map1-zip-read-generation.sql`; serving answer = public answer is checked per ZIP).
+    - `geo.n5_generation_record_proof` records every proof, failed ones included; ACTIVATE (Part H)
+      accepts only the NEWEST proof, only if it passed, only against the generation STILL serving, and
+      recomputes the data half. A failed proof stops the tick red and leaves the generation READY; the
+      next tick proves again. `prove_dry` rehearses the browser half on real data and records nothing.
+    - Proofs: `run_suite.py` P0–P10 (+ M23–M29), `run_lifecycle.py` E13b–E26, `run_part_h.py`,
+      `run_map1_generation.py`, `test/n5-preactivation-browser.browser.test.mjs` (6 probe mutations killed).
   - **Disk:** the provisioned size is READ from the Supabase Management API
     (`/v1/projects/<ref>/config/disk`, `attributes.size_gb` GiB, minus 512 MiB) once per run, so
     an autoscale resize needs no edit (founder, 2026-10-01: "i can not be doing this for years").
