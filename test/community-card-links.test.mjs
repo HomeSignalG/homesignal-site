@@ -3,7 +3,8 @@ import fs from 'node:fs'; import assert from 'node:assert/strict';
 const page = fs.readFileSync('lib/community-page.js','utf8');
 const tpl = fs.readFileSync('lib/templates.js','utf8');
 // the one link reader: http(s) only, from the record's own fields
-assert.match(tpl, /recordHref\(item\)[\s\S]{0,300}\^https\?:/, 'recordHref must accept only http(s)');
+assert.match(tpl, /function rawRecordUrl\(item\)[\s\S]{0,300}\^https\?:/, 'the one URL reader accepts only http(s)');
+assert.match(tpl, /recordHref\(item\)[\s\S]{0,120}rawRecordUrl\(item\)/, 'recordHref reads through it');
 assert.match(tpl, /miniCardLink[\s\S]{0,400}rel="noopener noreferrer"/, 'external links open safely');
 // every card type on the page goes through it
 // 4 = notice + news cards on the normal page, the news list on the non-pass page, and the notices on the

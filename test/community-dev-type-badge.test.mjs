@@ -55,7 +55,7 @@ const i1 = RT.indexOf("}).join('')", i0);
 ok(i0 > 0 && i1 > i0, '0e the Development & Growth card template is found in lib/community-page.js');
 const cardBody = RT.slice(i0 + CARD_START.length, i1);
 HS.barColor = () => '#999';
-HS.tpl = { recordHref: (r) => String((r && r.source_ref) || ''), browsingStatusLabel: (p) => String(p.status || ''), devImpactBlock: () => '<div class="impact">IMPACT</div>' };
+HS.tpl = { recordHref: (r) => String((r && r.source_ref) || ''), linkNote: () => '', browsingStatusLabel: (p) => String(p.status || ''), devImpactBlock: () => '<div class="impact">IMPACT</div>' };
 const renderCard = new Function('HS', 'p', cardBody);
 const card = (row) => renderCard(HS, normProject(row));
 const REG = HS.CATEGORY_REGISTRY;
