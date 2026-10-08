@@ -37,7 +37,7 @@ TICKS = "           'ticks',        coalesce((r.detail->>'ticks')::integer, 0) +
 LAST_TICK = "           'last_tick',    _res,"
 MAX_ZIPS = "  _max_zips   constant integer := 200;"
 INTERVAL = "  _interval_h constant integer := 24;"
-SCHED = "  _sched constant text := '*/5 2-7 * * *';"
+SCHED = "  _sched constant text := '*/5 2-8 * * *';"
 CMD = "  _cmd   constant text := 'select public.dev_change_observe_scheduled()';"
 ALTER = "    perform cron.alter_job(_id, schedule := _sched, command := _cmd, active := true);"
 JOB_MISSING = "when not exists (select 1 from cron.job where jobname = $1) then 'missing'"

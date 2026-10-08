@@ -74,7 +74,7 @@ await page.route('**/*', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
-const waitShell = () => page.waitForFunction(() => !!document.querySelector('.nav a'), null, { timeout: 30000 });
+const waitShell = () => page.waitForFunction(() => !!document.querySelector('.hs-nav a'), null, { timeout: 30000 });
 // reports.html sets this once it has DECIDED whether a back action is warranted. Every
 // assertion below about that action — present OR absent — waits on it first, because the
 // absence and "not yet run" are the same DOM and only one of them is a finding.
@@ -275,11 +275,15 @@ ok(unknownDossier.h1 !== target.address && unknownDossier.text.indexOf(target.ad
 await page.goto(base + '/reports.html?id=' + encodeURIComponent(target.id), { waitUntil: 'domcontentloaded' });
 await waitShell(); await waitDecided();
 const nav = await page.evaluate(() => ({
-  sidebar: document.querySelectorAll('.nav a').length,
-  active: [].slice.call(document.querySelectorAll('.nav a.on')).map(a => a.getAttribute('data-nav'))
+  sidebar: document.querySelectorAll('.hs-nav a').length,
+  active: [].slice.call(document.querySelectorAll('.hs-nav a.on')).map(a => a.getAttribute('data-nav'))
 }));
 ok(nav.sidebar > 0, '8 the page renders inside the shared shell, so nobody is stranded', nav);
-ok(nav.active.length === 0, '8 ...and lights no sidebar item, as a hidden section should', nav.active);
+// RETARGETED twice. Reports used to be a hidden section that lit nothing; navigation plan v3
+// (2026-09-30) filed it under My Places; the Revised Index Design (§9, uploaded 2026-10-02, the
+// later ruling) puts reports.html in the Explore group, so Explore is the one item it lights.
+ok(JSON.stringify(nav.active) === JSON.stringify(['explore']),
+  '8 ...and lights exactly Explore, where the Revised Index Design files Reports', nav.active);
 
 await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(base + '/reports.html?id=' + encodeURIComponent(target.id), { waitUntil: 'domcontentloaded' });

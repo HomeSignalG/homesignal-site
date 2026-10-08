@@ -1,7 +1,15 @@
 -- ============================================================================
 -- dev_refresh_collect() EVALUATES EACH HTTP RESPONSE ONCE (2026-09-24)
 --
--- SQL OF RECORD for public.dev_refresh_collect(), superseding the body parked in
+-- ⚠️ SUPERSEDED IN PART (2026-09-27). This body still passes the CORE clock
+--    (`d.refreshed_at`) to `dev_epa_write_refused`. SQL of record for the
+--    facility-clock correction and durable per-ZIP EPA outcome is
+--    docs/dev-epa-facility-clock-and-outcome.sql. Do not apply THIS file after
+--    that one: it would restore the stale-facility clearing defect. This file
+--    remains the once-per-response pin and the rollback path for that change.
+--
+-- SQL OF RECORD (2026-09-24..2026-09-27) for public.dev_refresh_collect(),
+-- superseding the body parked in
 -- docs/epa-decouple-phase1b-split-write.sql. That parked body was verified equal to
 -- live before this change (comments stripped, whitespace collapsed, lower-cased:
 -- normalized md5 0df2014d815e35cf881d75650916a1c1 on BOTH sides; pre-apply

@@ -11,8 +11,9 @@
 //   facility-rich      84101 (Salt Lake City UT)
 //   newly materialized 89501 (Reno NV — civic content, previously blocked)
 //                      35801 (Huntsville AL — coverage_coming honest empty)
-//   hardest centroid   84684 (West Mountain UT — ZIP absent from every ZIP
-//                             dataset; anchored at the Census place point)
+//   (84684 was walked here as the "hardest centroid" until 2026-10-03. Its existence is
+//    unverified, so it has no page (page_mode unverified in lib/zip-coverage.json) and shows a
+//    noindex notice instead of Map 1. No other ZIP was substituted for it.)
 // For each: page boots on live data, Street stays Street, Satellite stays
 // Satellite (no silent revert to Focus), Focus renders, hover = "type · name",
 // marker click opens the same right panel, zero page errors. Mobile bottom
@@ -29,7 +30,6 @@ const ZIPS = [
   { zip: '84101', markers: true,  note: 'facility-rich' },
   { zip: '89501', markers: false, note: 'newly materialized civic (was chicken-and-egg-blocked)' },
   { zip: '35801', markers: false, note: 'newly materialized coverage_coming honest empty' },
-  { zip: '84684', markers: false, note: 'hardest centroid (Census place point)' },
   { zip: '84302', markers: true,  note: 'normalized pilot ZIP (was city-row-resolved; now level=zip)' },
   { zip: '84005', markers: true,  note: 'normalized pilot ZIP under a root city (Eagle Mountain)' },
 ];

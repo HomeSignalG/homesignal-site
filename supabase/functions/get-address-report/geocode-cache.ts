@@ -58,6 +58,12 @@ export interface GeocodeResult {
   geocode_source: string;
   needs_review: boolean;
   review_reason: string | null;
+  // Last write / last TTL retry. Used to decide whether a cached 'failed' row is
+  // still fresh. Absent on older callers and on in-memory results that never read
+  // the table.
+  geocoded_at?: string;
+  updated_at?: string;
+  geofence_status?: string | null;
   // Provider diagnostics for callers that must record provenance (the data-centre derived-
   // location batch). NEVER persisted by supabaseStore -- public.geocodes' contract is unchanged
   // -- and absent on a cache hit, because the cache stores no provider response.
@@ -87,7 +93,46 @@ export interface GeocoderRung {
 export interface GeocodeStore {
   get: (canonical_addr: string) => Promise<GeocodeResult | null>;
   put: (row: GeocodeResult & { provider_vintage?: string }) => Promise<void>;
+  /** Bump updated_at on a failed row. Needed because upsert_geocode_if_better will
+   *  not overwrite failed→failed (equal rank), so a TTL retry that still misses
+   *  (or hits transport) would otherwise re-query Census on every refresh. */
+  touchFailed?: (canonical_addr: string) => Promise<void>;
 }
+
+/** Cached failures older than this are retried. Fresh failures stay cached so a
+ *  genuine no-match is not re-sent to Census on every report refresh. */
+export const FAILED_RETRY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function failedRowIsFresh(row: GeocodeResult, nowMs = Date.now()): boolean {
+  if (row.match_type !== "failed") return true;
+  const raw = row.updated_at || row.geocoded_at;
+  if (!raw) return false;
+  const t = Date.parse(raw);
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t < FAILED_RETRY_TTL_MS;
+}
+
+/** A geocoder transport failure (timeout, HTTP 5xx/4xx, non-JSON body). Distinct from a
+ *  completed lookup that found no match. Transport must NOT be persisted as match_type=
+ *  'failed' — that row would stick forever and never be retried. */
+export class GeocodeTransportError extends Error {
+  readonly kind = "transport" as const;
+  readonly status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "GeocodeTransportError";
+    this.status = status;
+  }
+}
+
+export function isGeocodeTransportError(e: unknown): e is GeocodeTransportError {
+  if (e instanceof GeocodeTransportError) return true;
+  if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) return true;
+  return false;
+}
+
+export const REVIEW_REASON_NO_MATCH = "census_no_match";
+export const REVIEW_REASON_TRANSPORT = "census_transport (not cached)";
 
 /** The write-once read-through cache. Hit → stored row; miss → run ladder in order,
  *  classify, set needs_review, persist, return. Never throws for a geocode miss — a
@@ -106,7 +151,7 @@ export async function resolveGeocode(
   // downgrade, and there is no delete/refresh gap where the row goes missing.
   if (!opts?.forceRefresh) {
     const cached = await store.get(canonical_addr).catch(() => null);
-    if (cached) return cached;
+    if (cached && failedRowIsFresh(cached)) return cached;
   }
 
   let resolved: GeocodeResult = {
@@ -118,16 +163,32 @@ export async function resolveGeocode(
     matched_address: null,
     geocode_source: "none",
     needs_review: true,
-    review_reason: "no geocoder rung resolved this address",
+    review_reason: REVIEW_REASON_NO_MATCH,
   };
 
+  // A rung returns null on a COMPLETED miss (HTTP 200, no match / dataset miss) → try the
+  // next rung. A transport error is not a miss: swallow it so the page does not break, but
+  // remember it so we do not persist a sticky 'failed' when Census never answered.
+  let sawTransport = false;
   for (const rung of ladder) {
-    // A rung returns null on a miss (no match or API error) → try the next rung. This is how the
-    // ladder degrades safely: the zero-fee dataset rung (OpenAddresses parcel_centroid) →
-    // Census (range_interpolated), ending at interpolation rather than ever hard-erroring.
-    const hit = await rung.resolve(input_address, canonical_addr).catch(() => null);
+    let hit: Awaited<ReturnType<GeocoderRung["resolve"]>> = null;
+    try {
+      hit = await rung.resolve(input_address, canonical_addr);
+    } catch (e) {
+      if (isGeocodeTransportError(e) || e instanceof Error) {
+        sawTransport = true;
+        continue;
+      }
+      sawTransport = true;
+      continue;
+    }
     if (!hit) continue;
     const clears = CLEARS_REVIEW.has(hit.match_type);
+    const nCand = hit.diag?.provider_candidates;
+    const candNote = nCand && nCand > 1 ? `candidates=${nCand}` : null;
+    const review = clears
+      ? candNote
+      : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade${candNote ? `; ${candNote}` : ""}`;
     resolved = {
       canonical_addr,
       input_address,
@@ -137,15 +198,24 @@ export async function resolveGeocode(
       matched_address: hit.matched_address,
       geocode_source: rung.source,
       needs_review: !clears,
-      review_reason: clears ? null : `match_type=${hit.match_type} (not rooftop) — flagged for optional precise upgrade`,
+      review_reason: review,
       diag: hit.diag,
     };
     break;
   }
 
-  // Persist even a failure, so the review queue captures it and we don't re-hit a dead
-  // address every refresh. Never let a cache-write error break the caller.
+  // Persist a genuine no-match so we don't re-hit a dead address every refresh. Do NOT
+  // persist a transport failure as a new 'failed' — that would look like a no-match.
+  // If this call skipped a stale cached failure, touch it so a down Census is not
+  // re-queried on the next refresh.
+  if (resolved.match_type === "failed" && sawTransport) {
+    await store.touchFailed?.(canonical_addr).catch(() => {});
+    return { ...resolved, review_reason: REVIEW_REASON_TRANSPORT };
+  }
   await store.put({ ...resolved, provider_vintage: opts?.providerVintage }).catch(() => {});
+  if (resolved.match_type === "failed") {
+    await store.touchFailed?.(canonical_addr).catch(() => {});
+  }
   return resolved;
 }
 
@@ -157,25 +227,69 @@ export async function resolveGeocode(
  *  therefore always flagged for review. That is the correct, honest signal until a
  *  parcel/rooftop rung is added ahead of this one. Returns null on no match → the caller
  *  falls to the next rung, or (today, with only this rung) to a 'failed' result. */
+/** Trailing 5-digit ZIP on a one-line address or a Census matchedAddress. */
+export function trailingZip5(s: string): string | null {
+  return (s || "").match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] ?? null;
+}
+
+export function censusMatchZip(m: { matchedAddress?: string; addressComponents?: { zip?: string } }): string | null {
+  const fromComp = String(m.addressComponents?.zip ?? "").match(/^(\d{5})/)?.[1];
+  return fromComp || trailingZip5(String(m.matchedAddress ?? ""));
+}
+
+/** Prefer the candidate whose matched ZIP equals the ZIP on the input. Fall back
+ *  to Census's first match when the input has no ZIP or no candidate agrees. */
+export function pickCensusMatch<T extends { matchedAddress?: string; addressComponents?: { zip?: string } }>(
+  matches: T[],
+  input: string,
+): T | undefined {
+  if (!matches.length) return undefined;
+  const filed = trailingZip5(input);
+  if (filed && matches.length > 1) {
+    const preferred = matches.find((m) => censusMatchZip(m) === filed);
+    if (preferred) return preferred;
+  }
+  return matches[0];
+}
+
 export function censusRung(fetchFn: typeof fetch): GeocoderRung {
   return {
     source: "census_onelineaddress",
     resolve: async (input: string) => {
       const q = new URLSearchParams({ address: input, benchmark: "Public_AR_Current", format: "json" });
-      const r = await fetchFn(
-        `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`,
-        { signal: AbortSignal.timeout(15000) },
-      );
-      const data = await r.json();
-      const matches = data?.result?.addressMatches ?? [];
+      let r: Response;
+      try {
+        r = await fetchFn(
+          `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`,
+          { signal: AbortSignal.timeout(15000) },
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "census fetch failed";
+        throw new GeocodeTransportError(msg);
+      }
+      if (!r.ok) {
+        throw new GeocodeTransportError(`census HTTP ${r.status}`, r.status);
+      }
+      let data: { result?: { addressMatches?: unknown[] } };
+      try {
+        data = await r.json();
+      } catch {
+        throw new GeocodeTransportError("census response was not JSON");
+      }
+      const matches = (data?.result?.addressMatches ?? []) as {
+        coordinates?: { x?: unknown; y?: unknown };
+        matchedAddress?: string;
+        addressComponents?: { zip?: string };
+      }[];
       if (!matches.length) return null;
-      const m = matches[0];
+      const m = pickCensusMatch(matches, input);
+      if (!m) return null;
       const c = m.coordinates;
       return {
-        lat: Number(c.y),
-        lng: Number(c.x),
+        lat: Number(c?.y),
+        lng: Number(c?.x),
         match_type: "range_interpolated" as MatchType,
-        matched_address: (m.matchedAddress as string) ?? input,
+        matched_address: m.matchedAddress ?? input,
         // Behaviour unchanged (first match, as before); the count is RECORDED so a caller that
         // must not act on an ambiguous match can see that there was more than one.
         diag: {
@@ -224,11 +338,15 @@ export function productionLadder(supabase: any, fetchFn: typeof fetch): Geocoder
 // deno-lint-ignore no-explicit-any
 export function supabaseStore(supabase: any): GeocodeStore {
   const COLS =
-    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason";
+    "canonical_addr,input_address,lat,lng,match_type,matched_address,geocode_source,needs_review,review_reason,geofence_status,geocoded_at,updated_at";
   return {
     get: async (canonical_addr: string) => {
       const { data } = await supabase.from("geocodes").select(COLS).eq("canonical_addr", canonical_addr).maybeSingle();
       return (data as GeocodeResult) ?? null;
+    },
+    touchFailed: async (canonical_addr: string) => {
+      await supabase.from("geocodes").update({ updated_at: new Date().toISOString() })
+        .eq("canonical_addr", canonical_addr).eq("match_type", "failed");
     },
     put: async (row) => {
       // THE IMPROVEMENT GUARD lives in SQL: upsert_geocode_if_better() inserts a new address,

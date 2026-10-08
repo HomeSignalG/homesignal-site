@@ -90,8 +90,9 @@ async function waitReady() {
 
 async function locLabel() {
   return page.evaluate(() => {
-    const el = document.getElementById('locLabel');
-    return el ? String(el.textContent || '').trim() : '';
+    // The Viewing chip left the global header (Revised Index Design, 2026-09-30); its decision
+    // is HS.viewingLabel().
+    return (window.HS && HS.viewingLabel) ? String(HS.viewingLabel().text || '').trim() : '';
   });
 }
 
@@ -100,9 +101,8 @@ try { await mkdir(ART, { recursive: true }); } catch (e) {}
 // ── list view stays an area ──────────────────────────────────────────────────
 await page.goto(base + '/development.html?data=seed&zip=78617', { waitUntil: 'domcontentloaded' });
 await waitReady();
-await page.waitForSelector('#locLabel');
 const listChip = await locLabel();
-ok(listChip.length > 0, 'list view paints the Viewing chip', listChip);
+ok(listChip.length > 0, 'list view has a Viewing label', listChip);
 ok(!new RegExp(STREET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(listChip),
   'Development LIST does not name the project street in Viewing', listChip);
 await page.screenshot({ path: join(ART, 'project_dossier_viewing_list.png'), fullPage: false });
@@ -111,8 +111,8 @@ await page.screenshot({ path: join(ART, 'project_dossier_viewing_list.png'), ful
 await page.goto(base + '/development.html?data=seed&zip=78617&id=' + PID, { waitUntil: 'domcontentloaded' });
 await waitReady();
 await page.waitForFunction((street) => {
-  const el = document.getElementById('locLabel');
-  return el && el.textContent && el.textContent.indexOf(street) >= 0;
+  const t = (window.HS && HS.viewingLabel) ? HS.viewingLabel().text : '';
+  return t && t.indexOf(street) >= 0;
 }, STREET);
 const detailChip = await locLabel();
 ok(detailChip.indexOf('Viewing · ' + STREET) >= 0,

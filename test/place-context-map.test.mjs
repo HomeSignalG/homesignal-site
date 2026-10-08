@@ -81,24 +81,35 @@ ok(!/[?&]addr=/.test(unesc(cp)), '2e2 ...nor on the ZIP host');
 ok(!/geocode/i.test(prop), '2f the Address host runs no geocoder',
   (propRaw.match(/.{0,50}geocode.{0,50}/i) || [])[0]);
 
-// ── §3 the ZIP embed URL, and the A-022 gate that withholds it ─────────────────────────
+// ── §3 the ZIP embed URL, shown to EVERY visitor ────────────────────────────────────────
+// ⚖️ INVERTED 2026-10-02 (founder: "a map should be on this page … at the top and small but
+// you can click on View Development Map … to expand to full map development page"). §3d/§3f
+// used to pin the A-022 gate that withheld the map from signed-out visitors. The map is now
+// public, like development.html's preview; ZIP HEALTH keeps the gate (§3f), and the ZIP
+// outline reader stays authenticated-only (test/zcta-boundary-reader.test.mjs §4d).
 const zipFrame = (cp.match(/<iframe id="zipMapFrame"[\s\S]*?<\/iframe>'/) || [''])[0];
 ok(zipFrame.length > 0, '3a the shared ZIP runtime renders an iframe for the context map');
 ok(/homesignalmap\.html\?embed=1/.test(zipFrame) && /zip=' \+ encodeURIComponent\(zip\)/.test(zipFrame),
   '3b ...in EMBED mode, carrying the ZIP');
 ok(!/[?&]addr=/.test(zipFrame) && !/lat=/.test(zipFrame),
   '3c ...and neither an address nor a point — a ZIP Place is an AREA');
-ok(/var zipContextMap = \(sess && !sess\.demo\)/.test(cp),
-  '3d the block is gated on (sess && !sess.demo) — the A-022 posture');
-ok(/var sess = HS\.state\.session;/.test(cp) && cp.indexOf('var sess = HS.state.session;') < cp.indexOf('zipContextMap'),
-  '3e ...read from the SAME single `var sess` ZIP health already uses (FM-081 unaffected)');
-// The empty string is what makes the public document byte-identical, so pin the else branch.
-ok(/\n    : '';/.test(cp.slice(cp.indexOf('zipContextMap'), cp.indexOf('zipContextMap') + 1400)),
-  '3f ...and an anonymous or demo visitor concatenates \'\' — no iframe, no request, no map');
+const zipBlockDecl = cp.slice(cp.indexOf('var zipContextMap ='), cp.indexOf("'</div>';", cp.indexOf('var zipContextMap =')) + 9);
+ok(/^var zipContextMap =\s*'<div class="block" id="zipContext">'/.test(zipBlockDecl) && zipBlockDecl.length > 200,
+  '3d the map block is built for every visitor — no condition in front of it', zipBlockDecl.slice(0, 120));
+ok(!/sess|demo|session/.test(zipBlockDecl),
+  '3e ...and nothing in it reads the session, so signed-out visitors get the same map',
+  (zipBlockDecl.match(/.{0,40}(sess|demo|session).{0,40}/) || [])[0]);
+ok(/var sess = HS\.state\.session;/.test(cp) && /var authedZipHealth = \(sess && !sess\.demo\)/.test(cp),
+  '3f ZIP health keeps the A-022 gate — only the map moved out of it');
+// Same size as the Development page preview the founder pointed at. Read both so the two
+// cannot drift apart.
+const devRaw = read('development.html');
+const devH = (devRaw.match(/id="devMapFrame"[\s\S]{0,200}?height:(clamp\([^)]*\))/) || [])[1];
+const zipH = (zipFrame.match(/height:(clamp\([^)]*\))/) || [])[1];
+ok(!!devH && devH === zipH, '3g the ZIP map is the Development page preview\'s size (' + zipH + ' vs ' + devH + ')');
 
-// ── §4 NO SECOND DEVELOPMENT LINK inside the frame ──────────────────────────────────────
-// A link inside an iframe navigates the iframe. The handoff belongs on the PARENT, and both
-// parents already had one before this unit.
+// ── §4 the full-map link sits on the PARENT, never inside the frame ────────────────────
+// A link inside an iframe navigates the iframe. The handoff belongs on the PARENT.
 ok(!/<a[^>]*homesignalmap/.test(zipFrame), '4a the ZIP frame markup carries no link of its own');
 ok(/HS\.navHref\('homesignalmap\.html', p\.zip\)/.test(prop) && /id="propMapOpen"/.test(prop),
   '4b property.html keeps its parent-level "Open in Development →"');
@@ -106,6 +117,11 @@ ok(!/data-znav/.test(prop),
   '4c ...with NO data-znav, which would let the shell re-stamp it with the app\'s ACTIVE zip',
   (propRaw.match(/.{0,60}data-znav.{0,60}/) || [])[0]);
 ok(/View Development Map/.test(cpRaw), '4d the ZIP page keeps its parent-level "View Development Map →"');
+const fullLink = (zipBlockDecl.match(/<a class="inlinebtn" id="zipMapFull"[\s\S]*?<\/a>/) || [''])[0];
+ok(/HS\.navHref\('homesignalmap\.html', zip\)/.test(fullLink) && /View full Development Map →/.test(fullLink),
+  '4e under the map, "View full Development Map →" opens Map 1 for THIS zip, like development.html', fullLink);
+ok(zipBlockDecl.indexOf('</iframe>') < zipBlockDecl.indexOf('id="zipMapFull"'),
+  '4f ...placed after the frame closes — a sibling of the iframe, not a child of it');
 
 // ── §5 a demo or sample Place gets no map ───────────────────────────────────────────────
 ok(/var realAddress = pcmHasPoint\(p\) && !p\.sample && !p\.demo;/.test(prop),

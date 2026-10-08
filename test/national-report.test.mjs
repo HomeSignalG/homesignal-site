@@ -142,7 +142,12 @@ const ids = (list) => list.join(',');
   }
   ok(same && count === 90, '3a Type and lifecycle equal the source authority (lib/project-type.js) on 9 types x 10 statuses = 90 records; the publisher status is carried verbatim', count);
   const dec = run({ rows: [row('kd', 0.2)], projects: [proj('kd', { status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' })] }).intelligence.projects[0];
-  ok(dec.lifecycle.key === 'unknown' && dec.publisher_status === 'Decided', '3b "Decided" stays lifecycle unknown with the publisher status kept (the known mismatch is not patched here)');
+  ok(dec.lifecycle.key === 'proposed' && dec.lifecycle.label === 'Proposed' && dec.publisher_status === 'Decided',
+    '3b "Decided" is lifecycle proposed (a decided application is a historical proposal, CLAUDE.md §7.05) with the publisher status "Decided" kept verbatim beside it');
+  const decGroups = run({ rows: [row('kd', 0.2), row('kp', 0.3)], projects: [
+    proj('kd', { status: 'Decided', date_kind: 'decided', submitted_at: '2026-09-10' }), proj('kp', { status: 'Proposed' })] }).intelligence.sections.by_lifecycle;
+  ok(ids(decGroups.proposed) === 'kd,kp' && decGroups.unknown.length === 0,
+    '3b2 a Decided project is listed with the Proposed group, and nothing lands in unknown because of it', ids(decGroups.proposed) + ' / unknown ' + decGroups.unknown.length);
   const lc = run({ rows: [row('ka', 0.2), row('kb', 0.3), row('kc', 0.4)], projects: [
     proj('ka', { status: 'Approved' }), proj('kb', { status: 'Proposed' }), proj('kc', { status: 'On file' })] }).intelligence.sections.by_lifecycle;
   ok(ids(lc.approved) === 'ka' && ids(lc.proposed) === 'kb' && ids(lc.unknown) === 'kc' && lc.operating.length === 0, '3c lifecycle groups are exactly the four canonical keys');
@@ -244,7 +249,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-1', zip: '97477', radius_mi: 1, recent_days: 90, rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-3', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
 
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
@@ -280,6 +285,12 @@ const FIELD = {
     ok(!/evergreen|homer|44\.046|springfield/i.test(f.join(' ')), '7c and the finding does not repeat the private value: ' + want, f);
   }
   ok(F({ ...clean, note: 'ZIP 97477 area, 44.0 lat' }).length === 0, '7d a ZIP and a coarse (fewer than five decimals) number are not findings');
+  // audit 2026-10-07: a match inside a longer house number or street name is a different address, not a leak (and was withheld, uncharged, as one)
+  ok(F({ ...clean, note: 'near 1742 Evergreen' }).length === 0 && F({ ...clean, note: 'at 742 Evergreenway' }).length === 0, '7e2 "742 Evergreen" is not found inside "1742 Evergreen" or "742 Evergreenway"');
+  ok(F({ ...clean, note: '"742 Evergreen"' }).includes('ADDRESS_FRAGMENT_IN_BODY:house_number_and_street') && F({ ...clean, note: '(742 Evergreen)' }).length > 0 && F({ ...clean, note: 'at 742 EVERGREEN, OR' }).length > 0,
+    '7e3 the real thing is still found between quotes, brackets, commas and in capitals');
+  ok(M.containsBounded('a 742 evergreen b', '742 evergreen') && !M.containsBounded('a 1742 evergreen b', '742 evergreen') && M.containsBounded('1742 evergreen 742 evergreen', '742 evergreen') && !M.containsBounded('', 'x') && !M.containsBounded('abc', ''),
+    '7e4 containsBounded: whole, inside a longer token, a later whole occurrence after an inner one, and the empty cases');
   ok(M.boundaryFindings({ zip: '97477', note: '742 Evergreen' }, null).length === 0, '7e with no private context there is nothing to leak (subject-relative keys are still checked)');
   ok(M.boundaryFindings({ zip: '97477', distance_mi: 1 }, null).length === 1, '7e including with no context');
   const fr = M.addressFragments('742 Evergreen Terrace, Springfield, OR 97477');
@@ -298,12 +309,150 @@ const FIELD = {
   ok(ids(r.intelligence.projects.map((p) => p.project_id)) === 'ka,kb', '8a projects are sorted by project id; a project not in the spatial answer is not added', ids(r.intelligence.projects.map((p) => p.project_id)));
   const r2 = run({ rows: [row('kc', 0.2), row('kd', 0.2), row('ke', 0.2)], projects: [proj('kc', { source_ref: '' }), proj('kd', { source_ref: null }), proj('ke', { record_kind: 'facility' })] });
   ok(r2.intelligence.projects.length === 0, '8b a record with no source URL, or that is not a development record, is not in the report');
-  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-1' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
+  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-3' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
   ok(M.parseRadius(0.5) === 0.5 && M.parseRadius('2') === 2 && M.parseRadius(3) === null && M.parseRadius('') === null && M.parseRadius(null) === null && M.parseRadius('x') === null, '8d only the four canonical radii parse');
   ok(throws(() => run({ radius_mi: 3 })) !== null && throws(() => run({ view: 'staff' })) !== null && throws(() => run({ subject: { ...SUBJECT, zip: '9747' } })) !== null && throws(() => run({ subject: { ...SUBJECT, address: '  ' } })) !== null
     && throws(() => run({ subject: { ...SUBJECT, lat: NaN } })) !== null, '8e a bad radius, view, ZIP, blank address or non-finite point is refused');
   ok(M.RECENT_DAYS === 90 && JSON.stringify(M.ALLOWED_RADII) === '[0.5,1,2,5]', '8f the window is 90 days and the radii are 0.5, 1, 2, 5');
   ok(JSON.stringify(Object.keys(M.EVENT_KINDS)) === '["filed","issued","decided","awarded","completed","hearing"]', '8f the event kinds are exactly the six that record something that happened');
+}
+
+// ---- 9. the Stage dimension and the map's directions (100526 plan, step 2) ----------------------------------------
+{
+  const named = Object.keys(M.STAGE_EVIDENCE);
+  ok(named.length === 17 && named.every((k) => M.stageEvidence(k) && M.stageEvidence(k).kind === M.STAGE_EVIDENCE[k]), '9a every named publisher stage is evidence of its own kind', named.length);
+  const as = (v) => (M.stageEvidence(v) || {}).kind || null;
+  ok(as('05_Construction') === 'under_construction' && as('5. ISSUED') === 'permit_issued' && as('UNDER CONSTRUCTION') === 'under_construction'
+    && as('  Permit   Issued ') === 'permit_issued' && as('Under Construction') === 'under_construction' && as('Construction Started') === 'under_construction',
+    '9b a leading phase number, case and spacing do not change the answer (production spellings)');
+  const notEvidence = ['Construction Work Program', 'In the 2026 county construction program', 'Design and Construct', 'CO Issued', 'C of O Issued',
+    'Certificate of Occupancy Issued', 'TCO Issued', 'Construction Completed', 'Decision Issued', 'To Be Issued', '05_Construction (Pending)',
+    'Approved for Permitting', 'PHASED PERMITTING', 'New Building', 'Phased Construction', 'Permit Printed', 'Underway', 'Close Out', 'Advertised', '', null, 7];
+  ok(notEvidence.every((v) => M.stageEvidence(v) === null), '9c plans, finished work, decisions, permit classes and unclear words are NOT evidence', notEvidence.filter((v) => M.stageEvidence(v) !== null));
+  ok(M.presentationStage('approved', 'Under Construction') === 'permitted' && M.presentationStage('unknown', 'Issued') === 'permitted'
+    && M.presentationStage('approved', 'Advertised') === 'approved' && M.presentationStage('approved', null) === 'approved'
+    && M.presentationStage('proposed', 'Issued') === 'proposed' && M.presentationStage('proposed', null) === 'proposed'
+    && M.presentationStage('operating', 'Construction') === null && M.presentationStage('unknown', 'On file') === null,
+    '9d one assignment: evidence makes an approved or unknown record Permitted; approved without it is Approved; proposed stays Proposed; operating and quiet unknown have no stage');
+  ok(JSON.stringify(M.STAGE_LABELS) === JSON.stringify({ approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction' })
+    && !('permitted' in { proposed: 1, approved: 1, operating: 1, unknown: 1 }) && JSON.stringify([...M.LIFECYCLE_ORDER]) === '["approved","proposed","operating","unknown"]',
+    '9e the three stage labels are the plan\'s, and the lifecycle keys are still exactly four (ruling 2)');
+
+  // the 84302 shape, read from production 2026-10-02 (app_projects, udot-active-projects-lines): two under construction, one closed out
+  const UDOT = 'udot-active-projects-lines';
+  const R = { version: 1, cleared: [{ registry_id: UDOT, cleared_on: '2026-10-02', audit_ref: 'test fixture', attribution: '' }] };
+  const SUB = { address: '20 N Main St, Brigham City, UT 84302', matched_address: '20 N MAIN ST, BRIGHAM CITY, UT, 84302', lat: 41.51090028281, lng: -112.015646109683, zip: '84302' };
+  const urow = (k, d, mlat, mlng) => ({ source_key: k, feature_id: k + '#1', registry_id: UDOT, provenance: 'recovered_authoritative', distance_mi: d, geometry_type: 'ST_MultiLineString', has_more: false, marker_lat: mlat, marker_lng: mlng });
+  const uproj = (k, status, stage, name) => ({ source_key: k, registry_id: UDOT, record_kind: 'development', name, type: 'Utility', type_raw: 'Traffic and Safety', status, stage,
+    developer: null, size: null, investment: null, submitted_at: '2024-08-26', date_kind: 'filed', address: 'SR-13', source_ref: 'https://data-uplan.opendata.arcgis.com/datasets/udot-projects-points' });
+  const out = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, rights: R, subject: SUB,
+    rows: [urow('u:22248', 0.1217, 41.5128578810083, -112.015662896203), urow('u:22250', 0.3195, 41.50607192187, -112.015813250643),
+      urow('u:22013', 0.4068, 41.5168505941753, -112.015583906049), urow('u:p', 0.2, 41.5109, -112.0100), urow('u:nm', 0.3, null, null)],
+    projects: [uproj('u:22248', 'Approved', 'Under Construction', 'SR-13 (Main St) & 100 North'), uproj('u:22250', 'Approved', 'Under Construction', 'SR-13 (Main St) & 200 South'),
+      uproj('u:22013', 'Operating', 'Close Out', 'SR-13 (Main Street) & 300 North'), uproj('u:p', 'Proposed', 'Concept', 'A proposed road'), uproj('u:nm', 'Approved', 'Advertised', 'No marker')],
+    ledger: [], events: [], health: [] });
+  const I = out.intelligence;
+  ok(JSON.stringify(I.sections.by_stage) === JSON.stringify({ approved: ['u:nm'], proposed: ['u:p'], permitted: ['u:22248', 'u:22250'] }),
+    '9f 84302: the two Under Construction records are Permitted / Under Construction, the Advertised one is Approved / Coming, the closed-out one is in no section', I.sections.by_stage);
+  ok(JSON.stringify(I.sections.by_lifecycle.approved) === '["u:22248","u:22250","u:nm"]' && I.projects.every((p) => p.lifecycle.key !== 'permitted'),
+    '9g the canonical lifecycle is untouched: Permitted records are still lifecycle approved');
+  const pp = Object.fromEntries(I.projects.map((p) => [p.project_id, p]));
+  ok(JSON.stringify(pp['u:22248'].stage) === JSON.stringify({ key: 'permitted', label: 'Permitted / Under Construction', evidence: 'Under construction' })
+    && JSON.stringify(pp['u:nm'].stage) === JSON.stringify({ key: 'approved', label: 'Approved / Coming' }) && pp['u:22248'].publisher_stage === 'Under Construction',
+    '9h each record carries its stage, the evidence that put it there, and the publisher\'s own stage word', pp['u:22248'].stage);
+  const all = Object.values(I.sections.by_stage).flat();
+  ok(all.length === new Set(all).size, '9i a project is in at most one stage section');
+  ok(I.stage_rule_version === 'stage-evidence-1' && out.engineInputs.stage_rule_version === 'stage-evidence-1' && I.radius_mi === 0.5, '9j the report says which stage rule judged it, and that it is 0.5 mile');
+  const B = out.renderOnly.bearings_deg;
+  ok(B['u:22248'] === 0 && B['u:22250'] === 181 && B['u:p'] === 90 && !('u:nm' in B) && !('u:22013' in B),
+    '9k map directions: north 0, a hair west of south 181 (the real 200 South point), east 90; none for a record with no display point or not in the report', B);
+  ok(S.subjectRelativeKeys(JSON.parse(S.snapshotBodyOf(I))).length === 0 && !JSON.stringify(I).includes('bearing'), '9l directions are response-only: nothing subject-relative is in the permanent report');
+  ok(M.bearingDeg(1, 1, 1, 1) === null && M.bearingDeg(NaN, 0, 1, 1) === null, '9m no direction from a point to itself, or from a non-finite point');
+  ok(JSON.stringify(out.renderOnly.review) === '["u:22248","u:p","u:nm"]' && M.REVIEW_LIMIT === 3,
+    '9n Things to Review: the three nearest projects in a stage section (0.12, 0.2, 0.3 mi; a missing map point does not matter); the fourth, at 0.32 mi, is left out', out.renderOnly.review);
+  const tie = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: 0.5, rights: R, subject: SUB,
+    rows: [urow('t:a', 0.2, 41.52, -112.0156), urow('t:b', 0.2, 41.52, -112.0156), urow('t:c', 0.2, 41.52, -112.0156), urow('t:d', 0.1, 41.52, -112.0156)],
+    projects: [uproj('t:a', 'Proposed', null, 'A'), uproj('t:b', 'Approved', 'Issued', 'B'), uproj('t:c', 'Approved', null, 'C'), uproj('t:d', 'Operating', 'Close Out', 'D')],
+    ledger: [], events: [], health: [] });
+  ok(JSON.stringify(tie.renderOnly.review) === '["t:b","t:c","t:a"]', '9o a tie in distance goes to the stronger stage (Permitted, Approved, Proposed); a record in no stage section is never listed', tie.renderOnly.review);
+  ok(!JSON.stringify(out.intelligence).includes('review'), '9p the review list is response-only: it is measured from the subject');
+}
+
+// ---- 10. the report's outcome: "No development activity" vs "No data ingested" (founder ruling R5, 2026-10-02) -----------------
+{
+  ok(JSON.stringify(M.ACTIVITY_LABELS) === JSON.stringify({ DEVELOPMENT_SHOWN: 'Development shown', NO_DEVELOPMENT_ACTIVITY: 'No development activity', NO_DATA_INGESTED: 'No data ingested' })
+    && JSON.stringify([...M.ACTIVITY_OUTCOMES]) === '["DEVELOPMENT_SHOWN","NO_DEVELOPMENT_ACTIVITY","NO_DATA_INGESTED"]' && M.ACTIVITY_RULE_VERSION === 'activity-outcome-1',
+    '10a three outcomes, in the founder\'s words, under a versioned rule');
+  ok(M.activityOutcome(1) === 'DEVELOPMENT_SHOWN' && M.activityOutcome(40) === 'DEVELOPMENT_SHOWN', '10b a report with development records shows development');
+  const zeros = [0, -1, 0.5, NaN, Infinity, null, undefined, '3'];
+  ok(zeros.every((v) => M.activityOutcome(v) === 'NO_DATA_INGESTED'), '10c an empty report, or a count that is not a whole number, is "No data ingested"', zeros.map((v) => M.activityOutcome(v)));
+  // NO_DEVELOPMENT_ACTIVITY needs the VERIFIED ZERO proof, which has no inputs yet: no input of today's rule can reach it
+  const reach = new Set([...Array(50).keys(), -5, 1.5, NaN, null].map((v) => M.activityOutcome(v)));
+  ok(!reach.has('NO_DEVELOPMENT_ACTIVITY'), '10d "No development activity" is unreachable until HomeSignal can prove its data for an address is coming in', [...reach]);
+
+  const projects = [proj('k1'), proj('k2', { registry_id: 'austin-site-plan-cases', name: 'Menchaca Apartments' })];
+  const rows = [row('k1', 0.2), row('k2', 0.4, { registry_id: 'austin-site-plan-cases' })];
+  const shipped = run({ rights: RIGHTS_NONE, rows, projects });
+  ok(JSON.stringify(shipped.intelligence.activity) === JSON.stringify({ outcome: 'NO_DATA_INGESTED', label: 'No data ingested', rule_version: 'activity-outcome-1' }),
+    '10e the shipped state (nothing cleared): records exist nearby, the customer report shows none, and it says "No data ingested" — never "No development activity"', shipped.intelligence.activity);
+  const internal = run({ rights: RIGHTS_NONE, rows, projects, view: 'internal' });
+  ok(internal.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && internal.intelligence.projects.length === 2, '10f the internal view, which shows uncleared records, shows development');
+  const nothing = run({ rights: RIGHTS_A, rows: [], projects: [] });
+  ok(nothing.intelligence.activity.outcome === 'NO_DATA_INGESTED' && nothing.coverage_state === 'REPORT_READY',
+    '10g a cleared source with no record in the radius is still "No data ingested": a query that returns nothing is not proof (plan line 1338)', [nothing.intelligence.activity.outcome, nothing.coverage_state]);
+  const shown = run({ rights: RIGHTS_A, rows, projects });
+  ok(shown.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && shown.coverage_state === 'LIMITED_COVERAGE', '10h development shown with a coverage limitation is still development shown');
+  ok(S.subjectRelativeKeys(JSON.parse(body(shipped))).length === 0 && Object.keys(shipped.intelligence.activity).join() === 'outcome,label,rule_version',
+    '10i the outcome is part of the permanent report (a reopened report says the same words) and carries nothing about the subject');
+  ok(shipped.engineInputs.activity_rule_version === 'activity-outcome-1', '10j the engine inputs record which outcome rule judged it');
+}
+
+// ---- 11. the credit rule: which reports use a free report (founder ruling R5; supabase/functions/_shared/credit-rule.ts) -------------
+{
+  const C = await import('../supabase/functions/_shared/credit-rule.ts');
+  const act = (outcome) => ({ outcome, label: M.ACTIVITY_LABELS[outcome], rule_version: M.ACTIVITY_RULE_VERSION });
+  const d = (o) => { const x = C.creditDecision(o); return [x.uses_report, x.reason, x.rule_version].join('|'); };
+  ok(C.CREDIT_RULE_VERSION === 'credit-rule-1', '11a the rule is versioned');
+  ok(d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'true|DEVELOPMENT_SHOWN|credit-rule-1', '11b a customer report that shows development uses one free report');
+  ok(d({ status: 'OK', view: 'customer', activity: act('NO_DEVELOPMENT_ACTIVITY'), storable: true }) === 'true|NO_DEVELOPMENT_ACTIVITY|credit-rule-1', '11c a proven "No development activity" uses one free report (a real answer)');
+  ok(d({ status: 'OK', view: 'customer', activity: act('NO_DATA_INGESTED'), storable: true }) === 'false|NO_DATA_INGESTED|credit-rule-1', '11d "No data ingested" never uses one (HomeSignal\'s gap)');
+  ok(d({ status: 'OK', view: 'internal', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|INTERNAL_VIEW|credit-rule-1', '11e the operator\'s internal view is never charged');
+  ok(d({ status: 'ADDRESS_NOT_RESOLVED' }) === 'false|NOT_A_REPORT|credit-rule-1' && d({ status: 'OUTSIDE_COVERAGE', view: 'customer' }) === 'false|NOT_A_REPORT|credit-rule-1'
+    && d({ status: 'ok', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|NOT_A_REPORT|credit-rule-1' && d(null) === 'false|NOT_A_REPORT|credit-rule-1',
+    '11f an unresolved address, a ZIP not covered, or any status but OK is not a report and is never charged');
+  ok(d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: false }) === 'false|NOT_STORABLE|credit-rule-1'
+    && d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN') }) === 'false|NOT_STORABLE|credit-rule-1'
+    && d({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: 'true' }) === 'false|NOT_STORABLE|credit-rule-1',
+    '11g a report that cannot be stored (so cannot be issued) is never charged');
+  const strange = [undefined, null, {}, { outcome: 'DEVELOPMENT_SHOWN' }, { outcome: 'DEVELOPMENT_SHOWN', rule_version: 'activity-outcome-0' },
+    { outcome: 'NO_ACTIVITY', rule_version: 'activity-outcome-1' }, { outcome: 'development_shown', rule_version: 'activity-outcome-1' }, 'DEVELOPMENT_SHOWN', ['DEVELOPMENT_SHOWN']];
+  ok(strange.every((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true }) === 'false|UNRECOGNISED|credit-rule-1'),
+    '11h an outcome the rule does not recognise, or one judged by another outcome rule, is never charged (fail closed toward the customer)', strange.map((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true })));
+  ok(d({ status: 'OK', view: 'staff', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|INTERNAL_VIEW|credit-rule-1', '11i only the customer view can be charged');
+  // the engine and the rule agree end to end: the shipped state is never charged; a cleared record shown is
+  const projects = [proj('k1')];
+  const rows = [row('k1', 0.2)];
+  const today = run({ rights: RIGHTS_NONE, rows, projects });
+  const cleared = run({ rights: RIGHTS_A, rows, projects });
+  const ask = (r, view) => C.creditDecision({ status: 'OK', view, activity: r.intelligence.activity, storable: r.storage_blockers.length === 0 });
+  ok(ask(today, 'customer').uses_report === false && ask(today, 'customer').reason === 'NO_DATA_INGESTED', '11j today (nothing cleared) every customer report is free: "No data ingested"');
+  ok(ask(cleared, 'customer').uses_report === true && ask(cleared, 'customer').reason === 'DEVELOPMENT_SHOWN', '11k once a source is cleared and its record is shown, the report uses one free report');
+  ok(Object.keys(C.creditDecision({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true })).join() === 'uses_report,reason,rule_version',
+    '11l the decision carries only whether, why and which rule');
+}
+
+// ---- 12: the official date of a record, of any age (audit 2026-10-07, finding 2) ----------------------------------------------------------
+{
+  const T = '2026-10-07', rd = (kind, day) => M.recordDate({ date_kind: kind, submitted_at: day }, T);
+  const a = rd('filed', '2016-03-04');
+  ok(a && a.kind === 'filed' && a.label === 'Filed' && a.date === '2016-03-04' && a.older_than_a_year === true, '12a an old filing keeps its date and kind and is flagged as more than a year old', a);
+  const b = rd('issued', '2026-09-20');
+  ok(b && b.label === 'Issued' && b.older_than_a_year === false, '12b a recent date is not flagged', b);
+  ok(rd('filed', '2025-10-07').older_than_a_year === false && rd('filed', '2025-10-06').older_than_a_year === true, '12c exactly 365 days old is not old; 366 is (the boundary is in whole days)');
+  ok(rd('filed', '1900-01-01') === null && rd('filed', '1969-12-31') === null && rd('filed', '1989-12-31') === null && rd('filed', '1990-01-01') !== null, '12d the epoch sentinels the column carries are never shown as a filing date; 1990-01-01 is the first real one');
+  ok(rd('filed', '2026-10-08') === null && rd('filed', '9999-09-09') === null && rd('filed', '2099-02-12') === null, '12e a date in the future is not a filing date');
+  ok(rd('scheduled', '2026-09-01') === null && rd('estimated', '2026-09-01') === null && rd('', '2026-09-01') === null && rd(null, '2026-09-01') === null, '12f a plan (scheduled, estimated) or an unknown kind is not an official record date');
+  ok(rd('filed', null) === null && rd('filed', 'not a day') === null && rd('filed', '2026-02-30') === null, '12g no date, an unparseable one, or an impossible one gives nothing');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);

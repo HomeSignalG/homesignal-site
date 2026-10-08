@@ -28,12 +28,14 @@ const WF_PATH = '.github/workflows/dev-change-baseline-suite.yml';
 const WF = existsSync(join(ROOT, WF_PATH)) ? read(WF_PATH) : '';
 
 const TICK = (SQL.match(/create or replace function public\.dev_change_tick\([\s\S]*?\$fn\$;/) || [''])[0];
-const VIEW = (SQL.match(/create or replace view public\.dev_change_source_health[\s\S]*?;\n/) || [''])[0];
+const WIDE = (SQL.match(/create or replace view public\.dev_change_source_health[\s\S]*?;\n/) || [''])[0];
+const NARROW = (SQL.match(/create or replace view public\.dev_change_source_fetch_health[\s\S]*?;\n/) || [''])[0];
+const VIEW = NARROW + WIDE;   // the source evidence is two views; every scan over "the view" reads both
 
 // ── 0. everything under test is located (positive control for every scan below) ───────────────
 ok(SQL.length > 4000 && SUITE.length > 8000 && MUT.length > 3000 && RUN.length > 800 && FIXTURE.length > 400 && LEDGER.length > 4000,
   '0: the SQL of record, the Order C ledger it builds on, the suite, mutations, harness and fixture are all located and non-empty');
-ok(TICK.length > 2500 && VIEW.length > 800, '0b: the driver function and the source-health view are both found', TICK.length + '/' + VIEW.length);
+ok(TICK.length > 2500 && NARROW.length > 500 && WIDE.length > 800, '0b: the driver function and BOTH source-evidence views are found', TICK.length + '/' + NARROW.length + '/' + WIDE.length);
 
 // ── 1. it builds on Order C and adds no second writer ──────────────────────────────────────────────
 ok(/to_regprocedure\('public\.dev_change_observe_zip\(text, uuid\)'\) is null/.test(SQL) && /Order C/.test(RAW.split('-- ---- 1.')[0]),
@@ -105,6 +107,16 @@ ok(/where f\.kind in \('fetch_failed', 'truncated', 'retired'\)/.test(VIEW) && !
   '8: the view reads only the failure kinds that belong to a source, never the whole-report fire kinds');
 ok(/from public\.dev_refresh_source_failures f/.test(VIEW) && !/create table[^;]*failure/i.test(SQL),
   '8b: source failure evidence is READ from the refresh\'s own record; no second failure table is created');
+ok(/from public\.dev_refresh_source_failures f/.test(NARROW) && !/dev_change_project/.test(NARROW) && /dev_change_project/.test(WIDE),
+  '8c: the failure evidence is its OWN view and never reads the ledger (control: the wide view does) — a reader that needs only "was this source read" must not pay for ledger coverage, which at 933,013 projects measured 6.1-10.6 s against PostgREST\'s 8 s');
+ok(/full join public\.dev_change_source_fetch_health f on f\.registry_id = l\.registry_id/.test(WIDE)
+   && !/interval '24 hours'|interval '14 days'|dev_refresh_source_failures|'fetch_failed'|'truncated'/.test(WIDE)
+   && /interval '24 hours'/.test(NARROW),
+  '8d: the wide view is built FROM the narrow one and restates no failure window or kind — the failure semantics are defined exactly once');
+ok(/revoke all on public\.dev_change_source_fetch_health from public, anon, authenticated, service_role;/.test(SQL)
+   && /grant select on public\.dev_change_source_fetch_health to service_role;/.test(SQL)
+   && /create or replace view public\.dev_change_source_fetch_health with \(security_invoker = true\)/.test(SQL),
+  '8e: the narrow view is system-only (revoked from everyone, service_role select only) and security-invoker, like the wide one');
 
 // ── 5. lock-down ──────────────────────────────────────────────────────────────────────────────────────────────────
 ok(/enable row level security/.test(SQL) && /revoke all on public\.dev_change_zip_cursor from public, anon, authenticated, service_role;/.test(SQL)
@@ -121,9 +133,9 @@ ok(/fillfactor = 80/.test(SQL), '9f: the ledger project table is given room for 
 
 // ── 6. rollback names everything created ─────────────────────────────────────────────────────────────────────────
 const rollback = RAW.slice(RAW.lastIndexOf('-- ROLLBACK'));
-ok(['public.dev_change_source_health', 'public.dev_change_tick(uuid, integer, integer, bigint, bigint, integer)', 'public.dev_change_zip_cursor', 'reset (fillfactor)']
+ok(['public.dev_change_source_health', 'public.dev_change_source_fetch_health', 'public.dev_change_tick(uuid, integer, integer, bigint, bigint, integer)', 'public.dev_change_zip_cursor', 'reset (fillfactor)']
      .every((s) => rollback.includes(s)),
-  '10: the ROLLBACK block names the view, the driver, the cursor and the storage parameter');
+  '10: the ROLLBACK block names both views, the driver, the cursor and the storage parameter');
 
 // ── 7. the suite, its mutations and its workflow are real and wired ────────────────────────────────────────────────────
 const checks = (SUITE.match(/pg_temp\._ck\(\s*'D\d+/g) || []).length;

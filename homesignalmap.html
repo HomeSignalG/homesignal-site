@@ -34,13 +34,17 @@
 <script>
 (function(){
   try {
-    if (new URL(window.location.href).searchParams.get("embed") === "1") {
+    var q = new URL(window.location.href).searchParams;
+    if (q.get("embed") === "1") {
       document.documentElement.classList.add("hs-embed");
+      // PREVIEW (?embed=1&preview=1) — the homepage's sample map. Layout only: see the
+      // .hs-embed.hs-preview rules below. Never set without embed=1.
+      if (q.get("preview") === "1") document.documentElement.classList.add("hs-preview");
     }
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="app.css?v=20814d85"/>
+<link rel="stylesheet" href="app.css?v=031bef8e"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -608,17 +612,33 @@
   .hs-embed .maprow{flex:0 1 auto;min-height:0;max-height:45dvh;overflow-y:auto}
   .hs-embed .map-frame{flex:1 1 auto;height:auto;min-height:160px}
 
-/* Map 1 -> Development list back link: ZIP pages only. */
-.devlist-back{display:none}body.zipmode .devlist-back{display:inline-flex}
+  /* ===================== PREVIEW (?embed=1&preview=1) ===================== */
+  /* The homepage's sample map (founder, Revised Index Design, 2026-09-30). The fixed-frame
+     rules above fit the card INTO the host's iframe height; the preview turns that around:
+     the document is as tall as its content, so STATUS / PROJECT TYPE / REGULATORY RECORDS and
+     the map key all show with no internal scrollbar, and the host sizes the iframe to this
+     document's scrollHeight. The map canvas has a fixed height: --hs-preview-map-h, which the
+     host sets by its own breakpoint (430px / 400px / 340px), default 430px.
+     LAYOUT ONLY. No control is hidden, renamed, restyled or re-created; no data, marker or
+     filter rule changes. Every rule is scoped to .hs-embed.hs-preview, so full-page Map 1 and
+     every other embed are unchanged. */
+  .hs-embed.hs-preview,
+  .hs-embed.hs-preview body{height:auto;min-height:0;overflow:hidden}
+  .hs-embed.hs-preview .app{min-height:0}
+  .hs-embed.hs-preview .card.mapcard{display:block;height:auto}
+  .hs-embed.hs-preview .maprow{max-height:none;overflow:visible}
+  .hs-embed.hs-preview .map-frame{height:var(--hs-preview-map-h,430px);min-height:0}
+
 </style>
 </head>
 <!-- data-nav is this page's NAVIGATION IDENTITY: shell.js lights the one sidebar link
-     whose data-nav matches it. This page is MAPS. It read "dev" from the days when the
-     sidebar's Maps entry pointed at the now-retired maps.html (which owned "maps"), so
-     after that retirement the primary map told every visitor they were in Development &
-     Impact and the Maps item could never light up anywhere. Founder-observed live.
-     Contract asserted by test/nav-identity.test.mjs. -->
-<body data-nav="dev">
+     whose data-nav matches it. Map 1 belongs to EXPLORE (founder navigation plan v3,
+     2026-09-30): it is a contextual Explore tool with no primary item of its own, reached
+     from the "View Development Map" links on the public ZIP page and development.html, and
+     from how-it-works.html. It is still in ZIP_NAV_PAGES and MAP_PAGES. Before v3 it
+     declared "dev" (A-021), and before that a retired "maps" entry. Contract asserted by
+     test/nav-identity.test.mjs. -->
+<body data-nav="explore" data-explore="map">
 <!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
      share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
      the shell owns them now. Page content lives in the <template> below; shell.js moves it into
@@ -626,7 +646,6 @@
 <template id="hs-content">
   <div class="wrap">
     <div class="head">
-      <a class="backbtn devlist-back" href="development.html" data-znav="development.html" style="text-decoration:none">← Back to What's being built — and how it impacts you</a>
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
       <h1>Development around your home</h1>
       <div class="sub">Enter a Box Elder County address to see what's built and what's proposed nearby —
@@ -883,16 +902,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="lib/data.js"></script>
 <script src="lib/topic-prefs.js"></script>
-<script src="lib/templates.js?v=ec3b1cb1"></script>
-<script src="lib/project-type.js?v=6ad8270c"></script>
+<script src="lib/templates.js?v=49ae3c36"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/map.js?v=f98598d2"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
-<script src="lib/zip-authoritative.js?v=20260922a"></script>
+<script src="lib/zip-authoritative.js?v=20261002a"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=f7ec5a9a"></script>
+<script src="shell.js?v=3316971d"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1683,13 +1702,20 @@ HS.onReady(function(){
       sigs.sort(function(a,b){ return ENV_TONE_RANK[a.tone]-ENV_TONE_RANK[b.tone]; });
       out = out.concat(sigs);
     }
-    // Baseline for any EPA facility (keyed on the FRS id) that produced no stronger signal — so the
-    // ECHO affordance never disappears, including on cache rows written before the env layer (they
-    // have no s.env; fall back to the legacy s.viol count).
+    // Baseline: a clean EPA record is a positive fact ONLY while compliance tracking is
+    // on — the same rule as HS.fac.signals. An FRS id alone is not a clean record: ECHO
+    // failed, ECHO matched nothing, CWA-only, and tracking-off used to print this line
+    // and made Map 1 disagree with the ZIP page (audit 2026-09-27: 199,409 stored sites).
     if(frsRid(s) && !out.length){
       var lv = s.viol||0;
-      out.push(lv>0 ? { text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" }
-                    : { text:"no recorded EPA violations", tone:"ok" });
+      if(lv>0){
+        out.push({ text: lv+" recorded violation"+(lv===1?"":"s"), tone:"alert" });
+      } else {
+        var interp = (typeof HS!=="undefined" && HS.fac) ? HS.fac.interpret({epa:epa}) : null;
+        if(interp && interp.tracking===true){
+          out.push({ text:"no recorded EPA violations (compliance tracking on)", tone:"ok" });
+        }
+      }
     }
     return out;
   }
@@ -2076,7 +2102,7 @@ HS.onReady(function(){
     // directly above results that say "Showing development within 2 miles of". A resident
     // reads top-down, so the biggest, first thing on the page was still making the
     // whole-ZIP claim over near-home results — measured on main, 2026-09-06: address mode
-    // rendered kicker "Development overview" / H1 "ZIP 78617".
+    // rendered kicker "Development map" / H1 "ZIP 78617".
     // loadZip() already restores all four for the ZIP view, so this is the missing half of
     // a switch that was only ever written in one direction.
     var _ebA = $("eyebrow"); if(_ebA) _ebA.textContent = "Address view";
@@ -2297,10 +2323,10 @@ HS.onReady(function(){
         // (indexability is driven by the stamped substance flag, not the state — see loadZip top)
         // Backbone standard: pair the most-specific place name with the ZIP — "Ogden (84401)".
         // The "Town Name (ZIP)" is the H1 (parity with the alerts page's comm-title) so a
-        // resident sees at a glance they're on the right ZIP page; "Development overview" is
+        // resident sees at a glance they're on the right ZIP page; "Development map" is
         // the small kicker above it.
         var label = zipPlaceLabel(rows, zip);
-        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development overview";
+        var _eb = $("eyebrow"); if(_eb) _eb.textContent = "Development map";
         var _h1 = document.querySelector(".head h1"); if(_h1) _h1.textContent = label;
         document.title = "Development around " + label + " — HomeSignal";
         // One canvas, two scopes - say so, in six words, rather than letting the caption
@@ -2317,7 +2343,7 @@ HS.onReady(function(){
     // Provisional first paint (the async fetch above upgrades "ZIP 84302" to "Brigham City
     // (84302)" once the community name resolves). H1 = the ZIP/place label, matching the
     // alerts page comm-title, so the resident immediately sees which ZIP page they're on.
-    $("eyebrow").textContent = "Development overview";
+    $("eyebrow").textContent = "Development map";
     var _h1z = document.querySelector(".head h1"); if(_h1z) _h1z.textContent = "ZIP " + zip;
     document.title = "Development around " + zip + " — HomeSignal";
     // ZIP mode: the page is about the whole ZIP, not a Box Elder address. Re-word the hero so a
@@ -5083,6 +5109,20 @@ HS.onReady(function(){
         // asked for a specific place must never be answered with a different one.
         status("This map needs a location.", true);
       }
+      return;
+    }
+    // HOMEPAGE HANDOFF (founder, 2026-10-04). index.html cannot put an address in a URL, and this
+    // page has no address route of its own, so the homepage leaves the typed text in this tab's
+    // sessionStorage and navigates here. It is read ONCE and removed before anything else runs,
+    // so a reload or Back never repeats the search. An explicit ?zip= / ?addr= in the URL wins.
+    var handed = "";
+    try {
+      handed = String(sessionStorage.getItem("hs.homeSearchAddress") || "").trim();
+      sessionStorage.removeItem("hs.homeSearchAddress");
+    } catch(_e) { handed = ""; }
+    if(handed && !u.searchParams.get("addr") && !u.searchParams.get("zip")){
+      $("addr").value = handed;
+      run(handed);
       return;
     }
     var a = u.searchParams.get("addr");

@@ -120,10 +120,94 @@ ok(allFiles.length > 50 && namesPrivate.includes('docs/report-private-context.sq
 // The ONE addition (2026-10-01, founder go for gate 5): the file that schedules the purge and watches it. It names the layer
 // because it must; test/report-private-context-purge-structure.test.mjs pins that it never names a private COLUMN, never
 // writes the layer, and never calls the per-context purge. Anything else naming the layer is still a consumer nobody designed.
-ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql'].includes(f)),
-  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the one addition is the file that schedules and watches the purge', namesPrivate.join(','));
-ok(!allFiles.some((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))),
-  '5d: nothing calls the function that returns the private values');
+// The SECOND addition (2026-10-01, the Follow / Changes Since Report function; contract §4: "a property Follow ... registers its own"
+// need, and §6 gate 4): the one file that calls the two need functions. It is the data layer of an internal admin function, and
+// 5c2 below pins that it names ONLY those two functions: never the table, never a column, never the read function (5d), never
+// the writer or the purge. Anything else naming the layer is still a consumer nobody designed.
+const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
+// The THIRD addition (2026-10-02): the follow-up that closes the audit log's identity counter, which production left usable by
+// anon and authenticated. It names the layer because it must (it finds the counter through the layer's tables); 5c3 below pins that
+// it names ONLY the event table and its own name, never a column, a function or the read path, and
+// test/report-private-context-sequence-lockdown-structure.test.mjs pins that it only ever REVOKES, from a computed lookup.
+const SEQ_LOCKDOWN = 'docs/report-private-context-sequence-lockdown.sql';
+// The FOURTH addition (2026-10-02, build step 5b): the report function's data layer. When a retried trial key returns the FIRST stored
+// report (docs/evaluation-entitlement.sql D-L6: the key is bound to the evaluation, never to the address), it must know whether that
+// report is about the same property before showing it. It calls the read function ONCE and compares the address inside one function;
+// only 'match' / 'mismatch' / 'unknown' leaves it (5c4, 5d). It never names the table, a column outside that comparison, the writer
+// or the purge.
+const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
+// The FIFTH addition (2026-10-03, build step 8): the ONE reader of a stored report's address and client label, _shared/private-subject.ts. Build
+// steps 6 and 7 had that read inside the report function's data layer; step 8 lets the holder of a client share link see the street address too
+// (founder, 2026-10-03), and a second copy of "only while the layer still keeps it" in the public function would be a second way to decide that
+// fact. So the read moved to one shared file with two windows: subjectOf (address and label, for a member of the brokerage) and addressOf
+// (the address alone, for the holder of a link). 5c5 and 5d pin it.
+const PRIVATE_SUBJECT = 'supabase/functions/_shared/private-subject.ts';
+// The SIXTH addition (2026-10-03, build step 9): the Watch. Its SQL (docs/property-watch.sql) asks the layer to KEEP a watched property (need_open) and to let go
+// of it (need_close, from the trigger that runs on every removal of a watch) and reads the need table once, in its audit; it never asks for a value. The ONE reader
+// above gains a third window, pointOf, for the daily job alone: the property's point, and nothing else. 5c6 pins the SQL; 5c5 pins the three windows.
+const WATCH_SQL = 'docs/property-watch.sql';
+ok(namesPrivate.every((f) => ['docs/report-private-context.sql', 'docs/report-snapshot.sql', 'docs/report-private-context-purge-schedule.sql', FOLLOW_DATA, SEQ_LOCKDOWN, REPORT_DATA, PRIVATE_SUBJECT, WATCH_SQL].includes(f)),
+  '5c: nothing else in the repository names the private layer — no page, script, function or consumer reads or writes it yet (Orders J and L design who may); the additions are the file that schedules and watches the purge, the Follow function\'s data layer, the file that closes the audit log\'s counter, the report function\'s replay check, and the one shared reader of a stored report\'s address, label and (for the daily Watch) point, and the Watch SQL, which only asks the layer to keep and release a property', namesPrivate.join(','));
+{
+  const names = [...new Set([...code(SEQ_LOCKDOWN).matchAll(/report_private_context\w*/g)].map((m) => m[0]))].sort();
+  ok(namesPrivate.includes(SEQ_LOCKDOWN) && names.length > 0
+     && names.every((x) => ['report_private_context', 'report_private_context_event', 'report_private_context_sequence_lockdown'].includes(x)),
+    '5c3: the counter lock-down names the private layer only as its event table, the layer\'s own name and its own prefix (control: it does name them; never a column, a function or the read path)', names.join(','));
+}
+{
+  const names = [...code(FOLLOW_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1').matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  ok(namesPrivate.includes(FOLLOW_DATA) && names.length === 2 && names.every((x) => x === 'report_private_context_need_open' || x === 'report_private_context_need_close'),
+    '5c2: the Follow function\'s data layer names the private layer only as report_private_context_need_open and report_private_context_need_close (control: it does name them; and nothing else, in code)', names);
+}
+{
+  const t = code(REPORT_DATA).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  const fn = (t.match(/async contextMatches\(contextId, address\) \{[\s\S]*?\n    \},/) || [''])[0];
+  // build step 8: the report function's data layer no longer reads a stored report's address itself; it hands that to the one shared reader (5c5).
+  // What stays here is the replay check: contextMatches returns only 'match' / 'mismatch' / 'unknown' and reads no column but the address it compares.
+  ok(namesPrivate.includes(REPORT_DATA) && JSON.stringify(names) === '["report_private_context_read"]' && fn.includes('report_private_context_read')
+     && /subjectOf: \(contextId\) => subjects\.subjectOf\(contextId, LABEL_MAX\),/.test(t) && /const subjects = makePrivateSubjectReads\(rpc\);/.test(t)
+     && [...fn.matchAll(/return ([^;]+);/g)].map((m) => m[1]).every((r) => /^'unknown'$|^norm\(c\.address\) === norm\(address\) \? 'match' : 'mismatch'$/.test(r))
+     && !/c\.(normalized_address|latitude|longitude|label|property_keys|purge)/.test(t),
+    '5c4: the report function\'s data layer names the private layer once, the read function, inside contextMatches (which returns only \'match\' / \'mismatch\' / \'unknown\' and reads no column but the address it compares); a stored report\'s address and label are asked of the shared reader, and no private column is named here (control: it does name it)', names);
+}
+{
+  const t = code(PRIVATE_SUBJECT).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const names = [...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]);
+  const subj = (t.match(/async subjectOf\(contextId: string \| null, labelMax: number\)[^{]*\{[\s\S]*?\n    \},/) || [''])[0];
+  const addr = (t.match(/async addressOf\(contextId: string \| null\)[^{]*\{[\s\S]*?\n    \},/) || [''])[0];
+  // the ONE reader, with two windows. subjectOf (for a member of the brokerage) returns the address and the cleaned label; addressOf (for the holder
+  // of a client share link) returns the address as a bare string, and its text cannot reach the label. Both read only while the layer holds the
+  // context ('active'); a failed or oddly shaped read is a fault, never "no address".
+  // build step 9: a THIRD window, pointOf, for the daily Watch job. It is a separate read of the same function (so the two display windows can
+  // never hand back a coordinate by accident), which is why the function is now named twice here: once inside activeContext (the display windows) and
+  // once inside pointOf. The point columns appear in pointOf and NOWHERE else; pointOf names no address and no label, so it cannot return one.
+  const cut = t.indexOf('async pointOf(');
+  const display = cut > 0 ? t.slice(0, cut) : '';
+  const point = cut > 0 ? t.slice(cut) : '';
+  ok(namesPrivate.includes(PRIVATE_SUBJECT) && names.length === 2 && names.every((x) => x === 'report_private_context_read')
+     && (display.match(/report_private_context_read/g) || []).length === 1 && (point.match(/report_private_context_read/g) || []).length === 1
+     && /if \(!c \|\| c\.state !== 'active'\) return null;/.test(display) && /if \(!contextId\) return null;/.test(display) && /if \(error \|\| !Array\.isArray\(data\)\) throw new DataUnavailable\('private context'\);/.test(display)
+     && subj.length > 100 && /label: cleanDisplayName\(c\.label, labelMax\)/.test(subj)
+     && addr.length > 60 && !/label/i.test(addr) && /return c \? addressText\(c\.address\) : null;/.test(addr)
+     && (t.match(/c\.label/g) || []).length === 2 && /return \{ address: c\.address, label: c\.label \};/.test(display)
+     && !/c\.(normalized_address|latitude|longitude|property_keys|purge)/.test(display)
+     && point.length > 200 && /if \(!c \|\| c\.state !== 'active'\) return null;/.test(point) && /return \{ lat, lng \};/.test(point)
+     && !/address|label|normalized|property_keys|purge/i.test(point.replace(/DataUnavailable\('private context'\)/g, '')),
+    '5c5: the shared reader calls the read function once per window kind, only for a context the layer still holds (state \'active\'): subjectOf returns the address and the cleaned label, addressOf returns the address alone and its text never names the label, pointOf returns the point alone and names no address or label, and the point columns are read nowhere else (control: it does name the function, twice)', names);
+}
+{
+  // build step 9: the Watch SQL asks the layer to KEEP a watched property and to LET GO of it, and reads the need table once (its audit). It never reads a value:
+  // not the read function, not the private table, not a column of either. Comments are stripped first (the file's header names the layer in prose).
+  const t = code(WATCH_SQL).replace(/--[^\n]*/g, '');
+  const names = [...new Set([...t.matchAll(/report_private_context\w*/g)].map((m) => m[0]))].sort();
+  ok(namesPrivate.includes(WATCH_SQL) && JSON.stringify(names) === '["report_private_context_need","report_private_context_need_close","report_private_context_need_open"]'
+     && !/report_private_context_(read|create|purge|retention)/.test(t) && !/from public\.report_private_context\s/.test(t)
+     && (t.match(/public\.report_private_context_need n\b/g) || []).length === 1 && /select 1 from public\.report_private_context_need n/.test(t),
+    '5c6: the Watch SQL names the private layer only as need_open, need_close and the need table (read once, in its audit, as an existence test); never the read function, the private table, or a value (control: it does name all three)', names.join(','));
+}
+ok(allFiles.filter((f) => f !== 'docs/report-private-context.sql' && /report_private_context_read/.test(code(f))).sort().join() === [PRIVATE_SUBJECT, REPORT_DATA].sort().join(),
+  '5d: two FILES call the function that returns the private values: the report function\'s data layer, for the replay check (compares, returns no value), and the one shared reader of a stored report\'s own address and label (build steps 6, 7 and 8)');
 ok(!/cron\./i.test(SQL) && !/pg_cron/i.test(SQL) && !/net\.http/i.test(SQL),
   '5e: THIS file arms no schedule and makes no network call — the purge batch is scheduled only by docs/report-private-context-purge-schedule.sql, a separate file with its own go and its own proof');
 

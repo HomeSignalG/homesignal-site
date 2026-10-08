@@ -83,11 +83,75 @@ const codeOf = (f) => { const t = readFileSync(join(ROOT, f), 'utf8'); return f.
 const namesTable = scanned.filter((f) => /\breport_snapshot\b/.test(codeOf(f)));
 ok(scanned.length > 50 && namesTable.includes('docs/report-snapshot.sql'),
   '3-control: the scan covers the code directories, the root files and every docs SQL, and finds the SQL of record', scanned.length + ' files');
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql'),
-  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader', namesTable.join(','));
+// The one reviewed reader (2026-10-01, Follow / Changes Since Report; contract §8.5): the data layer of an internal admin function.
+// 3b pins that it can only SELECT the columns it needs and names the table nowhere else in code.
+const FOLLOW_DATA = 'supabase/functions/follow-development-report/data.ts';
+// The one reference (2026-10-02, Order J unit J1): the share-link SQL. It stores a POINTER to a stored report (a foreign key on
+// report_id) and never reads one; 3d pins that it names the table nowhere but in that foreign key. Anything else naming the
+// table is still a consumer nobody designed.
+const SHARE_SQL = 'docs/report-share.sql';
+// Order L1 (docs/evaluation-entitlement.sql, parked and unapplied): the credit ledger REFERENCES this table (a foreign key, so a credit always links a
+// stored report) and the replay branch of its issue function reads one stored report back by id. It never writes the table: the only writer it calls is
+// report_snapshot_issue. test/evaluation-entitlement-structure.test.mjs pins that.
+const EVALUATION_SQL = 'docs/evaluation-entitlement.sql';
+// Build step 5b: the report function reads back ONE stored body by id, when a retried trial key returns the first report (3e).
+const REPORT_DATA = 'supabase/functions/get-development-activity-report/data.ts';
+// Build step 6: the two READ-ONLY saved-report functions join the ledger to this table to list a brokerage's reports and to open one by id.
+// They write nothing (STABLE, no DML), which test/saved-reports-structure.test.mjs pins.
+const SAVED_SQL = 'docs/saved-reports.sql';
+// Build step 8: the share-delivery SQL's client read (report_share_open) joins a share link's report id to this table to hand back the stored text
+// of a link that is usable, and nothing else. One STABLE read-only function; 3f pins that it names the table once and never writes or grants it.
+const DELIVERY_SQL = 'docs/report-share-delivery.sql';
+// Build step 9: docs/property-watch.sql joins this table in three read-only places to find a watched report's private-context handle and issue time: the closing
+// trigger, the agent's list and the audit. It writes nothing here (every DML statement of that file targets its own two property_watch tables).
+const WATCH_SQL = 'docs/property-watch.sql';
+const watchSrc = codeOf(WATCH_SQL);
+// Build step 11: docs/brokerage-billing.sql names the table four times and never writes it: its precondition, the paid ledger's foreign key (a paid credit row
+// points at ONE stored report), the replay read that returns a retried key's stored report, and the invariant that counts a paid credit with no stored report.
+// Every write of a report is the snapshot writer, which billing_paid_issue calls (3c).
+const BILLING_SQL = 'docs/brokerage-billing.sql';
+const billingSrc = codeOf(BILLING_SQL);
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL)
+   && namesTable.includes(BILLING_SQL) && (billingSrc.match(/\breport_snapshot\b/g) || []).length === 4 && (billingSrc.match(/references public\.report_snapshot \(report_id\)/g) || []).length === 1 && (billingSrc.match(/from public\.report_snapshot s\b/g) || []).length === 2
+   && /to_regclass\('public\.report_snapshot'\)/.test(billingSrc) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(billingSrc) && !/grant[^;]*report_snapshot\b(?!_issue)/i.test(billingSrc)
+   && (watchSrc.match(/\breport_snapshot\b/g) || []).length === 5 && /references public\.report_snapshot \(report_id\)/.test(watchSrc) && (watchSrc.match(/(?:from|join) public\.report_snapshot s\b/g) || []).length === 3 && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(watchSrc) && !/grant[^;]*report_snapshot/i.test(watchSrc),
+  '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read; and, from build step 8, the share-delivery client read, 3f; and from build step 9 three read-only joins in the property-watch SQL, and from build step 11 four references in the billing SQL: its precondition, one foreign key and two read-only checks)', namesTable.join(','));
+{
+  const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
+  ok(namesTable.includes(REPORT_DATA) && JSON.stringify(uses) === JSON.stringify(['report_snapshot?select=body&report_id=eq.']) && !/method: '(PUT|PATCH|DELETE)'/.test(t),
+    '3e: the report function names the table once, to read ONE stored body by id (a retried trial key), and has no write verb (control: it does name it)', uses);
+}
+{
+  const t = codeOf(DELIVERY_SQL).replace(/'(?:[^']|'')*'/g, "''");
+  const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
+  const open = (t.match(/create or replace function public\.report_share_open\([\s\S]*?\$\$;/) || [''])[0];
+  ok(namesTable.includes(DELIVERY_SQL) && uses.length === 1 && /join public\.report_snapshot s on s\.report_id = r\.report_id/.test(open) && /language sql stable security definer/.test(open)
+    && !/\b(insert|update|delete|truncate|grant|alter|drop)\b[^;]*\breport_snapshot\b/i.test(t),
+    '3f: the share-delivery SQL names the table exactly once, as a JOIN inside the STABLE client read report_share_open, and never inserts, updates, deletes, truncates, grants, alters or drops it (control: it does name it)', uses);
+}
+{
+  const t = codeOf(SHARE_SQL).replace(/'(?:[^']|'')*'/g, "''");
+  const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
+  ok(namesTable.includes(SHARE_SQL) && uses.length === 1 && uses[0] === 'report_snapshot (report_id)' && /references public\.report_snapshot \(report_id\)/.test(t)
+    && !/\b(select|insert|update|delete|truncate|grant)\b[^;]*\breport_snapshot\b/i.test(t),
+    '3d: the share SQL names the table exactly once, as the foreign key "references public.report_snapshot (report_id)", and never selects, inserts, updates, deletes, truncates or grants it (control: it does name it)', uses);
+}
+{
+  const t = readFileSync(join(ROOT, FOLLOW_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
+  // two SELECTs, one per kind of request: `changes` reads the body and identity and never the private-context handle;
+  // follow / unfollow read only the handle and never the body. Neither selects an engine input or any private column.
+  ok(namesTable.includes(FOLLOW_DATA) && uses.length === 2
+    && uses.includes('report_snapshot?select=report_id,content_hash,report_version,generated_at,body&report_id=eq.')
+    && uses.includes('report_snapshot?select=private_context_id&report_id=eq.')
+    && !/method: '(PUT|PATCH|DELETE)'/.test(t),
+    '3b: the one reader names the table twice, in two SELECTs for one report each (the body and identity; the context handle alone), and has no write verb (control: it does name it)', uses);
+}
 const callsWriter = scanned.filter((f) => /report_snapshot_issue/.test(readFileSync(join(ROOT, f), 'utf8')));
-ok(callsWriter.every((f) => ['docs/report-snapshot.sql', 'supabase/functions/_shared/report-snapshot.ts'].includes(f)),
-  '3b: the writer is called from one place only, the shared module', callsWriter.join(','));
+ok(callsWriter.every((f) => ['docs/report-snapshot.sql', 'supabase/functions/_shared/report-snapshot.ts', EVALUATION_SQL, BILLING_SQL].includes(f)) && callsWriter.includes(BILLING_SQL)
+   && (billingSrc.match(/report_snapshot_issue\(/g) || []).length === 2 && /select s\.\* into v_snap from public\.report_snapshot_issue\(p_body, p_content_hash, p_report_version, p_engine_inputs, p_private\) s;/.test(billingSrc),
+  '3c: the writer is called from the shared module and, inside ONE transaction with its ledger row, from the evaluation entitlement\'s issue function (docs/evaluation-entitlement.sql, the free credit) and from the paid allotment\'s one issuing helper (docs/brokerage-billing.sql, build step 11, the paid credit; called once, straight through); nowhere else', callsWriter.join(','));
 
 // ── 4. one place mints a report identity; the two legacy fingerprint sites are named, not extended ─────
 const assigners = scanned.filter((f) => !f.startsWith('test/') && /\b(draft|report|out|result)\.report_id\s*=[^=]/.test(readFileSync(join(ROOT, f), 'utf8')));

@@ -19,3 +19,48 @@ verify_jwt = true
 # Not in the deploy workflow's --no-verify-jwt exception.
 [functions.get-development-activity-report]
 verify_jwt = true
+
+# Changes Since Report and Follow for a stored Development Activity report. JWT stays ON, and the handler additionally requires a
+# signed-in, allow-listed user (the same shared gate as the national report). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.follow-development-report]
+verify_jwt = true
+
+# Joining a brokerage's Development Activity trial, and reading one's own trial (build step 5c). JWT stays ON, and the handler
+# additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.development-activity-trial]
+verify_jwt = true
+
+# A brokerage's agent makes, lists and withdraws the private client links to its own stored reports (build step 8). JWT stays ON, and the
+# handler additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-shared-report]
+verify_jwt = true
+
+# What a CLIENT who holds a share link may read (build step 8). The ONE Development Activity function with JWT verification OFF: the client has
+# no account, and the link's secret token is the only credential. The deploy workflow's second --no-verify-jwt exception (the first is
+# get-address-report). It answers only a token the database says is usable, reads one stored report and writes nothing.
+[functions.view-shared-report]
+verify_jwt = false
+
+# A brokerage's agent starts, lists and stops watching the property of one of its own stored reports (build step 9). JWT stays ON, and the
+# handler additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-property-watch]
+verify_jwt = true
+
+# The daily check of every watched property (build step 9). Called only by the database's scheduler (pg_cron through pg_net), never by a person
+# or a page. JWT stays ON (the scheduler sends the project's public key, which the gateway accepts) and the handler then requires the project's
+# private SIGNUP_HOOK_SECRET in x-signup-secret, refusing every request when none is configured: the gateway alone is not the gate. Not in the
+# deploy workflow's --no-verify-jwt exception.
+[functions.run-property-watch]
+verify_jwt = true
+
+# A brokerage member reads their plan, and a brokerage OWNER starts the $79 a month checkout (build step 11). JWT stays ON, and the handler
+# additionally requires a real signed-in user (the anon key passes the gateway). Not in the deploy workflow's --no-verify-jwt exception.
+[functions.manage-billing]
+verify_jwt = true
+
+# The payment processor's signed subscription events (build step 11). The SECOND Development Activity function with JWT verification OFF, and
+# the deploy workflow's third --no-verify-jwt exception: the processor sends no Supabase token, so its HMAC signature over the raw body is the
+# only credential, checked before the body is parsed. The function refuses every request when its signing secret is not configured. It records
+# an event for the brokerage a HomeSignal checkout named (public.billing_event_apply) and writes nothing else.
+[functions.development-activity-billing-webhook]
+verify_jwt = false

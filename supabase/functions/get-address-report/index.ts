@@ -64,11 +64,19 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { frsFacilities } from "./sources/epa-frs.ts";
+import {
+  echoEnrich,
+  cwaPermitEnrich,
+  enrichRadiusMi,
+  storedEpaByRegistryId,
+  preserveStoredEnv,
+  type EchoCallOutcome,
+} from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
-import { productionLadder, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
+import { GeocodeTransportError, isGeocodeTransportError, pickCensusMatch, productionLadder, resolveGeocode, supabaseStore } from "./geocode-cache.ts";
 import { canonicalAddr } from "./canonical-addr.ts";
 import { socrataForZip, type SocrataCommunityRow, type SocrataRegistryEntry } from "./sources/socrata.ts";
 import { readAllRows } from "./sources/pg-pages.ts";
@@ -207,12 +215,24 @@ function toEN(homeLat: number, homeLng: number, lat: number, lng: number): [numb
 }
 async function geocode(address: string): Promise<[number, number, string]> {
   const q = new URLSearchParams({ address, benchmark: "Public_AR_Current", format: "json" });
-  const r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
-  const data = await r.json();
+  let r: Response;
+  try {
+    r = await fetch(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${q}`, { signal: AbortSignal.timeout(15000) });
+  } catch (e) {
+    throw new GeocodeTransportError(e instanceof Error ? e.message : "census fetch failed");
+  }
+  if (!r.ok) throw new GeocodeTransportError(`census HTTP ${r.status}`, r.status);
+  let data: { result?: { addressMatches?: { coordinates?: { x?: unknown; y?: unknown }; matchedAddress?: string; addressComponents?: { zip?: string } }[] } };
+  try {
+    data = await r.json();
+  } catch {
+    throw new GeocodeTransportError("census response was not JSON");
+  }
   const matches = data?.result?.addressMatches ?? [];
   if (!matches.length) throw new Error(`No geocoder match for: ${address}`);
-  const c = matches[0].coordinates;
-  return [Number(c.y), Number(c.x), matches[0].matchedAddress ?? address];
+  const m = pickCensusMatch(matches, address) ?? matches[0];
+  const c = m.coordinates;
+  return [Number(c?.y), Number(c?.x), m.matchedAddress ?? address];
 }
 async function devSites(supabase: ReturnType<typeof createClient>, homeLat: number, homeLng: number, communityIds: string[]): Promise<Record<string, unknown>[]> {
   const sites: Record<string, unknown>[] = [];
@@ -319,7 +339,7 @@ type FacilityPlane = { sites: Record<string, unknown>[]; epa: Record<string, unk
 // never an answer of zero — the empty array plus `ok:false` is exactly the shape a 429 already
 // produces, which is why no downstream consumer needs to learn a new state.
 function facilitiesUnavailable(reason: "deadline" | "error"): FacilityPlane {
-  return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, kept: 0 } };
+  return { sites: [], epa: { ok: false, radius_used: null, reason, attempts: 0, raw_rows: 0, pre_cap: 0, kept: 0 } };
 }
 async function facilitySites(
   homeLat: number,
@@ -352,6 +372,9 @@ async function facilitySites(
     kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
   }
   kept.sort((a, b) => (a._d as number) - (b._d as number));
+  // `pre_cap` is the product-filtered count BEFORE MAX_FACILITIES. `kept` is after the cap.
+  // A ZIP sitting at exactly 40 cannot be told apart from a cap-hit without this number.
+  const preCap = kept.length;
   const sites = kept.slice(0, MAX_FACILITIES).map((f) => { delete f._d; return f; });
   return {
     sites,
@@ -364,6 +387,7 @@ async function facilitySites(
       reason: outcome.reason,
       attempts: outcome.attempts,
       raw_rows: rows.length,
+      pre_cap: preCap,
       kept: sites.length,
     },
   };
@@ -380,126 +404,49 @@ async function enrichViolations(supabase: ReturnType<typeof createClient>, fac: 
   } catch (_e) { /* best-effort */ }
 }
 
-// ── v19: ENVIRONMENTAL-RECORDS LAYER (EPA ECHO federal + TCEQ Central Registry state) ──────────
+// ── v19/v21/v25: ENVIRONMENTAL-RECORDS LAYER (EPA ECHO federal + TCEQ + call outcomes) ──
 // Cached, geo-matched enrichment (docs/source-registry.md). The two sources hang off the ids we
 // already carry — ECHO off the FRS registry_id (reuse frsRid), TCEQ off the RN — and stamp
 // s.env = { link_type:"geo_matched", epa?, tceq? }. The PAGE turns env into one plain-language
 // status line (all four render paths share that helper). Absent stays absent; nothing is invented.
+//
+// v25: echoEnrich / cwaPermitEnrich live in sources/echo-cwa.ts and RETURN an outcome
+// (`ok` / `reason` / `matched` / `QueryRows`). A whole-call failure is no longer stored as
+// "no data". When either call fails, last-known-good env.epa is copied back from
+// development_reports so a refresh cannot wipe a prior successful ECHO/CWA read.
+// TCEQ Central Registry (Texas state) still runs below, coverage-gated, and is unchanged.
 
-// Live EPA ECHO compliance enrichment. ONE get_facilities → get_qid pair per report (by
-// lat/lng/radius) returns every ECHO facility near the point WITH its interpreted compliance
-// summary, keyed on RegistryID — joined straight onto the FRS facilities we already placed
-// (ADDITIVE: FRS discovery is unchanged; this only annotates). This is the real-ECHO replacement
-// for the near-empty echo_violation_counts table. Fail-open: any hiccup leaves facilities
-// un-enriched, never blocking the page. Verified reachable + free (STEP 0, 2026-07-11).
-const ECHO_BASE = "https://echodata.epa.gov/echo";
-const ECHO_STATUTES: [string, string][] = [["CWA", "CWAComplianceStatus"], ["CAA", "CAAComplianceStatus"], ["RCRA", "RCRAComplianceStatus"], ["SDWA", "SDWAComplianceStatus"]];
-function echoParse(text: string): Record<string, any> { return JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")); }
-function echoYear(mdY?: string): string | null { const all = String(mdY ?? "").match(/\d{4}/g); return all && all.length ? all[all.length - 1] : null; }
-// One ECHO facility row → the interpreted env.epa fact block (absent stays absent).
-function interpretEcho(row: Record<string, string>): Record<string, unknown> {
-  const inViolation: string[] = [];
-  for (const [code, field] of ECHO_STATUTES) {
-    const v = String(row[field] ?? "");
-    if (/violation|significant|non.?compliance/i.test(v) && !/no violation|no data/i.test(v)) inViolation.push(code);
+async function loadStoredSites(
+  supabase: ReturnType<typeof createClient>,
+  zip: string | null,
+): Promise<unknown[]> {
+  if (!zip || !/^\d{5}$/.test(zip)) return [];
+  try {
+    const { data } = await supabase.from("development_reports").select("sites").eq("zip", zip).maybeSingle();
+    return Array.isArray(data?.sites) ? data.sites as unknown[] : [];
+  } catch (_e) {
+    return [];
   }
-  const epa: Record<string, unknown> = { in_violation: inViolation };
-  if (row.FacSNCFlg === "Y") epa.snc = true;
-  const qtrs = parseInt(row.FacQtrsWithNC ?? "", 10); if (Number.isFinite(qtrs) && qtrs > 0) epa.quarters_nc = qtrs;
-  const insp = parseInt(row.FacInspectionCount ?? "", 10); if (Number.isFinite(insp) && insp > 0) epa.inspections = insp;
-  const yr = echoYear(row.FacDateLastFormalAction); if (yr) epa.action_year = yr;
-  const pen = parseInt(row.FacPenaltyCount ?? "", 10); if (Number.isFinite(pen) && pen > 0) epa.penalty_count = pen;
-  epa.current_as_of = new Date().toISOString().slice(0, 10);
-  return epa;
-}
-async function echoEnrich(fac: Record<string, unknown>[], lat: number, lng: number, radiusMi: number): Promise<void> {
-  if (!fac.some((f) => String(f.registry_id ?? "").trim())) return;
-  try {
-    const q1 = new URLSearchParams({ output: "JSON", p_lat: lat.toFixed(6), p_long: lng.toFixed(6), p_radius: String(Math.min(radiusMi, MAX_RADIUS_MI)) });
-    const r1 = await fetch(`${ECHO_BASE}/echo_rest_services.get_facilities?${q1}`, { signal: AbortSignal.timeout(25000) });
-    if (!r1.ok) return;
-    const qid = echoParse(await r1.text())?.Results?.QueryID;
-    if (!qid) return;
-    const q2 = new URLSearchParams({ output: "JSON", qid: String(qid), responseset: "500" });
-    const r2 = await fetch(`${ECHO_BASE}/echo_rest_services.get_qid?${q2}`, { signal: AbortSignal.timeout(25000) });
-    if (!r2.ok) return;
-    const rows = (echoParse(await r2.text())?.Results?.Facilities ?? []) as Record<string, string>[];
-    const byId = new Map<string, Record<string, string>>();
-    for (const row of rows) { const id = String(row.RegistryID ?? "").trim(); if (id) byId.set(id, row); }
-    for (const f of fac) {
-      const row = byId.get(String(f.registry_id ?? "").trim());
-      if (!row) continue;
-      const epa = interpretEcho(row);
-      const env = (f.env ??= {}) as Record<string, unknown>;
-      env.link_type = "geo_matched"; env.epa = epa;
-      f.viol = (epa.in_violation as string[]).length;         // back-compat: viol == # open violations
-      if (row.FacStreet) f._fstreet = String(row.FacStreet);  // verified address for the TCEQ dedup key
-      if (row.FacZip) f._fzip = String(row.FacZip).slice(0, 5);
-    }
-  } catch (_e) { /* best-effort — never block the page */ }
 }
 
-// ── v21: ICIS-NPDES PERMIT STATUS (the "regulated facilities as entities" honest core) ─────────
-// The v19 ECHO pull reads only *ComplianceStatus fields; it never captured the NPDES permit
-// status (Effective / Admin Continued / Expired / Pending / Not Needed / Retired / Terminated),
-// so the page could not say WHY a facility's zeros are or aren't meaningful — a Terminated
-// permit's "0 violations" is an untracked permit, not a verified clean history. ONE
-// cwa_rest_services get_facilities → get_qid pair per report (same shape as echoEnrich),
-// qcolumns pinned to CWPName/SourceID/RegistryID/Statute/CWPPermitStatusDesc/CWPPermitTypeDesc
-// (ids 1,2,9,11,51,54 — column ids verified against cwa_rest_services.metadata 2026-07-17;
-// DALFEN FRS 110071346495 returns CWPPermitStatusDesc "Terminated" live). A facility can hold
-// several NPDES permits: ALL ride as env.epa.permits[] children; env.epa.permit_status is the
-// most-active one (precedence below) and env.epa.compliance_tracking_on derives from it —
-// tracking is ON only for Effective / Admin Continued / Expired (ECHO still counts Expired as
-// active). Verbatim statuses only; an unknown/blank status stamps NOTHING (absent stays absent,
-// the page renders "permit status not yet confirmed"). Additive + fail-open like echoEnrich.
-const CWA_QCOLUMNS = "1,2,9,11,51,54"; // CWPName,SourceID,RegistryID,Statute,CWPPermitStatusDesc,CWPPermitTypeDesc
-const PERMIT_STATUS_PRECEDENCE = ["Effective", "Admin Continued", "Administratively Continued", "Expired", "Pending", "Not Needed", "Retired", "Terminated"];
-const PERMIT_TRACKING_ON = new Set(["Effective", "Admin Continued", "Administratively Continued", "Expired"]);
-async function cwaPermitEnrich(fac: Record<string, unknown>[], lat: number, lng: number, radiusMi: number): Promise<void> {
-  if (!fac.some((f) => String(f.registry_id ?? "").trim())) return;
-  try {
-    const q1 = new URLSearchParams({ output: "JSON", p_lat: lat.toFixed(6), p_long: lng.toFixed(6), p_radius: String(Math.min(radiusMi, MAX_RADIUS_MI)) });
-    const r1 = await fetch(`${ECHO_BASE}/cwa_rest_services.get_facilities?${q1}`, { signal: AbortSignal.timeout(25000) });
-    if (!r1.ok) return;
-    const qid = echoParse(await r1.text())?.Results?.QueryID;
-    if (!qid) return;
-    const q2 = new URLSearchParams({ output: "JSON", qid: String(qid), qcolumns: CWA_QCOLUMNS, responseset: "500" });
-    const r2 = await fetch(`${ECHO_BASE}/cwa_rest_services.get_qid?${q2}`, { signal: AbortSignal.timeout(25000) });
-    if (!r2.ok) return;
-    const rows = (echoParse(await r2.text())?.Results?.Facilities ?? []) as Record<string, string>[];
-    const byId = new Map<string, Record<string, string>[]>();
-    for (const row of rows) {
-      const id = String(row.RegistryID ?? "").trim();
-      if (id) (byId.get(id) ?? byId.set(id, []).get(id)!).push(row);
-    }
-    for (const f of fac) {
-      const rws = byId.get(String(f.registry_id ?? "").trim());
-      if (!rws || !rws.length) continue;
-      // Children: every NPDES permit on this FRS id, verbatim (absent fields stay absent).
-      const permits = rws.map((r) => {
-        const p: Record<string, unknown> = {};
-        if (r.SourceID) p.npdes_id = String(r.SourceID);
-        if (r.Statute) p.statute = String(r.Statute);
-        if (r.CWPPermitStatusDesc) p.status = String(r.CWPPermitStatusDesc);
-        if (r.CWPPermitTypeDesc) p.type = String(r.CWPPermitTypeDesc);
-        return p;
-      }).filter((p) => Object.keys(p).length);
-      if (!permits.length) continue;
-      const statuses = permits.map((p) => String(p.status ?? "")).filter(Boolean);
-      const env = (f.env ??= {}) as Record<string, unknown>;
-      env.link_type = "geo_matched";
-      const epa = (env.epa ??= {}) as Record<string, unknown>;
-      epa.permits = permits;
-      // The headline status is the MOST-ACTIVE one across this facility's permits; only a
-      // verbatim known status is stamped, and tracking_on derives from that same value.
-      const head = PERMIT_STATUS_PRECEDENCE.find((s) => statuses.includes(s));
-      if (head) {
-        epa.permit_status = head;
-        epa.compliance_tracking_on = PERMIT_TRACKING_ON.has(head);
-      }
-    }
-  } catch (_e) { /* best-effort — never block the page */ }
+async function enrichFacilityEnv(
+  supabase: ReturnType<typeof createClient>,
+  fac: Record<string, unknown>[],
+  lat: number,
+  lng: number,
+  radiusMi: number,
+  zip: string | null,
+): Promise<{ echo: EchoCallOutcome; cwa: EchoCallOutcome }> {
+  await enrichViolations(supabase, fac);
+  const echo = await echoEnrich(fac, lat, lng, radiusMi);
+  const cwa = await cwaPermitEnrich(fac, lat, lng, radiusMi);
+  if (!echo.ok || !cwa.ok) {
+    const stored = storedEpaByRegistryId(await loadStoredSites(supabase, zip));
+    const restored = preserveStoredEnv(fac, stored, echo, cwa);
+    echo.restored = restored.restored_echo;
+    cwa.restored = restored.restored_cwa;
+  }
+  return { echo, cwa };
 }
 
 // TCEQ dedup + enrich: attach each TCEQ RN onto the FRS facility at the same physical site
@@ -696,11 +643,13 @@ async function handleRequest(req: Request): Promise<Response> {
     const devRaw = planes.core;
     const facResult = planes.overlay;
     const facRaw = facResult.sites;
-    await enrichViolations(supabase, facRaw);
-    // v19: live EPA ECHO compliance enrichment (real violations/programs, keyed on registry_id).
-    await echoEnrich(facRaw, clat, clng, zipRadius);
-    // v21: ICIS-NPDES permit status (env.epa.permits[] + permit_status + compliance_tracking_on).
-    await cwaPermitEnrich(facRaw, clat, clng, zipRadius);
+    // v19/v21/v25: live ECHO + CWA, queried at the radius FRS actually answered at
+    // (not the requested radius — a 3 mi ask that fell back to 2 mi used to search
+    // a wider circle than the facilities being matched). Failed calls restore
+    // last-known-good env.epa from development_reports before the refresh writes.
+    const { echo, cwa } = await enrichFacilityEnv(
+      supabase, facRaw, clat, clng, enrichRadiusMi(facResult.epa, zipRadius), zip,
+    );
     // TX TDLR/TABS enrichment (v16, additive — runbook §1). Coverage-gated inside
     // tabsForZip(): the source never runs for a non-TX ZIP. Separate query keeps
     // resolveCommunityIds() untouched (additive-only rule, source-registry #4).
@@ -725,6 +674,10 @@ async function handleRequest(req: Request): Promise<Response> {
     // the SQL improvement guard, so a re-geocode can only upgrade, never downgrade.
     const geoStore = supabaseStore(supabase);
     const geoLadder = GEO_LADDER(supabase);
+    const noteFence = async (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => {
+      await supabase.from("geocodes").update({ geofence_status: status })
+        .eq("canonical_addr", canonicalAddr(input)).then(() => {}, () => {});
+    };
     const tabs = await tabsForZip(zip, (commRows ?? []) as { state?: string; county?: string }[], TABS_PINS, {
       fetch,
       geocode: async (a: string) => {
@@ -732,6 +685,9 @@ async function handleRequest(req: Request): Promise<Response> {
         if (g.lat == null || g.lng == null) return null;   // failed → quarantine (tdlr-tabs.ts)
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
+      zipCentroid: { lat: clat, lng: clng },
+      reportZip: zip,
+      noteFence,
     });
     // TASK 1 — structured open-data permit/case records (Socrata), coverage-gated per registry entry.
     // Generic connector; adding a city is a jurisdiction-registry.json edit, never code here. Records
@@ -745,6 +701,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
     // permit/case layers (e.g. Salt Lake City building permits). Adding a jurisdiction is a
@@ -759,6 +716,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
       // the engine's standard centroid+radius ZIP approximation; records keep their own points.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
     // (e.g. Boston's data.boston.gov Approved Building Permits). Adding a jurisdiction is a
@@ -773,6 +731,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (CSV twin) — same generic, coverage-gated connector for first-party portals whose
     // interface is a published CSV file (e.g. San Diego's seshat.datasd.org approvals ledger).
@@ -786,6 +745,7 @@ async function handleRequest(req: Request): Promise<Response> {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals
     // (e.g. Philadelphia's phl.carto.com permits table). Adding a jurisdiction is a
@@ -801,6 +761,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for the GEOCODE geofence (sources/geo-fence.ts) — without it the
       // distance half of the fence fails open. Source-supplied coords are never fenced.
       zipCentroid: { lat: clat, lng: clng },
+      noteFence,
     });
     // Anti-fabrication: a marker with no official record URL is not rendered, not counted.
     const dev = devRaw.filter((s) => (s.url as string) && (s.url as string).trim() !== "");
@@ -940,7 +901,7 @@ async function handleRequest(req: Request): Promise<Response> {
     const envEpa = fac.filter((s) => (s.env as { epa?: unknown } | undefined)?.epa).length;
     const envTceq = fac.filter((s) => (s.env as { tceq?: unknown } | undefined)?.tceq).length;
     // TABS records are development filings → counts.development, never counts.facilities.
-    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
+    return json({ zip, mode: "zip", home: { lat: clat, lng: clng }, radius_mi: zipRadius, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, tabs_quarantined: tabs.quarantined, socrata_reports: socrata.reports, arcgis_reports: arcgis.reports, ckan_reports: ckan.reports, csv_reports: csv.reports, carto_reports: carto.reports, env_records: { epa_matched: envEpa, tceq_matched: tceqStats.matched, tceq_dataset: tceq.dataset ?? null, tceq_entities: tceq.entities.length, tceq_quarantined: tceq.quarantined }, note: "ZIP-wide view centered on the ZIP centroid (not a home). Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Environmental records (EPA ECHO federal + TCEQ Central Registry state) are geo-matched to each facility. Not for resale.", sites }, 200, cors);
   }
 
   const address = (body.address || "").trim();
@@ -948,7 +909,12 @@ async function handleRequest(req: Request): Promise<Response> {
   const radiusMi = Math.min(Math.max(Number(body.radius_mi) || 1, 0.25), MAX_RADIUS_MI);
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
   let lat: number, lng: number, matched: string;
-  try { [lat, lng, matched] = await geocode(address); } catch (e) { return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors); }
+  try {
+    [lat, lng, matched] = await geocode(address);
+  } catch (e) {
+    if (isGeocodeTransportError(e)) return json({ error: "geocoder_unavailable" }, 502, cors);
+    return json({ error: String(e instanceof Error ? e.message : e) }, 422, cors);
+  }
   const zipM = matched.match(/\b(\d{5})\b/);
   const communityIds = await resolveCommunityIds(supabase, zipM ? zipM[1] : null);
   // UNIT 4 — same bounded-deadline join as ZIP mode above, same module, one implementation.
@@ -960,12 +926,10 @@ async function handleRequest(req: Request): Promise<Response> {
   const dev = addrPlanes.core;
   const facResult = addrPlanes.overlay;
   const fac = facResult.sites;
-  await enrichViolations(supabase, fac);
-  // v19: same environmental-records layer as ZIP mode — live ECHO compliance + TCEQ Central
-  // Registry (coverage-gated to TX), geo-matched onto the facilities we already placed.
-  await echoEnrich(fac, lat, lng, radiusMi);
-  // v21: ICIS-NPDES permit status (env.epa.permits[] + permit_status + compliance_tracking_on).
-  await cwaPermitEnrich(fac, lat, lng, radiusMi);
+  const addrZip = zipM ? zipM[1] : null;
+  const { echo, cwa } = await enrichFacilityEnv(
+    supabase, fac, lat, lng, enrichRadiusMi(facResult.epa, radiusMi), addrZip,
+  );
   const { data: addrComm } = await supabase.from("communities").select("state,county").contains("zip_codes", [zipM ? zipM[1] : ""]);
   const addrTceq = await tceqForZip(zipM ? zipM[1] : "", (addrComm ?? []) as TceqCommunityRow[], { fetch });
   enrichTceq(fac, addrTceq.entities);
@@ -988,5 +952,5 @@ async function handleRequest(req: Request): Promise<Response> {
   const access = await accessLevel(req, supabase);
   const sites = access === "full" ? allSites : allSites.slice(0, TEASER_LIMIT);
   const locked = access === "full" ? 0 : Math.max(0, allSites.length - sites.length);
-  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
+  return json({ address: matched, home: { lat, lng }, radius_mi: radiusMi, access, paywall: PAYWALL_ENABLED, epa: facResult.epa, echo, cwa, counts: { facilities: fac.length, proposed: proposedRecords.length, proposed_active: proposedActiveRecords.length, proposed_decided: decidedRecords.length, approved: approvedRecords.length, operating: operatingRecords.length, development: proposedRecords.length + approvedRecords.length + operatingRecords.length, comment_open: commentOpenRecords.length, civic: dev.length - devReal.length, locked }, note: "Development items are jurisdiction-level (scope=area); facilities are precise (scope=point). Violations link to the EPA ECHO record. Not for resale.", sites }, 200, cors);
 }

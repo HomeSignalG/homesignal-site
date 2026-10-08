@@ -54,6 +54,15 @@ ROOT_FILES = (
     'contact.html',
     'dashboard.html',
     'development-activity.html',
+    # Internal, admin-only (build step 4 of docs/development-activity-build-steps-100526.md): noindex, robots-disallowed,
+    # linked from nowhere. The function it calls refuses anyone not signed in and on dashboard_admins.
+    'development-activity-review.html',
+    # The customer page for invited trial members (build step 5c): noindex, robots-disallowed, reached from an invite link and
+    # (since 2026-10-05) from "My reports" in the header's Enterprise dropdown. Both functions it calls answer only a signed-in person, about that person.
+    'development-activity-reports.html',
+    # The client's page for a private share link (build step 8): noindex, robots-disallowed, linked from nowhere, reached only from a link an
+    # agent made. It sends no referrer and holds no sign-in; its one function (view-shared-report) answers only a token the database says is usable.
+    'shared-report.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
@@ -66,7 +75,15 @@ ROOT_FILES = (
     'properties.html',
     'property.html',
     'reports.html',
-    'future-surroundings-report.html',
+    # RETIRED FROM THE ARTIFACT 2026-10-01 (Development Activity Order H, first step). The legacy
+    # browser-direct NYC report page, `future-surroundings-report.html`, is deliberately NOT named
+    # here. It generates a report entirely in the visitor's browser against data.cityofnewyork.us,
+    # so no HomeSignal server sees the request and no server-side quota could ever apply to it.
+    # The plan allows one customer-facing generation path (Hard Rule 24). The file and its three
+    # libraries stay in the repository untouched (ruling R6); only the SERVING stops, so the URL
+    # is a plain 404. TO REVERSE: re-add the line  'future-surroundings-report.html',  here and
+    # flip the pins in test/nyc-v1-report.test.mjs 5f and test/single-customer-generation-path.test.mjs P2.
+    # Decision and receipt: docs/order-h-retire-legacy-generator-2026-10-01.md.
     'share-text.html',
     'terms.html',
     'today.html',
@@ -106,7 +123,9 @@ ROOT_FILES = (
 TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
-    'assets': ('.js', '.css', '.png', '.svg', '.woff2'),
+    # .webp: the homepage's approved Development Activity report preview
+    # (assets/home-development-activity-report-preview.webp, founder-approved in #1494).
+    'assets': ('.js', '.css', '.png', '.svg', '.webp', '.woff2'),
     'seed': ('.js',),
 }
 

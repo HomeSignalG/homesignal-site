@@ -73,6 +73,12 @@ function buildRow(c) {
   evidence.theme = ('theme' in c) ? c.theme : 'datacenter';
   if (c.absence) { delete evidence.project_id; evidence.theme_answer = 'none_found'; }
   evidence.visual = { state: 'REAL_MAP_VISUAL', capture_key: 'placeholder' };
+  // A real project capture records its popup open (it refuses the shot otherwise), and since
+  // 2026-10-01 the binding requires it (founder: a post about a project shows its own pin,
+  // popup open). The absence post has no project and no popup.
+  if (evidence.project_id) evidence.visual.popup_open = true;
+  // …and, since 2026-10-02, that its pin shows the post's own record (Map 1 step (a)).
+  if (evidence.project_id) evidence.visual.record_match = true;
   if (!m.drop_capture_policy) evidence.visual.capture_policy = capture_policy;
 
   const post = {

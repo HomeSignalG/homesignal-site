@@ -97,8 +97,12 @@ ok(/id='propWatch'>Watch this address</.test(map), 'SHIPPED A-023 ...and the map
 // ── LEFTOVERS: measured, recorded, and deliberately NOT closed ───────────────────────────
 // Each of these is the kind of thing a later session "tidies up" in good faith. Pinning
 // them makes closing one a DELIBERATE act with a failing test attached, not a drive-by.
-ok(/if \(await HS\.data\.isCovered\(z\)\) location\.href = 'community\.html\?zip=' \+ z;/.test(idxRaw),
-  'LEFTOVER 1 index.html homeFind() still routes to community.html?zip=');
+// LEFTOVER 1 CLOSED 2026-10-02, then CHANGED 2026-10-04 (founder: "when an address or zip code is
+// entered it should automatically take you to the development map"). The homepage ZIP search
+// goes to Map 1's own ZIP route, and it still never asks HS.data.isCovered.
+ok(!/community\.html\?zip=/.test(idxRaw) && /location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(idxRaw)
+   && !/HS\.data\.isCovered/.test(idxRaw),
+  'LEFTOVER 1 CLOSED: the homepage ZIP search goes to homesignalmap.html?zip=<zip>');
 ok(/HS\.shareUrlOverride = HS_CONFIG\.BASE_URL \+ '\/community\.html\?zip=' \+ zip;/.test(cp),
   'LEFTOVER 2 HS.shareUrlOverride is still the community.html?zip= URL');
 ok(!/hs-resolve\.js/.test(map + dev + alerts + props + dash + idxRaw + read('community.html')),
@@ -110,13 +114,18 @@ ok(/HS\.N5_RADII = \[0\.5, 1, 2, 5\];/.test(read('lib/n5-radius.js'))
   'LEFTOVER 5 ...seven UI stops against four RPC stops, unreconciled');
 ok(/meetings\.find\(function\(x\)\{return x\.related_project_id===projectId;\}\) \|\| meetings\[0\];/.test(dev),
   'LEFTOVER 6 HS.addToCalendar still falls back to meetings[0]');
-ok(/data-znav="development\.html"/.test(map), 'LEFTOVER 7 CLOSED 2026-09-26: map→list exists (founder request)');
+// 2026-10-02 (founder): the map→list back link was removed; navigation is the Explore dropdown.
+ok(!/data-znav="development\.html"/.test(map), 'LEFTOVER 7 map→list back link removed 2026-10-02 (Explore dropdown replaces it)');
 ok(/HS\.navHref\('homesignalmap\.html', S\.zip\)/.test(dev), 'LEFTOVER 7 ...and list→map is still the one direction that exists');
 ok(!/sampleBtn/.test(map), 'LEFTOVER 7 #sampleBtn is still absent');
 ok(!/repPreview|impact model|updated today/.test(strip(read('reports.html'))),
   'LEFTOVER 8 the reports preview document was not ported into the stub');
-ok(/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="dev">/.test(read('homesignalmap.html')),
-  'LEFTOVER 10 the stale "This page is MAPS" narration sits above the correct data-nav="dev" — recorded, not edited');
+// LEFTOVER 10 CLOSED 2026-10-01 (founder navigation plan v3). It recorded a stale "This page
+// is MAPS." narration sitting above data-nav="dev". v3 re-tokened Map 1 to Explore, so the
+// comment had to be rewritten anyway; it now names the section the token actually lights.
+ok(!/This page is MAPS\./.test(read('homesignalmap.html')) && /<body data-nav="explore"[ >]/.test(read('homesignalmap.html'))
+   && /Map 1 belongs to EXPLORE/.test(read('homesignalmap.html')),
+  'LEFTOVER 10 CLOSED: the narration above Map 1\'s data-nav="explore" now matches what it lights');
 
 console.log(fails ? '\nFAILED ' + fails : '\nAll final-matrix checks passed');
 process.exit(fails ? 1 : 0);

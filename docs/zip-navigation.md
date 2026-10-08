@@ -27,7 +27,7 @@ Three concepts, kept separate:
 |---|---|---|
 | **Saved places** | what places does this resident care about? | `app_properties` (Addresses) + `app_follows` / `myCommunities` (ZIP Codes) — **never merged** |
 | **Viewed place** | what are they looking at right now? | `HS.state.zip` |
-| **Current tool** | which HomeSignal tool are they using? | the four sidebar containers |
+| **Current tool** | which HomeSignal section are they in? | the three primary items: Explore · My Places · Enterprise (founder navigation plan v3, 2026-09-30) |
 
 > A place-selection action may change place state. A tool-navigation action may change
 > tool state. Neither may implicitly change the other. **Account hydration may update
@@ -87,8 +87,9 @@ Viewing switcher (Addresses + ZIP Codes stay the two Place types).
 A ZIP-only Place has no Address: `switchZip` clears a conflicting `activePropId` /
 `hs:activeProp` (the **pointer** only — the saved row survives; removal is `HS.removeAddress`).
 
-**Sidebar = which tool. Viewing = which place.** `community.html` is the public ZIP hub
-(`data-nav="comm"`) and highlights no tool, so the Viewing control names the place from the
+**Sidebar = which section. Viewing = which place.** `community.html` is the public ZIP hub and,
+since plan v3, lights **Explore** (`data-nav="explore"`; it used to declare `comm` and light
+nothing). The lit item names a section, never a place, so the Viewing control names the place from the
 community's own metadata (`Bear River City · 84301`), falling back to the bare ZIP when
 metadata is absent. That is an AREA label, so a saved address in the viewed ZIP still
 reads `Viewing · <street>`.
@@ -108,12 +109,17 @@ location.href = HS.navHref('maps.html', HS.state.zip);
 
 `paintNavHrefs()` (called from `paintTopbar`) stamps:
 
-- Sidebar links listed in `ZIP_NAV_PAGES`
+- Sidebar links listed in `ZIP_NAV_PAGES` — **none since plan v3**: the three primary items
+  (`index.html`, `properties.html`, `development-activity.html`) are section links and carry
+  no `?zip=`. The rule stays, so a ZIP-routed page added to the sidebar later is stamped.
 - Any `#hs-slot a[data-znav]` in-page link
-- Exception: when the current page is a Development dossier (`development.html?id=`),
-  the Development sidebar link keeps that `id` so clicking the already-lit tool does
-  not dump the resident onto the ZIP list (and an old `myZip`). Other tools stay zip-only.
-  **Back to development** is still the list.
+- Exception (dormant since plan v3): on a Development dossier (`development.html?id=`), a
+  `development.html` link keeps that `id`. It was written for the Development SIDEBAR item,
+  which plan v3 removed, so no link on the dossier reaches it today. The dossier's
+  **Back to development** button returns to the ZIP list.
+
+`ZIP_NAV_PAGES` itself is unchanged by plan v3: `alerts.html`, `development.html`,
+`homesignalmap.html` and `community.html` left the menu but are still ZIP-routed pages.
 
 `ZIP_NAV_PAGES` and helpers live in **`lib/view-zip.js`** (canonical); `shell.js` mirrors
 them when the module is not loaded directly.
@@ -153,7 +159,8 @@ Run via `node scripts/run-unit-tests.mjs`.
 - `test/navigation-history.test.mjs` — Back/Forward restore a coherent place
 - `test/navigation-address-dossier-zip.test.mjs` — the Address dossier owns tool-nav geography
 - `test/navigation-project-dossier-view.test.mjs` — a project dossier names its listed street in Viewing
-- `test/nav-identity.test.mjs` — A-021 four-container sidebar (owns that pin)
+- `test/nav-identity.test.mjs` — the plan v3 sidebar: three items, and the section each page lights (owns that pin)
+- `test/navigation-v3.browser.test.mjs` — the same, rendered and signed in: no dashboard bounce, the active-item matrix, the support footer
 
 ## Related
 

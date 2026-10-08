@@ -268,7 +268,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      HS.resolveMarker so the dashboard and the map can never disagree about what a Data
      center is (lib/maps-social-theme.js). Both are self-contained helper IIFEs — they
      define functions on window.HS and touch no DOM at load. -->
-<script src="lib/project-type.js?v=6ad8270c"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/map.js?v=f98598d2"></script>
 <script src="lib/maps-social-theme.js?v=0d9ae778"></script>
 <!-- WHICH MAP IMAGE BELONGS TO WHICH DRAFT. The same module scripts/maps-social-image.mjs
@@ -276,7 +276,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      picture on screen is the picture this draft would publish. Loaded AFTER the theme lib
      because the binding key includes the theme, which that lib derives. -->
 <script src="lib/maps-capture-policy.js?v=1491d6a2"></script>
-<script src="lib/maps-capture-binding.js?v=3dbf8cf5"></script>
+<script src="lib/maps-capture-binding.js?v=a13ed577"></script>
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
@@ -1106,7 +1106,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       return ' &nbsp;·&nbsp; <span class="t-real">🗺 REAL MAP VISUAL</span>';
     }
     if(st===S.INELIGIBLE){
-      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">CANNOT BE PHOTOGRAPHED YET · '+
+      // ⚖️ For a post about a project this means its own pin cannot be shown yet, and no ZIP
+      // map stands in for it (founder ruling 2026-10-01). Approve stays blocked.
+      return ' &nbsp;·&nbsp; <span style="color:var(--persist)">PROJECT PIN CAN\u2019T BE SHOWN YET · '+
         'a capture limitation, not a finding about this ZIP'+why+'</span>';
     }
     if(st===S.FAILED){
@@ -1140,9 +1142,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var v=(p.evidence&&p.evidence.visual)||{};
     return '<div style="margin:0 0 10px"><div id="'+esc(id)+'" '+
       'style="min-height:20px"><div class="muted" style="font-size:12px">Loading map preview…</div></div>'+
+      // The caption says what the picture IS OF, read from the stored scope: a project pin,
+      // or the whole ZIP (only right for a post with no project). It used to say "framed on
+      // the project's own coordinates" under every picture, including ZIP maps.
       (v.page_url?('<div class="muted" style="font-size:11.5px;margin-top:4px">Captured from '+
-        esc(v.page_url)+' · framed on the project\u2019s own coordinates ('+
-        esc(String(v.framed_zoom||''))+'× zoom) · no home marker, no radius ring</div>'):'')+
+        esc(v.page_url)+' · '+
+        ((window.HS&&HS.mapsCaptureStoredScope&&HS.mapsCaptureStoredScope(v,p)==='zip')
+          ? 'a map of the whole ZIP, no project pin'
+          : ('framed on the project\u2019s own coordinates ('+esc(String(v.framed_zoom||''))+'× zoom)'))+
+        ' · no home marker, no radius ring</div>'):'')+
       '</div>';
   }
 

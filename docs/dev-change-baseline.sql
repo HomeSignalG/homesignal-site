@@ -233,6 +233,31 @@ $fn$;
 -- whole-report `fire_*` kinds are pipeline failures under a pseudo source and are not a source's
 -- health. `retired` means the refresh dropped the source's cached records; the ledger keeps them
 -- (absence is never an event) — this column is how that gap stays visible.
+-- THE FAILURE EVIDENCE, ON ITS OWN. One row per source family that has a failure record, and nothing else: no ledger column
+-- and no read of dev_change_project. It exists because a reader that needs only "was this source read in the last day" must
+-- not pay for ledger coverage it does not use: through dev_change_source_health the filter on registry_id is applied AFTER
+-- the whole ledger (933,013 projects on 2026-10-01) has been scanned and aggregated, measured at 6.1-6.2 s here and 7.4-10.6 s
+-- by an independent reviewer, against the 8 s statement timeout PostgREST runs under. Here a registry_id filter is
+-- pushed into the grouping and touches only dev_refresh_source_failures. A family with no failure record has NO row here;
+-- every consumer already treats an absent row and an all-zero row the same (national-report.ts `sourcesNotFullyRead`).
+-- dev_change_source_health below is built FROM this view, so the failure windows and kinds are defined exactly once.
+create or replace view public.dev_change_source_fetch_health with (security_invoker = true) as
+  select f.registry_id,
+         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '24 hours')                       as fetch_failures_24h,
+         count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '24 hours')  as blocked_24h,
+         count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '24 hours')                       as truncated_24h,
+         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '14 days')                        as fetch_failures_14d,
+         count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '14 days')   as blocked_14d,
+         count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '14 days')                        as truncated_14d,
+         count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated') and f.seen_at > now() - interval '14 days') as zips_failed_14d,
+         max(f.seen_at) filter (where f.kind = 'fetch_failed')                                                             as last_fetch_failure_at,
+         bool_or(f.kind = 'retired')                                                                                       as retired_ever
+    from public.dev_refresh_source_failures f
+   where f.kind in ('fetch_failed', 'truncated', 'retired')
+   group by f.registry_id;
+
+-- THE FULL EVIDENCE: ledger coverage per source family joined to the failure evidence above. For a person reading it;
+-- a reader that needs only the failure counts reads dev_change_source_fetch_health, never this.
 create or replace view public.dev_change_source_health with (security_invoker = true) as
 with led as (
   select p.registry_id,
@@ -251,20 +276,6 @@ with led as (
                   then (p.facts->>'submitted_at')::date end)             as newest_filing_date
     from public.dev_change_project p
    group by p.registry_id
-), fail as (
-  select f.registry_id,
-         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '24 hours')                       as fetch_failures_24h,
-         count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '24 hours')  as blocked_24h,
-         count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '24 hours')                       as truncated_24h,
-         count(*) filter (where f.kind = 'fetch_failed' and f.seen_at > now() - interval '14 days')                        as fetch_failures_14d,
-         count(*) filter (where f.kind = 'fetch_failed' and f.blocked_update and f.seen_at > now() - interval '14 days')   as blocked_14d,
-         count(*) filter (where f.kind = 'truncated'    and f.seen_at > now() - interval '14 days')                        as truncated_14d,
-         count(distinct f.zip) filter (where f.kind in ('fetch_failed', 'truncated') and f.seen_at > now() - interval '14 days') as zips_failed_14d,
-         max(f.seen_at) filter (where f.kind = 'fetch_failed')                                                             as last_fetch_failure_at,
-         bool_or(f.kind = 'retired')                                                                                       as retired_ever
-    from public.dev_refresh_source_failures f
-   where f.kind in ('fetch_failed', 'truncated', 'retired')
-   group by f.registry_id
 )
 select coalesce(l.registry_id, f.registry_id)      as registry_id,
        coalesce(l.identities, 0)                   as identities,
@@ -285,7 +296,7 @@ select coalesce(l.registry_id, f.registry_id)      as registry_id,
        f.last_fetch_failure_at,
        coalesce(f.retired_ever, false)             as retired_ever
   from led l
-  full join fail f on f.registry_id = l.registry_id;
+  full join public.dev_change_source_fetch_health f on f.registry_id = l.registry_id;
 
 -- ---- 4. LOCK-DOWN: system-only, no anon, no authenticated -------------------------------------------
 alter table public.dev_change_zip_cursor enable row level security;
@@ -294,6 +305,8 @@ grant select, insert, update on public.dev_change_zip_cursor to service_role;
 
 revoke all on public.dev_change_source_health from public, anon, authenticated, service_role;
 grant select on public.dev_change_source_health to service_role;
+revoke all on public.dev_change_source_fetch_health from public, anon, authenticated, service_role;
+grant select on public.dev_change_source_fetch_health to service_role;
 
 -- Every dev_change_ function, computed rather than typed (a list typed here would silently stop
 -- covering the next function added). Re-run here so the new function is covered.
@@ -310,6 +323,7 @@ end $lock$;
 
 -- ROLLBACK (this file only; touches nothing else):
 --   drop view if exists public.dev_change_source_health;
+--   drop view if exists public.dev_change_source_fetch_health;   (after the line above: the wide view reads it)
 --   drop function if exists public.dev_change_tick(uuid, integer, integer, bigint, bigint, integer);
 --   drop table if exists public.dev_change_zip_cursor;
 --   alter table public.dev_change_project reset (fillfactor);

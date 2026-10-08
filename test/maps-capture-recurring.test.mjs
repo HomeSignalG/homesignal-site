@@ -78,9 +78,13 @@ const COMPLIANT_POLICY = {
 function bound(over) {
   const d = draft(over);
   d.image_bucket_path = 'maps/' + d.zip + '/proj.png';
+  // popup_open: a real project capture refuses the shot unless the popup is open, and records
+  // it (scripts/maps-social-image.mjs). Since 2026-10-01 the binding requires it (founder:
+  // a post about a project shows its own pin, popup open). record_match: since 2026-10-02 the
+  // capture also records that the pin shows the post's own record (Map 1 step (a)).
   d.evidence.visual = Object.assign({
     status: 'REAL_MAP_VISUAL', state: S.READY, capture_key: HS.mapsCaptureKey(d), attempts: 0,
-    capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
+    popup_open: true, record_match: true, capture_policy: JSON.parse(JSON.stringify(COMPLIANT_POLICY))
   }, (over && over.visual) || {});
   return d;
 }
@@ -312,13 +316,14 @@ ok((GEN.match(/recordOutcome\(/g) || []).length >= 2,
 // record what was removed, so a pin that searches the whole file finds the very string it
 // forbids — the trap this repo has already paid for twice.
 const GEN_EXEC = GEN.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-// ⚠️ UPDATED when the fallback was LIFTED to module scope so its body could be executed
-// offline (it was `const zipFallback = async (why) => …` inside `main()`, which is why
-// mutation F survived the whole suite). This pin guards that the fallback EXISTS, not
-// which syntax declares it — freezing the shape is what made three suites go red on a
-// correct change, for the third time in this workstream.
-ok(/async function zipMapFallback\(/.test(GEN_EXEC),
+// ⚠️ UPDATED 2026-10-01: the ZIP-map fallback for a project that cannot be pinned is GONE
+// (founder: a post about a project shows its own pin, popup open). Those five record-shaped
+// conditions now record a refusal through `projectPinRefusal`, at module scope so its body
+// runs offline. This pin guards that it EXISTS, not which syntax declares it.
+ok(/async function projectPinRefusal\(/.test(GEN_EXEC),
   '10f₀₀: the comment-stripped source still holds the real code (control for §10f₀)');
+ok(/recordOutcome\(d, INELIGIBLE, reason, theme, 'project', extra\)/.test(GEN_EXEC),
+  '10f₀₀b: a project that cannot be pinned is recorded INELIGIBLE at project scope, with no picture');
 ok(!/await ineligible\(/.test(GEN_EXEC),
   '10f₀: …and no record-shaped condition ends a draft with no picture any more');
 ok(!/results\.push\(\{ id: d\.id, label, ok: false, reason: 'draft carries no project_id' \}\)/.test(GEN),
@@ -403,8 +408,8 @@ const compliantPolicy = COMPLIANT_POLICY;
 function dcBound(over) {
   const d = draft();
   d.image_bucket_path = 'maps/19475/x.png';
-  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null,
-    capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
+  d.evidence.visual = Object.assign({ state: S.READY, capture_key: null, popup_open: true,
+    record_match: true, capture_policy: JSON.parse(JSON.stringify(compliantPolicy)) }, over || {});
   if (d.evidence.visual.capture_key === null) d.evidence.visual.capture_key = HS.mapsCaptureKey(d);
   return d;
 }
@@ -512,8 +517,16 @@ ok(!/\bno\b[^'"]{0,40}\b(data cent|development|project)s?\b[^'"]{0,20}\b(here|in
 // ── §12 THE ATTACH IS CONDITIONAL — STRUCTURAL PINS ──────────────────────────────────
 // A read-then-unconditional-write is a race with a comment on it. These pin the preconditions
 // into the WHERE clause, which is the only place Postgres will evaluate them atomically.
-ok(/status=eq\.draft&revision=eq\.\$\{Number\(draft\.revision\)\}/.test(GEN),
-  '12a: every write filters on status=draft AND the observed revision');
+ok(/async function guardedPatch\(draft, body, status = 'draft'\)/.test(GEN)
+   && /status=eq\.\$\{status\}&revision=eq\.\$\{Number\(draft\.revision\)\}/.test(GEN),
+  '12a: every write filters on the status it read (draft unless named) AND the observed revision');
+// Only the record-check stamp names a status other than draft, and it writes evidence alone.
+{
+  const calls = GEN.match(/guardedPatch\([^;]*?\)\s*;/g) || [];
+  const named = calls.filter((c) => /,\s*d\.status\)\s*;$/.test(c));
+  ok(calls.length >= 3 && named.length === 1 && /\{ evidence: \{ \.\.\.d\.evidence, visual \} \}/.test(named[0]),
+    `12a₁: exactly one write passes a status other than draft — the record-check stamp, evidence only (${named.length} of ${calls.length})`);
+}
 ok(/Prefer: 'return=representation'/.test(GEN),
   '12b: …and asks for the rows back, so a refused precondition is VISIBLE rather than silent');
 ok(/return guardedPatch\(draft, \{/.test(GEN) && (GEN.match(/guardedPatch\(draft/g) || []).length >= 2,

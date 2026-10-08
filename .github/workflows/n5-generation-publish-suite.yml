@@ -23,8 +23,18 @@ on:
       - 'docs/n5-generation-publish-part-f.sql'
       - 'docs/n5-generation-publish-part-g.sql'
       - 'docs/n5-generation-publish-part-g.rollback.sql'
+      - 'docs/n5-generation-publish-part-h.sql'
+      - 'docs/n5-generation-publish-part-h.rollback.sql'
+      - 'scripts/n5_preactivation_browser.mjs'
+      - 'docs/maps-coverage/fix4/no-boundary-zip-classification.csv'
       - 'docs/map1-zip-read-char5.sql'
       - 'docs/map1-zip-read-char5.rollback.sql'
+      - 'docs/map1-representative-newest.sql'
+      - 'docs/map1-representative-newest.rollback.sql'
+      - 'docs/map1-representative-pick.sql'
+      - 'docs/map1-representative-pick.rollback.sql'
+      - 'docs/map1-zip-read-generation.sql'
+      - 'docs/map1-zip-read-generation.rollback.sql'
       - 'test/n5_generation_pg/**'
       - 'test/n5-generation-publish.test.mjs'
       - 'scripts/n5_orchestrate.py'
@@ -112,6 +122,30 @@ jobs:
           set -o pipefail
           python3 test/n5_generation_pg/run_map1_char5.py 2>&1 | tee /tmp/map1-char5.log
 
+      - name: Run Map 1's newest-record proof (docs/map1-representative-newest.sql, base + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_representative.py 2>&1 | tee /tmp/map1-representative.log
+
+      - name: Run Map 1's stored-pick proof (docs/map1-representative-pick.sql, base + cost + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_pick.py 2>&1 | tee /tmp/map1-pick.log
+
+      - name: Run Map 1's generation-read proof (docs/map1-zip-read-generation.sql, base + mutations)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_map1_generation.py 2>&1 | tee /tmp/map1-generation.log
+
       - name: Run Part G's rollback proof (undo, refuse twice, re-apply)
         if: always()
         env:
@@ -119,6 +153,14 @@ jobs:
         run: |
           set -o pipefail
           python3 test/n5_generation_pg/run_part_g_rollback.py 2>&1 | tee /tmp/part-g-rollback.log
+
+      - name: Run Part H's apply + rollback proof (the pre-activation proof onto production's state)
+        if: always()
+        env:
+          N5_TEST_DSN: "host=localhost port=5432 user=postgres password=postgres dbname=n5_publish_disposable"
+        run: |
+          set -o pipefail
+          python3 test/n5_generation_pg/run_part_h.py 2>&1 | tee /tmp/part-h.log
 
       - name: Run the gateway-timeout guard (a lost 524 response is proven, never re-sent)
         if: always()
@@ -140,6 +182,10 @@ jobs:
         if: always()
         run: python3 test/n5_generation_pg/build_part_g.py --check
 
+      - name: Part H and its rollback are exactly what the generator writes from Part D (no hand edits)
+        if: always()
+        run: python3 test/n5_generation_pg/build_part_h.py --check
+
       - name: Publish the receipt
         if: always()
         run: |
@@ -150,5 +196,7 @@ jobs:
             grep -E '^(END-TO-END|FAIL)' /tmp/n5-lifecycle.log || echo '(no lifecycle log)'
             grep -E '^(MAP1-CHAR5|KILLED|SURVIVED|FAIL)' /tmp/map1-char5.log || echo '(no map1-char5 log)'
             grep -E '^(PART-G-ROLLBACK|FAIL)' /tmp/part-g-rollback.log || echo '(no part-g-rollback log)'
+            grep -E '^(MAP1-GENERATION|KILLED|SURVIVED|FAIL)' /tmp/map1-generation.log || echo '(no map1-generation log)'
+            grep -E '^(PART-H|FAIL)' /tmp/part-h.log || echo '(no part-h log)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

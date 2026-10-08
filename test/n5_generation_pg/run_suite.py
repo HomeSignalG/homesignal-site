@@ -13,6 +13,7 @@ the suite itself — a test that cannot fail proves nothing.
 Target: N5_TEST_DSN (an admin connection to a THROWAWAY server; databases are created and
 dropped here). Refuses to run if a Supabase credential is visible.
 """
+import hashlib
 import json
 import os
 import re
@@ -35,6 +36,23 @@ LEGACY = "legacy-phase1-2026-09-01"
 GEN_B = "gen-b"
 GEN_C = "gen-c"
 ZIPS = ["11101", "11102", "11199", "11201", "11301"]
+# The canonical ZIPs with no Census boundary, as the orchestrator declares them (production
+# reads docs/maps-coverage/fix4/no-boundary-zip-classification.csv).
+DECLARED = ["11199"]
+
+
+def browser_ok(cand, base):
+    return {"candidate_generation_id": cand, "baseline_generation_id": base, "passed": True,
+            "zips_checked": 10, "mismatches": 0}
+
+
+def proof(c, gen, declared=None, browser="ok"):
+    """Record a pre-activation proof and return its row (problems decoded)."""
+    if browser == "ok":
+        browser = browser_ok(gen, q1(c, "select geo.n5_serving_generation_id()"))
+    r = q(c, "select * from geo.n5_generation_record_proof(%s,'run-p',%s,%s::jsonb)",
+          (gen, DECLARED if declared is None else declared, json.dumps(browser) if browser is not None else None))[0]
+    return dict(r)
 
 
 # --------------------------------------------------------------------------- plumbing
@@ -576,6 +594,9 @@ def run(conn, label, mutate=None, suite=None):
     s.ok("B3 restored: the check is clear again, so READY below is not passing over a tamper",
          "canonical_zip_status_disagrees_with_boundary" not in problems(), problems())
 
+    s.ok("P7 a pre-activation proof is refused while B is still BUILDING",
+         raises(c, "select geo.n5_generation_record_proof(%s,'run-p',%s,%s::jsonb)",
+                (GEN_B, DECLARED, json.dumps(browser_ok(GEN_B, LEGACY))), r"not READY"))
     q(c, "select geo.n5_generation_mark_ready(%s, array['111','112'])", (GEN_B,))
     s.ok("G6 recorded unresolved outcomes are frozen once B leaves BUILDING",
          raises(c, "delete from geo.n5_generation_unresolved where generation_id=%s", (GEN_B,), r"N5 GUARD"))
@@ -583,8 +604,58 @@ def run(conn, label, mutate=None, suite=None):
          q1(c, "select state from geo.n5_generation where generation_id=%s", (GEN_B,)) == "READY"
          and map_snapshot(c) == pre)
 
+    # ---- D14: the pre-activation proof (Fix 5)
+    act = "select geo.n5_generation_activate(%s, array['111','112'])"
+    s.ok("P0 READY alone does not activate: a generation with no proof is refused",
+         raises(c, act, (GEN_B,), r"no pre-activation proof"))
+    pp = lambda gen=GEN_B, base=LEGACY: {r["check_name"]: r["n"] for r in q(
+        c, "select * from geo.n5_generation_preactivation_problems(%s,%s,%s)", (gen, base, DECLARED))}
+    s.ok("P1 control: B's data checks are clear against the serving generation A, and A really "
+         "shows a member B does not (dev:P5 left B's capture)",
+         pp() == {} and q1(c, "select count(*) from geo.zip_authoritative_membership o where o.generation_id=%s "
+                              "and not exists (select 1 from geo.zip_authoritative_membership b where b.generation_id=%s "
+                              "and b.zcta5=o.zcta5 and b.source_key=o.source_key)", (LEGACY, GEN_B)) >= 1, pp())
+    bad = proof(c, GEN_B, browser=dict(browser_ok(GEN_B, LEGACY), mismatches=2, passed=False))
+    s.ok("P2 a browser mismatch is RECORDED as a failed proof (evidence kept), and activation is refused",
+         bad["passed"] is False and bad["problems"].get("browser_mismatches") == 1
+         and raises(c, act, (GEN_B,), r"did not pass"), bad["problems"])
+    for label, br, key in (
+            ("P3a a browser result for another candidate", dict(browser_ok(GEN_B, LEGACY), candidate_generation_id="gen-z"), "browser_candidate_differs"),
+            ("P3b a browser result against a generation that is not serving", browser_ok(GEN_B, "gen-z"), "browser_baseline_is_not_serving"),
+            ("P3c a browser sample under 10 ZIPs (or under every ZIP, where the generation has fewer: 5 here)", dict(browser_ok(GEN_B, LEGACY), zips_checked=4), "browser_sample_too_small"),
+            ("P3d no browser result at all", None, "browser_result_missing")):
+        r = proof(c, GEN_B, browser=br)
+        s.ok(f"{label} fails the proof", r["passed"] is False and key in r["problems"], r["problems"])
+    undeclared = proof(c, GEN_B, declared=["11101"])
+    s.ok("P4 a missing boundary that is not declared fails the proof (11199 undeclared; 11101 declared but measured)",
+         undeclared["passed"] is False
+         and undeclared["problems"].get("undeclared_missing_boundary") == 1
+         and undeclared["problems"].get("declared_no_boundary_measured") == 1, undeclared["problems"])
+    s.ok("P4b an empty declared list is refused, never a vacuous pass",
+         proof(c, GEN_B, declared=[])["problems"].get("declared_no_boundary_empty") == 1)
+    q(c, "update geo.n5_generation_publish set membership_rows = membership_rows + 1 where generation_id=%s and z3='111'", (GEN_B,))
+    s.ok("P5 a prefix receipt that no longer matches the rows fails the proof",
+         proof(c, GEN_B)["problems"].get("receipt_membership_rows_differ") == 1)
+    q(c, "update geo.n5_generation_publish set membership_rows = membership_rows - 1 where generation_id=%s and z3='111'", (GEN_B,))
+    good = proof(c, GEN_B)
+    s.ok("P6 a clean proof passes and records the serving baseline and the declared list's fingerprint",
+         good["passed"] is True and good["problems"] == {} and good["baseline_generation_id"] == LEGACY
+         and good["declared_no_boundary_md5"] == hashlib.md5(",".join(DECLARED).encode()).hexdigest(), good)
+    q(c, "update geo.n5_generation_publish set marker_rows = marker_rows + 1 where generation_id=%s and z3='112'", (GEN_B,))
+    s.ok("P8 activation RECOMPUTES the checks: a receipt changed after a passing proof is refused",
+         raises(c, act, (GEN_B,), r"pre-activation check failed .* receipt_marker_rows_differ = 1"))
+    q(c, "update geo.n5_generation_publish set marker_rows = marker_rows - 1 where generation_id=%s and z3='112'", (GEN_B,))
+    later = proof(c, GEN_B, browser=dict(browser_ok(GEN_B, LEGACY), mismatches=1, passed=False))
+    s.ok("P9 only the NEWEST proof counts: a failed proof after a passing one blocks activation",
+         later["passed"] is False and raises(c, act, (GEN_B,), r"did not pass"))
+    stale = proof(c, GEN_B)
+    q(c, "update geo.n5_generation_proof set baseline_generation_id='gen-z' where proof_id=%s", (stale["proof_id"],))
+    s.ok("P10 a proof taken against a generation that is no longer serving is refused",
+         raises(c, act, (GEN_B,), r"was taken against gen-z, but legacy-phase1-2026-09-01 is serving now"))
+    proof(c, GEN_B)
+
     fp_a = gen_fingerprint(c, LEGACY)
-    q(c, "select geo.n5_generation_activate(%s, array['111','112'])", (GEN_B,))
+    q(c, act, (GEN_B,))
     s.ok("10 activation switches Map 1 from A to B (P5 gone, P4 and P3 visible)",
          refs(c, "11101") == ["dev:P1", "dev:P2"] and refs(c, "11102") == ["dev:P2", "dev:P4"]
          and refs(c, "11201") == ["dev:P3"] and refs(c, "11301") == ["dev:P11"],
@@ -744,6 +815,27 @@ MUTATIONS = {
     "M22 completeness checks only one direction (boundary ZIPs)": ("B2", """
         do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_publish_problems(text,text[])'::regprocedure),
           'then ''boundary_complete'' else ''not_measured'' end)', 'then ''boundary_complete'' else st.status end)'); end $m$;"""),
+    "M23 activation stops requiring a pre-activation proof": ("P0", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
+          'raise exception ''activate: generation % has no pre-activation proof''', 'pf.passed := true; pf.declared_no_boundary := array[''11199'']; pf.baseline_generation_id := geo.n5_serving_generation_id(); --'); end $m$;"""),
+    "M24 the proof ignores browser mismatches": ("P2", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_record_proof(text,text,text[],jsonb)'::regprocedure),
+          'bproblem := bproblem || ''browser_mismatches''::text', 'null'); end $m$;"""),
+    "M25 the proof stops checking for undeclared missing boundaries": ("P4", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_preactivation_problems(text,text,text[])'::regprocedure),
+          'and not exists (select 1 from decl where decl.zip = st.zip)', 'and false'); end $m$;"""),
+    "M26 activation trusts the proof row instead of recomputing the checks": ("P8", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
+          'pf.baseline_generation_id, pf.declared_no_boundary) loop', 'pf.baseline_generation_id, pf.declared_no_boundary) where false loop'); end $m$;"""),
+    "M27 a serving member that left the capture counts as unexplained": ("P1", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_preactivation_problems(text,text,text[])'::regprocedure),
+          'and exists (select 1 from cap where cap.source_key = ex.source_key)', 'and true'); end $m$;"""),
+    "M28 the proof accepts a browser result taken against another generation": ("P3b", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_record_proof(text,text,text[],jsonb)'::regprocedure),
+          'bproblem := bproblem || ''browser_baseline_is_not_serving''::text', 'null'); end $m$;"""),
+    "M29 activation accepts a proof taken against a generation that no longer serves": ("P10", """
+        do $m$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
+          'if pf.baseline_generation_id is distinct from geo.n5_serving_generation_id() then', 'if false then'); end $m$;"""),
     "M7 activation stops recording the predecessor": ("16", """
         do $$ begin execute replace(pg_get_functiondef('geo.n5_generation_activate(text,text[])'::regprocedure),
           'predecessor_generation_id = coalesce(predecessor_generation_id, prev.generation_id)', 'predecessor_generation_id = predecessor_generation_id'); end $$;"""),

@@ -2,80 +2,48 @@
 //
 // This file names no Deno global: `index.ts` passes the environment and `fetch` in, so a test can hand it a stub and
 // look at every request it would make. It contains no rule about what a report says (that is _shared/national-report.ts)
-// and no rule about who may ask (that is handler.ts). It only fetches, and it fails CLOSED:
-//   * a non-2xx answer is DataUnavailable, never an empty list (an empty list reads as "nothing is near you");
-//   * a response that fills PostgREST's row cap is DataUnavailable, never silently cut short;
-//   * the service key is sent only to the project's own URL.
-import { DataUnavailable, GeocoderUnavailable } from './handler.ts';
+// and no rule about who may ask (that is _shared/admin-gate.ts). It only fetches, and it fails CLOSED. The shared
+// fetching, the row cap, the admin allow-list read and the user lookup are _shared/service-rest.ts, used unchanged by
+// every admin function (a second copy of "is this user an admin" is exactly what the one-path rule forbids).
+import { GeocoderUnavailable } from './handler.ts';
 import type { Deps, Geocoded } from './handler.ts';
-import type {
-  LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth,
-} from '../_shared/national-report.ts';
-import { RADIUS_ROW_LIMIT } from './handler.ts';
+import {
+  DataUnavailable, makeServiceReads, POSTGREST_ROW_CAP, quoteIn,
+} from '../_shared/service-rest.ts';
+import { makeReportReads } from '../_shared/report-reads.ts';
+import { makeChangeReads } from '../_shared/change-reads.ts';
+import { issueBrokerageReport } from '../_shared/report-snapshot.ts';
+import { makeEvaluationReads } from '../_shared/evaluation-reads.ts';
+import { makeBillingReads } from '../_shared/billing-reads.ts';
+import { makeRateReads } from '../_shared/rate-reads.ts';
+import { makePrivateSubjectReads } from '../_shared/private-subject.ts';
+import { norm } from '../_shared/national-report.ts';
+import type { FetchFn } from '../_shared/service-rest.ts';
+import { LABEL_MAX } from './handler.ts';
 
+export { POSTGREST_ROW_CAP, quoteIn };
 export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
-type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
-
-/** PostgREST's default response cap. A response this long may have been cut, so it is refused. */
-export const POSTGREST_ROW_CAP = 1000;
-const KEY_CHUNK = 25;
-const CHUNK_PARALLELISM = 4;
-
-/** A PostgREST `in.(…)` list. Each value is double-quoted; a backslash or a double quote inside a value is escaped. */
-export function quoteIn(values: string[]): string {
-  return '(' + values.map((v) => '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',') + ')';
-}
-
-function chunks<T>(xs: T[], n: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < xs.length; i += n) out.push(xs.slice(i, i + n));
-  return out;
-}
-
-async function inBatches<T>(items: string[], run: (batch: string[]) => Promise<T[]>): Promise<T[]> {
-  const out: T[] = [];
-  const parts = chunks(items, KEY_CHUNK);
-  for (let i = 0; i < parts.length; i += CHUNK_PARALLELISM) {
-    const got = await Promise.all(parts.slice(i, i + CHUNK_PARALLELISM).map(run));
-    for (const g of got) out.push(...g);
-  }
-  return out;
-}
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
-  const base = cfg.url.replace(/\/+$/, '');
-  const svc = { apikey: cfg.serviceKey, Authorization: 'Bearer ' + cfg.serviceKey, Accept: 'application/json' };
+  const { base, svc, rest, rpc, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
+  const reportReads = makeReportReads({ base, svc }, rest, fetchFn);
+  // the ledger, the reportable events and the source health: one definition, shared with Changes Since Report
+  const changeReads = makeChangeReads(rest);
 
-  async function rest<T>(path: string): Promise<T[]> {
-    let r: Response;
-    try { r = await fetchFn(base + '/rest/v1/' + path, { headers: svc }); } catch { throw new DataUnavailable('network'); }
-    if (!r.ok) throw new DataUnavailable('http ' + r.status);
-    let rows: unknown;
-    try { rows = await r.json(); } catch { throw new DataUnavailable('json'); }
-    if (!Array.isArray(rows)) throw new DataUnavailable('shape');
-    if (rows.length >= POSTGREST_ROW_CAP) throw new DataUnavailable('row cap reached: the answer may be incomplete');
-    return rows as T[];
-  }
+  // the trial: one definition, shared with the trial function (_shared/evaluation-reads.ts)
+  const evaluation = makeEvaluationReads(rpc);
+  const subjects = makePrivateSubjectReads(rpc);
+  // the plan (build step 11): one definition, shared with the Billing function (_shared/billing-reads.ts)
+  const billing = makeBillingReads(rpc);
+  // the report rate limit: one definition, the database's (docs/report-rate-limit.sql); this file only calls it
+  const rate = makeRateReads(rpc);
 
   return {
     now: cfg.now ?? (() => new Date()),
     rights: cfg.rights,
 
-    async authenticate(token) {
-      let r: Response;
-      try { r = await fetchFn(base + '/auth/v1/user', { headers: { apikey: cfg.serviceKey, Authorization: 'Bearer ' + token } }); }
-      catch { throw new DataUnavailable('network'); }
-      if (r.status === 401 || r.status === 403 || r.status === 404) return null; // includes the public anon key: no user
-      if (!r.ok) throw new DataUnavailable('http ' + r.status);
-      const u = await r.json().catch(() => null);
-      return u && typeof u.email === 'string' && u.email ? { email: u.email } : null;
-    },
-
-    async isAdmin(email) {
-      // exact comparison, the same as public.hs_acquisition_metrics: an email that does not match is not an admin
-      const rows = await rest<{ email: string }>('dashboard_admins?select=email&limit=1&email=eq.' + encodeURIComponent(email));
-      return rows.length === 1 && rows[0].email === email;
-    },
+    authenticate,
+    isAdmin,
 
     async geocode(address): Promise<Geocoded | null> {
       // the ONE geocoder: the existing geocode-address function, never a second Census client
@@ -101,51 +69,45 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
       return rows.length === 1;
     },
 
-    async radius(lat, lng, radiusMi): Promise<RadiusRow[]> {
-      let r: Response;
-      try {
-        r = await fetchFn(base + '/rest/v1/rpc/n5_projects_within_radius', {
-          method: 'POST',
-          headers: { ...svc, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ p_lat: lat, p_lng: lng, p_radius_mi: radiusMi, p_limit: RADIUS_ROW_LIMIT }),
-        });
-      } catch { throw new DataUnavailable('network'); }
-      if (!r.ok) throw new DataUnavailable('http ' + r.status); // a refused radius is an error, not "nothing nearby"
-      const rows = await r.json().catch(() => null);
-      if (!Array.isArray(rows)) throw new DataUnavailable('shape');
-      return rows as RadiusRow[];
+    // the two canonical project reads: ONE definition, shared with the Watch (_shared/report-reads.ts)
+    radius: reportReads.radius,
+    hydrate: reportReads.hydrate,
+
+    ...changeReads,
+
+    // ── the trial (build step 5b): every one of these goes through a database function that owns the decision ──
+    trialOf: evaluation.trialOf,
+    planOf: billing.usageOf,
+    rateClaim: rate.claim,
+
+    issue(userId, idempotencyKey, intelligence, privateContext, opts) {
+      return issueBrokerageReport(rpc, { userId, idempotencyKey }, intelligence, privateContext, opts);
     },
 
-    async hydrate(keys): Promise<ProjectRow[]> {
-      const cols = 'source_key,registry_id,record_kind,name,type,type_raw,status,stage,developer,size,investment,submitted_at,date_kind,address,source_ref,last_seen_at';
-      const rows = await inBatches<ProjectRow & { last_seen_at: string | null }>(keys, (b) =>
-        rest('app_projects?select=' + cols + '&record_kind=eq.development&source_key=in.' + encodeURIComponent(quoteIn(b))));
-      // a project has one copy per ZIP page; the newest materialisation is the one used (the order the N5 shadow read uses)
-      const best = new Map<string, ProjectRow & { last_seen_at: string | null }>();
-      for (const r of rows) {
-        const cur = best.get(r.source_key);
-        if (!cur || String(r.last_seen_at ?? '') > String(cur.last_seen_at ?? '')) best.set(r.source_key, r);
-      }
-      return [...best.values()].map(({ last_seen_at: _drop, ...p }) => p as ProjectRow);
+    async storedReport(reportId) {
+      const rows = await rest<{ body: string }>('report_snapshot?select=body&report_id=eq.' + encodeURIComponent(reportId));
+      return rows.length === 1 && typeof rows[0].body === 'string' ? rows[0].body : null;
     },
 
-    async ledger(keys): Promise<LedgerProject[]> {
-      const cols = 'identity_key,registry_id,comparable,change_ready,observation_count,first_observed_at,last_observed_at';
-      return await inBatches<LedgerProject>(keys, (b) =>
-        rest('dev_change_project?select=' + cols + '&identity_key=in.' + encodeURIComponent(quoteIn(b))));
-    },
+    // saved reports (build step 6): the brokerage's stored reports, read through the one membership resolver
+    savedReports: evaluation.savedReports,
+    openSavedReport: evaluation.openSavedReport,
 
-    async events(keys, sinceDay): Promise<ReportableEvent[]> {
-      const cols = 'identity_key,event_type,material,observed_at,prev_facts,new_facts,changed_fields,publisher_event_type,publisher_event_date';
-      return await inBatches<ReportableEvent>(keys, (b) =>
-        rest('dev_change_event_reportable?select=' + cols + '&observed_at=gte.' + encodeURIComponent(sinceDay)
-          + '&identity_key=in.' + encodeURIComponent(quoteIn(b))));
-    },
+    // the header a member's reports carry (build step 7): the brokerage's name and the person's own, read when a report is shown, never stored
+    headerOf: evaluation.reportHeader,
 
-    async health(families): Promise<SourceHealth[]> {
-      return await inBatches<SourceHealth>(families, (b) =>
-        rest('dev_change_source_health?select=registry_id,fetch_failures_24h,blocked_24h,truncated_24h&registry_id=in.'
-          + encodeURIComponent(quoteIn(b))));
+    // the address and the client label a stored report was made for, while the private layer still keeps them: the ONE reader of that
+    // (_shared/private-subject.ts), shared with the public share-link function, which can read the address alone
+    subjectOf: (contextId) => subjects.subjectOf(contextId, LABEL_MAX),
+
+    // A retried key returns the FIRST report (D-L6). Whether it is the same property is asked of its private context; the address read
+    // stays inside this function, and only the answer leaves it.
+    async contextMatches(contextId, address) {
+      const { data, error } = await rpc('report_private_context_read', { p_context: contextId });
+      if (error || !Array.isArray(data)) throw new DataUnavailable('private context');
+      const c = data.length === 1 ? data[0] : null;
+      if (!c || c.state !== 'active' || typeof c.address !== 'string') return 'unknown';
+      return norm(c.address) === norm(address) ? 'match' : 'mismatch';
     },
   };
 }

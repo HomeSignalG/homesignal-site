@@ -29,6 +29,11 @@ absent from the plane is not eligible. INDEX = Rule F OR Rule D.
 import argparse, hashlib, html, json, os, re, subprocess, sys, tempfile, time, unicodedata, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
+# Loaded by path in some tests (importlib spec_from_file_location), where this directory is not
+# on sys.path; the sibling module is the page-semantics authority and is imported by name.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import page_semantics as ps  # noqa: E402
+
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = "https://homesignal.net"
 STEP = 1000
@@ -126,6 +131,41 @@ def fetch_all(path, key, select, extra="", keyset="id"):
 # Pinned against the JS half by test/meetings-upcoming-window.test.mjs.
 def meeting_cutoff(now_iso):
     return (now_iso or "")[:10]
+
+
+COVERAGE_PATH = os.path.join(os.path.dirname(__file__), "..", "lib", "zip-coverage.json")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import build_zip_coverage as zcov   # the model's own validator (one definition of its invariants)
+
+
+def coverage_mode(entry):
+    """The page a ZIP gets. MUST equal shell.js HS.zipCoverageMode (pinned by
+    test/zip-coverage.test.mjs, which runs both over every entry). A ZIP with no entry is
+    standard. Anything this cannot place fails SAFE to verification_pending, never to a
+    made-up boundary."""
+    if entry is None:
+        return "standard"
+    if entry.get("page_mode") in ("retired", "unverified"):
+        return entry["page_mode"]
+    if entry.get("page_mode") == "standard" and entry.get("map_coverage") == "zcta":
+        return "standard"
+    if entry.get("page_mode") == "specialized_zip":
+        return "specialized_zip"
+    return "verification_pending"
+
+
+def load_zip_coverage(path=COVERAGE_PATH):
+    """The ZIP coverage model (lib/zip-coverage.json, founder 2026-10-03). A missing or
+    malformed model is an error, never an empty one: an empty model would silently turn every
+    one of these ZIPs back into a standard page that claims a map it does not have."""
+    try:
+        doc = json.load(open(path, encoding="utf-8"))
+        zcov.validate_public(doc)
+    except (OSError, ValueError, KeyError) as e:
+        sys.exit(f"ERROR: cannot use the ZIP coverage model {path}: {e}")
+    if not doc["zips"]:
+        sys.exit(f"ERROR: {path} holds no ZIPs")
+    return doc
 
 
 def fetch_data(key, now_iso):
@@ -654,8 +694,11 @@ def assemble(d, now_iso):
         pages[z]["um"] = meetings_for(z)
 
     for p in pages.values():
-        p["ln"].sort(key=lambda x: (x["date"], x["title"]), reverse=True)
-        p["gn"].sort(key=lambda x: (x["date"], x["title"]), reverse=True)
+        # The url is the final tie-break. app_changes is deleted and reinserted on every ZIP
+        # refresh, so two rows with the same day and title (two NWS "Flood Warning"s) can come back
+        # in the other order; without a total order the page would "change" with no change.
+        p["ln"].sort(key=lambda x: (x["date"], x["title"], x["url"] or ""), reverse=True)
+        p["gn"].sort(key=lambda x: (x["date"], x["title"], x["url"] or ""), reverse=True)
         journalism = [x for x in p["ln"] if not x["weather"]]
         p["n_ln_journalism"], p["n_gn"] = len(journalism), len(p["gn"])
         p["n_um"] = min(len(p["um"]), UM_CAP)
@@ -758,7 +801,23 @@ def _items(items, heading, empty, kind):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=20814d85">\n'
+APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=031bef8e">\n'
+
+
+def coverage_panel(p):
+    """The coverage panel for a ZIP with no Census-drawn area. Same words as shell.js
+    HS.zipCoveragePanelHTML (both read lib/zip-coverage.json's copy); test/zip-coverage.test.mjs
+    fails if the two ever differ. No count, no '0 projects', no empty-search sentence."""
+    cov, z = p["coverage"], p["zip"]
+    c = cov["copy"]
+    # The nearby link is absolute on purpose: the document sets <base href="/">, so a bare
+    # "#zip-nearby" would resolve to the HOME page and leave this one.
+    sub = lambda t: t.replace("{zip}", z)
+    return (f'<section class="zcov" id="hs-zip-coverage" data-zip-coverage="{esc(cov["mode"])}" data-zip="{esc(z)}">'
+            f'<h2>{esc(sub(c["title"]))}</h2>'
+            + "".join(f'<p style="margin:10px 0 0">{esc(sub(t))}</p>' for t in c["body"])
+            + f'<p class="zcov-cta"><a class="inlinebtn" id="zcovAddress" href="/?near={esc(z)}#homeSearch">{esc(c["primary_cta"])}</a> '
+              f'<a class="inlinebtn" id="zcovNearby" href="/community/{esc(z)}/#zip-nearby">{esc(c["secondary_cta"])}</a></p></section>')
 
 
 def render(p, built):
@@ -791,6 +850,17 @@ def render(p, built):
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
             "Government notices, public meetings and local news")
+    cov = p.get("coverage")
+    if cov:
+        # A ZIP with no Census-drawn area (lib/zip-coverage.json). Title and description are the
+        # founder's patterns; robots stays the usual Rule F decision (never noindex merely for
+        # lacking a ZCTA). Nothing here claims a ZIP-wide map, a ZIP-wide count or a ZIP-wide
+        # search: the records below are what the governments and publishers that cover this ZIP
+        # have posted, and the panel says what this page cannot show.
+        title = cov["copy"]["page_title"].replace("{zip}", z)
+        desc = cov["copy"]["meta_description"].replace("{zip}", z)
+        lead = ("Government notices, public meetings and local news from the governments and "
+                "publishers that cover")
     # Usable links in the INITIAL HTML (Step 12). Internal, crawlable, no JavaScript: the
     # ZIP's own development/map page and the site root. Deliberately NOT the legacy
     # community.html?zip= URL — that page canonicalises here, so linking to it from here
@@ -799,6 +869,11 @@ def render(p, built):
              f'Development &amp; permits map for {esc(z)}</a> · '
              f'<a href="/">HomeSignal home</a> · '
              f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
+    if cov:
+        # No ZIP map exists for this ZIP, so no link to one; the address search is the way in.
+        links = (f'<nav class="zsec"><a href="/?near={esc(z)}#homeSearch">Search an address near {esc(z)}</a> · '
+                 f'<a href="/">HomeSignal home</a> · '
+                 f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
     # The sibling block goes AFTER that nav and carries a DIFFERENT class, deliberately.
     # scripts/prove-zip-pages-live.mjs scrapes `<nav class="zsec">[\s\S]*?</nav>` and takes
     # the FIRST match to assert the page's usable internal links; a second zsec nav placed
@@ -811,8 +886,14 @@ def render(p, built):
         where = f"{esc(p['county'])} County, {esc(st)}" if st else f"{esc(p['county'])} County"
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
-        links += (f'<nav class="zsib" aria-label="More ZIP codes in this county">'
+        nearby_id = ' id="zip-nearby"' if cov else ""
+        links += (f'<nav class="zsib"{nearby_id} aria-label="More ZIP codes in this county">'
                   f'<h2>More ZIP codes in {where}</h2><ul>{items}</ul></nav>')
+    elif cov:
+        # The panel's "Search nearby ZIPs" link needs somewhere to land even when the county
+        # offers no sibling ZIP.
+        links += ('<nav class="zsib" id="zip-nearby" aria-label="Search nearby ZIPs">'
+                  '<h2>Search nearby ZIPs</h2><p><a href="/#homeSearch">Search another ZIP code or an address</a></p></nav>')
     # UP to the city page (SEO plan step 10: City -> ZIP -> Project). Only a city page
     # that exists is linked; its own class, for the same reason as zsib above.
     cts = p.get("cities") or []
@@ -831,11 +912,13 @@ def render(p, built):
                   f'{project_list_path(z)}">All {npl} project{"s" if npl != 1 else ""} on record '
                   f'in {esc(z)}</a></nav>')
     body = (
-        f'<main id="hs-ssr"><header><p class="eyebrow">ZIP Codes</p>'
+        f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
         f'<h1>{esc(z)} · {esc(label)}</h1>'
-        f'<p>{lead} that apply to the whole of '
-        f'ZIP {esc(z)}{county_bit}.</p></header>'
-        + _dev_items(p.get("dev_entities") or [])
+        + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
+           if cov else
+           f'<p>{lead} that apply to the whole of '
+           f'ZIP {esc(z)}{county_bit}.</p></header>')
+        + ("" if cov else _dev_items(p.get("dev_entities") or []))
         + _items(p["gn"][:GN_CAP], "Government notices",
                  "No government notices on file for this ZIP yet.", "gn")
         + _items(um_items, "Upcoming public meetings",
@@ -888,14 +971,18 @@ def render(p, built):
         "object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; "
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' "
         'https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; '
-        # frame-src/child-src 'self': the AUTHENTICATED ZIP context map is a same-origin
-        # iframe of homesignalmap.html. An anonymous visitor never renders it, so these
-        # two directives are the ONLY public-byte change the Place-maps work leaves on this
-        # document - lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
+        # frame-src/child-src 'self': the ZIP page's map is a same-origin iframe of
+        # homesignalmap.html, shown to every visitor since 2026-10-02 (it was signed-in
+        # only before). lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
         + APP_CSS_LINK + '</head>\n'
-        f'<body data-nav="comm" data-zip="{esc(z)}">\n{body}\n'
+        # data-nav="explore": this document loads the shared shell, and the public ZIP page
+        # is an Explore child (founder navigation plan v3), the same identity community.html
+        # declares. The city/project/project-list/guide families below carry no shell.
+        # data-explore="activity": it is the Activity page in the Explore dropdown, as
+        # community.html is (founder, 2026-10-02).
+        f'<body data-nav="explore" data-zip="{esc(z)}" data-explore="activity">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
@@ -906,13 +993,13 @@ def render(p, built):
         # instead of an absence sentence. Same parity rule as gov-notice-copy.js below —
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
-        '<script src="/lib/zip-authoritative.js?v=20260922a"></script>\n'
+        '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
         '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
-        '<script src="/lib/templates.js?v=ec3b1cb1"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=49ae3c36"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
-        '<script src="/lib/project-type.js?v=6ad8270c"></script>\n'
+        '<script src="/lib/project-type.js?v=108e00a6"></script>\n'
         # gov-notice-copy.js MUST load before community-page.js: the shared runtime calls
         # HS.govNoticeCopy.build() for a ZIP with no notices, and this document is the other
         # host of that same runtime. It was added to community.html alone, so every generated
@@ -923,9 +1010,9 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=f7ec5a9a"></script>\n'
+        '<script src="/shell.js?v=3316971d"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=ff5259e5"></script>\n'
+        '<script src="/lib/community-page.js?v=67435c86"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1032,7 +1119,7 @@ def render_city(c, pages, built):
         f'<body data-nav="city">\n{body}\n</body>\n</html>\n')
 
 
-def build_cities(cities, pages, out_dir, built):
+def build_cities(cities, pages, out_dir, built, state=None):
     written = 0
     for key in sorted(cities):
         c = cities[key]
@@ -1043,7 +1130,10 @@ def build_cities(cities, pages, out_dir, built):
             sys.exit(f"ERROR: city {key} names non-canonical ZIPs {missing[:5]}")
         d = os.path.join(out_dir, "city", c["state"].lower(), c["slug"])
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "index.html"), "wb").write(render_city(c, pages, built).encode("utf-8"))
+        doc = render_city(c, pages, ps.BUILD_DAY_TOKEN)
+        if state is not None:
+            state.add(city_path(c), doc)
+        open(os.path.join(d, "index.html"), "wb").write(doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8"))
         written += 1
     return written
 
@@ -1295,7 +1385,7 @@ def render_project_list(z, keys, projects, pages):
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
 
-def build_projects(projects, pages, out_dir, built):
+def build_projects(projects, pages, out_dir, built, state=None):
     written, nbytes = 0, 0
     for key in sorted(projects):
         pr = projects[key]
@@ -1306,7 +1396,16 @@ def build_projects(projects, pages, out_dir, built):
             sys.exit(f"ERROR: project {key!r} names no canonical ZIP ({missing[:5]})")
         d = os.path.join(out_dir, *pr["path"].strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
-        h = render_project(pr, pages, built, projects).encode("utf-8")
+        doc = render_project(pr, pages, ps.BUILD_DAY_TOKEN, projects)
+        if state is not None:
+            # changed_on is the project page's own modification day (the existing authority for
+            # its sitemap lastmod); it is also the only source-derived time that can seed it.
+            # A tracked project's as_of advances daily and is bookkeeping, not a fact (see
+            # page_semantics.NEUTRAL_AS_OF): its fingerprint reads the page rendered with it held.
+            sem = (render_project({**pr, "as_of": ps.NEUTRAL_AS_OF}, pages, ps.BUILD_DAY_TOKEN, projects)
+                   if pr["tracked"] and pr["as_of"] else None)
+            state.add(pr["path"], doc, pr.get("changed_on") or None, sem)
+        h = doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         nbytes += len(h)
@@ -1460,13 +1559,15 @@ def render_guide_check(projects, pages, built):
                  GUIDE_CHECK, body, built)
 
 
-def build_guides(cities, projects, pages, out_dir, built):
+def build_guides(cities, projects, pages, out_dir, built, state=None):
     written = []
-    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, built)),
-                        (GUIDE_CHECK, render_guide_check(projects, pages, built))):
+    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
+                        (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))):
         d = os.path.join(out_dir, *path.strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "index.html"), "wb").write(html_.encode("utf-8"))
+        if state is not None:
+            state.add(path, html_)
+        open(os.path.join(d, "index.html"), "wb").write(html_.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8"))
         written.append(path)
     return written
 
@@ -1492,9 +1593,11 @@ SITEMAP_DEV_RE = re.compile(
 
 
 def _url_el(loc, lastmod=None):
-    """lastmod is the day the page's facts last changed, never the build day: a lastmod
-    that moves every day tells Google nothing, and it learns to ignore it."""
-    lm = f"    <lastmod>{lastmod}</lastmod>\n" if lastmod and DAY_RE.match(lastmod) else ""
+    """lastmod is when the page's semantic content last changed (a day, or a UTC instant),
+    never the build day: a lastmod that moves every day tells a crawler nothing, and it learns
+    to ignore it. None means no truthful time is known, and the element is omitted."""
+    lm = (f"    <lastmod>{lastmod}</lastmod>\n"
+          if lastmod and (DAY_RE.fullmatch(lastmod) or ps.STAMP_RE.fullmatch(lastmod)) else "")
     return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n{lm}"
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
@@ -1541,19 +1644,22 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     """
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
-    block = "\n".join(_url_el(f"{BASE}/community/{z}/") for z in zips)
+    # lastmod comes from page_semantics.finalize for EVERY family: it moves only when the page's
+    # semantic fingerprint moved, and is omitted where no truthful time is known.
+    lm = lastmod or {}
+    block = "\n".join(_url_el(f"{BASE}/community/{z}/", lm.get(f"/community/{z}/")) for z in zips)
     # City pages (plan step 9) exist only when they qualify, so every one is indexable.
     cps = sorted(city_paths)
     if cps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{cp}") for cp in cps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{cp}", lm.get(cp)) for cp in cps)
     # Project pages (plan step 12) are written only for featured, durable projects: every
     # one is indexable.
     pps = sorted(project_paths)
     if pps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", (lastmod or {}).get(pp)) for pp in pps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{pp}", lm.get(pp)) for pp in pps)
     gps = sorted(guide_paths)
     if gps:
-        block += "\n" + "\n".join(_url_el(f"{BASE}{gp}") for gp in gps)
+        block += "\n" + "\n".join(_url_el(f"{BASE}{gp}", lm.get(gp)) for gp in gps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1627,7 +1733,7 @@ def write_family_sitemaps(out_dir, families, lastmod=None):
 
 
 # ---------------------------------------------------------------- build + gates
-def build(pages, out_dir, canonical, built):
+def build(pages, out_dir, canonical, built, state=None):
     canon = set(canonical)
     written, total, mx, mxz = 0, 0, 0, None
     for z in sorted(pages):
@@ -1639,7 +1745,10 @@ def build(pages, out_dir, canonical, built):
         if os.path.abspath(d) != os.path.normpath(os.path.abspath(d)) or ".." in z:
             sys.exit(f"ERROR: path traversal refused: {z!r}")
         os.makedirs(d, exist_ok=True)
-        h = render(pages[z], built).encode("utf-8")
+        doc = render(pages[z], ps.BUILD_DAY_TOKEN)
+        if state is not None:
+            state.add(f"/community/{z}/", doc)
+        h = doc.replace(ps.BUILD_DAY_TOKEN, built).encode("utf-8")
         open(os.path.join(d, "index.html"), "wb").write(h)
         written += 1
         total += len(h)
@@ -1647,6 +1756,19 @@ def build(pages, out_dir, canonical, built):
             mx, mxz = len(h), z
     return {"documents": written, "bytes": total, "avg": total // max(written, 1),
             "max": mx, "max_zip": mxz}
+
+
+def load_page_state_baseline(path, reseed):
+    """The previous live state, or None. None is ONLY for 'there is none' (no path, no file) or an
+    explicit reseed. A file that exists but does not validate is a hard error: treating a corrupt
+    baseline as 'first run' would swallow a real delta and re-seed over it."""
+    if reseed or not path or not os.path.exists(path):
+        return None
+    try:
+        return ps.load_baseline(open(path, encoding="utf-8").read())
+    except ps.BaselineError as e:
+        sys.exit(f"ERROR: previous page-state baseline is unusable ({e}); dispatch pages with "
+                 f"reseed=true after checking https://homesignal.net/sitemaps/page-state.json")
 
 
 def main():
@@ -1665,6 +1787,19 @@ def main():
                     help="project pages' data JSON published beside the plane "
                          "(default: data/development_seo_projects.json). Production: missing, "
                          "or from a different run than the plane, is a hard error.")
+    ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
+                    help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
+                         "this at a fixture model; production always uses the committed one.")
+    ap.add_argument("--baseline", default=None,
+                    help="the PREVIOUS LIVE sitemaps/page-state.json, captured before this build. "
+                         "A missing file seeds the state (nothing is notified); a file that does "
+                         "not validate fails the build.")
+    ap.add_argument("--reseed", action="store_true",
+                    help="ignore the baseline: publish this state as the new baseline, notify nothing")
+    ap.add_argument("--delta-out", default=None,
+                    help="write the semantic delta (IndexNow notification set) here, outside the artifact")
+    ap.add_argument("--build-id", default=os.environ.get("HS_BUILD_ID", ""))
+    ap.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
     ap.add_argument("--allow-missing-dev-plane", action="store_true",
                     help="fixture-only: a missing plane is {} (no Rule D). "
                          "Refused in production.")
@@ -1718,35 +1853,108 @@ def main():
                                      cities_path=cities_path, projects_out=projects,
                                      projects_path=projects_path)
 
+    ps.assert_token_absent(json.dumps(d, default=str) + json.dumps(cities, default=str)
+                           + json.dumps(projects, default=str))
     zips = d["zips"]
     if len(zips) != len(set(zips)):
         sys.exit(f"ERROR: duplicate ZIPs in canonical registry: {len(zips)} rows, {len(set(zips))} distinct")
     if "80249" in set(zips):
         sys.exit("ERROR: ZIP 80249 present in the canonical registry - removed drift page")
     print(f"canonical registry: {len(zips)} rows, {len(set(zips))} distinct, 0 duplicates")
+    # ZIP COVERAGE (founder, 2026-10-03; replaces the 2026-10-01 "withheld pages" list).
+    # lib/zip-coverage.json names the ZIPs with no Census-drawn area. Every one of them keeps a
+    # document, a canonical URL and its usual sitemap rule: no map and no ZIP-wide development
+    # claim, a coverage panel instead. Only a ZIP whose retirement the internal record shows as
+    # USPS-verified (page_mode retired, none today) or whose existence is unverified (page_mode
+    # unverified: 84684, 84685, founder 2026-10-03) gets no document. Against production every listed ZIP must be
+    # canonical, or a typo would change nothing while the build reported success (a fixture is a
+    # small slice of the registry, so it is only intersected).
+    coverage = load_zip_coverage(a.zip_coverage)
+    modes = {z: coverage_mode(e) for z, e in coverage["zips"].items()}
+    nonstandard = {z for z, m in modes.items() if m != "standard"}
+    retired = {z for z, m in modes.items() if m == "retired"}
+    unverified = {z for z, m in modes.items() if m == "unverified"}
+    nodoc = retired | unverified     # no document, no sitemap entry, no sibling/city/project link
+    stray = sorted(set(coverage["zips"]) - set(zips))
+    if stray and not a.fixture:
+        sys.exit(f"ERROR: coverage ZIP(s) not in the canonical registry: {stray}")
+    registry_n = len(zips)
+    zips = [z for z in zips if z not in nodoc]
+    d["zips"] = zips
+    present = {z: m for z, m in modes.items() if z in set(zips) and m != "standard"}
+    counts = {m: sum(1 for x in present.values() if x == m) for m in ("specialized_zip", "verification_pending")}
+    print(f"zip coverage   : {len(coverage['zips'])} modelled; documents for {len(present)} "
+          f"({counts['specialized_zip']} specialized_zip, {counts['verification_pending']} verification_pending); "
+          f"{len(retired)} retired, {len(unverified)} unverified (no page); building {len(zips)} of {registry_n}")
+    # City and project pages list the ZIPs they cover. A ZIP with no Census-drawn area has no
+    # ZIP-wide development records, so it leaves those lists, and it may only appear there as a
+    # listed or held ZIP: a city that COUNTS such a ZIP as Rule D, or a project whose only ZIP is
+    # one, would make a page describe ZIP-wide records that cannot exist, so the build stops and
+    # names it rather than guessing.
+    for key, c in cities.items():
+        counted = [z for z in c["rule_d_zips"] if z in nonstandard]
+        if counted:
+            sys.exit(f"ERROR: city {key} counts coverage-limited ZIP(s) {counted} as Rule D")
+        c["zips"] = [z for z in c["zips"] if z not in nonstandard]
+        c["held_zips"] = [z for z in c["held_zips"] if z not in nonstandard]
+    for key, pr in projects.items():
+        kept = [z for z in pr["zips"] if z not in nonstandard]
+        if not kept:
+            sys.exit(f"ERROR: project {key!r} is only on coverage-limited ZIP(s) {pr['zips'][:5]}")
+        pr["zips"] = kept
 
     pages = assemble(d, now_iso)
     if len(pages) != len(zips):
         sys.exit(f"ERROR: assembled {len(pages)} pages for {len(zips)} canonical ZIPs")
+    for z, m in present.items():
+        # Rule D (ZIP-wide development entities) and the development cards need a ZIP area; this
+        # ZIP has none, so neither applies. Rule F (government notices, meetings, news) is
+        # unchanged: it does not depend on a boundary.
+        pages[z]["coverage"] = {"mode": m, "copy": coverage["copy"][m], "entry": coverage["zips"][z]}
+        pages[z]["rule_d"], pages[z]["rule_d_count"], pages[z]["dev_entities"] = False, 0, []
     link_cities(pages, cities)
     linked = link_projects(pages, cities, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
     ndpass = sum(1 for p in pages.values() if p.get("rule_d"))
-    stats = build(pages, a.out, zips, now_iso[:10])
+    # The semantic state is collected by the SAME render calls that write the documents: one
+    # page-semantics authority (scripts/page_semantics.py), no second pass over the content.
+    state = ps.PageState(now_iso[:10])
+    stats = build(pages, a.out, zips, now_iso[:10], state)
     indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
-    ncity = build_cities(cities, pages, a.out, now_iso[:10])
+    ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
-    nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10])
+    nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
     project_paths = sorted(pr["path"] for pr in projects.values())
-    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10])
+    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
+
+    baseline = load_page_state_baseline(a.baseline, a.reseed)
+    now_stamp = datetime.fromisoformat(now_iso).strftime("%Y-%m-%dT%H:%M:%SZ")
+    page_state = ps.finalize(state, baseline, now_stamp, override_lastmod=project_lastmod)
+    delta = ps.compute_delta(baseline, page_state)
+    # The notification policy reads robots out of each document; the sitemap is built from the
+    # Rule F / Rule D sets. They are two views of one decision and must be the same set.
+    zip_idx = {p for p, e in page_state.items() if e["i"] and ps.family_of(p) == "zip"}
+    if zip_idx != {f"/community/{z}/" for z in indexable}:
+        sys.exit("ERROR: robots-derived index-eligible set != the sitemap's indexable set")
+    for p, e in page_state.items():
+        if ps.family_of(p) in ("city", "project", "guide") and not e["i"]:
+            sys.exit(f"ERROR: {p} is advertised in the sitemap but its document says noindex")
+    lastmod_map = {p: e["l"] for p, e in page_state.items() if e["l"]}
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
-                           lastmod=project_lastmod)
+                           lastmod=lastmod_map)
     fam = write_family_sitemaps(a.out, {
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
         "city": city_paths, "project": project_paths, "guide": guide_paths},
-        lastmod=project_lastmod)
+        lastmod=lastmod_map)
+    state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
+    open(os.path.join(a.out, "sitemaps", "page-state.json"), "w", encoding="utf-8").write(
+        json.dumps(state_doc, separators=(",", ":"), sort_keys=True))
+    delta["verify"] = ps.verification_sample(state, delta)
+    if a.delta_out:
+        delta["build_id"], delta["commit"], delta["built_at"] = a.build_id, a.commit, now_stamp
+        json.dump(delta, open(a.delta_out, "w", encoding="utf-8"), indent=1, sort_keys=True)
 
     print(f"documents      : {stats['documents']}")
     print(f"rule F pass    : {npass}")
@@ -1766,6 +1974,11 @@ def main():
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs")
     print("family sitemaps : " + ", ".join(f"{k} {v}" for k, v in fam.items()))
+    print(f"page state     : {len(page_state)} tracked pages, state_hash {state_doc['state_hash']}, "
+          f"{'SEED (' + delta['seed_reason'] + ')' if delta['seed'] else 'vs baseline ' + str(delta['baseline_state_hash'])}")
+    print(f"semantic delta : +{len(delta['added'])} added, ~{len(delta['changed'])} changed, "
+          f"{len(delta['indexability_changed'])} indexability flips, -{len(delta['removed'])} removed "
+          f"=> {len(delta['submit'])} URLs to notify")
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
@@ -1779,6 +1992,9 @@ def main():
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
     json.dump({"documents": stats["documents"], "rule_f_pass": npass,
+               "canonical_registry": registry_n, "retired_zips": sorted(retired),
+               "unverified_zips": sorted(unverified),
+               "coverage_zips": {z: m for z, m in sorted(present.items())},
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
@@ -1787,7 +2003,8 @@ def main():
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
-               "family_sitemaps": fam},
+               "family_sitemaps": fam,
+               "page_state_hash": state_doc["state_hash"], "page_state_pages": len(page_state)},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")
 

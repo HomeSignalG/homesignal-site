@@ -31,7 +31,7 @@ import {
   buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
 import { browsingBucketFor, decisionFor, decisionEvidenceLevel } from "./decision.ts";
-import { fenceGeocode } from "./geo-fence.ts";
+import { fenceGeocode, noteFenceOutcome } from "./geo-fence.ts";
 import { applyCommercialWorkEvidence } from "./commercial-eligibility.ts";
 import type { CommercialWorkEvidence } from "./commercial-eligibility.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
@@ -236,6 +236,8 @@ export interface ArcgisDeps {
   /** ZIP centroid of the report being built — required only by entries using
    *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
   zipCentroid?: { lat: number; lng: number } | null;
+  /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
+  noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
 
 export interface ArcgisCommunityRow { state?: string | null; county?: string | null; }
@@ -471,6 +473,7 @@ async function normalizeRow(
       // address (the Clark County fix: fence against the address's OWN ZIP, not the report
       // ZIP) → reportZip. Same fence comparison as before, just a more accurate filed ZIP.
       const verdict = fenceGeocode(g, gi.filedZip, deps.zipCentroid);
+      await noteFenceOutcome(deps.noteFence, gi.input, verdict);
       if (!verdict.ok) {
         report.geocode_failures++;
         report.quarantined.push({ reason: verdict.reason, sample: address });

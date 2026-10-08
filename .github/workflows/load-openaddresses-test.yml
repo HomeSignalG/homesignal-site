@@ -1,0 +1,26 @@
+name: load-openaddresses-test
+
+# The dry-run match preview in scripts/load-openaddresses.py is a measurement a decision rests on, so
+# it is pinned: an exact-key hit counts, a unit-stripped-only hit does not, and its controls hold.
+on:
+  pull_request:
+    paths:
+      - 'scripts/load-openaddresses.py'
+      - 'test/test_load_openaddresses_dc_report.py'
+      - '.github/workflows/load-openaddresses-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/load-openaddresses.py'
+      - 'test/test_load_openaddresses_dc_report.py'
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 test/test_load_openaddresses_dc_report.py

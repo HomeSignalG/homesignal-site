@@ -11,7 +11,8 @@ to geo.n5_generation_mark_ready() and geo.n5_generation_activate(), which re-der
 condition against the DECLARED chunk set and raise rather than returning false.
 With AUTO_LIFECYCLE=1 (the unattended tick, founder instruction 2026-09-29) the `work` tick
 also opens the next generation when none is building and, once a build is complete, CALLS
-those two gates in order. A gate that raises stops the tick red; nothing is retried around it.
+those gates in order: READY, then the pre-activation proof, then ACTIVATE. A gate that raises
+(or a proof that does not pass) stops the tick red; nothing is retried around it.
 
 MODES
   status     one-read generation state (geo.n5_generation_status)
@@ -26,8 +27,16 @@ MODES
   reconcile  compute reconciliation chunks for a generation
   ready      BUILDING -> READY through geo.n5_generation_mark_ready, which re-derives
              completeness and reconciliation itself and raises on any gap
+  prove      the PRE-ACTIVATION PROOF for a READY generation (Fix 5, 2026-10-08): render a
+             sample of ZIPs in a real browser under the candidate AND the serving generation
+             (scripts/n5_preactivation_browser.mjs) and record the result with the declared
+             no-boundary list through geo.n5_generation_record_proof, which also runs the data
+             checks. A failed proof is recorded and stops the tick red.
+  prove_dry  read-only rehearsal of the browser half on real data (GENERATION against BASELINE,
+             default its predecessor); records nothing
   activate   hand the DECLARED chunk set to the activation gate. Its COMMIT is the one
-             serving switch: Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation.
+             serving switch: Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation. The gate
+             refuses unless the newest proof passed against the generation still serving.
   rollback   GENERATION = the superseded generation to restore; REASON required
   fail       mark a candidate FAILED; REASON required
   discard    delete a FAILED / superseded generation's rows (never the serving generation
@@ -59,6 +68,13 @@ MODE = os.environ.get("MODE", "status").strip()
 MAX_SHARDS = int(os.environ.get("MAX_SHARDS", "1"))
 MAX_SECONDS = int(os.environ.get("MAX_SECONDS", "3000"))
 LEASE_SECONDS = int(os.environ.get("LEASE_SECONDS", "3600"))
+# Unattended ticks put a halted shard back in the queue until it has been tried this many
+# times. A shard rerun is safe by design: it deletes its own partial slice before freezing
+# again, and every gate runs again. 2026-10-01: shard 010 of n5-national-2026-10-01 timed out
+# freezing ZIP 01001 minutes after the 2.9M-row open (cold statistics), while the next 145
+# shards ran clean; a halt is final to n5_claim_shard, so without this the build could never
+# finish. A shard that halts this many times stays halted and n5_map1_build alarms.
+MAX_SHARD_ATTEMPTS = 3
 WORKER = os.environ.get("WORKER", f"gh-{os.environ.get('GITHUB_RUN_ID', 'local')}-"
                                   f"{os.environ.get('GITHUB_JOB', os.getpid())}")
 # CHUNKS defaults to EMPTY, meaning "the generation's own shard prefixes". Reconciliation
@@ -83,10 +99,29 @@ AUTO_OPEN_MIN_HOURS = float(os.environ.get("AUTO_OPEN_MIN_HOURS", "20"))
 # requires that much above the 2,048 MB floor, so a build is never started that the floor
 # would halt half way.
 BUILD_RESERVE_MB = float(os.environ.get("BUILD_RESERVE_MB", "3500"))
-# READY + ACTIVATE are two heavy calls (up to HEAVY_CLIENT_TIMEOUT each). They start only
+# READY, the pre-activation proof and ACTIVATE are heavy calls (up to HEAVY_CLIENT_TIMEOUT each; the
+# proof also renders ~16 ZIPs twice in a browser, a few minutes). They start only
 # while the tick still has room for both inside the 150-minute job; otherwise the next tick
 # does them first thing.
 FINISH_START_LIMIT_S = int(os.environ.get("FINISH_START_LIMIT_S", "3000"))
+# THE PRE-ACTIVATION PROOF (Fix 5). The canonical ZIPs with no Census boundary, as Fix 4
+# classified them: read from the committed file every time, never transcribed (claims rule 7).
+DECLARED_NO_BOUNDARY_CSV = os.environ.get("DECLARED_NO_BOUNDARY_CSV", "").strip() or \
+    os.path.join(HERE, "..", "docs", "maps-coverage", "fix4", "no-boundary-zip-classification.csv")
+# How many ZIPs the browser renders under both generations. Every ZIP whose membership changes
+# between the two comes first (up to PROOF_CHANGED_ZIPS), then one unmeasured ZIP, then a
+# deterministic spread of ordinary ones. The database refuses a proof under 10 ZIPs.
+PROOF_ZIPS = int(os.environ.get("PROOF_ZIPS", "16"))
+PROOF_CHANGED_ZIPS = int(os.environ.get("PROOF_CHANGED_ZIPS", "8"))
+PROOF_MAX_MEMBERS = int(os.environ.get("PROOF_MAX_MEMBERS", "1500"))
+# The browser step, as an argv. Tests replace it; production runs the shipped script, and only
+# then is the browser installed (ensure_browser) - an hourly tick that does not prove pays nothing.
+PROOF_BROWSER_DEFAULT = not os.environ.get("PROOF_BROWSER_CMD", "").strip()
+PROOF_BROWSER_CMD = os.environ.get("PROOF_BROWSER_CMD", "").split() or \
+    ["node", os.path.join(HERE, "n5_preactivation_browser.mjs")]
+# Pinned exactly as the unit-tests workflow pins them, so the proof runs the browser the
+# browser suites were proven with.
+PROOF_BROWSER_PACKAGES = ["playwright@1.56.0", "leaflet@1.9.4"]
 T_START = time.time()
 
 
@@ -342,7 +377,10 @@ def mode_work():
             raise SystemExit(f"STOP: {len(pending)} generations are READY ({','.join(pending)}). "
                              f"Refusing to guess which one to activate.")
         if pending:
-            # A READY generation left by an earlier tick (its activate was deferred or lost).
+            # A READY generation left by an earlier tick (its proof or activate was deferred,
+            # lost or refused). The proof is taken again: it must be against the generation
+            # serving NOW.
+            prove(pending[0])
             activate(pending[0])
             retire_superseded()
             return 0
@@ -363,6 +401,8 @@ def mode_work():
     if not snap:
         raise SystemExit(f"STOP: generation {gen} does not exist.")
     snapshot_id = snap[0]["snapshot_id"]
+    if auto:
+        requeue_halted(gen)
     t0 = time.time()
     done = 0
     while done < MAX_SHARDS and (time.time() - t0) < MAX_SECONDS:
@@ -387,6 +427,17 @@ def mode_work():
     if auto:
         auto_finish(gen)
     return 0
+
+
+def requeue_halted(gen):
+    """Put halted shards tried fewer than MAX_SHARD_ATTEMPTS times back in the queue."""
+    rows = sql(f"""update geo.n5_shard set state='pending', claimed_by=null, claim_expires_at=null
+                    where generation_id={lit(gen)} and state='halted'
+                      and attempts < {MAX_SHARD_ATTEMPTS}
+                   returning z3, attempts;""", "requeue halted")
+    for r in rows or []:
+        say("requeued halted shard", f"{r['z3']} (tried {r['attempts']} of {MAX_SHARD_ATTEMPTS})")
+    return len(rows or [])
 
 
 def generations_in(state):
@@ -450,6 +501,7 @@ def auto_finish(gen):
         say("auto finish", "build complete - READY/activate deferred to the next tick (time)")
         return 0
     ready(gen)
+    prove(gen)
     activate(gen)
     retire_superseded()
     return 0
@@ -467,12 +519,18 @@ def auto_finish(gen):
 # A DELETE does not shrink the database; autovacuum makes the space reusable, and the next
 # build's inserts into the same tables reuse it, so measured size stops growing by a build a
 # day. The auto-open disk check stays on the measured figure, which errs on the safe side.
+# THE CANDIDATE LIST READS ONLY THE TINY CATALOG TABLE (2026-10-06). It used to carry the two
+# "does this generation still have rows" probes as correlated EXISTS subqueries, and with a
+# correlated parameter the planner prices an average-sized generation, so it chose a sequential
+# scan of geo.zip_authoritative_membership (1.8 GB) and preservation.app_project_identity
+# (5.7 GB) per candidate. A generation already retired has no rows, so its probe read the WHOLE
+# table and found nothing: four retired candidates blew the 120 s statement timeout, every tick
+# died here ("SQL retire candidates failed HTTP 400 ... 57014") before it could open the daily
+# build, and no Map 1 generation opened for 4 days. The probes now run one per candidate with
+# the id as a LITERAL (see _has_rows_sql / _has_snapshot_sql), which the planner prices from the
+# column's own statistics: an index-only scan, cost ~1.7 either way.
 RETIRE_CANDIDATES_SQL = """
-select g.generation_id, g.snapshot_id,
-       exists (select 1 from geo.zip_authoritative_membership m
-                where m.generation_id = g.generation_id) as has_rows,
-       exists (select 1 from preservation.app_project_identity i
-                where i.snapshot_id = g.snapshot_id) as has_snapshot
+select g.generation_id, g.snapshot_id
   from geo.n5_generation g
  where g.state = 'SUPERSEDED'
    and exists (select 1 from geo.n5_generation s where s.state = 'ACTIVE')
@@ -484,6 +542,20 @@ select g.generation_id, g.snapshot_id,
    and not exists (select 1 from geo.n5_generation o
                     where o.snapshot_id = g.snapshot_id and o.generation_id <> g.generation_id)
  order by g.opened_at;"""
+
+
+def _has_rows_sql(gen):
+    """Does this generation still hold build rows? A LITERAL id on purpose: it is priced from
+    the column statistics and served by zip_authoritative_membership_gen_source (see the note
+    on RETIRE_CANDIDATES_SQL for what the correlated form cost)."""
+    return (f"select exists (select 1 from geo.zip_authoritative_membership "
+            f"where generation_id={lit(gen)}) ok;")
+
+
+def _has_snapshot_sql(snap):
+    """Does this snapshot still hold its capture? Literal id, served by the primary key."""
+    return (f"select exists (select 1 from preservation.app_project_identity "
+            f"where snapshot_id={lit(snap)}) ok;")
 
 
 def _verify_discarded(gen):
@@ -504,13 +576,16 @@ def retire_superseded():
     done = 0
     for r in sql(RETIRE_CANDIDATES_SQL, "retire candidates", read_only=True):
         gen, snap = r["generation_id"], r["snapshot_id"]
-        if not (r["has_rows"] or r["has_snapshot"]):
+        has_rows = bool(sql(_has_rows_sql(gen), "retire probe rows", read_only=True)[0]["ok"])
+        has_snapshot = bool(sql(_has_snapshot_sql(snap), "retire probe snapshot",
+                                read_only=True)[0]["ok"])
+        if not (has_rows or has_snapshot):
             continue  # already retired on an earlier tick
-        if r["has_rows"]:
+        if has_rows:
             heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",
                   verify=_verify_discarded(gen))
             say("retired build rows", gen)
-        if r["has_snapshot"]:
+        if has_snapshot:
             heavy(f"delete from preservation.app_project_identity where snapshot_id={lit(snap)};",
                   "retire snapshot", verify=_verify_snapshot_gone(snap))
             say("retired snapshot", snap)
@@ -644,6 +719,191 @@ def ready(gen):
     return 0
 
 
+def announce_serving_change(gen):
+    """Tell the workflow that WHICH generation Map 1 serves just changed. Rule D scores the
+    serving membership, so its published plane is stale from this moment; the workflow uses
+    this to ask the plane's own refresh (homesignal-ingest) to run now instead of tomorrow.
+    Nothing is decided here: no ZIP is named and no page is judged."""
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as f:
+            f.write(f"n5_serving_changed={gen}\n")
+
+
+def declared_no_boundary():
+    import csv
+    with open(DECLARED_NO_BOUNDARY_CSV, newline="", encoding="utf-8") as f:
+        zips = sorted({r["zip"].strip() for r in csv.DictReader(f) if r.get("zip", "").strip()})
+    if not zips:
+        raise SystemExit(f"STOP: no declared no-boundary ZIPs read from {DECLARED_NO_BOUNDARY_CSV}")
+    return zips
+
+
+def proof_sample(gen, base):
+    """The ZIPs the browser renders under both generations: changed ones first, then one
+    unmeasured, then a deterministic spread. Read-only."""
+    rows = sql(f"""
+with ch as (
+  select zcta5 zip from (
+    (select zcta5, source_key from geo.zip_authoritative_membership where generation_id = {lit(gen)}
+     except select zcta5, source_key from geo.zip_authoritative_membership where generation_id = {lit(base)})
+    union all
+    (select zcta5, source_key from geo.zip_authoritative_membership where generation_id = {lit(base)}
+     except select zcta5, source_key from geo.zip_authoritative_membership where generation_id = {lit(gen)})) d
+  group by zcta5),
+c as (select s.zip::text zip, 1 k, md5(s.zip || {lit(gen)}) o
+        from geo.maps_zip_geography_status s join ch on ch.zip = s.zip
+       where s.generation_id = {lit(gen)} and s.membership_rows <= {PROOF_MAX_MEMBERS}
+       order by o limit {PROOF_CHANGED_ZIPS}),
+u as (select s.zip::text zip, 2 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
+       where s.generation_id = {lit(gen)} and s.status <> 'boundary_complete' order by o limit 1),
+r as (select s.zip::text zip, 3 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
+       where s.generation_id = {lit(gen)} and s.status = 'boundary_complete'
+         and s.membership_rows between 1 and {PROOF_MAX_MEMBERS}
+       order by o limit {PROOF_ZIPS})
+select zip from (select distinct on (zip) zip, k, o from (select * from c union all select * from u
+                 union all select * from r) x order by zip, k) y
+ order by k, o limit {PROOF_ZIPS};""", "proof sample", read_only=True, timeout=300)
+    return [r["zip"] for r in rows]
+
+
+def proof_input(gen, base, zips):
+    """Each sample ZIP's answer under both generations, read through the ONE function Map 1
+    reads (geo.n5_zip_projects_markers_at), plus the reader-parity control: the serving
+    generation's answer through that function must equal the public reader's own answer."""
+    out = {"candidate_generation_id": gen, "baseline_generation_id": base, "zips": []}
+    reader_mismatch = []
+    # Where the page centres the map: the ZIP's cached report point when there is one (every
+    # canonical ZIP in production), else nothing. It decides only the view, never a marker.
+    has_reports = sql("select to_regclass('public.development_reports') is not null ok;",
+                      "proof reports", read_only=True)[0]["ok"]
+    home = (lambda z: f"(select home_lat from public.development_reports where zip = {lit(z)}) home_lat, "
+                      f"(select home_lng from public.development_reports where zip = {lit(z)}) home_lng") \
+        if has_reports else (lambda z: "null::float8 home_lat, null::float8 home_lng")
+    for z in zips:
+        r = sql(f"""select geo.n5_zip_projects_markers_at({lit(gen)}, {lit(z)}, 'development') c,
+       geo.n5_zip_projects_markers_at({lit(base)}, {lit(z)}, 'development') b,
+       geo.n5_zip_projects_markers_at({lit(base)}, {lit(z)}, 'development')
+         = public.app_zip_projects_markers({lit(z)}, 'development', true) same,
+       {home(z)};""", f"proof answers {z}", read_only=True, timeout=300)[0]
+        if not r["same"]:
+            reader_mismatch.append(z)
+        out["zips"].append({"zip": z, "home_lat": r["home_lat"], "home_lng": r["home_lng"],
+                            "candidate": r["c"], "baseline": r["b"]})
+    return out, reader_mismatch
+
+
+def ensure_browser():
+    """Install playwright + the pinned leaflet build beside the checkout and download Chromium,
+    unless they already resolve. Only the shipped browser step needs it."""
+    if not PROOF_BROWSER_DEFAULT:
+        return
+    root = os.path.abspath(os.path.join(HERE, ".."))
+    probe = subprocess.run(["node", "-e", "import('playwright').then(()=>process.exit(0),()=>process.exit(1))"],
+                           cwd=root)
+    if probe.returncode == 0:
+        return
+    for cmd in (["npm", "install", "--no-save", "--no-audit", "--no-fund"] + PROOF_BROWSER_PACKAGES,
+                ["npx", "playwright", "install", "--with-deps", "chromium"]):
+        r = subprocess.run(cmd, cwd=root)
+        if r.returncode != 0:
+            raise SystemExit(f"STOP: prove: could not install the browser ({' '.join(cmd)} exited {r.returncode}).")
+
+
+def prove(gen):
+    """READY -> a recorded pre-activation proof. The browser renders the sample under both
+    generations; geo.n5_generation_record_proof runs the data checks and records the result.
+    Raises (tick red) unless the recorded proof passed."""
+    import tempfile
+    state = sql(f"select state from geo.n5_generation where generation_id={lit(gen)};",
+                "proof state", read_only=True)
+    if not state or state[0]["state"] != "READY":
+        raise SystemExit(f"STOP: prove: generation {gen} is not READY.")
+    reader = sql("select position('n5_zip_projects_markers_at(geo.n5_serving_generation_id()' in prosrc) > 0 ok "
+                 "from pg_proc where oid = 'public.app_zip_projects_markers(text,text,boolean)'::regprocedure;",
+                 "proof reader", read_only=True)
+    if not reader or not reader[0]["ok"]:
+        raise SystemExit("STOP: prove: Map 1's reader does not read through geo.n5_zip_projects_markers_at "
+                         "(docs/map1-zip-read-generation.sql is not applied), so the browser cannot render "
+                         "the candidate through the code residents run.")
+    base_rows = sql("select geo.n5_serving_generation_id() g;", "proof baseline", read_only=True)
+    base = base_rows[0]["g"] if base_rows else None
+    if not base:
+        raise SystemExit("STOP: prove: no generation is serving, so there is nothing to prove against.")
+    declared = declared_no_boundary()
+    zips = proof_sample(gen, base)
+    say("proof sample", f"{len(zips)} ZIP(s) against {base}: {','.join(zips)}")
+    data, reader_mismatch = proof_input(gen, base, zips)
+    ensure_browser()
+    with tempfile.TemporaryDirectory() as d:
+        inp, outp = os.path.join(d, "in.json"), os.path.join(d, "out.json")
+        with open(inp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        r = subprocess.run(PROOF_BROWSER_CMD + ["--input", inp, "--out", outp])
+        if not os.path.exists(outp):
+            raise SystemExit(f"STOP: prove: the browser step exited {r.returncode} and wrote no result.")
+        with open(outp, encoding="utf-8") as f:
+            browser = json.load(f)
+    if reader_mismatch:
+        browser["reader_mismatch_zips"] = reader_mismatch
+        browser["mismatches"] = int(browser.get("mismatches") or 0) + len(reader_mismatch)
+        browser["passed"] = False
+    import uuid
+    run_id = f"{WORKER}-proof-{uuid.uuid4().hex[:12]}"
+    arr = "array[" + ",".join(lit(z) for z in declared) + "]::text[]"
+    heavy(f"select proof_id from geo.n5_generation_record_proof({lit(gen)}, {lit(run_id)}, {arr}, "
+          f"{lit(json.dumps(browser))}::jsonb);", "proof",
+          verify=(f"select exists (select 1 from geo.n5_generation_proof where generation_id={lit(gen)} "
+                  f"and run_id={lit(run_id)}) ok;"))
+    row = sql(f"select proof_id, passed, problems, baseline_generation_id from geo.n5_generation_proof "
+              f"where generation_id={lit(gen)} and run_id={lit(run_id)} order by proof_id desc limit 1;",
+              "proof read", read_only=True)[0]
+    say("proof", f"#{row['proof_id']} against {row['baseline_generation_id']}: "
+                 f"{'PASSED' if row['passed'] else 'FAILED'} {json.dumps(row['problems'])} "
+                 f"(browser: {browser.get('zips_checked')} ZIP(s), {browser.get('mismatches')} mismatch(es), "
+                 f"{browser.get('differing_zips')} changed)")
+    if not row["passed"]:
+        raise SystemExit(f"STOP: the pre-activation proof for {gen} did not pass: {json.dumps(row['problems'])}. "
+                         f"{gen} stays READY; Map 1 keeps serving {base}.")
+    return 0
+
+
+def mode_prove():
+    return prove(require_generation())
+
+
+def mode_prove_dry():
+    """READ-ONLY rehearsal of the browser half on real data: render the sample under
+    GENERATION and BASELINE (default: GENERATION's recorded predecessor) exactly as `prove`
+    does, print the result, record NOTHING. Any state with rows will do, e.g. the serving
+    generation against its predecessor. It decides nothing and cannot activate anything."""
+    gen = require_generation()
+    base = os.environ.get("BASELINE", "").strip()
+    if not base:
+        rows = sql(f"select predecessor_generation_id p from geo.n5_generation where generation_id={lit(gen)};",
+                   "dry baseline", read_only=True)
+        base = rows[0]["p"] if rows else None
+    if not base:
+        raise SystemExit("STOP: prove_dry: no BASELINE given and the generation has no predecessor.")
+    zips = proof_sample(gen, base)
+    say("dry proof sample", f"{len(zips)} ZIP(s), {gen} against {base}: {','.join(zips)}")
+    data, reader_mismatch = proof_input(gen, base, zips)
+    ensure_browser()
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        inp, outp = os.path.join(d, "in.json"), os.path.join(d, "out.json")
+        with open(inp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        r = subprocess.run(PROOF_BROWSER_CMD + ["--input", inp, "--out", outp])
+        browser = json.load(open(outp, encoding="utf-8")) if os.path.exists(outp) else {}
+    say("dry proof", f"browser exit {r.returncode}: passed={browser.get('passed')} "
+                     f"zips_checked={browser.get('zips_checked')} mismatches={browser.get('mismatches')} "
+                     f"changed={browser.get('differing_zips')}; reader parity mismatches: {reader_mismatch or 'none'}")
+    if r.returncode != 0 or not browser.get("passed") or reader_mismatch:
+        raise SystemExit("STOP: the dry proof did not pass (nothing was recorded).")
+    return 0
+
+
 def mode_activate():
     return activate(require_generation())
 
@@ -653,6 +913,7 @@ def activate(gen):
     heavy(f"select geo.n5_generation_activate({lit(gen)}, {arr});", "activate",
           verify=_verify_state(gen, "ACTIVE"))
     say("generation", f"{gen} -> ACTIVE")
+    announce_serving_change(gen)
     return 0
 
 
@@ -666,6 +927,7 @@ def mode_rollback():
     gen = require_generation()
     sql(f"select geo.n5_generation_rollback({lit(gen)}, {lit(require_reason())});", "rollback")
     say("generation", f"{gen} restored as the serving generation")
+    announce_serving_change(gen)
     return 0
 
 
@@ -685,7 +947,7 @@ def mode_discard():
 
 MODES = {"status": lambda: 0, "open": mode_open, "work": mode_work, "publish": mode_publish,
          "unresolved": mode_unresolved, "reconcile": mode_reconcile, "ready": mode_ready,
-         "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
+         "prove": mode_prove, "prove_dry": mode_prove_dry, "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
          "discard": mode_discard}
 
 

@@ -43,13 +43,21 @@ test('no NEW Census geocoder: the callers are exactly the three that predate thi
   const callers = FILES.filter((f) => readFileSync(f, 'utf8').includes('geocoding.geo.census.gov/geocoder/locations'))
     .filter((f) => !f.startsWith('scripts/verify-geocodes'))   // the geofence VERIFIER, not a geocoder
     .sort();
+  const geoAddr = readFileSync('supabase/functions/geocode-address/index.ts', 'utf8');
+  assert.equal((geoAddr.match(/\bfetch\(/g) || []).length, 1);
+  assert.match(geoAddr, /AbortSignal\.timeout\(15000\)/);
+  assert.doesNotMatch(geoAddr, /geocode-cache|resolveGeocode|supabaseStore|GeocodeStore/);
+
   assert.deepEqual(callers, [
     // stateless consumer proxy for add-your-home (browser flow; no cache, no DB)
     'supabase/functions/geocode-address/index.ts',
+    // request handler for that same proxy (timeout / transport / filed-ZIP pick)
+    'supabase/functions/geocode-address/logic.ts',
     // THE record ladder's Census rung
     'supabase/functions/get-address-report/geocode-cache.ts',
-    // PRE-EXISTING, named not fixed: the report engine's address-mode geocode() of the
-    // REQUESTING USER'S home address (not of any record). Out of scope here.
+    // PRE-EXISTING: the report engine's address-mode geocode() of the
+    // REQUESTING USER'S home address (not of any record). Aligned in step 7
+    // (timeout + transport vs no-match + filed-ZIP pick).
     'supabase/functions/get-address-report/index.ts',
   ]);
 });

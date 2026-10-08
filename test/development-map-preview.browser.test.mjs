@@ -121,6 +121,14 @@ let frame = await frameEl.contentFrame();
 await frame.waitForLoadState('domcontentloaded');
 await frame.waitForFunction(() => window.HS && window.HS.ready);
 await frame.evaluate(() => window.HS.ready);
+// Map 1 reads the ZIP after HS.ready resolves, and #results (which holds the map) stays
+// display:none until that read finishes. On a busy runner this check ran first and saw a
+// 0x0 map (CI run 37028354853). Wait for the read to finish, with a limit: a map that never
+// shows still fails below.
+await frame.waitForFunction(() => {
+  const r = document.getElementById('results');
+  return !!r && getComputedStyle(r).display !== 'none';
+}, null, { timeout: 20000 }).catch(() => {});
 const inside = await frame.evaluate(() => {
   const vis = (sel) => { const e = document.querySelector(sel); if (!e) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
   return {

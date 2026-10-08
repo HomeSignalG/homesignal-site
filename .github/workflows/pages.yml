@@ -38,8 +38,29 @@ name: pages
 # breaks, main does not deploy, so catching it before merge is part of deploying reliably.
 # Its ref is refs/pull/N/merge, a different concurrency group, so it cannot starve main.
 
+# INDEXNOW / SEMANTIC FRESHNESS (2026-10-07). The same build that writes the documents also
+# writes `sitemaps/page-state.json`: one semantic fingerprint per canonical URL
+# (scripts/page_semantics.py, ONE authority, rendered by gen_zip_pages.py itself). Before
+# anything is built, the PREVIOUS LIVE state is captured from the live site; the candidate is
+# compared with it; the difference is the IndexNow notification set and it drives a truthful
+# sitemap <lastmod>. Order is fixed: capture baseline -> build -> gates -> deploy -> prove the
+# new bytes are live -> notify. A notification failure is its own job, after `deploy`, and
+# cannot undo a valid deployment. Full record: docs/indexnow-seo-freshness.md.
+#
+# FRESHNESS RUNS. `freshness` (a dispatch input, or the half-hourly schedule) builds exactly as
+# usual but publishes ONLY when the semantic state differs from the live one, or when the live
+# build is from another commit. Every other trigger deploys as before.
 on:
   workflow_dispatch:
+    inputs:
+      freshness:
+        description: 'publish only if a public page changed (the event-driven path)'
+        type: boolean
+        default: false
+      reseed:
+        description: 'ignore the live page state: publish this one as the new baseline, notify nothing'
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -73,6 +94,9 @@ on:
       - 'test/bsky-did-document.test.mjs'
       - '.well-known/did.json'
       - 'scripts/gen_zip_pages.py'
+      - 'scripts/page_semantics.py'
+      - 'scripts/indexnow.py'
+      - 'test/indexnow-*.test.mjs'
       - 'scripts/annotate-dev-seo-ssr.mjs'
       - 'scripts/prove-zip-pages.mjs'
       - 'lib/project-type.js'
@@ -82,6 +106,10 @@ on:
       # ship an artifact whose controls file the live monitor cannot use.
       - 'scripts/lib/zip-page-controls.mjs'
       - 'lib/community-page.js'
+      - 'lib/zip-coverage.json'
+      - 'docs/maps-coverage/fix4/zip-coverage-internal.json'
+      - 'scripts/build_zip_coverage.py'
+      - 'shell.js'
       - 'community.html'
       - '404.html'
       - 'test/zip-pages-seo.test.mjs'
@@ -96,6 +124,11 @@ on:
       - '.github/workflows/pages.yml'
   schedule:
     - cron: '40 6 * * *'   # daily, after the ingest cycle; keeps robots current as ZIPs cross Rule F or Rule D
+    # FRESHNESS tick: reads the same read model as the daily build and publishes only if a public
+    # page changed. GitHub drops scheduled runs on this repo, so this is a floor, not the trigger
+    # of record: the ingest workflows and n5-generation dispatch `freshness` when they have
+    # something to show (docs/indexnow-seo-freshness.md §Triggers).
+    - cron: '12,42 * * * *'
 
 permissions:
   contents: read
@@ -111,11 +144,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read        # carry-over: read earlier runs' IndexNow job results and stored deltas
+    outputs:
+      proceed: ${{ steps.decide.outputs.proceed }}
+      submit_count: ${{ steps.decide.outputs.submit_count }}
+    env:
+      # true only for a freshness-triggered run (dispatch input, or the half-hourly tick).
+      FRESHNESS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.freshness == true) || (github.event_name == 'schedule' && github.event.schedule != '40 6 * * *')) && 'true' || 'false' }}
+      RESEED: ${{ (github.event_name == 'workflow_dispatch' && inputs.reseed == true) && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      # BEFORE anything is built or deployed. After the deploy the live file IS the new state, so
+      # this is the only moment the previous one can be read. Cache-busted, validated, and a read
+      # failure fails the build rather than being mistaken for a first run (a first run notifies
+      # nothing). 404 = no baseline yet = seed.
+      - name: Capture the previous LIVE page state (baseline)
+        run: |
+          set -euo pipefail
+          python3 scripts/page_semantics.py fetch-baseline --out "$RUNNER_TEMP/baseline-page-state.json"
 
       - name: Stage the static site
         run: |
@@ -175,11 +227,44 @@ jobs:
           PY
 
       - name: Generate one document per canonical ZIP
+        env:
+          HS_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          python3 scripts/gen_zip_pages.py --out _site | tee -a "$RUNNER_TEMP/receipts.txt"
+          EXTRA=""
+          if [ "$RESEED" = "true" ]; then EXTRA="--reseed"; fi
+          python3 scripts/gen_zip_pages.py --out _site \
+            --baseline "$RUNNER_TEMP/baseline-page-state.json" \
+            --delta-out "$RUNNER_TEMP/indexnow-delta.json" $EXTRA | tee -a "$RUNNER_TEMP/receipts.txt"
+
+      # `deploy` precedes `indexnow`, so a failed notification leaves its pages live and inside the
+      # NEXT baseline: they would never differ again. Pick them up from the earlier run's stored
+      # delta, so a notification outage self-heals on the next build with no one asked to act.
+      - name: Carry over notifications an earlier IndexNow job did not send
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/indexnow.py carry-over --delta "$RUNNER_TEMP/indexnow-delta.json"
+
+      # One decision, from the delta the generator just wrote. A freshness run with nothing new to
+      # publish stops here (every later step is gated on it): no Playwright, no upload, no deploy.
+      - name: Decide whether this run publishes
+        id: decide
+        run: |
+          set -euo pipefail
+          python3 scripts/page_semantics.py decide --delta "$RUNNER_TEMP/indexnow-delta.json" \
+            --freshness "$FRESHNESS" --sha "$GITHUB_SHA" --reseed "$RESEED" | tee -a "$GITHUB_OUTPUT"
+
+      # The verification file is the one deliberately public use of the key. main only: a
+      # pull_request run never writes it. Absent secret = skipped, and the deployment is unaffected.
+      - name: Publish the IndexNow key file (main only)
+        if: steps.decide.outputs.proceed == 'true'
+        env:
+          INDEXNOW_KEY: ${{ github.ref == 'refs/heads/main' && secrets.INDEXNOW_KEY || '' }}
+        run: python3 scripts/indexnow.py write-key --out _site
 
       - name: Build gates
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
@@ -191,6 +276,39 @@ jobs:
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
+          # ZIP COVERAGE (founder, 2026-10-03): every ZIP in lib/zip-coverage.json keeps a document
+          # (a ZIP with no Census-drawn area is not proven inactive), the model ships (shell.js
+          # reads it), the model equals what the classification record derives, and the documents
+          # plus the USPS-confirmed retired ZIPs (none today) are exactly the canonical registry.
+          python3 scripts/build_zip_coverage.py --check
+          python3 - <<'PY'
+          import json, os
+          man = json.load(open('_site/zip-pages-manifest.json'))
+          cov = json.load(open('_site/lib/zip-coverage.json'))['zips']
+          assert man['coverage_zips'] and set(man['coverage_zips']) <= set(cov), 'the build did not use the shipped model'
+          # PUBLIC MODEL HYGIENE (founder, 2026-10-03): what browsers receive carries page behavior only.
+          # No provenance, no review notes, no vendor detail; the full record stays internal.
+          import re
+          raw = open('_site/lib/zip-coverage.json', encoding='utf-8').read()
+          bad = re.findall(r'third_party_flag|decommission|verification_notes|postal_status(?:_source|_verified_at)?|source_md5|source_class|unitedstateszipcodes', raw, re.I)
+          assert not bad, f'internal provenance reached the browser-delivered model: {sorted(set(bad))}'
+          assert all(sorted(e) == ['map_coverage', 'page_mode', 'zip_code', 'zip_type'] for e in cov.values()), 'public coverage entries must be exactly the four public fields'
+          assert not os.path.exists('_site/docs'), 'docs/ (the internal coverage record) must not ship'
+          missing = [z for z in man['coverage_zips'] if not os.path.exists(f'_site/community/{z}/index.html')]
+          assert not missing, f'coverage ZIPs with no document: {missing}'
+          # ZIPs with NO page: USPS-verified retired (none today) and unverified (84684, 84685; founder 2026-10-03)
+          retired = man['retired_zips'] + man['unverified_zips']
+          assert sorted(man['unverified_zips']) == ['84684', '84685'], f"unverified ZIPs changed: {man['unverified_zips']}"
+          present = [z for z in retired if os.path.exists(f'_site/community/{z}')]
+          assert not present, f'documents were written for ZIPs with no page: {present}'
+          sm = open('_site/sitemap.xml', encoding='utf-8').read()
+          listed = [z for z in retired if f'/community/{z}/' in sm or f'zip={z}' in sm]
+          assert not listed, f'ZIPs with no page are in the sitemap: {listed}'
+          assert man['documents'] + len(retired) == man['canonical_registry'], \
+              f"documents {man['documents']} + no-page {len(retired)} != registry {man['canonical_registry']}"
+          print(f"ZIP coverage: {len(man['coverage_zips'])} limited-coverage ZIPs all have a document; "
+                f"{len(retired)} retired; {man['documents']} documents + {len(retired)} = {man['canonical_registry']}")
+          PY
           echo "artifact size: $(du -sh _site | cut -f1)"
           # SITEMAP RECONCILIATION — the advertised set must BE the index-eligible set.
           python3 - <<'PY'
@@ -264,6 +382,7 @@ jobs:
           echo "GATES OK"
 
       - name: Artifact contract gate (Fix 19)
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
@@ -273,9 +392,11 @@ jobs:
       # drifted or missing /.well-known/did.json makes every HomeSignal feed read as offline to
       # every subscriber, with nothing else on the site failing — so it gates the deploy.
       - name: Bluesky feed-generator DID document
+        if: steps.decide.outputs.proceed == 'true'
         run: node test/bsky-did-document.test.mjs
 
       - name: Audit the REAL artifact (Fix 19)
+        if: steps.decide.outputs.proceed == 'true'
         # The gate above proves the producer. This proves the ARTIFACT — the actual _site
         # tree after every build step has written into it, which is what GitHub Pages
         # uploads. A repo-side test cannot see a later step copying something in, so the
@@ -295,7 +416,7 @@ jobs:
                   actual.add(os.path.relpath(os.path.join(root, f), '_site').replace(os.sep, '/'))
           # everything the build legitimately ADDS to the staged contract
           def generated(p):
-              return (p == 'zip-pages-manifest.json' or p.startswith('community/')
+              return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
                       or p.startswith('guides/') or p.startswith('sitemaps/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
@@ -318,7 +439,15 @@ jobs:
           print('ARTIFACT AUDIT OK — the published tree is the contract plus generated ZIP documents')
           PY
 
+      # The key may exist in the artifact in exactly one place: indexnow.txt.
+      - name: IndexNow artifact hygiene (the key appears only in indexnow.txt)
+        if: steps.decide.outputs.proceed == 'true'
+        env:
+          INDEXNOW_KEY: ${{ github.ref == 'refs/heads/main' && secrets.INDEXNOW_KEY || '' }}
+        run: python3 scripts/indexnow.py check-artifact --dir _site
+
       - name: Confirm no generated HTML is tracked by git
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           if git ls-files --error-unmatch community/ >/dev/null 2>&1; then
             echo 'ERROR: community/ is tracked in git — generated output must never be committed'
@@ -339,6 +468,7 @@ jobs:
           echo "git is clean of generated ZIP documents"
 
       - name: Offline gates for the generated documents
+        if: steps.decide.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
@@ -348,9 +478,11 @@ jobs:
           done
 
       - name: Install Playwright (chromium)
+        if: steps.decide.outputs.proceed == 'true'
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
 
       - name: Candidate crawler proof (initial HTML + JS + Googlebot UAs)
+        if: steps.decide.outputs.proceed == 'true'
         env:
           SITE_DIR: _site
           # CONTROLS — classes A-J. Only point_dense is still PINNED, and only because
@@ -379,8 +511,19 @@ jobs:
           node scripts/prove-zip-pages.mjs
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.decide.outputs.proceed == 'true'
         with:
           path: _site
+
+      # The notification set, computed BEFORE the deploy from the pre-deploy live baseline. The
+      # indexnow job downloads exactly this; nothing is recomputed after the deployment.
+      - name: Keep the semantic delta (the IndexNow set)
+        if: steps.decide.outputs.proceed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-delta
+          path: ${{ runner.temp }}/indexnow-delta.json
+          retention-days: 30
 
       - name: Report build stats
         if: always()
@@ -410,8 +553,9 @@ jobs:
           echo "----- END BUILD STATS -----"
 
   deploy:
-    # Only main deploys. Requires the repository Pages Source = "GitHub Actions".
-    if: github.ref == 'refs/heads/main'
+    # Only main deploys. Requires the repository Pages Source = "GitHub Actions". A freshness run
+    # with nothing to publish does not deploy (needs.build.outputs.proceed).
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.proceed == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -423,3 +567,39 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # NOTIFY, AFTER the deployment and never before it. Runs only when `deploy` succeeded and the
+  # delta names at least one URL. It proves the live site serves the candidate state, the key
+  # file and the exact bytes of a sample of the changed pages, and only then POSTs the
+  # precomputed set. If IndexNow is down this job goes red; the deployed site is untouched.
+  indexnow:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.deploy.result == 'success' && needs.build.outputs.submit_count != '0'
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: indexnow-delta
+          path: delta
+      - name: Verify the new build is live, then notify IndexNow
+        env:
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+        run: |
+          set -euo pipefail
+          python3 scripts/indexnow.py notify --delta delta/indexnow-delta.json --receipt "$RUNNER_TEMP/indexnow-receipt.json"
+      - name: Keep the sanitized receipt and the submitted URLs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-receipt
+          path: |
+            ${{ runner.temp }}/indexnow-receipt.json
+            delta/indexnow-delta.json
+          retention-days: 90

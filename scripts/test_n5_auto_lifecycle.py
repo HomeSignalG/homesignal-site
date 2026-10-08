@@ -30,7 +30,7 @@ def check(name, cond):
 
 
 def world(ready=(), building=(), newest=None, exists=False, free=10000.0, complete=False,
-          ready_raises=False, auto=True, generation=""):
+          ready_raises=False, auto=True, generation="", requeue=False, prove_raises=False):
     """Stub every database read the auto path makes; record every lifecycle call."""
     log = []
 
@@ -47,12 +47,22 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
             return [{"snapshot_id": "snap"}]
         if tag == "unresolved fresh":
             return [{"ok": complete}]
+        if tag == "requeue halted":
+            if requeue:  # only the requeue scenarios record it; the rest keep exact logs
+                log.append(("requeue", query))
+                return [{"z3": "010", "attempts": 1}]
+            return []
         raise AssertionError(f"unexpected query tag {tag!r}")
 
     def fake_ready(gen):
         log.append(("ready", gen))
         if ready_raises:
             raise SystemExit("STOP: INV-1 gap")
+
+    def fake_prove(gen):
+        log.append(("prove", gen))
+        if prove_raises:
+            raise SystemExit(f"STOP: the pre-activation proof for {gen} did not pass")
 
     o.sql = fake_sql
     o.say = lambda *a, **k: None
@@ -66,6 +76,7 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
     o.shards_unfinished = lambda gen: 0 if complete else 3
     o.unpublished_prefixes = lambda gen: [] if complete else ["100"]
     o.ready = fake_ready
+    o.prove = fake_prove
     o.activate = lambda gen: log.append(("activate", gen))
     o.retire_superseded = lambda: log.append(("retire",))
     return log
@@ -78,7 +89,17 @@ def old(h, state="ACTIVE"):
 # 1. a READY generation is activated first, and the tick does nothing else
 log = world(ready=["g-ready"])
 o.mode_work()
-check("READY left over -> activated, then keep-two retirement", log == [("activate", "g-ready"), ("retire",)])
+check("READY left over -> proved again, activated, then keep-two retirement",
+      log == [("prove", "g-ready"), ("activate", "g-ready"), ("retire",)])
+
+# 1b. a READY generation whose proof fails is NOT activated and the tick stops red
+log = world(ready=["g-ready"], prove_raises=True)
+try:
+    o.mode_work()
+    check("READY left over, proof fails -> stop", False)
+except SystemExit as e:
+    check("READY left over, proof fails -> stop", "did not pass" in str(e))
+check("READY left over, proof fails -> never activated", log == [("prove", "g-ready")])
 
 # 2. two READY -> hard stop
 log = world(ready=["a", "b"])
@@ -118,8 +139,16 @@ check("opens when no generation exists yet", ("open", TODAY) in log)
 # 4. finish: complete -> READY then ACTIVATE; incomplete -> neither
 log = world(building=["g1"], complete=True)
 o.mode_work()
-check("complete build -> READY then ACTIVATE",
-      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("activate", "g1"), ("retire",)])
+check("complete build -> READY, then the proof, then ACTIVATE",
+      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("prove", "g1"), ("activate", "g1"), ("retire",)])
+log = world(building=["g1"], complete=True, prove_raises=True)
+try:
+    o.mode_work()
+    check("complete build, proof fails -> stop", False)
+except SystemExit as e:
+    check("complete build, proof fails -> stop", "did not pass" in str(e))
+check("complete build, proof fails -> READY but never ACTIVATE",
+      log == [("retire",), ("publish", "g1"), ("ready", "g1"), ("prove", "g1")])
 log = world(building=["g1"], complete=False)
 o.mode_work()
 check("incomplete build -> no READY, no ACTIVATE", log == [("retire",), ("publish", "g1")])
@@ -150,12 +179,32 @@ log = world(generation="g-explicit", ready=["g-ready"], complete=True)
 o.mode_work()
 check("explicit GENERATION: auto path ignored (no retirement either)", log == [("publish", "g-explicit")])
 
+# 6b. halted shards: requeued only on unattended ticks, bounded, scoped to the generation
+log = world(building=["g1"], requeue=True)
+o.mode_work()
+rq = [e for e in log if e[0] == "requeue"]
+check("auto tick requeues halted shards before claiming", len(rq) == 1
+      and log.index(rq[0]) < log.index(("publish", "g1")))
+q = rq[0][1]
+check("requeue is bounded by attempts < MAX_SHARD_ATTEMPTS (3)",
+      o.MAX_SHARD_ATTEMPTS == 3 and "attempts < 3" in q)
+check("requeue touches only halted shards of THIS generation",
+      "state='halted'" in q and "generation_id='g1'" in q)
+log = world(auto=False, building=["g1"], requeue=True)
+o.mode_work()
+check("auto off: halted shards are not requeued", not any(e[0] == "requeue" for e in log))
+log = world(generation="g-explicit", requeue=True)
+o.mode_work()
+check("explicit GENERATION: halted shards are not requeued", not any(e[0] == "requeue" for e in log))
+
 # 7. structure: one disk definition, and the gates stay behind heavy(..., verify=)
 src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "n5_orchestrate.py")).read()
 check("free disk comes from n5_shard.disk_free_mb (the shard floor's own formula)",
       "from n5_shard import disk_free_mb, DISK_FLOOR_MB" in src)
-check("auto_finish calls ready() before activate()",
-      src.index("    ready(gen)\n    activate(gen)") > src.index("def auto_finish"))
+check("auto_finish calls ready(), then prove(), then activate()",
+      src.index("    ready(gen)\n    prove(gen)\n    activate(gen)") > src.index("def auto_finish"))
+check("a READY generation left by an earlier tick is proved again before it is activated",
+      "            prove(pending[0])\n            activate(pending[0])" in src)
 wf = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".github", "workflows",
                        "n5-generation.yml")).read()
 check("schedule ticks run with AUTO_LIFECYCLE=1",
@@ -171,6 +220,54 @@ check("never a snapshot another generation shares", "o.snapshot_id = g.snapshot_
 check("the discard and the snapshot delete both go through heavy(..., verify=)",
       'heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",\n                  verify=' in src
       and '"retire snapshot", verify=' in src)
+
+# 8b. the candidate list reads ONLY the catalog table. The two "still has rows" probes used to be
+# correlated EXISTS subqueries in it; the planner priced them as sequential scans of the 1.8 GB and
+# 5.7 GB tables, and for an already-retired generation (no rows) each scan read the whole table.
+# Four retired candidates blew the 120 s statement timeout on every tick from 2026-10-05, so no
+# Map 1 generation opened for 4 days. The probes are per candidate, with a LITERAL id.
+check("candidate list does not touch zip_authoritative_membership (the 2026-10-06 timeout)",
+      "zip_authoritative_membership" not in rsql)
+check("candidate list does not touch app_project_identity (the 2026-10-06 timeout)",
+      "app_project_identity" not in rsql)
+check("candidate list reads only the catalog table", "geo.n5_generation g" in rsql)
+import importlib  # noqa: E402
+
+o = importlib.reload(o)  # world() above replaced o.retire_superseded with a stub: test the real one
+orig = (o.sql, o.heavy, o.say)
+rlog, heavy_calls = [], []
+
+
+def retire_sql(query, tag="", **kw):
+    rlog.append((tag, query))
+    if tag == "retire candidates":
+        return [{"generation_id": "g-old1", "snapshot_id": "s-old1"},
+                {"generation_id": "g-old2", "snapshot_id": "s-old2"},
+                {"generation_id": "g-live", "snapshot_id": "s-live"}]
+    if tag == "retire probe rows":
+        return [{"ok": "g-live" in query}]
+    if tag == "retire probe snapshot":
+        return [{"ok": "s-live" in query}]
+    raise AssertionError(f"unexpected query tag {tag!r}")
+
+
+o.sql = retire_sql
+o.heavy = lambda query, tag, verify=None: heavy_calls.append((tag, query))
+o.say = lambda *a, **k: None
+retired = o.retire_superseded()
+o.sql, o.heavy, o.say = orig
+probes = [(t, q) for t, q in rlog if t.startswith("retire probe")]
+check("already-retired candidates cost only their probes: no discard, no delete for them",
+      not any("g-old" in q or "s-old" in q for t, q in heavy_calls))
+check("a candidate that still holds rows and a capture IS retired (discard, then snapshot)",
+      [t for t, q in heavy_calls] == ["discard", "retire snapshot"]
+      and all("g-live" in q or "s-live" in q for t, q in heavy_calls))
+check("retire_superseded counts only the generations it actually retired", retired == 1)
+check("each candidate is probed once for rows and once for its snapshot (6 probes for 3)",
+      len(probes) == 6)
+check("every probe keys on a literal id, never on a correlated column",
+      all("g.generation_id" not in q and "g.snapshot_id" not in q for t, q in probes)
+      and any("'g-old1'" in q for t, q in probes) and any("'s-old2'" in q for t, q in probes))
 
 # 9. publishing refreshes table statistics first and then every ANALYZE_EVERY_PREFIXES prefixes
 import importlib, types  # noqa: E402

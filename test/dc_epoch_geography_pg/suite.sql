@@ -585,4 +585,52 @@ insert into _r select nextval('_r_n_seq'), 'E36 [B] a publisher point its OWN ad
        (select g.geography_status || ' ' || g.rule_key || ' ' || g.quality_flags::text from pg_temp.geo('Far Address DC', 'compute_atlas') g)
        || ' id=' || coalesce(pg_temp.idstate('Far Address Epoch'), '?');
 
+-- E37 (2026-10-01): the identity-open view runs the adjudicator only on cross-source pairs of different entities. It must
+-- return EXACTLY what the previous definition (below, generated from origin/main, never retyped) returns on this state.
+create temp view _old_identity_open as
+with d as (
+    select k.observation_a, k.observation_b, k.candidate_rule_key, a.decision_state, a.decision_rule_key
+      from public.dc_identity_candidate k
+     cross join lateral public.dc_adjudicate_pair(k.observation_a, k.observation_b, k.candidate_rule_key) a
+     where a.decision_state <> 'CONFIRMED_DISTINCT'
+), e as (
+    select xa.canonical_entity_id ea, xb.canonical_entity_id eb,
+           d.candidate_rule_key, d.decision_state, d.decision_rule_key
+      from d
+      join public.dc_entity_observation xa on xa.home_signal_observation_id = d.observation_a
+      join public.dc_entity_observation xb on xb.home_signal_observation_id = d.observation_b
+     where xa.source_key <> xb.source_key
+       and xa.canonical_entity_id <> xb.canonical_entity_id
+), both_dirs as (
+    select ea canonical_entity_id, eb other_entity_id, candidate_rule_key, decision_state, decision_rule_key from e
+    union
+    select eb, ea, candidate_rule_key, decision_state, decision_rule_key from e
+)
+select b.canonical_entity_id, b.other_entity_id, b.candidate_rule_key, b.decision_state, b.decision_rule_key
+  from both_dirs b
+  join public.dc_canonical_entity me on me.canonical_entity_id = b.canonical_entity_id
+  join public.dc_canonical_entity oe on oe.canonical_entity_id = b.other_entity_id
+ where me.superseded_by is null
+   and oe.superseded_by is null
+   and oe.classification in ('CONFIRMED_DC', 'DC_CANDIDATE')
+   and not exists (
+        select 1
+          from public.dc_entity_observation l1
+          join public.dc_observation_record_key r1 on r1.home_signal_observation_id = l1.home_signal_observation_id
+          join public.dc_entity_observation l2
+            on l2.canonical_entity_id = b.other_entity_id
+          join public.dc_observation_record_key r2 on r2.home_signal_observation_id = l2.home_signal_observation_id
+         where l1.canonical_entity_id = b.canonical_entity_id
+           and r1.record_key_rank < 2 and r2.record_key_rank < 2
+           and split_part(r1.record_key, '|', 1) = split_part(r2.record_key, '|', 1)
+           and split_part(r1.record_key, '|', 2) = split_part(r2.record_key, '|', 2)
+           and r1.record_key <> r2.record_key);
+
+insert into _r select nextval('_r_n_seq'), 'E37 [open] the cross-source pre-filter returns exactly the rows the previous identity-open definition returned (non-vacuous: the open set is not empty)',
+       (select count(*) from public.dc_entity_identity_open) > 0
+   and (select count(*) from public.dc_entity_identity_open) = (select count(*) from _old_identity_open)
+   and not exists (select 1 from (select * from public.dc_entity_identity_open except select * from _old_identity_open) x)
+   and not exists (select 1 from (select * from _old_identity_open except select * from public.dc_entity_identity_open) y),
+       (select count(*) || ' new vs ' || (select count(*) from _old_identity_open) || ' old' from public.dc_entity_identity_open);
+
 select check_name, coalesce(pass, false), coalesce(detail, '') from _r order by n;

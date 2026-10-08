@@ -1,11 +1,14 @@
 // DEVELOPMENT ACTIVITY LANDING PAGE — driven in a real browser.
 //
 // Proves the behaviour the brief asks the page to demonstrate, on the shipped file:
-//   * the shared shell is the only chrome (four sidebar containers, nothing added, nothing lit);
+//   * the shared shell is the only chrome (the three primary items of the founder navigation plan
+//     v3, and Enterprise is the one lit — this page IS Enterprise);
 //   * the sample report keeps the real hierarchy, and Type and Stage are two separate fields;
 //   * selecting a Type filters that Type across ALL THREE Stage sections at once, dims the same
 //     projects on the evidence plot, and shows an honest empty line where a Stage has none;
-//   * the commerce buttons do nothing (entitlement and checkout do not exist);
+//   * the commerce buttons are hidden and do nothing (entitlement and checkout do not exist; the
+//     founder listed the page on 2026-10-02 with the buttons hidden), and the Enterprise contact
+//     link is the visible, working action;
 //   * the coverage check answers only what it can prove, and says so when it cannot;
 //   * a phone-width viewport does not scroll sideways.
 //
@@ -92,20 +95,28 @@ const page = D.page;
 
 console.log('--- 1. the shared shell, and nothing but the shared shell ---');
 const shell = await page.evaluate(() => ({
-  navLinks: [...document.querySelectorAll('#hs-nav a')].map((a) => a.getAttribute('href').split('?')[0]),
+  // Primary items carry data-nav; the Explore dropdown's entries (founder, 2026-10-02) do not.
+  navLinks: [...document.querySelectorAll('#hs-nav a[data-nav]')].map((a) => a.getAttribute('href').split('?')[0]),
   sidebars: document.querySelectorAll('.side').length,
+  // The shared chrome carries two <nav> elements: the header's primary nav and the footer's
+  // site-information links. Count them by name, so a page that adds its own <nav> still fails.
   navs: document.querySelectorAll('nav').length,
-  lit: document.querySelectorAll('#hs-nav a.on').length,
-  logo: document.querySelectorAll('.logo').length,
+  chromeNavs: document.querySelectorAll('#hs-top nav, #hs-footer nav').length,
+  lit: [...document.querySelectorAll('#hs-nav a.on')].map((a) => a.getAttribute('data-nav')),
+  logo: document.querySelectorAll('.hs-brand').length,
   upsell: document.querySelectorAll('.upsell').length,
   top: document.querySelectorAll('#hs-top').length,
+  footer: document.querySelectorAll('#hs-footer').length,
   inSlot: !!document.querySelector('#hs-slot .page.da'),
   outsideSlot: document.querySelectorAll('.da').length - document.querySelectorAll('#hs-slot .da, #hs-slot .da *').length
 }));
-ok(JSON.stringify(shell.navLinks) === JSON.stringify(['dashboard.html', 'alerts.html', 'development.html', 'properties.html']),
-  'the sidebar is the four shared containers, unchanged', shell.navLinks);
-ok(shell.sidebars === 1 && shell.logo === 1 && shell.top === 1 && shell.navs === 1, 'one sidebar, one logo, one top bar, one <nav>: the page adds none', shell);
-ok(shell.lit === 0, 'no sidebar entry is lit: no Development Activity menu item was invented');
+ok(JSON.stringify(shell.navLinks) === JSON.stringify(['index.html', 'properties.html', 'development-activity.html']),
+  'the header nav is the three primary items: Explore, My Places, Enterprise', shell.navLinks);
+ok(shell.sidebars === 0 && shell.logo === 1 && shell.top === 1 && shell.footer === 1 && shell.upsell === 0
+   && shell.chromeNavs === 2 && shell.navs === 2,
+  'one header, one logo, one footer, no sidebar, and only the chrome\'s two <nav>s: the page adds none', shell);
+ok(JSON.stringify(shell.lit) === JSON.stringify(['enterprise']),
+  'exactly one header item is lit, and it is Enterprise: this page is the Enterprise item', shell.lit);
 ok(shell.inSlot, 'the page content is mounted in the shell slot');
 
 console.log('--- 2. the sample keeps the real report hierarchy ---');
@@ -196,7 +207,7 @@ await page.click('#daPlot .da-mk >> nth=3');
 const sel4 = await page.evaluate(() => document.querySelector('.da-card[data-n="4"]').classList.contains('sel') && !document.querySelector('.da-card[data-n="1"]').classList.contains('sel'));
 ok(sel4, 'selecting a marker selects its project card');
 
-console.log('--- 6. the commerce buttons are inert; Enterprise is a real link ---');
+console.log('--- 6. the commerce buttons are hidden and inert; Enterprise is a real link ---');
 // Positive control: the same probe DOES see a modal when one is really open, so a zero below means something.
 const probe = () => page.evaluate(() => document.querySelectorAll('.overlay.show, .overlay.open, .modal.show').length);
 await page.evaluate(() => HS.openModal('premiumModal'));
@@ -204,14 +215,46 @@ const controlOpen = await probe();
 await page.evaluate(() => HS.closeModal('premiumModal'));
 ok(controlOpen > 0 && (await probe()) === 0, 'control: an opened modal is visible to the probe used below', controlOpen);
 const urlBefore = page.url();
-const btns = await page.$$('[data-cta]');
-for (const b of btns) await b.click({ force: true });
+const seen = await page.evaluate(() => {
+  const vis = (n) => n.offsetParent !== null && n.getClientRects().length > 0;
+  const soon = [...document.querySelectorAll('.da-soon')];
+  return {
+    buttons: document.querySelectorAll('button[data-cta]').length,
+    visibleButtons: [...document.querySelectorAll('button[data-cta]')].filter(vis).length,
+    soon: soon.length,
+    visibleSoon: soon.filter(vis).length,
+    // Positive control for the visibility probe: the coverage button IS visible.
+    control: vis(document.getElementById('daCoverBtn')),
+    joinVisible: vis(document.getElementById('daJoin')), joinHref: document.getElementById('daJoin').getAttribute('href'), joinText: document.getElementById('daJoin').textContent, joinTag: document.getElementById('daJoin').tagName,
+    enterpriseVisible: vis(document.getElementById('daEnterprise')),
+    finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
+  };
+});
+ok(seen.control && seen.buttons === 3 && seen.visibleButtons === 0,
+  'HIDDEN (founder, 2026-10-02): the three Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
+ok(seen.soon === 3 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
+ok(seen.joinVisible && seen.joinHref === 'development-activity-reports.html#billing' && seen.joinText === 'Join for $79/month' && seen.joinTag === 'A',
+  'Join for $79/month is a VISIBLE link to the Reports page Billing card (founder, 2026-10-06), not a button', seen);
+ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
+// A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
+await page.$$eval('button[data-cta]', (bs) => bs.forEach((b) => b.click()));
 const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
-ok(btns.length === 4 && page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
-  'clicking any of the four commerce buttons opens nothing and goes nowhere', { count: btns.length, url: page.url(), afterClicks });
-ok((await page.$$eval('[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
-ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us for Enterprise Pricing →'), 'Contact us for Enterprise Pricing → opens the existing contact page');
-ok(await page.$eval('#daHeroCheck', (a) => a.getAttribute('href') === '#coverage'), 'Check coverage → jumps to the coverage check near the hero');
+ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
+  'clicking any of the three Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
+ok((await page.$$eval('button[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
+ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal →')
+   && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
+ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sample' && a.textContent === 'View a sample report →'), 'the hero\'s visible action is View a sample report →, and it jumps to the sample');
+// The plan's section order, measured on the rendered page (top of each block), and the coverage utility is not a hero or closing action.
+const geo = await page.evaluate(() => {
+  const top = (sel) => { const n = document.querySelector(sel); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
+  const h2 = (txt) => { const n = [...document.querySelectorAll('.da h2')].find((e) => e.textContent.includes(txt)); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
+  return { hero: top('#hero h1'), pricing: top('#pricing'), sample: top('#sample'), moments: h2('Walk into the conversation'), trust: h2('Show them the record'), coverage: top('#coverage'), final: h2('before your client asks'),
+    coverageLinks: document.querySelectorAll('a[href="#coverage"]').length };
+});
+const gseq = [geo.hero, geo.pricing, geo.sample, geo.moments, geo.trust, geo.coverage, geo.final];
+ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order (founder, 2026-10-06: pricing before the sample): hero → pricing → sample → use cases → trust → coverage → final conversion', geo);
+ok(geo.coverageLinks === 0, 'no hero/closing link to coverage', geo);
 
 console.log('--- 7. coverage check: answers only what it can prove ---');
 async function ask(input, stubs) {

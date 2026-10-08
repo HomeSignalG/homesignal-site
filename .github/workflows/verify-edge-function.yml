@@ -74,15 +74,22 @@ jobs:
       - name: Run geocoder helper tests (offline)
         run: |
           set -o pipefail
-          out="$(deno run "${FN_DIR}/sources/geo-input.test.ts")"
-          printf '%s\n' "$out"
-          if printf '%s\n' "$out" | grep -q '^FAIL '; then
-            echo "::error::geo-input helper tests reported failures"; exit 1
-          fi
-          if ! printf '%s\n' "$out" | grep -qE ', 0 failed$'; then
-            echo "::error::did not observe a clean test summary (', 0 failed')"; exit 1
-          fi
-          echo "geo-input helper tests passed"
+          run_helper() {
+            local file="$1" label="$2"
+            local out
+            out="$(deno run "${file}")"
+            printf '%s\n' "$out"
+            if printf '%s\n' "$out" | grep -q '^FAIL '; then
+              echo "::error::${label} helper tests reported failures"; exit 1
+            fi
+            if ! printf '%s\n' "$out" | grep -qE ', 0 failed$'; then
+              echo "::error::${label}: did not observe a clean test summary (', 0 failed')"; exit 1
+            fi
+            echo "${label} helper tests passed"
+          }
+          run_helper "${FN_DIR}/sources/geo-input.test.ts" "geo-input"
+          run_helper "${FN_DIR}/geocode-cache.test.ts" "geocode-cache"
+          run_helper "supabase/functions/geocode-address/geocode-address.test.ts" "geocode-address"
 
       - name: Type-check the new geocoder helper (strict, must be clean)
         run: |
@@ -146,13 +153,13 @@ jobs:
           PR_DIFF="${RUNNER_TEMP}/pr.diff" CHECK_ERR="${RUNNER_TEMP}/check.out" \
             deno run --allow-read --allow-env "${RUNNER_TEMP}/gate.ts"
 
-      - name: Assert geocode_assemble flags (exactly eight, Boulder unflagged)
+      - name: Assert geocode_assemble flags (city/county street ledgers, Boulder unflagged)
         run: |
           cat > "${RUNNER_TEMP}/assert-flags.ts" <<'TS'
           // The registry is an object keyed by platform (socrata/arcgis/ckan/csv/carto),
           // each an array of entries; readme keys hold non-entry arrays. Flatten the real
-          // entries and confirm the eight intended `geocode_assemble` flags — and only those —
-          // and that Boulder is NOT flagged.
+          // entries and confirm the intended `geocode_assemble` flags — and only those —
+          // and that Boulder is NOT flagged (its address already concatenates city+state).
           const path = "supabase/functions/get-address-report/jurisdiction-registry.json";
           const reg = JSON.parse(Deno.readTextFileSync(path)) as Record<string, unknown>;
           const entries = Object.values(reg)
@@ -164,32 +171,124 @@ jobs:
             .map((e) => e.registry_id as string)
             .sort();
           const want = [
+            "adams-county-building-permits",
+            "albuquerque-building-permits",
+            "allentown-energov-building-permits",
+            "anaheim-land-use-cases",
+            "ann-arbor-energov-permits",
+            "arlington-planning-cases",
+            "asheville-accela-permits",
+            "aurora-building-permits",
+            "austin-issued-construction-permits",
+            "austin-site-plan-cases",
+            "austin-subdivision-cases",
+            "baltimore-city-housing-permits",
+            "baltimore-county-permits",
             "bellevue-permits",
+            "bend-or-permit-applications",
+            "bentonville-catalyst-permits",
+            "bismarck-building-permits",
+            "boston-approved-building-permits",
+            "bozeman-building-permits",
+            "brunswick-county-permits",
+            "butler-county-ks-permits",
+            "cabarrus-county-plan-reviews",
+            "cambridge-building-permits-addition-alteration",
+            "cambridge-building-permits-new-construction",
+            "cambridge-demolition-permits",
+            "canyon-county-building-permits",
+            "casa-grande-active-development-sites",
+            "champaign-il-special-use-permits",
+            "charlotte-land-dev-commercial-projects",
+            "chattanooga-permits-archive",
+            "chicago-building-permits",
             "cincinnati-building-permits",
             "clark-county-active-dev-permits",
+            "cleveland-issued-building-permits",
+            "colorado-springs-planning-applications",
+            "columbia-mo-permits",
             "columbus-building-permits",
+            "denver-commercial-construction-permits",
+            "denver-residential-construction-permits",
+            "desoto-county-permits",
+            "detroit-building-permits",
+            "detroit-demolition-permits",
+            "detroit-trades-permits",
+            "east-baton-rouge-building-permits",
+            "el-paso-new-residential-permits",
+            "fairfax-active-site-construction",
+            "fairfax-recent-building-permits",
+            "flathead-county-building-permits",
+            "fort-collins-building-permits",
             "fort-worth-development-permits",
+            "fort-worth-zoning-cases",
+            "frisco-active-building-permits",
+            "gilbert-energov-permits",
+            "harris-county-permits",
+            "harris-county-plats",
+            "hartford-building-permits",
+            "henderson-commercial-permits",
+            "henderson-residential-permits",
+            "huntsville-building-permits",
+            "independence-twp-construction-permits",
+            "johns-creek-building-permits",
+            "kcmo-building-permits",
+            "kenton-county-devtracking-permits",
+            "knoxville-building-permits",
+            "lincoln-residential-new-construction-permits",
+            "little-rock-permits",
+            "loudoun-county-residential-permits",
+            "louisville-active-construction-permits",
+            "madison-planning-projects",
+            "marin-county-building-permits",
+            "memphis-dpd-building-permits",
+            "mesa-building-permits",
+            "miami-building-permits",
+            "missoula-addresses-with-permits",
+            "nashville-building-permits-issued",
+            "new-hanover-county-building-permits",
+            "new-orleans-permits",
+            "overland-park-building-permits",
+            "peoria-az-building-permits",
+            "philadelphia-li-permits",
+            "phoenix-building-permits",
             "pierce-county-pals-permits",
-            // Added 2026-07-28 (Phase 1 ArcGIS wire pass, PR #418). Virginia Beach is the one
-            // geometry-less endpoint in that pass — the layer serves attributes only, with no
-            // esriGeometryPoint and no lat/lng columns — so its records place through the
-            // geocode path, and StreetAddress is street-only ("2101 PARKS AVE", with City/
-            // State/Zip in separate columns). That is exactly the case geocode_assemble
-            // exists for: a bare street line does not match the Census geocoder.
-            "virginia-beach-building-permits",
-            // Added 2026-07-28 (Phase 4 special-handling wire pass, PR #421). Prince George's
-            // is a no-geometry endpoint — the dataset publishes no lat/lng and no point column,
-            // only text address parts — so its records place through the geocode path, and
-            // street_address is street-only ("9014 CHESTNUT", with city/zip_code in separate
-            // columns). Same case as Virginia Beach: a bare street line does not match the
-            // Census geocoder.
+            "pittsburgh-pli-permits",
+            "portland-building-permits",
             "prince-georges-county-permits",
+            "provo-planning-applications",
+            "round-rock-large-development-projects",
+            "salem-structure-permits",
+            "san-antonio-permits-issued",
+            "san-antonio-prelim-plan-review",
+            "san-diego-approved-permits",
+            "san-jose-permits",
+            "san-marcos-planning-cases",
+            "savannah-commercial-building-permits",
+            "scottsdale-building-permits",
+            "seattle-building-permits",
+            "seattle-land-use-permits",
+            "sioux-falls-building-permits",
+            "slc-planning-petitions",
+            "sonoma-county-fire-rebuild-permits",
+            "spokane-county-building-planning-permits",
+            "stamford-major-developments",
+            "tacoma-accela-permits",
+            "tempe-building-permits",
+            "topeka-building-permits",
+            "tucson-commercial-building-permits",
+            "tucson-residential-building-permits",
+            "virginia-beach-building-permits",
+            "wake-county-building-permits",
+            "worcester-building-permits",
           ].sort();
           console.log(`flagged (${flagged.length}): ${flagged.join(", ")}`);
           let ok = true;
           if (JSON.stringify(flagged) !== JSON.stringify(want)) {
             ok = false;
-            console.error(`::error::geocode_assemble flag set mismatch — want [${want.join(", ")}]`);
+            const missing = want.filter((id) => !flagged.includes(id));
+            const extra = flagged.filter((id) => !want.includes(id));
+            console.error(`::error::geocode_assemble flag set mismatch — missing [${missing.join(", ")}] extra [${extra.join(", ")}]`);
           }
           const boulder = entries.find((e) => e.registry_id === "boulder-construction-permits");
           if (boulder && boulder.geocode_assemble) {
@@ -197,6 +296,6 @@ jobs:
             console.error("::error::boulder-construction-permits must NOT be geocode_assemble-flagged");
           }
           if (!ok) Deno.exit(1);
-          console.log("registry flags OK — exactly eight intended entries flagged, Boulder unflagged");
+          console.log(`registry flags OK — ${want.length} intended entries flagged, Boulder unflagged`);
           TS
           deno run --allow-read "${RUNNER_TEMP}/assert-flags.ts"

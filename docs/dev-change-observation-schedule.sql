@@ -40,11 +40,17 @@
 -- the updates HOT. Nationally that is about 2.9 million rows read and 933,000 records rewritten a day:
 -- roughly 25 to 35 minutes of work and 1 to 3 GB of WAL (a projection, not a measurement: 1.0 to 1.4 GB
 -- at the tightly bracketed rate, up to 3.1 GB at the loosest), spread over the window below.
---   A pass is 12,722 ZIPs = 64 calls of 200. The window therefore needs at least 64 calls a day, and
---   `*/5 2-7` gives 72 (14,400 ZIPs, 13 % headroom); `*/5 2-6` gave 60 (12,000) and could never reach
---   "nothing due" in a day. The structural test pins that capacity, not just the string.
+--   A pass is 12,722 ZIPs = 64 calls of 200 IF every call fills. The window therefore needs at least 64
+--   calls a day. `*/5 2-6` gave 60 (12,000) and could never reach "nothing due" in a day.
+--   2026-10-07 MEASUREMENT: `*/5 2-7` (72 calls) was not enough either. Calls that hold large ZIPs stop
+--   on the 60-second cap with fewer than 200 observed (about 19 of 72 calls a night; the night averages
+--   about 171 ZIPs a call), so a night observed about 12,300 ZIPs, about 3 % short, and about 400 ZIPs
+--   slipped to the next night. `*/5 2-8` gives 84 calls (about 14,300 ZIPs at 171 a call, 12 %
+--   headroom). The structural test pins that capacity at the MEASURED rate, not the nominal 200.
+--   The 48-hour alarm threshold is deliberately UNCHANGED (founder, 2026-10-07: "leave 48 hour"):
+--   the alarm is correct, the window was short.
 --
--- THE WINDOW. 02:00 to 07:59 UTC. It ends before the daily verify-communities walk can start (cron
+-- THE WINDOW. 02:00 to 08:59 UTC. It ends before the daily verify-communities walk can start (cron
 -- 13:17 UTC, observed starting 17:10 to 20:07 UTC, lasting 22 to 47 minutes, and the cause of 190
 -- statement timeouts on its own on 2026-09-29). NO UTC HOUR IS QUIET: over the last three days cron
 -- runs of more than 20 seconds (the content refresh and the development refresh) occurred in every
@@ -236,7 +242,7 @@ Service-role only.';
 do $cron$
 declare
   _name  constant text := 'dev-change-observe';
-  _sched constant text := '*/5 2-7 * * *';
+  _sched constant text := '*/5 2-8 * * *';
   _cmd   constant text := 'select public.dev_change_observe_scheduled()';
   _id    bigint;
 begin
