@@ -49,6 +49,13 @@ export type Redeemed = { role: Role; replayed: boolean };
 export type CreatedTrial = { invite_link: string; invite_expires_at: string };
 /** An agent invite, as the owner who made it is shown it: once, and never an id (build step 5e). */
 export type CreatedInvite = { invite_link: string; invite_expires_at: string };
+/**
+ * One line of an owner's team list (docs/da-owner-safeguards.sql part A). `ref` is the opaque handle the removal / withdrawal takes: it is worth nothing to
+ * anyone who does not own the same brokerage. A member's `label` is a MASKED email (first letter, ***, domain); an invite has no label, and no token.
+ */
+export type TeamMember = { ref: string; label: string; joined_at: string };
+export type TeamInvite = { ref: string; created_at: string; expires_at: string };
+export type Team = { members: TeamMember[]; invites: TeamInvite[] };
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isTime = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v));
@@ -212,6 +219,55 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
       const r = data[0];
       if (!r || typeof r.token !== 'string' || !INVITE_TOKEN.test(r.token) || !isTime(r.expires_at)) throw new DataUnavailable('shape');
       return { invite_link: inviteLink(r.token), invite_expires_at: r.expires_at };
+    },
+
+    /**
+     * An OWNER's view of their own team (public.brokerage_team_of): the agents on it, as masked labels, and the invite links still open. The database
+     * decides who is an owner and which brokerage is theirs; anyone else is NotEntitled. A row of the wrong shape is a fault, never an empty team.
+     */
+    async teamOf(userId: string): Promise<Team> {
+      const { data, error } = await rpc('brokerage_team_of', { p_actor: userId });
+      if (error) {
+        if (error.message === 'NOT_ENTITLED') throw new NotEntitled('refused');
+        throw new DataUnavailable('brokerage_team_of');
+      }
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      const team: Team = { members: [], invites: [] };
+      for (const r of data) {
+        if (!r || typeof r.ref !== 'string' || !UUID.test(r.ref) || r.role !== 'agent' || !isTime(r.at)) throw new DataUnavailable('shape');
+        if (r.kind === 'member' && typeof r.label === 'string' && r.label.length > 0 && r.label.length <= 200 && r.expires_at === null) {
+          team.members.push({ ref: r.ref.toLowerCase(), label: r.label, joined_at: r.at });
+        } else if (r.kind === 'invite' && r.label === null && isTime(r.expires_at)) {
+          team.invites.push({ ref: r.ref.toLowerCase(), created_at: r.at, expires_at: r.expires_at });
+        } else {
+          throw new DataUnavailable('shape');
+        }
+      }
+      return team;
+    },
+
+    /** An owner ends an agent's membership (public.brokerage_member_remove). true when THIS call did it, false when it was already ended; NotEntitled when it is not theirs to do. */
+    async removeMember(userId: string, memberRef: string): Promise<boolean> {
+      if (!UUID.test(memberRef)) throw new NotEntitled('malformed');
+      const { data, error } = await rpc('brokerage_member_remove', { p_actor: userId, p_member_id: memberRef });
+      if (error) {
+        if (error.message === 'NOT_ENTITLED') throw new NotEntitled('refused');
+        throw new DataUnavailable('brokerage_member_remove');
+      }
+      if (typeof data !== 'boolean') throw new DataUnavailable('shape');
+      return data;
+    },
+
+    /** An owner withdraws an open invite link (the existing public.evaluation_invite_revoke, which already refuses anyone but an owner of that invite's brokerage). */
+    async withdrawInvite(userId: string, inviteRef: string): Promise<boolean> {
+      if (!UUID.test(inviteRef)) throw new NotEntitled('malformed');
+      const { data, error } = await rpc('evaluation_invite_revoke', { p_invite_id: inviteRef, p_actor: userId });
+      if (error) {
+        if (error.message === 'NOT_ENTITLED') throw new NotEntitled('refused');
+        throw new DataUnavailable('evaluation_invite_revoke');
+      }
+      if (typeof data !== 'boolean') throw new DataUnavailable('shape');
+      return data;
     },
   };
 }

@@ -5,7 +5,7 @@
 //
 // Run: node test/development-map-preview.browser.test.mjs
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 

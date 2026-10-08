@@ -92,6 +92,8 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-service-monitor.sql'
+      - 'test/report_service_monitor_pg/**'
       - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
@@ -161,6 +163,9 @@ on:
       - 'test/report_rate_limit_pg/**'
       - 'test/report-rate-limit-structure.test.mjs'
       - 'test/report-rate-limit-function.test.mjs'
+      - 'docs/da-owner-safeguards.sql'
+      - 'test/da_owner_safeguards_pg/**'
+      - 'test/da-owner-safeguards-structure.test.mjs'
       - 'supabase/functions/_shared/rate-reads.ts'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
@@ -176,6 +181,8 @@ on:
       - 'docs/report-snapshot.sql'
       - 'docs/report-private-context.sql'
       - 'docs/report-private-context-purge-schedule.sql'
+      - 'docs/report-service-monitor.sql'
+      - 'test/report_service_monitor_pg/**'
       - 'docs/report-private-context-sequence-lockdown.sql'
       - 'test/report_private_context_purge_pg/**'
       - 'test/report_snapshot_pg/**'
@@ -245,6 +252,9 @@ on:
       - 'test/report_rate_limit_pg/**'
       - 'test/report-rate-limit-structure.test.mjs'
       - 'test/report-rate-limit-function.test.mjs'
+      - 'docs/da-owner-safeguards.sql'
+      - 'test/da_owner_safeguards_pg/**'
+      - 'test/da-owner-safeguards-structure.test.mjs'
       - 'supabase/functions/_shared/rate-reads.ts'
       - 'test/billing-structure.test.mjs'
       - 'test/billing-functions.test.mjs'
@@ -266,7 +276,7 @@ concurrency:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:17
@@ -344,6 +354,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_private_context_purge_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rpp.log
+      - name: The report-service email alarm passes; the file applies twice and rolls back exactly; it is refused when what it stands on is missing; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/report_service_monitor_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/rsm.log
       - name: Changes Since Report and Follow run end to end; the answer is the same while the context is kept and after it is purged
         env:
           PGHOST: localhost
@@ -486,6 +506,52 @@ jobs:
         run: |
           set -o pipefail
           bash test/report_rate_limit_pg/mutate_all.sh 2>&1 | grep -v NOTICE | tee /tmp/report-rate-limit-mutations.log
+
+  owner-safeguards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The three owner safeguards pass (team removal, the client link rate limit, one open checkout); real sessions racing cannot beat them; applying changes nothing it stands on; it applies twice and rolls back exactly
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/da_owner_safeguards_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/da-owner-safeguards.log
+      - name: Every prohibited mutation of the owner safeguards is killed by a named check
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/da_owner_safeguards_pg/mutate_all.sh 2>&1 | grep -v NOTICE | tee /tmp/da-owner-safeguards-mutations.log
 
   launch-gate:
     runs-on: ubuntu-latest

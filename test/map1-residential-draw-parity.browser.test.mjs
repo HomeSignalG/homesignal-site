@@ -10,7 +10,7 @@
 // Run: node test/map1-residential-draw-parity.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';

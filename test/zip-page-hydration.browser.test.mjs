@@ -20,7 +20,8 @@
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync } from './lib/serve-page.mjs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';

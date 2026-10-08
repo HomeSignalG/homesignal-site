@@ -22,7 +22,7 @@
 // Run: node test/map1-mode-identity.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { createRequire } from 'node:module';

@@ -10,12 +10,18 @@
 //   * it writes nothing and charges nothing: opening a report is a read (the database function behind it is STABLE).
 //
 // It is deployed WITHOUT JWT verification (the client has no account), so there is no gate to rely on: every rule is in this file and in the
-// database function it calls. Rate limiting is not built here; a 256-bit token cannot be guessed, and a flood of requests is carried to
-// build step 13 (docs/development-activity-report-engine-2026-09-30.md).
+// database function it calls.
+//
+// THE RATE LIMIT (audit item D, docs/da-owner-safeguards.sql part B). A 256-bit token cannot be guessed, but a flood of requests still costs a
+// database read each. Every well-formed request first takes one from the windows of (1) the caller's network address, stored only as a salted
+// one-way hash, and (2) the link it asks about, and a full window answers 429 `rate_limited` with how long to wait. The claim comes BEFORE the link
+// is looked up, so unknown links count against the caller too. It fails closed: a limiter that cannot be read is 502 and the link is not opened.
+// The numbers are the database's (public.share_view_limits()); none is written here.
 //
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { corsFor, readBounded, reply, TOO_LARGE } from '../_shared/admin-gate.ts';
 import { BROKERAGE_NAME_MAX, cleanDisplayName } from '../_shared/evaluation-reads.ts';
+import type { ShareViewVerdict } from '../_shared/rate-reads.ts';
 import type { SharedReport } from '../_shared/share-reads.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
@@ -26,6 +32,12 @@ export type Deps = {
   openShared: (token: unknown) => Promise<SharedReport | null>;
   /** The street address the report was made for, while the private layer keeps it, else null. The ONLY thing read from that layer. */
   addressOf: (contextId: string | null) => Promise<string | null>;
+  /** The link's subject for the rate limit: the SHA-256 of a well-formed token, else null. */
+  linkKey: (token: unknown) => Promise<string | null>;
+  /** The caller, as a one-way hash of their network address (never the address). Throws DataUnavailable when it cannot be made. */
+  clientKey: (req: Request) => Promise<string>;
+  /** The rate limit (docs/da-owner-safeguards.sql part B): take one request from the client's and the link's windows, or learn one is full. Throws DataUnavailable when it cannot say. */
+  viewClaim: (clientKey: string, linkHash: string | null) => Promise<ShareViewVerdict>;
 };
 
 export const CAPABILITY = {
@@ -33,6 +45,7 @@ export const CAPABILITY = {
   method: 'POST { token }',
   access: 'anyone holding a share link; there is no sign-in. A link is read-only and can be withdrawn by the brokerage that made it.',
   writes: [],
+  rate_limit: 'requests are rate limited per caller and per link; a full window answers 429 rate_limited with retry_after_seconds (the limits are set in the database)',
 };
 
 export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
@@ -49,6 +62,10 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     if (Object.keys(b).some((k) => k !== 'token')) return reply(req, { error: 'bad_request' }, 400);
 
     try {
+      // the rate limit, BEFORE the link is looked up: a request with no usable token still takes the caller's windows (a flood of garbage is still a flood)
+      const linkHash = await deps.linkKey(b.token);
+      const verdict = await deps.viewClaim(await deps.clientKey(req), linkHash);
+      if (!verdict.allowed) return reply(req, { error: 'rate_limited', retry_after_seconds: verdict.retryAfterSeconds }, 429);
       // a token that is not a string, or could never have been one, reaches no database and gets the same answer as an unknown link
       if (typeof b.token !== 'string') return reply(req, { error: 'not_found' }, 404);
       const shared = await deps.openShared(b.token);

@@ -9,6 +9,7 @@ import { makeServiceReads } from '../_shared/service-rest.ts';
 import type { FetchFn } from '../_shared/service-rest.ts';
 import { makeShareReads } from '../_shared/share-reads.ts';
 import { makePrivateSubjectReads } from '../_shared/private-subject.ts';
+import { makeShareViewRateReads, shareClientKey } from '../_shared/rate-reads.ts';
 
 export type Config = { url: string; serviceKey: string };
 
@@ -16,5 +17,10 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { rpc } = makeServiceReads(cfg, fetchFn);
   const shares = makeShareReads(rpc);
   const subjects = makePrivateSubjectReads(rpc);
-  return { openShared: shares.openShared, addressOf: subjects.addressOf };
+  const rate = makeShareViewRateReads(rpc);
+  // the caller's address is hashed under the service key, which never leaves this function: the table holds a hash nobody can turn back into an address
+  return {
+    openShared: shares.openShared, addressOf: subjects.addressOf, linkKey: shares.linkHashOf,
+    clientKey: (req) => shareClientKey(req.headers, cfg.serviceKey), viewClaim: rate.claim,
+  };
 }

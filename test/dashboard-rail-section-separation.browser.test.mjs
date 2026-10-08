@@ -30,7 +30,7 @@
 // NO NETWORK. The supabase-js CDN request is fulfilled locally with a stub; everything else
 // is aborted. A route that escaped would make this suite pass or fail on someone else's uptime.
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 

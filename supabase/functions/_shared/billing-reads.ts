@@ -51,6 +51,9 @@ export function planSummary(u: BillingUsage | null): PlanSummary {
   return { state: u.state, role: u.role, credit_limit: u.credit_limit, credits_used: u.credits_used, credits_remaining: u.credits_remaining, period_ends_at: u.period_ends_at };
 }
 
+/** The checkout slot (docs/da-owner-safeguards.sql, part C): CLAIMED = make one checkout; BUSY = one was claimed in the last ten minutes, make none. */
+export type CheckoutSlot = { outcome: 'CLAIMED' | 'BUSY' };
+
 export type AppliedEvent = { outcome: 'RECORDED' | 'DUPLICATE'; bound: boolean; state: PlanState; is_latest: boolean };
 
 export function makeBillingReads(rpc: ServiceRpc) {
@@ -72,6 +75,29 @@ export function makeBillingReads(rpc: ServiceRpc) {
         brokerage_id: u.brokerage_id.toLowerCase(), role: u.role, state: u.state, credit_limit: u.credit_limit,
         credits_used: u.credits_used, credits_remaining: u.credits_remaining, period_ends_at: u.period_ends_at,
       };
+    },
+
+    /**
+     * Take the brokerage's single checkout slot (public.billing_checkout_claim, ONE transaction, serialised per brokerage): CLAIMED means make one
+     * checkout, BUSY means one was claimed in the last ten minutes and none is made. The address of a checkout is never kept anywhere. Any failure to
+     * claim is DataUnavailable: no checkout is made without the slot.
+     */
+    async checkoutClaim(brokerageId: string): Promise<CheckoutSlot> {
+      if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout claim needs a brokerage id');
+      const { data, error } = await rpc('billing_checkout_claim', { p_brokerage: brokerageId });
+      if (error) throw new DataUnavailable('billing_checkout_claim');
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (r && r.outcome === 'CLAIMED' && Object.keys(r).length === 1) return { outcome: 'CLAIMED' };
+      if (r && r.outcome === 'BUSY' && Object.keys(r).length === 1) return { outcome: 'BUSY' };
+      throw new DataUnavailable('shape');
+    },
+
+    /** The checkout could not be made: free the slot at once. Best effort: if this fails the slot frees itself in ten minutes. */
+    async checkoutRelease(brokerageId: string): Promise<void> {
+      if (!UUID.test(brokerageId)) throw new DataUnavailable('checkout release needs a brokerage id');
+      const { error } = await rpc('billing_checkout_release', { p_brokerage: brokerageId });
+      if (error) throw new DataUnavailable('billing_checkout_release');
     },
 
     /**

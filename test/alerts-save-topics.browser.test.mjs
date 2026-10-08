@@ -11,7 +11,7 @@
 // Run: node test/alerts-save-topics.browser.test.mjs   (needs playwright; CI's browser job)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 

@@ -127,7 +127,9 @@ jobs:
   # in a different place.
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 25, not 15: the whole browser suite takes 13 to 16 minutes and has grown with every page. At 15 the job was CANCELLED by the limit with no test failing
+    # (run 37796324697, 2026-10-08), which reads as red without being a finding. The limit is a hang guard, not a speed target.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -10,7 +10,7 @@
 // Run: node test/maps-zip-email.browser.test.mjs   (needs playwright; reported in CI's browser job)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { createRequire } from 'node:module';

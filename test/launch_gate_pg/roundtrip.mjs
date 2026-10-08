@@ -66,6 +66,11 @@ const RPC = {
   brokerage_membership_of: (a) => [asJson("public.brokerage_membership_of(:'u'::uuid)"), { u: a.p_user_id }],
   // the report rate limit (docs/report-rate-limit.sql): the wrapper that takes the DATABASE's clock. The clocked variant is NOT listed: the handler must not be able to reach it.
   report_rate_claim: (a) => [asJson("public.report_rate_claim(:'u'::uuid)"), { u: a.p_user }],
+  // the one open checkout (docs/da-owner-safeguards.sql part C): the slot is claimed before the processor is asked, and freed or recorded after
+  // (one column: the function is wrapped in a select so the row is an object, as PostgREST sends it, not the bare column)
+  billing_checkout_claim: (a) => [asJson("(select * from public.billing_checkout_claim(:'b'::uuid))"), { b: a.p_brokerage }],
+  // this one answers a bare boolean, which PostgREST sends as a bare JSON value
+  billing_checkout_release: (a) => ["select to_json(public.billing_checkout_release(:'b'::uuid))", { b: a.p_brokerage }],
   evaluation_invite_mint: (a) => [asJson("public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid)"),
     { e: a.p_evaluation_id, r: a.p_role, u: a.p_actor }],
 };

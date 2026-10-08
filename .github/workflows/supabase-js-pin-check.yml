@@ -1,0 +1,31 @@
+name: supabase-js-pin-check
+
+# The pinned supabase-js (scripts/supabase-js-pin.json) is only "checked" if somebody compares the recorded hash with what the
+# CDN really serves. This does that on a GitHub runner: it downloads the pinned URL and fails unless its sha384 equals the
+# recorded value. test/supabase-js-pin.test.mjs (unit) separately fails unless every shipped page matches the record.
+# Runs when the pin record changes and on demand; NO schedule (no new scheduled job). Read-only, no secret.
+on:
+  pull_request:
+    paths:
+      - 'scripts/supabase-js-pin.json'
+      - '.github/workflows/supabase-js-pin-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: The pinned URL serves exactly the recorded bytes
+        run: |
+          set -euo pipefail
+          url="$(python3 -c 'import json; print(json.load(open("scripts/supabase-js-pin.json"))["url"])')"
+          want="$(python3 -c 'import json; print(json.load(open("scripts/supabase-js-pin.json"))["integrity"])')"
+          curl -fsS -o /tmp/sb.js "$url"
+          got="sha384-$(openssl dgst -sha384 -binary /tmp/sb.js | openssl base64 -A)"
+          echo "url:  $url"; echo "want: $want"; echo "got:  $got"; echo "bytes: $(wc -c < /tmp/sb.js)"
+          test "$got" = "$want"
