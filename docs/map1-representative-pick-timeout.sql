@@ -21,6 +21,12 @@
 -- nearly the whole scan (quarter 0: 40.9 s; quarter 1: cancelled at 120 s on a cold read). Four
 -- quarters would pay that scan four times. Parts remain useful only for a first fill.
 --
+-- APPLIED 2026-10-08 14:58Z (execute_sql, the DO block below byte for byte). Proven first on a
+-- throwaway job with the same prefix: `set statement_timeout = '15min'; select pg_sleep(135)`
+-- succeeded in 135 s (14:55:00 -> 14:57:15), past the 120 s cap. The first test was cancelled
+-- because the job was unscheduled while it ran; unscheduling a running pg_cron job cancels it.
+-- The first real run under the new command is 2026-10-09 04:50 UTC.
+--
 -- SAFETY. One transaction. Refuses unless job 83 carries exactly the original command and the
 -- function is the applied body (md5 e36b0263e217ab8a36fcb357c4fe027e). Idempotent. Undo:
 -- docs/map1-representative-pick-timeout.rollback.sql.
