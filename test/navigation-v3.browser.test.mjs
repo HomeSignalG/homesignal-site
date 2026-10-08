@@ -29,7 +29,7 @@
 // resolves empty. Each table read is recorded, so the preview's ZIP is asserted from the
 // query the page actually made rather than from what it rendered.
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 

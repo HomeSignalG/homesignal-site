@@ -1,0 +1,8 @@
+{
+  "package": "@supabase/supabase-js",
+  "version": "2.117.3",
+  "url": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3",
+  "integrity": "sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+",
+  "read_on": "2026-10-08",
+  "how": "supabase-js-pin-probe.yml run 37794788852 on a GitHub runner: '@2' resolved to 2.117.3, 218199 bytes, identical bytes under both names, and a second read gave the same hash. To move to a newer version: run that probe, change this file, then every page (the test fails until they agree)."
+}

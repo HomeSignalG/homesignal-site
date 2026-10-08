@@ -985,7 +985,7 @@ def render(p, built):
         f'<body data-nav="explore" data-zip="{esc(z)}" data-explore="activity">\n{body}\n'
         '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
-        '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>\n'
+        '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>\n'
         # zip-authoritative.js is the CANONICAL OWNER of ZIP geography semantics and this
         # document is its second consumer: lib/data.js::rpcAllRows classifies
         # app_projects_for_zip's {unavailable, zip_geography_status} envelope through

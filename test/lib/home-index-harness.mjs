@@ -7,7 +7,7 @@
 // playwright. This file does not import playwright: the suites that use it do, which is how
 // scripts/run-unit-tests.mjs classifies them as browser suites.
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);

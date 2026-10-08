@@ -7,7 +7,7 @@
 // Run: node test/unsubscribe-page.browser.test.mjs   (needs playwright; reported in CI's browser job)
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize } from 'node:path';
 import { FOUNDER_TITLE, FOUNDER_LINES, FOUNDER_CTA, GENERAL_TITLE, GENERAL_TEXT } from './lib/unsubscribe-founder-copy.mjs';
