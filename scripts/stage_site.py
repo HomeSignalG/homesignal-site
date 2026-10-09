@@ -74,6 +74,7 @@ ROOT_FILES = (
     'privacy.html',
     'properties.html',
     'property.html',
+    'refund-policy.html',
     'reports.html',
     # RETIRED FROM THE ARTIFACT 2026-10-01 (Development Activity Order H, first step). The legacy
     # browser-direct NYC report page, `future-surroundings-report.html`, is deliberately NOT named

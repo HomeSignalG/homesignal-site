@@ -46,6 +46,7 @@ BASE = "https://homesignal.net"
 STATIC = [("/", "weekly", "1.0"), ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
           ("/privacy.html", "yearly", "0.3"),
+          ("/terms.html", "yearly", "0.3"), ("/refund-policy.html", "yearly", "0.3"),
           # The Enterprise page (founder, 2026-10-02): listed with its inert commerce buttons
           # hidden. test/development-activity-landing.test.mjs pins that pairing.
           ("/development-activity.html", "monthly", "0.6")]
