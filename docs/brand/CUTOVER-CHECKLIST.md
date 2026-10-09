@@ -32,8 +32,14 @@ plus the engineering gates it unlocks. Nothing here has been done on the founder
    Jody site by design (`brand_stage.py` leaves mailboxes alone) so a resident never gets a dead mailbox.
 
 ## D. Payments
-8. **Lemon Squeezy** (the billing processor in this repo): confirm the store allows the new domain; update the store's allowed domains, checkout
-   success/redirect URLs and the webhook URL if it names the old host. Do not change the live webhook without a test event.
+8. **Lemon Squeezy** (code read 2026-10-09; the store dashboard itself is not visible to this session). What the code does:
+   - The checkout's success page is `redirect_url = BILLING_PAGE` (`_shared/billing-reads.ts`, a constant on homesignal.net). It "only brings the person back and grants
+     nothing" (`lemon-billing.ts`). After cutover that URL answers a 301 to jodytracks.com, so a buyer still lands on the billing page; it changes to the Jody host in Step 8.
+   - Subscription state is bound by the signed `custom_data` (brokerage id + signature) and the **webhook** (`development-activity-billing-webhook`), which lives on the
+     Supabase functions host, not on homesignal.net - so the cutover does not move it. Do NOT edit the live webhook URL.
+   - The returned checkout address must be on `lemonsqueezy.com` (`checkoutUrlFrom`); a custom checkout domain would be refused until widened on purpose.
+   Founder action: in the Lemon Squeezy dashboard confirm no allowed-domain / branding setting names homesignal.net that would reject a jodytracks.com return, and
+   run one test-mode checkout after Step 8 flips `BILLING_PAGE`. Not verified from here: the store's settings and the webhook URL as configured there.
 9. Receipt/branding strings in the store admin (product names, invoice header) are founder edits.
 
 ## E. Search consoles (Step 9; needs the new site live)
