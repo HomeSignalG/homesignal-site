@@ -1963,9 +1963,13 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok(outside === 0, '14d Tab stays inside the dialog while it is open', outside);
   for (let i = 0; i < 12; i++) { await page.keyboard.press('Shift+Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
   ok(outside === 0, '14e so does Shift+Tab', outside);
-  await page.focus('#auth-back-link');
+  // put the focus on the link and PROVE it is there before pressing the key (a slow runner can drop the focus after the Tab loops above)
+  for (let i = 0; i < 5; i++) {
+    await page.focus('#auth-back-link');
+    if (await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'auth-back-link', null, { timeout: 1000 }).then(() => true).catch(() => false)) break;
+  }
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block', null, { timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block' && getComputedStyle(document.getElementById('auth-code')).display === 'none', null, { timeout: 8000 }).catch(() => {});
   ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
   await page.keyboard.press('Escape');
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');

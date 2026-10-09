@@ -389,8 +389,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const n = (t, re) => (t.match(re) || []).length;
       ok(tClosed === tOpen && n(tClosed, /Status in HomeSignal's record:/g) >= 8 && !/Supporting evidence for each record/.test(tClosed),
         '12k printing with the evidence collapsed on screen prints exactly what it prints with it open (the whole report), and not the toggle', { same: tClosed === tOpen, status: n(tClosed, /Status in HomeSignal's record:/g) });
-      ok(/DEVELOPMENT\s+STAGE\s+QUALITY-OF-LIFE IMPACT/i.test(tClosed) && n(tClosed, /Official source/g) >= 16 && n(tClosed, /Potential|Denied or withdrawn:/g) >= 7 && n(tClosed, /https:\/\/example\.gov\/records\//g) === 8,
-        '12l the printed report carries the three-column table, an "Official source" link per record in the table and in its evidence entry, and each full address exactly once (in the evidence entry only)', { src: n(tClosed, /Official source/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
+      ok(/DEVELOPMENT\s+STAGE\s+QUALITY-OF-LIFE IMPACT/i.test(tClosed) && n(tClosed, /Official source/g) >= 16 && n(tClosed, /Potential|Denied or withdrawn:/g) >= 7 && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
+        '12l the printed report carries the three-column table, an "Official source" link per record in the table and in its evidence entry, and no raw web address (the links stay clickable in a saved PDF)', { src: n(tClosed, /Official source/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
       ok(/Page 1 of \d/.test(tClosed) && /HomeSignal Development Activity report/.test(tClosed), '12l2 each printed page carries HomeSignal\'s own footer and "Page N of M"');
       // the 3-record road corridor (the Brigham City sample shape) is a short report: two pages
       const { proj, row, FAM_A: FA } = await import('./lib/da-report-view-world.mjs');

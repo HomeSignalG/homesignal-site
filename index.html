@@ -254,6 +254,22 @@
       hint.hidden = false;
       $('homeQuery').focus();
     }
+    // A buyer's shared Development Activity report links here with the property address in the URL FRAGMENT
+    // (#address=...), never in the query: a fragment is not sent to any server. It is read once, taken out of the
+    // address bar before anything else runs, and then goes through the SAME search a typed address does (so the
+    // hand-off to Map 1 still travels in sessionStorage and is never put in a URL). Anything that is not a plausible
+    // street address is ignored and the page stays as it is.
+    var link = /^#address=(.+)$/.exec(location.hash || '');
+    if (link) {
+      var wanted = '';
+      try { wanted = decodeURIComponent(link[1].replace(/\+/g, ' ')).trim(); } catch (err) { wanted = ''; }
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {}
+      if (wanted.length >= 8 && wanted.length <= 200 && !/^\d{5}$/.test(wanted)) {
+        $('homeQuery').value = wanted;
+        submit();
+        return;
+      }
+    }
     var f = $('homeMapFrame');
     f.addEventListener('load', function () { watchSample(); });
     // The frame is in the page from the moment the shell injects it, so Map 1 can finish

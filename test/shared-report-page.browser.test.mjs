@@ -103,9 +103,12 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   ok((await page.$$('.da-rv-label')).length === 0 && !(await page.content()).includes('client_label'), '1g no client label is shown or even present: the function never sends one');
   ok((await page.$$('.da-rv-actions')).length === 0 && (await page.$$('.da-rv-act')).length === 0, '1h the report\'s own action bar (Compare, Watch, Share, PDF) is left out for a client');
   ok((await page.$$('.da-rv-table tbody tr')).length > 0 && /Search radius 0\.5 mile/.test(await text(page, '.da-rv-meta')), '1i it is the full report: the records table, and the half-mile radius in the header');
+  const href = await page.getAttribute('#invite a', 'href');
+  ok(href === 'https://homesignal.net/#address=' + encodeURIComponent(ADDRESS) && !/[?]/.test(href), '1j4 the invitation links to the property: the address rides in the URL FRAGMENT only (no query), exactly encoded', href);
+  ok((await page.getAttribute('#invite a', 'rel')) === 'noopener noreferrer', '1j5 the link sends no referrer, so the report page is not named to the destination');
   ok(await visible(page, '#pdf') && (await text(page, '#rid')) === 'Report ID ' + RID, '1j the Download PDF button and the permanent report id are shown');
   ok(/private link/.test(await text(page, '#private')) && /six months/.test(await text(page, '#private')) && /withdraw it at any time/.test(await text(page, '#private')), '1k the page tells the client the link is private, how long it lasts and that the brokerage can withdraw it');
-  ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Follow quality-of-life intelligence for this property.' && (await page.getAttribute('#invite a', 'href')) === 'https://homesignal.net/' && (await text(page, '#invite a')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
+  ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Follow quality-of-life intelligence for this property.' && (await page.getAttribute('#invite a', 'href')).startsWith('https://homesignal.net/') && (await text(page, '#invite a')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
   ok(await page.evaluate(() => { const i = document.getElementById('invite'); const r = document.getElementById('report'); const p = document.getElementById('private'); return !!(r.compareDocumentPosition(i) & 4) && !!(p.compareDocumentPosition(i) & 4) && !r.contains(i) && /Brokerage|Acme/.test(r.textContent); }), '1j3 it sits after the report and the privacy note, outside the report, and the brokerage is still in the report');
   ok(!(await text(page, 'body')).includes('Sign in') && (await page.$$('input')).length === 0, '1l there is no sign-in and no form: a client needs no account');
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
@@ -183,6 +186,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   const { ctx, page } = await open({ w });
   await settled(page);
   const addr = await text(page, '.da-rv-addr');
+  ok((await page.getAttribute('#invite a', 'href')) === 'https://homesignal.net/', '5a2 with no address the invitation links to the plain home page: nothing is invented, no empty #address=');
   ok((await stateOf(page)) === 'report' && !addr.includes('Evergreen') && addr.length > 0, '5a once the address has been purged the report still opens, with the report\'s own words where the address was', addr);
   await ctx.close();
 }

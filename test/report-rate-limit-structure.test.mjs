@@ -119,7 +119,7 @@ ok(!/rate_limited|waitWords/.test(read('development-activity-review.html')), '4d
 // ---- 5. the record -------------------------------------------------------------------------------------------------------------------------------------------------
 const WF = stripYml(read('.github/workflows/report-snapshot-suite.yml'));
 const job = (/\n  report-rate-limit:\n([\s\S]*?)(?=\n  [a-z-]+:\n|$)/.exec(WF) || [, ''])[1];
-ok(job.length > 500 && /bash test\/report_rate_limit_pg\/run\.sh/.test(job) && /bash test\/report_rate_limit_pg\/mutate_all\.sh/.test(job) && /image: postgres:17/.test(job) && /POSTGRES_DB: dev_change_disposable/.test(job),
+ok(job.length > 500 && /bash test\/report_rate_limit_pg\/run\.sh/.test(job) && /bash test\/report_rate_limit_pg\/mutate_all\.sh/.test(job) && /image: mirror\.gcr\.io\/library\/postgres:17/.test(job) && /POSTGRES_DB: dev_change_disposable/.test(job),
   '5a CI runs the rate limit\'s database suite AND its mutation loop in their own job, against the disposable container', job.length);
 ok(/SUPABASE_DB_URL/.test(job) && /exit 1/.test(job) && !/\$\{\{\s*secrets\./.test(job), '5b the job refuses to run with a Supabase credential present and takes no repository secret');
 const pr = (/\n  pull_request:\n([\s\S]*?)\n  push:/.exec(WF) || [, ''])[1], push = (/\n  push:\n([\s\S]*?)\n  workflow_dispatch/.exec(WF) || [, ''])[1];

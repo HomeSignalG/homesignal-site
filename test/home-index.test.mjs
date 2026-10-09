@@ -98,7 +98,19 @@ ok(!/addr|address|lat=|lng=/i.test(urls), 'no address or coordinate is ever plac
 ok(/HANDOFF_KEY = 'hs\.homeSearchAddress'/.test(pageScript) && /sessionStorage\.getItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html'))
    && /sessionStorage\.removeItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html')),
   'Map 1 reads the same key and removes it in the same step');
-ok(!/history\.(pushState|replaceState)|location\.hash\s*=/.test(pageScript), 'no search touches browser history');
+ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.match(/history\.replaceState/g) || []).length === 1
+   && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(pageScript),
+  'no search touches browser history: the ONE replaceState only removes the #address= fragment (below), and nothing pushes history or sets the hash');
+// A buyer's shared report arrives with the property address in the URL FRAGMENT (2026-10-09, founder: link to the full address).
+{
+  const arrival = (pageScript.match(/var link = [\s\S]*?\n    var f = \$\('homeMapFrame'\)/) || [''])[0];
+  ok(/\/\^#address=\(\.\+\)\$\/\.exec\(location\.hash/.test(arrival) && !/location\.search|URLSearchParams/.test(arrival.replace("location.pathname + location.search", '')),
+    'the address is read from the URL FRAGMENT (#address=), never from the query string: a fragment is not sent to any server');
+  ok(arrival.indexOf('history.replaceState') > -1 && arrival.indexOf('history.replaceState') < arrival.indexOf('submit()'),
+    'the fragment is taken out of the address bar BEFORE the search runs');
+  ok(/wanted\.length >= 8 && wanted\.length <= 200 && !\/\^\\d\{5\}\$\/\.test\(wanted\)/.test(arrival) && /\$\('homeQuery'\)\.value = wanted;\s*submit\(\);/.test(arrival),
+    'only a plausible street address is searched, and through the SAME submit() a typed address uses (the hand-off stays in sessionStorage, never a URL)');
+}
 ok(!/HS\.data\.isCovered|HS\.findCommunity|HS\.openLoc|openModal|followCommunity|ensureAreaSubscribed|app_follows|app_properties|\.insert\(|saveHome|LS\.set|localStorage/.test(pageScript),
   'no search follows, saves, subscribes, opens the coverage form or writes persistent storage');
 const controls = (tpl.match(/<(a|button)\b[\s\S]*?<\/\1>/g) || []).join(' ');
