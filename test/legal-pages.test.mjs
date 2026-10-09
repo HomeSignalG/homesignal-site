@@ -48,4 +48,6 @@ ok(!/HomeSignal, Inc|\bLLC\b|Corporation/.test(terms + ' ' + read('404.html')), 
 ok(/sole proprietorship/.test(terms), 'Terms identify HomeSignal as a sole proprietorship');
 ok(/prevents the next renewal charge/.test(terms) && /through the end of the billing period you have already paid/.test(terms) && /returns to the applicable free level/.test(terms) && /saved remain accessible/.test(terms), 'Terms carry the founder cancellation rule');
 ok(!/\b\d+[- ]day\b/i.test(text(read('refund-policy.html'))), 'Refund Policy states no fixed refund window');
+for (const f of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(/<body[^>]*data-page-type="legal"/.test(read(f)), f + ' declares data-page-type="legal"');
+ok(/STATIC_PAGE_TYPES = \['legal', 'support'\]/.test(read('shell.js')) && /HS\.isStaticPage\(\)\) \{/.test(read('shell.js')), 'the shared where-line injector honors the page type');
 process.exit(fails ? 1 : 0);
