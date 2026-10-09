@@ -1,0 +1,49 @@
+name: jody-dns-audit
+
+# Jody migration, Step 6. READ-ONLY public lookups for the two domains, printed to the job log: nameservers, A/AAAA, MX,
+# TXT (SPF), _dmarc, common DKIM selectors, CAA, registration (RDAP) and a no-follow HEAD of each site. It changes nothing
+# and sends nothing but ordinary DNS/HTTP queries. The output is the evidence the cutover checklist's email section
+# (SPF / DKIM / DMARC for hello@ and alerts@jodytracks.com) is built against. Manual only.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install dig
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq dnsutils >/dev/null
+      - name: DNS
+        run: |
+          for d in jodytracks.com homesignal.net; do
+            echo "================ $d"
+            for t in NS SOA A AAAA MX TXT CAA; do echo "--- $t"; dig +short +time=5 +tries=2 "$t" "$d" || true; done
+            echo "--- www CNAME/A"; dig +short +time=5 www."$d" || true
+            echo "--- _dmarc TXT"; dig +short +time=5 TXT _dmarc."$d" || true
+            for s in resend google default selector1 selector2 k1 s1 s2 mail; do
+              r=$(dig +short +time=5 TXT "$s"._domainkey."$d"); [ -n "$r" ] && { echo "--- DKIM selector $s"; echo "$r"; }
+            done
+            echo "--- (DKIM selectors tried: resend google default selector1 selector2 k1 s1 s2 mail)"
+          done
+      - name: Registration (RDAP) and HTTP
+        run: |
+          for d in jodytracks.com homesignal.net; do
+            echo "================ RDAP $d"
+            curl -sS -m 20 -L "https://rdap.org/domain/$d" | python3 -c '
+          import json,sys
+          try: j=json.load(sys.stdin)
+          except Exception as e: print("RDAP unreadable:", e); sys.exit()
+          print("status:", j.get("status"))
+          for ev in j.get("events",[]): print(ev.get("eventAction"), ev.get("eventDate"))
+          for en in j.get("entities",[]):
+              if "registrar" in (en.get("roles") or []):
+                  v=(en.get("vcardArray") or [None,[]])[1]
+                  print("registrar:", [x[3] for x in v if x[0]=="fn"])
+          print("nameservers:", [n.get("ldhName") for n in j.get("nameservers",[])])'
+            echo "================ HTTP $d (no redirect follow)"
+            curl -sS -m 20 -o /dev/null -D - "https://$d/" | head -15 || true
+          done
