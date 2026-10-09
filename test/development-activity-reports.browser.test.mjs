@@ -1349,7 +1349,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   for (const num of [3, 2, 1]) {
     await page.click('#saved-list li:nth-child(' + (4 - num) + ') button');
     await page.waitForFunction((k) => new RegExp('Saved report ' + k).test(document.getElementById('saved-status').textContent), num, { timeout: 8000 }).catch(() => {});
-    own.push(await page.evaluate(() => { const m = /On the record within 0\.5 miles: (\d+) permitted \/ under construction · (\d+) approved \/ coming · (\d+) proposed \/ under review(?: · \d+ decided \(denied or withdrawn\))?\./.exec(document.getElementById('report').textContent.replace(/\s+/g, ' ')); return m ? [m[1], m[2], m[3]] : null; }));
+    own.push(await page.evaluate(() => { const t = document.getElementById('report').textContent.replace(/\s+/g, ' '); const f = /As of [^:]*: ([^.]*)\./.exec(t); if (!f) return null; const g = (re) => { const x = re.exec(f[1]); return x ? x[1] : '0'; }; return [g(/(\d+) permitted \/ under construction/), g(/(\d+) approved \/ coming/), g(/(\d+) proposed \/ under review/)]; }));
   }
   ok(own.every((o2) => o2 && o2.join() === '0,2,3') && [0, 1, 2].every((i) => rowCells(t, 'Permitted / Under Construction')[i] === own[i][0] && rowCells(t, 'Approved / Coming')[i] === own[i][1] && rowCells(t, 'Proposed / Under Review')[i] === own[i][2]),
     '11m each column\'s stage counts are exactly what that report prints for itself when opened on its own (0 / 2 / 3; the fourth saved Proposed record is Decided and is counted on its own row)', [own, rowCells(t, 'Approved / Coming')]);
@@ -1387,7 +1387,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await page.click('#compare-go');
   await waitCompared(page);
   let t = await tableOf(page);
-  ok(t.heads.length === 5 && t.rows.length === 14 && t.rows.every((r) => r.cells.length === 5), '11p five reports compare: five columns and fourteen rows (the thirteen plus the Decided row, which shows when any report has a decided application)', [t.heads, t.rows.length]);
+  ok(t.heads.length === 5 && t.rows.length === 15 && t.rows.every((r) => r.cells.length === 5), '11p five reports compare: five columns and fifteen rows (the thirteen plus the Decided row, which shows when any report has a decided application, plus the Civic & public Type row)', [t.heads, t.rows.length]);
   await page.uncheck('#compare-list li:nth-child(1) input');
   ok((await page.$$('#compare-result .da-cmp')).length === 0 && (await text(page, '#compare-status')) === '' && !(await compareBoxes(page))[5].disabled, '11q changing the choice clears the comparison, so it never sits beside a different choice, and frees the sixth box');
   await ctx.close();
@@ -1965,6 +1965,7 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok(outside === 0, '14e so does Shift+Tab', outside);
   await page.focus('#auth-back-link');
   await page.keyboard.press('Enter');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block', null, { timeout: 5000 }).catch(() => {});
   ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
   await page.keyboard.press('Escape');
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');

@@ -102,7 +102,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   ok(who === 'Acme Realty', '1f and the brokerage\'s name - and no individual', who);
   ok((await page.$$('.da-rv-label')).length === 0 && !(await page.content()).includes('client_label'), '1g no client label is shown or even present: the function never sends one');
   ok((await page.$$('.da-rv-actions')).length === 0 && (await page.$$('.da-rv-act')).length === 0, '1h the report\'s own action bar (Compare, Watch, Share, PDF) is left out for a client');
-  ok((await page.$$('.da-rv-card')).length > 0 && /Within 0\.5 mile/.test(await text(page, '.da-rv-meta')), '1i it is the full report: cards, and the half-mile radius in the header');
+  ok((await page.$$('.da-rv-table tbody tr')).length > 0 && /Search radius 0\.5 mile/.test(await text(page, '.da-rv-meta')), '1i it is the full report: the records table, and the half-mile radius in the header');
   ok(await visible(page, '#pdf') && (await text(page, '#rid')) === 'Report ID ' + RID, '1j the Download PDF button and the permanent report id are shown');
   ok(/private link/.test(await text(page, '#private')) && /six months/.test(await text(page, '#private')) && /withdraw it at any time/.test(await text(page, '#private')), '1k the page tells the client the link is private, how long it lasts and that the brokerage can withdraw it');
   ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Follow quality-of-life intelligence for this property.' && (await page.getAttribute('#invite a', 'href')) === 'https://homesignal.net/' && (await text(page, '#invite a')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
@@ -194,7 +194,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   await page.emulateMedia({ media: 'print' });
   const p = await page.evaluate(() => {
     const shown = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0; };
-    return { report: shown('#report .da-rv'), head: shown('header.top'), pdf: shown('#pdf'), status: shown('#status'), privateNote: shown('#private'), rid: shown('#rid'), notice: shown('#gone'), cards: shown('.da-rv-card'), filters: shown('.da-rv-sec--filters'), bg: getComputedStyle(document.body).backgroundColor };
+    return { report: shown('#report .da-rv'), head: shown('header.top'), pdf: shown('#pdf'), status: shown('#status'), privateNote: shown('#private'), rid: shown('#rid'), notice: shown('#gone'), cards: shown('.da-rv-table tbody tr'), filters: shown('.da-rv-sec--filters'), bg: getComputedStyle(document.body).backgroundColor };
   });
   ok(p.report && p.cards && p.rid && !p.head && !p.pdf && !p.status && !p.privateNote && !p.notice && !p.filters && p.bg === 'rgb(255, 255, 255)', '6a on paper: the report and its id, on white; no header, no button, no status line, no privacy note, no filter chips', p);
   ok(await visible(page, '#invite'), '6a2 the invitation prints, so a saved PDF carries it');
