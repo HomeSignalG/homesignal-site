@@ -151,8 +151,8 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(h.share && h.signin && !h.avatar && !h.menu, '1 Share and Sign in show; no avatar, no Menu button at 1440px', h);
   ok(h.oneLine === 72, '1 the header is one 72px line', h.oneLine);
   ok(h.gone.length === 0 && !h.bell, '1 no sidebar, Viewing chip, Place adds, bell or backdrop', h.gone);
-  ok(h.footers === 1 && JSON.stringify(h.footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms=privacy.html#terms']),
-    '1 exactly one footer: How It Works / About / Contact / Privacy / Terms', h);
+  ok(h.footers === 1 && JSON.stringify(h.footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms of Service=terms.html', 'Refund Policy=refund-policy.html']),
+    '1 exactly one footer: How It Works / About / Contact / Privacy / Terms of Service / Refund Policy', h);
   ok(!!h.footerBelowSlot, '1 the footer renders below the page content');
   ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Enterprise overview', 'Explore Enterprise →']), '1 the Enterprise message appears once (header item, its dropdown\'s overview entry + hero card; no bottom banner)', h.enterpriseLinks);
   ok(h.h1 === 'See what’s changing around a property.' && h.h1Lines === 2, '1 H1 copy, in two lines at 1440px', h);

@@ -147,8 +147,8 @@ ok(/HS\.openSwitcher = function/.test(shellJs) && /HS\.addHome = function/.test(
 const footers = shellNoComments.match(/<footer class="hs-footer" id="hs-footer">[\s\S]*?<\/footer>/g) || [];
 ok(footers.length === 1, 'ONE shared footer', footers.length);
 const footLinks = [...(footers[0] || '').matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].map((m) => m[2] + '=' + m[1]);
-ok(JSON.stringify(footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms=privacy.html#terms']),
-  'the footer is How It Works, About, Contact, Privacy, Terms', footLinks);
+ok(JSON.stringify(footLinks) === JSON.stringify(['How It Works=how-it-works.html', 'About=about.html', 'Contact=contact.html', 'Privacy=privacy.html', 'Terms of Service=terms.html', 'Refund Policy=refund-policy.html']),
+  'the footer is How It Works, About, Contact, Privacy, Terms of Service, Refund Policy', footLinks);
 ok(shellNoComments.indexOf('id="hs-slot"') < shellNoComments.indexOf('id="hs-footer"'), 'the footer renders below #hs-slot');
 ok(/\.hs-embed \.hs-header,\.hs-embed \.hs-footer\{display:none !important\}/.test(css), 'header and footer are hidden in Map 1\'s embed mode');
 ok(!/<footer\b/.test(tpl), 'the homepage has no footer of its own');

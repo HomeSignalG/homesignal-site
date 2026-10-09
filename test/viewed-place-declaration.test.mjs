@@ -174,7 +174,9 @@ const EXEMPT = {
   'contact.html': 'marketing — no Place subject',
   'how-it-works.html': 'marketing — no Place subject',
   'development-activity.html': 'marketing — no Place subject',
-  'privacy.html': 'marketing — no Place subject'
+  'privacy.html': 'marketing — no Place subject',
+  'terms.html': 'legal policy — no Place subject',
+  'refund-policy.html': 'legal policy — no Place subject'
 };
 const chromePages = fs.readdirSync(new URL('../', import.meta.url))
   .filter((f) => f.endsWith('.html'))

@@ -12,11 +12,10 @@
 //      still reads the sample ZIP its heading names (78657), never the resident's;
 //   3. every page lights the item of the section it belongs to (the active-item matrix);
 //   4. My Places shows "What's Changed" and "Alert Settings" above the place list;
-//   5. the five support links sit in the ONE shared footer, in order, without overflow at
+//   5. the six support links sit in the ONE shared footer, in order, without overflow at
 //      1280px and at 390px;
-//   6. privacy.html#terms lands on the Terms heading, clear of the sticky header, even
-//      though the page body is injected after load; it jumps when the page appears, not
-//      after the account reads; and tapping the footer's Terms on privacy.html lands there;
+//   6. Terms of Service, Refund Policy and Privacy are real pages reached from the footer,
+//      each its own page rather than a section of privacy.html;
 //   7. Enterprise is linked and listed.
 //
 // THE SIDEBAR BECAME A HORIZONTAL HEADER (founder, Revised Index Design, 2026-09-30, audited
@@ -296,14 +295,14 @@ const readFooter = (page) => page.evaluate(() => {
     linkHeights: links.map((a) => Math.round(a.getBoundingClientRect().height))
   };
 });
-const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms'];
-const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'privacy.html#terms'];
+const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms of Service', 'Refund Policy'];
+const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html'];
 await D.page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 let f = await readFooter(D.page);
 ok(f.footers === 1 && f.belowSlot, '5 1280px: exactly one footer, below the page content', f);
-ok(JSON.stringify(f.labels) === JSON.stringify(EXPECT_LABELS), '5 1280px: five support links, in order', f.labels);
-ok(JSON.stringify(f.hrefs) === JSON.stringify(EXPECT_HREFS), '5 1280px: ...to the five support pages (Terms is privacy.html#terms)', f.hrefs);
+ok(JSON.stringify(f.labels) === JSON.stringify(EXPECT_LABELS), '5 1280px: six support links, in order', f.labels);
+ok(JSON.stringify(f.hrefs) === JSON.stringify(EXPECT_HREFS), '5 1280px: ...to the six support pages', f.hrefs);
 ok(f.lit === 0 && f.inNav === 0, '5 1280px: support links carry no data-nav and sit outside the primary <nav>', f);
 ok(!f.overflowX && f.outside.length === 0, '5 1280px: nothing overflows the footer', f);
 ok(f.lines === 1, '5 1280px: the footer is one line', f.lines);
@@ -319,110 +318,22 @@ ok(!f.overflowX && f.outside.length === 0, '5 390px: nothing overflows the foote
 ok(Math.max(...f.linkHeights) <= Math.min(...f.linkHeights) + 1 && Math.min(...f.linkHeights) >= 44, '5 390px: no single link wraps, and each is a 44px target', f.linkHeights);
 ok(!pageOverflow, '5 390px: the page does not scroll sideways');
 
-// ═══ 6. privacy.html#terms lands on Terms ═══
-// "Lands on Terms" means the Terms of Use heading is on screen and NOT under the sticky
-// header (72px). Checked with elementFromPoint at the heading's
-// centre, at the phone sizes where a plain jump leaves it covered (360x640, 375x667, 390x664,
-// 844x390 landscape) and at sizes where the page bottom happens to hide the problem.
-console.log('--- 6. Terms anchor ---');
-const termsView = (page) => page.evaluate(() => {
-  const h = document.getElementById('terms');
-  const bar = document.getElementById('hs-top');
-  if (!h) return { exists: false };
-  const r = h.getBoundingClientRect();
-  const b = bar ? bar.getBoundingClientRect() : { bottom: 0 };
-  const hit = document.elementFromPoint(Math.min(r.left + 20, window.innerWidth - 1), r.top + r.height / 2);
-  return { exists: true, text: h.textContent.trim(), headTop: Math.round(r.top), headBottom: Math.round(r.bottom),
-           barBottom: Math.round(b.bottom), hitInTerms: !!(hit && h.contains(hit)), vh: window.innerHeight,
-           scrollY: Math.round(window.scrollY), path: location.pathname, hash: location.hash,
-           ready: window.__rd === undefined ? null : window.__rd };
-});
-const clearOfBar = (v) => v.exists && v.hitInTerms && v.headTop >= v.barBottom && v.headBottom <= v.vh;
-const loadTerms = async (page) => {
-  await page.goto('about:blank');
-  await page.goto(base + '/privacy.html#terms', { waitUntil: 'domcontentloaded' });
-  await waitReady(page);
-  await page.waitForTimeout(300);
-  return termsView(page);
-};
-let t = await loadTerms(D.page);
-ok(t.exists && t.text === 'Terms of Use', '6 privacy.html has the Terms of Use heading (positive control)', t);
-ok(t.scrollY > 0 && clearOfBar(t), '6 1280px: #terms opens on the Terms heading, clear of the header', t);
-t = await loadTerms(M.page);
-ok(t.scrollY > 0 && clearOfBar(t), '6 390x844: ...and on a tall phone', t);
-const SMALL = [{ width: 360, height: 640 }, { width: 375, height: 667 }, { width: 390, height: 664 }, { width: 844, height: 390 }];
-const smallPages = [];
-for (const vp of SMALL) {
-  const P = await newPage(vp);
-  smallPages.push(P);
-  t = await loadTerms(P.page);
-  ok(t.barBottom > 0, '6 ' + vp.width + 'x' + vp.height + ': the sticky header is measured (positive control)', t);
-  ok(clearOfBar(t), '6 ' + vp.width + 'x' + vp.height + ': the Terms heading is not under the header', t);
-}
-
-// On privacy.html the footer's Terms link stays on the same document, so it is a jump within
-// the page. Tap it from the top of the page and when the URL already ends in #terms (no
-// hashchange fires then): it must land on Terms, clear of the header, with the compact menu
-// closed. about:blank first: going to privacy.html#terms from privacy.html#terms is a jump
-// within the page, not a load.
-const tapTermsInFooter = async (page) => {
-  let clickError = null;
-  try {
-    await page.click('#hs-footer a[href="privacy.html#terms"]', { timeout: 5000 });
-  } catch (e) { clickError = String(e).split('\n')[0]; }
-  await page.waitForTimeout(400);
-  const v = await termsView(page);
-  const d = await page.evaluate(() => ({ menuOpen: document.getElementById('hs-top').classList.contains('menu-open') }));
-  return { clickError, ...d, ...v };
-};
-const FOOTER_TAP = [['390x844', M.page], ['375x667', smallPages[1].page]];
-for (const [label, page] of FOOTER_TAP) {
-  for (const start of ['/privacy.html', '/privacy.html#terms']) {
+// ═══ 6. Terms and Refund Policy are real pages, reached from the footer (2026-10-09) ═══
+// Terms used to be a section of privacy.html opened by #terms; each policy is now its own page.
+console.log('--- 6. Legal pages ---');
+for (const [label, page] of [['1280px', D.page], ['390x844', M.page]]) {
+  for (const [href, h1] of [['terms.html', 'HomeSignal Terms of Service'], ['refund-policy.html', 'HomeSignal Refund Policy'], ['privacy.html', 'HomeSignal Privacy Notice']]) {
     await page.goto('about:blank');
-    await page.goto(base + start, { waitUntil: 'domcontentloaded' });
+    await page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
     await waitReady(page);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    const d = await tapTermsInFooter(page);
-    const tag = '6 ' + label + ' ' + start + ': ';
-    ok(!d.clickError, tag + 'the footer\'s Terms was tapped (positive control)', d);
-    ok(!d.menuOpen && d.path === '/privacy.html' && d.hash === '#terms' && clearOfBar(d), tag + 'it lands on the Terms heading, clear of the header', d);
+    let clickError = null;
+    try { await page.click('#hs-footer a[href="' + href + '"]', { timeout: 5000 }); } catch (e) { clickError = String(e).split('\n')[0]; }
+    await page.waitForFunction((p) => location.pathname === '/' + p, href, { timeout: 10000 }).catch(() => {});
+    await waitReady(page);
+    const d = await page.evaluate(() => ({ path: location.pathname, h1: (document.querySelector('h1') || {}).textContent || '' }));
+    ok(!clickError && d.path === '/' + href && d.h1.trim() === h1, '6 ' + label + ': footer link opens ' + href + ' as its own page', { clickError, ...d });
   }
 }
-
-// A signed-in resident on a slow connection. The account reads that come before HS.ready
-// take seconds here (every table read is delayed). The page is on screen long before that,
-// so the jump to Terms must happen when the page appears, not when the reads finish, and a
-// reader who has scrolled since must not be pulled back. The footer's Terms must also work
-// before the reads finish.
-const SLOW = await newPage({ width: 375, height: 667 }, { delay: 700 });
-const markReady = (page) => page.evaluate(() => { window.__rd = false; window.HS.ready.then(() => { window.__rd = true; }); });
-await SLOW.page.goto(base + '/privacy.html#terms', { waitUntil: 'domcontentloaded' });
-await markReady(SLOW.page);
-await SLOW.page.waitForFunction(() => !!document.getElementById('terms'), null, { timeout: 30000 });
-await SLOW.page.waitForTimeout(150);
-let s1 = await termsView(SLOW.page);
-ok(s1.ready === false, '6 slow sign-in: the account reads are still pending when the page appears (positive control)', s1);
-ok(s1.scrollY > 0 && clearOfBar(s1), '6 slow sign-in: the page is already on the Terms heading, before the reads finish', s1);
-await SLOW.page.mouse.move(187, 400);
-await SLOW.page.mouse.wheel(0, -180);
-await SLOW.page.waitForTimeout(400);
-const userY = await SLOW.page.evaluate(() => Math.round(window.scrollY));
-ok(Math.abs(userY - s1.scrollY) > 20, '6 slow sign-in: the reader scrolled away from Terms (positive control)', { from: s1.scrollY, to: userY });
-await waitReady(SLOW.page);
-await SLOW.page.waitForTimeout(400);
-const s2 = await termsView(SLOW.page);
-ok(s2.ready === true && Math.abs(s2.scrollY - userY) <= 2,
-  '6 slow sign-in: when the reads finish, the page stays where the reader scrolled', { userY, after: s2.scrollY, ready: s2.ready });
-
-await SLOW.page.goto('about:blank');
-await SLOW.page.goto(base + '/privacy.html', { waitUntil: 'domcontentloaded' });
-await markReady(SLOW.page);
-await SLOW.page.waitForSelector('#hs-footer a[href="privacy.html#terms"]', { timeout: 30000 });
-await SLOW.page.evaluate(() => window.scrollTo(0, 0));
-const sd = await tapTermsInFooter(SLOW.page);
-ok(!sd.clickError && sd.ready === false,
-  '6 slow sign-in: the footer\'s Terms was tapped before the reads finished (positive control)', sd);
-ok(sd.hash === '#terms' && clearOfBar(sd), '6 slow sign-in: it lands on Terms without waiting for the reads', sd);
 
 // ═══ 7. Enterprise is linked and listed (founder, 2026-10-02: commerce buttons hidden) ═══
 console.log('--- 7. Enterprise is index, follow ---');
