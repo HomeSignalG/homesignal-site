@@ -139,7 +139,11 @@ const rateCode = code(RATE_SQL);
 // makes ONE write to the spine: ending an agent's membership, by status only (the guard stamps the time; the row is history and is never deleted or re-pointed).
 const DA_SQL = 'docs/da-owner-safeguards.sql';
 const daCode = code(DA_SQL);
-ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL])
+// docs/individual-agent-signup.sql (Order L2, 2026-10-09): adds ONE column to the account row (its type), three guards, and ONE writer, individual_signup, which makes an
+// individual's account and owner membership in the same transaction as their evaluation. It is not a second account system: it creates no table and replaces no function.
+const L2_SQL = 'docs/individual-agent-signup.sql';
+const l2Code = code(L2_SQL);
+ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, DA_SQL, L2_SQL])
    && (daCode.match(/from public\.brokerage_membership_of\(p_actor\) r/g) || []).length === 2 && !/\b(insert\s+into|delete\s+from|truncate|alter\s+table|drop\s+table|create\s+table)\s+(only\s+)?public\.brokerage_(account|member)/i.test(daCode)
    && (daCode.match(/\bupdate\s+public\.brokerage_member\b/gi) || []).length === 1 && /update public\.brokerage_member set status = 'deactivated' where id = mem\.id;/.test(daCode)
    && (daCode.match(/\bpublic\.brokerage_account\b/g) || []).length === 3
@@ -154,9 +158,14 @@ ok(sorted(naming) === sorted([SQL_FILE, L1_SQL, EVAL_READS, SAVED_SQL, HEADER_SQ
    && !/\b(insert|update|delete|truncate|alter\s+table|create\s+table|drop\s+table)\b/i.test(headerCode.replace(/drop function if exists[^;]*;/gi, ''))
    && /\bstable\b/i.test(headerCode) && !/\bvolatile\b/i.test(headerCode)
    && !/brokerage_account|brokerage_member\b/.test(savedCode) && (savedCode.match(/brokerage_membership_of\(p_user_id\)/g) || []).length === 2
-   && !/brokerage_account|brokerage_member\b/.test(readsCode) && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
+   && !/brokerage_account|brokerage_member\b/.test(readsCode.replace(/'brokerage_account_type_of'/g, '')) && (readsCode.match(/'brokerage_account_type_of'/g) || []).length === 2 && (readsCode.match(/brokerage_membership_of/g) || []).length === 2
    && /await rpc\('brokerage_membership_of', \{ p_user_id: userId \}\)/.test(readsCode),
   '4: nothing else in the repository names the tables or the resolver except the evaluation entitlement SQL (Order L1) and the one billing SQL (build step 11: the resolver three times, the account row for its status, never the member table, no write of this spine) and, for the resolver ONLY, the shared trial module (build step 5e: one rpc call for a member\'s role, plus its error label) and the two read-only saved-reports functions (build step 6, resolver only) and the one read-only report-header function (build step 7: the resolver, then the account row it points at for the brokerage\'s name, no write) and the one share-delivery SQL (build step 8: the resolver twice, the account table for a name and its precondition, no write) and the one owner-safeguards SQL (audit item D: the resolver twice, the member table read in the list and the removal, the account row read once and referenced by foreign key; its ONE write is ending an agent\'s membership by status, never a delete or a re-point) and the one property-watch SQL (build step 9: the resolver twice, in start and in the per-brokerage count, plus its precondition, which only checks the account table exists; never the member table) — no page, script, other edge function or other SQL reads or writes them', naming.join(','));
+ok((l2Code.match(/\balter\s+table\s+public\.brokerage_account\s+add\s+column\s+if\s+not\s+exists\s+account_type\b/gi) || []).length === 1 && !/create\s+table/i.test(l2Code)
+   && (l2Code.match(/\binsert\s+into\s+public\.brokerage_account\b/gi) || []).length === 1 && (l2Code.match(/\binsert\s+into\s+public\.brokerage_member\b/gi) || []).length === 1
+   && !/\b(update|delete\s+from|truncate)\s+(only\s+)?public\.brokerage_(account|member)\b/i.test(l2Code) && !/drop\s+(table|function)/i.test(l2Code)
+   && (l2Code.match(/brokerage_membership_of\(/g) || []).length === 2,
+  '4c the individual-signup SQL (Order L2) touches the spine in exactly four ways: one column on the account row, one insert of an account and one of its owner membership (both in individual_signup, one transaction), and the resolver read by the type reader; no update, delete, truncate, drop or new table');
 ok(GATE.length > 1500 && REST.length > 1500 && !/brokerage/i.test(stripJs(GATE)) && !/brokerage/i.test(stripJs(REST)),
   '4b: the admin gate and the service reader do not mention a brokerage at all — the resolver is not a second gate, and when Orders J and L swap the entitlement check into the gate it is read THERE, never called from a handler');
 

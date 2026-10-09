@@ -220,6 +220,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
     <p class="sub" id="trial-sub"></p>
   </section>
+  <section class="card" id="signup" aria-labelledby="signup-title" hidden>
+    <h2 id="signup-title">Create your individual account</h2>
+    <p class="sub">For individual real estate agents: 10 free Development Activity reports, then $79/month for 100 reports. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
+    <form id="sf" novalidate>
+      <label>Your name, shown at the top of your reports<input type="text" id="signup-name" maxlength="120" autocomplete="name" placeholder="Pat Agent"></label>
+      <button type="submit" class="go" id="signup-go">Create my account</button>
+    </form>
+    <p id="signup-status" role="status" aria-live="polite"></p>
+  </section>
   <section class="card" id="billing" aria-labelledby="billing-title" hidden>
     <h2 id="billing-title">Billing</h2>
     <p class="plan" id="billing-plan"></p>
@@ -343,8 +352,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=81e25d9f"></script>
-<script src="lib/da-report-compare.js?v=611ae3bf"></script>
+<script src="lib/da-report-view.js?v=54fdf72c"></script>
+<script src="lib/da-report-compare.js?v=a3609f97"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -374,6 +383,8 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   var freeLimit = null;
   function freeLimitFrom(trial){ if (trial && typeof trial.credits_used === 'number' && typeof trial.credits_remaining === 'number') freeLimit = trial.credits_used + trial.credits_remaining; }
   function freeWords(){ return freeLimit === null ? 'free reports' : freeLimit + ' free reports'; }
+  var acctType = null;  // 'individual' | 'brokerage' | null: what the trial function says; it only changes WORDS, the database decides what is allowed
+  function mine(){ return acctType === 'individual'; }
   var plan = null, checkoutState = null, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
@@ -484,19 +495,21 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
       count.textContent = left === 1 ? '1 free report left' : left + ' free reports left';
-      sub.textContent = "Your brokerage's trial includes " + (freeLimit === null ? 'a set number of' : freeLimit) + " reports, shared by everyone on it. A report with no development data for its area (“No data ingested”) does not use one.";
+      sub.textContent = mine()
+        ? 'Your free trial includes ' + (freeLimit === null ? 'a set number of' : freeLimit) + ' reports. A report with no development data for its area (“No data ingested”) does not use one.'
+        : "Your brokerage's trial includes " + (freeLimit === null ? 'a set number of' : freeLimit) + " reports, shared by everyone on it. A report with no development data for its area (“No data ingested”) does not use one.";
     } else if (a === 'admin') {
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
     } else if (a === 'complete') {
       count.textContent = 'All ' + freeWords() + ' are used'; count.className = 'count out';
-      sub.textContent = "Your brokerage's free trial is complete.";
+      sub.textContent = mine() ? 'Your free trial is complete. Your saved reports stay available.' : "Your brokerage's free trial is complete.";
     } else if (a === 'ended') {
       count.textContent = 'This trial has ended'; count.className = 'count out';
       sub.textContent = 'Ask the person who invited you for a new invite.';
     } else {
       count.textContent = 'This account is not part of a trial yet'; count.className = 'count out';
-      sub.textContent = 'Open the invite link your brokerage sent you, then sign in with this email.';
+      sub.textContent = 'Create your individual account below, or open the invite link your brokerage sent you and sign in with this email.';
     }
     if ((a === 'trial' || a === 'complete') && isPaid()) {
       // a paid plan: every new report is one of the month's (the database decides); the free reports are kept apart and neither used nor lost
@@ -504,7 +517,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (n > 0) {
         count.className = 'count';
         count.textContent = n === 1 ? '1 report left this month' : n + ' reports left this month';
-        sub.textContent = "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it" + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
+        sub.textContent = (mine() ? 'Your $79/month plan includes 100 new reports each month' : "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it") + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
       } else {
         count.className = 'count out';
         count.textContent = 'All 100 reports for this month are used';
@@ -513,7 +526,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     }
     if (note) sub.textContent = note + ' ' + sub.textContent;
     $('go').disabled = busy || !canMake();
-    showTeam(a === 'trial' && role === 'owner');
+    showTeam(a === 'trial' && role === 'owner' && !mine());   // an individual account has nobody to invite: the database refuses it, so the page does not offer it
     showSaved(a === 'trial' || a === 'complete');
     showProfile(a === 'trial' || a === 'complete');
   }
@@ -534,7 +547,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       return;
     }
     var owner = plan.role === 'owner';
-    var offer = ' $79/month gives your brokerage 100 new reports each month. Cancel anytime.';
+    var offer = mine() ? ' $79/month gives you 100 new reports each month. Cancel anytime.' : ' $79/month gives your brokerage 100 new reports each month. Cancel anytime.';
     var who = owner ? '' : " Only your brokerage's owner can subscribe.";
     var closed = owner && checkoutState === 'not_set_up' ? ' Subscribing is not open yet.' : '';
     if (plan.state === 'paid') {
@@ -545,7 +558,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     }
     if (plan.state === 'none' || plan.state === 'test_only') {
       p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : 'Free trial used');
-      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : "Your brokerage's " + freeWords() + " are separate from the plan.") + offer + who + closed;
+      sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : (mine() ? 'Your ' : "Your brokerage's ") + freeWords() + " are separate from the plan.") + offer + who + closed;
     } else if (plan.state === 'canceled') {
       p.className = 'plan out'; p.textContent = 'Your subscription has ended';
       sub.textContent = 'Your saved reports stay available. Subscribe again for 100 new reports each month.' + who + closed;
@@ -577,14 +590,15 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (member) await loadBilling(); else { plan = null; checkoutState = null; }
     if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way: show them nothing of it
     showTrial(a, trial, note);
+    showSignup(a === 'none' && !!session && !!session.user);
     showBilling(member);
     if (wantBilling) {
       wantBilling = false;
       if (member) { $('billing').scrollIntoView(); }
       else {
         var ts = $('trial-sub');
-        ts.textContent = 'This email is not on a brokerage account. HomeSignal sets brokerage accounts up, and only a brokerage’s owner can subscribe. ';
-        var ca = document.createElement('a'); ca.href = 'contact.html'; ca.textContent = 'Contact HomeSignal'; ts.appendChild(ca);
+        ts.textContent = 'This email does not have an account yet. Create your individual account below to start with 10 free reports and subscribe from there. For a brokerage, team or enterprise organization: ';
+        var ca = document.createElement('a'); ca.href = 'contact.html'; ca.textContent = 'Request a custom quote'; ts.appendChild(ca);
       }
     }
   }
@@ -622,7 +636,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     if (keepSay) { billingSay(say, was === 'err'); } else billingSay('', false);
   }
   function trialUnreadable(){
-    access = null; role = null; showTeam(false); showSaved(false); showProfile(false); hideBilling();
+    access = null; role = null; acctType = null; showSignup(false); showTeam(false); showSaved(false); showProfile(false); hideBilling();
     $('trial-count').className = 'count out';
     $('trial-count').textContent = 'Your trial could not be read just now';
     $('trial-sub').textContent = 'Reload the page in a minute.';
@@ -639,18 +653,47 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       if (r.status === 0 || r.status >= 500) { trialUnreadable(); return; } // keep the invite for a reload
       invite = null; store(null);
       if (r.status === 200 && r.body && r.body.status === 'OK') {
-        role = r.body.role;
+        role = r.body.role; acctType = r.body.account_type || null;
         await present(r.body.access, r.body.trial, r.body.replayed ? '' : 'You have joined your brokerage’s trial.');
         return;
       }
       var note = r.body && REDEEM_NOTE[r.body.error] ? REDEEM_NOTE[r.body.error] : 'That invite link could not be used.';
       var s = await post(TRIAL_FN, { action: 'status' });
-      if (s.status === 200 && s.body && s.body.status === 'OK') { role = s.body.role; await present(s.body.access, s.body.trial, note); } else trialUnreadable();
+      if (s.status === 200 && s.body && s.body.status === 'OK') { role = s.body.role; acctType = s.body.account_type || null; await present(s.body.access, s.body.trial, note); } else trialUnreadable();
       return;
     }
     var st = await post(TRIAL_FN, { action: 'status' });
-    if (st.status === 200 && st.body && st.body.status === 'OK') { role = st.body.role; await present(st.body.access, st.body.trial, ''); } else trialUnreadable();
+    if (st.status === 200 && st.body && st.body.status === 'OK') { role = st.body.role; acctType = st.body.account_type || null; await present(st.body.access, st.body.trial, ''); } else trialUnreadable();
   }
+
+  // ---- an individual agent makes their own account (Order L2): ONE call, no admin, no invite, no HomeSignal step -----------------------------------
+  var signingUp = false;
+  function signupSay(text, isError){ var s=$('signup-status'); s.textContent=text||''; s.className=isError?'err':''; }
+  function showSignup(on){
+    $('signup').hidden = !on;
+    if (!on) { signupSay('', false); signingUp = false; $('signup-go').disabled = false; }
+  }
+  var SIGNUP_NOTE = {
+    signup_refused: 'We could not create your account. Check your name, and sign in again with a confirmed email address.',
+    already_a_member: 'This email already belongs to a brokerage account, so an individual account was not created.',
+    bad_request: 'Type your name as you want it shown on your reports.'
+  };
+  async function signup(){
+    if (signingUp || !session || !session.user) return;
+    var forUser = session.user.id, name = ($('signup-name').value || '').trim();
+    if (!name) { signupSay(SIGNUP_NOTE.bad_request, true); return; }
+    signingUp = true; $('signup-go').disabled = true; signupSay('Creating your account…', false);
+    var r = await post(TRIAL_FN, { action: 'signup', name: name });
+    signingUp = false; $('signup-go').disabled = false;
+    if (!session || !session.user || session.user.id !== forUser) return;   // the person changed while this was on its way
+    if (r.status === 200 && r.body && r.body.status === 'OK') {
+      role = r.body.role; acctType = r.body.account_type || null;
+      await present(r.body.access, r.body.trial, r.body.replayed ? '' : 'Your account is ready.');
+      return;
+    }
+    signupSay(r.body && SIGNUP_NOTE[r.body.error] ? SIGNUP_NOTE[r.body.error] : (r.status === 0 || r.status >= 500 ? 'Your account could not be created just now. Try again in a minute.' : 'We could not create your account.'), true);
+  }
+  $('sf').addEventListener('submit', function(e){ e.preventDefault(); signup(); });
 
   // ---- an owner invites an agent (build step 5e): one link per agent, shown once -----------------------------------------
   function teamSay(text, isError){ var s=$('team-status'); s.textContent=text||''; s.className=isError?'err':''; }
@@ -1243,12 +1286,12 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
       if (session.user && session.user.id !== was) {
-        role = null; showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch(); // another person's role, invite link, reports, plan, client links, watches and name are never shown to this one
+        role = null; acctType = null; showSignup(false); showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch(); // another person's role, invite link, reports, plan, client links, watches and name are never shown to this one
         $('report').textContent = ''; $('creditnote').hidden = true; say('', false);
         loadTrial().then(function(){ if (pendingRun && canMake()) { pendingRun = false; run(); } });
       }
     } else {
-      access = null; role = null; attempt = null; showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch();
+      access = null; role = null; acctType = null; attempt = null; showSignup(false); showTeam(false); showSaved(false); showProfile(false); hideBilling(); hideShare(); hideWatch();
       $('report').textContent = ''; $('creditnote').hidden = true; say('', false); // a report on screen is the signed-out person's no more
       $('trial-count').className = 'count';
       $('trial-count').textContent = invite ? 'Sign in to join your brokerage’s trial.' : 'Sign in to see your brokerage’s free reports.';

@@ -23,6 +23,8 @@ export class SeatLimitReached extends Error {}
 export class TrialRejected extends Error {}
 /** The person may not invite: they belong to no trial, are not an active OWNER of it, or the trial has ended (EV003, NOT_ENTITLED). */
 export class NotEntitled extends Error {}
+/** The database refused an individual signup: no confirmed email, an unknown user, or an unusable name (EV001, SIGNUP_REFUSED). Nothing was created. */
+export class SignupRefused extends Error {}
 
 /** An invite token as public.evaluation_invite_mint makes it. Anything else is refused before the database is asked. */
 export const INVITE_TOKEN = /^hse1_[0-9a-f]{64}$/;
@@ -38,6 +40,10 @@ export function inviteLink(token: string): string {
 }
 
 export type Role = 'owner' | 'agent';
+/** The kind of account a person belongs to (public.brokerage_account.account_type, docs/individual-agent-signup.sql, Order L2). */
+export type AccountType = 'individual' | 'brokerage';
+/** An individual signup, as the person who made it is told: whether it was a replay of their own earlier signup. No id leaves the server. */
+export type SignedUp = { replayed: boolean };
 /** One of a brokerage's stored reports, as the list shows it. The context handle is for the caller's own address read; it never leaves the report function. */
 export type SavedReport = { report_id: string; number: number; generated_at: string; private_context_id: string | null };
 /** One stored report, opened: the stored text exactly as it was stored. */
@@ -148,6 +154,39 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
       const r = data[0];
       if (data.length !== 1 || !r || (r.role !== 'owner' && r.role !== 'agent')) throw new DataUnavailable('shape');
       return r.role;
+    },
+
+    /**
+     * The kind of account the person belongs to, 'individual' or 'brokerage', or null when they belong to none (Order L2). Read from
+     * public.brokerage_account_type_of, which goes through the one membership resolver. It decides only what the page OFFERS (an
+     * individual account has no team to invite); the database refuses a team in an individual account whatever the page shows.
+     */
+    async accountTypeOf(userId: string): Promise<AccountType | null> {
+      const { data, error } = await rpc('brokerage_account_type_of', { p_user_id: userId });
+      if (error) throw new DataUnavailable('brokerage_account_type_of');
+      if (!Array.isArray(data)) throw new DataUnavailable('shape');
+      if (data.length === 0) return null;
+      const r = data[0];
+      if (data.length !== 1 || !r || (r.account_type !== 'individual' && r.account_type !== 'brokerage')) throw new DataUnavailable('shape');
+      return r.account_type;
+    },
+
+    /**
+     * An individual agent makes their own account (public.individual_signup, Order L2): the account, the owner membership and the 10-report
+     * evaluation, in the database's one transaction. Idempotent for the same person (replayed: true). Refusals are named errors; nothing
+     * is created on any of them. The database checks the email is confirmed and the name is usable; this only names its answers.
+     */
+    async signupIndividual(userId: string, name: string): Promise<SignedUp> {
+      const { data, error } = await rpc('individual_signup', { p_user_id: userId, p_name: name });
+      if (error) {
+        if (error.message === 'SIGNUP_REFUSED') throw new SignupRefused('refused');
+        if (error.message === 'ALREADY_A_MEMBER') throw new AlreadyAMember('refused');
+        throw new DataUnavailable('individual_signup');
+      }
+      if (!Array.isArray(data) || data.length !== 1) throw new DataUnavailable('shape');
+      const r = data[0];
+      if (!r || typeof r.replayed !== 'boolean') throw new DataUnavailable('shape');
+      return { replayed: r.replayed };
     },
 
     /**

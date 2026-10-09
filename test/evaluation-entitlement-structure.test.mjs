@@ -198,7 +198,7 @@ const limitMigrationCode = code(LIMIT_MIGRATION);
 const DA_SQL = 'docs/da-owner-safeguards.sql';
 const daCode = code(DA_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS, DA_SQL].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql'].sort())
    && dmlTargets(daCode).length >= 3 && dmlTargets(daCode).every((t) => /^(brokerage_member|share_view_window|billing_checkout_claim)$/.test(t)) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(?:public\.)?evaluation/i.test(daCode)
    && (daCode.match(/\bpublic\.evaluation_invite_revoke\(/g) || []).length === 2 && !/\bfrom public\.evaluation_invite_revoke|\bperform public\.evaluation_invite_revoke/.test(daCode) && /to_regprocedure\('public\.evaluation_invite_revoke\(uuid,uuid\)'\)/.test(daCode)
    && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigrationCode)
@@ -230,7 +230,7 @@ ok(GATE.length > 1500 && REST.length > 1500 && SNAPMOD.length > 1500 && HAN_FOLL
   const TD = readFileSync(join(ROOT, 'supabase/functions/development-activity-trial/data.ts'), 'utf8');
   ok(TH.length > 1500 && TD.length > 300 && ![TH, TD].some((t) => OURS.test(strip4(t)))
      && /const evaluation = makeEvaluationReads\(rpc\);/.test(strip4(TD)) && /trialOf: evaluation\.trialOf, redeemInvite: evaluation\.redeemInvite, createTrial: evaluation\.createTrial,/.test(strip4(TD))
-     && /roleOf: evaluation\.roleOf, inviteAgent: evaluation\.inviteAgent,/.test(strip4(TD))
+     && /roleOf: evaluation\.roleOf, accountTypeOf: evaluation\.accountTypeOf, signupIndividual: evaluation\.signupIndividual, inviteAgent: evaluation\.inviteAgent,/.test(strip4(TD))
      && !/evaluation_id|brokerage_id|invite_id|brokerage_membership_of/.test(strip4(TH)),
     '4b2: the trial function (build steps 5c, 5d, 5e) names no evaluation function, no resolver and no id: it asks the shared trial module (status, role, redeem, create, invite), and never returns an evaluation, brokerage or invite id');
 }

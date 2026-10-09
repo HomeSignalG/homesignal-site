@@ -9,7 +9,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 3 Jody staging site | DONE, merged | site #1740 -> `5d769e3`; `jody-staging` ran green on a runner; nothing deployed |
 | 4 SEO migration | tooling merged; real-snapshot parity PASSED (run 37971696362) | see Step 4 |
 | 5 Zero-cost redirect | built + proven offline; host test needs founder's Netlify account | see Step 5 |
-| 6 Integration + rehearsal | in progress; DNS/registration audit DONE (run 37978348576) | see Step 6 |
+| 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
 | 7 Cutover | needs founder GO LIVE | |
 | 8 Email + Bluesky | not started | |
 | 9 Search transition + monitoring | not started | |

@@ -40,6 +40,8 @@ function deps(over = {}) {
     redeemInvite: rec('redeemInvite', over.redeemInvite ?? (async () => ({ role: 'agent', replayed: false }))),
     createTrial: rec('createTrial', over.createTrial ?? (async () => ({ invite_link: E.inviteLink(TOKEN), invite_expires_at: '2026-10-16T12:00:00+00:00' }))),
     roleOf: rec('roleOf', over.roleOf ?? (async () => 'agent')),
+    accountTypeOf: rec('accountTypeOf', over.accountTypeOf ?? (async () => 'brokerage')),
+    signupIndividual: rec('signupIndividual', over.signupIndividual ?? (async () => ({ replayed: false }))),
     teamOf: rec('teamOf', over.teamOf ?? (async () => ({ members: [{ ref: M1, label: 'a***@example.test', joined_at: '2026-10-03T12:00:00+00:00' }], invites: [{ ref: I1, created_at: '2026-10-04T12:00:00+00:00', expires_at: '2026-10-18T12:00:00+00:00' }] }))),
     removeMember: rec('removeMember', over.removeMember ?? (async () => true)),
     withdrawInvite: rec('withdrawInvite', over.withdrawInvite ?? (async () => true)),
@@ -153,22 +155,23 @@ const USER = [/\/auth\/v1\/user$/, () => json({ id: UID, email: 'agent@example.t
 const NOT_ADMIN = [/dashboard_admins/, () => json([])];
 const USAGE = [/\/rest\/v1\/rpc\/evaluation_usage$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', status: 'active', credit_limit: 10, credits_used: 5, credits_remaining: 5, expires_at: null, expired: false }])];
 const MEMBER = (role = 'agent') => [/\/rest\/v1\/rpc\/brokerage_membership_of$/, () => json([{ brokerage_id: 'b0000000-0000-4000-8000-000000000002', role }])];
+const ACCT = (t = 'brokerage') => [/\/rest\/v1\/rpc\/brokerage_account_type_of$/, () => json([{ account_type: t }])];
 async function real(routes, body) {
   seen.length = 0;
   const h = H.makeHandler(D.makeDeps({ url: 'https://proj.supabase.co/', serviceKey: 'svc-key' }, stubFetch(routes)));
   const res = await h(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: JSON.parse(await res.text()) };
 }
-r = await real([USER, NOT_ADMIN, USAGE, MEMBER('owner')], { action: 'status' });
+r = await real([USER, NOT_ADMIN, USAGE, MEMBER('owner'), ACCT()], { action: 'status' });
 ok(r.status === 200 && r.json.access === 'trial' && r.json.trial.credits_remaining === 5 && r.json.role === 'owner', '4a status through the real data layer, with the role', r.json);
-ok(JSON.stringify(seen.map((s) => s.method + ' ' + s.path.split('?')[0])) === JSON.stringify(['GET /auth/v1/user', 'GET /rest/v1/dashboard_admins', 'POST /rest/v1/rpc/evaluation_usage', 'POST /rest/v1/rpc/brokerage_membership_of']),
-  '4b exactly four requests: who the token belongs to, the allow-list, evaluation_usage, and the membership resolver for the role', seen.map((s) => s.path));
+ok(JSON.stringify(seen.map((s) => s.method + ' ' + s.path.split('?')[0])) === JSON.stringify(['GET /auth/v1/user', 'GET /rest/v1/dashboard_admins', 'POST /rest/v1/rpc/evaluation_usage', 'POST /rest/v1/rpc/brokerage_membership_of', 'POST /rest/v1/rpc/brokerage_account_type_of']),
+  '4b exactly five requests: who the token belongs to, the allow-list, evaluation_usage, the membership resolver for the role, and the account type (Order L2)', seen.map((s) => s.path));
 ok(seen[0].headers.Authorization === 'Bearer user-token' && seen[2].headers.Authorization === 'Bearer svc-key' && JSON.stringify(seen[2].body) === JSON.stringify({ p_user_id: UID })
    && seen[3].headers.Authorization === 'Bearer svc-key' && JSON.stringify(seen[3].body) === JSON.stringify({ p_user_id: UID }),
   '4c the user lookup carries the person\'s token; both database calls carry the service key and ask by the person\'s id');
 ok(!/e0000000|b0000000/.test(JSON.stringify(r.json)), '4d neither the evaluation id nor the brokerage id the database returned reaches the answer');
 const REDEEM_OK = [/\/rest\/v1\/rpc\/evaluation_invite_redeem$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', brokerage_id: 'b0000000-0000-4000-8000-000000000002', role: 'agent', replayed: false }])];
-r = await real([USER, NOT_ADMIN, REDEEM_OK, USAGE, MEMBER()], { action: 'redeem', token: TOKEN });
+r = await real([USER, NOT_ADMIN, REDEEM_OK, USAGE, MEMBER(), ACCT()], { action: 'redeem', token: TOKEN });
 const redeemReq = seen.find((s) => /evaluation_invite_redeem/.test(s.path));
 ok(r.status === 200 && r.json.role === 'agent' && redeemReq && JSON.stringify(redeemReq.body) === JSON.stringify({ p_token: TOKEN, p_user_id: UID }),
   '4e redeem through the real data layer: the token and the person\'s id go to evaluation_invite_redeem', r.json);
@@ -183,7 +186,7 @@ r = await real([USER, NOT_ADMIN, [/evaluation_invite_redeem/, () => { throw new 
 ok(r.status === 502, '4i the database unreachable: 502');
 r = await real([USER, NOT_ADMIN, REDEEM_OK, USAGE], { action: 'redeem', token: 'hse1_' + 'Z'.repeat(64) });
 ok(r.status === 400 && !seen.some((s) => /evaluation_invite_redeem/.test(s.path)), '4j a token of the wrong shape never reaches the database (the shared module checks it too)');
-r = await real([USER, NOT_ADMIN, [/evaluation_invite_redeem/, () => json([{ role: 'boss', replayed: false }])], USAGE, MEMBER()], { action: 'redeem', token: TOKEN });
+r = await real([USER, NOT_ADMIN, [/evaluation_invite_redeem/, () => json([{ role: 'boss', replayed: false }])], USAGE, MEMBER(), ACCT()], { action: 'redeem', token: TOKEN });
 ok(r.status === 502, '4k an answer of the wrong shape (an unknown role) is unavailable, not a success (every later read would succeed)');
 for (const bad of [[{ role: 'boss', replayed: false }], [{ role: 'agent', replayed: 'no' }], [{ role: 'agent', replayed: false }, { role: 'agent', replayed: false }], []]) {
   let thrown = null;
@@ -197,10 +200,10 @@ ok(r.status === 200 && r.json.access === 'none' && r.json.role === null && !seen
 for (const [label, route] of [['an unknown role', () => json([{ brokerage_id: 'b0000000-0000-4000-8000-000000000002', role: 'boss' }])],
   ['two rows', () => json([{ role: 'owner' }, { role: 'agent' }])], ['a refusal', () => json({ message: 'nope' }, 400)], ['a 5xx', () => json({ message: 'down' }, 503)],
   ['not a list', () => json({ role: 'owner' })]]) {
-  r = await real([USER, NOT_ADMIN, USAGE, [/brokerage_membership_of/, route]], { action: 'status' });
+  r = await real([USER, NOT_ADMIN, USAGE, [/brokerage_membership_of/, route], ACCT()], { action: 'status' });
   ok(r.status === 502 && r.json.error === 'data_unavailable', '4o the membership resolver answering with ' + label + ': 502, never a guessed role', r.json);
 }
-r = await real([USER, NOT_ADMIN, USAGE, [/brokerage_membership_of/, () => json([])]], { action: 'status' });
+r = await real([USER, NOT_ADMIN, USAGE, [/brokerage_membership_of/, () => json([])], ACCT()], { action: 'status' });
 ok(r.status === 200 && r.json.role === null, '4p the resolver answering no membership (a race with a removal): no role, not an error', r.json);
 
 {
@@ -409,7 +412,7 @@ r = await ask(deps({ withdrawInvite: async () => { throw new E.NotEntitled('x');
 ok(r.status === 403 && r.json.error === 'not_allowed', '8l an invite that is not theirs is 403 not_allowed');
 r = await ask(deps(), { action: 'withdraw_invite', member: M1 });
 ok(r.status === 400 && named('withdrawInvite').length === 0, '8m a withdrawal carries an invite handle, not a member handle');
-ok(['team', 'remove_member', 'withdraw_invite'].every((a) => H.CAPABILITY.method.includes(a)) && H.CAPABILITY.writes.length === 5, '8n the capability lists the three new actions and what they write');
+ok(['team', 'remove_member', 'withdraw_invite'].every((a) => H.CAPABILITY.method.includes(a)) && H.CAPABILITY.writes.length === 6 && H.CAPABILITY.method.includes('signup'), '8n the capability lists the three new actions and what they write');
 r = await ask(deps({ isAdmin: async () => true }), { action: 'team' });
 ok(named('teamOf').length === 1, '8o being an admin does not skip the database\'s ownership check: it is asked for an admin too');
 // the real data layer
@@ -439,6 +442,48 @@ for (const [fn, body] of [['brokerage_member_remove', { action: 'remove_member',
   }
 }
 ok(bad9 === 8, '8u a 5xx or a non-boolean answer is a fault (502) and a NOT_ENTITLED is 403 - never "done" (eight cases)', bad9);
+
+// ---- 9. signup (Order L2, docs/individual-agent-signup.sql): an individual agent makes their own account ----------------------------------------
+console.log('--- 9. individual signup ---');
+r = await ask(deps(), { action: 'signup', name: 'Ann Agent' }, { auth: null });
+ok(r.status === 401 && named('signupIndividual').length === 0, '9a signup needs a signed-in person: no token, 401, nothing written');
+r = await ask(deps(), { action: 'signup', name: 'Ann Agent' });
+ok(r.status === 200 && r.json.status === 'OK' && r.json.replayed === false && named('signupIndividual').length === 1
+   && named('signupIndividual')[0][1] === UID && named('signupIndividual')[0][2] === 'Ann Agent',
+  '9b signup makes the account for THE SIGNED-IN USER (their id, never one from the request) with their cleaned name', r.json);
+r = await ask(deps(), { action: 'signup', name: 'Ann Agent', user_id: 'b0000000-0000-4000-8000-000000000009' });
+ok(r.status === 400 && named('signupIndividual').length === 0, '9c a request that names any other field (an id, a plan, a type) is refused before the database is asked');
+let nm = 0;
+for (const bad of [undefined, null, '', '   ', 42, {}, 'x'.repeat(121)]) {
+  r = await ask(deps(), { action: 'signup', name: bad });
+  if (r.status === 400 && named('signupIndividual').length === 0) nm++;
+}
+r = await ask(deps(), { action: 'signup', name: 'Line\u202eBreak' });
+if (r.status === 200 && named('signupIndividual')[0][2] === 'Line Break') nm++;
+ok(nm === 8, '9d a missing, blank, non-text or over-long name is refused; a direction-changing character is made safe (a space) before it reaches the database', nm);
+r = await ask(deps({ signupIndividual: async () => ({ replayed: true }) }), { action: 'signup', name: 'Ann Agent' });
+ok(r.status === 200 && r.json.replayed === true, '9e signing up again is told it is a replay (200), not an error');
+r = await ask(deps({ signupIndividual: async () => { throw new E.AlreadyAMember('x'); } }), { action: 'signup', name: 'Ann Agent' });
+ok(r.status === 409 && r.json.error === 'already_a_member', '9f a person who belongs to a brokerage is told so (409)');
+r = await ask(deps({ signupIndividual: async () => { throw new E.SignupRefused('x'); } }), { action: 'signup', name: 'Ann Agent' });
+ok(r.status === 400 && r.json.error === 'signup_refused', '9g an unconfirmed email or unusable account is refused (400), nothing created');
+r = await ask(deps({ signupIndividual: async () => { throw new H.DataUnavailable('x'); } }), { action: 'signup', name: 'Ann Agent' });
+ok(r.status === 502, '9h a database fault is 502, never "refused" and never "created"');
+r = await ask(deps({ trialOf: async () => ACTIVE, accountTypeOf: async () => 'individual', roleOf: async () => 'owner' }), { action: 'status' });
+ok(r.status === 200 && r.json.account_type === 'individual' && r.json.role === 'owner' && !/brokerage_id|evaluation_id/.test(r.text), '9i status says the account type (what the page offers) and still no id');
+r = await ask(deps({ trialOf: async () => null }), { action: 'status' });
+ok(r.status === 200 && r.json.account_type === null && named('accountTypeOf').length === 0, '9j a person with no account: no type, and the type is not asked');
+r = await ask(deps({ trialOf: async () => ACTIVE, accountTypeOf: async () => { throw new H.DataUnavailable('x'); } }), { action: 'status' });
+ok(r.status === 200 && r.json.account_type === null && r.json.access === 'trial' && r.json.trial.credits_remaining === 7, '9n a type that cannot be read degrades to unknown: the status still answers (wording only), so deploy order does not matter');
+// the real data layer: the exact request, by the person's id
+const SIGNUP_OK = [/\/rest\/v1\/rpc\/individual_signup$/, () => json([{ evaluation_id: 'e0000000-0000-4000-8000-000000000001', brokerage_id: 'b0000000-0000-4000-8000-000000000002', replayed: false }])];
+r = await real([USER, NOT_ADMIN, SIGNUP_OK, USAGE, MEMBER('owner'), ACCT('individual')], { action: 'signup', name: '  Ann   Agent ' });
+const sreq = seen.find((x) => /individual_signup/.test(x.path));
+ok(r.status === 200 && r.json.account_type === 'individual' && sreq && JSON.stringify(sreq.body) === JSON.stringify({ p_user_id: UID, p_name: 'Ann Agent' }) && sreq.headers.Authorization === 'Bearer svc-key',
+  '9k through the real data layer: ONE call to individual_signup with the person\'s id and cleaned name, service key; no id in the answer', r.json);
+ok(!/e0000000|b0000000/.test(JSON.stringify(r.json)), '9l neither the evaluation id nor the account id the database returned reaches the answer');
+r = await real([USER, NOT_ADMIN, [/individual_signup/, () => new Response(JSON.stringify({ message: 'SIGNUP_REFUSED' }), { status: 400, headers: { 'content-type': 'application/json' } })]], { action: 'signup', name: 'Ann' });
+ok(r.status === 400 && r.json.error === 'signup_refused', '9m the database\'s SIGNUP_REFUSED becomes signup_refused through the real layer', r.json);
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

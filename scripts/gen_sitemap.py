@@ -42,7 +42,9 @@ SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 ANON = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3"
         "bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6"
         "MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U")
-BASE = "https://homesignal.net"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import brand_host  # noqa: E402
+BASE = brand_host.origin()   # one origin, from the brand contract
 STATIC = [("/", "weekly", "1.0"), ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
           ("/privacy.html", "yearly", "0.3"),

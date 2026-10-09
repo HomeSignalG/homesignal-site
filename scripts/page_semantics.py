@@ -38,9 +38,12 @@ import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import brand_host  # noqa: E402
+
 SEMANTIC_VERSION = 1
 SCHEMA = "homesignal-page-state"
-BASE = "https://homesignal.net"
+BASE = brand_host.origin()   # the contract's current identity (scripts/brand_host.py)
 
 # Substituted into the HTML by the renderer, replaced by the real day when the file is written.
 # html.escape leaves '@' and '-' alone, so it survives esc() unchanged. It is not a value any
