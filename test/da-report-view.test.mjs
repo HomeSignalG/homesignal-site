@@ -414,6 +414,7 @@ try {
   ok(/\.da-rv-h2\{break-after:avoid/.test(P) || /\.da-rv-brieflab,\.da-rv-h2\{break-after:avoid/.test(P), '12c print: a heading is kept with what follows it');
   ok(/thead\{display:table-header-group\}/.test(P), '12d print: the table header repeats on each page');
   ok(/\.da-rv-actions[^{]*\{display:none/.test(P) && /da-rv-sec--filters/.test(P), '12e print: the buttons and the filters are not printed');
+  ok(/\.da-rv-detail>\.da-rv-sum\{display:none\}\.da-rv-detail::details-content\{content-visibility:visible;display:block\}/.test(P), '12e2 print: the collapsed evidence block is printed open (the whole report is printed)');
   ok(/html,body\{background:#fff!important\}/.test(P), '12f print: the page background is white (no grey block on a short last page)');
   ok(/Headers and footers/.test(V.PDF_HINT), '12g the Download PDF hint tells the person which browser setting to switch off');
   // one renderer: every page that shows a report loads this file and the layout lives nowhere else

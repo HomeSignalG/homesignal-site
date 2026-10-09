@@ -188,11 +188,11 @@ m('briefing_caution_dropped', "+ '<p class=\"da-rv-p da-rv-quiet\" data-da-cauti
 m('address_recased_when_mixed', "if (a !== a.toUpperCase() && a !== a.toLowerCase()) return a;", "")
 m('brokerage_agent_invented', "var who = [opts.brokerage, opts.agent].map(", "var who = [opts.brokerage || 'HomeSignal Realty', opts.agent].map(")
 m('print_white_background_dropped', "    'html,body{background:#fff!important}',\n", "", [BROWSER])
-m('print_page_number_dropped', "@bottom-right{content:\"Page \" counter(page) \" of \" counter(pages);", "@bottom-right{content:\"\";", [BROWSER])
-m('print_row_split_allowed', ".da-rv-sec--map,.da-rv-table tr{break-inside:avoid;page-break-inside:avoid}", ".da-rv-sec--map{break-inside:avoid;page-break-inside:avoid}", [BROWSER])
-m('print_header_not_repeated', "'.da-rv-table thead{display:table-header-group}',", "'.da-rv-table thead{display:table-row-group}',", [BROWSER])
-m('print_url_hidden', "'.da-rv-url{display:block;font-size:10px;", "'.da-rv-url{display:none;font-size:10px;", [BROWSER])
-m('print_evidence_collapsed', "'.da-rv-detail>.da-rv-sum{display:none}.da-rv-detail::details-content{content-visibility:visible;display:block}',", "", [BROWSER])
+m('print_page_number_dropped', "@bottom-right{content:\"Page \" counter(page) \" of \" counter(pages);", "@bottom-right{content:\"\";")
+m('print_row_split_allowed', ".da-rv-sec--map,.da-rv-table tr{break-inside:avoid;page-break-inside:avoid}", ".da-rv-sec--map{break-inside:avoid;page-break-inside:avoid}")
+m('print_header_not_repeated', "'.da-rv-table thead{display:table-header-group}',", "'.da-rv-table thead{display:table-row-group}',")
+m('print_url_hidden', "'.da-rv-url{display:block;font-size:10px;", "'.da-rv-url{display:none;font-size:10px;")
+m('print_evidence_collapsed', "'.da-rv-detail>.da-rv-sum{display:none}.da-rv-detail::details-content{content-visibility:visible;display:block}',", "")
 
 
 def first_failure(out):
