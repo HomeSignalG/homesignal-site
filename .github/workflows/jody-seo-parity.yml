@@ -1,0 +1,50 @@
+name: jody-seo-parity
+
+# Jody migration, Step 4. ONE real generation of the whole site from the live read model, then the Jody LAUNCH
+# overlay applied to a COPY, then scripts/seo_parity.py compares the two. Because both trees come from the same
+# generation, the data snapshot is frozen by construction: a difference is the migration's, never the data's.
+# Manual only. Reads the same public data the Pages build reads; DEPLOYS NOTHING and notifies no search engine.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Stage the static site
+        run: python3 scripts/stage_site.py --src . --out _a
+      - name: Fetch the published Rule D plane (same objects the Pages build reads)
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          B='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo'
+          curl -fsSL --retry 3 "$B/development-seo-plane.json" -o data/development_seo_plane.json
+          curl -fsSL --retry 3 "$B/development-seo-cities.json" -o data/development_seo_cities.json
+          curl -fsSL --retry 3 "$B/development-seo-projects.json" -o data/development_seo_projects.json
+      - name: Generate one document per canonical ZIP (the single snapshot)
+        env:
+          HS_BUILD_ID: parity-${{ github.run_id }}
+        run: python3 scripts/gen_zip_pages.py --out _a --reseed
+      - name: Apply the Jody LAUNCH overlay to a copy
+        run: |
+          cp -r _a _b
+          python3 scripts/brand_stage.py --dir _b --identity jody --report brand-launch-report.json
+      - name: SEO parity (HomeSignal tree vs Jody launch tree)
+        run: python3 scripts/seo_parity.py --a _a --b _b --report seo-parity-report.json
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jody-seo-parity-reports
+          path: |
+            seo-parity-report.json
+            brand-launch-report.json
+          retention-days: 30
