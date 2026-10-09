@@ -234,6 +234,29 @@ console.log('--- 4b. #address= is searched once, taken out of the URL, and hande
   ok(!/address|Evergreen|%20/.test(String(arrived.url)), '4b and it is in no URL on the way (the hand-off is sessionStorage, never a query or fragment)', arrived.url);
   await ctx.close();
 }
+// The pause (founder, 2026-10-09): the first version moved on only after the shell finished its network boot, so the homepage showed
+// for a couple of seconds first. The move now happens as the page script runs; this holds the map response back and checks the
+// document stays hidden (nothing of the homepage is visible) while the map page is slow.
+console.log('--- 4b2. a slow map page never shows the homepage in between ---');
+{
+  const ADDR = '742 Evergreen Terrace, Springfield, OR 97477';
+  const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });
+  await page.route('**/homesignalmap.html', async (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); await new Promise((r) => setTimeout(r, 1500)); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }).catch(() => {}); });
+  // Every frame the browser paints on the homepage is recorded with the document's visibility; none may be visible.
+  const frames = [];
+  await page.exposeFunction('__hsFrame', (v) => { frames.push(v); });
+  await page.addInitScript(() => {
+    if (location.pathname !== '/index.html') return;
+    (function tick() { try { window.__hsFrame(getComputedStyle(document.documentElement).visibility); } catch (e) {} requestAnimationFrame(tick); })();
+  });
+  await page.goto('about:blank');
+  await page.goto(base + '/index.html#address=' + encodeURIComponent(ADDR), { waitUntil: 'commit' });
+  await page.waitForURL((u) => u.pathname === '/homesignalmap.html', { timeout: 20000 }).catch(() => {});
+  const mid = { samples: frames.length, shown: frames.filter((v) => v !== 'hidden').length };
+  ok(mid.samples > 0 && mid.shown === 0, '4b2 while the map page is slow the document is hidden, so no homepage shows', mid);
+  ok(new URL(page.url()).pathname === '/homesignalmap.html', '4b2 and it then arrives at Map 1', page.url());
+  await ctx.close();
+}
 {
   for (const frag of ['#address=abc', '#address=78657', '#address=%E0%A4%A', '#other=1 Main Street Springfield OR']) {
     const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });

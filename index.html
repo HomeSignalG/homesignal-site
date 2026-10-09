@@ -22,6 +22,11 @@
 <meta name="twitter:image" content="https://homesignal.net/og-default.png">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
 <link rel="stylesheet" href="app.css?v=5e5acb5b">
+<script>
+  // A link from a buyer's shared report arrives as /#address=...: hide the document at once so no homepage paints while the
+  // page script (at the end of the body) moves on. That script un-hides it when the fragment is not a usable address.
+  (function () { if (/^#address=./.test(location.hash || '')) { document.documentElement.style.visibility = 'hidden'; setTimeout(function () { document.documentElement.style.visibility = ''; }, 5000); } })();
+</script>
 </head>
 <body data-nav="explore">
 <!-- THE HOMEPAGE (founder, Revised Index Design — Final Claude-Ready, 2026-09-30). index.html is
@@ -142,6 +147,27 @@
   var sampleObserver = null;
   var $ = function (id) { return document.getElementById(id); };
 
+  // A buyer's shared Development Activity report links here with the property address in the URL FRAGMENT
+  // (#address=...), never in the query: a fragment is not sent to any server (founder, 2026-10-09: link to the
+  // full address). It is acted on HERE, as this script runs, and not in HS.onReady: that waits for the shell's whole
+  // network boot (ZIP coverage, sign-in, saved topics, saved place), and the visitor sat on the homepage for seconds
+  // before being moved. The fragment is taken out of the address bar first, the address goes through the SAME rule a
+  // typed address does (searchKind, then the sessionStorage hand-off Map 1 reads and removes), and the page is hidden
+  // until the browser leaves it so no homepage flashes. location.replace, so Back returns to the report and not to a
+  // page that would redirect again. Anything that is not a plausible street address is ignored and the page loads as usual.
+  var link = /^#address=(.+)$/.exec(location.hash || '');
+  if (link) {
+    var wanted = '';
+    try { wanted = decodeURIComponent(link[1].replace(/\+/g, ' ')).trim(); } catch (err) { wanted = ''; }
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {}
+    if (wanted.length <= 200 && searchKind(wanted) === 'address') {
+      try {
+        sessionStorage.setItem(HANDOFF_KEY, wanted);
+        location.replace('homesignalmap.html');
+      } catch (err) { document.documentElement.style.visibility = ''; /* blocked storage: an ordinary homepage visit */ }
+    } else { document.documentElement.style.visibility = ''; }
+  }
+
   // ---- the map ----------------------------------------------------------------------
   // THE SAMPLE IS AUTO-SIZED, NEVER GIVEN A FIXED HEIGHT. Map 1's preview document is as tall
   // as its content; this sets the iframe to that height on load and whenever it changes. The
@@ -224,13 +250,22 @@
     box.hidden = !text;
   }
 
+  // ONE decision for what a query means, used by the search box AND by a link that arrives with an address:
+  // a 5-digit ZIP, a plausible street address (the same minimum the Add-an-address box asks for before it
+  // calls the geocoder), or too short to search.
+  function searchKind(q) {
+    if (/^\d{5}$/.test(q)) return 'zip';
+    if (q.length < 8 || q.indexOf(' ') < 0) return 'short';
+    return 'address';
+  }
+
   function submit(e) {
     if (e) e.preventDefault();
     var q = String($('homeQuery').value || '').trim();
     searchError('');
-    if (/^\d{5}$/.test(q)) { location.assign('homesignalmap.html?zip=' + q); return; }
-    // The same minimum the Add-an-address box asks for before it calls the geocoder.
-    if (q.length < 8 || q.indexOf(' ') < 0) {
+    var kind = searchKind(q);
+    if (kind === 'zip') { location.assign('homesignalmap.html?zip=' + q); return; }
+    if (kind === 'short') {
       searchError('Enter a 5-digit ZIP code, or a street address with its city or ZIP.');
       $('homeQuery').focus();
       return;
@@ -253,22 +288,6 @@
       hint.textContent = 'Enter a street address near ZIP ' + near + ' to see development activity around that address.';
       hint.hidden = false;
       $('homeQuery').focus();
-    }
-    // A buyer's shared Development Activity report links here with the property address in the URL FRAGMENT
-    // (#address=...), never in the query: a fragment is not sent to any server. It is read once, taken out of the
-    // address bar before anything else runs, and then goes through the SAME search a typed address does (so the
-    // hand-off to Map 1 still travels in sessionStorage and is never put in a URL). Anything that is not a plausible
-    // street address is ignored and the page stays as it is.
-    var link = /^#address=(.+)$/.exec(location.hash || '');
-    if (link) {
-      var wanted = '';
-      try { wanted = decodeURIComponent(link[1].replace(/\+/g, ' ')).trim(); } catch (err) { wanted = ''; }
-      try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {}
-      if (wanted.length >= 8 && wanted.length <= 200 && !/^\d{5}$/.test(wanted)) {
-        $('homeQuery').value = wanted;
-        submit();
-        return;
-      }
     }
     var f = $('homeMapFrame');
     f.addEventListener('load', function () { watchSample(); });
