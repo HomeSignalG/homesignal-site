@@ -45,6 +45,12 @@ header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;c
 .notice p+p{margin-top:8px}
 #rid{margin:0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 #private{margin:0;font-size:12.5px;color:var(--muted);max-width:75ch}
+/* The buyer invitation: the last thing on the page, after the report and its disclosures, set apart from the findings. Printed too, so a saved PDF carries a clickable link. */
+.invite{margin:10px 0 0;padding:18px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;break-inside:avoid;page-break-inside:avoid}
+.invite h2{margin:0 0 6px;font-size:17px}
+.invite p{margin:0;color:var(--muted);max-width:65ch}
+.invite a{display:inline-block;margin-top:12px;font-weight:600;color:var(--accent);text-decoration:underline;text-underline-offset:3px;padding:10px 0;min-height:44px}
+.invite a:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 noscript p{margin:16px;font-weight:600}
 @media print{
   body{background:#fff;font-size:12.5px}
@@ -67,6 +73,11 @@ noscript p{margin:16px;font-weight:600}
   <div id="report"></div>
   <p id="rid" hidden></p>
   <p id="private" hidden>This is a private link. Anyone who has it can read this report, so share it only with people you trust. The brokerage that sent it can withdraw it at any time, and it stops working six months after it was made.</p>
+  <aside id="invite" class="invite" hidden aria-label="About HomeSignal">
+    <h2>Know what changes around your home.</h2>
+    <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
+    <a href="https://homesignal.net/" rel="noopener">Explore HomeSignal &rarr;</a>
+  </aside>
 </main>
 <noscript><p>This report needs JavaScript to be shown. Please turn it on, or ask the person who sent you the link for a printed copy.</p></noscript>
 <script src="lib/project-type.js?v=108e00a6"></script>
@@ -138,12 +149,13 @@ noscript p{margin:16px;font-weight:600}
     state('report'); say('', false);
     if (typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id)) { $('rid').textContent = 'Report ID ' + body.report_id; $('rid').hidden = false; }
     $('private').hidden = false;
+    $('invite').hidden = false;
     $('pdf').hidden = false;
   }
 
   async function start(){
     var token = readToken();
-    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('pdf').hidden = true;
+    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('invite').hidden = true; $('pdf').hidden = true;
     if (!token) { missing(); return; }
     state('loading'); say('Loading the report…', false);
     var res;
