@@ -76,12 +76,12 @@ const htmlLife = viewLife(W);
 
 // ---- 1. section order: the 100526 plan's (ruling 3) ----------------------------------------------------------------------------------------------
 {
-  const FULL = 'changed,activity,filters,map,review,approved,proposed,permitted,history,evidence';
-  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Type and stage, the map, Things to Review, the three stages, Change History, Evidence', keysOf(html));
-  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Type and stage | Development Activity Map | Things to Review With Your Client | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Change History | Official evidence & coverage',
+  const FULL = 'changed,activity,filters,map,review,approved,proposed,permitted,operating,history,evidence';
+  ok(keysOf(html) === FULL, '1a every section has data: What Changed, Recent Official Activity, Type and stage, the map, Things to Review, the three stages, Operating / Built, Change History, Evidence', keysOf(html));
+  ok(sections(html).map((s) => s.label).join(' | ') === 'What Changed Around This Property | Recent Official Activity | Type and stage | Development Activity Map | Things to Review With Your Client | Approved / Coming | Proposed / Under Review | Permitted / Under Construction | Operating / Built | Change History | Official evidence & coverage',
     '1b the section titles are the plan\'s (ruling 3 and the visual layout contract)', sections(html).map((s) => s.label));
   ok(keysOf(htmlNone) === 'outcome,evidence', '1c an empty report renders only its outcome and Official evidence & coverage', keysOf(htmlNone));
-  ok(keysOf(htmlCold) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
+  ok(keysOf(htmlCold) === 'activity,filters,map,review,approved,proposed,permitted,operating,history,evidence', '1d the cold start (no ledger): Recent Official Activity leads, and there is no What Changed section', keysOf(htmlCold));
   const quiet = { rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01', name: 'Quiet Approved Plat' })], ledger: [], events: [], health: [] };
   const hq = view(await wire(quiet));
   ok(keysOf(hq) === 'activity,filters,map,review,approved,proposed,permitted,history,evidence' && /da-rv-hero/.test(sec(hq, 'activity').cls) && metricsOf(sec(hq, 'activity')).join() === 'Records with official activity in the last 90 days=0',
@@ -156,7 +156,7 @@ const htmlLife = viewLife(W);
   const typeByName = Object.fromEntries(W.report.projects.map((p) => [p.name, p.type]));
   const chipOf = (c) => { const m = /<span class="da-rv-tag da-rv-type">([^<]*)<\/span>/.exec(c); return m ? decode(m[1]) : null; };
   const cards = cardsOf(html);
-  ok(cards.length === 8 && cards.every((c) => chipOf(c) === (typeByName[cardTitle(c)] ? typeByName[cardTitle(c)].label : null)) && cards.filter((c) => chipOf(c)).length >= 6,
+  ok(cards.length === 9 && cards.every((c) => chipOf(c) === (typeByName[cardTitle(c)] ? typeByName[cardTitle(c)].label : null)) && cards.filter((c) => chipOf(c)).length >= 6,
     '3c2 every card shows the engine\'s own Type label as its chip (and the labels are real: ' + [...new Set(cards.map(chipOf))].join(', ') + ')');
   const noType = clone(W);
   noType.report.projects.find((p) => p.project_id === 'k-approved').type = null;
@@ -328,7 +328,7 @@ const htmlLife = viewLife(W);
   const real = [...html.matchAll(/<a class="da-rv-link" href="([^"]*)" target="_blank" rel="noopener noreferrer">/g)];
   const nLinks = [...html.matchAll(/<a\b/g)].length;
   const inTable = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].reduce((a, t) => a + (t[0].match(/<a\b/g) || []).length, 0);
-  ok(real.length === nLinks && inTable > 0 && real.length === 11 + inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer (8 cards and 3 review items: 11, plus one per table row that has a link: ' + inTable + ')', [real.length, inTable]);
+  ok(real.length === nLinks && inTable > 0 && real.length === 12 + inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer (9 cards and 3 review items: 12, plus one per table row that has a link: ' + inTable + ')', [real.length, inTable]);
   ok(/Official source <span aria-hidden="true">→<\/span><span class="da-rv-sr"> for Menchaca Apartments \(opens in a new tab\)<\/span>/.test(html), '6g a link\'s accessible name carries the record it belongs to');
   const subj = '742 Evergreen Terrace, Springfield, OR 97477';
   const hs = V.html(W, { subject: subj });
@@ -408,7 +408,7 @@ const htmlLife = viewLife(W);
   ok(V.SCOPE_NOTE === quote('This report focuses on development activity and change.'), '9c the supporting scope note is the plan\'s (line 1265)');
   ok(V.EYEBROW === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && V.EYEBROW === M.PRODUCT_NAME, '9d the eyebrow equals the engine\'s product name (ruling R6)');
   ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['What Changed Around This Property', 'Recent Official Activity', 'Things to Review With Your Client', 'Type and stage', 'Development Activity Map',
-    'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']), '9e the section titles, in the 100526 plan\'s order (plus Stage not stated, audit 2026-10-07)');
+    'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Operating / Built', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']), '9e the section titles, in the 100526 plan\'s order (plus Operating / Built, 2026-10-09, and Stage not stated, audit 2026-10-07)');
   const p100526 = readFileSync(join(root, 'docs/development-activity-plan-100526.md'), 'utf8');
   ok(['WHAT CHANGED AROUND THIS PROPERTY', 'THINGS TO REVIEW WITH YOUR CLIENT', 'DEVELOPMENT ACTIVITY MAP', 'APPROVED / COMING', 'PROPOSED / UNDER REVIEW', 'PERMITTED / UNDER CONSTRUCTION', 'CHANGE HISTORY'].every((t) => p100526.includes(t))
     && ['changed', 'review', 'map', 'approved', 'proposed', 'permitted', 'history'].every((k) => p100526.includes(V.TITLES[k].toUpperCase())), '9f each of those titles is written, in capitals, in the 100526 plan');
@@ -792,6 +792,15 @@ const htmlLife = viewLife(W);
   const hu = view(WU), bu = decode((hu.match(/data-da-briefing>([\s\S]*?)<\/p>/) || [, ''])[1]), us = sec(hu, 'unstaged');
   ok(/2 more official records in this report state no stage\./.test(bu) && us && /2 official records/.test(textOf(us.html)) && /Quiet Unknown A/.test(us.html) && /Quiet Unknown B/.test(us.html)
     && /does not state a stage, so HomeSignal does not place these under Approved, Proposed or Permitted/.test(textOf(us.html)), '17h records with no stage are counted in the briefing and listed under "Stage not stated", never in a stage', bu);
+}
+
+// ---- 19: Operating / Built records (2026-10-09) --------------------------------------------------------------------------------------------
+{
+  const so = sec(html, 'operating');
+  const tb = (/<table[\s\S]*?<\/table>/.exec(so ? so.html : '') || [''])[0];
+  ok(so && /Highway 99 Widening/.test(tb) && /Operating \/ built/.test(textOf(tb)) && !/Stage not stated/.test(tb), '19a an operating record the report carries gets an "Operating / Built" section with its row, the Stage cell being the engine\'s own lifecycle label');
+  ok(/<th scope="col"[^>]*>Development<\/th>[\s\S]*<th scope="col"[^>]*>Stage<\/th>[\s\S]*<th scope="col"[^>]*>Quality-of-Life Impact<\/th>/.test(tb) && (tb.match(/<th scope="col"/g) || []).length === 3 && /data-da-stage="operating"/.test(tb) && /data-da-type="\w+"/.test(tb), '19b it has the same three columns, and its rows carry the Type and Stage the filters match on (stage "operating"), so a Type filter does not leave another Type\'s row showing');
+  ok(!sec(htmlNone, 'operating') && !sec(html, 'approved').html.includes('Highway 99 Widening'), '19c an empty report has no such section, and the operating record is not also listed in a stage section');
 }
 
 // ---- 18: the three-column table and its one quality-of-life rule (2026-10-09) --------------------------------------------------------------------

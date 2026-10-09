@@ -80,9 +80,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 3 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\(STATUS_LABEL, status\)/g) || []).length === 2
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the agency\'s status word is read in the two card builders (printed under its own label) and in ONE function, isDecided, that only asks whether it is Decided');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 7
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the operating card and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
