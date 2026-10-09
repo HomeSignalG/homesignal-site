@@ -3,6 +3,23 @@
 Status document: `docs/brand/MIGRATION-STATUS.md`. This file is the **single list of everything only the founder can do**, in order,
 plus the engineering gates it unlocks. Nothing here has been done on the founder's behalf. Nothing is cleared legally by this file.
 
+## Founder to-do, in order (the one consolidated list; details in sections A-H)
+Nothing below needs doing for the site to keep working today. Items 1-6 can be done now and none changes what residents see.
+
+| # | Do this | Why / where |
+|---|---|---|
+| 1 | Confirm jodytracks.com is in YOUR Infomaniak account; turn on auto-renew for it (expires 2027-10-08) and for homesignal.net (2027-05-26) | B.2 |
+| 2 | Find which console controls homesignal.net DNS (nameservers are `*.googledomains.com`, registrar Tucows - not Shopify) | B.2, H.5 |
+| 3 | Create the Netlify Free account, upload the redirect folder, send back the `*.netlify.app` address (no card; stop if asked for one) | B.1 |
+| 4 | Create `hello@` and `alerts@jodytracks.com` mailboxes at Infomaniak (its MX/SPF already exist) | C.6 |
+| 5 | In Resend add jodytracks.com; add the DKIM records and Resend's SPF include to the ONE existing SPF record at Infomaniak; add an `rua=` mailbox to DMARC. Send nothing until Resend says verified (DMARC is already `p=reject`) | C.4-5 |
+| 6 | Lemon Squeezy dashboard: confirm no allowed-domain or branding setting rejects a jodytracks.com return | D.8 |
+| 7 | Get a trademark / name clearance opinion and counsel's read of Jody `privacy.html` and `terms.html`; decide the legal entity text | A |
+| 8 | **GO LIVE decision** (H): engineering then does H.1-3, you do H.4-5 (DNS), engineering does H.6-7 | H |
+| 9 | After GO LIVE: Bluesky handle choice, Search Console Change of Address, Bing Site Move | E, F |
+
+Engineering's side is ready through Step 6; the cutover PR (H.3) is prepared but NOT merged until item 8.
+
 ## A. Not cleared, and not represented as cleared
 - **Trademark / name clearance for "Jody" and "JodyTracks".** No search has been run. Engineering has not checked, and cannot check, a
   trademark register. Get a clearance opinion before GO LIVE. (Founder / counsel)
