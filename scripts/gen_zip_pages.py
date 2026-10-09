@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import page_semantics as ps  # noqa: E402
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
-BASE = "https://homesignal.net"
+BASE = ps.BASE   # one origin, from the brand contract
 STEP = 1000
 
 # What the document renders. LN_CAP matches lib/community-page.js::LOCAL_NEWS_CAP so the
@@ -1777,7 +1777,7 @@ def load_page_state_baseline(path, reseed):
         return ps.load_baseline(open(path, encoding="utf-8").read())
     except ps.BaselineError as e:
         sys.exit(f"ERROR: previous page-state baseline is unusable ({e}); dispatch pages with "
-                 f"reseed=true after checking https://homesignal.net/sitemaps/page-state.json")
+                 f"reseed=true after checking {BASE}/sitemaps/page-state.json")
 
 
 def main():

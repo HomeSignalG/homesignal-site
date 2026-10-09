@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 import page_semantics as ps
 
 ENDPOINT = "https://api.indexnow.org/indexnow"
-HOST = "homesignal.net"
+HOST = ps.BASE.split("://", 1)[1]   # from the brand contract via page_semantics
 KEY_LOCATION = f"https://{HOST}/indexnow.txt"
 KEY_FILE = "indexnow.txt"
 MAX_URLS_PER_POST = 10_000
