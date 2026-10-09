@@ -242,7 +242,7 @@ const afterClicks = await page.evaluate(() => ({ overlays: document.querySelecto
 ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
   'clicking any of the three Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
 ok((await page.$$eval('button[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
-ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal →')
+ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Request a Custom Quote')
    && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
 ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sample' && a.textContent === 'View a sample report →'), 'the hero\'s visible action is View a sample report →, and it jumps to the sample');
 // The plan's section order, measured on the rendered page (top of each block), and the coverage utility is not a hero or closing action.

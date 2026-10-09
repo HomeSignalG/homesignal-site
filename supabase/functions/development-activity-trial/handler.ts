@@ -1,7 +1,10 @@
 // development-activity-trial — joining a brokerage's 10-report trial, reading one's own trial (Development Activity build step 5c),
 // creating a trial (step 5d) and an owner inviting agents (step 5e; docs/development-activity-build-steps-100526.md).
 //
-// SEVEN ACTIONS:
+// EIGHT ACTIONS:
+//   signup   an individual agent makes their own account (Order L2): the database creates the account, the owner membership and the 10-report
+//            evaluation in one transaction, only for a confirmed email, once per person (a repeat is a replay). Never for a person who already
+//            belongs to a brokerage. No admin, no invite, no HomeSignal step.
 //   status   whether this person can make reports here, how many free reports their brokerage's trial has left, and their role.
 //   redeem   join a trial with an invite token (the one in the invite link). The same person using their own invite again
 //            is told so and nothing changes.
@@ -25,9 +28,9 @@
 // This file holds the LOGIC and reads no environment and calls no network: everything external arrives through `Deps`.
 import { authorizeSignedIn, corsFor, readBounded, reply, TOO_LARGE, trialStanding, trialSummary } from '../_shared/admin-gate.ts';
 import type { AdminGateDeps, TrialState } from '../_shared/admin-gate.ts';
-import { AlreadyAMember, InviteUnusable, NotEntitled, SeatLimitReached, TrialRejected } from '../_shared/evaluation-reads.ts';
-import type { CreatedInvite, CreatedTrial, NewTrial, Redeemed, Role, Team } from '../_shared/evaluation-reads.ts';
-import { UUID } from '../_shared/evaluation-reads.ts';
+import { AlreadyAMember, InviteUnusable, NotEntitled, SeatLimitReached, SignupRefused, TrialRejected } from '../_shared/evaluation-reads.ts';
+import type { AccountType, CreatedInvite, CreatedTrial, NewTrial, Redeemed, Role, SignedUp, Team } from '../_shared/evaluation-reads.ts';
+import { BROKERAGE_NAME_MAX, UUID, cleanDisplayName } from '../_shared/evaluation-reads.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
 export { DataUnavailable };
@@ -37,6 +40,10 @@ export type Deps = AdminGateDeps & {
   redeemInvite: (token: string, userId: string) => Promise<Redeemed>;
   createTrial: (t: NewTrial) => Promise<CreatedTrial>;
   roleOf: (userId: string) => Promise<Role | null>;
+  /** The kind of account the person belongs to, from the one membership resolver (Order L2). */
+  accountTypeOf: (userId: string) => Promise<AccountType | null>;
+  /** An individual agent makes their own account, owner membership and 10-report evaluation in one database transaction (Order L2). */
+  signupIndividual: (userId: string, name: string) => Promise<SignedUp>;
   inviteAgent: (userId: string) => Promise<CreatedInvite>;
   /** An owner's team (docs/da-owner-safeguards.sql part A): agents as masked labels, and open invites. NotEntitled for anyone who is not an owner. */
   teamOf: (userId: string) => Promise<Team>;
@@ -49,10 +56,11 @@ export type Deps = AdminGateDeps & {
 
 export const CAPABILITY = {
   product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-  method: 'POST { action: "status" } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? } | { action: "invite" } | { action: "team" } | { action: "remove_member", member } | { action: "withdraw_invite", invite }',
-  access: 'signed-in user; answers only about their own trial. create: an internal admin (dashboard_admins) only. invite, team, remove_member, withdraw_invite: an owner of their own brokerage only',
+  method: 'POST { action: "status" } | { action: "signup", name } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? } | { action: "invite" } | { action: "team" } | { action: "remove_member", member } | { action: "withdraw_invite", invite }',
+  access: 'signed-in user; answers only about their own trial. signup: the signed-in user, for themselves only. create: an internal admin (dashboard_admins) only. invite, team, remove_member, withdraw_invite: an owner of their own brokerage only',
   stores_reports: false,
-  writes: ['a brokerage membership, when the signed-in person redeems an invite',
+  writes: ['an individual account, its owner membership and its 10-report evaluation, when a signed-in agent signs up for themselves',
+    'a brokerage membership, when the signed-in person redeems an invite',
     'a brokerage account, its trial and its owner invite, when an admin creates a trial',
     'an agent invite, when a trial owner invites an agent',
     'an agent\'s membership ends, when an owner removes them',
@@ -90,7 +98,13 @@ async function standingOf(deps: Deps, admin: boolean, userId: string) {
   const trial = await deps.trialOf(userId);
   const standing = trial ? trialStanding(trial) : null;
   const access = admin ? 'admin' : standing === null ? 'none' : standing === 'active' ? 'trial' : standing;
-  return { access, trial: trial ? trialSummary(trial) : null, role: trial ? await deps.roleOf(userId) : null };
+  return {
+    access, trial: trial ? trialSummary(trial) : null,
+    role: trial ? await deps.roleOf(userId) : null,
+    // 'individual' | 'brokerage': what the page WORDS and offers, never what is allowed (the database decides that). It degrades to unknown (null) if
+    // it cannot be read, so a status answer never fails for wording alone, and this function can be deployed before or after docs/individual-agent-signup.sql.
+    account_type: trial ? await deps.accountTypeOf(userId).catch((e) => { if (e instanceof DataUnavailable) return null; throw e; }) : null,
+  };
 }
 
 export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
@@ -111,6 +125,21 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     try {
       if (action === 'status') {
         return reply(req, { status: 'OK', ...await standingOf(deps, who.admin, who.userId) });
+      }
+      if (action === 'signup') {
+        // the person's own act, for themselves: the account is made for THE SIGNED-IN USER and no id comes from the request
+        const keys = Object.keys(body as Record<string, unknown>).filter((k) => k !== 'action' && k !== 'name');
+        const name = cleanDisplayName((body as Record<string, unknown>).name, BROKERAGE_NAME_MAX);
+        if (keys.length || name === null) return reply(req, { error: 'bad_request', detail: 'name' }, 400);
+        let made: SignedUp;
+        try {
+          made = await deps.signupIndividual(who.userId, name);
+        } catch (e) {
+          if (e instanceof SignupRefused) return reply(req, { error: 'signup_refused' }, 400);
+          if (e instanceof AlreadyAMember) return reply(req, { error: 'already_a_member' }, 409);
+          throw e;
+        }
+        return reply(req, { status: 'OK', replayed: made.replayed, ...await standingOf(deps, who.admin, who.userId) });
       }
       if (action === 'redeem') {
         if (typeof token !== 'string' || token.length > 100) return reply(req, { error: 'invite_unusable' }, 400);

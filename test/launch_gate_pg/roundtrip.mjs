@@ -64,6 +64,7 @@ const RPC = {
   evaluation_report_open: (a) => [asJson("public.evaluation_report_open(:'u'::uuid, :'r'::uuid)"), { u: a.p_user_id, r: a.p_report_id }],
   report_header_of: (a) => [asJson("public.report_header_of(:'u'::uuid)"), { u: a.p_user_id }],
   brokerage_membership_of: (a) => [asJson("public.brokerage_membership_of(:'u'::uuid)"), { u: a.p_user_id }],
+  brokerage_account_type_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_account_type_of(:'u'::uuid) t", { u: a.p_user_id }],
   // the report rate limit (docs/report-rate-limit.sql): the wrapper that takes the DATABASE's clock. The clocked variant is NOT listed: the handler must not be able to reach it.
   report_rate_claim: (a) => [asJson("public.report_rate_claim(:'u'::uuid)"), { u: a.p_user }],
   // the one open checkout (docs/da-owner-safeguards.sql part C): the slot is claimed before the processor is asked, and freed or recorded after
