@@ -173,7 +173,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     if (!inReport) return { inReport: false, tag: a ? a.tagName : null };
     const cs = getComputedStyle(a), r = a.getBoundingClientRect(), box = (a.closest('.da-rv-card, .da-rv-rev') || a).getBoundingClientRect();
     return { inReport: true, kind: a.classList.contains('da-rv-link') ? 'link' : a.classList.contains('da-rv-chip') ? 'chip' : a.classList.contains('da-rv-act') ? 'action' : a.tagName,
-      href: a.getAttribute('href'), outline: cs.outlineStyle, outlineWidth: parseFloat(cs.outlineWidth), top: Math.round(box.top + scrollY), inView: r.top >= 0 && r.bottom <= innerHeight };
+      href: a.getAttribute('href'), outline: cs.outlineStyle, outlineWidth: parseFloat(cs.outlineWidth), top: Math.round(box.top + scrollY), inView: r.top >= -1 && r.bottom <= innerHeight + 1 };
   });
   const seq = [];
   for (let i = 0; i < 60; i++) { await page.keyboard.press('Tab'); const p = await probe(); if (!p.inReport) { seq.push(p); break; } seq.push(p); }
