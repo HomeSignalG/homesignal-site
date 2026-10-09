@@ -110,7 +110,7 @@ ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" 
   const inv = (page.match(/<aside id="invite"[\s\S]*?<\/aside>/g) || []);
   ok(inv.length === 1, '8a exactly one invitation in the page', inv.length);
   const a = inv[0] || '';
-  ok(/<h2>Know what changes around your home\.<\/h2>/.test(a) && /<p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about\.<\/p>/.test(a) && />Explore HomeSignal &rarr;<\/a>/.test(a), '8b the approved wording, whole');
+  ok(/<h2>Follow quality-of-life intelligence for this property\.<\/h2>/.test(a) && /<p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about\.<\/p>/.test(a) && />Explore HomeSignal &rarr;<\/a>/.test(a), '8b the approved wording, whole');
   ok((a.match(/<a /g) || []).length === 1 && /<a href="https:\/\/homesignal\.net\/" rel="noopener">/.test(a), '8c one link, to the public home page on the production domain');
   ok(page.indexOf('id="private"') < page.indexOf('id="invite"') && page.indexOf('id="invite"') > page.indexOf('id="report"') && page.indexOf('</main>') > page.indexOf('id="invite"') && !/<(?:main|div|p)[^>]*id="[^"]*"[^>]*>[^<]*<\/(?:main)>\s*<main/.test(page), '8d it comes after the report, its id and the privacy note');
   ok(/id="invite" class="invite" hidden/.test(page) && /\$\('invite'\)\.hidden = false/.test(sh) && /\$\('invite'\)\.hidden = true/.test(fn('start')), '8e it shows only with a report and is hidden again when a link opens nothing');
