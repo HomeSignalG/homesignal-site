@@ -1,0 +1,30 @@
+name: jody-redirect-site
+
+# Jody migration, Step 5. Builds the zero-cost redirect site that will answer on homesignal.net after cutover and
+# proves its rules. Manual only; DEPLOYS NOTHING and touches no DNS. The uploaded folder can be dragged onto Netlify
+# Free (Netlify Drop) to get a *.netlify.app preview that scripts/verify_redirect_service.py can probe BEFORE any DNS change.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/build_redirect_site.py --out _redirect
+      - run: python3 scripts/build_redirect_site.py --out _redirect --check
+      - run: python3 scripts/verify_redirect_service.py --simulate _redirect
+      - run: node test/redirect-service.test.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: homesignal-redirect-site
+          path: _redirect
+          include-hidden-files: true
+          retention-days: 30
