@@ -49,6 +49,7 @@ const RPC = {
   // the header (build step 7): one read-only function
   report_header_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_header_of(:'u'::uuid) t", { u: a.p_user_id }],
   brokerage_membership_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_membership_of(:'u'::uuid) t", { u: a.p_user_id }],
+  brokerage_account_type_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.brokerage_account_type_of(:'u'::uuid) t", { u: a.p_user_id }],
   // the lifetime is left to the database's default, as PostgREST does when the argument is not sent
   evaluation_invite_mint: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_invite_mint(p_evaluation_id => :'e'::uuid, p_role => :'r', p_actor => :'u'::uuid) t",
     { e: a.p_evaluation_id, r: a.p_role, u: a.p_actor }],

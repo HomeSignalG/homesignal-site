@@ -1,0 +1,116 @@
+name: individual-signup-suite
+
+# THE INDIVIDUAL-AGENT SIGNUP (docs/individual-agent-signup.sql; Development Activity plan Order L2), proven against DISPOSABLE Postgres containers.
+# PARKED SQL, NOT APPLIED to production: this workflow only ever addresses a container and refuses to run if a Supabase credential is present.
+#   sql        every layer it stands on is applied UNMUTATED, a legacy brokerage is fingerprinted, the file is applied, and the legacy rows must be
+#              byte-identical; the executable suite (signup, replay, refusals, no team inside an individual account, the 10 reports, billing reads
+#              the owner); twenty simultaneous signups of one person make one account; the file applies twice; it refuses without its layers; the
+#              rollback footer works; every prohibited mutation of the SQL fails a check.
+#   roundtrip  the REAL trial, report and billing request handlers against the real SQL: sign up -> ten reports -> the eleventh refused -> billing
+#              sees the owner (checkout stays not_set_up) -> no team can form.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/individual-agent-signup.sql'
+      - 'docs/brokerage-account-spine.sql'
+      - 'docs/evaluation-entitlement.sql'
+      - 'docs/brokerage-billing.sql'
+      - 'test/individual_signup_pg/**'
+      - 'supabase/functions/development-activity-trial/**'
+      - 'supabase/functions/_shared/evaluation-reads.ts'
+      - 'supabase/functions/manage-billing/**'
+      - 'supabase/functions/get-development-activity-report/**'
+      - '.github/workflows/individual-signup-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/individual-agent-signup.sql'
+      - 'test/individual_signup_pg/**'
+      - '.github/workflows/individual-signup-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: individual_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The signup suite passes; simultaneous signups make one account; it applies twice; the rollback works; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: individual_disposable
+        run: |
+          set -o pipefail
+          bash test/individual_signup_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/sql.log
+
+  roundtrip:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: individual_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      # 22, not the runner's default: the round trip imports the real TypeScript handlers, and Node strips types on import from 22.18
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Signup -> ten reports -> the eleventh refused -> billing sees the owner -> no team can form, through the real handlers
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: individual_disposable
+        run: |
+          set -o pipefail
+          bash test/individual_signup_pg/run-roundtrip.sh 2>&1 | grep -v NOTICE | tee /tmp/rt.log
+          grep -q '0 failed' /tmp/rt.log

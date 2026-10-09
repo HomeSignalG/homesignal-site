@@ -25,10 +25,10 @@ const count = (s, re) => (s.match(re) || []).length;
 // ---- 1. the setup script --------------------------------------------------------------------------------------------------------------------
 const RUN = stripSh(read('test/launch_gate_pg/run.sh'));
 const LAYERS = ['brokerage-account-spine', 'report-private-context', 'report-snapshot', 'evaluation-entitlement', 'saved-reports', 'report-share', 'report-share-delivery',
-  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'report-rate-limit', 'da-owner-safeguards'];
+  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'report-rate-limit', 'da-owner-safeguards', 'individual-agent-signup'];
 const applied = (/for f in ([^;]+); do/.exec(RUN) || [, ''])[1].trim().split(/\s+/);
 ok(RUN.length > 400 && applied.length > 5, '1a the setup script is read and lists the layers it applies (positive control)', applied.length);
-ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the thirteen layers the product stands on, in the order production applied them (the billing file, the report rate limit, then the owner safeguards)', applied.join(','));
+ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the fourteen layers the product stands on, in the order production applied them (the billing file, the report rate limit, the owner safeguards, then the individual-agent signup, which the trial function status now reads)', applied.join(','));
 ok(/case "\$PGDATABASE" in \*disposable\*\)/.test(RUN) && /exit 1/.test(RUN) && /SUPABASE_DB_URL/.test(RUN) && /SUPABASE_ACCESS_TOKEN/.test(RUN) && /SUPABASE_WRITE_KEY/.test(RUN),
   '1c it refuses a database not named disposable and refuses to run when any Supabase credential is present');
 ok(LAYERS.every((f) => existsSync(join(ROOT, 'docs', f + '.sql'))) && existsSync(join(ROOT, 'test/evaluation_entitlement_pg/fixture.sql')), '1d every layer it applies, and the roles fixture, exist');

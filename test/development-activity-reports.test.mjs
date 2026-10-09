@@ -132,10 +132,24 @@ ok(/does not use one/.test(showTrial) && /No data ingested/.test(showTrial), '6d
 // ---- 7. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------------
 ok(/<section class="card" id="team" aria-labelledby="team-title" hidden>/.test(page) && /<input type="text" id="invite-link" readonly>/.test(page),
   '7a the invite card is hidden until the trial function names an owner, and the link sits in a read-only box');
-ok(/showTeam\(a === 'trial' && role === 'owner'\);/.test(showTrial) && (code.match(/showTeam\(true\)/g) || []).length === 0,
-  '7b the card shows only for an OWNER of an ACTIVE trial (access "trial"), as the trial function named them; nothing else turns it on');
-ok((code.match(/role = (?:r|s|st)\.body\.role;/g) || []).length === 3 && !/role = '(?:owner|agent)'/.test(code) && !/role = body/.test(code),
-  '7c the page takes the role only from the trial function\'s status or join answer, never sets it itself');
+ok(/showTeam\(a === 'trial' && role === 'owner' && !mine\(\)\);/.test(showTrial) && (code.match(/showTeam\(true\)/g) || []).length === 0,
+  '7b the card shows only for an OWNER of an ACTIVE trial (access "trial") of a BROKERAGE (an individual account has nobody to invite), as the trial function named them; nothing else turns it on');
+ok((code.match(/role = (?:r|s|st)\.body\.role;/g) || []).length === 4 && !/role = '(?:owner|agent)'/.test(code) && !/role = body/.test(code),
+  '7c the page takes the role only from the trial function\'s status, join or signup answer, never sets it itself');
+// ---- 7+. an individual agent makes their own account (Order L2, docs/individual-agent-signup.sql) ---------------------------------------------------------
+console.log('--- individual signup card ---');
+ok(/<section class="card" id="signup" aria-labelledby="signup-title" hidden>/.test(page) && /<form id="sf" novalidate>/.test(page) && /id="signup-name" maxlength="120"/.test(page),
+  '7i the signup card is hidden until the trial function says the person has no account, and takes one thing: the name shown on their reports');
+const sg = fn('signup');
+ok((code.match(/action: 'signup'/g) || []).length === 1 && /post\(TRIAL_FN, \{ action: 'signup', name: name \}\)/.test(sg),
+  '7j the account is made by the trial function with nothing but the action and the name: no id, no plan, no account type comes from the page');
+ok(/showSignup\(a === 'none' && !!session && !!session\.user\);/.test(fn('present')) && !/showSignup\(true\)/.test(code),
+  '7k the card is shown only to a SIGNED-IN person whose access is none; nothing else turns it on');
+ok(/session\.user\.id !== forUser\) return;/.test(sg) && /signingUp/.test(sg),
+  '7l a second press while one is on its way does nothing, and an answer that lands after another person signed in is dropped');
+ok(/href="contact\.html" id="signup-quote">request a custom quote<\/a>/.test(page) && /Brokerages, teams and enterprise organizations/.test(page),
+  '7m a brokerage, team or enterprise organization is sent to the existing contact page for a custom quote from the same card');
+ok(!/checkout|lemonsqueezy/i.test(sg) && !/billing/i.test(sg), '7n signing up touches no billing and starts no checkout: payment stays exactly as it was');
 const mint = fn('mintInvite');
 ok(/await post\(TRIAL_FN, \{ action: 'invite' \}\)/.test(mint) && (code.match(/action: 'invite'/g) || []).length === 1,
   '7d the link is made by the trial function, through the one helper, with nothing but the action (the server knows who is asking)');
@@ -147,8 +161,8 @@ const team = fn('showTeam');
 ok(/if \(!on\) \{ \$\('minted'\)\.hidden = true; \$\('invite-link'\)\.value = '';/.test(team) && /\$\('team'\)\.hidden = !on;/.test(team),
   '7g hiding the card also forgets the link it showed');
 const onSess = fn('onSession');
-ok(/access = null; role = null; attempt = null; showTeam\(false\);/.test(onSess) && /role = null; showTeam\(false\); showSaved\(false\);[^\n]*\n[^\n]*\n\s*loadTrial\(\)/.test(onSess)
-   && /access = null; role = null; showTeam\(false\);/.test(fn('trialUnreadable')),
+ok(/access = null; role = null; acctType = null; attempt = null; showSignup\(false\); showTeam\(false\);/.test(onSess) && /role = null; acctType = null; showSignup\(false\); showTeam\(false\); showSaved\(false\);[^\n]*\n[^\n]*\n\s*loadTrial\(\)/.test(onSess)
+   && /access = null; role = null; acctType = null; showSignup\(false\); showTeam\(false\);/.test(fn('trialUnreadable')),
   '7h signing out, a different person signing in, and an unreadable trial each forget the role and the link');
 ok(/var forUser = session\.user \? session\.user\.id : null;/.test(mint) && /if \(!session \|\| !session\.user \|\| session\.user\.id !== forUser\) \{ showTeam\(false\); return; \}/.test(mint)
    && mint.indexOf('session.user.id !== forUser') < mint.indexOf("$('invite-link').value = link;"),

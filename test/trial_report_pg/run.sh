@@ -33,4 +33,7 @@ P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the 
 # the report rate limit: the real handler now claims one request from it before any work is done, so this suite must have it (applied twice, as the others are)
 P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply"; exit 1; }
 P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply a second time"; exit 1; }
+# Order L2 (docs/individual-agent-signup.sql): the trial function now also reads the account type, so the SQL it reads must be there (applied twice, as the others are)
+P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply"; exit 1; }
+P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply a second time"; exit 1; }
 exec node "$here/roundtrip.mjs"

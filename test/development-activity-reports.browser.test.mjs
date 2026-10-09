@@ -80,9 +80,9 @@ window.supabase = { createClient: function () { return { auth: {
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 const TEAM_M1 = 'c0000000-0000-4000-8000-000000000001', TEAM_M2 = 'c0000000-0000-4000-8000-000000000003', TEAM_I1 = 'c0000000-0000-4000-8000-000000000002';
-function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true } = {}) {
+function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true, signup = 'ok', individual = false } = {}) {
   // build step 11: `plan` is the state the database would answer for this brokerage (none, paid, past_due, canceled, ...), `paidUsed` the reports used this month
-  const w = { used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
+  const w = { signup, individual, signedUp: [], used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
     watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false,
     // the owner's team (audit item D): what the database would list, and what the page asked it to change
@@ -99,6 +99,16 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
       return { role: w.role, replayed: w.redeemed > 1 };
     },
     roleOf: async () => (w.trial === null ? null : w.role),
+    accountTypeOf: async () => (w.trial === null ? null : (w.individual ? 'individual' : 'brokerage')),
+    // Order L2: the database makes the account, owner membership and evaluation in one transaction; here the world records the name it was given
+    signupIndividual: async (_u, name) => {
+      if (w.signup === 'refuse') throw new E.SignupRefused('x');
+      if (w.signup === 'member') throw new E.AlreadyAMember('x');
+      if (w.signup === 'down') throw new TH.DataUnavailable('x');
+      const again = w.trial !== null && w.individual;
+      w.signedUp.push(name); w.trial = 'active'; w.role = 'owner'; w.individual = true; if (!again) w.used = 0;
+      return { replayed: again };
+    },
     // the database's own check at the moment of minting: an active owner of this brokerage, for an agent invite
     inviteAgent: async () => {
       if (w.mint === 'refuse' || w.role !== 'owner' || w.trial !== 'active') throw new E.NotEntitled('x');
@@ -1789,13 +1799,53 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await ctx.close();
 }
 {
-  // 13d. signed in, not on any brokerage: no plan card, and a plain way to ask HomeSignal for a brokerage account
+  // 13d. signed in, with no account at all: no plan card, a plain way to make an individual account, and a way to ask HomeSignal for a brokerage quote
   const { ctx, page, billingCalls, checkouts } = await open({ w: world({ trial: null }), hash: '#billing' });
-  await page.waitForFunction(() => /not on a brokerage account/.test(document.getElementById('trial-sub').textContent), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => /does not have an account yet/.test(document.getElementById('trial-sub').textContent), null, { timeout: 8000 }).catch(() => {});
   const sub = await page.$eval('#trial-sub', (e) => e.textContent);
-  ok(/This email is not on a brokerage account\./.test(sub) && /only a brokerage’s owner can subscribe/.test(sub), '13d a person with no brokerage is told so, and who can subscribe', sub);
-  ok(await page.$eval('#trial-sub a', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact HomeSignal'), '13d2 with a link to HomeSignal\'s contact page');
+  ok(/This email does not have an account yet\./.test(sub) && /Create your individual account below/.test(sub), '13d a person with no account is told so and pointed at the signup card', sub);
+  ok(await page.$eval('#trial-sub a', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Request a custom quote'), '13d2 with a link to the existing contact page for a brokerage, team or enterprise quote');
   ok(!(await billingShown(page)) && billingCalls.length === 0 && checkouts.length === 0, '13d3 no Billing card, no billing call and no checkout for them', billingCalls.map((c) => c.body));
+  ok(await page.$eval('#signup', (e) => !e.hidden), '13d4 and the individual signup card is showing');
+  await ctx.close();
+}
+{
+  // 14. THE INDIVIDUAL SIGNUP (Order L2): name in, account out, ten free reports, no admin and no invite
+  const w = world({ trial: null });
+  const { ctx, page } = await open({ w });
+  await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(await page.$eval('#signup', (e) => !e.hidden) && /not part of a trial/.test(await text(page, '#trial-count')), '14a signed in with no account: the signup card shows');
+  ok(/10 free Development Activity reports, then \$79\/month for 100 reports/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
+    '14b it states the offer in the founder\'s words and links brokerages to the contact page');
+  await page.click('#signup-go');
+  ok(w.signedUp.length === 0 && /Type your name/.test(await text(page, '#signup-status')), '14c an empty name is stopped on the page: nothing is sent');
+  await page.fill('#signup-name', '  Ann   Agent ');
+  await page.click('#signup-go');
+  await page.waitForFunction(() => document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(w.signedUp.length === 1 && w.signedUp[0] === 'Ann Agent', '14d one signup call carrying the cleaned name', w.signedUp);
+  ok(/^10 free reports left$/.test(await text(page, '#trial-count')) && /Your account is ready\./.test(await text(page, '#trial-sub')) && !/brokerage/i.test(await text(page, '#trial-sub')),
+    '14e the card goes away and the panel reads ten free reports, in words for one person (no brokerage)', await text(page, '#trial-sub'));
+  ok(await page.$eval('#team', (e) => e.hidden), '14f an individual account is never offered the team / invite card');
+  await ctx.close();
+}
+for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse' }, /could not create your account/], ['already a member', { trial: null, signup: 'member' }, /already belongs to a brokerage/], ['down', { trial: null, signup: 'down' }, /could not be created just now/]]) {
+  const w = world(opts);
+  const { ctx, page } = await open({ w });
+  await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
+  await page.fill('#signup-name', 'Ann Agent'); await page.click('#signup-go');
+  await page.waitForFunction(() => document.getElementById('signup-status').textContent !== 'Creating your account…' && document.getElementById('signup-status').textContent !== '', null, { timeout: 8000 }).catch(() => {});
+  ok(expect.test(await text(page, '#signup-status')) && await page.$eval('#signup', (e) => !e.hidden) && await page.$eval('#signup-go', (b) => !b.disabled), '14g ' + label + ': the reason is shown in words, the card stays, the button works again', await text(page, '#signup-status'));
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ w: world({ trial: 'active', role: 'owner' }) });
+  await page.waitForFunction(() => /free reports left/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(await page.$eval('#signup', (e) => e.hidden), '14h a person who already has an account never sees the signup card');
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ w: world({ trial: null }), signedIn: false });
+  ok(await page.$eval('#signup', (e) => e.hidden), '14i signed out: no signup card (they sign in first, and the card appears if they have no account)');
   await ctx.close();
 }
 {
