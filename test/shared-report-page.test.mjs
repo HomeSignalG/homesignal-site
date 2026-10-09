@@ -105,6 +105,19 @@ ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript\{displa
 ok(/id="pdf" hidden/.test(page) && /\$\('pdf'\)\.hidden = false/.test(sh), '7c the button appears only when there is a report to print');
 ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" content="width=device-width,initial-scale=1"/.test(page) && /id="status" role="status" aria-live="polite"/.test(page), '7d a page without JavaScript says so, the status line is announced, and the page scales to a phone');
 
+// ---- 8. the buyer invitation (one aside, last on the page, one link to the public site) ------------------------------------------------------------------------
+{
+  const inv = (page.match(/<aside id="invite"[\s\S]*?<\/aside>/g) || []);
+  ok(inv.length === 1, '8a exactly one invitation in the page', inv.length);
+  const a = inv[0] || '';
+  ok(/<h2>Know what changes around your home\.<\/h2>/.test(a) && /<p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about\.<\/p>/.test(a) && />Explore HomeSignal &rarr;<\/a>/.test(a), '8b the approved wording, whole');
+  ok((a.match(/<a /g) || []).length === 1 && /<a href="https:\/\/homesignal\.net\/" rel="noopener">/.test(a), '8c one link, to the public home page on the production domain');
+  ok(page.indexOf('id="private"') < page.indexOf('id="invite"') && page.indexOf('id="invite"') > page.indexOf('id="report"') && page.indexOf('</main>') > page.indexOf('id="invite"') && !/<(?:main|div|p)[^>]*id="[^"]*"[^>]*>[^<]*<\/(?:main)>\s*<main/.test(page), '8d it comes after the report, its id and the privacy note');
+  ok(/id="invite" class="invite" hidden/.test(page) && /\$\('invite'\)\.hidden = false/.test(sh) && /\$\('invite'\)\.hidden = true/.test(fn('start')), '8e it shows only with a report and is hidden again when a link opens nothing');
+  ok(!/(?:#private,|,#private)[^{]*\.invite|\.invite\{[^}]*display:none/.test(page), '8f the print stylesheet keeps it, so a saved PDF carries the clickable link');
+  ok(!/<form|<input/.test(a), '8g it asks for nothing: no form, no sign-in');
+}
+
 // ---- audit fix 8 (2026-10-07): a stalled connection ends in the "could not load" message ------------------------------------------------
 ok(/new AbortController\(\)/.test(code) && /signal: ctl \? ctl\.signal : undefined/.test(code) && /setTimeout\(function\(\)\{ ctl\.abort\(\); \}, 20000\)/.test(code) && (code.match(/clearTimeout\(timer\)/g) || []).length === 2,
   'T1 the report request is aborted after 20 seconds and the timer is cleared on both the failure and the answer');
