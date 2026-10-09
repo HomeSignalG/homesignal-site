@@ -44,4 +44,8 @@ ok(/100 new Development Activity reports each month/.test(dat), 'plan page publi
 for (const h of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(da.includes('href="' + h + '"'), 'plan page links ' + h + ' in its own content');
 const customer = [read('development-activity.html'), read('development-activity-reports.html')].map(text).join(' ');
 ok(!/Lemon\s*Squeezy/i.test(customer), 'visible plan pages do not name Lemon Squeezy as the provider');
+ok(!/HomeSignal, Inc|\bLLC\b|Corporation/.test(terms + ' ' + read('404.html')), 'no unverified corporate-entity name is claimed');
+ok(/sole proprietorship/.test(terms), 'Terms identify HomeSignal as a sole proprietorship');
+ok(/prevents the next renewal charge/.test(terms) && /through the end of the billing period you have already paid/.test(terms) && /returns to the applicable free level/.test(terms) && /saved remain accessible/.test(terms), 'Terms carry the founder cancellation rule');
+ok(!/\b\d+[- ]day\b/i.test(text(read('refund-policy.html'))), 'Refund Policy states no fixed refund window');
 process.exit(fails ? 1 : 0);
