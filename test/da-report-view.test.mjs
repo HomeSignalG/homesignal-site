@@ -158,8 +158,7 @@ try {
   const links = [...html.matchAll(/<table[\s\S]*?<\/table>/g)][0][0];
   ok(!/https?:\/\//.test(textOf(links)) && !/example\.gov/.test(textOf(links)) && (links.match(/class="da-rv-link"/g) || []).length === 8, '5b-a the table shows a short "Official source" label, never a raw address (8 links, 0 visible URLs)');
   ok(/Official source/.test(textOf(links)) && [...links.matchAll(/class="da-rv-link" href="([^"]*)"/g)].every((m) => /^https:\/\/example\.gov\/records\/k-/.test(m[1])), '5b-b each link still points at that record\'s own address');
-  ok(/<span class="da-rv-url">https:\/\/example\.gov\/records\/k-approved<\/span>/.test(html), '5b-c the full address is carried once, in the evidence entry (printed there so a paper copy still leads to the record)');
-  ok(/\.da-rv-url\{display:none/.test(V.CSS) && /@media print\{[\s\S]*\.da-rv-url\{display:block/.test(V.CSS), '5b-d the address is print-only: hidden on screen, shown in print');
+  ok(!/da-rv-url/.test(html + V.CSS) && !/example\.gov/.test(textOf(html)), '5b-c no raw web address is printed anywhere: every record shows only the short "Official source" link, which stays clickable in a saved PDF');
   const longName = 'The Extraordinarily Long Named Mixed-Use Redevelopment Of The Former Downtown Industrial Warehouse District And Adjacent Parcels Phase 2B';
   const ln = clone(W); ln.report.projects.find((p) => p.project_id === 'k-approved').name = longName;
   ln.report.projects.find((p) => p.project_id === 'k-approved').source.url = 'https://example.gov/' + 'very-long-path-segment/'.repeat(12) + 'record?id=1';
