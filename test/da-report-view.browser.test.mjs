@@ -447,6 +447,25 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   }
 }
 
+{
+  // Layout refinement (screen): heading hierarchy, a framed three-column table that does not overflow, nothing scrolls sideways on a phone.
+  const { ctx, page } = await open(1280, 900);
+  await mount(page, W, ADDRESS);
+  const d = await page.evaluate(() => {
+    const fs = (sel) => parseFloat(getComputedStyle(document.querySelector(sel)).fontSize);
+    const t = document.querySelector('.da-rv-sec--records .da-rv-table'), wrap = t.closest('.da-rv-tablewrap');
+    return { addr: fs('.da-rv-addr'), h2: fs('.da-rv-h2'), body: fs('.da-rv-p'), cols: t.querySelectorAll('thead th').length, over: wrap.scrollWidth - wrap.clientWidth,
+      cell: parseFloat(getComputedStyle(t.querySelector('td')).paddingTop), secBorder: getComputedStyle(document.querySelector('.da-rv-sec--records')).borderTopWidth };
+  });
+  ok(d.addr > d.h2 && d.h2 > d.body, '13a type hierarchy: address > section heading > supporting text', d);
+  ok(d.cols === 3 && d.over <= 0 && d.cell >= 14 && d.secBorder === '1px', '13b the table keeps exactly three columns, does not overflow, rows have room, and sections are separated by a hairline', d);
+  const m = await open(390, 800);
+  await mount(m.page, W, ADDRESS);
+  ok((await m.page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)) <= 0, '13c on a phone nothing scrolls sideways', null);
+  await m.ctx.close();
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);

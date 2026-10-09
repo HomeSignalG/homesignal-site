@@ -221,6 +221,20 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   await d.ctx.close();
 }
 
+// ---- 8. layout: a comfortable reading width on a large desktop, and clear section headings (layout refinement) ----------------------------------------
+{
+  const { ctx, page } = await open({ width: 1920, height: 1000 });
+  await settled(page);
+  const m = await page.evaluate(() => {
+    const rv = document.querySelector('.da-rv').getBoundingClientRect(), h = getComputedStyle(document.querySelector('.da-rv-h2')), addr = getComputedStyle(document.querySelector('.da-rv-addr'));
+    return { w: Math.round(rv.width), h2: parseFloat(h.fontSize), weight: Number(h.fontWeight), upper: h.textTransform, addr: parseFloat(addr.fontSize) };
+  });
+  ok(m.w >= 1000 && m.w <= 1120, '8a on a 1920 px screen the report is a comfortable 1000-1120 px column (it was 928 px)', m);
+  ok(m.h2 >= 20 && m.weight >= 600 && m.upper === 'none', '8b a section heading is at least 20 px, semibold and not small uppercase', m);
+  ok(m.addr > m.h2, '8c the property address is the strongest element, larger than any section heading', m);
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);
