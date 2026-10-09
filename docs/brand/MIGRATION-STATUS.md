@@ -8,9 +8,9 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 2 Dual-domain compatibility | DONE, deployed | site #1736 -> `11fd3d3`; ingest #653 -> `b074f81`; guard migration applied; see "Step 2 deployment record" |
 | 3 Jody staging site | DONE, merged | site #1740 -> `5d769e3`; `jody-staging` ran green on a runner; nothing deployed |
 | 4 SEO migration | tooling merged; real-snapshot parity PASSED (run 37971696362) | see Step 4 |
-| 5 Zero-cost redirect | built + proven offline; host test needs founder's Netlify account | see Step 5 |
+| 5 Zero-cost redirect | built + proven by simulation only; real-HTTP provider test workflow written (`jody-redirect-verify`), needs a Netlify token | see Step 5 |
 | 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
-| 7 Cutover | needs founder GO LIVE | |
+| 7 Cutover | NOT READY: gates G1/G2/G3/G7/G8 open (see Launch readiness); needs founder GO LIVE | `docs/brand/CUTOVER-CHECKLIST.md` |
 | 8 Email + Bluesky | not started | |
 | 9 Search transition + monitoring | not started | |
 
@@ -68,6 +68,8 @@ Rule D / Rule F are untouched: the overlay never reads or changes the plane, and
 
 **What is NOT proven:** Netlify's own behaviour. The simulator proves our rules, not the host. The first real proof is the probe against a `*.netlify.app` preview (no DNS needed) - a founder action, see the checklist.
 
+**Hosting split (corrected):** Netlify carries ONLY the redirect and the DID document (tiny, no build minutes); the revenue site stays on GitHub Pages, so Netlify credit exhaustion cannot take the product down. See checklist section 3.
+
 **Alternatives if Netlify Free is refused** (all zero-cost, none chosen silently): Cloudflare free plan redirect rule (needs the domain's nameservers moved - bigger DNS change); a registrar-level 301 forward if the registrar offers one free (cannot serve the DID file, so unsuitable alone). GitHub Pages cannot send a real 301.
 
 **Hard constraint recorded:** do not change DNS for homesignal.net (the audit below shows its nameservers are Google-hosted, not Shopify; the registrar is Tucows) until the founder's GO LIVE; until then GitHub Pages keeps answering.
@@ -88,11 +90,15 @@ Rule D / Rule F are untouched: the overlay never reads or changes the plane, and
 | CAA | none | none |
 
 **What this changes (corrections to earlier assumptions):**
-1. **homesignal.net DNS is not in Shopify.** The earlier note ("managed in Shopify") was an assumption and is wrong on this evidence: the nameservers are `*.googledomains.com` and the registrar is Tucows. The GO LIVE step to point homesignal.net at the redirect host is an edit at THAT DNS host (the founder must confirm which console controls it). Nothing was changed.
+1. **Who controls homesignal.net DNS is UNRESOLVED, not settled.** The founder reports Shopify shows the domain as Shopify-managed with editable DNS, and the Shopify Admin API agrees it is the primary domain. Public lookups show Tucows as registrar and Google nameservers, which does not prove Shopify's console is inactive. The earlier claim "not in Shopify" is WITHDRAWN. Decisive test: add a probe TXT in the Shopify DNS console and observe it at the delegated nameservers (`jody-dns-authority` workflow). Until then no GO LIVE DNS edit is specified for a provider.
 2. **jodytracks.com is registered, current and held at Infomaniak (registered yesterday), with working Infomaniak mail DNS and no web records.** I cannot verify from here that the founder's account is the registrant; RDAP shows the registrar, not the owner.
 3. **Mail is already configured at Infomaniak for jodytracks.com**, so receiving `hello@` / `alerts@` there is a mailbox-creation step, not a DNS one.
-4. **Sending as `alerts@jodytracks.com` through Resend will be REJECTED as things stand.** SPF is `-all` listing only Infomaniak, and DMARC is `p=reject`; no Resend DKIM exists. Mail from Resend needs, at Infomaniak DNS: the Resend DKIM CNAME/TXT records, and Resend's SPF include added to the existing SPF record (keep ONE SPF record). With `p=reject` already live, do not send a test before both are in and Resend shows the domain verified. Also add an `rua=` mailbox to the DMARC record so failures are visible.
+4. **Resend needs four records and NO change to the root SPF.** Resend's SPF/return-path live on the `send` subdomain (MX + TXT), plus a DKIM TXT at `resend._domainkey` and a `rsend` CNAME. Root SPF, MX and DMARC stay as they are, so Infomaniak mail is untouched. The earlier "add Resend to the root SPF" instruction is WITHDRAWN. Exact values: checklist section 2 (domain created in Resend, receiving disabled; values compared by sha256 in the `resend-domain-records` workflow).
 5. Both domains expire within 13 months; turn on auto-renew for both (a lapse of homesignal.net would break the redirect AND the immutable `did:web:homesignal.net`).
 6. Proton MX on homesignal.net means existing `@homesignal.net` mailboxes keep working after the redirect; the redirect service must not touch MX records (it only needs the web A/CNAME records).
 
-Not verified (no source available to this session): who the registrant is, the exact DNS console for homesignal.net, Resend's required records for jodytracks.com (shown only in the Resend dashboard), Infomaniak mailbox existence.
+Not verified: who the registrant is, which servers actually serve homesignal.net's zone, Infomaniak mailbox existence, Netlify's real behaviour.
+
+
+## Launch readiness (corrected 2026-10-09)
+Verdict: **NOT READY. GO LIVE not executed.** Open gates: G1 (authoritative DNS control of homesignal.net), G2 (real-HTTP Netlify redirect + DID 200), G3 (Resend domain verified), G7 (auto-renew, counsel/trademark), G8 (Paddle). Payments are a separate gate and stay OFF: Paddle is the intended processor (sandbox approved for both domains); the Lemon Squeezy code is audited in `docs/brand/PADDLE-AUDIT.md` and is not activated. Live Paddle approval and working billing are separate gates. Production DNS, Jody activation and payments are unchanged.

@@ -1,0 +1,107 @@
+name: jody-redirect-verify
+
+# Jody migration, Step 5. REAL-HTTP verification of the redirect service on the actual provider. The offline simulator proves our
+# rules; only this proves Netlify's behaviour (301 with path+query preserved, the DID document answering 200 and NOT redirected,
+# robots.txt answering 200). Manual only. Touches no DNS and no homesignal.net traffic.
+#
+#   mode=probe            Probes `base_url` (a *.netlify.app preview, or homesignal.net after cutover) with scripts/verify_redirect_service.py.
+#                         Needs no secret.
+#   mode=deploy-and-probe Deploys the generated folder to a NEW throw-away Netlify site named homesignal-redirect-<run id> using the
+#                         NETLIFY_AUTH_TOKEN repository secret, waits for it to be ready, probes it, prints the result and DELETES the
+#                         site (unless keep_site=true). Fails with a clear message if the secret is missing. Free plan only; the token
+#                         is never printed.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: probe or deploy-and-probe
+        default: deploy-and-probe
+        type: choice
+        options: [deploy-and-probe, probe]
+      base_url:
+        description: Only for mode=probe - the URL to probe (https://...)
+        default: ''
+      keep_site:
+        description: Keep the throw-away Netlify site afterwards
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build the redirect folder and prove our rules offline first
+        run: |
+          python3 scripts/build_redirect_site.py --out _redirect
+          python3 scripts/build_redirect_site.py --out _redirect --check
+          python3 scripts/verify_redirect_service.py --simulate _redirect
+      - name: Deploy to a throw-away Netlify site
+        id: deploy
+        if: ${{ inputs.mode == 'deploy-and-probe' }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys, time, urllib.request, urllib.error
+          tok = os.environ.get("NETLIFY_AUTH_TOKEN", "")
+          if not tok:
+              sys.exit("NETLIFY_AUTH_TOKEN is not set as a repository secret. Create a Netlify Free account, make a personal access token, "
+                       "and add it under Settings > Secrets and variables > Actions. Nothing else is needed from you.")
+          api = "https://api.netlify.com/api/v1"
+          def call(method, path, body=None, ctype="application/json"):
+              data = body if isinstance(body, (bytes, type(None))) else json.dumps(body).encode()
+              req = urllib.request.Request(api + path, method=method, data=data,
+                  headers={"Authorization": "Bearer " + tok, "Content-Type": ctype, "User-Agent": "homesignal-site/jody-redirect-verify"})
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      raw = r.read(); return r.status, (json.loads(raw) if raw else {})
+              except urllib.error.HTTPError as e:
+                  try: b = json.loads(e.read() or b"{}")
+                  except Exception: b = {}
+                  return e.code, b
+          name = "homesignal-redirect-" + os.environ["RUN_ID"]
+          st, site = call("POST", "/sites", {"name": name})
+          print("create site ->", st)
+          if st not in (200, 201): sys.exit(f"could not create a Netlify site: {st} {site.get('message') or site}")
+          sid = site["id"]; url = site.get("ssl_url") or site.get("url")
+          print("site:", url)
+          subprocess.run(["bash", "-c", "cd _redirect && zip -qr ../redirect.zip . && cd .. && unzip -l redirect.zip | tail -n +4 | head -20"], check=True)
+          st, dep = call("POST", f"/sites/{sid}/deploys", open("redirect.zip", "rb").read(), "application/zip")
+          print("deploy ->", st, dep.get("state"))
+          if st not in (200, 201): sys.exit(f"deploy refused: {st} {dep.get('message') or dep}")
+          for _ in range(60):
+              st, d = call("GET", "/deploys/" + dep["id"])
+              state = d.get("state")
+              if state == "ready": break
+              if state in ("error", "rejected"): sys.exit(f"deploy {state}: {d.get('error_message')}")
+              time.sleep(5)
+          else:
+              sys.exit("deploy did not become ready in 5 minutes")
+          print("deploy ready")
+          open(os.environ["GITHUB_OUTPUT"], "a").write(f"url={url}\nsite_id={sid}\n")
+          PY
+      - name: Probe the live deployment with real HTTP (no redirect following)
+        env:
+          TARGET: ${{ inputs.mode == 'probe' && inputs.base_url || steps.deploy.outputs.url }}
+        run: |
+          [ -n "$TARGET" ] || { echo "no target URL"; exit 1; }
+          case "$TARGET" in https://*) ;; *) echo "target must be https://"; exit 1;; esac
+          echo "probing $TARGET"
+          python3 scripts/verify_redirect_service.py --base "$TARGET" --files _redirect
+      - name: Delete the throw-away site
+        if: ${{ always() && inputs.mode == 'deploy-and-probe' && steps.deploy.outputs.site_id != '' && !inputs.keep_site }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SITE_ID: ${{ steps.deploy.outputs.site_id }}
+        run: |
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" "https://api.netlify.com/api/v1/sites/$SITE_ID")
+          echo "delete site -> HTTP $code"
