@@ -214,6 +214,35 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   await ctx.close();
 }
 
+// ──────────────────────────────────────── 4b: an address arriving from a buyer's shared report ──
+// (founder, 2026-10-09: "link to the full address".) The shared report's invitation links to /#address=<encoded>. The fragment is
+// read once, removed from the address bar, and the address goes through the SAME search a typed address does.
+console.log('--- 4b. #address= is searched once, taken out of the URL, and handed over in sessionStorage ---');
+{
+  const ADDR = '742 Evergreen Terrace, Springfield, OR 97477';
+  const { ctx, page, errors } = await open(browser, base, '/index.html#address=' + encodeURIComponent(ADDR), { stub: STUB, waitReady: false });
+  await page.route('**/homesignalmap.html', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
+  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
+  const arrived = await page.evaluate(() => ({ path: location.pathname, url: location.href, handed: sessionStorage.getItem('hs.homeSearchAddress') }));
+  ok(arrived.path === '/homesignalmap.html' && arrived.handed === ADDR, '4b the address from the fragment is searched: Map 1 opens with the address handed over in sessionStorage', arrived);
+  ok(!/address|Evergreen|%20/.test(arrived.url), '4b and it is in no URL on the way (the hand-off is sessionStorage, never a query or fragment)', arrived.url);
+  await page.goBack().catch(() => {});
+  await page.waitForFunction(() => location.pathname === '/index.html', null, { timeout: 8000 }).catch(() => {});
+  const back = await page.evaluate(() => location.href);
+  ok(/\/index\.html$/.test(back) && !/address/.test(back), '4b Back returns to the plain home page: the fragment was removed from the history entry, so the search does not run again', back);
+  ok(errors.length === 0, '4b no page or console errors', errors);
+  await ctx.close();
+}
+{
+  for (const frag of ['#address=abc', '#address=78657', '#address=%E0%A4%A', '#other=1 Main Street Springfield OR']) {
+    const { ctx, page } = await open(browser, base, '/index.html' + frag, { stub: STUB });
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(() => ({ path: location.pathname, box: document.getElementById('homeQuery').value, handed: sessionStorage.getItem('hs.homeSearchAddress') }));
+    ok(r.path === '/index.html' && r.box === '' && r.handed === null, '4b ' + frag + ' is not a plausible street address: the page stays as it is and searches nothing', r);
+    await ctx.close();
+  }
+}
+
 // ─────────────────────────────────────────────────────────────── 2b: canvas by width ──
 console.log('--- 2b. the preview canvas follows the host breakpoint; no internal scroll at any width ---');
 for (const [w, h, want, live] of [[1280, 900, 430, 760], [1024, 768, 430, 760], [768, 1024, 400, 700], [390, 844, 340, 660]]) {

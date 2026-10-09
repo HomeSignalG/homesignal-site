@@ -76,7 +76,7 @@ noscript p{margin:16px;font-weight:600}
   <aside id="invite" class="invite" hidden aria-label="About HomeSignal">
     <h2>Follow quality-of-life intelligence for this property.</h2>
     <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
-    <a href="https://homesignal.net/" rel="noopener">Explore HomeSignal &rarr;</a>
+    <a href="https://homesignal.net/" rel="noopener noreferrer">Explore HomeSignal &rarr;</a>
   </aside>
 </main>
 <noscript><p>This report needs JavaScript to be shown. Please turn it on, or ask the person who sent you the link for a printed copy.</p></noscript>
@@ -149,6 +149,14 @@ noscript p{margin:16px;font-weight:600}
     state('report'); say('', false);
     if (typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id)) { $('rid').textContent = 'Report ID ' + body.report_id; $('rid').hidden = false; }
     $('private').hidden = false;
+    // The invitation takes the buyer to the property: the address rides in the link's FRAGMENT (never sent to a server, never in a query), only
+    // while the private layer still keeps it. Once it is purged the link is the plain home page.
+    var inv = document.querySelector('#invite a');
+    if (inv) {
+      var base = inv.href.split('#')[0];
+      var where = typeof body.address === 'string' ? body.address.trim() : '';
+      inv.href = where ? base + '#address=' + encodeURIComponent(where) : base;
+    }
     $('invite').hidden = false;
     $('pdf').hidden = false;
   }
