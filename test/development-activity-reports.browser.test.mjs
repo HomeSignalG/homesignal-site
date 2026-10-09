@@ -236,8 +236,12 @@ const server = createServer(async (req, res) => {
   const url = req.url.split('?')[0];
   const p = normalize(join(root, decodeURIComponent(url)));
   if (!p.startsWith(root)) { res.writeHead(403).end(); return; }
-  try { res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(await readFile(p)); }
-  catch { res.writeHead(404).end('not found'); }
+  // Read BEFORE writing any header. The old form sent `writeHead(200)` first and awaited the file inside `.end(...)`, so a request
+  // for a file that does not exist (a favicon, a prefetch) threw AFTER the 200 head was out, and the catch's `writeHead(404)` then
+  // raised ERR_HTTP_HEADERS_SENT and killed the whole test process - a crash that only fires when such a request races the run.
+  let body;
+  try { body = await readFile(p); } catch { res.writeHead(404).end('not found'); return; }
+  res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = 'http://127.0.0.1:' + server.address().port;
