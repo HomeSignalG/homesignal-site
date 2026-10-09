@@ -10,6 +10,9 @@ emailed, posted or signed reads this contract.
 | `docs/brand/brand-contract.v1.sha256` | sha256 of the canonical (key-sorted, whitespace-free) JSON. Detects edits and drift. |
 | `test/lib/brand-contract.mjs` | Validator, canonicalizer, hash and `checkPin`. stdlib only. |
 | `test/brand-contract.test.mjs` | Fail-closed suite (positive and negative controls). |
+| `scripts/gen-brand-origins.mjs` | Step 2: generates `supabase/functions/_shared/brand-origins.generated.ts` (the backend browser-origin allowlist) from the contract. Never hand-edit the output. |
+| `test/brand-origins.test.mjs` | Step 2: generated file == contract, both origins echoed, lookalikes refused, authorization independent of origin. |
+| `docs/brand/MIGRATION-STATUS.md` | The one migration status document. |
 
 Operational secrets, provider settings and deployment controls are deliberately NOT fields.
 
