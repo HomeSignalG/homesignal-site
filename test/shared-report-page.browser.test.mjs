@@ -105,6 +105,8 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   ok((await page.$$('.da-rv-card')).length > 0 && /Within 0\.5 mile/.test(await text(page, '.da-rv-meta')), '1i it is the full report: cards, and the half-mile radius in the header');
   ok(await visible(page, '#pdf') && (await text(page, '#rid')) === 'Report ID ' + RID, '1j the Download PDF button and the permanent report id are shown');
   ok(/private link/.test(await text(page, '#private')) && /six months/.test(await text(page, '#private')) && /withdraw it at any time/.test(await text(page, '#private')), '1k the page tells the client the link is private, how long it lasts and that the brokerage can withdraw it');
+  ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Know what changes around your home.' && (await page.getAttribute('#invite a', 'href')) === 'https://homesignal.net/' && (await text(page, '#invite a')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
+  ok(await page.evaluate(() => { const i = document.getElementById('invite'); const r = document.getElementById('report'); const p = document.getElementById('private'); return !!(r.compareDocumentPosition(i) & 4) && !!(p.compareDocumentPosition(i) & 4) && !r.contains(i) && /Brokerage|Acme/.test(r.textContent); }), '1j3 it sits after the report and the privacy note, outside the report, and the brokerage is still in the report');
   ok(!(await text(page, 'body')).includes('Sign in') && (await page.$$('input')).length === 0, '1l there is no sign-in and no form: a client needs no account');
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('#pdf');
@@ -144,6 +146,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   await settled(g.page);
   ok(/doesn.t open a report/.test(await text(g.page, '#gone h1')) && /withdrawn/.test(await text(g.page, '#gone')) && /expired/.test(await text(g.page, '#gone')) && /Ask the person who sent it/.test(await text(g.page, '#gone')), '3b the message says it may have been withdrawn or expired and who to ask');
   ok(!(await visible(g.page, '#pdf')) && !(await visible(g.page, '#private')) && !(await visible(g.page, '#rid')), '3c a dead link shows no PDF button, no report id and no privacy note');
+  ok(!(await visible(g.page, '#invite')), '3c3 a dead link shows no invitation');
   ok(!(await visible(g.page, '#gone button')), '3c2 and no "Try again" button: retrying a withdrawn or expired link cannot help');
   await g.ctx.close();
   const m = await open({ hash: '#share=short' });
@@ -194,6 +197,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
     return { report: shown('#report .da-rv'), head: shown('header.top'), pdf: shown('#pdf'), status: shown('#status'), privateNote: shown('#private'), rid: shown('#rid'), notice: shown('#gone'), cards: shown('.da-rv-card'), filters: shown('.da-rv-sec--filters'), bg: getComputedStyle(document.body).backgroundColor };
   });
   ok(p.report && p.cards && p.rid && !p.head && !p.pdf && !p.status && !p.privateNote && !p.notice && !p.filters && p.bg === 'rgb(255, 255, 255)', '6a on paper: the report and its id, on white; no header, no button, no status line, no privacy note, no filter chips', p);
+  ok(await visible(page, '#invite'), '6a2 the invitation prints, so a saved PDF carries it');
   const links = await page.evaluate(() => { const a = [...document.querySelectorAll('.da-rv a[href^="http"]')]; return a.length ? getComputedStyle(a[0], '::after').content : 'none'; });
   ok(links === 'none' || /^" \(http/.test(links), '6b each official link prints its address after it, so the paper copy still leads to the record', links);
   await ctx.close();
@@ -204,6 +208,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   const { ctx, page } = await open({ width: 390, height: 844 });
   await settled(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  ok(await visible(page, '#invite a') && (await page.$eval('#invite a', (a) => a.getBoundingClientRect().height)) >= 44, '7a2 on a phone the link is visible and a full-size tap target');
   ok((await stateOf(page)) === 'report' && wide <= 0, '7a on a 390 px screen the report is shown and the page does not scroll sideways', wide);
   await ctx.close();
   const d = await open({ hash: '#share=' + UNKNOWN, width: 390, height: 844 });
