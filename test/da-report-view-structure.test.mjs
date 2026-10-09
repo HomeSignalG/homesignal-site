@@ -77,10 +77,10 @@ const C = code(SRC);
   ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
   ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
   // audit 2026-10-07 (finding 1): a third read, isDecided(), exists so a denied or withdrawn application is never labelled "under review".
-  ok((C.match(/publisher_status/g) || []).length === 3 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\(STATUS_LABEL, status\)/g) || []).length === 2
+  ok((C.match(/publisher_status/g) || []).length === 2 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 1 && (C.match(/line\(STATUS_LABEL, status\)/g) || []).length === 1
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
-    '2e the agency\'s status word is read in the two card builders (printed under its own label) and in ONE function, isDecided, that only asks whether it is Decided');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 7
+    '2e the agency\'s status word is read in the evidence-entry builder (printed under its own label) and in ONE function, isDecided, that only asks whether it is Decided');
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
     '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the operating card and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
 }
@@ -94,7 +94,7 @@ const C = code(SRC);
   const regUses = [...C.matchAll(/CATEGORY_REGISTRY/g)].length, reg = (C.match(/function typeLabelFor\(k, seen\) \{[\s\S]*?\n  \}/) || [''])[0];
   ok(regUses === 2 && reg.length > 100 && (reg.match(/CATEGORY_REGISTRY/g) || []).length === 2 && /reg\[k\]\.isFacility \? txt\(reg\[k\]\.label\)/.test(reg) && !/classify|canonical/.test(reg),
     '3a2 the Type authority\'s registry is read in ONE place, typeLabelFor (the Type filter and the comparison both use it), for its labels only (and a regulated facility is never offered as a Type, ruling 1)');
-  const filt = (C.match(/function filtersSection\(current, stageFor\) \{[\s\S]*?\n  \}/) || [''])[0];
+  const filt = (C.match(/function filtersSection\(current, m\) \{[\s\S]*?\n  \}/) || [''])[0];
   ok(filt.length > 300 && !/CATEGORY_REGISTRY/.test(filt) && /typeLabelFor\(k, seen\)/.test(filt), '3a3 (control) the Type filter reaches the registry only through typeLabelFor, so there is no second read to drift');
   // The one status word the view may name is 'decided' (denied or withdrawn, CLAUDE.md 7.05), once, inside isDecided, to LABEL it, never to place it in a stage.
   ok(!/['"](on file|built|active)['"]/i.test(C) && (C.match(/['"]decided['"]/gi) || []).length === 1 && /isDecided\(p\) \{ return [^;]*=== 'decided'; \}/.test(C),
@@ -104,9 +104,9 @@ const C = code(SRC);
   ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),
     '3c the module owns no change rule and no window: it does not decide what changed or what is recent (and carries no day-count of its own)');
   ok(!/validateRights|report-rights|cleared\b|attribution\s*[:=]\s*['"]/.test(C) && !/rights/i.test(C), '3d it owns no rights rule: it cannot say whether a source may appear, and invents no attribution');
-  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|closest)\b/i.test(C) && !/\.sort\(/.test(C) && /response\.render\.review/.test(C) && (C.match(/nearest/gi) || []).length === 1 && /m\.review\[0\]/.test(C), '3e it ranks nothing: Things to Review is the engine\'s own list (render.review), shown in the engine\'s order; the word "nearest" appears only to introduce that list\'s first record in the briefing (read from m.review[0], never sorted here)');
-  ok(/Things to Review With Your Client/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
-    '3f the 100526 sections are written (Things to Review, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
+  ok(!/\b(rank|ranked|ranking|score|priority|sortBy|closest|nearest)\b/i.test(C) && !/\.sort\(/.test(C) && !/render\.review/.test(C), '3e it ranks nothing and sorts nothing: records appear in the engine\'s own order, and the engine\'s review list is no longer read (the table is the one list)');
+  ok(/Nearby Development/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
+    '3f the 100526 sections are written (Nearby Development, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
   ok((C.match(/aria-disabled="true"/g) || []).length === 1 && !/addEventListener\('click'[\s\S]{0,200}da-rv-act/.test(C), '3f2 the action bar\'s buttons are switched off, and nothing listens to them');
   // Founder ruling R5 (2026-10-02): "No development activity" is a real answer when the ENGINE can prove it. The view may write those words
   // exactly once, as the title it shows for the engine's own NO_DEVELOPMENT_ACTIVITY outcome; any other absence wording is still refused.
@@ -133,7 +133,7 @@ const C = code(SRC);
   ok((C.match(/target="_blank"/g) || []).length === 1 && (C.match(/rel="noopener noreferrer"/g) || []).length === 1, '4d every link that opens a new tab says noopener noreferrer (one link, one rel)');
   // the address
   const head = (C.match(/function header\(report, opts\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok(head.startsWith('function header(report, opts) {') && /esc\(subject \|\| NO_ADDRESS\)/.test(head), '4e (control) the header region was sliced correctly and writes the address through esc()');
+  ok(head.startsWith('function header(report, opts) {') && /esc\(subject \? displayAddress\(subject\) : NO_ADDRESS\)/.test(head), '4e (control) the header region was sliced correctly and writes the address through esc()');
   const subjectUses = [...C.matchAll(/\bsubject\b/g)].length, inHeader = [...head.matchAll(/\bsubject\b/g)].length;
   ok(subjectUses > 0 && subjectUses === inHeader, '4f the caller\'s address is read in ONE function, header(), and nowhere else', { subjectUses, inHeader });
   const optReads = [...C.matchAll(/opts\.(\w+)/g)].map((m) => m[1]);
@@ -222,7 +222,7 @@ const C = code(SRC);
   const mut = read('test/da_report_view_mutants.py');
   const names = [...mut.matchAll(/^m\('([a-z_0-9]+)'/gm)].map((m) => m[1]);
   ok(names.length >= 40, '7d the mutation harness carries its prohibited mutations (' + names.length + ')');
-  ok(['swap_two_sections', 'change_hero_from_publisher_date', 'render_source_family', 'render_storage_blockers', 'render_hold', 'proposed_labelled_coming', 'lifecycle_text_dropped', 'escaping_removed',
+  ok(['swap_two_sections', 'row_name_not_escaped', 'stale_warning_dropped', 'render_storage_blockers', 'print_row_split_allowed', 'proposed_labelled_coming', 'lifecycle_text_dropped', 'escaping_removed',
     'javascript_url_accepted', 'distance_without_render', 'adds_a_fetch', 'address_in_href'].every((x) => names.includes(x)), '7e and every mutation the audit named is in it');
 }
 

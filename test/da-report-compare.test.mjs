@@ -91,22 +91,23 @@ const html3 = cmp(E3);
 // ---- 2. THE SAME NUMBERS AS THE REPORT: each cell equals what that report prints for itself -------------------------------------------------------------
 {
   const own = (response) => V.html(response, { subject: 'x' });
-  const stageLine = (h) => { const m = /On the record within 0\.5 miles: (\d+) permitted \/ under construction · (\d+) approved \/ coming · (\d+) proposed \/ under review(?: · \d+ decided \(denied or withdrawn\))?\./.exec(textOf(h)); return m ? [m[1], m[2], m[3]] : null; };
+  // the report's own stage counts are in its briefing's first line (a stage with none is not listed there, so it reads as 0)
+  const stageLine = (h) => { const t = textOf(h); const first = /data-da-briefing/.test(h) ? (/As of [^:]*: ([^.]*)\./.exec(t) || [])[1] : null; if (first === null || first === undefined) return null; const g = (re) => { const m = re.exec(first); return m ? m[1] : '0'; }; return [g(/(\d+) permitted \/ under construction/), g(/(\d+) approved \/ coming/), g(/(\d+) proposed \/ under review/)]; };
   const sectionHtml = (h, key) => { const m = new RegExp('<section class="da-rv-sec da-rv-sec--' + key + '[^"]*"[^>]*>([\\s\\S]*?)</section>').exec(h); return m ? m[1] : ''; };
   const metricSum = (h) => [...h.matchAll(/<div class="da-rv-metric"><b>(\d+)<\/b>/g)].reduce((a, m) => a + Number(m[1]), 0);
   const chips = (h) => Object.fromEntries([...h.matchAll(/data-da-filter="type" data-da-value="(\w+)" aria-pressed="false">([^<]*?) <span class="da-rv-chipn">(\d+)<\/span>/g)].map((m) => [decode(m[2]), m[3]]));
   const two = cmp([entry(2, W), entry(1, WCOLD)]);
   [[W, 0], [WCOLD, 1]].forEach(([resp, col]) => {
     const h = own(resp), line = stageLine(h);
-    ok(line !== null, '2a the report prints its own stage line ("On the record within 0.5 miles: ...") — column ' + (col + 1), textOf(h).slice(0, 200));
+    ok(line !== null, '2a the report prints its own stage counts in its briefing — column ' + (col + 1), textOf(h).slice(0, 200));
     ok(rowOf(two, 'Permitted / Under Construction')[col] === line[0] && rowOf(two, 'Approved / Coming')[col] === line[1] && rowOf(two, 'Proposed / Under Review')[col] === line[2],
       '2b the three stage cells equal the report\'s own stage line ' + JSON.stringify(line) + ' (column ' + (col + 1) + ')', [rowOf(two, 'Permitted / Under Construction')[col], rowOf(two, 'Approved / Coming')[col], rowOf(two, 'Proposed / Under Review')[col]]);
     const ch = chips(h), typeRows = rowsOf(two).filter((r) => ch[r.label] !== undefined);
     ok(Object.keys(ch).length > 0 && Object.keys(ch).filter((l) => ch[l] !== '0').every((l) => (rowOf(two, l)[col] || '') === ch[l]), '2c every Type with a record on the report is the same count in the comparison as on the report\'s own Type chip (column ' + (col + 1) + ')', [ch, typeRows]);
-    const changedOwn = metricSum(sectionHtml(h, 'changed')), activityOwn = metricSum(sectionHtml(h, 'activity'));
-    const changedCmp = rowOf(two, 'Records with a change HomeSignal detected')[col];
-    ok(String(activityOwn) === rowOf(two, 'Records with a recent official event')[col], '2d the recent-official-event count equals the report\'s own Recent Official Activity total (' + activityOwn + ', column ' + (col + 1) + ')');
-    ok(resp === W ? changedCmp === String(changedOwn) : (changedOwn === 0 && changedCmp === 'Not yet measured'), '2e the detected-change count equals the report\'s What Changed total where there is one (' + changedOwn + '), and is not shown as a zero where the report has no history yet (column ' + (col + 1) + ')', changedCmp);
+    const mm = V.read(resp), changedCmp = rowOf(two, 'Records with a change HomeSignal detected')[col];
+    const briefChanged = (/(\d+) records? shows? a recent change in HomeSignal/.exec(textOf(h)) || [])[1] || '0';
+    ok(String(mm.activity.length) === rowOf(two, 'Records with a recent official event')[col], '2d the recent-official-event count is the length of the view\'s own list (' + mm.activity.length + ', column ' + (col + 1) + ')');
+    ok(resp === W ? changedCmp === briefChanged : (briefChanged === '0' && changedCmp === 'Not yet measured'), '2e the detected-change count equals the number the report\'s briefing states (' + briefChanged + '), and is not shown as a zero where the report has no history yet (column ' + (col + 1) + ')', [changedCmp, briefChanged]);
   });
   // the report's own lists, through the shared read()
   const m = V.read(W);
@@ -114,7 +115,7 @@ const html3 = cmp(E3);
     && rowOf(two, 'Records with a change HomeSignal detected')[0] === String(m.changed.length), '2f the cells are the lengths of the view\'s own lists (read()), not a second derivation');
   ok(rowOf(two, 'Decided (denied or withdrawn)')[0] === String(m.staged.proposed.length - V.util.openProposed(m.staged.proposed).length) && Number(rowOf(two, 'Decided (denied or withdrawn)')[0]) >= 1,
     '2g a Decided application is counted on its own row, so "Proposed / Under Review" is only what is open (audit 2026-10-07)');
-  ok(rowOf(two, 'Residential')[0] === '3' && rowOf(two, 'Commercial')[0] === '2' && rowOf(two, 'Roads & infrastructure')[0] === '1', '2g anchor: the rich fixture is 3 residential, 2 commercial, 1 roads & infrastructure', rowsOf(two).map((r) => r.label + '=' + r.cells[0]));
+  ok(rowOf(two, 'Residential')[0] === '3' && rowOf(two, 'Commercial')[0] === '2' && rowOf(two, 'Roads & infrastructure')[0] === '2', '2g anchor: the rich fixture is 3 residential, 2 commercial, 2 roads & infrastructure (every record in the report\'s table)', rowsOf(two).map((r) => r.label + '=' + r.cells[0]));
   // the labels of the three stages are the view's own titles
   ok(['Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'].every((l) => rowsOf(two).some((r) => r.label === l)) && V.TITLES.approved === 'Approved / Coming', '2h the stage rows carry the view\'s own titles');
 }
@@ -162,7 +163,7 @@ const html3 = cmp(E3);
   ok(C.NOT_A_SCORE === 'This sets facts from official records side by side. It is not a score or a recommendation, and HomeSignal does not rank properties.' && textOf(html3).includes(C.NOT_A_SCORE), '4f the page says in one fixed sentence that it is not a score or a recommendation');
   // the rows are the plan's factual items, nothing else
   ok(groupsOf(html3).join(' | ') === 'What changed | By stage | By type | Timeline | Coverage and freshness', '4g the groups are the plan\'s factual items: recent changes, stages, Types, timeline, coverage and freshness', groupsOf(html3));
-  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Most recent change HomeSignal detected | Most recent official record | Report as of (UTC day) | What "recent" means | Limits the report states',
+  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Civic & public | Most recent change HomeSignal detected | Most recent official record | Report as of (UTC day) | What "recent" means | Limits the report states',
     '4h the rows, in order', rowsOf(html3).map((r) => r.label));
 }
 
@@ -215,7 +216,7 @@ const html3 = cmp(E3);
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');
   ok(/<caption class="da-cmp-vh">Compare properties: 3 reports side by side<\/caption>/.test(html3) && /<th scope="col"><span class="da-cmp-vh">Fact<\/span><\/th>/.test(html3), '8f the table has a caption and a heading for its first column, for a screen reader');
-  ok(rowsOf(html3).every((r) => r.cells.length === 3) && (html3.match(/<td><span class="da-cmp-r">Report \d<\/span>/g) || []).length === 14 * 3, '8g every row has one cell per report, each starting with its report number (what a phone shows when the table stacks)');
+  ok(rowsOf(html3).every((r) => r.cells.length === 3) && (html3.match(/<td><span class="da-cmp-r">Report \d<\/span>/g) || []).length === 15 * 3, '8g every row has one cell per report, each starting with its report number (what a phone shows when the table stacks)');
 }
 
 // ---- 9. mount ----------------------------------------------------------------------------------------------------------------------------------------------
