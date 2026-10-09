@@ -88,9 +88,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-card').length,
   }));
-  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Type and stage|Development Activity Map|Things to Review With Your Client|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Change History|Official evidence & coverage',
+  ok(info.h2.join('|') === 'What Changed Around This Property|Recent Official Activity|Type and stage|Development Activity Map|Things to Review With Your Client|Approved / Coming|Proposed / Under Review|Permitted / Under Construction|Operating / Built|Change History|Official evidence & coverage',
     '1c the sections render as headings, in the plan\'s order with the filters directly above the map', info.h2);
-  ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight cards', info);
+  ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 9, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, nine cards', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
   ok(await page.evaluate(() => document.querySelectorAll('#da-rv-style').length) === 1, '1e mounting again does not add a second stylesheet');
 
@@ -136,7 +136,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
   const PLAN_MOBILE = ['What Changed Around This Property', 'Recent Official Activity', 'Type and stage', 'Development Activity Map', 'Things to Review With Your Client', 'Approved / Coming', 'Proposed / Under Review',
-    'Permitted / Under Construction', 'Change History', 'Official evidence & coverage'];
+    'Permitted / Under Construction', 'Operating / Built', 'Change History', 'Official evidence & coverage'];
   ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the page-one order with the filters directly above the map: what changed, the filters, the map, things to review, the three stages, history, evidence', lay.secs.map((s) => s.label));
   const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
   ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
@@ -149,12 +149,12 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const rt = t.getBoundingClientRect(), rs = s.getBoundingClientRect(), cs = getComputedStyle(t);
     return rt.width > 20 && rt.height > 8 && rs.width >= 12 && rs.height >= 12 && cs.visibility === 'visible' && cs.display !== 'none' && t.textContent.trim().length > 0;
   }));
-  ok(vis.length === 8 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card once its detail is open (8 of 8); the rows above show the marker shape without opening anything (2f2)', vis);
-  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('.da-rv-td--stage svg.da-rv-shape'), n = r.querySelector('.da-rv-td--dev .da-rv-sub:not(.da-rv-sub--type):not(.da-rv-sub--src)'); const a = sv && sv.getBoundingClientRect(), b = n && n.getBoundingClientRect(); return !!(a && b && a.width >= 12 && a.height >= 12 && b.width > 4 && /Map \d+/.test(n.textContent)); }));
-  ok(rowsVis.length === 6 && rowsVis.every(Boolean), '2f2 every table row shows its stage shape and its "Map N" number without opening anything (6 of 6: the eight cards less the two hero rows that sit outside the stage sections)', rowsVis);
+  ok(vis.length === 9 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card once its detail is open (9 of 9); the rows above show the marker shape without opening anything (2f2)', vis);
+  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('.da-rv-td--stage svg.da-rv-shape'), n = r.querySelector('.da-rv-td--dev .da-rv-sub:not(.da-rv-sub--type):not(.da-rv-sub--src)'); const a = sv && sv.getBoundingClientRect(), b = n && n.getBoundingClientRect(); const op = r.getAttribute('data-da-stage') === 'operating'; return !!(a && b && a.width >= 12 && a.height >= 12 && b.width > 4 && (op || /Map \d+/.test(n.textContent))); }));
+  ok(rowsVis.length === 7 && rowsVis.every(Boolean), '2f2 every table row shows its stage or lifecycle shape, and every staged row its "Map N" number, without opening anything (7 of 7: six staged rows and the one operating row, which is not on the map)', rowsVis);
   const links = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width)]; }));
   const tableLinks = await page.evaluate(() => document.querySelectorAll('.da-rv-table .da-rv-link').length);
-  ok(tableLinks > 0 && links.length === 11 + tableLinks && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (8 cards, 3 review items, ' + tableLinks + ' table rows) is at least 32px tall and 60px wide on a phone: tappable', links);
+  ok(tableLinks > 0 && links.length === 12 + tableLinks && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (9 cards, 3 review items, ' + tableLinks + ' table rows) is at least 32px tall and 60px wide on a phone: tappable', links);
   const chipsH = await page.evaluate(() => [...document.querySelectorAll('.da-rv-chip, .da-rv-act')].map((b) => Math.round(b.getBoundingClientRect().height)));
   ok(chipsH.length >= 8 && chipsH.every((h) => h >= 36), '2g2 every filter chip and action button is at least 36px tall on a phone', chipsH);
   const sr = await page.evaluate(() => { const e = document.querySelector('.da-rv-sr'); const r = e.getBoundingClientRect(); return [r.width, r.height]; });
@@ -181,9 +181,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   const reached = inside.filter((s) => s.kind === 'link');
   const kinds = inside.map((s) => s.kind);
   const expect = await page.evaluate(() => ({ reachable: [...document.querySelectorAll('.da-rv-link')].filter((a) => !a.closest('details:not([open])')).length, review: document.querySelectorAll('.da-rv-rev .da-rv-link').length, table: document.querySelectorAll('.da-rv-table .da-rv-link').length, sums: document.querySelectorAll('.da-rv-sum').length }));
-  ok(expect.review === 3 && expect.table > 0 && expect.sums === 2 && reached.length === expect.reachable && expect.reachable === 2 + expect.review + expect.table && kinds.filter((k) => k === 'chip').length === 8 && kinds.filter((k) => k === 'action').length === 4
-    && kinds.filter((k) => k === 'SUMMARY').length === 2 && kinds.every((k) => ['link', 'chip', 'action', 'SUMMARY'].includes(k)) && left.inReport === false,
-    '3a Tab reaches the two hero links, the review links (3), the table links (' + expect.table + '), every filter chip (8), the two "Full official detail" toggles (the Permitted section is empty in this report) and the four actions, one per press, and then leaves the report; the cards inside a closed detail are not tab stops', kinds.join(','));
+  ok(expect.review === 3 && expect.table > 0 && expect.sums === 3 && reached.length === expect.reachable && expect.reachable === 2 + expect.review + expect.table && kinds.filter((k) => k === 'chip').length === 8 && kinds.filter((k) => k === 'action').length === 4
+    && kinds.filter((k) => k === 'SUMMARY').length === 3 && kinds.every((k) => ['link', 'chip', 'action', 'SUMMARY'].includes(k)) && left.inReport === false,
+    '3a Tab reaches the two hero links, the review links (3), the table links (' + expect.table + '), every filter chip (8), the three "Full official detail" toggles (the Permitted section is empty in this report) and the four actions, one per press, and then leaves the report; the cards inside a closed detail are not tab stops', kinds.join(','));
   ok(inside.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link, chip and action shows a visible focus ring of at least 2px', inside.filter((s) => !(s.outline !== 'none' && s.outlineWidth >= 2)).map((s) => s.kind));
   ok(inside.every((s, i) => i === 0 || s.top >= inside[i - 1].top - 1), '3c focus follows reading order, top to bottom (items in one row share a top)', inside.map((s) => s.top));
   ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view', reached.filter((s) => !s.inView));
@@ -279,8 +279,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   ok(JSON.stringify(s0.cards) === '{"approved":2,"proposed":4,"permitted":0}' && s0.marks === 6 && s0.pressed === 'stage:all,type:all', '7a at rest: All and All are pressed, every staged card and map marker is shown', s0);
   await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
   const s1 = await state();
-  ok(JSON.stringify(s1.cards) === '{"approved":0,"proposed":4,"permitted":0}' && s1.marks === 4 && s1.pressed === 'stage:proposed,type:all' && s1.noMatch.join() === 'Approved / Coming',
-    '7b Stage = Proposed / Under Review: only proposed cards and markers stay, and Approved / Coming says nothing in it matches the filters', s1);
+  ok(JSON.stringify(s1.cards) === '{"approved":0,"proposed":4,"permitted":0}' && s1.marks === 4 && s1.pressed === 'stage:proposed,type:all' && s1.noMatch.join() === 'Approved / Coming,Operating / Built',
+    '7b Stage = Proposed / Under Review: only proposed cards and markers stay, and Approved / Coming and Operating / Built say nothing in them matches the filters', s1);
   await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="residential"]');
   const s2 = await state();
   ok(JSON.stringify(s2.cards) === '{"approved":0,"proposed":1,"permitted":0}' && s2.marks === 1 && s2.pressed === 'stage:proposed,type:residential', '7c Type and Stage combine: Residential + Proposed leaves the one proposed residential record, on the map and in the list', s2);
@@ -364,7 +364,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const { ctx, page } = await open(1280, 900);
     await mount(page, bare, ADDRESS);
     const th = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table')].map((t) => [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim()).join('|')));
-    ok(th.length === 2 && th.every((h) => h === 'Development|Stage|Quality-of-Life Impact'), '12j with no distances and no links the table still has exactly three columns, never an extra or a missing one', th);
+    ok(th.length === 3 && th.every((h) => h === 'Development|Stage|Quality-of-Life Impact'), '12j with no distances and no links the table still has exactly three columns, never an extra or a missing one', th);
     await ctx.close();
   }
   {
