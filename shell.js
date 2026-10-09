@@ -1418,10 +1418,26 @@
   // visitor's own (the same never-faked gate the maps use). Idempotent: pages
   // that rebuild their .ph dynamically (development.html) just call it again
   // after painting.
+  //
+  // PAGE TYPE (2026-10-09). A static legal or support page (Privacy, Terms, Refund Policy,
+  // How It Works, About, Contact) has no place subject, so it declares <body data-page-type=
+  // "legal"|"support"> and the line is never drawn there — a signed-in resident's saved
+  // address must not appear under a policy heading. The decision lives HERE, once, so a new
+  // static page declares its type instead of getting its own DOM patch. Product pages declare
+  // nothing and keep the line.
+  const STATIC_PAGE_TYPES = ['legal', 'support'];
+  HS.isStaticPage = function () {
+    return STATIC_PAGE_TYPES.indexOf(document.body.dataset.pageType || '') >= 0;
+  };
   HS.paintWhereLine = async function () {
     try {
       const ph = document.querySelector('#hs-slot .ph');
       if (!ph || document.body.dataset.noWhere != null) return;
+      if (HS.isStaticPage()) {
+        const old = document.getElementById('phWhere');
+        if (old) old.remove();
+        return;
+      }
       let el = document.getElementById('phWhere');
       if (!el || !el.isConnected) {
         el = document.createElement('p');
