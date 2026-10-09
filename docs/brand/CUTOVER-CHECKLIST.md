@@ -15,8 +15,9 @@ plus the engineering gates it unlocks. Nothing here has been done on the founder
 1. **Netlify Free account.** Create it; drag the `homesignal-redirect-site` artifact (workflow `jody-redirect-site`) onto Netlify Drop. Send back the
    `*.netlify.app` address. Then run `python3 scripts/verify_redirect_service.py --base https://<it>.netlify.app --files <folder>`
    (or ask for it): 13 real-HTTP cases. This is the only proof of Netlify's own behaviour. No charge; if Netlify asks for a card, stop.
-2. **jodytracks.com**: confirm you own it and where its DNS lives. Run workflow `jody-dns-audit` and read the log: it reports nameservers, MX, SPF, DMARC, DKIM,
-   registrar and expiry for both domains.
+2. **jodytracks.com**: audit DONE (2026-10-09, see MIGRATION-STATUS "Step 6"): registered at Infomaniak 2026-10-08, DNS at Infomaniak, no web records yet.
+   Confirm it is in YOUR Infomaniak account, and **find which console controls homesignal.net DNS** (nameservers are `*.googledomains.com`, registrar Tucows - not Shopify).
+   Turn on auto-renew for both domains (jodytracks.com expires 2027-10-08, homesignal.net 2027-05-26).
 3. **Where a site for jodytracks.com will be hosted.** GitHub Pages serves ONE custom domain per repo and homesignal.net holds it today.
    The Jody site therefore needs its own host: either a second Pages repo (free) or Netlify Free. Decision: founder. Engineering
    recommendation: Netlify Free for BOTH (Jody site on jodytracks.com, redirect site on homesignal.net) so one workflow publishes both; GitHub Pages stays
@@ -24,8 +25,9 @@ plus the engineering gates it unlocks. Nothing here has been done on the founder
 
 ## C. Email (Step 6 gate; needed before Step 8)
 4. **Resend**: add `jodytracks.com` as a sending domain; it shows the DKIM/SPF records. Add them at the DNS host of jodytracks.com.
-5. **DMARC** `_dmarc.jodytracks.com`: start at `v=DMARC1; p=none; rua=mailto:<a mailbox you read>`; tighten after two clean weeks.
-6. **Mailboxes** `hello@jodytracks.com` and `alerts@jodytracks.com` (receiving): create at the mail host. Infomaniak mail DNS records (MX/SPF) are a founder action.
+5. **DMARC** `_dmarc.jodytracks.com` is ALREADY `v=DMARC1; p=reject;` with no `rua`. Add `rua=mailto:<a mailbox you read>`, and consider `p=none` until Resend is verified and two clean weeks have passed.
+   **Add the Resend DKIM records AND Resend's SPF include to the single existing SPF record (`v=spf1 include:spf.infomaniak.ch -all` today) before any send** - as it stands Resend mail would be rejected.
+6. **Mailboxes** `hello@jodytracks.com` and `alerts@jodytracks.com` (receiving): create at Infomaniak. Its MX and SPF records already exist (audit), so this is a mailbox-creation step only.
 7. Until all of 4-6 are verified, nothing sends from jodytracks.com. The overlay keeps every `@homesignal.net` address on the
    Jody site by design (`brand_stage.py` leaves mailboxes alone) so a resident never gets a dead mailbox.
 

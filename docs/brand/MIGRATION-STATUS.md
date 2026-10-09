@@ -9,7 +9,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 3 Jody staging site | DONE, merged | site #1740 -> `5d769e3`; `jody-staging` ran green on a runner; nothing deployed |
 | 4 SEO migration | tooling merged; real-snapshot parity PASSED (run 37971696362) | see Step 4 |
 | 5 Zero-cost redirect | built + proven offline; host test needs founder's Netlify account | see Step 5 |
-| 6 Integration + rehearsal | not started | |
+| 6 Integration + rehearsal | in progress; DNS/registration audit DONE (run 37978348576) | see Step 6 |
 | 7 Cutover | needs founder GO LIVE | |
 | 8 Email + Bluesky | not started | |
 | 9 Search transition + monitoring | not started | |
@@ -70,4 +70,29 @@ Rule D / Rule F are untouched: the overlay never reads or changes the plane, and
 
 **Alternatives if Netlify Free is refused** (all zero-cost, none chosen silently): Cloudflare free plan redirect rule (needs the domain's nameservers moved - bigger DNS change); a registrar-level 301 forward if the registrar offers one free (cannot serve the DID file, so unsuitable alone). GitHub Pages cannot send a real 301.
 
-**Hard constraint recorded:** do not change DNS for homesignal.net (managed in Shopify) until the founder's GO LIVE; until then GitHub Pages keeps answering.
+**Hard constraint recorded:** do not change DNS for homesignal.net (the audit below shows its nameservers are Google-hosted, not Shopify; the registrar is Tucows) until the founder's GO LIVE; until then GitHub Pages keeps answering.
+
+## Step 6 - DNS and registration audit (2026-10-09, `jody-dns-audit` run 37978348576, read-only, from a GitHub runner)
+
+| | jodytracks.com | homesignal.net |
+|---|---|---|
+| Registrar | Infomaniak Network SA | Tucows Domains Inc. |
+| Registered / expires | 2026-10-08 / **2027-10-08** | 2026-05-26 / **2027-05-26** |
+| Registry status | client transfer prohibited | client transfer + update prohibited |
+| Nameservers (DNS host) | `nsany1/2.infomaniak.com` | `ns-cloud-e1..4.googledomains.com` (Google-hosted DNS) |
+| A / AAAA / www | **none - does not resolve** (curl: could not resolve host) | A `185.199.108.153`, `www` CNAME `homesignalg.github.io` (GitHub Pages, HTTP 200) |
+| MX | `mta-gw.infomaniak.ch` (Infomaniak mail) | Proton (`mail`/`mailsec.protonmail.ch`) |
+| SPF | `v=spf1 include:spf.infomaniak.ch -all` | `v=spf1 include:_spf.protonmail.ch ~all` |
+| DMARC | `v=DMARC1; p=reject;` (no `rua`) | `v=DMARC1; p=none; rua=mailto:dmarc@homesignal.net` |
+| DKIM seen (selectors tried: resend google default selector1 selector2 k1 s1 s2 mail) | none | `resend._domainkey` present |
+| CAA | none | none |
+
+**What this changes (corrections to earlier assumptions):**
+1. **homesignal.net DNS is not in Shopify.** The earlier note ("managed in Shopify") was an assumption and is wrong on this evidence: the nameservers are `*.googledomains.com` and the registrar is Tucows. The GO LIVE step to point homesignal.net at the redirect host is an edit at THAT DNS host (the founder must confirm which console controls it). Nothing was changed.
+2. **jodytracks.com is registered, current and held at Infomaniak (registered yesterday), with working Infomaniak mail DNS and no web records.** I cannot verify from here that the founder's account is the registrant; RDAP shows the registrar, not the owner.
+3. **Mail is already configured at Infomaniak for jodytracks.com**, so receiving `hello@` / `alerts@` there is a mailbox-creation step, not a DNS one.
+4. **Sending as `alerts@jodytracks.com` through Resend will be REJECTED as things stand.** SPF is `-all` listing only Infomaniak, and DMARC is `p=reject`; no Resend DKIM exists. Mail from Resend needs, at Infomaniak DNS: the Resend DKIM CNAME/TXT records, and Resend's SPF include added to the existing SPF record (keep ONE SPF record). With `p=reject` already live, do not send a test before both are in and Resend shows the domain verified. Also add an `rua=` mailbox to the DMARC record so failures are visible.
+5. Both domains expire within 13 months; turn on auto-renew for both (a lapse of homesignal.net would break the redirect AND the immutable `did:web:homesignal.net`).
+6. Proton MX on homesignal.net means existing `@homesignal.net` mailboxes keep working after the redirect; the redirect service must not touch MX records (it only needs the web A/CNAME records).
+
+Not verified (no source available to this session): who the registrant is, the exact DNS console for homesignal.net, Resend's required records for jodytracks.com (shown only in the Resend dashboard), Infomaniak mailbox existence.
