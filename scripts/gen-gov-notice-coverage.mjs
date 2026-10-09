@@ -2,10 +2,11 @@
 // Regenerates lib/generated/gov-notice-coverage.json — the list of canonical ZIP pages
 // that have a Government Notices source wired.
 //
-// WHY THIS READS `alerts` AND NOT `feeds`. public.feeds is the configuration source of
-// truth, but it has RLS enabled with ZERO policies, so the anon key (the only key this
-// repo holds) cannot read it and neither can the browser. `alerts` IS anon-readable, and
-// the two agree exactly: measured 2026-09-04 against the live project, the set of ZIPs
+// WHY THIS READS DELIVERED NOTICES AND NOT `feeds`. public.feeds is the configuration source of
+// truth, but it has RLS enabled with ZERO policies, so the anon key (the only key this repo holds)
+// cannot read it and neither can the browser. Delivered notices ARE anon-readable -- through
+// public.gov_notice_current_communities since 2026-10-09 (base `alerts` was revoked 2026-09-26) --
+// and the two agree exactly: measured 2026-09-04 against the live project, the set of ZIPs
 // whose chain reaches an ACTIVE government_notice feed and the set whose chain reaches a
 // delivered government_notice alert have a symmetric difference of ZERO (6,231 each, of
 // 12,722 canonical). Delivery is also the more conservative predicate for this file's
@@ -48,82 +49,31 @@ async function all(path, select) {
 
 const communities = await all('communities?id=not.is.null', 'id,parent_id,level,zip_codes');
 
-// SOURCE CURRENTNESS (founder ruling 2026-09-06). A community only anchors coverage when
-// it has a CURRENT source: at least one qualifying dated government notice no more than
-// 90 days in the PAST. Applied here so the committed artifact cannot claim coverage that
-// is held up only by stale content — the guarantee is structural, not coincidental.
+// SOURCE CURRENTNESS (founder ruling 2026-09-06): a community only anchors coverage when it has
+// a CURRENT source -- at least one government_notice alert inside the symmetric -90/+90 day window
+// (UTC midnight bounds). THAT DECISION NOW LIVES IN ONE PLACE, THE DATABASE:
+// public.gov_notice_current_communities (docs/gov-notice-current-communities.sql). It returns
+// community_id only. This file no longer carries the window, a date, or a pipeline_type filter, so
+// it cannot drift from the view it reads.
 //
-//   * `gte` and no upper bound (beyond the +730 the ingest guard already enforces before
-//     a row is ever stored): on this corpus the normalized GN date is often the MEETING
-//     date, not the posting date. A strictly-past window marks live agenda-publishing
-//     counties stale. Control measured 2026-09-06: Dorchester SC's live feed returned 103
-//     items whose newest POSTING date was two days old while its stored notice dates are
-//     2026-09-08 and 2026-03-17.
-//   * This is NOT the record-display window. Records 91–365 days old stay displayable on
-//     a current source; nothing here filters what a page shows.
-//   * The engine-side measurement (homesignal-ingest scripts/measure_gov_notices.sql)
-//     additionally requires an ACTIVE government_notice/alerts feed. This generator
-//     cannot: public.feeds has RLS with zero policies, so the anon key sees none of it.
-//     Both give the same membership today; the engine measurement is the stricter of the
-//     two and is the one to trust if they ever diverge.
-const SOURCE_CURRENT_DAYS = 90;
-const currentFloor = new Date(Date.now() - SOURCE_CURRENT_DAYS * 86400000)
-  .toISOString()
-  .slice(0, 10);
-// The window is SYMMETRIC, so the ceiling is the SAME constant mirrored — never a second
-// one. Two numbers can drift apart; one cannot drift from itself. Same UTC date-slice as
-// the floor, so both ends are built identically and a timezone change moves them together.
-const currentCeiling = new Date(Date.now() + SOURCE_CURRENT_DAYS * 86400000)
-  .toISOString()
-  .slice(0, 10);
-// ✅ THE +90 CEILING IS RESTORED — 2026-09-07. It was withheld on purpose, and the reason
-// it was withheld is gone, so this is the change that was promised rather than a loosening.
+// WHY A VIEW AND NOT `alerts`: anon SELECT on `alerts` was revoked 2026-09-26 (Phase 3 of the anon
+// read-surface lockdown), after which this read returned 401 and both workflows that run this file
+// went red. `alerts_public` cannot replace it -- it omits pipeline_type, and category is no
+// substitute ("Stratos data center project" occurs under both news and government_notice).
 //
-// WHAT WAS WRONG: 322 canonical ZIP pages across 17 counties failed the ceiling because of
-// a HomeSignal CONFIGURATION DEFECT, not because their sources were stale. Every one is a
-// CivicClerk feed; the vendor caps a page at ~15 rows regardless of $top, so
-// `$orderby=startDateTime desc` returned only the tenant's far-future tail and the county's
-// current meetings — sitting in the middle of the tenant's history — were unreachable.
-// Applying the ceiling then would have deleted 322 pages of correct coverage to enforce a
-// rule against our own query.
-//
-// WHAT REPAIRED IT: homesignal-ingest PR #480, squash-merged to main 2026-09-07T17:19:32Z as
-// f67959ff7ef78b281fa2e350d92aebaf2b4496ba. adapters/civicclerk.py now bounds the fetch with
-// `$filter=startDateTime le {today+90}`, reading the 90 from
-// ingest.GOV_NOTICE_SOURCE_CURRENT_FUTURE_DAYS so the fetch bound cannot drift from the
-// window it serves.
-//
-// PROOF THE REPAIR REACHED STORED ROWS — ingest.yml run #597 (databaseId 34154189876,
-// workflow_dispatch, dry_run false, head_sha f67959f). Measured on the JOB, never the run:
-// job 101842478462 started 2026-09-07T19:04:59Z, completed 2026-09-07T20:25:11Z, conclusion
-// success, and the three write steps ("Classify news subtopics", "Sync feed inventory",
-// "Refresh & publish acquisition dashboard snapshot") all COMPLETED SUCCESS rather than
-// being skipped — which is what proves dry_run did not take. It wrote 15 in-window notices
-// to each of the 17 counties (10 to Benton WA).
-//
-// GATE 5, measured 2026-09-07 21:11Z: 17 of 17 cohort counties now hold at least one
-// government_notice alert dated inside -90/+90, and 0 of the cohort's 322 ZIP rows remain
-// stale. Cohort frozen in public.gn_civicclerk_window_defect_20260906.
-//
-// MEMBERSHIP IS UNCHANGED BY THIS CEILING, and that was measured BEFORE the edit rather
-// than hoped for afterwards: simulating this generator's own predicate with and without the
-// ceiling returns 7,121 ZIPs both ways, md5 3fa1825f8d5ddde0f3dd230c43e27407 both ways,
-// 0 dropped and 0 added.
-//
-// THE ENGINE SQL ALREADY ENFORCED BOTH ENDS and is NOT edited by this change — quoted here
-// so the two halves can be compared without opening the other repo
-// (homesignal-ingest scripts/measure_gov_notices.sql, current_notice_roots):
-//
-//     and a.published_at::date between current_date - 90 and current_date + 90
-//     and a.published_at::date between current_date - 365 and current_date + 730
-//
-// ⚠️ The second line is the RECORD-ELIGIBILITY window (-365/+730) and is a DIFFERENT
-// contract. Do not merge the two: a CURRENT source legitimately displays qualifying records
-// 91-365 days old, and nothing here filters what a page shows.
-const delivered = await all(
-  `alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}&published_at=lte.${currentCeiling}`,
-  'community_id',
-);
+// The window's history (kept so the reasoning is not lost; the numbers are unchanged):
+//   * gte and no upper bound was the first form: the normalized GN date is often the MEETING date,
+//     so a strictly-past window marks live agenda-publishing counties stale (Dorchester SC control).
+//   * The +90 ceiling was restored 2026-09-07 after homesignal-ingest PR #480 (f67959f) repaired
+//     the CivicClerk fetch that made 17 counties look far-future-only. Membership was unchanged by
+//     it: 7,121 ZIPs both ways, md5 3fa1825f8d5ddde0f3dd230c43e27407.
+//   * This is NOT the record-display window (-365/+730, homesignal-ingest). Records 91-365 days
+//     old stay displayable on a current source; nothing here filters what a page shows.
+//   * The engine-side measurement (homesignal-ingest scripts/measure_gov_notices.sql) additionally
+//     requires an ACTIVE government_notice/alerts feed. This generator cannot: public.feeds has RLS
+//     with zero policies. Both give the same membership; the engine one is stricter and wins if
+//     they ever diverge.
+const delivered = await all('gov_notice_current_communities?community_id=not.is.null', 'community_id');
 
 const kids = new Map();
 for (const c of communities) if (c.parent_id) (kids.get(c.parent_id) || kids.set(c.parent_id, []).get(c.parent_id)).push(c.id);
