@@ -89,7 +89,7 @@ const COPY = [
   'Professional', '$79', '/month', '100 new Development Activity reports each month',
   'Reopen existing reports without using another report.', 'Share existing reports with clients.',
   'Download or print existing reports.', 'Cancel anytime.', 'Join for $79/month',
-  'Brokerage / Enterprise', 'Contact HomeSignal', 'Contact HomeSignal →',
+  'Professional — Individual Agents', 'Start with 10 free reports.', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
   'Know what’s changing before your client asks.',
   'Run Development Activity reports for the properties you’re working on now.',
   'Brokerage or enterprise? Contact us',
@@ -101,7 +101,7 @@ const missing = COPY.filter((c) => !text.includes(c) && !plain.includes(c));
 ok(missing.length === 0, 'every approved sentence, heading, CTA and price string is present verbatim', missing);
 const H1 = (markup.match(/<h1[^>]*>([\s\S]*?)<\/h1>/g) || []);
 ok(H1.length === 1, 'exactly one h1', H1.length);
-ok(/<a class="da-link" href="contact\.html" id="daEnterprise">Contact HomeSignal →<\/a>/.test(src) && /<a class="da-link" href="contact\.html" id="daEnterpriseFinal">Contact us<\/a>/.test(src),
+ok(/<a class="mbtn" href="contact\.html" id="daEnterprise">Request a Custom Quote<\/a>/.test(src) && /<a class="da-link" href="contact\.html" id="daEnterpriseFinal">Contact us<\/a>/.test(src),
   'the Brokerage / Enterprise tier and the closing secondary path are both real links to the existing contact page');
 
 console.log('--- 2b. the prohibitions ---');
@@ -154,7 +154,7 @@ const REMOVED = [
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
 ok((text.match(/\$\d+/g) || []).every((p) => p === '$79') && (text.match(/\$\d+/g) || []).length >= 2, 'the only price on the page is the existing $79/month; no replacement price was invented', text.match(/\$\d+/g));
 ok(/<h3[^>]*>Before a buyer tour<\/h3>/.test(markup) && /<h3[^>]*>Before a listing presentation<\/h3>/.test(markup), 'use cases are concrete transaction moments');
-ok(['Free', 'Professional', 'Brokerage / Enterprise'].every((b) => new RegExp('<p class="da-band">' + b.replace('/', '\\/') + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
+ok(['Free', 'Professional — Individual Agents', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-band">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
 const finalAt = at(/class="da-final"/);
 ok((markup.slice(coverageAt, finalAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
@@ -188,7 +188,7 @@ ok(cta.length === 3 && cta.every((c) => c.cta === 'start-free'),
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)].map((m) => ({ tag: m[0], label: m[1] }));
 ok(joins.length === 1 && joins[0].label === 'Join for $79/month' && /\shref="development-activity-reports\.html#billing"/.test(joins[0].tag) && !/aria-disabled|onclick=/.test(joins[0].tag),
   'Join for $79/month is one live link to the Reports page Billing card (development-activity-reports.html#billing)', joins);
-ok(/Subscribing is for brokerage owners\. HomeSignal sets up brokerage accounts:/.test(text), 'the Join link says plainly who can use it: brokerage owners, whose accounts HomeSignal sets up');
+ok(/Individual real estate agents can subscribe\./.test(text) && !/Subscribing is for brokerage owners/.test(text), 'the Join link says plainly that individual agents can subscribe, and no longer says only brokerage owners can');
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
   'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

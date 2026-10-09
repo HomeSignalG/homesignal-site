@@ -10,7 +10,7 @@
      exist (100126 plan, section 25), so the three "Start free" buttons stay inert (aria-disabled) and sit inside
      a <div data-commerce hidden>. To LAUNCH them: make them live, then remove `hidden` from those three divs.
      Founder, 2026-10-06: "Join for $79/month" is a real link to the Reports page's Billing card
-     (development-activity-reports.html#billing), where an existing brokerage owner signs in and presses Subscribe.
+     (development-activity-reports.html#billing), where the account holder signs in and presses Subscribe.
      The signed checkout is made by manage-billing, never by this page. test/development-activity-landing.test.mjs
      fails if an inert button is visible on an indexable page, or if anything other than the shell's
      Enterprise item links here. -->
@@ -178,7 +178,7 @@
           <p class="da-muted" style="margin-top:14px!important">Individual accounts receive 10 individual evaluation reports. Brokerage evaluation accounts share 10 reports across their invited evaluation users.</p>
         </div>
         <div>
-          <p class="da-band">Professional</p>
+          <p class="da-band">Professional — Individual Agents</p>
           <div class="da-price">$79<small>/month</small></div>
           <p>100 new Development Activity reports each month</p>
           <ul class="da-list">
@@ -186,16 +186,18 @@
             <li>Share existing reports with clients.</li>
             <li>Download or print existing reports.</li>
             <li>Cancel anytime.</li>
+            <li>Start with 10 free reports.</li>
           </ul>
           <p class="da-muted">Recurring monthly subscription, renewing automatically until cancelled. See the <a class="da-link" href="terms.html">Terms of Service</a>, <a class="da-link" href="refund-policy.html">Refund Policy</a> and <a class="da-link" href="privacy.html">Privacy Notice</a>.</p>
           <p><a class="mbtn da-join" href="development-activity-reports.html#billing" id="daJoin" data-cta="join">Join for $79/month</a></p>
-          <p class="da-muted">Subscribing is for brokerage owners. HomeSignal sets up brokerage accounts: <a class="da-link" href="contact.html">contact us</a> to get one.</p>
+          <p class="da-muted">Individual real estate agents can subscribe. Brokerages, teams, and enterprise organizations: see Brokerage &amp; Enterprise custom pricing.</p>
         </div>
         <div>
-          <p class="da-band">Brokerage / Enterprise</p>
-          <div class="da-price da-sm">Contact HomeSignal</div>
-          <p>For a brokerage, team, or organization needing arrangements beyond the standard self-service account.</p>
-          <p><a class="da-link" href="contact.html" id="daEnterprise">Contact HomeSignal →</a></p>
+          <p class="da-band">Brokerage &amp; Enterprise</p>
+          <div class="da-price da-sm">Custom Pricing</div>
+          <p>HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.</p>
+          <p>Contact us to discuss your number of agents, anticipated report volume, and business requirements.</p>
+          <p><a class="mbtn" href="contact.html" id="daEnterprise">Request a Custom Quote</a></p>
         </div>
       </div>
     </section>
