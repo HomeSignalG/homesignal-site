@@ -52,6 +52,7 @@ ALLOWED_LEFTOVER = [
     re.compile(r"did:web:homesignal\.net"),                  # immutable Bluesky identity
     re.compile(r"homesignal-(?:ingest|site|tracker|video|zip-order)[A-Za-z0-9._\-/]*"),
     re.compile(r"homesignalmap[A-Za-z0-9_.\-]*"),            # file names / ids, identical paths
+    re.compile(r"homesignal-page-state"),                    # the page-state schema marker (page_semantics.SCHEMA)
     re.compile(r"homesignal_[a-z_.]+"),                      # database identifiers
     re.compile(r"\(\?:homesignal\\\.net\|"),                       # the dual-origin validator this script writes
     re.compile(r"'@homesignal'|@homesignal'"),                    # iCalendar UID suffix (an identifier)
