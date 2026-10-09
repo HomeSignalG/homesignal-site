@@ -213,7 +213,9 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   ok(pre2.headers.get('access-control-allow-origin') === null, '5b a foreign origin gets no allow-origin header');
   const any = [pre, pre2, await call(f, REQ, { ...AUTH, origin: 'https://evil.example' })];
   ok(any.every((r) => (r.headers.get ? r.headers.get('access-control-allow-origin') : r.headers['access-control-allow-origin']) !== '*'), '5c the allow-origin header is never a wildcard');
-  ok(H.ALLOWED_ORIGINS.join() === 'https://homesignal.net,https://www.homesignal.net', '5d the allowed origins are exactly the two site origins');
+  ok(H.ALLOWED_ORIGINS.join() === 'https://homesignal.net,https://www.homesignal.net,https://jodytracks.com', '5d the allowed origins are exactly the two HomeSignal origins plus the contract-derived (not yet active) Jody origin');
+  const preJody = await h(new Request('https://x/functions/v1/y', { method: 'OPTIONS', headers: { origin: 'https://jodytracks.com' } }));
+  ok(preJody.headers.get('access-control-allow-origin') === 'https://jodytracks.com', '5e the supported Jody origin is echoed, never a wildcard');
 }
 
 // ---- 6. nothing private is ever logged -----------------------------------------------------------------------

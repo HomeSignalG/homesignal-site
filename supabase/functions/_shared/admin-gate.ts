@@ -11,7 +11,10 @@
 //
 // PURE of environment and network: the two reads arrive through `AdminGateDeps`.
 export const MAX_BODY_BYTES = 4096;
-export const ALLOWED_ORIGINS = ['https://homesignal.net', 'https://www.homesignal.net'];
+// Derived from the ONE brand contract (docs/brand/): HomeSignal's origins plus the not-yet-active Jody origin. Supporting an
+// origin here only lets the browser READ this function's answer; who may call it is still decided by identify() below.
+import { BROWSER_ORIGINS } from './brand-origins.generated.ts';
+export const ALLOWED_ORIGINS: string[] = [...BROWSER_ORIGINS];
 
 export type AdminGateDeps = {
   authenticate: (token: string) => Promise<{ email: string; id?: string; confirmed?: boolean } | null>;
