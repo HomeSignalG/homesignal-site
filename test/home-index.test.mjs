@@ -89,7 +89,7 @@ console.log('--- 3. a search hands off to the Development Map (founder, 2026-10-
 ok(!/lib\/landing\.js/.test(idx) && !/HS\.landingFor/.test(idxNoComments), 'index.html no longer loads lib/landing.js or calls HS.landingFor');
 // The ONLY navigations the page script makes are to Map 1, and only from the submit handler.
 const navs = pageScript.match(/location\.(replace|assign)\([^)]*\)|location\.href\s*=[^;]*/g) || [];
-ok(navs.length === 2 && navs.every((n) => /homesignalmap\.html/.test(n)), 'the page script navigates only to homesignalmap.html', navs.join(' | '));
+ok(navs.length === 3 && navs.every((n) => /homesignalmap\.html/.test(n)), 'the page script navigates only to homesignalmap.html (the ZIP, the address, and a link that arrives with an address)', navs.join(' | '));
 ok(/location\.assign\('homesignalmap\.html\?zip=' \+ q\)/.test(pageScript), 'a 5-digit ZIP goes to homesignalmap.html?zip=<zip>');
 ok(/location\.assign\('homesignalmap\.html'\)/.test(pageScript) && /sessionStorage\.setItem\(HANDOFF_KEY, q\)/.test(pageScript),
   'an address goes to homesignalmap.html with the text handed over once in sessionStorage');
@@ -102,14 +102,24 @@ ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.matc
    && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(pageScript),
   'no search touches browser history: the ONE replaceState only removes the #address= fragment (below), and nothing pushes history or sets the hash');
 // A buyer's shared report arrives with the property address in the URL FRAGMENT (2026-10-09, founder: link to the full address).
+// 2026-10-09, later: it must be acted on AS THE PAGE SCRIPT RUNS, not in HS.onReady (which waits for the shell's whole network boot:
+// the visitor sat on the homepage for seconds before being moved).
 {
-  const arrival = (pageScript.match(/var link = [\s\S]*?\n    var f = \$\('homeMapFrame'\)/) || [''])[0];
+  const arrival = (pageScript.match(/var link = [\s\S]*?\n  }\n/) || [''])[0];
+  const onReadyAt = pageScript.indexOf('HS.onReady(function');
+  ok(arrival.length > 200 && pageScript.indexOf('var link = ') < onReadyAt && !/HS\.onReady/.test(arrival),
+    'the arriving address is handled as the page script runs, BEFORE and OUTSIDE HS.onReady (which waits for the shell\'s whole network boot)');
   ok(/\/\^#address=\(\.\+\)\$\/\.exec\(location\.hash/.test(arrival) && !/location\.search|URLSearchParams/.test(arrival.replace("location.pathname + location.search", '')),
     'the address is read from the URL FRAGMENT (#address=), never from the query string: a fragment is not sent to any server');
-  ok(arrival.indexOf('history.replaceState') > -1 && arrival.indexOf('history.replaceState') < arrival.indexOf('submit()'),
-    'the fragment is taken out of the address bar BEFORE the search runs');
-  ok(/wanted\.length >= 8 && wanted\.length <= 200 && !\/\^\\d\{5\}\$\/\.test\(wanted\)/.test(arrival) && /\$\('homeQuery'\)\.value = wanted;\s*submit\(\);/.test(arrival),
-    'only a plausible street address is searched, and through the SAME submit() a typed address uses (the hand-off stays in sessionStorage, never a URL)');
+  ok(arrival.indexOf('history.replaceState') > -1 && arrival.indexOf('history.replaceState') < arrival.indexOf('location.replace('),
+    'the fragment is taken out of the address bar BEFORE the page moves');
+  ok(/wanted\.length <= 200 && searchKind\(wanted\) === 'address'/.test(arrival) && /sessionStorage\.setItem\(HANDOFF_KEY, wanted\)/.test(arrival),
+    'only a plausible street address moves the page, decided by searchKind, and it is handed over in sessionStorage (never a URL)');
+  ok(/function searchKind\(q\)/.test(pageScript) && (pageScript.match(/q\.length < 8/g) || []).length === 1 && /var kind = searchKind\(q\);/.test(pageScript),
+    'ONE rule decides what a query means (ZIP, address, too short): the search box and the arriving link both ask searchKind');
+  const headScript = (read('index.html').match(/<script>[\s\S]*?<\/script>\s*<\/head>/) || [''])[0];
+  ok(/style\.visibility = 'hidden'/.test(headScript) && /#address=/.test(headScript) && /location\.replace\('homesignalmap\.html'\)/.test(arrival),
+    'the document is hidden by a script in the HEAD (before the blocking scripts, so no homepage flash), and the page moves with location.replace so Back returns to the report, not to a page that redirects again');
 }
 ok(!/HS\.data\.isCovered|HS\.findCommunity|HS\.openLoc|openModal|followCommunity|ensureAreaSubscribed|app_follows|app_properties|\.insert\(|saveHome|LS\.set|localStorage/.test(pageScript),
   'no search follows, saves, subscribes, opens the coverage form or writes persistent storage');
