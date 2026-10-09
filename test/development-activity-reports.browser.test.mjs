@@ -1915,6 +1915,7 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok(outside === 0, '14e so does Shift+Tab', outside);
   await page.focus('#auth-back-link');
   await page.keyboard.press('Enter');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block', null, { timeout: 5000 }).catch(() => {});
   ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
   await page.keyboard.press('Escape');
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
