@@ -156,7 +156,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   ok(JSON.stringify(calls[0].body) === JSON.stringify({ address: ADDRESS, view: 'internal' }),
     '2b it sends only the address and the view (no radius: a report is always 0.5 mile; the label, brokerage and agent stay on the page)', calls[0].body);
   const secs = await sections(page);
-  ok(secs[0] === 'What Changed Around This Property' && secs.includes('Development Activity Map') && secs.includes('Permitted / Under Construction') && secs[secs.length - 1] === 'Official evidence & coverage',
+  ok(secs[0] === 'Type and stage' && secs.includes('Nearby Development') && secs.includes('Development Activity Map') && secs[secs.length - 1] === 'Official evidence & coverage',
     '2c the report is drawn by the shared view, in the plan\'s order', secs);
   const head = await page.$eval('#report .da-rv-head', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   ok(head.includes(ADDRESS) && head.includes('Smith buyers') && head.includes('ABC Realty · Pat Agent'), '2d the header carries the typed address, client label, brokerage and agent', head);
@@ -166,7 +166,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   ok(W_INTERNAL.credit.reason === 'INTERNAL_VIEW' && /^The internal view is never charged\./.test(await page.textContent('#creditnote')) && await page.isVisible('#creditnote'),
     '2f2 and that it is never charged (the function\'s credit rule said so)', await page.textContent('#creditnote'));
   await page.click('#report .da-rv-chip[data-da-filter="stage"][data-da-value="proposed"]');
-  const hidden = await page.$$eval('#report .da-rv-sec--approved .da-rv-card', (c) => c.filter((e) => e.hasAttribute('hidden')).length);
+  const hidden = await page.$$eval('#report .da-rv-table tbody tr', (c) => c.filter((e) => e.hasAttribute('hidden')).length);
   ok(hidden > 0, '2g the filters work on this page (the view\'s own controls are wired up)', hidden);
   ok(errors.length === 0 && foreign.length === 0, '2h no page error and no other request', { errors, foreign });
   await ctx.close();
@@ -230,7 +230,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await make(phone.page);
   await settle(phone.page);
   const over = await phone.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-  ok(over <= 0 && (await sections(phone.page)).length > 5, '5b at 390 px the page and the report fit the screen (no sideways scroll)', over);
+  ok(over <= 0 && (await sections(phone.page)).length >= 4, '5b at 390 px the page and the report fit the screen (no sideways scroll)', over);
   await phone.ctx.close();
 }
 
