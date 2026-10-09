@@ -80,9 +80,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 3 && (C.match(/var status = txt\(p\.publisher_status\)/g) || []).length === 2 && (C.match(/line\(STATUS_LABEL, status\)/g) || []).length === 2
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the agency\'s status word is read in the two card builders (printed under its own label) and in ONE function, isDecided, that only asks whether it is Decided');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 5
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker and the table row); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
@@ -145,7 +145,7 @@ const C = code(SRC);
      && (C.match(/opts\.showLifecycle/g) || []).length === 1 && /opts\.showLifecycle === true/.test(C) && !head.includes('opts.showLifecycle') && !bar.includes('opts.showLifecycle'),
     '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
-  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-qol', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
     '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, the filter keys and (build step 8) the action a live button stands for', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
@@ -227,5 +227,17 @@ const C = code(SRC);
 }
 
 ok(/\.da-rv-table thead th\{overflow-wrap:normal;word-break:normal;hyphens:none;white-space:nowrap\}/.test(SRC), '5a a table column heading is never broken inside a word (the page-wide overflow-wrap:anywhere let a narrow print table squeeze "DISTANCE" into "DISTAN / CE" once a Direction column was added)');
+// ---- 8. the quality-of-life rule is ONE function in ONE file (2026-10-09) -------------------------------------------------------------------
+{
+  const rule = (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_TYPE/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
+    '8a the Type-to-impact rule is one function, called once (by the table), reading only the record: no clock, no network, no storage, no randomness, no distance');
+  const dirs = ['lib', 'supabase/functions', 'scripts'], hits = [];
+  const walk = (d) => { for (const f of readdirSync(join(root, d))) { const q = join(d, f); if (statSync(join(root, q)).isDirectory()) { if (f !== 'node_modules') walk(q); } else if (/\.(js|mjs|ts|html|py)$/.test(f) && q !== 'lib/da-report-view.js' && /cooling noise|traffic\/access disruption|Impact not determined/.test(read(q))) hits.push(q); } };
+  dirs.forEach((d) => existsSync(join(root, d)) && walk(d));
+  ok(hits.length === 0 && ['development-activity-reports.html', 'development-activity-review.html', 'shared-report.html'].every((f) => !/cooling noise|traffic\/access disruption/.test(read(f))), '8b no other page, library, function or script carries impact wording: every surface reaches it through HS.daReportView', hits);
+  ok(!/\b(\d+ ?dB|decibel|risk score|quality-of-life score)\b/i.test(C), '8c the view contains no measurement, risk rating or numerical quality-of-life score');
+}
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);
