@@ -1,0 +1,35 @@
+name: jody-staging
+
+# Jody migration, Step 3. Builds the Jody STAGING tree and proves it; DEPLOYS NOTHING.
+# Manual only (no push, no schedule): the tree is uploaded as a workflow artifact for review and is never
+# handed to a Pages deployment, so no public URL, no DNS and no search-engine signal is created.
+# The overlay (scripts/brand_stage.py --staging) makes every page noindex and robots.txt disallow everything.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage the static site, then apply the Jody brand overlay
+        run: |
+          python3 scripts/stage_site.py --src . --out _jody
+          python3 scripts/brand_stage.py --dir _jody --identity jody --staging --report brand-stage-report.json
+      - name: Offline proof of the overlay
+        run: node test/brand-stage.test.mjs
+      - name: Browser proof (Chromium loads the staged tree)
+        run: |
+          npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+          node test/jody-staging.browser.test.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jody-staging-tree
+          path: |
+            _jody
+            brand-stage-report.json
+          retention-days: 14
