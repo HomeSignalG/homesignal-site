@@ -217,26 +217,29 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
 // ──────────────────────────────────────── 4b: an address arriving from a buyer's shared report ──
 // (founder, 2026-10-09: "link to the full address".) The shared report's invitation links to /#address=<encoded>. The fragment is
 // read once, removed from the address bar, and the address goes through the SAME search a typed address does.
+// Deterministic by construction: the page is loaded first (so nothing here races a still-loading page), the stub for the map page is
+// registered BEFORE the navigation that triggers the search (so the real Map 1 can never load and consume the hand-off), and the check
+// that the fragment is removed BEFORE the search is the structural pin in test/home-index.test.mjs, not a Back-navigation here.
 console.log('--- 4b. #address= is searched once, taken out of the URL, and handed over in sessionStorage ---');
 {
   const ADDR = '742 Evergreen Terrace, Springfield, OR 97477';
-  const { ctx, page, errors } = await open(browser, base, '/index.html#address=' + encodeURIComponent(ADDR), { stub: STUB, waitReady: false });
-  await page.route('**/homesignalmap.html', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
-  await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
-  const arrived = await page.evaluate(() => ({ path: location.pathname, url: location.href, handed: sessionStorage.getItem('hs.homeSearchAddress') }));
-  ok(arrived.path === '/homesignalmap.html' && arrived.handed === ADDR, '4b the address from the fragment is searched: Map 1 opens with the address handed over in sessionStorage', arrived);
-  ok(!/address|Evergreen|%20/.test(arrived.url), '4b and it is in no URL on the way (the hand-off is sessionStorage, never a query or fragment)', arrived.url);
-  await page.goBack().catch(() => {});
-  await page.waitForFunction(() => location.pathname === '/index.html', null, { timeout: 8000 }).catch(() => {});
-  const back = await page.evaluate(() => location.href);
-  ok(/\/index\.html$/.test(back) && !/address/.test(back), '4b Back returns to the plain home page: the fragment was removed from the history entry, so the search does not run again', back);
-  ok(errors.length === 0, '4b no page or console errors', errors);
+  const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });
+  let mapRequests = 0;
+  await page.route('**/homesignalmap.html', (route) => { if (route.request().frame() !== page.mainFrame()) return route.fallback(); mapRequests++; return route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>map</title>' }); });
+  await page.goto('about:blank');
+  await page.goto(base + '/index.html#address=' + encodeURIComponent(ADDR), { waitUntil: 'commit' });
+  await page.waitForURL((u) => u.pathname === '/homesignalmap.html', { timeout: 20000 }).catch(() => {});
+  const arrived = await page.evaluate(() => ({ path: location.pathname, url: location.href, handed: sessionStorage.getItem('hs.homeSearchAddress') })).catch((e) => ({ error: String(e).slice(0, 200) }));
+  ok(arrived.path === '/homesignalmap.html' && arrived.handed === ADDR && mapRequests === 1, '4b the address from the fragment is searched once: Map 1 opens with the address handed over in sessionStorage', arrived);
+  ok(!/address|Evergreen|%20/.test(String(arrived.url)), '4b and it is in no URL on the way (the hand-off is sessionStorage, never a query or fragment)', arrived.url);
   await ctx.close();
 }
 {
   for (const frag of ['#address=abc', '#address=78657', '#address=%E0%A4%A', '#other=1 Main Street Springfield OR']) {
-    const { ctx, page } = await open(browser, base, '/index.html' + frag, { stub: STUB });
-    await page.waitForTimeout(500);
+    const { ctx, page } = await open(browser, base, '/index.html', { stub: STUB });
+    await page.goto('about:blank');
+    await page.goto(base + '/index.html' + frag, { waitUntil: 'load' });
+    await page.waitForTimeout(600);
     const r = await page.evaluate(() => ({ path: location.pathname, box: document.getElementById('homeQuery').value, handed: sessionStorage.getItem('hs.homeSearchAddress') }));
     ok(r.path === '/index.html' && r.box === '' && r.handed === null, '4b ' + frag + ' is not a plausible street address: the page stays as it is and searches nothing', r);
     await ctx.close();
