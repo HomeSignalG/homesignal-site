@@ -150,8 +150,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return rt.width > 20 && rt.height > 8 && rs.width >= 12 && rs.height >= 12 && cs.visibility === 'visible' && cs.display !== 'none' && t.textContent.trim().length > 0;
   }));
   ok(vis.length === 8 && vis.every(Boolean), '2f the lifecycle text AND its shape are visible on every card once its detail is open (8 of 8); the rows above show the marker shape without opening anything (2f2)', vis);
-  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('svg.da-rv-shape'), n = r.querySelector('.da-rv-td--num span'); const a = sv && sv.getBoundingClientRect(), b = n && n.getBoundingClientRect(); return !!(a && b && a.width >= 12 && a.height >= 12 && b.width > 4 && /^\d+$/.test(n.textContent.trim())); }));
-  ok(rowsVis.length === 6 && rowsVis.every(Boolean), '2f2 every table row shows its marker shape and map number without opening anything (6 of 6: the eight cards less the two hero rows that sit outside the stage sections)', rowsVis);
+  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('.da-rv-td--stage svg.da-rv-shape'), n = r.querySelector('.da-rv-td--dev .da-rv-sub:not(.da-rv-sub--type):not(.da-rv-sub--src)'); const a = sv && sv.getBoundingClientRect(), b = n && n.getBoundingClientRect(); return !!(a && b && a.width >= 12 && a.height >= 12 && b.width > 4 && /Map \d+/.test(n.textContent)); }));
+  ok(rowsVis.length === 6 && rowsVis.every(Boolean), '2f2 every table row shows its stage shape and its "Map N" number without opening anything (6 of 6: the eight cards less the two hero rows that sit outside the stage sections)', rowsVis);
   const links = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width)]; }));
   const tableLinks = await page.evaluate(() => document.querySelectorAll('.da-rv-table .da-rv-link').length);
   ok(tableLinks > 0 && links.length === 11 + tableLinks && links.every(([h, w]) => h >= 32 && w >= 60), '2g every source link (8 cards, 3 review items, ' + tableLinks + ' table rows) is at least 32px tall and 60px wide on a phone: tappable', links);
@@ -186,7 +186,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     '3a Tab reaches the two hero links, the review links (3), the table links (' + expect.table + '), every filter chip (8), the two "Full official detail" toggles (the Permitted section is empty in this report) and the four actions, one per press, and then leaves the report; the cards inside a closed detail are not tab stops', kinds.join(','));
   ok(inside.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link, chip and action shows a visible focus ring of at least 2px', inside.filter((s) => !(s.outline !== 'none' && s.outlineWidth >= 2)).map((s) => s.kind));
   ok(inside.every((s, i) => i === 0 || s.top >= inside[i - 1].top - 1), '3c focus follows reading order, top to bottom (items in one row share a top)', inside.map((s) => s.top));
-  ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view');
+  ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view', reached.filter((s) => !s.inView));
   // a keyboard user opens a detail with Enter and the next Tab press lands on a card inside it
   await page.focus('.da-rv-sum');
   await page.keyboard.press('Enter');
@@ -323,9 +323,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const det = document.querySelector('.da-rv-sec--proposed .da-rv-detail');
       const card = det.querySelector('.da-rv-card');
       return { display: cs.display, th, headH: Math.round(head.height), rows: t.querySelectorAll('tbody tr').length, cards: det.querySelectorAll('.da-rv-card').length, open: det.open, cardShown: card.checkVisibility({ contentVisibilityAuto: true, checkVisibilityCSS: true }),
-        titles: [...t.querySelectorAll('tbody th[scope=row]')].map((x) => x.textContent.trim()), cardTitles: [...det.querySelectorAll('.da-rv-title')].map((x) => x.textContent.trim()) };
+        titles: [...t.querySelectorAll('tbody th[scope=row] .da-rv-name')].map((x) => x.textContent.trim()), cardTitles: [...det.querySelectorAll('.da-rv-title')].map((x) => x.textContent.trim()) };
     });
-    ok(d.display === 'table' && d.headH > 10 && d.th[0] === 'Map' && d.th[1] === 'Record' && d.th.includes('Official source') && d.rows === 4, '12a on a desktop the stage section opens with a real table: Map, Record, ... Official source, one row per record', d);
+    ok(d.display === 'table' && d.headH > 10 && d.th.join('|') === 'Development|Stage|Quality-of-Life Impact' && d.rows === 4, '12a on a desktop the stage section opens with a real table of exactly three columns: Development, Stage, Quality-of-Life Impact, one row per record', d);
     ok(d.open === false && d.cardShown === false && d.cards === 4 && d.rows === d.cards && d.titles.join('|') === d.cardTitles.join('|'), '12b the cards are in the DOM but collapsed until opened, and the rows list the same records in the same order', [d.open, d.cardShown, d.titles, d.cardTitles]);
     ok(errors.length === 0, '12c no page error and no console error', errors);
     // the filters: a Stage filter takes the other sections' rows, table and detail with it; a Type filter does the same inside a section
@@ -352,8 +352,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
         tops: [...row.children].map((c) => Math.round(c.getBoundingClientRect().top)) };
     });
     ok(m.rowDisplay === 'block' && m.rowW <= m.vw - 20 && m.headW <= 1 && m.headH <= 1 && m.over <= 0, '12f on a phone the table stacks: one block per record, inside the screen, the header row gone from view, no sideways scroll', m);
-    ok(m.labels.includes('Distance:') && m.labels.includes('Type:') && m.labels.includes('Official source:') && !m.labels.includes('Agency stage:') && m.tops.every((t, i) => i === 0 || t >= m.tops[i - 1]),
-      '12g each stacked cell says what it is ("Distance:", "Type:", "Official source:"), a record with no agency stage has no empty "Agency stage:" cell, and the cells run top to bottom', m);
+    ok(m.labels.join('|') === 'Stage:|Quality-of-Life Impact:' && m.tops.every((t, i) => i === 0 || t >= m.tops[i - 1]),
+      '12g on a phone each stacked cell says what it is ("Stage:", "Quality-of-Life Impact:"; the record name is the row heading), and the three run top to bottom', m);
     ok(m.role === 'table' && m.rowRole === 'row' && m.hasRowHeader, '12h the stacked rows keep their table roles (table, row, row header) for screen readers', m);
     ok(errors.length === 0, '12i no page error and no console error on a phone', errors);
     await ctx.close();
@@ -364,7 +364,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const { ctx, page } = await open(1280, 900);
     await mount(page, bare, ADDRESS);
     const th = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table')].map((t) => [...t.querySelectorAll('thead th')].map((x) => x.textContent.trim()).join('|')));
-    ok(th.length === 2 && th.every((h) => !/Distance/.test(h) && !/Official source/.test(h) && /^Map\|Record/.test(h)), '12j a column no record has a value for is left out: no Distance without distances, no Official source without a link', th);
+    ok(th.length === 2 && th.every((h) => h === 'Development|Stage|Quality-of-Life Impact'), '12j with no distances and no links the table still has exactly three columns, never an extra or a missing one', th);
     await ctx.close();
   }
   {
@@ -388,7 +388,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const n = (t, re) => (t.match(re) || []).length;
       ok(tClosed === tOpen && n(tClosed, /Status in HomeSignal's record:/g) >= 6 && !/Full official detail/.test(tClosed),
         '12k printing the report with every detail collapsed on screen prints exactly what it prints with every detail open (the whole report), and not the "Full official detail" toggle', { same: tClosed === tOpen, status: n(tClosed, /Official agency status:/g), toggle: /Full official detail/.test(tClosed) });
-      ok(/MAP\s+RECORD/i.test(tClosed) && n(tClosed, /Official source/g) >= 12, '12l the printed report carries the table (Map, Record ...) and a link line for each record in the table and in its card', [/MAP\s+RECORD/i.test(tClosed), n(tClosed, /Official source/g)]);
+      ok(/DEVELOPMENT\s+STAGE\s+QUALITY-OF-LIFE IMPACT/i.test(tClosed) && n(tClosed, /Official source/g) >= 12 && n(tClosed, /Potential|Impact not determined|Denied or withdrawn:/g) >= 6, '12l the printed report carries the three-column table (Development, Stage, Quality-of-Life Impact), a link line for each record in the table and in its card, and an impact line for every row', [/DEVELOPMENT\s+STAGE\s+QUALITY/i.test(tClosed), n(tClosed, /Official source/g), n(tClosed, /Potential|Impact not determined|Denied or withdrawn:/g)]);
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = false; }));
     }
     await ctx.close();

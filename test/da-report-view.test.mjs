@@ -228,7 +228,7 @@ const htmlLife = viewLife(W);
   ok(attrs(html).every(([k, v]) => !risky.test(k + ' ' + v) || k === 'href'),
     '4e no attribute name or value carries an id, a family, a registry value or a rights word (links excepted)', attrs(html).filter(([k, v]) => risky.test(k + ' ' + v) && k !== 'href').slice(0, 5));
   ok(attrs(html).length > 40, '4e (control) there were attributes to scan (' + attrs(html).length + ')');
-  const ALLOWED_ATTRS = new Set(['class', 'aria-label', 'aria-hidden', 'data-lifecycle', 'href', 'target', 'rel', 'viewBox', 'width', 'height', 'focusable', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'd',
+  const ALLOWED_ATTRS = new Set(['class', 'aria-label', 'aria-hidden', 'data-lifecycle', 'data-da-qol', 'href', 'target', 'rel', 'viewBox', 'width', 'height', 'focusable', 'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'cx', 'cy', 'r', 'x', 'y', 'rx', 'd',
     // the 100526 layout: stage badges, the filters, the map, the action bar
     'data-stage', 'data-da-type', 'data-da-stage', 'data-da-filter', 'data-da-value', 'aria-pressed', 'type', 'role', 'scope', 'transform', 'text-anchor', 'dy', 'aria-disabled', 'hidden']);
   const seen = new Set(Object.values(outputs).flatMap((o) => attrs(o).map(([k]) => k)));
@@ -590,7 +590,7 @@ const htmlLife = viewLife(W);
 // ---- 12. the comparison table (step 15): rows above the cards, which stay below in an expandable detail --------------------------------------------
 {
   const tableOf = (h) => (/<table[\s\S]*?<\/table>/.exec(h) || [''])[0];
-  const rowsOf = (tb) => [...tb.matchAll(/<tr role="row" data-da-type="(\w+)" data-da-stage="(\w+)">([\s\S]*?)<\/tr>/g)].map((m) => ({ type: m[1], stage: m[2], html: m[3], title: decode((/<th scope="row"[^>]*>([^<]*)<\/th>/.exec(m[3]) || [0, ''])[1]) }));
+  const rowsOf = (tb) => [...tb.matchAll(/<tr role="row" data-da-type="(\w+)" data-da-stage="(\w+)">([\s\S]*?)<\/tr>/g)].map((m) => ({ type: m[1], stage: m[2], html: m[3], title: decode((/da-rv-name">([^<]*)</.exec(m[3]) || [0, ''])[1]) }));
   const heads = (tb) => [...tb.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map((m) => decode(m[1]));
   for (const k of ['approved', 'proposed']) {
     const s = sec(html, k), tb = tableOf(s.html), rows = rowsOf(tb), cards = cardsOf(s.html);
@@ -601,28 +601,29 @@ const htmlLife = viewLife(W);
   }
   const none = sec(html, 'permitted');
   ok(!/<table|<details/.test(none.html) && /No projects at this stage in this report\./.test(none.html), '12c an empty stage has no table and no detail, only its honest empty line');
+  const EXACT = 'Development|Stage|Quality-of-Life Impact';
   const ph = heads(tableOf(sec(html, 'proposed').html));
-  ok(ph.join('|') === 'Map|Record|Distance|Direction|Type|Official source', '12d the columns, in order, for records that state a distance, a direction, a Type and a link but no agency stage: Map, Record, Distance, Direction, Type, Official source', ph);
+  ok(ph.join('|') === EXACT, '12d the table has EXACTLY three primary columns, in order: Development, Stage, Quality-of-Life Impact (distance, direction, Type, map number and the official link live inside the Development cell)', ph);
   const stagedW = await wire({ rows: [row('s1', 0.12, FAM_A)], projects: [proj('s1', FAM_A, { name: 'Staged', type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })], ledger: [], events: [], health: [] });
-  ok(heads(tableOf(sec(V.html(stagedW, {}), 'permitted').html)).join('|') === 'Map|Record|Distance|Direction|Type|Agency stage|Official source' && /Under Construction/.test(textOf(tableOf(sec(V.html(stagedW, {}), 'permitted').html))),
-    '12d2 a record that states an agency stage adds the Agency stage column, in the agency\'s own words');
-  // an absent field stays absent: a column no record has a value for is not drawn, and a cell is never a placeholder
+  const stagedT = tableOf(sec(V.html(stagedW, {}), 'permitted').html);
+  ok(heads(stagedT).join('|') === EXACT && /Agency stage: Under Construction/.test(textOf(stagedT)), '12d2 a record that states an agency stage shows it in the Stage cell, in the agency\'s own words, under the engine\'s stage');
+  // an absent field stays absent: no empty column, and a cell is never a placeholder; a record with nothing to say about distance or a link just omits that line
   const bare = clone(W); delete bare.render; bare.report.projects.forEach((p) => { p.source = { url: '', attribution: '' }; p.publisher_stage = null; });
   const hb2 = V.html(bare, {});
   const bh = heads(tableOf(sec(hb2, 'proposed').html));
-  ok(bh.join('|') === 'Map|Record|Type', '12e with no distances, no stage words and no links the table is Map, Record, Type only (no empty columns, no "not stated" cells)', bh);
-  ok(!/not stated|N\/A|&mdash;|—/.test(tableOf(sec(hb2, 'proposed').html)), '12f no placeholder text in any cell');
+  ok(bh.join('|') === EXACT, '12e the three columns never change shape: with no distances, no stage words and no links there are still exactly three, no more and no fewer', bh);
+  ok(!/not stated|N\/A|&mdash;|—|Agency stage:/.test(tableOf(sec(hb2, 'proposed').html)) && !/<a\b/.test(tableOf(sec(hb2, 'proposed').html)), '12f no placeholder text in any cell, and no empty "Agency stage:" or link line');
   // every value in a cell is escaped, and the link is the one validated link
   const hostileT = clone(W); hostileT.report.projects.find((p) => p.project_id === 'k-proposed').name = '<script>alert(1)</script>';
   const ht = V.html(hostileT, {});
-  ok(!/<script/.test(ht) && /<th scope="row"[^>]*>&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/th>/.test(tableOf(sec(ht, 'proposed').html)), '12g a hostile record name is escaped in its table row');
+  ok(!/<script/.test(ht) && /da-rv-name">&lt;script&gt;alert\(1\)&lt;\/script&gt;<\/span>/.test(tableOf(sec(ht, 'proposed').html)), '12g a hostile record name is escaped in its table row');
   const rowLinks = [...tableOf(sec(html, 'proposed').html).matchAll(/<a class="da-rv-link" href="([^"]*)" target="_blank" rel="noopener noreferrer">Official source /g)].map((m) => m[1]);
   ok(rowLinks.length === 4 && rowLinks.every((u) => /^https:\/\/example\.gov\/records\//.test(u)), '12h each row\'s official link is the record\'s own http(s) link, opening in a new tab with noopener noreferrer', rowLinks);
   ok(!/lifecycle|storage|HOLD|registry|family/i.test(textOf(tableOf(sec(html, 'proposed').html))), '12i the table carries no lifecycle line and nothing internal');
   const first = rowsOf(tableOf(sec(html, 'proposed').html))[0];
-  ok(/<svg class="da-rv-shape"/.test(first.html) && />\d+<\/span>/.test(first.html), '12j a row opens with the marker\'s own shape and map number, the same number the map and the card carry', first.html.slice(0, 160));
+  ok(/<svg class="da-rv-shape"/.test(first.html) && /Map \d+/.test(first.html), '12j a row carries the stage\'s own shape and the map number ("Map N"), the same number the map and the card carry', first.html.slice(0, 160));
   // the numbers match the map markers and the cards
-  const nums = [...tableOf(sec(html, 'proposed').html).matchAll(/da-rv-td--num"><svg[^>]*>.*?<\/svg><span>(\d+)<\/span>/g)].map((m) => m[1]);
+  const nums = [...tableOf(sec(html, 'proposed').html).matchAll(/da-rv-td--dev">.*?Map (\d+)</g)].map((m) => m[1]);
   const cardNums = cardsOf(sec(html, 'proposed').html).map((c) => (/Map (\d+)/.exec(c) || [0, ''])[1]);
   ok(nums.length === 4 && nums.join() === cardNums.join(), '12k the map numbers in the rows are the numbers on the cards', [nums, cardNums]);
 }
@@ -694,11 +695,11 @@ const htmlLife = viewLife(W);
   const reopened = clone(WB); delete reopened.render.bearings_deg;
   const hr = V.html(reopened, {});
   ok(!/\bto the (north|south|east|west)/.test(textOf(sec(hr, 'review').html)) && !/<th[^>]*>Direction<\/th>/.test(hr) && !/\bto the (north|south|east|west)/.test(textOf(hr.slice(hr.indexOf('data-da-briefing'), hr.indexOf('<section')))),
-    '14b with no bearing in the response there is no direction anywhere: not in the briefing, the review list or a table column');
+    '14b with no bearing in the response there is no direction anywhere: not in the briefing, the review list or the table');
   // the table column and the review line
   const hd = V.html(WP, {});
   const th = [...tableOf(sec(hd, 'permitted').html).matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map((m) => decode(m[1]));
-  ok(th.includes('Direction') && /<td[^>]*da-rv-td--dir[^>]*><span class="da-rv-lab">Direction: <\/span>North<\/td>/.test(sec(hd, 'permitted').html), '14c a table with bearings has a Direction column, in capitals-first words', th);
+  ok(th.join('|') === 'Development|Stage|Quality-of-Life Impact' && /da-rv-sub">[^<]*\d mi north[^<]*</.test(sec(hd, 'permitted').html), '14c with bearings the direction sits in the Development cell beside the distance (there is no Direction column)', th);
   ok(/0\.1 mi north/.test(textOf(sec(hd, 'review').html)), '14d the review list gives distance and direction together');
   // the map's four letters
   ok(['N', 'E', 'S', 'W'].every((l) => new RegExp('class="da-rv-ringlab">' + l + '</text>').test(hd)), '14e the map carries all four compass letters, not only N');
@@ -792,6 +793,34 @@ const htmlLife = viewLife(W);
   ok(/2 more official records in this report state no stage\./.test(bu) && us && /2 official records/.test(textOf(us.html)) && /Quiet Unknown A/.test(us.html) && /Quiet Unknown B/.test(us.html)
     && /does not state a stage, so HomeSignal does not place these under Approved, Proposed or Permitted/.test(textOf(us.html)), '17h records with no stage are counted in the briefing and listed under "Stage not stated", never in a stage', bu);
 }
+
+// ---- 18: the three-column table and its one quality-of-life rule (2026-10-09) --------------------------------------------------------------------
+{
+  const tableOf = (h) => (/<table[\s\S]*?<\/table>/.exec(h) || [''])[0];
+  const cellsOf = (tb) => [...tb.matchAll(/<tr role="row"[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => ({ dev: (/<th scope="row"[\s\S]*?<\/th>/.exec(m[1]) || [''])[0], stage: (/da-rv-td--stage[\s\S]*?<\/td>/.exec(m[1]) || [''])[0], qol: (/da-rv-td--qol[\s\S]*?<\/td>/.exec(m[1]) || [''])[0] })).filter((c) => c.dev);
+  const Q = V.qolImpact, P = (type, status) => ({ type: { key: type, label: type }, publisher_status: status || 'Approved' });
+  // 18a the rule: deterministic, keyed by the Type key only, always qualified, never a measurement
+  const keys = ['infrastructure', 'datacenter', 'industrial', 'commercial', 'residential', 'civic'];
+  ok(keys.every((k) => Q(P(k)).kind === 'potential' && /(not verified|not site-verified)/i.test(Q(P(k)).text) && /^Potential /.test(Q(P(k)).text)), '18a every supported Type gives a "Potential ..." consideration that says it is not verified');
+  ok(Q(P('infrastructure')).text === 'Potential construction noise and traffic/access disruption. Effects not verified.', '18b road construction gets the approved wording, exactly');
+  ok(/cooling noise/.test(Q(P('datacenter')).text) && /backup-generator/.test(Q(P('datacenter')).text) && /construction traffic/.test(Q(P('datacenter')).text) && /water-demand/.test(Q(P('datacenter')).text) && /no effect is established/.test(Q(P('datacenter')).text), '18c a data center names cooling noise, generators, construction traffic and water demand, and says no effect is established');
+  ok(['other', 'zzz', '', undefined].every((k) => Q(P(k)).kind === 'unknown' && Q(P(k)).text === 'Impact not determined from available records.') && Q({}).kind === 'unknown' && Q(null === 1 ? {} : { type: 'x' }).kind === 'unknown', '18d an Other, unrecognised or missing Type is "Impact not determined from available records."');
+  ok(Q(P('infrastructure', 'Decided')).kind === 'denied_or_withdrawn' && /Denied or withdrawn/.test(Q(P('infrastructure', 'Decided')).text) && !/noise|traffic/.test(Q(P('infrastructure', 'Decided')).text), '18e a denied or withdrawn application is never given construction considerations');
+  ok(JSON.stringify(Q(P('civic'))) === JSON.stringify(Q(P('civic'))) && keys.concat(['other']).every((k) => !/\d|decibel|\bdB\b|score|risk|harm|will |polluti|completion|cost/i.test(Q(P(k)).text)), '18f the rule is deterministic and invents no number, score, risk, pollution, date or cost, and never says an effect will happen');
+  // 18g on the real report: three SR-13-shaped road records, each with the three cells
+  const sr = (id, nm) => proj(id, FAM_A, { name: nm, type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2025-06-02' });
+  const WSR = await wire({ rows: [row('r1', 0.12, FAM_A), row('r2', 0.2, FAM_A), row('r3', 0.3, FAM_A)], projects: [sr('r1', 'SR-13 (Main St) & 100 North'), sr('r2', 'SR-13 (Main St) & 200 North'), sr('r3', 'SR-13 (Main St) & 300 North')], ledger: [], events: [], health: [] });
+  const hs = view(WSR), cs = cellsOf(tableOf(sec(hs, 'permitted').html));
+  ok(cs.length === 3 && cs.every((c) => /Under Construction/.test(textOf(c.stage)) && /Potential construction noise and traffic\/access disruption\. Effects not verified\./.test(textOf(c.qol)) && /Map \d/.test(textOf(c.dev)) && /Official source/.test(c.dev) && /Infrastructure|Roads/i.test(textOf(c.dev))), '18g all three road records appear as rows with Development (name, Type, distance, Map N, official link), Stage and a qualified impact', cs.map((c) => textOf(c.dev)));
+  // 18h a record in no stage is still a row, "Stage not stated", and the filters never hide it
+  const uns = tableOf(sec(view(await wire({ ...RICH, rows: [row('k-p1', 0.2, FAM_A), row('k-unk-a', 0.4, FAM_B)], projects: [proj('k-p1', FAM_A, { name: 'Open Proposal Plaza', type: 'Commercial', status: 'Proposed' }), proj('k-unk-a', FAM_B, { name: 'Quiet Unknown A', type: 'Civic/Public', status: 'On file', date_kind: 'scheduled', submitted_at: '2027-01-01' })], ledger: [], events: [] })), 'unstaged').html);
+  ok(/Quiet Unknown A/.test(uns) && /Stage not stated/.test(uns) && !/data-da-stage/.test(uns) && /Potential/.test(uns) && heads18(uns) === 'Development|Stage|Quality-of-Life Impact', '18h an unstaged record is a three-column row reading "Stage not stated", carrying no filter attribute');
+  // 18i a hostile Type label cannot reach the impact cell (the rule reads the key and writes only its own sentences)
+  const hostile = clone(W); hostile.report.projects.forEach((p) => { p.type = { key: '<img src=x onerror=1>', label: '<b>x</b>' }; });
+  const hh = V.html(hostile, {});
+  ok(!/<img|<b>x/.test(hh) && /Impact not determined from available records\./.test(hh), '18i a hostile Type is escaped and, being unrecognised, is "Impact not determined"');
+}
+function heads18(tb) { return [...tb.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]).join('|'); }
 
 ok(threw === 0, 'Z the view did not throw on any response in any check above (a throw is returned as a marker, so a check that expects an absence cannot pass on it)', threw);
 
