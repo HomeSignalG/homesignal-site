@@ -88,7 +88,7 @@ ok(/process\.on\('uncaughtException'/.test(RT) && /FAIL — the scenario stopped
 const WF = stripYml(read('.github/workflows/report-snapshot-suite.yml'));
 const job = (/\n  launch-gate:\n([\s\S]*?)(?=\n  [a-z][a-z-]*:\n|$)/.exec(WF) || [, ''])[1];
 ok(job.length > 500, '4a the workflow has a launch-gate job (positive control)', job.length);
-ok(/bash test\/launch_gate_pg\/run\.sh/.test(job) && /POSTGRES_DB: dev_change_disposable/.test(job) && /node-version: '22'/.test(job) && /image: postgres:17/.test(job),
+ok(/bash test\/launch_gate_pg\/run\.sh/.test(job) && /POSTGRES_DB: dev_change_disposable/.test(job) && /node-version: '22'/.test(job) && /image: mirror\.gcr\.io\/library\/postgres:17/.test(job),
   '4b it runs the gate against the disposable container on node 22');
 ok(/SUPABASE_DB_URL/.test(job) && /LEMON_SQUEEZY_API_KEY/.test(job) && /exit 1/.test(job) && !/\$\{\{\s*secrets\./.test(job), '4c it refuses to run with a Supabase credential or a processor key present, and takes no repository secret');
 const pr = (/\n  pull_request:\n([\s\S]*?)\n  push:/.exec(WF) || [, ''])[1], push = (/\n  push:\n([\s\S]*?)\n  workflow_dispatch/.exec(WF) || [, ''])[1];

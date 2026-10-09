@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 40
     services:
       postgres:
-        image: postgres:17
+        image: mirror.gcr.io/library/postgres:17
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: individual_disposable
@@ -79,7 +79,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:17
+        image: mirror.gcr.io/library/postgres:17
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: individual_disposable
