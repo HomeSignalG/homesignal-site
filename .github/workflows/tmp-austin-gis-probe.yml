@@ -1,0 +1,24 @@
+name: tmp-austin-gis-probe
+# TEMPORARY, READ-ONLY. Public HTTP GET only. No secrets, no database, no deploy. Branch tmp/austin-gis-probe is never merged.
+on:
+  push:
+    branches: [tmp/austin-gis-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgis:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: probe
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U postgres" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/tmp_austin_gis_probe.py
+        env:
+          PGPASSWORD: probe
