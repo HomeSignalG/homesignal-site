@@ -67,12 +67,29 @@ jobs:
           echo
           echo "distinct SOA serials across servers: $(echo $serials | tr ' ' '\n' | sort -u | grep -c .)  (1 = all agree)"
           echo
-          echo "== 3. Extra names, first authoritative server"
-          first=$(head -1 /tmp/deleg.txt)
+          echo "== 3. Extra names, asked of EVERY authoritative server (a name must read the same on all of them)"
           for n in $NAMES; do
             fq="$n.$DOMAIN"
             echo "--- $fq"
-            for t in CNAME MX TXT; do r=$(dig +norecurse +short +time=5 "$t" "$fq" @"$first" | tr '\n' ' '); [ -n "$r" ] && echo "$t: $r"; done
+            for t in CNAME MX TXT; do
+              prev=""; same=1; out=""
+              while read -r ns; do
+                r=$(dig +norecurse +short +time=5 "$t" "$fq" @"$ns" | sort | tr '\n' ' ')
+                out="$out [${ns%.} = ${r:-<none>}]"
+                [ -n "$prev" ] && [ "$prev" != "$r" ] && same=0
+                prev="$r"
+              done < /tmp/deleg.txt
+              case "$out" in *"= <none>]"*"= <none>]"*) ;; *) echo "$t agree=$([ $same = 1 ] && echo yes || echo NO):$out" ;; esac
+            done
+          done
+          echo
+          echo "== 3b. The same names as PUBLIC recursive resolvers see them (a resolver may still hold a cached 'does not exist' from before the record was added; the zone's negative-cache time is the last SOA field above)"
+          for res in 1.1.1.1 8.8.8.8 9.9.9.9; do
+            echo "--- resolver $res"
+            for n in $NAMES; do
+              fq="$n.$DOMAIN"
+              for t in MX TXT CNAME; do r=$(dig +short +time=5 "$t" "$fq" @"$res" | sort | tr '\n' ' '); [ -n "$r" ] && echo "$fq $t: $r"; done
+            done
           done
           if [ -n "$PROBE" ]; then
             case "$PROBE" in *[!A-Za-z0-9._-]*) echo "bad probe name"; exit 1;; esac
