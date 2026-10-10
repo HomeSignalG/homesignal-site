@@ -3,7 +3,7 @@ name: jody-dns-audit
 # Jody migration, Step 6. READ-ONLY public lookups for the two domains, printed to the job log: nameservers, A/AAAA, MX,
 # TXT (SPF), _dmarc, common DKIM selectors, CAA, registration (RDAP) and a no-follow HEAD of each site. It changes nothing
 # and sends nothing but ordinary DNS/HTTP queries. The output is the evidence the cutover checklist's email section
-# (SPF / DKIM / DMARC for hello@ and alerts@jodytracks.com) is built against. Manual only.
+# (SPF / DKIM / DMARC for info@ and contact@jodytracks.com) is built against. Manual only.
 on:
   workflow_dispatch:
 
