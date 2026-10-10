@@ -27,6 +27,7 @@
 // entry.geographic), $where for the ZIP filter + optional recency window, $limit/$offset
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
+import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
 // THE decision-history authority. Imported rather than restated so the five connectors,
 // the engine and (via test/decision-vocabulary-parity.test.mjs) the page cannot drift
@@ -290,13 +291,15 @@ export interface SocrataRunReport {
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the fetch and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
+  /** true ⇒ the fetch used the polygon-bbox scope (wider than the legacy centroid circle). */
+  scope_widened?: boolean;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
  *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
  *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
  *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
-interface FetchMeta { truncated: boolean; cap: number }
+interface FetchMeta { truncated: boolean; cap: number; widened?: boolean }
 
 export interface SocrataDeps {
   fetch: typeof fetch;
@@ -312,6 +315,10 @@ export interface SocrataDeps {
   /** ZIP centroid of the report being built — required only by entries using
    *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
   zipCentroid?: { lat: number; lng: number } | null;
+  /** Bounding box of the ZIP's canonical polygon (sources/scope-box.ts). When it extends beyond
+   *  the legacy centroid scope, a spatial_zip_radius_mi entry queries the UNION box (within_box)
+   *  instead of the circle, so records inside the polygon are not lost. Absent ⇒ the circle. */
+  zipBounds?: ZipBounds | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -417,15 +424,27 @@ async function runEntry(
   const caseFold = new Map<string, CaseFoldMatch>();
   const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
-  const fetchMeta: FetchMeta = { truncated: false, cap: 0 };
+  let fetchMeta: FetchMeta = { truncated: false, cap: 0 };
   let rows: Record<string, unknown>[];
   try {
     rows = await fetchRows(entry, zip, zipCol, deps, fetchMeta);
+    // NEVER WORSE THAN BEFORE (same rule as arcgis.ts): if widening to the polygon box is what ran
+    // the fetch into the max_rows cap, re-run on the legacy circle and say so.
+    if (fetchMeta.truncated && fetchMeta.widened && deps.zipBounds) {
+      const widenedCap = fetchMeta.cap;
+      fetchMeta = { truncated: false, cap: 0 };
+      rows = await fetchRows(entry, zip, zipCol, { ...deps, zipBounds: null }, fetchMeta);
+      report.quarantined.push({
+        reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid circle for this ZIP`,
+        sample: entry.registry_id,
+      });
+    }
   } catch (e) {
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.dataset_id });
     return { records, report };
   }
   report.fetched = rows.length;
+  if (fetchMeta.widened) report.scope_widened = true;
   // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
   // field, and a quarantine note so it appears wherever quarantines are already read.
   if (fetchMeta.truncated) {
@@ -623,7 +642,7 @@ async function fetchRows(
   const pageSize = deps.pageSize ?? 1000;
   const maxRows = entry.max_rows ?? 20000;
   const ext = entry.geographic ? "geojson" : "json";
-  const where = buildWhere(entry, zip, zipCol, deps.zipCentroid ?? null);
+  const where = buildWhere(entry, zip, zipCol, deps.zipCentroid ?? null, deps.zipBounds ?? null, meta);
   const order = entry.incremental_field || ":id";
 
   const out: Record<string, unknown>[] = [];
@@ -655,10 +674,20 @@ async function fetchRows(
  *  NO ZIP column but a Socrata Point column (entry.spatial_point_col, e.g. Chicago's
  *  `location`) scope via within_circle around the ZIP centroid — the engine's standard
  *  centroid+radius ZIP approximation. Records keep their OWN per-parcel points. */
-function buildWhere(entry: SocrataRegistryEntry, zip: string, zipCol: string, centroid: { lat: number; lng: number } | null): string {
+function buildWhere(
+  entry: SocrataRegistryEntry, zip: string, zipCol: string, centroid: { lat: number; lng: number } | null,
+  bounds: ZipBounds | null = null, meta?: FetchMeta,
+): string {
   const spatial = (entry.spatial_zip_radius_mi ?? 0) > 0 && centroid && entry.spatial_point_col;
+  // Polygon-bbox scope (sources/scope-box.ts): only when the ZIP polygon's box reaches beyond the
+  // legacy centroid scope. Otherwise the query string is byte-for-byte what it always was.
+  const box = spatial && bounds ? scopeBox(centroid, entry.spatial_zip_radius_mi as number, bounds) : null;
+  const widened = !!(box && centroid && widensLegacy(box, centroid, entry.spatial_zip_radius_mi as number));
+  if (widened && meta) meta.widened = true;
   const clauses = [spatial
-    ? `within_circle(${entry.spatial_point_col}, ${centroid.lat}, ${centroid.lng}, ${Math.round((entry.spatial_zip_radius_mi as number) * 1609.34)})`
+    ? (widened && box
+        ? `within_box(${entry.spatial_point_col}, ${box.ymax}, ${box.xmin}, ${box.ymin}, ${box.xmax})`
+        : `within_circle(${entry.spatial_point_col}, ${centroid.lat}, ${centroid.lng}, ${Math.round((entry.spatial_zip_radius_mi as number) * 1609.34)})`)
     : (entry.zip_numeric
         ? `${zipCol}=${zip.replace(/[^0-9]/g, "")}`               // numeric zip column: no upper(), no quotes
         : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`)];

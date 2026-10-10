@@ -31,6 +31,7 @@
 // Types and values are imported separately: Node's type stripping (used by the offline
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
+import { pointInBox, validBounds, type ZipBounds } from "./scope-box.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -109,6 +110,8 @@ export interface CsvRunReport {
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the emit and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
+  /** true ⇒ at least one row was kept only because of the polygon-bbox scope. */
+  scope_widened?: boolean;
 }
 
 export interface CsvDeps {
@@ -118,6 +121,10 @@ export interface CsvDeps {
   >;
   /** ZIP centroid for entries using spatial_zip_radius_mi. */
   zipCentroid?: { lat: number; lng: number };
+  /** Bounding box of the ZIP's canonical polygon (sources/scope-box.ts). A row is kept when it is
+   *  within the legacy radius of the centroid OR inside this box — a strict superset of before.
+   *  Absent/invalid ⇒ the radius test alone. A prefilter; membership stays polygon-based. */
+  zipBounds?: ZipBounds | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -201,7 +208,8 @@ async function runEntry(
       const lat = numOrNull(readCol(r, entry.column_map.lat));
       const lng = numOrNull(readCol(r, entry.column_map.lng));
       if (lat == null || lng == null) { report.skipped_no_coords++; continue; }
-      if (milesBetween(cLat, cLng, lat, lng) <= radius) zipRows.push(r);
+      if (milesBetween(cLat, cLng, lat, lng) <= radius) { zipRows.push(r); continue; }
+      if (validBounds(deps.zipBounds) && pointInBox(lat, lng, deps.zipBounds)) { zipRows.push(r); report.scope_widened = true; }
     }
   }
   report.fetched = zipRows.length;

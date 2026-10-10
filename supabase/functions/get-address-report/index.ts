@@ -73,6 +73,7 @@ import {
   type EchoCallOutcome,
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
+import { zipScopeBounds } from "./sources/zip-bounds.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -631,6 +632,15 @@ async function handleRequest(req: Request): Promise<Response> {
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const communityIds = await resolveCommunityIds(supabase, zip);
+    // Polygon bounding box of this ZIP for the radius-scoped connectors (sources/scope-box.ts).
+    // Fail-safe: null ⇒ the legacy centroid scope, i.e. what ran before this read existed.
+    // STAGED ROLLOUT SWITCH: the rolling refresh re-fetches every ZIP every ~53 h, so deploying this
+    // code with the scope ON would be a national re-fetch by another name. It ships OFF: the
+    // function secret ZIP_SCOPE_BOUNDS=1 turns it on for every ZIP; a request may opt in/out for a
+    // targeted canary with {"scope_bounds": true|false}, which wins over the secret.
+    const scopeOn = typeof body.scope_bounds === "boolean" ? body.scope_bounds : Deno.env.get("ZIP_SCOPE_BOUNDS") === "1";
+    const scope = scopeOn ? await zipScopeBounds(supabase, zip) : { bounds: null, reason: "polygon-bbox scope disabled (ZIP_SCOPE_BOUNDS)" };
+    if (scopeOn && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
     // FRS ladder. Core still throws on failure (the refresh layer keeps the previous cached
@@ -701,6 +711,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
+      zipBounds: scope.bounds,
       noteFence,
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
@@ -716,6 +727,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // ZIP centroid for entries using spatial_zip_radius_mi (layers with no ZIP attribute) —
       // the engine's standard centroid+radius ZIP approximation; records keep their own points.
       zipCentroid: { lat: clat, lng: clng },
+      zipBounds: scope.bounds,
       noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
@@ -745,6 +757,7 @@ async function handleRequest(req: Request): Promise<Response> {
         return { lat: g.lat, lng: g.lng, match_type: g.match_type, matched_address: g.matched_address, geocode_source: g.geocode_source, needs_review: g.needs_review };
       },
       zipCentroid: { lat: clat, lng: clng },
+      zipBounds: scope.bounds,
       noteFence,
     });
     // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals
