@@ -1,0 +1,287 @@
+{
+ "old_045": [
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C17-2017-0128.SH",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.23401757524805136,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24808151,
+   "marker_lng": -97.77390624,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2024-0397C",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.3053751851686153,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24453868,
+   "marker_lng": -97.78188145,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:86-10-0341",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.4876032252893104,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24039662,
+   "marker_lng": -97.78187685,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2025-0039",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.4933977973261155,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24530869,
+   "marker_lng": -97.76893033,
+   "has_more": false
+  }
+ ],
+ "new_045": [
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-00-2130",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.16838157795350153,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.2437128,
+   "marker_lng": -97.77687613,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2026-0102CSL",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.18292894295439632,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24352679,
+   "marker_lng": -97.77761596,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C17-2017-0128.SH",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.23401757524805136,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24808151,
+   "marker_lng": -97.77390624,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2024-0397C",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.3053751851686153,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24453868,
+   "marker_lng": -97.78188145,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2026-0155D",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.311974841053249,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24429006,
+   "marker_lng": -97.78188099,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2015-0047",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.32863866115013324,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24498917,
+   "marker_lng": -97.77179295,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2016-0039",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.38552441400968346,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.243383,
+   "marker_lng": -97.77151879,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-04-0140",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.434928743183558,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24891449,
+   "marker_lng": -97.7705864,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2026-0279C",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.44891207653553244,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.23963078,
+   "marker_lng": -97.77712356,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:86-10-0341",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.4876032252893104,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24039662,
+   "marker_lng": -97.78187685,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2025-0039",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.4933977973261155,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24530869,
+   "marker_lng": -97.76893033,
+   "has_more": false
+  }
+ ],
+ "old_055": [
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C17-2017-0128.SH",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.19529401600900737,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24808151,
+   "marker_lng": -97.77390624,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2024-0397C",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.35400443458328357,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24453868,
+   "marker_lng": -97.78188145,
+   "has_more": false
+  }
+ ],
+ "new_055": [
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C17-2017-0128.SH",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.19529401600900737,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24808151,
+   "marker_lng": -97.77390624,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-00-2130",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.26789738123732404,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.2437128,
+   "marker_lng": -97.77687613,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2026-0102CSL",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.28184398877430805,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24352679,
+   "marker_lng": -97.77761596,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2024-0397C",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.35400443458328357,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24453868,
+   "marker_lng": -97.78188145,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:mavg-96ck:SP-2026-0155D",
+   "feature_id": "pt:1",
+   "registry_id": "austin-site-plan-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.3644314769247594,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24429006,
+   "marker_lng": -97.78188099,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2015-0047",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.36589202627903045,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24498917,
+   "marker_lng": -97.77179295,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-04-0140",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.4013588470768214,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.24891449,
+   "marker_lng": -97.7705864,
+   "has_more": false
+  },
+  {
+   "source_key": "socrata:data.austintexas.gov:edir-dcnf:C14-2016-0039",
+   "feature_id": "pt:1",
+   "registry_id": "austin-zoning-cases",
+   "provenance": "proven_stored_point",
+   "distance_mi": 0.44336962691630877,
+   "geometry_type": "ST_Point",
+   "marker_lat": 30.243383,
+   "marker_lng": -97.77151879,
+   "has_more": false
+  }
+ ],
+ "subject_045": 30.246147796654597,
+ "subject_055": 30.24759602257784
+}

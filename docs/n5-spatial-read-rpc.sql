@@ -104,6 +104,40 @@
 --      it conveys nothing.
 --
 -- ----------------------------------------------------------------------------
+-- REVISION 4 (2026-10-10) — THE SERVING GENERATION'S STORED POINTS ARE CANDIDATES TOO.
+-- Revisions 1-3 read geo.n5_geom only. Its `proven_stored_point` rows are the FROZEN
+-- phase-1 snapshot (verdict_snapshot_id = phase1-2026-09-01, written 2026-09-03 and
+-- never refreshed), while the daily-built serving generation that Map 1's ZIP mode and
+-- the ZIP pages read keeps its own verified points for every project captured since, in
+-- geo.n5_gen_proven_point. So a project filed after 2026-09-01 was drawn on Map 1 and
+-- NEVER returned here — which is the radius read the Development Activity report is
+-- built on. Measured 2026-10-10 against production (generation n5-national-2026-10-10):
+-- 724,721 generation points, 78,301 with no admitted n5_geom row, 0 of those carrying a
+-- generation reject verdict; by lifecycle Approved 58,394 / Operating 8,130 / Proposed
+-- 7,575 / Decided 4,257. Real example: Austin site-plan case SP-2026-0279C
+-- ("Lightsey Residences", Proposed / In Review, filed 2026-09-01) sat at distance 0 from
+-- its own coordinate and was not returned at 0.5 mi.
+--
+-- THE RULE ADDED, and nothing else: a generation point is returned when
+--     * its generation is the ACTIVE one (n5_generation_one_serving makes that unique;
+--       ACTIVE_LEGACY owns no geo.n5_gen_proven_point rows, so it adds nothing),
+--     * the project has NO admitted row in geo.n5_geom — so every row revision 3
+--       returned is still returned, unchanged, and none is replaced or duplicated,
+--     * it is not in geo.n5_point_reject and carries no geo.n5_generation_key_verdict
+--       for that generation (the generation's own reject record).
+-- It is the SAME evidence class as the snapshot point (`proven_stored_point`: one
+-- distinct stored coordinate of a PROVEN registry — geo.n5_gen_prepare_publish applies
+-- exactly the phase-1 rule), at feature_id 'pt:1', and is labelled so. No new admission
+-- rule, no new vocabulary, no second distance calculation: the same ST_DWithin over the
+-- same geography cast, the same marker derivation, the same ordering and limit.
+-- The return type is unchanged, so this is a plain CREATE OR REPLACE and the grants
+-- survive; the DROP below is kept so the file stays re-appliable from any revision.
+--
+-- Map 1's address mode calls this function too, so it gains the same projects its ZIP
+-- mode already draws. That is the intended effect: both surfaces answer from the
+-- serving generation, which is what Map 1 states.
+--
+-- ----------------------------------------------------------------------------
 -- WHY geo.n5_geom AND NOT app_projects
 -- `app_projects` stores ONE representative lat/lng per row. Authoritative source
 -- geometry here is polygons and polylines, so no view over a representative point
@@ -357,6 +391,7 @@ declare
   -- The eligible provenance classes, named positively (founder decision above).
   v_prov      constant text[] := array['proven_stored_point','recovered_authoritative'];
   v_snapshot  text;
+  v_gen       text;   -- revision 4: the ACTIVE serving generation, NULL when none or legacy
   v_meters    double precision;
   v_home4326  geometry;
   v_home4269  geometry;
@@ -416,6 +451,14 @@ begin
         using errcode = '55000';
   end;
 
+  -- ---- REVISION 4. The serving generation whose stored points are also candidates.
+  -- n5_generation_one_serving guarantees at most one ACTIVE/ACTIVE_LEGACY row, so this
+  -- cannot match twice. Nothing serving, or only ACTIVE_LEGACY, leaves v_gen NULL and the
+  -- function behaves exactly as revision 3.
+  select gen.generation_id into v_gen
+    from geo.n5_generation gen
+   where gen.state = 'ACTIVE';
+
   v_meters   := p_radius_mi::double precision * 1609.344;
   v_home4326 := st_setsrid(st_makepoint(p_lng, p_lat), 4326);
   v_home4269 := st_transform(v_home4326, 4269);
@@ -436,13 +479,17 @@ begin
   -- referenced twice and must be computed exactly once.
   return query
   with hit as materialized (
+   select u.source_key, u.feature_id, u.registry_id, u.provenance,
+          u.distance_mi, u.geometry_type, u.src
+     from (
     select g.source_key   as source_key,
            g.feature_id   as feature_id,
            g.registry_id  as registry_id,
            g.provenance   as provenance,
            st_distance(st_transform(g.geom, 4326)::geography,
                        v_home4326::geography) / 1609.344 as distance_mi,
-           st_geometrytype(g.geom) as geometry_type
+           st_geometrytype(g.geom) as geometry_type,
+           'n5_geom'::text as src
       from geo.n5_geom g
      where g.outcome = 1                        -- positive allowlist; fails closed
        and g.geom is not null
@@ -469,8 +516,42 @@ begin
        -- exact answer on the TRUE geometry, in metres
        and st_dwithin(st_transform(g.geom, 4326)::geography,
                       v_home4326::geography, v_meters)
-     order by distance_mi, source_key, feature_id
-     limit p_limit + 1
+    union all
+    -- ---- REVISION 4: the serving generation's verified stored points for projects
+    -- geo.n5_geom does not already admit. See the REVISION 4 block above.
+    select pp.source_key  as source_key,
+           'pt:1'::text   as feature_id,
+           pp.registry_id as registry_id,
+           'proven_stored_point'::text as provenance,
+           st_distance(st_transform(pp.geom, 4326)::geography,
+                       v_home4326::geography) / 1609.344 as distance_mi,
+           st_geometrytype(pp.geom) as geometry_type,
+           'generation'::text as src
+      from geo.n5_gen_proven_point pp
+     where v_gen is not null
+       and pp.generation_id = v_gen
+       and pp.geom is not null
+       -- a project n5_geom already admits keeps exactly the row(s) it had
+       and not exists (select 1 from geo.n5_geom g2
+                        where g2.source_key = pp.source_key
+                          and g2.outcome = 1
+                          and g2.geom is not null
+                          and g2.provenance = any (v_prov)
+                          and (g2.provenance = 'recovered_authoritative'
+                               or g2.verdict_snapshot_id = v_snapshot))
+       -- defence in depth, as for the snapshot point: a rejected identity's stored
+       -- coordinate never enters a radius result
+       and not exists (select 1 from geo.n5_point_reject r
+                        where r.source_key = pp.source_key)
+       and not exists (select 1 from geo.n5_generation_key_verdict kv
+                        where kv.generation_id = pp.generation_id
+                          and kv.source_key = pp.source_key)
+       and pp.geom && st_expand(v_home4269, v_deg_lng, v_deg_lat)
+       and st_dwithin(st_transform(pp.geom, 4326)::geography,
+                      v_home4326::geography, v_meters)
+     ) u
+    order by u.distance_mi, u.source_key, u.feature_id
+    limit p_limit + 1
   ),
   -- ---- PAGE. The caller's page, fixed BEFORE any marker work happens, so marker
   -- derivation is bounded by p_limit and can never touch a row that was filtered out.
@@ -480,7 +561,8 @@ begin
            h.registry_id  as registry_id,
            h.provenance   as provenance,
            h.distance_mi  as distance_mi,
-           h.geometry_type as geometry_type
+           h.geometry_type as geometry_type,
+           h.src          as src
       from hit h
      order by h.distance_mi, h.source_key, h.feature_id
      limit p_limit
@@ -491,18 +573,26 @@ begin
   part as (
     select p.source_key, p.feature_id, p.registry_id, p.provenance,
            p.distance_mi, p.geometry_type,
-           g.geom              as g_geom,
-           geometrytype(g.geom) as g_type,
+           cg.geom              as g_geom,
+           geometrytype(cg.geom) as g_type,
            lp.geom             as principal
       from page p
       left join geo.n5_geom g
-             on g.source_key = p.source_key
+             on p.src = 'n5_geom'
+            and g.source_key = p.source_key
             and g.feature_id = p.feature_id
+      -- revision 4: a generation row's geometry is read from the generation's own point,
+      -- by the (generation, source_key) key it was returned under — never from n5_geom
+      left join geo.n5_gen_proven_point pp
+             on p.src = 'generation'
+            and pp.generation_id = v_gen
+            and pp.source_key = p.source_key
+      left join lateral (select coalesce(g.geom, pp.geom) as geom) cg on true
       left join lateral (
         select d.geom
-          from st_dump(g.geom) d
-         where geometrytype(g.geom) in ('LINESTRING','MULTILINESTRING','POLYGON','MULTIPOLYGON')
-         order by case when geometrytype(g.geom) in ('POLYGON','MULTIPOLYGON')
+          from st_dump(cg.geom) d
+         where geometrytype(cg.geom) in ('LINESTRING','MULTILINESTRING','POLYGON','MULTIPOLYGON')
+         order by case when geometrytype(cg.geom) in ('POLYGON','MULTIPOLYGON')
                        then st_area(d.geom)
                        else st_length(d.geom)
                   end desc,

@@ -208,7 +208,7 @@ def main():
     plain = conn.cursor()
 
     print("=" * 78)
-    print("N5 SPATIAL READ RPC — EXECUTABLE CONTRACT SUITE (revision 3)")
+    print("N5 SPATIAL READ RPC — EXECUTABLE CONTRACT SUITE (revision 4)")
     ver = q(plain, "select version(), postgis_full_version();")[0]
     print("server : %s" % ver[0].split(",")[0])
     print("postgis: %s" % ver[1].split(" ")[0:3])
@@ -694,6 +694,157 @@ def main():
     restored = call(cur, radius=5, limit=500)
     check("restoring the shipped DDL restores the exact row count",
           len(restored) == len(full), (len(restored), len(full)))
+
+    # ======================================================================
+    # REVISION 4 — the serving generation's verified stored points are candidates too.
+    # Every assertion above ran with the three generation tables EMPTY, which is the
+    # proof that revision 4 changes nothing until a generation is serving.
+    # ======================================================================
+    print("-" * 78)
+    print("REVISION 4 — serving-generation stored points")
+    plain.execute(ddl_exec)
+    set_manifest(plain, "READY", True)
+    seed(plain)
+    DEG_PER_MI = 1.0 / 69.05   # north-south: one mile is this many degrees of latitude
+
+    def north(mi):
+        return HOME_LAT + mi * DEG_PER_MI
+
+    def gen_pt(g, key, lat, lng, reg="reg:gen"):
+        plain.execute("insert into geo.n5_gen_proven_point (generation_id, source_key, registry_id, geom)"
+                      " values (%s,%s,%s, st_transform(st_setsrid(st_makepoint(%s,%s),4326),4269));",
+                      (g, key, reg, lng, lat))
+
+    plain.execute("delete from geo.n5_gen_proven_point; delete from geo.n5_generation_key_verdict;"
+                  " delete from geo.n5_generation;")
+    plain.execute("insert into geo.n5_generation (generation_id, state) values ('g-old','SUPERSEDED'),('g-now','ACTIVE');")
+
+    before = {(r["source_key"], r["feature_id"]) for r in call(cur, radius=5, limit=2000)}
+
+    # ~0.45 mi and ~0.55 mi due north of the home point: a NEW project (no n5_geom row)
+    gen_pt("g-now", "proj:gen045", north(0.45), HOME_LNG)
+    gen_pt("g-now", "proj:gen055", north(0.55), HOME_LNG)
+    # a project n5_geom ALREADY admits (snapshot point 'proj:near', ~82 m east): the generation
+    # carries a DIFFERENT coordinate for it, 0.3 mi north. It must not be added or replace the row.
+    gen_pt("g-now", "proj:near", north(0.30), HOME_LNG)
+    # identities the generation or the corpus has rejected
+    gen_pt("g-now", "proj:genreject", north(0.20), HOME_LNG)
+    plain.execute("insert into geo.n5_point_reject (source_key, reason, verdict_snapshot_id)"
+                  " values ('proj:genreject','MULTI_COORD_UNRESOLVED',%s);", (SNAP,))
+    gen_pt("g-now", "proj:genverdict", north(0.21), HOME_LNG)
+    plain.execute("insert into geo.n5_generation_key_verdict (generation_id, source_key, verdict)"
+                  " values ('g-now','proj:genverdict','MULTI_COORD_UNRESOLVED');")
+    # a point held only by a SUPERSEDED generation
+    gen_pt("g-old", "proj:genold", north(0.22), HOME_LNG)
+
+    rows5 = call(cur, radius=0.5, limit=2000)
+    by = {r["source_key"]: r for r in rows5}
+    check("R4 a project only the serving generation knows, ~0.45 mi away, IS returned at 0.5 mi",
+          "proj:gen045" in by, sorted(by))
+    if "proj:gen045" in by:
+        g = by["proj:gen045"]
+        check("R4 its distance is the true distance (0.45 mi +/- 0.01)",
+              abs(g["distance_mi"] - 0.45) < 0.01, g["distance_mi"])
+        check("R4 it is labelled for what it is: proven_stored_point at feature pt:1, ST_Point",
+              (g["provenance"], g["feature_id"], g["geometry_type"]) == ("proven_stored_point", "pt:1", "ST_Point"),
+              (g["provenance"], g["feature_id"], g["geometry_type"]))
+        check("R4 its marker is its own coordinate (a point IS its marker), not NULL",
+              g["marker_lat"] is not None and abs(g["marker_lat"] - north(0.45)) < 1e-6
+              and abs(g["marker_lng"] - HOME_LNG) < 1e-6, (g["marker_lat"], g["marker_lng"]))
+    check("R4 ~0.55 mi is OUTSIDE a 0.5 mi radius", "proj:gen055" not in by, sorted(by))
+    one = {r["source_key"] for r in call(cur, radius=1, limit=2000)}
+    check("R4 the same ~0.55 mi project IS returned at 1 mi (so the 0.5 exclusion is the distance, nothing else)",
+          "proj:gen055" in one, sorted(one))
+    near_rows = [r for r in call(cur, radius=5, limit=2000) if r["source_key"] == "proj:near"]
+    check("R4 a project n5_geom already admits keeps exactly one row (no duplicate, no replacement)",
+          len(near_rows) == 1, near_rows)
+    near_row = near_rows[0]
+    check("R4 ...and that row is still the SNAPSHOT point (~82 m), not the generation's 0.3 mi coordinate",
+          near_row["distance_mi"] < 0.1, near_row["distance_mi"])
+    check("R4 a key in geo.n5_point_reject is not admitted through the generation",
+          "proj:genreject" not in by)
+    check("R4 a key with a generation reject verdict is not admitted",
+          "proj:genverdict" not in by)
+    check("R4 a point held only by a SUPERSEDED generation is not admitted", "proj:genold" not in by)
+    after = {(r["source_key"], r["feature_id"]) for r in call(cur, radius=5, limit=2000)}
+    check("R4 ADDITIVE: every row returned before is still returned (5 mi, full fixture)",
+          before <= after, sorted(before - after))
+    check("R4 ...and the only additions are generation projects",
+          {k for k, _ in (after - before)} == {"proj:gen045", "proj:gen055"}, sorted(after - before))
+    ordered = call(cur, radius=5, limit=2000)
+    check("R4 ordering stays nearest-first across both candidate classes",
+          [r["distance_mi"] for r in ordered] == sorted(r["distance_mi"] for r in ordered))
+    lim = call(cur, radius=5, limit=3)
+    check("R4 p_limit/has_more are honoured over the combined set",
+          len(lim) == 3 and all(r["has_more"] for r in lim), len(lim))
+
+    # ACTIVE_LEGACY (the pre-generation serving state) and NO serving generation add nothing
+    plain.execute("update geo.n5_generation set state='SUPERSEDED' where generation_id='g-now';"
+                  " update geo.n5_generation set state='ACTIVE_LEGACY' where generation_id='g-old';")
+    legacy = {r["source_key"] for r in call(cur, radius=5, limit=2000)}
+    check("R4 with only an ACTIVE_LEGACY generation serving, nothing is added (behaves as revision 3)",
+          legacy == {k for k, _ in before}, sorted(legacy ^ {k for k, _ in before}))
+    plain.execute("update geo.n5_generation set state='SUPERSEDED';")
+    none_srv = {r["source_key"] for r in call(cur, radius=5, limit=2000)}
+    check("R4 with NO serving generation, nothing is added (behaves as revision 3)",
+          none_srv == {k for k, _ in before})
+    plain.execute("update geo.n5_generation set state='ACTIVE' where generation_id='g-now';")
+    check("R4 a second serving generation is impossible (the one-serving index holds)",
+          raises(plain, "update geo.n5_generation set state='ACTIVE' where generation_id='g-old';")[0])
+
+    # the lifecycle gate still governs: no consumable snapshot -> refuse, generation or not
+    set_manifest(plain, "READY", False)
+    check("R4 the snapshot lifecycle gate still refuses mid-sweep",
+          raises(cur, "select * from public.n5_projects_within_radius(%s,%s,0.5,10)",
+                 (HOME_LAT, HOME_LNG))[0])
+    set_manifest(plain, "READY", True)
+
+    # --- NEGATIVE CONTROLS for revision 4 (each mutation must be DETECTED) ---
+    # (1) drop the "n5_geom already admits it" clause -> the project is returned twice
+    m1 = ddl_exec.replace("""       and not exists (select 1 from geo.n5_geom g2
+                        where g2.source_key = pp.source_key
+                          and g2.outcome = 1
+                          and g2.geom is not null
+                          and g2.provenance = any (v_prov)
+                          and (g2.provenance = 'recovered_authoritative'
+                               or g2.verdict_snapshot_id = v_snapshot))
+""", "")
+    check("R4 mutation 1 actually changed the DDL", m1 != ddl_exec)
+    plain.execute(m1)
+    dup = [r for r in call(cur, radius=5, limit=2000) if r["source_key"] == "proj:near"]
+    check("R4 dropping the n5_geom guard is DETECTED (the admitted project is returned twice)",
+          len(dup) == 2, len(dup))
+    plain.execute(ddl_exec)
+    # (2) drop the generation filter -> a superseded generation's point leaks
+    m2 = ddl_exec.replace("and pp.generation_id = v_gen\n       and pp.geom is not null", "and pp.geom is not null")
+    check("R4 mutation 2 actually changed the DDL", m2 != ddl_exec)
+    plain.execute(m2)
+    leak = {r["source_key"] for r in call(cur, radius=0.5, limit=2000)}
+    check("R4 dropping the generation filter is DETECTED (a superseded generation's point leaks)",
+          "proj:genold" in leak, sorted(leak))
+    plain.execute(ddl_exec)
+    # (3) drop the generation-aware marker join -> the new row loses its marker
+    m3 = ddl_exec.replace("left join lateral (select coalesce(g.geom, pp.geom) as geom) cg on true",
+                          "left join lateral (select g.geom as geom) cg on true")
+    check("R4 mutation 3 actually changed the DDL", m3 != ddl_exec)
+    plain.execute(m3)
+    nm = {r["source_key"]: r for r in call(cur, radius=0.5, limit=2000)}
+    check("R4 dropping the generation-aware geometry source is DETECTED (marker becomes NULL)",
+          nm["proj:gen045"]["marker_lat"] is None, nm["proj:gen045"])
+    plain.execute(ddl_exec)
+    # (4) drop the verdict guard
+    m4 = ddl_exec.replace("""       and not exists (select 1 from geo.n5_generation_key_verdict kv
+                        where kv.generation_id = pp.generation_id
+                          and kv.source_key = pp.source_key)
+""", "")
+    check("R4 mutation 4 actually changed the DDL", m4 != ddl_exec)
+    plain.execute(m4)
+    lv = {r["source_key"] for r in call(cur, radius=0.5, limit=2000)}
+    check("R4 dropping the generation reject-verdict guard is DETECTED", "proj:genverdict" in lv, sorted(lv))
+    plain.execute(ddl_exec)
+    ok2 = {r["source_key"] for r in call(cur, radius=0.5, limit=2000)}
+    check("R4 restoring the shipped DDL restores the result",
+          "proj:genverdict" not in ok2 and "proj:genold" not in ok2 and "proj:gen045" in ok2, sorted(ok2))
 
     print("=" * 78)
     print("TOTAL %d  PASS %d  FAIL %d" % (_n, _pass, _fail))
