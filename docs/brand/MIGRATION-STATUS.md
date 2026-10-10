@@ -11,7 +11,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 5 Zero-cost redirect | built + proven by simulation only; real-HTTP provider test workflow written (`jody-redirect-verify`), needs a Netlify token | see Step 5 |
 | 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
 | 7 Cutover | NOT READY: gates G1/G2/G3/G7/G8 open (see Launch readiness); needs founder GO LIVE | `docs/brand/CUTOVER-CHECKLIST.md` |
-| 8 Email + Bluesky | not started | |
+| 8 Email + Bluesky | Resend domain jodytracks.com VERIFIED (2026-10-10 18:41Z); nothing sent, no outreach, Bluesky untouched | see "Resend verified" below |
 | 9 Search transition + monitoring | not started | |
 
 ## Step 2 — what "supported" means, decided from the inventory (2026-10-09)
@@ -107,3 +107,12 @@ Verdict: **NOT READY. GO LIVE not executed.** Open gates: G1 (authoritative DNS 
 **Resend records for jodytracks.com** (ingest run 38011246891, `resend-domain-records`, action=list): domain exists, `status=not_started`, receiving not enabled. sha256 prefixes of the live values equal those of the values in the checklist: DKIM `32247e2058267231`, MX value `ee89fd80a0081318`, SPF TXT `c313e30853f26faf`, rsend CNAME value `cc29fc1fd06e1461`. Names (`resend._domainkey`, `send` x2, `rsend`) and MX priority 10 match as printed. The hand-copied DKIM value is therefore exact. Records are NOT yet added at Infomaniak (status `not_started`).
 
 **homesignal.net authority** (site run 38011245097, `jody-dns-authority`, no probe): the .net registry delegates to `ns-cloud-e1..e4.googledomains.com`; all four answer authoritatively (`aa`) with one SOA serial (1), so the zone is served consistently. Apex A `185.199.108.153` (GitHub Pages), `www` CNAME `homesignalg.github.io`, MX/SPF Proton, DMARC `p=none; rua=mailto:dmarc@homesignal.net`, and homesignal.net already has its own Resend `send` and `resend._domainkey` records. **Still UNPROVEN: which console edits this zone** (Shopify, Google Cloud DNS or another). A name server's name does not show that. Gate G1 stays open until a probe TXT added in Shopify's DNS console is observed on all four servers.
+
+## Resend verified for jodytracks.com (2026-10-10)
+**PASS.** ingest run 38076820342 (`resend-domain-records`, `list`, from `main`, 18:41:56Z): domain `jodytracks.com` `status=verified`; DKIM TXT `resend._domainkey` verified (sha256 `32247e2058267231`), SPF MX `send` priority 10 verified (`ee89fd80a0081318`), SPF TXT `send` verified (`c313e30853f26faf`), CNAME `rsend` verified (`cc29fc1fd06e1461`). Capabilities: sending enabled, **receiving disabled**; open and click tracking off; region us-east-1.
+
+**DNS evidence at 18:37Z** (site run 38076506706, `jody-dns-authority`): both Infomaniak authoritative servers (`nsany1`, `nsany2`) agree on all four records with one SOA serial, and Cloudflare 1.1.1.1, Google 8.8.8.8 and Quad9 9.9.9.9 return them. Root MX (`5 mta-gw.infomaniak.ch`), root SPF (`v=spf1 include:spf.infomaniak.ch -all`) and `_dmarc` (`v=DMARC1; p=reject;`) were unchanged on both servers.
+
+**Timeline:** records added by the founder 2026-10-10; Resend `pending` from 16:19Z; `rsend` verified 16:51Z; the other three verified between 18:37Z and 18:41Z, about 2 h 20 min after the DNS was already correct on every server. The only action in between was repeated read-only `verify` calls; no DNS was changed.
+
+**Not done, by instruction:** no customer email sent, no outreach activated, no website DNS change, no GO LIVE. The mailboxes are `info@jodytracks.com` and `contact@jodytracks.com` (contact@ = real-estate-agent outreach and free-report invitations); their existence cannot be verified from DNS. DMARC reporting is recommended, not required; the existing `p=reject` is unchanged.
