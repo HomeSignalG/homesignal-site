@@ -54,16 +54,16 @@
     {
       "id": "frisco-active-building-permits",
       "kind": "arcgis-layer",
-      "url": "https://geo.friscotexas.gov/arcgis/rest/services/Layers_External/MapServer/77",
+      "url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1",
       "jurisdiction": "Frisco",
       "coverage": {
         "state": "TX",
         "county": "Collin"
       },
       "hosts": [
-        "geo.friscotexas.gov"
+        "maps.friscotexas.gov"
       ],
-      "rejected": "2026-07-13: host blocks external IPs (TLS handshake timeout) \u2014 feed exists but unreachable"
+      "rejected": "WIRED 2026-07-27 on maps.friscotexas.gov (registry service_url). The 2026-07-13 target pointed at geo.friscotexas.gov, which still times out from every egress (re-probed 2026-10-10, 20 s) -- that was the retired host, so the nightly 'unreachable' row was a stale probe URL, not the wired source (live 2026-10-10: HTTP 200, 647 permits, all ISSUED)"
     },
     {
       "id": "frisco-active-zoning-sup-cases",

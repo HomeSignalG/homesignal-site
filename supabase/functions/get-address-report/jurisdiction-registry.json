@@ -5150,7 +5150,7 @@
         "type_source": "PermitType",
         "file_date": "DateReceiv",
         "decision_date": "DateApprov",
-        "address": "PropertyAc",
+        "address": "PropertySi",
         "lat": "__lat",
         "lng": "__lng",
         "case_number": "PermitID"
@@ -5190,7 +5190,7 @@
       },
       "record_url_precision": "dataset",
       "spatial_zip_radius_mi": 3,
-      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3."
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3. | 2026-10-10 Denton data-integrity gate: address mapping corrected from PropertyAc (alias \"Property Account\", an account number that printed as an address, e.g. \"R87447\") to PropertySi (alias \"Property Situs Address\"), populated on 43,242 of 48,161 whitelisted records (live count, 2026-10-10). Source still frozen at max(DateReceiv) 2023-06-09 (56,500 rows, unchanged)."
     },
     {
       "registry_id": "clv-planning-cases",
