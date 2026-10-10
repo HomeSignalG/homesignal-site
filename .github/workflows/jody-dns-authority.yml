@@ -1,0 +1,83 @@
+name: jody-dns-authority
+
+# Jody migration. READ-ONLY. Answers "which servers are AUTHORITATIVE for this domain, do they agree, and can a record the founder
+# adds in their DNS console be seen on them?" by asking the .net/.com registry for the delegation and then asking EACH delegated
+# nameserver directly (no recursive resolver, no cache). It changes nothing: ordinary DNS queries only.
+#
+# Why this exists: a registrar name and a nameserver name do not say whose console edits the zone. The only proof is an observed write:
+# the founder adds a harmless TXT record in the console they believe controls the zone, and this workflow reads it back from every
+# authoritative server. Run it with probe_name empty first (delegation + agreement + current records), then with the probe.
+# Manual only.
+on:
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: Domain to inspect (apex)
+        default: homesignal.net
+      probe_name:
+        description: Optional full TXT record name to look for on every authoritative server (e.g. _jody-dnstest.homesignal.net)
+        default: ''
+      names:
+        description: Extra names to read from the authoritative servers (space separated, relative to the domain; TXT, MX and CNAME are shown)
+        default: 'send resend._domainkey _dmarc www'
+
+permissions:
+  contents: read
+
+jobs:
+  authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install dig
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq dnsutils >/dev/null
+      - name: Delegation and authoritative answers
+        env:
+          DOMAIN: ${{ inputs.domain }}
+          PROBE: ${{ inputs.probe_name }}
+          NAMES: ${{ inputs.names }}
+        run: |
+          set -u
+          case "$DOMAIN" in *[!A-Za-z0-9.-]*|"") echo "bad domain"; exit 1;; esac
+          tld="${DOMAIN##*.}"
+          echo "== 1. Delegation published by the .$tld registry (what the whole internet is told)"
+          parent=$(dig +short NS "$tld." | head -1)
+          dig +norecurse +noall +authority +time=5 "$DOMAIN" NS @"$parent" | awk '{print $5}' | sort -u | tee /tmp/deleg.txt
+          [ -s /tmp/deleg.txt ] || { echo "NO DELEGATION FOUND"; exit 1; }
+          echo
+          echo "== 2. Each delegated server, asked directly (aa = answers authoritatively; serial must match across servers)"
+          serials=""
+          while read -r ns; do
+            ip=$(dig +short A "$ns" | head -1)
+            echo "--- $ns ($ip)"
+            dig +norecurse +noall +comments +time=5 SOA "$DOMAIN" @"$ns" | grep -E "flags:" | sed 's/^;; //'
+            soa=$(dig +norecurse +short +time=5 SOA "$DOMAIN" @"$ns")
+            echo "SOA: $soa"
+            serials="$serials $(echo "$soa" | awk '{print $3}')"
+            echo "NS : $(dig +norecurse +short +time=5 NS "$DOMAIN" @"$ns" | sort | tr '\n' ' ')"
+            echo "A  : $(dig +norecurse +short +time=5 A "$DOMAIN" @"$ns" | tr '\n' ' ')"
+            echo "MX : $(dig +norecurse +short +time=5 MX "$DOMAIN" @"$ns" | tr '\n' ' ')"
+            echo "TXT: $(dig +norecurse +short +time=5 TXT "$DOMAIN" @"$ns" | tr '\n' ' ')"
+          done < /tmp/deleg.txt
+          echo
+          echo "distinct SOA serials across servers: $(echo $serials | tr ' ' '\n' | sort -u | grep -c .)  (1 = all agree)"
+          echo
+          echo "== 3. Extra names, first authoritative server"
+          first=$(head -1 /tmp/deleg.txt)
+          for n in $NAMES; do
+            fq="$n.$DOMAIN"
+            echo "--- $fq"
+            for t in CNAME MX TXT; do r=$(dig +norecurse +short +time=5 "$t" "$fq" @"$first" | tr '\n' ' '); [ -n "$r" ] && echo "$t: $r"; done
+          done
+          if [ -n "$PROBE" ]; then
+            case "$PROBE" in *[!A-Za-z0-9._-]*) echo "bad probe name"; exit 1;; esac
+            echo
+            echo "== 4. PROBE $PROBE on EVERY authoritative server"
+            found=0; total=0
+            while read -r ns; do
+              total=$((total+1))
+              r=$(dig +norecurse +short +time=5 TXT "$PROBE" @"$ns" | tr '\n' ' ')
+              if [ -n "$r" ]; then found=$((found+1)); echo "FOUND  on $ns: $r"; else echo "ABSENT on $ns"; fi
+            done < /tmp/deleg.txt
+            echo "probe present on $found of $total authoritative servers"
+          fi
