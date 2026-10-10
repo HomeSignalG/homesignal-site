@@ -3,7 +3,7 @@
      only ZIP pages whose materializer-stamped app_community_meta.indexable is
      true (pass AND dev-backed OR >=3 facilities) are advertised; empties and
      thin pages are real, reachable pages but noindexed. do NOT hand-edit.
-     11695 community ZIP pages + 11650 development ZIP pages + 6 static pages (0 newcomer(s) deferred by the ramp).
+     11696 community ZIP pages + 11651 development ZIP pages + 8 static pages (0 newcomer(s) deferred by the ramp).
      Regenerated on a schedule. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
@@ -28,6 +28,16 @@
   </url>
   <url>
     <loc>https://homesignal.net/privacy.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/terms.html</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/refund-policy.html</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
@@ -36058,6 +36068,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/community.html?zip=59468</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/community.html?zip=59472</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -94473,6 +94488,11 @@
   </url>
   <url>
     <loc>https://homesignal.net/homesignalmap.html?zip=59468</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://homesignal.net/homesignalmap.html?zip=59472</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
