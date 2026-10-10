@@ -34,6 +34,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Refuse to run off main
+        # This job can hold a secret or probe production. A dispatch from a branch would run the BRANCH's copy of this file.
+        # Hygiene, not a security boundary (that is a protected environment); it fails loudly rather than skipping green.
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then echo "Refusing: dispatch this workflow from main only (ref=${GITHUB_REF})"; exit 1; fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
