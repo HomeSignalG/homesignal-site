@@ -33,7 +33,9 @@ ban('Find my community', 'the old hero and bottom CTA buttons');
 
 // The approved copy (Appendix A), verbatim
 req('See what’s changing around a property.', 'hero H1');
-req('Development. Government decisions. Public meetings. Local activity.', 'hero subhead');
+req('Track changes that impact your quality of life. Receive alerts on changes affecting traffic, noise, and air, water, and soil pollution.', 'hero subhead 1');
+req('HomeSignal connects these impacts to proposed developments, construction, infrastructure projects, and local government decisions, helping you understand what’s coming and how it could affect where you live.', 'hero subhead 2');
+ban('Development. Government decisions. Public meetings. Local activity.', 'the old hero subhead');
 ok(/placeholder="Enter an address or ZIP code"/.test(tpl), 'required copy present: search placeholder');
 ok(/>Search<\/button>/.test(tpl), 'required copy present: Search button');
 req('No account required.', 'helper');
