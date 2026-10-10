@@ -25,6 +25,7 @@ Nothing here has been done on the founder's behalf, and nothing is cleared legal
 Read from the Resend account through the API (`resend-domain-records`); the domain was added to Resend (sending only, **receiving disabled**, region us-east-1). It sent nothing and changed no DNS.
 `homesignal.net` is set up the same way in the same account (verified), which is why this is the right shape: **all four records live on `resend._domainkey`, `send` and `rsend`, none on the root.**
 Root SPF (`v=spf1 include:spf.infomaniak.ch -all`), root MX (Infomaniak mail) and `_dmarc` (`v=DMARC1; p=reject;`) are **not touched**, so Infomaniak delivery is preserved.
+**DMARC reporting (restored): `_dmarc` is `p=reject` with no `rua=`, so the first misaligned email would be dropped with no trace.** Before any sending, change `_dmarc` to `v=DMARC1; p=reject; rua=mailto:dmarc@jodytracks.com` (create that mailbox or alias at Infomaniak first). This is a policy-preserving edit: `p=reject` stays.
 DMARC alignment holds without root changes: Resend signs with `d=jodytracks.com` (DKIM, aligned) and its return path is `send.jodytracks.com` (SPF, relaxed-aligned subdomain).
 Do **not** enable Resend "Receiving" for this domain: it would add a root MX record and break Infomaniak mail.
 Names are relative to `jodytracks.com`; if the Infomaniak form wants a full name, append `.jodytracks.com`.

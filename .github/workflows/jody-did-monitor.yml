@@ -1,0 +1,39 @@
+name: jody-did-monitor
+
+# Jody migration. READ-ONLY. did:web:homesignal.net is immutable, so https://homesignal.net/.well-known/did.json must keep answering
+# HTTP 200 with the right document for as long as the Bluesky account exists - before AND after the redirect cutover (the redirect host
+# serves it with 200 and never redirects it). This check proves it with a real HTTP request. Manual only: adding a schedule is a
+# new scheduled job and needs the founder's approval; it is one `schedule:` line when approved.
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: Host to check
+        default: homesignal.net
+
+permissions:
+  contents: read
+
+jobs:
+  did:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the DID document over real HTTP
+        env:
+          HOST: ${{ inputs.host }}
+        run: |
+          set -u
+          case "$HOST" in *[!A-Za-z0-9.-]*|"") echo "bad host"; exit 1;; esac
+          url="https://$HOST/.well-known/did.json"
+          code=$(curl -sS -o /tmp/did.json -w '%{http_code}' --max-redirs 0 "$url") || { echo "REQUEST FAILED: $url"; exit 1; }
+          echo "GET $url -> HTTP $code"
+          [ "$code" = "200" ] || { echo "FAIL: expected 200 with no redirect"; exit 1; }
+          python3 - <<'PY'
+          import json,sys
+          d=json.load(open('/tmp/did.json'))
+          want="did:web:homesignal.net"
+          print("id:", d.get("id"))
+          if d.get("id")!=want: sys.exit(f"FAIL: id is {d.get('id')!r}, expected {want!r}")
+          print("OK: DID document answers 200 with the expected id")
+          PY
