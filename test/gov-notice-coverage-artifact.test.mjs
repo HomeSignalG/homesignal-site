@@ -40,8 +40,16 @@ const MAP = JSON.parse(readFileSync(join(root, 'lib/generated/gov-notice-coverag
 const failures = [];
 
 // ── The generator derives from delivered NOTICES, not from feeds ────────────────────
-if (!/alerts\?pipeline_type=eq\.government_notice/.test(GEN_CODE)) {
-  failures.push('generator: no read of delivered government_notice alerts — the notices-tile source is gone');
+if (!/gov_notice_current_communities\?/.test(GEN_CODE)) {
+  failures.push('generator: no read of public.gov_notice_current_communities — the notices-tile source is gone');
+}
+// Base `alerts` is closed to anon (Phase-3 revoke, 2026-09-26): a read of it is a 401 at runtime.
+if (/['"`]alerts\?|rest\/v1\/alerts\b/.test(GEN_CODE)) {
+  failures.push('generator: reads base `alerts` — anon SELECT was revoked 2026-09-26; use gov_notice_current_communities');
+}
+// The window and the pipeline filter belong to the view, not to a second copy here.
+if (/pipeline_type|published_at|SOURCE_CURRENT_DAYS|currentFloor|currentCeiling/.test(GEN_CODE)) {
+  failures.push('generator: carries its own window or pipeline_type filter — that decision lives in the view');
 }
 if (/rest\/v1\/feeds|['"`]feeds\?/.test(GEN_CODE)) {
   failures.push('generator: reads `feeds` — coverage must come from delivered notices, not from arming');
@@ -82,24 +90,24 @@ if (!(c.configured > 0 && c.configured < c.canonical_zip_pages)) {
 // a far-future calendar placeholder hold a dead source open; ceiling-only lets a
 // years-stale archive count as current. Either alone still returns a plausible number.
 
-const genFloor = /published_at=gte\.\$\{currentFloor\}/.test(GEN_CODE);
-const genCeil = /published_at=lte\.\$\{currentCeiling\}/.test(GEN_CODE);
-if (!genFloor) failures.push('generator: the -90 source-currentness FLOOR (published_at=gte.) is missing');
-if (!genCeil) failures.push('generator: the +90 source-currentness CEILING (published_at=lte.) is missing');
-if (!/const SOURCE_CURRENT_DAYS = 90;/.test(GEN_CODE)) failures.push('generator: SOURCE_CURRENT_DAYS is no longer 90');
-// The ceiling must be the SAME constant mirrored, never a second literal that can drift.
-if (!/currentCeiling = new Date\(Date\.now\(\) \+ SOURCE_CURRENT_DAYS \* 86400000\)/.test(GEN_CODE)) {
-  failures.push('generator: currentCeiling is not derived from SOURCE_CURRENT_DAYS');
-}
-// Both bounds must be on the SAME request. Two separate reads unioned would re-admit
-// exactly what the window excludes.
-if (!/alerts\?pipeline_type=eq\.government_notice[^`]*gte\.\$\{currentFloor\}[^`]*lte\.\$\{currentCeiling\}/.test(GEN_CODE)) {
-  failures.push('generator: floor and ceiling are not ANDed into one government_notice read');
-}
+const VIEW = readFileSync(join(root, 'docs/gov-notice-current-communities.sql'), 'utf8');
+const VIEW_CODE = VIEW.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n');
+if (!/pipeline_type\s*=\s*'government_notice'/.test(VIEW_CODE)) failures.push('view: not restricted to government_notice');
+if (!/published_at\s*>=/.test(VIEW_CODE)) failures.push('view: the -90 source-currentness FLOOR (published_at >=) is missing');
+if (!/published_at\s*<=/.test(VIEW_CODE)) failures.push('view: the +90 source-currentness CEILING (published_at <=) is missing');
+if (!/\)\s*-\s*90\)/.test(VIEW_CODE)) failures.push('view: the floor is no longer today - 90');
+if (!/\)\s*\+\s*90\)/.test(VIEW_CODE)) failures.push('view: the ceiling is no longer today + 90');
+// It must expose community_id and nothing else, and must not widen anon beyond SELECT.
+if (!/select distinct a\.community_id\s+from public\.alerts/i.test(VIEW_CODE)) failures.push('view: does not select only community_id from public.alerts');
+if (/\b(title|source_url|agency_name|description)\b/i.test(VIEW_CODE.split(/\bfrom\b/i)[0])) failures.push('view: projects a content column');
+if (!/revoke all on public\.gov_notice_current_communities from public, anon, authenticated/.test(VIEW_CODE)) failures.push('view: does not revoke the default grants');
+if (!/grant select on public\.gov_notice_current_communities to anon/.test(VIEW_CODE)) failures.push('view: anon SELECT grant missing');
+if (/grant\s+(all|insert|update|delete)[^;]*gov_notice_current_communities/i.test(VIEW_CODE)) failures.push('view: grants more than SELECT');
+if (!/security_invoker\s*=\s*false/.test(VIEW_CODE)) failures.push('view: not an owner-rights view — anon cannot read alerts, so it would return nothing');
 
 // The record window is a DIFFERENT contract and must not be conflated with -90/+90.
-if (/published_at=gte\.\$\{recordFloor\}|current_date - 365/.test(GEN_CODE)) {
-  failures.push('generator: the -365/+730 RECORD window must not be applied here');
+if (/recordFloor|current_date - 365|\)\s*-\s*365/.test(GEN_CODE + VIEW_CODE)) {
+  failures.push('the -365/+730 RECORD window must not be applied here');
 }
 
 // ── The self-test: these assertions must be capable of failing ──────────────────────
@@ -108,17 +116,15 @@ if (/published_at=gte\.\$\{recordFloor\}|current_date - 365/.test(GEN_CODE)) {
 const mixedGenerator = "const feeds = await all('feeds?target_table=eq.alerts', 'community_id');";
 if (!/target_table/.test(mixedGenerator)) failures.push('self-test: the target_table guard cannot detect mixing');
 if (!/rest\/v1\/feeds|['"`]feeds\?/.test(mixedGenerator)) failures.push('self-test: the feeds guard cannot detect a feeds read');
-if (/alerts\?pipeline_type=eq\.government_notice/.test(mixedGenerator)) failures.push('self-test: the notices-source guard matches text that has no such read');
-
-// Each window bound must be provably detectable in its own absence. A generator carrying
-// only the other end must fail the pattern for the missing one — otherwise "both ends are
-// present" is a claim no assertion here could ever contradict.
-const floorOnly = 'alerts?pipeline_type=eq.government_notice&published_at=gte.${currentFloor}';
-const ceilOnly = 'alerts?pipeline_type=eq.government_notice&published_at=lte.${currentCeiling}';
-if (/published_at=lte\.\$\{currentCeiling\}/.test(floorOnly)) failures.push('self-test: the CEILING guard passes text that has no ceiling');
-if (/published_at=gte\.\$\{currentFloor\}/.test(ceilOnly)) failures.push('self-test: the FLOOR guard passes text that has no floor');
-if (/gte\.\$\{currentFloor\}[^`]*lte\.\$\{currentCeiling\}/.test(floorOnly)) failures.push('self-test: the ANDed-bounds guard passes a floor-only read');
-if (/gte\.\$\{currentFloor\}[^`]*lte\.\$\{currentCeiling\}/.test(ceilOnly)) failures.push('self-test: the ANDed-bounds guard passes a ceiling-only read');
+if (/gov_notice_current_communities\?/.test(mixedGenerator)) failures.push('self-test: the notices-source guard matches text that has no such read');
+const baseAlertsRead = "const delivered = await all('alerts?pipeline_type=eq.government_notice', 'community_id');";
+if (!/['"`]alerts\?|rest\/v1\/alerts\b/.test(baseAlertsRead)) failures.push('self-test: the base-alerts guard cannot detect the revoked read');
+if (/['"`]alerts\?|rest\/v1\/alerts\b/.test("all('gov_notice_current_communities?community_id=not.is.null', 'community_id')")) failures.push('self-test: the base-alerts guard flags the view read');
+// Each window bound must be provably detectable in its own absence.
+const floorOnly = "where a.pipeline_type = 'government_notice' and a.published_at >= ((d) - 90)";
+const ceilOnly = "where a.pipeline_type = 'government_notice' and a.published_at <= ((d) + 90)";
+if (/published_at\s*<=/.test(floorOnly)) failures.push('self-test: the CEILING guard passes text that has no ceiling');
+if (/published_at\s*>=/.test(ceilOnly)) failures.push('self-test: the FLOOR guard passes text that has no floor');
 
 if (failures.length) {
   console.error(failures.map((f) => '  ✗ ' + f).join('\n'));
