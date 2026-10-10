@@ -23,7 +23,7 @@ north-west Denton or The Colony. This session did not discover one; the county h
 * Our table: **180 of the 210 are present, all 180 as `status='Decided'`; 0 as Proposed/Approved/anything else;** 0 `Decided` rows that are not in the source.
 * The other **30 lie 3.32 to 7.73 miles from every canonical ZIP centroid**, outside the registry's `spatial_zip_radius_mi: 3` scoping. That rule is
   status-agnostic. 180 + 30 = 210.
-* Presentation: the shipped renderer (`lib/da-report-view.js`) labels a Decided record "Decided (denied or withdrawn) ... not open or under
+* Presentation: the shipped report renderer labels a Decided record "Decided (denied or withdrawn) ... not open or under
   review" and counts it apart from open proposals. Verified on a real Decided Denton record ("HOUSE F56 INVESTMENTS, LLC", filed 2023-03-01) through the real
   handler and renderer: counted as decided, not in the open-proposal count.
 * **What is still missing:** the *outcome* (Denied vs Withdrawn). `app_projects` carries only `Decided`; the parked
