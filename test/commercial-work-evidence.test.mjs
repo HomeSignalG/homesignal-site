@@ -99,9 +99,7 @@ console.log('§2 an entry with NO rule is byte-for-byte unchanged');
   // the audit's positive control. It must carry no rule at all.
   const ch = entryById('charlotte-land-dev-commercial-projects');
   ok(ch && !ch.commercial_work_evidence, '§2 charlotte positive control carries NO gate');
-  // 2026-10-10: Charlotte no longer stamps Commercial from its LAYER NAME (its ProjectType is the
-  // review workflow, not the use). It is still the no-rule control: an entry with no gate is untouched.
-  ok(!ch.use_type_const, '§2 charlotte declares no source-wide Type (see charlotte-type-evidence.test.mjs)');
+  eq(ch.use_type_const, 'Commercial', '§2 charlotte still declares Commercial');
 }
 
 console.log('§3 Little Rock — the largest false-positive family');
