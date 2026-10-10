@@ -202,7 +202,7 @@ ok(/<section class="card" id="share"[^>]*\shidden>/.test(page) && /var shareable
   '9h the card is hidden until a report that was SAVED is on screen: an unsaved report has no permanent id to share');
 ok(/function printReport\(\)\{ window\.print\(\); \}/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib|\.pdf\b/i.test(page.replace(/Download PDF|Save as PDF|\bPDF\b/g, '')),
   '9i "Download PDF" is the browser\'s own print window and nothing else: no PDF library, no canvas, no file made');
-ok(/@media print\{[\s\S]*?header\.top,\.card,#status,#creditnote,\.auth-overlay,#share-pop\{display:none!important\}/.test(page), '9j the print stylesheet leaves the header, every card, the status lines, the sign-in and the share popup off the paper');
+ok(/@media print\{[\s\S]*?header\.top,\.card,[^{}]*#status,#creditnote,[^{}]*\.auth-overlay,#share-pop\{display:none!important\}/.test(page), '9j the print stylesheet leaves the header, every card, the status lines, the empty-report note, the account section, the sign-in and the share popup off the paper');
 ok(/not your name, not your client label/.test(page) && /6 months/.test(page) && /street address/.test(page), '9k the card tells the agent what the client will and will not see, and how long the link lasts (founder, 2026-10-03)');
 ok(!/shared-report/.test(read('development-activity.html')) && !/shared-report/.test(read('partials/shell.html')) && !/shared-report/.test(read('shell.js')), '9l no public page links the client\'s page: a client reaches it only from a link an agent made');
 
@@ -222,7 +222,7 @@ ok(css.search(/(^|\})\s*\[hidden\]\{display:none!important\}/) < css.search(/(^|
 
 // ---- the report's own "Share report" popup (follow-up to build step 8, founder 2026-10-04) -----------------------------------------------------
 // The popup decides nothing: the link is made by the share function through makeShare, and the popup only hands that one validated link to the person's own apps.
-const popMarkup = (page.match(/<div id="share-pop"[\s\S]*?<div id="report">/) || [''])[0];
+const popMarkup = (page.match(/<div id="share-pop"[\s\S]*?<\/main>/) || [''])[0];
 ok(/<div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>/.test(popMarkup) && (popMarkup.match(/<a class="go ghost"/g) || []).length === 3
    && !/facebook|twitter|reddit|linkedin|bsky|nextdoor|telegram/i.test(popMarkup + code.slice(code.indexOf('function fillSharePop'), code.indexOf('function copyPop'))),
   '9k the popup is a hidden, labelled modal dialog with exactly three link targets (text, email, WhatsApp) and no public network anywhere in it');

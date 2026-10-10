@@ -259,7 +259,7 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '' } = {}) {
+async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '', accountClosed = false } = {}) {
   const ctx = await browser.newContext(tz ? { viewport: { width, height }, timezoneId: tz } : { viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
@@ -313,6 +313,9 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
+  // "Account and administration" (Billing, Your name on reports, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
+  // checks of those cards are about the cards, so they are read with the section open; the closed default is asserted on its own (Part L, accountClosed).
+  if (!accountClosed) await page.evaluate(() => { document.getElementById('account').open = true; });
   return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
 }
 const text = (page, sel) => page.$eval(sel, (e) => e.textContent.trim());
@@ -409,7 +412,9 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '2h signed out, none of the seven member cards is drawn (Billing, Invite an agent, Saved reports, Compare, Your name, Share, Watch), while the form and the sign-in panel are', drawnOut);
   // the instrument must be able to see the defect: take the page's [hidden] rule out of the live stylesheet (the page as it was before the fix) and the same read must now
   // find all seven drawn. The count of rules removed is asserted, so a mutation that did not apply cannot pass as a kill.
-  const removed = await so.page.evaluate(() => { let n = 0; for (const sh of document.styleSheets) { for (let i = sh.cssRules.length - 1; i >= 0; i--) { if (sh.cssRules[i].selectorText === '[hidden]') { sh.deleteRule(i); n++; } } } return n; });
+  // The page also keeps its empty wrappers (the account section, the share/watch row) off the screen with `:has()` rules; those are taken out as well, so what is read is the
+  // [hidden] rule alone, exactly as before the wrappers existed.
+  const removed = await so.page.evaluate(() => { let n = 0; for (const sh of document.styleSheets) { for (let i = sh.cssRules.length - 1; i >= 0; i--) { const t = sh.cssRules[i].selectorText; if (t === '[hidden]') { sh.deleteRule(i); n++; } else if (t && t.includes(':has(')) sh.deleteRule(i); } } return n; });
   const drawnOld = await drawnCards(so.page);
   ok(removed === 1 && JSON.stringify(drawnOld.slice().sort()) === JSON.stringify(CARDS.slice().sort()),
     '2i without the page\'s [hidden] rule the same read finds all seven hidden cards drawn: this check fails on the old page', { removed, drawnOld });
@@ -931,9 +936,10 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 
   // the report's own bar: Compare (build step 10), Share and Watch are live and go to their cards, Download PDF is live and prints
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ t: e.textContent, live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action'), disabled: e.getAttribute('aria-disabled') })));
-  ok(JSON.stringify(bar.map((b) => b.t)) === JSON.stringify(['Compare property', 'Watch property', 'Share report', 'Download PDF'])
-     && bar[0].live && bar[0].act === 'compare' && bar[0].disabled === null && bar[1].live && bar[1].act === 'watch' && bar[2].live && bar[2].act === 'share' && bar[3].live && bar[3].act === 'pdf',
-    '9m the report\'s own bar has Compare (build step 10), Watch (build step 9), Share and Download PDF all live', bar);
+  // redesign 2026-10-10: the bar is set directly under the report's heading, Share with Client and Watch Property first (the page moves and renames the view's own buttons)
+  ok(JSON.stringify(bar.map((b) => b.t)) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF', 'Compare'])
+     && bar[0].live && bar[0].act === 'share' && bar[0].disabled === null && bar[1].live && bar[1].act === 'watch' && bar[2].live && bar[2].act === 'pdf' && bar[3].live && bar[3].act === 'compare',
+    '9m the report\'s own bar has Share with Client, Watch Property, Download PDF and Compare (build steps 8, 9, 10) all live, in that order', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
   await page.click('#share-pdf');
@@ -1289,8 +1295,8 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 
 // ---- 11. build step 10: comparing saved reports side by side ------------------------------------------------------------------------------
 const compareHidden = (page) => page.$eval('#compare', (e) => e.hidden);
-const compareBoxes = (page) => page.$$eval('#compare-list input', (els) => els.map((e) => ({ checked: e.checked, disabled: e.disabled })));
-const waitBoxes = (page, n) => page.waitForFunction((k) => document.querySelectorAll('#compare-list input').length === k, n, { timeout: 8000 }).catch(() => {});
+const compareBoxes = (page) => page.$$eval('#saved-list input', (els) => els.map((e) => ({ checked: e.checked, disabled: e.disabled })));
+const waitBoxes = (page, n) => page.waitForFunction((k) => document.querySelectorAll('#saved-list input').length === k, n, { timeout: 8000 }).catch(() => {});
 const waitCompared = (page) => page.waitForFunction(() => document.querySelector('#compare-result .da-cmp') !== null || /could not|cannot|Choose|not made over|Sign in/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
 const tableOf = (page) => page.evaluate(() => {
   const rows = [...document.querySelectorAll('#compare-result .da-cmp-table tbody tr')].filter((tr) => tr.querySelector('.da-cmp-rowh'));
@@ -1326,15 +1332,15 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
-  const labels = await page.$$eval('#compare-list label', (els) => els.map((e) => e.textContent.trim()));
+  const labels = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
   ok(labels.length === 3 && /^Report 3 · 3 Third Ave/.test(labels[0]) && /^Report 1 · 1 First Ave/.test(labels[2]), '11d the card lists the saved reports, newest first, each as "Report N · address · date"', labels);
   ok((await compareBoxes(page)).every((b) => !b.checked && !b.disabled) && (await page.$eval('#compare-go', (b) => b.disabled)) && /Choose 2 to 5 reports\./.test(await text(page, '#compare-count')), '11e nothing is ticked at first: the button is off and the count says to choose 2 to 5');
-  await page.check('#compare-list li:nth-child(1) input');
+  await page.check('#saved-list li:nth-child(1) input');
   ok((await page.$eval('#compare-go', (b) => b.disabled)) && /1 report chosen\./.test(await text(page, '#compare-count')), '11f one chosen is not enough');
-  await page.check('#compare-list li:nth-child(3) input');
+  await page.check('#saved-list li:nth-child(3) input');
   ok(!(await page.$eval('#compare-go', (b) => b.disabled)) && /2 reports chosen\./.test(await text(page, '#compare-count')), '11g two chosen turns the button on');
   const usedBefore = w.used, madeBefore = reports.length, listsBefore = saved.length;
-  await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(2) input');
   await page.click('#compare-go');
   await waitCompared(page);
   const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
@@ -1364,8 +1370,8 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  const listed = await page.$$eval('#compare-list label', (els) => els.map((e) => e.textContent.trim()));
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  const listed = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   await page.click('#compare-go');
   await waitCompared(page);
   const t2 = await tableOf(page);
@@ -1380,7 +1386,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
   await waitBoxes(page, 6);
-  for (let i = 1; i <= 5; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
   let boxes = await compareBoxes(page);
   ok(boxes.filter((b) => b.checked).length === 5 && boxes[5].disabled && !boxes[5].checked && !(await page.$eval('#compare-go', (b) => b.disabled)) && /5 reports chosen\./.test(await text(page, '#compare-count')),
     '11o with five chosen the sixth cannot be ticked, and five is enough to compare', boxes);
@@ -1388,7 +1394,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCompared(page);
   let t = await tableOf(page);
   ok(t.heads.length === 5 && t.rows.length === 15 && t.rows.every((r) => r.cells.length === 5), '11p five reports compare: five columns and fifteen rows (the thirteen plus the Decided row, which shows when any report has a decided application, plus the Civic & public Type row)', [t.heads, t.rows.length]);
-  await page.uncheck('#compare-list li:nth-child(1) input');
+  await page.uncheck('#saved-list li:nth-child(1) input');
   ok((await page.$$('#compare-result .da-cmp')).length === 0 && (await text(page, '#compare-status')) === '' && !(await compareBoxes(page))[5].disabled, '11q changing the choice clears the comparison, so it never sits beside a different choice, and frees the sixth box');
   await ctx.close();
 }
@@ -1401,7 +1407,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = clone(WNONE_REPORT);                   // report 1 is stored as the engine saves a report with no data ingested
   await waitBoxes(page, 2);
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   await page.click('#compare-go');
   await waitCompared(page);
   const t = await tableOf(page);
@@ -1418,7 +1424,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
-  for (let i = 1; i <= 3; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  for (let i = 1; i <= 3; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
   const keys = [...w.made.keys()];
   const gone = w.made.get(keys[1]);
   w.made.delete(keys[1]);                                              // report 2 is no longer there when the page asks for it
@@ -1441,10 +1447,10 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live'), label: e.textContent.trim() })));
-  ok(btn.some((b) => b.act === 'compare' && b.live && b.label === 'Compare property'), '11v on a saved report the "Compare property" button is live', btn);
+  ok(btn.some((b) => b.act === 'compare' && b.live && b.label === 'Compare'), '11v on a saved report the "Compare" button is live', btn);
   await page.click('.da-rv-act[data-da-action="compare"]');
   const boxes = await compareBoxes(page);
-  ok(boxes.filter((b) => b.checked).length === 1 && boxes[0].checked && /1 report chosen\./.test(await text(page, '#compare-count')) && (await page.evaluate(() => document.activeElement && document.activeElement.closest('#compare-list') !== null)),
+  ok(boxes.filter((b) => b.checked).length === 1 && boxes[0].checked && /1 report chosen\./.test(await text(page, '#compare-count')) && (await page.evaluate(() => document.activeElement && document.activeElement.closest('#saved-list') !== null)),
     '11w pressing it ticks the report on screen (the newest, report 2) and moves to the card; it compares nothing by itself', boxes);
   ok((await page.$$('#compare-result .da-cmp')).length === 0, '11w2 ... and no comparison is drawn until the person asks for one');
   await ctx.close();
@@ -1456,13 +1462,13 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   await page.click('#compare-go');
   await waitCompared(page);
   ok((await page.$$('#compare-result .da-cmp')).length === 1, '11x a comparison is on screen');
   await page.evaluate(() => { window.__sb.session = null; window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)); });
   await page.waitForTimeout(200);
-  const out = await page.evaluate(() => ({ hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#compare-list li').length, result: document.getElementById('compare-result').textContent.trim(), status: document.getElementById('compare-status').textContent, count: document.getElementById('compare-count').textContent, go: document.getElementById('compare-go').disabled }));
+  const out = await page.evaluate(() => ({ hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#saved-list li').length, result: document.getElementById('compare-result').textContent.trim(), status: document.getElementById('compare-status').textContent, count: document.getElementById('compare-count').textContent, go: document.getElementById('compare-go').disabled }));
   ok(out.hidden && out.list === 0 && out.result === '' && out.status === '' && out.count === '' && out.go, '11y signing out hides the card and takes the list, the comparison and the messages away', out);
   await ctx.close();
 }
@@ -1472,13 +1478,13 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   await page.click('#compare-go');
   await waitCompared(page);
   const swap = await page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
-    return { hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#compare-list li').length, result: document.getElementById('compare-result').textContent.trim() };
+    return { hidden: document.getElementById('compare').hidden, list: document.querySelectorAll('#saved-list li').length, result: document.getElementById('compare-result').textContent.trim() };
   });
   ok(swap.hidden && swap.list === 0 && swap.result === '', '11z a different person signing in takes the first person\'s list and comparison away at once', swap);
   await ctx.close();
@@ -1490,7 +1496,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   w.holdNextOpen = true;
   await page.click('#compare-go');
   await page.waitForFunction(() => /Opening 2 saved reports/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -1510,7 +1516,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   for (const a of [A1, A2, A3, A4, A5]) await make(page, a);
   await waitBoxes(page, 5);
-  for (let i = 1; i <= 5; i++) await page.check('#compare-list li:nth-child(' + i + ') input');
+  for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
   await page.click('#compare-go');
   await waitCompared(page);
   const m = await page.evaluate(() => {
@@ -1524,7 +1530,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(d.page, /free reports left/);
   await make(d.page, A1); await make(d.page, A2);
   await waitBoxes(d.page, 2);
-  await d.page.check('#compare-list li:nth-child(1) input'); await d.page.check('#compare-list li:nth-child(2) input');
+  await d.page.check('#saved-list li:nth-child(1) input'); await d.page.check('#saved-list li:nth-child(2) input');
   await d.page.click('#compare-go');
   await waitCompared(d.page);
   const desk = await d.page.evaluate(() => ({ tag: getComputedStyle(document.querySelector('#compare-result .da-cmp-table tbody td .da-cmp-r')).display, tableDisplay: getComputedStyle(document.querySelector('#compare-result .da-cmp-table')).display, wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
@@ -1568,7 +1574,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports left/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#compare-list li:nth-child(1) input'); await page.check('#compare-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = { not: 'a report' };
   await page.click('#compare-go');
@@ -2033,6 +2039,82 @@ for (const [text, want] of [['Enterprise', /\/development-activity\.html$/], ['H
   const { ctx, page } = await open();
   await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click('header.top .sitenav a:text-is("' + text + '")')]);
   ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking "${text}" opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
+  await ctx.close();
+}
+
+// ---- Part L: the page layout (redesign 2026-10-10) ---------------------------------------------------------------------------------------------------------
+// Presentation only. The order of the sections, the empty state, the closed account section, the one saved-reports library with its search, and no sideways scroll at
+// phone, tablet and desktop widths. Set DA_SHOTS=<directory> to also write a full-page screenshot of each state for a visual review.
+const SHOTS = process.env.DA_SHOTS || '';
+const shot = async (page, name) => { if (SHOTS) await page.screenshot({ path: SHOTS + '/' + name + '.png', fullPage: true }); };
+const topOf = (page, sel) => page.$eval(sel, (e) => e.getBoundingClientRect().top + scrollY);
+const noSideways = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
+{
+  // L1. signed out: the form and the empty state are there; no member section, and no empty "Account and administration" bar
+  const { ctx, page } = await open({ w: world(), signedIn: false, accountClosed: true });
+  ok((await drawn(page, '#create-title')) && (await drawn(page, '#rf')) && (await drawn(page, '#report-empty')), 'L1a signed out: Create a property report and the empty-report note are drawn');
+  ok(!(await drawn(page, '#account')) && (await drawnCards(page)).length === 0, 'L1b signed out: the account section is not drawn at all (no empty bar), and no member card is');
+  ok(/Generate report/.test(await text(page, '#go')) && /Create a property report/.test(await text(page, '#create-title')) && /Current property report/.test(await text(page, '#current-title')),
+    'L1c the form is titled "Create a property report" with a "Generate report" button, and the report area is titled "Current property report"');
+  ok((await topOf(page, '#create-title')) < (await topOf(page, '#current-title')), 'L1d Create comes before the current report');
+  await shot(page, 'L1-signed-out-desktop');
+  await ctx.close();
+}
+{
+  // L2. a signed-in owner with saved reports: the order, the report as the dominant element, the actions under its heading, the closed account section
+  const w = world({ role: 'owner' });
+  const { ctx, page } = await open({ w, accountClosed: true });
+  await waitCount(page, /free reports left/);
+  ok(await drawn(page, '#report-empty') && !(await drawn(page, '#share')) && !(await drawn(page, '#watch')), 'L2a before any report is open, the empty note is shown and the Share and Watch cards are not');
+  await shot(page, 'L2-empty-member-desktop');
+  await make(page, A1); await make(page, A2); await make(page, A3);
+  await waitBoxes(page, 3);
+  ok(!(await drawn(page, '#report-empty')) && (await drawn(page, '#report .da-rv')), 'L2b with a report open the empty note is gone and the report is drawn');
+  const t = { create: await topOf(page, '#create-title'), current: await topOf(page, '#current-title'), report: await topOf(page, '#report .da-rv'), saved: await topOf(page, '#saved'), account: await topOf(page, '#account') };
+  ok(t.create < t.current && t.current < t.report && t.report < t.saved && t.saved < t.account, 'L2c the order is Create, Current report, Saved reports, Account and administration', t);
+  const bar = await page.evaluate(() => { const h = document.querySelector('#report .da-rv-head'), n = h && h.nextElementSibling; return { adjacent: !!n && n.classList.contains('da-rv-actions'), labels: n ? [...n.querySelectorAll('button')].map((b) => b.textContent) : [] }; });
+  ok(bar.adjacent && JSON.stringify(bar.labels) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF', 'Compare']), 'L2d the report\'s action buttons sit directly under its heading: Share with Client, Watch Property, Download PDF, Compare', bar);
+  ok(await drawn(page, '#share') && await drawn(page, '#watch'), 'L2e the client-link and watch cards are drawn once a saved report is open');
+  ok(!(await page.$eval('#account', (e) => e.open)) && (await drawn(page, '#account > summary')) && !(await page.$eval('#billing', (e) => e.checkVisibility())) && !(await page.$eval('#team', (e) => e.checkVisibility())) && !(await page.$eval('#profile', (e) => e.checkVisibility())),
+    'L2f the account section is closed by default: its heading is drawn, Billing, Invite an agent and Your name on reports are not');
+  await shot(page, 'L2-report-desktop');
+  await page.click('#account > summary');
+  ok((await drawn(page, '#billing')) && (await drawn(page, '#team')) && (await drawn(page, '#profile')), 'L2g opening it shows Billing, Your name on reports and Invite an agent');
+  await shot(page, 'L2-account-open-desktop');
+  await page.click('#account > summary');
+  // the one library: every row opens a report and holds its own checkbox, and there is no second list
+  ok((await page.$$('#saved-list li')).length === 3 && (await page.$$('#saved-list li input[type=checkbox]')).length === 3 && (await page.$$('#compare-list')).length === 0, 'L2h Saved reports is one list: three rows, each with its own checkbox, and no second list');
+  await page.check('#saved-list li:nth-child(1) input');
+  await page.fill('#saved-search', 'second');
+  const f1 = await page.$$eval('#saved-list li', (els) => els.map((e) => !e.hidden));
+  ok(f1.filter(Boolean).length === 1 && /Second/.test(await page.$eval('#saved-list li:not([hidden]) button', (b) => b.textContent)), 'L2i searching narrows the list to the matching report', f1);
+  ok(/1 report chosen\./.test(await text(page, '#compare-count')) && (await page.$eval('#saved-list li:nth-child(1) input', (e) => e.checked)), 'L2j a ticked report that the search hides stays ticked and still counts');
+  await page.fill('#saved-search', 'no such street');
+  ok(await drawn(page, '#saved-nomatch') && (await page.$$eval('#saved-list li', (els) => els.every((e) => e.hidden))), 'L2k a search with no match says so');
+  await page.fill('#saved-search', '');
+  ok((await page.$$eval('#saved-list li', (els) => els.every((e) => !e.hidden))) && !(await drawn(page, '#saved-nomatch')), 'L2l clearing the search shows every report again');
+  await ctx.close();
+}
+for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
+  // L3. no sideways scroll at desktop, tablet and phone widths, with a report, the library and the account section open
+  const { ctx, page } = await open({ w: world({ role: 'owner' }), width, height });
+  await waitCount(page, /free reports left/);
+  await make(page, A1); await make(page, A2);
+  await waitBoxes(page, 2);
+  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.click('#compare-go');
+  await waitCompared(page);
+  ok(await noSideways(page), `L3 at ${width}px wide nothing scrolls sideways (report, library, comparison and account section all drawn)`, await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]));
+  const small = await page.$$eval('#report .da-rv-act, #go, #saved-list li button, #saved-list li .sv-pick', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { h: r.height, w: r.width, t: e.tagName }; }).filter((x) => x.h < 24 || x.w < 18));
+  ok(small.length === 0, `L3b at ${width}px the action buttons, Generate report and every library row can be touched (none smaller than 24px)`, small);
+  await shot(page, `L3-${width}`);
+  await ctx.close();
+}
+{
+  // L4. the Billing deep link still lands on the plan, with the account section opened for it
+  const { ctx, page } = await open({ w: world({ role: 'owner' }), hash: '#billing', accountClosed: true });
+  await waitBilling(page, /Free trial/);
+  ok(await page.$eval('#account', (e) => e.open) && (await drawn(page, '#billing')), 'L4 arriving on #billing opens the account section and shows the plan');
   await ctx.close();
 }
 
