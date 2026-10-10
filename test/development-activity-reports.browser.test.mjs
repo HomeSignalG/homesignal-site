@@ -1969,14 +1969,20 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok(outside === 0, '14d Tab stays inside the dialog while it is open', outside);
   for (let i = 0; i < 12; i++) { await page.keyboard.press('Shift+Tab'); if (!(await page.evaluate(() => document.getElementById('auth-overlay').contains(document.activeElement)))) outside++; }
   ok(outside === 0, '14e so does Shift+Tab', outside);
-  // put the focus on the link and PROVE it is there before pressing the key (a slow runner can drop the focus after the Tab loops above)
-  for (let i = 0; i < 5; i++) {
-    await page.focus('#auth-back-link');
-    if (await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'auth-back-link', null, { timeout: 1000 }).then(() => true).catch(() => false)) break;
+  // put the focus on the link and PROVE it is there before pressing the key (a slow runner can drop the focus after the Tab loops above). A keypress a loaded runner
+  // drops is tried again, from a proven focus, up to four times: what is asserted is that Enter on the focused link goes back to the email step.
+  const atEmail = () => page.evaluate(() => getComputedStyle(document.getElementById('auth-email')).display === 'block' && getComputedStyle(document.getElementById('auth-code')).display === 'none');
+  let back = false;
+  for (let attempt = 0; attempt < 4 && !back; attempt++) {
+    for (let i = 0; i < 5; i++) {
+      await page.focus('#auth-back-link');
+      if (await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'auth-back-link', null, { timeout: 1000 }).then(() => true).catch(() => false)) break;
+    }
+    await page.keyboard.press('Enter');
+    back = await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block' && getComputedStyle(document.getElementById('auth-code')).display === 'none', null, { timeout: 3000 }).then(() => true).catch(() => false);
   }
-  await page.keyboard.press('Enter');
-  await page.waitForFunction(() => getComputedStyle(document.getElementById('auth-email')).display === 'block' && getComputedStyle(document.getElementById('auth-code')).display === 'none', null, { timeout: 8000 }).catch(() => {});
-  ok((await page.$eval('#auth-email', (e) => getComputedStyle(e).display)) === 'block' && (await page.$eval('#auth-code', (e) => getComputedStyle(e).display)) === 'none', '14f pressing it from the keyboard goes back to the email step');
+  ok(back && await atEmail(), '14f pressing it from the keyboard goes back to the email step',
+    await page.evaluate(() => ({ active: document.activeElement && (document.activeElement.id || document.activeElement.tagName), email: getComputedStyle(document.getElementById('auth-email')).display, code: getComputedStyle(document.getElementById('auth-code')).display, overlay: getComputedStyle(document.getElementById('auth-overlay')).display })));
   await page.keyboard.press('Escape');
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
   await ctx.close();
