@@ -60,3 +60,41 @@ create table geo.n5_verdict_manifest (
   constraint n5_verdict_manifest_state_ck check (state in ('BUILDING','READY','FAILED')),
   constraint n5_verdict_manifest_sync_ck  check (canonical_synced_at is null or state = 'READY')
 );
+
+-- ---------------------------------------------------------------------------
+-- REVISION 4 (2026-10-10): the serving generation's own verified stored points.
+-- Names, types and keys as in production (read from pg_attribute / pg_indexes 2026-10-10).
+-- These tables are EMPTY unless a test seeds them, so every revision-3 assertion runs
+-- against exactly the fixture it always did.
+-- ---------------------------------------------------------------------------
+drop table if exists geo.n5_generation cascade;
+create table geo.n5_generation (
+  generation_id text primary key,
+  state         text not null,
+  constraint n5_generation_state_check check (state = any (array[
+    'BUILDING','VALIDATING','READY','ACTIVE','SUPERSEDED','FAILED','ACTIVE_LEGACY']))
+);
+-- production's n5_generation_one_serving: at most one ACTIVE/ACTIVE_LEGACY row
+create unique index n5_generation_one_serving on geo.n5_generation
+  (((state = any (array['ACTIVE','ACTIVE_LEGACY'])))) where (state = any (array['ACTIVE','ACTIVE_LEGACY']));
+
+drop table if exists geo.n5_gen_proven_point cascade;
+create table geo.n5_gen_proven_point (
+  generation_id text not null references geo.n5_generation(generation_id) on delete cascade,
+  source_key    text not null,
+  registry_id   text,
+  geom          geometry(Point,4269),
+  primary key (generation_id, source_key)
+);
+create index n5_gen_proven_point_gix on geo.n5_gen_proven_point using gist (geom);
+
+drop table if exists geo.n5_generation_key_verdict cascade;
+create table geo.n5_generation_key_verdict (
+  generation_id text not null,
+  source_key    text not null,
+  registry_id   text,
+  verdict       text not null,
+  detail        jsonb,
+  recorded_at   timestamptz not null default now(),
+  primary key (generation_id, source_key)
+);

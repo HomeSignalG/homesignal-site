@@ -190,7 +190,8 @@ ok(/from hit h\n\s*order by h\.distance_mi, h\.source_key, h\.feature_id\n\s*lim
 ok(!/limit v_max_rows|limit 2000/.test(code), 'no hard-coded row limit anywhere');
 ok(/v_max_rows\s+constant integer\s*:=\s*2000/.test(code), 'a hard server maximum bounds any caller request');
 ok(!/limit v_max_rows/.test(code), 'the bare unconditional LIMIT of revision 1 is gone');
-ok(/order by distance_mi, source_key, feature_id[\s\S]{0,80}limit p_limit \+ 1/.test(code),
+// REVISION 4: `hit` is a union of two candidate branches, so the ordering/limit sit over the union (alias u).
+ok(/order by u\.distance_mi, u\.source_key, u\.feature_id[\s\S]{0,40}limit p_limit \+ 1/.test(code),
   'the bounded fetch is ordered nearest-first, so truncation drops the FARTHEST rows');
 ok(/order by h\.distance_mi, h\.source_key, h\.feature_id/.test(code),
   'the returned result is ordered nearest-first and deterministic on ties');
@@ -209,8 +210,9 @@ ok(!/grant[\s\S]{0,80}on (table |schema )?geo\./i.test(code),
 ok(!/execute format|execute '|quote_ident|dynamic/i.test(code),
   'no dynamic SQL — this cannot be turned into an arbitrary query endpoint');
 const geoReads = (code.match(/geo\.[a-z0-9_]+/g) || []).filter((v, i, a) => a.indexOf(v) === i).sort();
-ok(geoReads.join(',') === 'geo.n5_geom,geo.n5_point_reject,geo.n5_verdict_manifest',
-  'reads exactly three geo tables: n5_geom, n5_point_reject, n5_verdict_manifest — ' + geoReads.join(','));
+// REVISION 4 adds exactly the serving generation's own verified-point evidence: its points, its row, its reject verdicts.
+ok(geoReads.join(',') === 'geo.n5_gen_proven_point,geo.n5_generation,geo.n5_generation_key_verdict,geo.n5_geom,geo.n5_point_reject,geo.n5_verdict_manifest',
+  'reads exactly six geo tables: the three of revision 3 plus n5_gen_proven_point, n5_generation, n5_generation_key_verdict — ' + geoReads.join(','));
 ok(!/n5_association|n5_frozen|n5_shard|n5_zcta|n5_a3_/.test(code),
   'does not read the association/frozen/shard/A3 tables');
 const drops = (code.match(/^\s*drop .*$/gim) || []).map((l) => l.trim());
@@ -255,8 +257,15 @@ ok(!/marker[\s\S]{0,200}order by (?!pl\.distance_mi)/i.test(
   'final ordering is still distance_mi, source_key, feature_id — never the marker');
 
 // THE ONLY INPUT IS THIS ROW'S OWN GEOMETRY.
-ok(/left join geo\.n5_geom g\n\s*on g\.source_key = p\.source_key\n\s*and g\.feature_id = p\.feature_id/.test(code),
+ok(/left join geo\.n5_geom g\n\s*on p\.src = 'n5_geom'\n\s*and g\.source_key = p\.source_key\n\s*and g\.feature_id = p\.feature_id/.test(code),
   'marker geometry is joined on the SAME (source_key, feature_id) the row returns');
+// REVISION 4: a generation row's marker comes from the generation's own point, by the key it was returned under.
+ok(/left join geo\.n5_gen_proven_point pp\n\s*on p\.src = 'generation'\n\s*and pp\.generation_id = v_gen\n\s*and pp\.source_key = p\.source_key/.test(code),
+  'a generation row\'s marker geometry is joined on (generation, source_key) of the row it returned');
+ok(/v_gen is not null\s+and pp\.generation_id = v_gen/.test(code) && /where gen\.state = 'ACTIVE'/.test(code),
+  'generation points are read only from the ACTIVE serving generation (and not at all when none is)');
+ok(/not exists \(select 1 from geo\.n5_geom g2/.test(code),
+  'generation points are added only for projects geo.n5_geom does not already admit (strictly additive)');
 ok(/left join geo\.n5_geom/.test(code),
   'that join is a LEFT join — a row can lose its marker but can never be dropped by it');
 ok(!/app_properties|source_ref|source_seq|n5_association|rep_lat|rep_lng/i.test(markerRegion),
