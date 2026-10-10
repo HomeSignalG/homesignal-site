@@ -192,7 +192,8 @@ m('print_page_number_dropped', "@bottom-right{content:\"Page \" counter(page) \"
 m('print_row_split_allowed', ".da-rv-sec--map,.da-rv-table tr{break-inside:avoid;page-break-inside:avoid}", ".da-rv-sec--map{break-inside:avoid;page-break-inside:avoid}")
 m('print_header_not_repeated', "'.da-rv-table thead{display:table-header-group}',", "'.da-rv-table thead{display:table-row-group}',")
 m('raw_url_printed_again', "link + '</p>'", "link + '<span class=\"da-rv-url\">' + esc(safeHref(isObj(p.source) ? p.source.url : '')) + '</span></p>'")
-m('print_evidence_collapsed', "'.da-rv-detail>.da-rv-sum{display:none}.da-rv-detail::details-content{content-visibility:visible;display:block}',", "")
+m('print_evidence_collapsed', ".da-rv-detail::details-content{content-visibility:visible;display:block}',", "',")
+m('print_evidence_heading_hidden', "'.da-rv-detail>.da-rv-sum{display:block;list-style:none;", "'.da-rv-detail>.da-rv-sum{display:none;list-style:none;")
 
 
 def first_failure(out):
