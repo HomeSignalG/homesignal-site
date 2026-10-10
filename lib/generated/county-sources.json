@@ -1381,7 +1381,7 @@
         "id": "charlotte-land-dev-commercial-projects",
         "label": "City of Charlotte",
         "scope": "city",
-        "commercial": true
+        "commercial": false
       }
     ],
     "NC|New Hanover": [
