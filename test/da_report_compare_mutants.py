@@ -123,7 +123,7 @@ m('changing_the_choice_keeps_the_comparison', "cb.addEventListener('change', fun
 m('compare_action_not_live_on_a_reopened_report', "live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']", "live: canShare ? ['share', 'watch', 'pdf'] : ['share', 'pdf']", PAGEOFF + [PB], PAGE)  # re-anchored 2026-10-07 (audit fix 10)
 m('compare_action_not_live_on_a_new_report', "live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']", "live: shareable ? ['share', 'watch', 'pdf'] : ['share', 'pdf']", PAGEOFF + [PB], PAGE)  # re-anchored 2026-10-07 (audit fix 10)
 m('compare_action_compares_at_once', "else if (act === 'compare' && !$('compare').hidden) chooseForCompare(shareFor);", "else if (act === 'compare' && !$('compare').hidden) runCompare();", PAGEOFF + [PB], PAGE)
-m('card_shown_to_everyone', 'id="compare" aria-labelledby="compare-title" hidden>', 'id="compare" aria-labelledby="compare-title">', PAGEOFF + [PB], PAGE)
+m('card_shown_to_everyone', 'id="compare" aria-labelledby="compare-title" role="group" hidden>', 'id="compare" aria-labelledby="compare-title" role="group">', PAGEOFF + [PB], PAGE)
 m('unreadable_saved_list_says_nothing', "paintCompare(null); return; }", "return; }", PAGEOFF + [PB], PAGE)
 m('a_not_found_report_is_compared_anyway', "if (r.status !== 200 || body.status !== 'OK' || body.reopened !== true || !V.renderable(body)) { compareSay(compareMessage(r.status), true); return; }", "if (r.status !== 200) { compareSay(compareMessage(r.status), true); return; }", PAGEOFF + [PB], PAGE)
 m('opening_is_said_to_use_a_free_report', "Opening them did not use a free report.'", "Opening them used one free report each.'", [PB], PAGE)

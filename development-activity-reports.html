@@ -171,22 +171,88 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #watch-state{margin:0;font-size:14px;max-width:70ch}
 #watch-status{margin:0;font-size:14px;min-height:1.5em}
 #watch-status.err{color:var(--red);font-weight:600}
-#compare{display:grid;gap:10px}
-#compare h2{margin:0;font-size:17px}
+#compare{display:grid;gap:10px;margin-top:6px;padding-top:16px;border-top:1px solid var(--line)}
+#compare h3{margin:0;font-size:16px}
 #compare .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
-#compare-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
-#compare-list label{display:flex;align-items:flex-start;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;min-height:44px;overflow-wrap:anywhere;cursor:pointer}
-#compare-list input{margin:2px 0 0;width:18px;height:18px;flex:none}
-#compare-list input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 #compare-count{margin:0}
 #compare-status{margin:0;font-size:14px;min-height:1.5em}
 #compare-status.err{color:var(--red);font-weight:600}
+/* ============================================================================
+   PAGE LAYOUT (redesign, 2026-10-10). Presentation only: the order of the sections, their spacing and the way the same controls are grouped.
+   Every id, every `hidden` toggle and every request below is the page's own as before. The report is drawn by lib/da-report-view.js, untouched.
+   Order: account strip, Create a property report, Current property report (the primary feature), Saved reports (one library, comparison included),
+   Account and administration (secondary, closed until wanted).
+   ============================================================================ */
+header.top{padding:22px 16px 18px}
+header.top h1{font-size:26px;letter-spacing:-.01em}
+header.top .brand{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+header.top .meta{font-size:14.5px;margin-top:6px}
+.wrap{gap:22px;padding-top:24px}
+.sec-h{margin:0 0 12px;font-size:19px;letter-spacing:-.01em}
+#trial{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 18px;padding:12px 18px}
+#trial .count{font-size:15.5px}
+input[type=text],input[type=search]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
+input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+/* Create a property report */
+.create{padding:24px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
+.create .sec-h{margin-bottom:14px}
+.create-row{display:flex;gap:12px;align-items:flex-end}
+.create-addr{flex:1;min-width:0}
+.create-addr input{font-size:17px;padding:14px 16px}
+.create-row .go{justify-self:auto;padding:14px 26px;font-size:16px;min-height:52px;white-space:nowrap}
+.create-label{max-width:360px}
+/* Current property report */
+.stage{display:grid;gap:14px}
+.stage>.sec-h{margin:0}
+#report-empty{display:none;background:var(--panel);border:1px dashed #b9cdc0;border-radius:14px;padding:34px 24px;text-align:center}
+#report:empty+#report-empty{display:block}
+#report-empty .empty-t{margin:0 0 4px;font-size:17px;font-weight:600}
+#report-empty .empty-s{margin:0 auto;max-width:56ch;font-size:14px;color:var(--muted)}
+#report .da-rv-actions{margin:22px 0 0;padding:18px 0 0;border-top:1px solid var(--rv-line);gap:12px}
+#report .da-rv-act{min-height:44px;padding:10px 20px;font-size:14.5px;border-radius:10px}
+#report .da-rv-act--live[data-da-action="share"]{background:var(--accent);border-color:var(--accent);color:#fff}
+#report .da-rv-act--live[data-da-action="share"]:hover{background:#0f5c37}
+#report .da-rv-act--live[data-da-action="watch"]{border-color:var(--accent);color:var(--accent)}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.tools:not(:has(.card:not([hidden]))){display:none}
+.tools .card{align-content:start}
+/* Saved reports: one library. Each row opens the report and holds its own comparison checkbox. */
+.sv-search{max-width:420px}
+#saved-list{max-height:23rem;overflow-y:auto;padding:2px}
+#saved-list:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+.sv-row{display:flex;gap:10px;align-items:stretch}
+.sv-row button{flex:1;min-width:0}
+.sv-pick{flex:none;display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.sv-pick input{width:18px;height:18px;margin:0}
+.sv-pick input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+/* Account and administration: secondary, closed until wanted, and not drawn at all while none of its cards may show */
+.acct{background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+.acct:not(:has(.card:not([hidden]))){display:none}
+.acct>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px;padding:14px 18px;min-height:48px;border-radius:12px}
+.acct>summary::-webkit-details-marker{display:none}
+.acct>summary::before{content:"\25B8";color:var(--muted);font-size:13px}
+.acct[open]>summary::before{content:"\25BE"}
+.acct>summary:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+.acct-t{font-weight:600}
+.acct-s{font-size:13px;color:var(--muted)}
+.to-billing .wrap{padding-bottom:calc(100vh - 120px)}
+.acct-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:0 18px 18px;align-items:start}
+@media(max-width:820px){.tools{grid-template-columns:1fr}}
+@media(max-width:620px){
+  .create{padding:18px}
+  .create-row{flex-direction:column;align-items:stretch}
+  .create-row .go{width:100%}
+  .create-label{max-width:none}
+  header.top h1{font-size:22px}
+  #report .da-rv-act{flex:1 1 calc(50% - 12px);padding:10px 12px}
+}
 /* PRINT: only the report goes on the paper (build step 8). Every card, the form, the status lines and the sign-in are left off; the report's
    own stylesheet (lib/da-report-view.js) takes care of the report. */
 @media print{
   body{background:#fff}
-  header.top,.card,#status,#creditnote,.auth-overlay,#share-pop{display:none!important}
+  header.top,.card,.sec-h,#status,#creditnote,#report-empty,.acct,.auth-overlay,#share-pop{display:none!important}
   .wrap{max-width:none;padding:0;display:block}
+  .stage{display:block}
 }
 .auth-overlay{display:none;position:fixed;inset:0;background:rgba(16,33,28,.45);z-index:2000;align-items:center;justify-content:center}
 .auth-modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px;width:100%;max-width:380px;margin:16px;position:relative}
@@ -208,14 +274,16 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   <div class="in">
     <nav class="sitenav" aria-label="HomeSignal site"><a href="index.html">HomeSignal</a><a href="development-activity.html">Enterprise</a></nav>
     <div>
-      <h1>Development Activity reports</h1>
-      <p class="meta">Type a U.S. property address to see the official development records within half a mile of it.</p>
+      <p class="brand">HomeSignal</p>
+      <h1>Development Activity Reports</h1>
+      <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
     </div>
     <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
   </div>
 </header>
 
 <main class="wrap">
+  <!-- 1. Where the account stands: the free reports or the month's reports left (the trial function's words, unchanged). -->
   <section class="card" id="trial" aria-live="polite">
     <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
     <p class="sub" id="trial-sub"></p>
@@ -229,93 +297,125 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     </form>
     <p id="signup-status" role="status" aria-live="polite"></p>
   </section>
-  <section class="card" id="billing" aria-labelledby="billing-title" hidden>
-    <h2 id="billing-title">Billing</h2>
-    <p class="plan" id="billing-plan"></p>
-    <p class="sub" id="billing-sub"></p>
-    <div class="row">
-      <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
-      <button type="button" class="go ghost" id="billing-refresh">Check again</button>
-    </div>
-    <p class="hint" id="billing-hint" hidden>Back from the payment page? Press Check again: your plan appears here once the payment provider has confirmed it.</p>
-    <p id="billing-status" role="status" aria-live="polite"></p>
-  </section>
-  <section class="card" id="team" aria-labelledby="team-title" hidden>
-    <h2 id="team-title">Invite an agent</h2>
-    <p class="sub">Each invite link lets one agent join your brokerage's trial and share its free reports. Make a new link for each agent.</p>
-    <button type="button" class="go" id="mint">Make an invite link</button>
-    <div id="minted" hidden>
-      <label>Agent invite link<input type="text" id="invite-link" readonly></label>
-      <button type="button" class="go" id="copy-invite">Copy link</button>
-      <p class="hint" id="invite-note"></p>
-    </div>
-    <h3 id="team-list-title">Your team</h3>
-    <p class="hint">Agents who have joined, and invite links nobody has used yet. Removing an agent ends their access to your brokerage's reports; their saved reports and the count of reports used stay as they are. Withdrawing an invite link makes it stop working.</p>
-    <ul id="team-list" aria-labelledby="team-list-title"></ul>
-    <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
-    <p id="team-status" role="status" aria-live="polite"></p>
-  </section>
-  <section class="card" id="saved" aria-labelledby="saved-title" hidden>
-    <h2 id="saved-title">Saved reports</h2>
-    <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report.</p>
-    <ul id="saved-list"></ul>
-    <p id="saved-status" role="status" aria-live="polite"></p>
-  </section>
-  <section class="card" id="compare" aria-labelledby="compare-title" hidden>
-    <h2 id="compare-title">Compare properties</h2>
-    <p class="sub">Choose 2 to 5 of your saved reports to see them side by side: what changed, what is approved, proposed or under construction, the project Types, and what each report says about its own coverage. It sets facts next to each other and does not score or rank properties. To compare a new address, make its report first. Comparing does not use a free report.</p>
-    <ul id="compare-list"></ul>
-    <p class="hint" id="compare-count"></p>
-    <div class="row"><button type="button" class="go" id="compare-go" disabled>Compare selected reports</button></div>
-    <p id="compare-status" role="status" aria-live="polite"></p>
-    <div id="compare-result"></div>
-  </section>
-  <section class="card" id="profile" aria-labelledby="profile-title" hidden>
-    <h2 id="profile-title">Your name on reports</h2>
-    <p class="sub">Every report you make or reopen shows your brokerage's name and your name at the top. Your brokerage's name comes from its account; your name is whatever you type here.</p>
-    <form id="pf" novalidate>
-      <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
-      <button type="submit" class="go" id="save-name">Save my name</button>
-    </form>
-    <p id="profile-status" role="status" aria-live="polite"></p>
-  </section>
-  <section class="card" aria-label="Make a report">
+
+  <!-- 2. Create a Property Report. The same form, the same ids and the same submit handler as before. -->
+  <section class="card create" aria-labelledby="create-title">
+    <h2 class="sec-h" id="create-title">Create a property report</h2>
     <form id="rf" novalidate>
-      <label>Property address
-        <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
-      </label>
-      <label>Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
+      <div class="create-row">
+        <label class="create-addr">Property address
+          <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
+        </label>
+        <button type="submit" class="go" id="go">Generate report</button>
+      </div>
+      <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
       <p class="hint">The client label appears in this report's header. A saved report keeps it with the address, not in the report itself, so you see it when you reopen the report.</p>
-      <button type="submit" class="go" id="go">Make report</button>
     </form>
   </section>
-  <p id="status" role="status" aria-live="polite"></p>
-  <p id="creditnote" hidden></p>
-  <section class="card" id="share" aria-labelledby="share-title" hidden>
-    <h2 id="share-title">Share this report with your client</h2>
-    <p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p>
-    <div class="row">
-      <button type="button" class="go" id="share-make">Make a client link</button>
-      <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+
+  <!-- 3. The current property report: the primary feature. The report itself is drawn by lib/da-report-view.js into #report; its action buttons are
+       moved to just under the report's heading by the script below (dressActions). -->
+  <section class="stage" id="current" aria-labelledby="current-title">
+    <h2 class="sec-h" id="current-title">Current property report</h2>
+    <p id="status" role="status" aria-live="polite"></p>
+    <p id="creditnote" hidden></p>
+    <div id="report"></div>
+    <div class="empty" id="report-empty">
+      <p class="empty-t">No report is open</p>
+      <p class="empty-s">Enter a property address above and press Generate report, or open one from Saved reports. The report appears here.</p>
     </div>
-    <div id="share-new" hidden>
-      <label>Client link<input type="text" id="share-link" readonly></label>
-      <button type="button" class="go" id="share-copy">Copy link</button>
-      <p class="hint" id="share-note"></p>
+    <div class="tools">
+      <section class="card" id="share" aria-labelledby="share-title" hidden>
+        <h2 id="share-title">Share this report with your client</h2>
+        <p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p>
+        <div class="row">
+          <button type="button" class="go" id="share-make">Make a client link</button>
+          <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+        </div>
+        <div id="share-new" hidden>
+          <label>Client link<input type="text" id="share-link" readonly></label>
+          <button type="button" class="go" id="share-copy">Copy link</button>
+          <p class="hint" id="share-note"></p>
+        </div>
+        <ul id="share-list"></ul>
+        <p id="share-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" id="watch" aria-labelledby="watch-title" hidden>
+        <h2 id="watch-title">Watch this property</h2>
+        <p class="sub">HomeSignal checks the area around this property once a day. When the official status of a nearby project changes, it emails you at the address you signed in with. The email names this report by its number and date and does not include the property's address: open the report here to see which property it is.</p>
+        <div class="row">
+          <button type="button" class="go" id="watch-start">Watch this property</button>
+          <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
+        </div>
+        <p id="watch-state"></p>
+        <p id="watch-status" role="status" aria-live="polite"></p>
+      </section>
     </div>
-    <ul id="share-list"></ul>
-    <p id="share-status" role="status" aria-live="polite"></p>
   </section>
-  <section class="card" id="watch" aria-labelledby="watch-title" hidden>
-    <h2 id="watch-title">Watch this property</h2>
-    <p class="sub">HomeSignal checks the area around this property once a day. When the official status of a nearby project changes, it emails you at the address you signed in with. The email names this report by its number and date and does not include the property's address: open the report here to see which property it is.</p>
-    <div class="row">
-      <button type="button" class="go" id="watch-start">Watch this property</button>
-      <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
+
+  <!-- 4. Saved reports: ONE library. Each row opens the report and carries its own comparison checkbox. -->
+  <section class="card" id="saved" aria-labelledby="saved-title" hidden>
+    <h2 class="sec-h" id="saved-title">Saved reports</h2>
+    <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report. Tick 2 to 5 to compare them side by side.</p>
+    <div class="sv-tools" id="saved-tools" hidden>
+      <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
     </div>
-    <p id="watch-state"></p>
-    <p id="watch-status" role="status" aria-live="polite"></p>
+    <ul id="saved-list" tabindex="0" role="group" aria-label="Saved reports, most recent first as the list returns them"></ul>
+    <p class="hint" id="saved-nomatch" hidden>No saved report matches that search.</p>
+    <p id="saved-status" role="status" aria-live="polite"></p>
+    <div class="cmp" id="compare" aria-labelledby="compare-title" role="group" hidden>
+      <h3 id="compare-title">Compare properties</h3>
+      <p class="sub">Choose 2 to 5 of your saved reports to see them side by side: what changed, what is approved, proposed or under construction, the project Types, and what each report says about its own coverage. It sets facts next to each other and does not score or rank properties. To compare a new address, make its report first. Comparing does not use a free report.</p>
+      <p class="hint" id="compare-count"></p>
+      <div class="row"><button type="button" class="go" id="compare-go" disabled>Compare selected reports</button></div>
+      <p id="compare-status" role="status" aria-live="polite"></p>
+      <div id="compare-result"></div>
+    </div>
   </section>
+
+  <!-- 5. Account and administration. Nothing here is new: the same cards, in a secondary section that is closed until it is wanted. There is no
+       account page on this site to move them to, so they are grouped here. It shows only while at least one of the cards is allowed to show. -->
+  <details class="acct" id="account">
+    <summary><span class="acct-t">Account and administration</span><span class="acct-s">Billing, report branding, invite an agent</span></summary>
+    <div class="acct-in">
+      <section class="card" id="billing" aria-labelledby="billing-title" hidden>
+        <h2 id="billing-title">Billing</h2>
+        <p class="plan" id="billing-plan"></p>
+        <p class="sub" id="billing-sub"></p>
+        <div class="row">
+          <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
+          <button type="button" class="go ghost" id="billing-refresh">Check again</button>
+        </div>
+        <p class="hint" id="billing-hint" hidden>Back from the payment page? Press Check again: your plan appears here once the payment provider has confirmed it.</p>
+        <p id="billing-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" id="profile" aria-labelledby="profile-title" hidden>
+        <h2 id="profile-title">Your name on reports</h2>
+        <p class="sub">Every report you make or reopen shows your brokerage's name and your name at the top. Your brokerage's name comes from its account; your name is whatever you type here.</p>
+        <form id="pf" novalidate>
+          <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
+          <button type="submit" class="go" id="save-name">Save my name</button>
+        </form>
+        <p id="profile-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" id="team" aria-labelledby="team-title" hidden>
+        <h2 id="team-title">Invite an agent</h2>
+        <p class="sub">Each invite link lets one agent join your brokerage's trial and share its free reports. Make a new link for each agent.</p>
+        <button type="button" class="go" id="mint">Make an invite link</button>
+        <div id="minted" hidden>
+          <label>Agent invite link<input type="text" id="invite-link" readonly></label>
+          <button type="button" class="go" id="copy-invite">Copy link</button>
+          <p class="hint" id="invite-note"></p>
+        </div>
+        <h3 id="team-list-title">Your team</h3>
+        <p class="hint">Agents who have joined, and invite links nobody has used yet. Removing an agent ends their access to your brokerage's reports; their saved reports and the count of reports used stay as they are. Withdrawing an invite link makes it stop working.</p>
+        <ul id="team-list" aria-labelledby="team-list-title"></ul>
+        <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
+        <p id="team-status" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+  </details>
+
   <div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>
     <div class="box">
       <h2 id="share-pop-title">Share this report with your client</h2>
@@ -336,7 +436,6 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       <button type="button" class="go ghost" id="share-pop-close">Close</button>
     </div>
   </div>
-  <div id="report"></div>
 </main>
 
 <div id="auth-overlay" class="auth-overlay">
@@ -542,6 +641,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var p = $('billing-plan'), sub = $('billing-sub'), buy = $('subscribe');
     p.className = 'plan'; buy.hidden = true; $('billing-hint').hidden = true;
     if (!plan) {
+      $('account').open = true;
       p.className = 'plan out'; p.textContent = 'Your plan could not be read just now';
       sub.textContent = 'Press Check again in a minute. Your saved reports are not affected.';
       return;
@@ -560,13 +660,13 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       p.textContent = plan.state === 'test_only' ? 'Test subscription only' : (access === 'trial' ? 'Free trial' : 'Free trial used');
       sub.textContent = (plan.state === 'test_only' ? 'This brokerage has a test subscription, which does not give any reports.' : (mine() ? 'Your ' : "Your brokerage's ") + freeWords() + " are separate from the plan.") + offer + who + closed;
     } else if (plan.state === 'canceled') {
-      p.className = 'plan out'; p.textContent = 'Your subscription has ended';
+      $('account').open = true; p.className = 'plan out'; p.textContent = 'Your subscription has ended';
       sub.textContent = 'Your saved reports stay available. Subscribe again for 100 new reports each month.' + who + closed;
     } else if (plan.state === 'past_due') {
-      p.className = 'plan out'; p.textContent = 'Your subscription needs attention';
+      $('account').open = true; p.className = 'plan out'; p.textContent = 'Your subscription needs attention';
       sub.textContent = 'The last payment did not go through, so new reports are paused. Your saved reports stay available.';
     } else {
-      p.className = 'plan out'; p.textContent = 'Your subscription status is not clear';
+      $('account').open = true; p.className = 'plan out'; p.textContent = 'Your subscription status is not clear';
       sub.textContent = 'New reports are paused until it is. Your saved reports stay available.';
     }
     // The owner always SEES the button where a new subscription would be possible. Before the payment provider is set up it is shown disabled
@@ -594,7 +694,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     showBilling(member);
     if (wantBilling) {
       wantBilling = false;
-      if (member) { $('billing').scrollIntoView(); }
+      if (member) { document.body.classList.add('to-billing'); $('account').open = true; $('billing').scrollIntoView(); }   // to-billing: room below the last section, so the card can be brought to the top
       else {
         var ts = $('trial-sub');
         ts.textContent = 'This email does not have an account yet. Create your individual account below to start with 10 free reports and subscribe from there. For a brokerage, team or enterprise organization: ';
@@ -808,7 +908,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   function savedSay(text, isError){ var s=$('saved-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide or show the card. Hiding also forgets the list, so one person's reports are never left on the page for the next. */
   function showSaved(on){
-    if (!on) { savedFresh = false; $('saved-list').textContent = ''; savedSay('', false); $('saved').hidden = true; hideCompare(); return; }
+    if (!on) { savedFresh = false; $('saved-list').textContent = ''; $('saved-search').value = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; savedSay('', false); $('saved').hidden = true; hideCompare(); return; }
     $('saved').hidden = false;
     if (!savedFresh) refreshSaved();
   }
@@ -825,54 +925,66 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var r = await post(REPORT_FN, { action: 'list' });
     if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
     var body = r.body || {};
-    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; savedSay(savedMessage(r.status), true); paintCompare(null); return; }
-    var list = $('saved-list');
+    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; $('saved-list').textContent = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; savedSay(savedMessage(r.status), true); paintCompare(null); return; }
+    var list = $('saved-list'), keep = chosenIds();
     list.textContent = '';
     savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your brokerage’s reports.', false);
     var offered = [];
     body.reports.forEach(function(rep){
       if (!rep || typeof rep.report_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(rep.report_id)) return;
       offered.push(rep);
+      var text = savedRowText(rep);
       var li = document.createElement('li'), b = document.createElement('button');
+      li.className = 'sv-row';
+      // the comparison checkbox (build step 10) sits on the same row as the report it chooses; ticking it never opens anything
+      var pick = document.createElement('label'), cb = document.createElement('input');
+      pick.className = 'sv-pick'; cb.type = 'checkbox'; cb.value = rep.report_id; cb.checked = keep.indexOf(rep.report_id) >= 0;
+      cb.setAttribute('aria-label', 'Compare report ' + rep.number);
+      cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
+      pick.appendChild(cb);
       b.type = 'button';
-      b.textContent = 'Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '');
+      b.textContent = text;
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
-      li.appendChild(b); list.appendChild(li);
+      li.appendChild(pick); li.appendChild(b); list.appendChild(li);
     });
+    $('saved-tools').hidden = offered.length === 0;
+    filterSaved();
     paintCompare(offered);
+  }
+  /** One saved report, in words: the same line the list has always shown. The search reads this text and nothing else. */
+  function savedRowText(rep){
+    return 'Report ' + rep.number + ' \u00b7 ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' \u00b7 ' + dateWords(rep.generated_at) : '');
+  }
+  /** Show the rows that match what was typed (all of them when nothing is). It only hides rows: a ticked row stays ticked and still counts. */
+  function filterSaved(){
+    var q = ($('saved-search').value || '').trim().toLowerCase(), rows = $('saved-list').children, shown = 0;
+    Array.prototype.forEach.call(rows, function(li){
+      var hit = !q || (li.textContent || '').toLowerCase().indexOf(q) >= 0;
+      li.hidden = !hit; if (hit) shown++;
+    });
+    $('saved-nomatch').hidden = !(q && rows.length && !shown);
   }
   // ---- comparing saved reports (build step 10) --------------------------------------------------------------------------------
   function compareSay(text, isError){ var s=$('compare-status'); s.textContent=text||''; s.className=isError?'err':''; }
   function chosenIds(){
-    return Array.prototype.filter.call($('compare-list').querySelectorAll('input'), function(c){ return c.checked; }).map(function(c){ return c.value; });
+    return Array.prototype.filter.call($('saved-list').querySelectorAll('input'), function(c){ return c.checked; }).map(function(c){ return c.value; });
   }
   /** Hide the card and forget everything on it, so one person's reports and comparison are never left on the page for the next. */
   function hideCompare(){
     compareRows = []; comparing = false;
-    $('compare').hidden = true; $('compare-list').textContent = ''; $('compare-result').textContent = ''; $('compare-count').textContent = '';
+    $('compare').hidden = true; $('compare-result').textContent = ''; $('compare-count').textContent = '';
     $('compare-go').disabled = true; compareSay('', false);
   }
   /** Keep the button and the count in step with the boxes: 2 to 5 may be chosen, and once 5 are the rest wait. */
   function syncCompare(){
     var n = chosenIds().length, C = window.HS && window.HS.daReportCompare, max = C ? C.MAX : 5, min = C ? C.MIN : 2;
-    Array.prototype.forEach.call($('compare-list').querySelectorAll('input'), function(c){ c.disabled = !c.checked && n >= max; });
+    Array.prototype.forEach.call($('saved-list').querySelectorAll('input'), function(c){ c.disabled = !c.checked && n >= max; });
     $('compare-go').disabled = comparing || n < min || n > max;
     $('compare-count').textContent = compareRows.length >= min ? (n === 0 ? 'Choose ' + min + ' to ' + max + ' reports.' : n + (n === 1 ? ' report' : ' reports') + ' chosen.') : '';
   }
-  /** Offer these saved reports ([{ report_id, number, address, generated_at }]), or say they could not be read (null). A choice that is still there is kept. */
+  /** Tell the comparison which saved reports are on offer ([{ report_id, number, address, generated_at }]), or that they could not be read (null). */
   function paintCompare(rows){
-    var keep = chosenIds();
-    compareRows = Array.isArray(rows) ? rows : [];
-    var list = $('compare-list');
-    list.textContent = '';
-    compareRows.forEach(function(rep){
-      var li = document.createElement('li'), lab = document.createElement('label'), cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = rep.report_id; cb.checked = keep.indexOf(rep.report_id) >= 0;
-      cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
-      lab.appendChild(cb);
-      lab.appendChild(document.createTextNode('Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '')));
-      li.appendChild(lab); list.appendChild(li);
-    });
+    compareRows = Array.isArray(rows) ? rows : [];   // the rows themselves, and their checkboxes, are the Saved reports list (refreshSaved)
     $('compare').hidden = false;
     if (rows === null) compareSay('The saved reports could not be read just now. Try again in a minute.', true);
     else if (compareRows.length < 2) compareSay('Comparing needs at least 2 saved reports. Make another report, then come back.', false);
@@ -881,10 +993,10 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
   }
   /** The report on screen joins the choice: its own "Compare property" button. */
   function chooseForCompare(reportId){
-    var boxes = $('compare-list').querySelectorAll('input'), first = null;
+    var boxes = $('saved-list').querySelectorAll('input'), first = null;
     Array.prototype.forEach.call(boxes, function(c){ if (!first) first = c; if (c.value === reportId && !c.checked && !c.disabled) { c.checked = true; $('compare-result').textContent = ''; compareSay('', false); } });
     syncCompare();
-    $('compare').scrollIntoView();
+    $('saved').scrollIntoView();
     if (first) first.focus();
   }
   function compareMessage(httpStatus){
@@ -934,6 +1046,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
       subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
       brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']
     })) {
+      dressActions();
       if (canShare) { showShare(body.report_id); showWatch(body.report_id); }
       savedSay('Saved report ' + number + (dateWords(body.generated_at) ? ' from ' + dateWords(body.generated_at) : '') + '.', false);
       $('creditnote').textContent = 'This is the report as it was saved. Opening it did not use a free report.'; $('creditnote').hidden = false;
@@ -1107,6 +1220,21 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var first = f[0], last = f[f.length - 1], at = document.activeElement;
     if (e.shiftKey && (at === first || !$('share-pop').contains(at))) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && (at === last || !$('share-pop').contains(at))) { e.preventDefault(); first.focus(); }
+  }
+  /** The report's own action buttons (lib/da-report-view.js writes them, at its foot), set where the person looks first: directly under the report's heading,
+   *  Share and Watch first. This only MOVES and RENAMES the buttons the view wrote; each keeps its data-da-action and the one click handler below does the rest.
+   *  The view is shared with other pages and is not changed. Its key order (ACTION_KEYS) is the order its buttons are written in. */
+  var ACTION_WORDS = { share: 'Share with Client', watch: 'Watch Property', pdf: 'Download PDF', compare: 'Compare' };
+  var ACTION_ORDER = ['share','watch','pdf','compare'];
+  function dressActions(){
+    var V = window.HS && window.HS.daReportView, box = $('report'), bar = box.querySelector('.da-rv-actions'), head = box.querySelector('.da-rv-head');
+    if (!V || !bar || !head || !head.parentNode) return;
+    var keys = V.ACTION_KEYS, buttons = Array.prototype.slice.call(bar.querySelectorAll('.da-rv-act')), byKey = {};
+    if (buttons.length !== keys.length) return; // not the four buttons this was written for: leave the view's bar exactly as it came
+    buttons.forEach(function(b, i){ byKey[keys[i]] = b; });
+    ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; bar.appendChild(b); } });
+    var note = bar.querySelector('.da-rv-soon'); if (note) bar.appendChild(note);
+    head.parentNode.insertBefore(bar, head.nextSibling);
   }
   /** "Download PDF" is the browser's own print window: the person chooses "Save as PDF" there. The print stylesheet leaves only the report. */
   function printReport(){ window.print(); }
@@ -1373,7 +1501,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     var r = await post(REPORT_FN, payload);
     busy = false; $('go').disabled = false;
     if (epochAtAsk !== sessionEpoch) { attempt = null; return; } // the person signed out (or another signed in) while the report was being made: it is shown to nobody
-    if (r.status === 0) { say('The report service could not be reached. Check your connection, then press Make report again: it will not use a second free report.', true); return; }
+    if (r.status === 0) { say('The report service could not be reached. Check your connection, then press Generate report again: it will not use a second free report.', true); return; }
     attempt = null; // the server answered: this request is finished
     var body = r.body || {};
     if (body.plan && typeof body.plan.state === 'string' && typeof body.plan.credits_remaining === 'number' && (access === 'trial' || access === 'complete')) plan = body.plan; // the plan as the database left it after this report
@@ -1390,6 +1518,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     // only a report that was saved (it has a permanent id) can be shared with a client; any report on screen can be printed
     var shareable = body.stored === true && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
     if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf'] })) { say('The report came back but could not be shown.', true); return; }
+    dressActions();
     if (shareable) { showShare(body.report_id); showWatch(body.report_id); }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
     // The status line follows the ENGINE's outcome code, never the count: a report with "No data ingested" has zero records because HomeSignal cannot yet confirm it
@@ -1429,6 +1558,7 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
     $('compare-go').addEventListener('click', runCompare);
+    $('saved-search').addEventListener('input', filterSaved);
     // the report's own Compare, Watch, Share and Download PDF buttons (lib/da-report-view.js writes them with data-da-action; the page decides what they do)
     $('report').addEventListener('click', function(e){
       var b = e.target && e.target.closest ? e.target.closest('[data-da-action]') : null;
