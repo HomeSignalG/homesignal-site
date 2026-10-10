@@ -174,7 +174,11 @@ jobs:
       # then have SKIPPED the commit step, and the monitor's evidence would die with it, which
       # is the same class of mistake in a new place.
       #
-      # Reads the committed anon key from config.js (public, RLS-gated), so it needs no secret.
+      # Public reads use the committed anon key from config.js. The ONE internal read (dev_zip_source_ids) needs the repo's
+      # existing SUPABASE_SERVICE_ROLE_KEY secret, scoped to this step only: anon lost SELECT on app_zip_source_ids on 2026-09-26
+      # (phase1_revoke_anon_internal_read_surface) and this step has failed with HTTP 401 / 42501 every night since.
       - name: Live scoreboard (ranked work list)
         if: always()
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/live-scoreboard.mjs

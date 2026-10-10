@@ -10,7 +10,7 @@
 //   2. NOT_WIRED        — discovery/wire work, each row carrying its BLOCKERS
 //
 // Run:  node scripts/live-scoreboard.mjs [--json]
-// Env:  SUPABASE_URL, SUPABASE_ANON_KEY (a runner has egress; the sandbox does not).
+// Env:  SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (a runner has egress; the sandbox does not).
 //       RESEARCH_ROWS — optional path to a JSON array of NOT_WIRED research rows.
 //
 // The registry is read from disk, so completeness is computable offline; only the ZIP-page
@@ -35,6 +35,12 @@ function fromConfigJs(name) {
 }
 const SUPABASE_URL = (process.env.SUPABASE_URL || fromConfigJs('SUPABASE_URL') || '').replace(/\/$/, '');
 const KEY = process.env.SUPABASE_ANON_KEY || fromConfigJs('SUPABASE_ANON_KEY') || '';
+// The ONE internal read (dev_zip_source_ids -> app_zip_source_ids) needs a server-side key. `anon` had SELECT on that table until
+// phase1_revoke_anon_internal_read_surface (2026-09-26) -- a deliberate hardening -- after which every nightly run died with
+// HTTP 401 / 42501 "permission denied for table app_zip_source_ids" (source-monitor runs 2026-09-27 .. 2026-10-10). The fix is NOT to
+// re-grant anon: it is to read with the repository's existing runner secret, exactly as the other runner jobs do. Env only -- it is
+// never read from config.js, never logged, never sent anywhere but SUPABASE_URL. The public communities read stays on the anon key.
+const INTERNAL_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const AS_JSON = process.argv.includes('--json');
 
 function flattenRegistry(path) {
@@ -130,7 +136,9 @@ async function fetchZipPages() {
 const ZIP_SOURCE_PAGE = 1000;
 
 async function fetchZipSourceIds() {
-  const hdr = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+  // Fail closed and say WHY: falling back to the anon key would 401 again with a message that points at the wrong cause.
+  if (!SUPABASE_URL || !INTERNAL_KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for dev_zip_source_ids (anon cannot read app_zip_source_ids)');
+  const hdr = { apikey: INTERNAL_KEY, Authorization: `Bearer ${INTERNAL_KEY}`, 'Content-Type': 'application/json' };
   const map = new Map();
   let after = '';
   for (;;) {

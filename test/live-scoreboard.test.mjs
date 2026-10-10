@@ -299,3 +299,24 @@ test('dev_zip_source_ids paging: one identifier, no literals, and it stays under
   assert.match(code, /page\.length\s*<\s*COMMUNITIES_PAGE/, 'its terminator must use the same constant');
   assert.doesNotMatch(code, /limit=\d+/, 'no paged read may hard-code its URL limit');
 });
+test('dev_zip_source_ids is read with the runner secret, never the anon key (anon lost SELECT 2026-09-26; 401 / 42501 nightly until fixed)', () => {
+  const src = readFileSync(new URL('../scripts/live-scoreboard.mjs', import.meta.url), 'utf8');
+  const code = src.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
+  const fn = code.slice(code.indexOf('async function fetchZipSourceIds'));
+  const body = fn.slice(0, fn.indexOf('\n}') + 2);
+  assert.match(code, /const INTERNAL_KEY = process\.env\.SUPABASE_SERVICE_ROLE_KEY \|\| '';/, 'the internal key comes from the environment only');
+  assert.doesNotMatch(code, /fromConfigJs\('SUPABASE_SERVICE_ROLE_KEY'\)/, 'the service key is never read from a committed file');
+  assert.match(body, /Authorization: `Bearer \$\{INTERNAL_KEY\}`/, 'the RPC call authenticates with the internal key');
+  assert.doesNotMatch(body, /\$\{KEY\}/, 'and not with the anon key');
+  assert.match(body, /if \(!SUPABASE_URL \|\| !INTERNAL_KEY\) throw/, 'a missing secret fails closed with its own message');
+  assert.doesNotMatch(code, /console\.(log|error|warn)\([^)]*INTERNAL_KEY/, 'the key is never printed');
+  // the public communities read keeps the anon key: widening the secret's reach would be a second change, not this one
+  const pages = code.slice(code.indexOf('async function fetchZipPages'), code.indexOf('async function fetchZipSourceIds'));
+  assert.match(pages, /Bearer \$\{KEY\}/); assert.doesNotMatch(pages, /INTERNAL_KEY/);
+  const wf = readFileSync(new URL('../.github/workflows/source-monitor.yml', import.meta.url), 'utf8');
+  const step = wf.slice(wf.indexOf('- name: Live scoreboard'));
+  assert.match(step, /SUPABASE_SERVICE_ROLE_KEY: \$\{\{ secrets\.SUPABASE_SERVICE_ROLE_KEY \}\}/, 'the workflow hands the step the secret');
+  assert.equal((wf.match(/SUPABASE_SERVICE_ROLE_KEY/g) || []).filter((x, i, a) => true).length >= 2, true);
+  const before = wf.slice(0, wf.indexOf('- name: Live scoreboard'));
+  assert.doesNotMatch(before.replace(/^\s*#.*$/gm, ''), /secrets\.SUPABASE_SERVICE_ROLE_KEY/, 'no earlier step receives it: the secret is scoped to this one step');
+});
