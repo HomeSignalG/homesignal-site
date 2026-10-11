@@ -259,7 +259,7 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '', accountClosed = false } = {}) {
+async function open({ compare = true, w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '', accountClosed = false } = {}) {
   const ctx = await browser.newContext(tz ? { viewport: { width, height }, timezoneId: tz } : { viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
@@ -272,6 +272,13 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
     const r = route.request(), url = r.url();
+    // Compare is hidden at launch (COMPARE_AT_LAUNCH = false in the page). The comparison tests below keep proving the engine and its UI by serving the page with the
+    // switch ON (open() with compare: true, the default); the launch section (N) opens it exactly as shipped (compare: false).
+    if (compare && url.split('?')[0].endsWith(PAGE)) {
+      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;');
+      if (!html.includes('COMPARE_AT_LAUNCH = true;')) throw new Error('the launch switch is not in the page');
+      return route.fulfill({ status: 200, contentType: 'text/html', body: html });
+    }
     if (url.startsWith(base)) return route.continue();
     if (url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB(signedIn, name) });
     if (url === MANAGE_FN) {
@@ -2250,7 +2257,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 
 // ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
 for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
-  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true });
+  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true, compare: false });
   await waitCount(page, /free reports left/);
   await make(page, A1);
   await waitBoxes(page, 1);
@@ -2277,6 +2284,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /free reports used/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
   ok(!g.entnav && !g.brandLabel, `${tag}: no Enterprise row and no repeated HomeSignal label`, g);
   ok(g.overflow <= 0, `${tag}: nothing scrolls sideways`, g.overflow);
+  ok(await page.evaluate(() => ![...document.querySelectorAll('[data-da-action="compare"], #compare-mode, #compare, .sv-pick')].some((e) => e.getClientRects().length) && ![...document.querySelectorAll('button')].some((b) => /compare/i.test(b.textContent) && b.getClientRects().length)), `${tag}: no Compare button, selection UI or report-level Compare action anywhere (launch scope)`);
   if (w >= 1000) {
     ok(g.rail.w >= 295 && g.rail.w <= 345 && g.stage.w >= g.wrapW.w * 0.6, `${tag}: the rail stays about 300-340px and the report column takes the rest`, { rail: g.rail.w, stage: g.stage.w, wrap: g.wrapW.w });
     ok(g.addr.w > g.label.w && g.go.w > 100 && Math.abs(g.addr.y - g.go.y) < 60 && Math.abs(g.addr.y - g.label.y) < 60, `${tag}: address, client label and Generate share one row, address widest`, { a: g.addr, l: g.label, g: g.go });
@@ -2292,9 +2300,72 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   await ctx.close();
 }
 {
-  const { ctx, page } = await open({ signedIn: false });
+  const { ctx, page } = await open({ signedIn: false, compare: false });
   ok(await page.$eval('header.sitebar #acct-btn', (e) => getComputedStyle(e).display === 'none'), 'M signed out: there is no Account control (nothing to administer)');
   ok(await page.$eval('#report-empty', (e) => getComputedStyle(e).display !== 'none' && /No report is open/.test(e.textContent) && /Enter an address above or open a saved report\./.test(e.textContent)), 'M the empty state is the restrained two-line one');
+  await ctx.close();
+}
+
+// ---- N. LAUNCH SCOPE (founder, 2026-10-11): Compare is hidden; the page is opened exactly as shipped (compare: false) ---------------------------------------------
+{
+  const w = world();
+  const { ctx, page, errors, shareCalls, watchCalls } = await open({ w, compare: false });
+  await waitCount(page, /free reports used/);
+  await make(page, A1); await make(page, A2);
+  await page.waitForFunction(() => document.querySelectorAll('#saved-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
+  const used = await text(page, '#trial-count');
+  const gone = async (where) => {
+    const v = await page.evaluate(() => {
+      const shown = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+      return { mode: shown(document.getElementById('compare-mode')), card: shown(document.getElementById('compare')), go: shown(document.getElementById('compare-go')),
+        count: shown(document.getElementById('compare-count')), picks: document.querySelectorAll('#saved-list .sv-pick, #saved-list input').length, rowKids: [...document.querySelectorAll('#saved-list li')].map((l) => l.children.length),
+        acts: [...document.querySelectorAll('[data-da-action]')].map((b) => b.getAttribute('data-da-action')), soon: document.querySelectorAll('.da-rv-soon, .da-rv-act[aria-disabled="true"]').length,
+        words: /compar/i.test(document.body.innerText), savedRail: document.getElementById('rail').innerText };
+    });
+    ok(!v.mode && !v.card && !v.go && !v.count && v.picks === 0 && v.rowKids.every((n) => n === 1) && !v.acts.includes('compare') && v.soon === 0 && !v.words,
+      `N1 ${where}: no Compare reports / Cancel comparing button, no checkboxes, no Compare properties card, no Compare selected reports button, no report-level Compare action, no "available soon" and no Compare wording anywhere on the page`, v);
+    return v;
+  };
+  await gone('with reports listed');
+  ok(JSON.stringify(await page.$$eval('#rail-actions .da-rv-act', (b) => b.map((e) => e.textContent.trim()))) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']),
+    'N2 the current report offers Share with Client, Watch Property and Download PDF, and nothing else');
+  // the saved list is still a plain list of clickable rows and reopens a report without using one
+  const before = (await page.evaluate(() => document.getElementById('trial-count').textContent));
+  await page.click('#saved-list li:nth-child(2) button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Saved report/.test(await text(page, '#saved-status')) && (await page.$('#report .da-rv')) !== null && (await text(page, '#trial-count')) === before && before === used,
+    'N3 a saved report still reopens from its row, and reopening it does not change the report count');
+  ok(JSON.stringify(await page.$$eval('#rail-actions .da-rv-act', (b) => b.map((e) => e.textContent.trim()))) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']), 'N3b a reopened report has the same three actions');
+  await gone('on a reopened saved report');
+  // Share, Watch and Download PDF still work
+  await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
+  await page.click('#rail-actions .da-rv-act[data-da-action="pdf"]');
+  ok((await page.evaluate(() => window.__prints)) === 1, 'N4 Download PDF still opens the browser\'s print window');
+  const c0 = shareCalls.filter((c) => c.body.action === 'create').length;
+  await page.click('#rail-actions .da-rv-act[data-da-action="share"]');
+  await page.waitForFunction(() => !document.getElementById('share-pop-body').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(shareCalls.filter((c) => c.body.action === 'create').length === c0 + 1 && /^https:\/\//.test(await page.$eval('#share-pop-link', (e) => e.value)), 'N5 Share with Client still makes one private link and shows it');
+  await page.keyboard.press('Escape');
+  await page.click('#rail-actions .da-rv-act[data-da-action="watch"]');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'watch-start', null, { timeout: 4000 }).catch(() => {});
+  const w0 = watchCalls.filter((c) => c.body.action === 'start').length;
+  await page.click('#watch-start');
+  await page.waitForFunction(() => !document.getElementById('watch-stop').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(watchCalls.filter((c) => c.body.action === 'start').length === w0 + 1 && !(await page.$eval('#watch-stop', (e) => e.hidden)), 'N6 Watch Property still starts watching the property');
+  // generating a report still works and still counts
+  await make(page, A3);
+  await page.waitForFunction((u) => document.getElementById('trial-count').textContent !== u, used, { timeout: 8000 }).catch(() => {});   // the count follows the report by a moment: wait for it, then assert it changed
+  ok((await page.$$eval('#saved-list li', (l) => l.length)) === 3 && (await text(page, '#trial-count')) !== used && (await page.$('#report .da-rv')) !== null, 'N7 generating a report still works, is saved, and uses one report');
+  await gone('after generating another report');
+  ok(errors.length === 0, 'N8 no page error', errors);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  if (SHOTS) { await page.evaluate(() => scrollTo(0, 0)); await page.screenshot({ path: SHOTS + '/N-launch-1440x900.png' }); await page.screenshot({ path: SHOTS + '/N-launch-full.png', fullPage: true }); await (await page.$('#saved')).screenshot({ path: SHOTS + '/N-launch-saved.png' }); }
+  await ctx.close();
+}
+{
+  // signed out: the card and its button stay out of the page too
+  const { ctx, page } = await open({ signedIn: false, compare: false });
+  ok(!(await drawn(page, '#compare-mode')) && !(await drawn(page, '#compare')) && !/compar/i.test(await page.evaluate(() => document.body.innerText)), 'N9 signed out, there is no Compare control or wording either');
   await ctx.close();
 }
 

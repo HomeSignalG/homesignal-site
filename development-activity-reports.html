@@ -414,9 +414,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <aside class="rail" id="rail" aria-label="Agent workspace">
       <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title">
         <h2 class="sec-h" id="rail-report-title">This report</h2>
-        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF, Compare) -->
+        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF) -->
         <div id="rail-actions"></div>
-        <p class="hint rail-note">Open a report to share, watch, download or compare it.</p>
+        <p class="hint rail-note">Open a report to share, watch or download it.</p>
       <section class="card" id="share" aria-labelledby="share-title" hidden>
         <h2 id="share-title">Share this report with your client</h2>
         <details class="more"><summary>What your client sees</summary><p class="sub">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p></details>
@@ -447,7 +447,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       <h2 class="sec-h" id="saved-title" title="Reopening a saved report does not use a report.">Saved reports</h2>
       <div class="sv-tools" id="saved-tools" hidden>
         <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
-        <div class="row sv-modes"><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
+        <div class="row sv-modes" id="compare-modes" hidden><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
       </div>
       <ul id="saved-list" tabindex="0" role="group" aria-label="Saved reports, most recent first as the list returns them"></ul>
       <div class="row"><button type="button" class="go ghost" id="saved-more" hidden></button></div>
@@ -555,7 +555,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=3a41075f"></script>
+<script src="lib/da-report-view.js?v=f88d41a2"></script>
 <script src="lib/da-report-compare.js?v=a3609f97"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -580,6 +580,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   var teamFresh = false, teamBusy = false, armed = null, armedTimer = null; // the team list (audit item D)
   var savedFresh = false, opening = false, savingName = false;
   var shareFor = null, sharing = false; // build step 8: the report id on screen that can be shared (one that was saved), and a link being made
+  // LAUNCH SCOPE: Compare is intentionally hidden. The factual comparison engine (lib/da-report-compare.js, the saved-report selection and the code below) is kept
+  // whole for later; it is reconsidered once HomeSignal has an evidence-backed comparison layer rather than side-by-side counts. Turn on to restore.
+  var COMPARE_AT_LAUNCH = false;
   var compareRows = [], comparing = false; // build step 10: the saved reports offered for a comparison, and a comparison being opened
   // the size of the free allowance, as the database reports it: used + remaining, from the trial answer. This page holds no number of its own, so the
   // allowance can change in ONE place (the database's free-report limit) and the words follow. Unknown until the first trial answer arrives.
@@ -1068,15 +1071,20 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var li = document.createElement('li'), b = document.createElement('button');
       li.className = 'sv-row';
       // the comparison checkbox (build step 10) sits on the same row as the report it chooses; ticking it never opens anything
-      var pick = document.createElement('label'), cb = document.createElement('input');
-      pick.className = 'sv-pick'; cb.type = 'checkbox'; cb.value = rep.report_id; cb.checked = keep.indexOf(rep.report_id) >= 0;
-      cb.setAttribute('aria-label', 'Compare report ' + rep.number);
-      cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
-      pick.appendChild(cb);
+      var pick = null;
+      if (COMPARE_AT_LAUNCH) {
+        var cb = document.createElement('input');
+        pick = document.createElement('label');
+        pick.className = 'sv-pick'; cb.type = 'checkbox'; cb.value = rep.report_id; cb.checked = keep.indexOf(rep.report_id) >= 0;
+        cb.setAttribute('aria-label', 'Compare report ' + rep.number);
+        cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
+        pick.appendChild(cb);
+      }
       b.type = 'button';
       b.textContent = text; b.title = text; // one line in the rail; the whole line on hover
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
-      li.appendChild(pick); li.appendChild(b); list.appendChild(li);
+      if (pick) li.appendChild(pick);
+      li.appendChild(b); list.appendChild(li);
     });
     $('saved-tools').hidden = offered.length === 0;
     filterSaved();
@@ -1119,6 +1127,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   }
   /** Tell the comparison which saved reports are on offer ([{ report_id, number, address, generated_at }]), or that they could not be read (null). */
   function paintCompare(rows){
+    if (!COMPARE_AT_LAUNCH) { compareRows = []; $('compare').hidden = true; return; }
     compareRows = Array.isArray(rows) ? rows : [];   // the rows themselves, and their checkboxes, are the Saved reports list (refreshSaved)
     $('compare').hidden = !$('saved').classList.contains('cmp-on');
     if (rows === null) compareSay('The saved reports could not be read just now. Try again in a minute.', true);
@@ -1130,6 +1139,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
    *  Turning it off forgets the choice and any comparison on screen. The rules (2 to 5, the count, the button) are syncCompare's and runCompare's, unchanged. */
   function setCompareMode(on){
     var box = $('saved'), btn = $('compare-mode');
+    if (!COMPARE_AT_LAUNCH) on = false;
     if (!on) {
       Array.prototype.forEach.call($('saved-list').querySelectorAll('input'), function(c){ c.checked = false; c.disabled = false; });
       $('compare-result').textContent = ''; compareSay('', false);
@@ -1194,7 +1204,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var canShare = r.status === 200 && body.status === 'OK' && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
     if (r.status === 200 && body.status === 'OK' && body.reopened === true && V && V.mount($('report'), body, {
       subject: typeof body.address === 'string' ? body.address : '', label: typeof body.client_label === 'string' ? body.client_label : '',
-      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']
+      brokerage: hd.brokerage, agent: hd.agent, live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf'], hide: COMPARE_AT_LAUNCH ? [] : ['compare']
     })) {
       dressActions();
       if (canShare) { showShare(body.report_id); showWatch(body.report_id); }
@@ -1381,7 +1391,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     clearActions();
     if (!V || !bar || !rail) return;
     var keys = V.ACTION_KEYS, buttons = Array.prototype.slice.call(bar.querySelectorAll('.da-rv-act')), byKey = {};
-    if (buttons.length !== keys.length) return; // not the four buttons this was written for: leave the view's bar exactly as it came
+    // the view writes its buttons in ACTION_KEYS order, minus any the page hid (Compare, at launch); a disabled one has no data-da-action, so they are keyed by that order
+    if (!COMPARE_AT_LAUNCH) keys = keys.filter(function(k){ return k !== 'compare'; });
+    if (buttons.length !== keys.length) return; // not the buttons this was written for: leave the view's bar exactly as it came
     buttons.forEach(function(b, i){ byKey[keys[i]] = b; });
     ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; bar.appendChild(b); } });
     var note = bar.querySelector('.da-rv-soon'); if (note) bar.appendChild(note);
@@ -1670,7 +1682,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var hd = headerOf(body);
     // only a report that was saved (it has a permanent id) can be shared with a client; any report on screen can be printed
     var shareable = body.stored === true && typeof body.report_id === 'string' && /^[0-9a-f-]{36}$/i.test(body.report_id);
-    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf'] })) { say('The report came back but could not be shown.', true); return; }
+    if (!V || !V.mount($('report'), body, { subject: address, label: field('label'), brokerage: hd.brokerage, agent: hd.agent, live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf'], hide: COMPARE_AT_LAUNCH ? [] : ['compare'] })) { say('The report came back but could not be shown.', true); return; }
     dressActions();
     if (shareable) { showShare(body.report_id); showWatch(body.report_id); }
     var n = body.report && Array.isArray(body.report.projects) ? body.report.projects.length : 0;
@@ -1710,6 +1722,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     document.addEventListener('keydown', sharePopKeys);
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
+    $('compare-modes').hidden = !COMPARE_AT_LAUNCH;
     $('compare-go').addEventListener('click', runCompare);
     $('saved-search').addEventListener('input', filterSaved);
     // the report's own Compare, Watch, Share and Download PDF buttons (lib/da-report-view.js writes them with data-da-action; the page decides what they do)
