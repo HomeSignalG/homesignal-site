@@ -2385,6 +2385,24 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   await ctx.close();
 }
 
+{
+  // THE LEFT RAIL ANSWERS TWO QUESTIONS ONLY (founder, 2026-10-11): what can I do with THIS report, and which OTHER report do I open.
+  const w = world();
+  const { ctx, page, errors } = await open({ w, compare: false });
+  await waitCount(page, /free reports used/);
+  ok(!(await drawn(page, '#rail-report')) && !/Open a report to share/.test(await page.evaluate(() => document.getElementById('rail').innerText)), 'O1 with no report open the rail has no empty "This report" section');
+  await make(page);
+  ok(await drawn(page, '#rail-report'), 'O2 with a report open, This report is drawn');
+  const rail = await page.evaluate(() => ({ buttons: [...document.querySelectorAll('#rail-report button')].filter((b) => b.getClientRects().length).map((b) => b.textContent.trim()), text: document.getElementById('rail').innerText }));
+  ok(JSON.stringify(rail.buttons) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']), 'O3 the report has exactly one Share, one Watch and one Download PDF entry point', rail.buttons);
+  ok(!/Make a client link|Share this report with your client|Watch this property|Account and administration/.test(rail.text), 'O4 no second Share or Watch card and no account section is in the rail', rail.text);
+  ok((await page.$eval('#watch', (e) => e.hidden)) && (await page.$eval('#share', (e) => e.hidden)), 'O5 no Watch or client-link management is drawn until it is wanted');
+  await page.click('#rail-actions [data-da-action="watch"]');
+  ok((await drawn(page, '#watch-start')) && /Start watching/.test(await text(page, '#watch-start')), 'O6 Watch Property reveals the existing watch panel with its start control');
+  ok(errors.length === 0, 'O7 no page error', errors);
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log('\n' + (total - fails) + ' passed, ' + fails + ' failed of ' + total);
