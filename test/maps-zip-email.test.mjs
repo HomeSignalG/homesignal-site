@@ -129,8 +129,8 @@ ok(/const resume = _afterAuth; _afterAuth = null;/.test(verify),
   '§4 the pending action is consumed exactly once');
 ok(verify.indexOf('await resume()') > -1 && verify.indexOf('await resume()') < verify.indexOf('setTimeout('),
   '§4 the resume runs BEFORE the onboarding check (its follow counts as the location)');
-ok(/needsOnboarding\(\)\) \{\s*HS\.startOnboarding\(\);\s*\} else if \(resume\) \{/.test(verify),
-  '§4 with a resumed action the page stays put (?zip= and utm_* intact); onboarding still wins');
+ok(/needsOnboarding\(\) && !HS\.followEmbed\) \{\s*HS\.startOnboarding\(\);\s*\} else if \(resume\) \{/.test(verify),
+  '§4 with a resumed action the page stays put (?zip= and utm_* intact); onboarding still wins (except inside the inline follow frame)');
 ok(/requireAuth = function \(thenLabel, afterAuth\)[\s\S]{0,300}HS\.openAuth\(afterAuth\);/.test(shell),
   '§4 requireAuth passes the action through to the sign-in');
 
