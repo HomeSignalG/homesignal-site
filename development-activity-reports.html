@@ -247,17 +247,29 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
    Below 1000px the rail dissolves and the sections stack in the order below, so the phone reads: create (above the workspace), this report's tools, the report, saved, account. */
 .ws{display:flex;flex-direction:column;gap:18px}
 .rail{display:contents}
-.rail>.rail-sec{order:2}.ws>.stage{order:3}.rail>#saved{order:4}.rail>.acct{order:5}
+.rail>.rail-sec{order:2}.ws>.stage{order:3}.rail>#saved{order:4}
+.wrap>.acct{margin-top:18px}
 .rail-sec{display:grid;gap:12px}
 .rail-sec>.sec-h{margin:0}
 #rail-actions{display:grid;gap:8px;--rv-ink:var(--ink);--rv-ink2:var(--muted);--rv-line:var(--line);--rv-green:var(--accent);--rv-deep:#0f5c37;--rv-tint:#e9f5ee}
 #rail-actions:empty{display:none}
-#rail-actions:not(:empty)~.rail-note{display:none}
+/* management is quiet: it opens from the action, never sits beside it */
+.mgmt{background:transparent;border:0;padding:0;font-size:13px;color:var(--muted)}
+.mgmt>summary{cursor:pointer;list-style:none;min-height:32px;padding:4px 2px;font-weight:600;color:var(--muted)}
+.mgmt>summary::-webkit-details-marker{display:none}
+.mgmt>summary::before{content:"\25B8\00a0"}
+.mgmt[open]>summary::before{content:"\25BE\00a0"}
+.mgmt>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mgmt[open]{display:grid;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 12px 12px;background:var(--panel)}
+.mgmt:not([open]){display:block}
+.mgmt .hint,.mgmt p{margin:0}
+#sb-account{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
 #rail-actions .da-rv-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;padding:0;border:0}
 #rail-actions .da-rv-act{min-height:44px;padding:10px 12px;font-size:14px;border-radius:10px}
 #rail-actions .da-rv-act[data-da-action="share"]{grid-column:1/-1;min-height:48px;background:var(--accent);border-color:var(--accent);color:#fff}
 #rail-actions .da-rv-act[data-da-action="share"]:hover{background:#0f5c37}
 #rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent)}
+#rail-actions .da-rv-act[data-da-action="pdf"]{grid-column:1/-1}
 #rail-actions .da-rv-act[data-da-action="pdf"],#rail-actions .da-rv-act[data-da-action="compare"]{min-height:40px;font-weight:500;font-size:13.5px;color:var(--muted);border-color:var(--line);background:var(--panel2)}
 #rail-actions .da-rv-act[data-da-action="pdf"]:hover,#rail-actions .da-rv-act[data-da-action="compare"]:hover{color:var(--ink);background:#eef2ee}
 #rail-actions .da-rv-soon{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
@@ -402,35 +414,31 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <aside class="rail" id="rail" aria-label="Agent workspace">
 
 
-      <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title">
+      <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title" hidden>
         <h2 class="sec-h" id="rail-report-title">This report</h2>
-        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF) -->
+        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF). The section is drawn only while they are here. -->
         <div id="rail-actions"></div>
-        <p class="hint rail-note">Open a report to share, watch or download it.</p>
-      <section class="card" id="share" aria-labelledby="share-title" hidden>
-        <h2 id="share-title">Share this report with your client</h2>
-        <p class="sub">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p>
-        <div class="row">
-          <button type="button" class="go" id="share-make">Make a client link</button>
-        </div>
-        <div id="share-new" hidden>
-          <label>Client link<input type="text" id="share-link" readonly></label>
-          <button type="button" class="go" id="share-copy">Copy link</button>
-          <p class="hint" id="share-note"></p>
-        </div>
-        <ul id="share-list"></ul>
-        <p id="share-status" role="status" aria-live="polite"></p>
-      </section>
-      <section class="card" id="watch" aria-labelledby="watch-title" hidden>
-        <h2 id="watch-title">Watch this property</h2>
-        <p class="sub">Checked once a day. If a nearby project's official status changes, we email the address you signed in with. The email does not include the property's address.</p>
-        <div class="row">
-          <button type="button" class="go" id="watch-start">Watch this property</button>
-          <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
-        </div>
-        <p id="watch-state"></p>
-        <p id="watch-status" role="status" aria-live="polite"></p>
-      </section>
+        <!-- Management is reached from the action, not shown beside it: client links appear once one exists; the watch panel opens from Watch Property. -->
+        <details class="mgmt" id="share" hidden>
+          <summary>Manage client links</summary>
+          <div id="share-new" hidden>
+            <label>Client link<input type="text" id="share-link" readonly></label>
+            <button type="button" class="go" id="share-copy">Copy link</button>
+            <p class="hint" id="share-note"></p>
+          </div>
+          <ul id="share-list"></ul>
+          <p id="share-status" role="status" aria-live="polite"></p>
+        </details>
+        <details class="mgmt" id="watch" hidden>
+          <summary id="watch-summary">Watch property</summary>
+          <p class="hint">Checked once a day. If a nearby project's official status changes, we email the address you signed in with. The email does not include the property's address.</p>
+          <p id="watch-state"></p>
+          <div class="row">
+            <button type="button" class="go" id="watch-start">Start watching</button>
+            <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
+          </div>
+          <p id="watch-status" role="status" aria-live="polite"></p>
+        </details>
       </div>
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
@@ -453,46 +461,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       </div>
     </section>
 
-    <details class="acct" id="account">
-      <summary><span class="acct-t">Account and administration</span></summary>
-      <div class="acct-in">
-        <section class="card" id="billing" aria-labelledby="billing-title" hidden>
-          <h2 id="billing-title">Billing</h2>
-          <p class="plan" id="billing-plan"></p>
-          <p class="sub" id="billing-sub"></p>
-          <div class="row">
-            <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
-            <button type="button" class="go ghost" id="billing-refresh">Check again</button>
-          </div>
-          <p class="hint" id="billing-hint" hidden>Back from payment? Press Check again.</p>
-          <p id="billing-status" role="status" aria-live="polite"></p>
-        </section>
-        <section class="card" id="profile" aria-labelledby="profile-title" hidden>
-          <h2 id="profile-title">Your name on reports</h2>
-          <p class="sub">Shown at the top of every report, beside your brokerage's name.</p>
-          <form id="pf" novalidate>
-            <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
-            <button type="submit" class="go" id="save-name">Save my name</button>
-          </form>
-          <p id="profile-status" role="status" aria-live="polite"></p>
-        </section>
-        <section class="card" id="team" aria-labelledby="team-title" hidden>
-          <h2 id="team-title">Invite an agent</h2>
-          <p class="sub">One link per agent. They join your brokerage's trial.</p>
-          <button type="button" class="go" id="mint">Make an invite link</button>
-          <div id="minted" hidden>
-            <label>Agent invite link<input type="text" id="invite-link" readonly></label>
-            <button type="button" class="go" id="copy-invite">Copy link</button>
-            <p class="hint" id="invite-note"></p>
-          </div>
-          <h3 id="team-list-title">Your team</h3>
-          <p class="hint">Removing an agent ends their access; saved reports and usage counts stay.</p>
-          <ul id="team-list" aria-labelledby="team-list-title"></ul>
-          <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
-          <p id="team-status" role="status" aria-live="polite"></p>
-        </section>
-      </div>
-    </details>
     </aside>
 
     <!-- RIGHT: the current Development Activity report, the dominant surface. -->
@@ -509,10 +477,52 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     </section>
   </div>
 
+  <details class="acct" id="account">
+    <summary><span class="acct-t">Account and administration</span></summary>
+    <div class="acct-in">
+      <section class="card" id="billing" aria-labelledby="billing-title" hidden>
+        <h2 id="billing-title">Billing</h2>
+        <p class="plan" id="billing-plan"></p>
+        <p class="sub" id="billing-sub"></p>
+        <div class="row">
+          <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
+          <button type="button" class="go ghost" id="billing-refresh">Check again</button>
+        </div>
+        <p class="hint" id="billing-hint" hidden>Back from payment? Press Check again.</p>
+        <p id="billing-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" id="profile" aria-labelledby="profile-title" hidden>
+        <h2 id="profile-title">Your name on reports</h2>
+        <p class="sub">Shown at the top of every report, beside your brokerage's name.</p>
+        <form id="pf" novalidate>
+          <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
+          <button type="submit" class="go" id="save-name">Save my name</button>
+        </form>
+        <p id="profile-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" id="team" aria-labelledby="team-title" hidden>
+        <h2 id="team-title">Invite an agent</h2>
+        <p class="sub">One link per agent. They join your brokerage's trial.</p>
+        <button type="button" class="go" id="mint">Make an invite link</button>
+        <div id="minted" hidden>
+          <label>Agent invite link<input type="text" id="invite-link" readonly></label>
+          <button type="button" class="go" id="copy-invite">Copy link</button>
+          <p class="hint" id="invite-note"></p>
+        </div>
+        <h3 id="team-list-title">Your team</h3>
+        <p class="hint">Removing an agent ends their access; saved reports and usage counts stay.</p>
+        <ul id="team-list" aria-labelledby="team-list-title"></ul>
+        <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
+        <p id="team-status" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+  </details>
+
   <div id="share-pop" role="dialog" aria-modal="true" aria-labelledby="share-pop-title" hidden>
     <div class="box">
       <h2 id="share-pop-title">Share this report with your client</h2>
       <p class="hint" id="share-pop-msg" role="status" aria-live="polite"></p>
+      <p class="hint">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p>
       <div id="share-pop-body" hidden>
         <label>Client link<input type="text" id="share-pop-link" readonly></label>
         <div class="row">
@@ -1209,17 +1219,15 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   /** Hide the card and forget everything on it. The link in particular is never left on the page for the next report or the next person. */
   function hideShare(){
     shareFor = null; sharing = false;
-    $('share').hidden = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    $('share').hidden = true; $('share').open = false; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
     $('share-pop').hidden = true; $('share-pop-body').hidden = true; $('share-pop-link').value = ''; sharePopFrom = null;
     $('share-list').textContent = ''; shareSay('', false);
-    $('share-make').disabled = false; $('share-make').textContent = 'Make a client link';
   }
   /** Show the card for a report that was saved (it has a permanent id). A report that was not saved cannot be shared, so it gets no card. */
   function showShare(reportId){
     hideShare();
     if (typeof reportId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reportId)) return false;
-    shareFor = reportId;
-    $('share').hidden = false;
+    shareFor = reportId;   // the management section appears when refreshShares finds a link to manage
     refreshShares();
     return true;
   }
@@ -1239,6 +1247,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return; // the person or the report changed while the answer was on its way
     var body = r.body || {};
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.shares)) { shareSay(shareMessage(r.status, body), true); return; }
+    $('share').hidden = !body.shares.length;
     var list = $('share-list');
     list.textContent = '';
     body.shares.forEach(function(sh){
@@ -1256,18 +1265,16 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       }
       list.appendChild(li);
     });
-    if (!body.shares.length) shareSay('No client link has been made for this report yet.', false);
-    else if ($('share-status').className !== 'err') shareSay('', false);
+    if ($('share-status').className !== 'err') shareSay('', false);
   }
   async function makeShare(){
     if (sharing || !session || !session.user || !shareFor) return false;
     var forUser = session.user.id, forReport = shareFor;
-    sharing = true; $('share-make').disabled = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    sharing = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
     shareSay('Making the link\u2026', false);
     var r = await post(SHARE_FN, { action: 'create', report_id: forReport });
     sharing = false;
     if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return false;
-    $('share-make').disabled = false;
     var body = r.body || {};
     var link = typeof body.link === 'string' ? body.link : '';
     if (r.status === 200 && body.status === 'OK' && SHARE_LINK.test(link)) {
@@ -1387,9 +1394,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; bar.appendChild(b); } });
     var note = bar.querySelector('.da-rv-soon'); if (note) bar.appendChild(note);
     rail.appendChild(bar); // the same <nav>, handled by the same click handler (onReportAction), now in the workspace rail
+    $('rail-report').hidden = false;
   }
   /** The rail holds the open report's buttons; whenever the report is cleared or replaced they go with it. */
-  function clearActions(){ var r = $('rail-actions'); if (r) r.textContent = ''; }
+  function clearActions(){ var r = $('rail-actions'); if (r) r.textContent = ''; var s = $('rail-report'); if (s) s.hidden = true; }
   /** "Download PDF" is the browser's own print window: the person chooses "Save as PDF" there. The print stylesheet leaves only the report. */
   function printReport(){ window.print(); }
 
@@ -1405,11 +1413,12 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     EMAIL_FAILED: 'a change was found but the email could not be sent, so HomeSignal will try again.',
     NO_RECIPIENT: 'a change was found but your account has no email address to send it to.'
   };
+  var watchAsked = false; // the agent pressed Watch Property: the panel stays until the report changes
   function watchSay(text, isError){ var s=$('watch-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide the card and forget everything on it, so the next report or the next person never sees this one's watch. */
   function hideWatch(){
-    watchFor = null; watchId = null; watchBusy = false;
-    $('watch').hidden = true;
+    watchFor = null; watchId = null; watchBusy = false; watchAsked = false;
+    $('watch').hidden = true; $('watch').open = false;
     $('watch-start').hidden = false; $('watch-start').disabled = false; $('watch-stop').hidden = true; $('watch-stop').disabled = false;
     $('watch-state').textContent = ''; watchSay('', false);
   }
@@ -1417,8 +1426,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function showWatch(reportId){
     hideWatch();
     if (typeof reportId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reportId)) return false;
-    watchFor = reportId;
-    $('watch').hidden = false;
+    watchFor = reportId;   // the panel appears when a watch exists, or when Watch Property is pressed
     $('watch-start').hidden = true; $('watch-stop').hidden = true;
     $('watch-state').textContent = 'Checking whether you are already watching this property…';
     refreshWatch();
@@ -1437,6 +1445,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function paintWatch(w){
     watchId = w ? w.watch_id : null;
     $('watch-start').hidden = !!w; $('watch-stop').hidden = !w;
+    $('watch-summary').textContent = w ? 'Watching \u00b7 checked daily' : 'Watch property';
+    $('watch').hidden = !(w || watchAsked);
     var st = $('watch-state');
     if (!w) { st.textContent = 'You are not watching this property.'; return; }
     var since = dateWords(w.created_at), last = dateWords(w.last_run_at), next = dateWords(w.next_due_at);
@@ -1453,7 +1463,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (!session || !session.user || session.user.id !== forUser || watchFor !== forReport) return; // the person or the report changed while the answer was on its way
     var body = r.body || {};
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.watches)) {
-      $('watch-state').textContent = ''; $('watch-start').hidden = false; $('watch-stop').hidden = true; // starting is safe to offer: it does nothing twice
+      $('watch-state').textContent = ''; $('watch-start').hidden = false; $('watch-stop').hidden = true; $('watch').hidden = !watchAsked; // starting is safe to offer: it does nothing twice
       watchSay(watchMessage(r.status, body), true);
       return;
     }
@@ -1555,6 +1565,18 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     } catch (e) { select(); }
   }
 
+  /** Header "Account": opens the existing Account and administration section (Billing, Your name, Invite an agent) and brings it into view. */
+  function openAccount(){
+    var a = $('account'); if (!a) return;
+    a.open = true; a.scrollIntoView();
+    var sm = a.querySelector('summary'); if (sm) sm.focus({ preventScroll: true });
+  }
+  /** The control is offered only while the section has a card to show (the section itself is not drawn otherwise). */
+  function syncAccountBtn(){
+    var b = $('sb-account'); if (!b) return;
+    b.hidden = !document.querySelector('#account .card:not([hidden])');
+    var dot = b.nextSibling; if (dot && dot.nodeType === 3) dot.textContent = b.hidden ? '' : ' · ';
+  }
   function onSession(s){
     var was = session && session.user ? session.user.id : null;
     session = s && s.access_token ? s : null;
@@ -1564,6 +1586,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (session) {
       var email = session.user && session.user.email ? session.user.email : 'an account';
       who.appendChild(document.createTextNode('Signed in as ' + email + ' · '));
+      var acctBtn = document.createElement('button'); acctBtn.type = 'button'; acctBtn.id = 'sb-account'; acctBtn.textContent = 'Account';
+      acctBtn.addEventListener('click', openAccount);
+      who.appendChild(acctBtn); who.appendChild(document.createTextNode(' · '));
+      syncAccountBtn();
       var out = document.createElement('button'); out.type = 'button'; out.textContent = 'Sign out';
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
@@ -1702,13 +1728,13 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('trial-cta').addEventListener('click', trialCtaPressed);
     $('billing-refresh').addEventListener('click', function(){ refreshBilling(false); });
     $('copy-invite').addEventListener('click', copyInvite);
-    $('share-make').addEventListener('click', makeShare);
     $('share-copy').addEventListener('click', copyShare);
     $('share-pop-copy').addEventListener('click', copyPop);
     $('share-pop-native').addEventListener('click', nativePop);
     $('share-pop-close').addEventListener('click', closeSharePop);
     $('share-pop').addEventListener('click', function(e){ if (e.target === $('share-pop')) closeSharePop(); });
     document.addEventListener('keydown', sharePopKeys);
+    if (window.MutationObserver) new MutationObserver(syncAccountBtn).observe($('account'), { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
     $('compare-modes').hidden = !COMPARE_AT_LAUNCH;
@@ -1722,7 +1748,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (act === 'pdf') printReport();
       else if (act === 'share') shareFromReport(b);
       else if (act === 'compare' && !$('saved').hidden) chooseForCompare(shareFor);
-      else if (act === 'watch' && !$('watch').hidden) { $('watch').scrollIntoView(); var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : null); if (wb) wb.focus(); }
+      else if (act === 'watch' && watchFor) { watchAsked = true; $('watch').hidden = false; $('watch').open = true; var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : $('watch-summary')); wb.focus(); }
     }
     $('report').addEventListener('click', onReportAction);
     $('rail-actions').addEventListener('click', onReportAction); // the buttons now sit in the rail: one handler, two homes
