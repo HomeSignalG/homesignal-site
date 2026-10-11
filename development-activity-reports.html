@@ -93,6 +93,10 @@ header.top .sitenav a:focus-visible{outline:3px solid var(--accent);outline-offs
 #trial{display:grid;gap:4px}
 #trial .count{margin:0;font-size:17px;font-weight:600}
 #trial .count.out{color:var(--red)}
+#trial .trial-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:6px;flex-basis:100%}
+#trial .trial-cta[hidden]{display:none}
+#trial-cta-status{font-size:13.5px;color:var(--muted)}
+#trial-cta-status.err{color:var(--red)}
 #trial .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
 #billing{display:grid;gap:10px}
 #billing h2{margin:0;font-size:17px}
@@ -287,6 +291,11 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   <section class="card" id="trial" aria-live="polite">
     <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
     <p class="sub" id="trial-sub"></p>
+    <!-- The commercial action always sits in the tile, so nobody hunts the page for how to continue: "Subscribe — $79/month" until the plan is paid, then "Manage plan". -->
+    <div class="trial-cta" id="trial-cta-wrap" hidden>
+      <button type="button" class="go" id="trial-cta"></button>
+      <span id="trial-cta-status" role="status" aria-live="polite"></span>
+    </div>
   </section>
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
@@ -628,16 +637,41 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     showTeam(a === 'trial' && role === 'owner' && !mine());   // an individual account has nobody to invite: the database refuses it, so the page does not offer it
     showSaved(a === 'trial' || a === 'complete');
     showProfile(a === 'trial' || a === 'complete');
+    showTrialCta(a);
+  }
+
+  // ---- the tile's commercial action: always present for a member, whatever the free reports say --------------------------
+  function ctaSay(text, isError){ var s = $('trial-cta-status'); s.textContent = text || ''; s.className = isError ? 'err' : ''; }
+  /** "Subscribe — $79/month" until the plan is paid; "Manage plan" once it is (or while a payment needs attention). Shown with free reports left or none. */
+  function showTrialCta(a){
+    var wrap = $('trial-cta-wrap'), btn = $('trial-cta');
+    ctaSay('', false);
+    if (a !== 'trial' && a !== 'complete') { wrap.hidden = true; return; }
+    var manage = !!plan && (plan.state === 'paid' || plan.state === 'past_due');
+    btn.textContent = manage ? 'Manage plan' : 'Subscribe — $79/month';
+    btn.dataset.mode = manage ? 'manage' : 'subscribe';
+    wrap.hidden = false;
+  }
+  async function trialCtaPressed(){
+    if ($('trial-cta').dataset.mode === 'manage') { $('account').open = true; $('billing').hidden = false; $('billing').scrollIntoView(); return; }
+    if (!plan) { ctaSay('Your plan could not be read just now. Open Account and administration and press Check again.', true); return; }
+    if (plan.role !== 'owner') { ctaSay("Only your brokerage's owner can subscribe.", true); return; }
+    if (checkoutState !== 'available') { ctaSay('Subscribing is not open yet.', true); return; }
+    ctaSay('Opening the payment page…', false);
+    await subscribe();   // the one checkout path; it leaves the page on success, and says why on a refusal
+    var s = $('billing-status');
+    ctaSay(s.className === 'err' ? s.textContent : '', s.className === 'err');
   }
 
   // ---- billing (build step 11): the brokerage's plan, in words, and an owner's checkout ------------------------------------
   function billingSay(text, isError){ var s=$('billing-status'); s.textContent=text||''; s.className=isError?'err':''; }
   function monthEndWords(){ return plan && plan.period_ends_at ? dateWords(plan.period_ends_at) : ''; }
-  function hideBilling(){ plan = null; checkoutState = null; $('billing').hidden = true; $('subscribe').hidden = true; $('billing-hint').hidden = true; $('billing-plan').textContent = ''; $('billing-sub').textContent = ''; billingSay('', false); }
+  function hideBilling(){ plan = null; checkoutState = null; $('trial-cta-wrap').hidden = true; $('billing').hidden = true; $('subscribe').hidden = true; $('billing-hint').hidden = true; $('billing-plan').textContent = ''; $('billing-sub').textContent = ''; billingSay('', false); }
   /** Show or hide the card. Hiding also forgets the plan, so one person's billing is never left on the page for the next. */
   function showBilling(member){
     if (!member) { hideBilling(); return; }
     $('billing').hidden = false;
+    showTrialCta(access);   // the tile's action follows the plan every time the plan is re-read
     var p = $('billing-plan'), sub = $('billing-sub'), buy = $('subscribe');
     p.className = 'plan'; buy.hidden = true; $('billing-hint').hidden = true;
     if (!plan) {
@@ -1545,6 +1579,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });
     $('mint').addEventListener('click', mintInvite);
     $('subscribe').addEventListener('click', subscribe);
+    $('trial-cta').addEventListener('click', trialCtaPressed);
     $('billing-refresh').addEventListener('click', function(){ refreshBilling(false); });
     $('copy-invite').addEventListener('click', copyInvite);
     $('share-make').addEventListener('click', makeShare);
