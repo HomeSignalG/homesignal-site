@@ -28,6 +28,10 @@
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
+import {
+  classifyByCircle, keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
+  type MembershipFn, type ScopeMetrics,
+} from "./scope-members.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
 // THE decision-history authority. Imported rather than restated so the five connectors,
 // the engine and (via test/decision-vocabulary-parity.test.mjs) the page cannot drift
@@ -295,14 +299,16 @@ export interface SocrataRunReport {
   scope_widened?: boolean;
   /** set ⇒ widened scope REQUESTED but this is the LEGACY-scope result (widened fetch overflowed
    *  max_rows); the polygon-only records were NOT recovered for this ZIP. */
-  scope_fallback?: "legacy_after_overflow";
+  scope_fallback?: "legacy_after_overflow" | "legacy_after_membership_error";
+  /** Widened-scope accounting (sources/scope-members.ts); present only when the widened scope ran. */
+  scope_membership?: ScopeMetrics;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
  *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
  *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
  *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
-interface FetchMeta { truncated: boolean; cap: number; widened?: boolean }
+interface FetchMeta { truncated: boolean; cap: number; widened?: boolean; metrics?: ScopeMetrics }
 
 export interface SocrataDeps {
   fetch: typeof fetch;
@@ -322,6 +328,8 @@ export interface SocrataDeps {
    *  the legacy centroid scope, a spatial_zip_radius_mi entry queries the UNION box (within_box)
    *  instead of the circle, so records inside the polygon are not lost. Absent ⇒ the circle. */
   zipBounds?: ZipBounds | null;
+  /** Tests widened-only records against the canonical polygon; the box is used only together with it. */
+  zipMembers?: MembershipFn | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -427,16 +435,39 @@ async function runEntry(
   const caseFold = new Map<string, CaseFoldMatch>();
   const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
-  let fetchMeta: FetchMeta = { truncated: false, cap: 0 };
+  const widenedOk = !!widenedBounds(deps.zipBounds, deps.zipMembers);
+  const metrics = newScopeMetrics();
+  let fetchMeta: FetchMeta = { truncated: false, cap: 0, metrics };
   let rows: Record<string, unknown>[];
+  const legacyRun = async () => {
+    fetchMeta = { truncated: false, cap: 0 };
+    return fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null, zipMembers: null }, fetchMeta);
+  };
+  let widenedRan = false;
   try {
-    rows = await fetchRows(entry, zip, zipCol, deps, fetchMeta);
-    // NEVER WORSE THAN BEFORE (same rule as arcgis.ts): if widening to the polygon box is what ran
-    // the fetch into the max_rows cap, re-run on the legacy circle and say so.
-    if (fetchMeta.truncated && fetchMeta.widened && deps.zipBounds) {
+    try {
+      rows = await fetchRows(entry, zip, zipCol, deps, fetchMeta);
+      widenedRan = !!fetchMeta.widened;
+    } catch (e) {
+      // Membership could not be KNOWN ⇒ legacy scope (never an unfiltered widened result). See arcgis.ts.
+      if (!(e instanceof ScopeMembershipError) || !widenedOk) throw e;
+      widenedRan = true;
+      metrics.legacy_fallback = e.reason === "candidate_limit" ? "candidate_limit"
+        : e.reason === "scan_limit" ? "scan_limit" : "membership_error";
+      rows = await legacyRun();
+      report.scope_fallback = "legacy_after_membership_error";
+      report.quarantined.push({
+        reason: `polygon membership unavailable (${e.message}); used the legacy centroid circle for this ZIP`,
+        sample: entry.registry_id,
+      });
+    }
+    // NEVER WORSE THAN BEFORE (same rule as arcgis.ts): if the widened scope, counted AFTER polygon
+    // filtering, ran the fetch into the max_rows cap, re-run on the legacy circle and say so.
+    if (fetchMeta.truncated && fetchMeta.widened && widenedOk) {
       const widenedCap = fetchMeta.cap;
-      fetchMeta = { truncated: false, cap: 0 };
-      rows = await fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null }, fetchMeta);
+      metrics.capacity_truncated = true;
+      metrics.legacy_fallback = "capacity_overflow";
+      rows = await legacyRun();
       report.scope_fallback = "legacy_after_overflow";
       report.quarantined.push({
         reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid circle for this ZIP`,
@@ -447,6 +478,7 @@ async function runEntry(
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.dataset_id });
     return { records, report };
   }
+  if (widenedRan) report.scope_membership = metrics;
   report.fetched = rows.length;
   if (fetchMeta.widened) report.scope_widened = true;
   // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
@@ -646,11 +678,15 @@ async function fetchRows(
   const pageSize = deps.pageSize ?? 1000;
   const maxRows = entry.max_rows ?? 20000;
   const ext = entry.geographic ? "geojson" : "json";
-  const where = buildWhere(entry, zip, zipCol, deps.zipCentroid ?? null, deps.zipBounds ?? null, meta);
+  const where = buildWhere(entry, zip, zipCol, deps.zipCentroid ?? null, widenedBounds(deps.zipBounds, deps.zipMembers), meta);
   const order = entry.incremental_field || ":id";
 
   const out: Record<string, unknown>[] = [];
   let offset = 0;
+  const m = meta.widened ? (meta.metrics ??= newScopeMetrics()) : null;
+  const scanCap = maxRows * SCAN_FACTOR;
+  // `out` holds only KEPT rows (legacy + polygon members) when widened, so records the polygon
+  // excludes never consume capacity or hide in-polygon records behind the cap.
   // Deliberately `<=`: fetch ONE row past the cap so truncation is EXACT. A full final page
   // does NOT prove more rows exist — a source holding precisely max_rows records is COMPLETE, and
   // inferring truncation from a full page would cry wolf on exactly that case.
@@ -669,7 +705,18 @@ async function fetchRows(
     }
     const rows = entry.geographic ? geojsonRows(page) : (page as Record<string, unknown>[]);
     if (!Array.isArray(rows) || rows.length === 0) break;
-    out.push(...rows);
+    if (m && deps.zipMembers && deps.zipCentroid) {
+      m.rows_scanned += rows.length;
+      if (m.rows_scanned > scanCap) throw new ScopeMembershipError("scan_limit", `scanned more than ${scanCap} rows`);
+      const num = (v: unknown) => (v == null || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+      const kept = await keepMembers(rows, (r) =>
+        classifyByCircle(num(readCol(r, entry.column_map.lat) ?? r.__lat), num(readCol(r, entry.column_map.lng) ?? r.__lng),
+          deps.zipCentroid as { lat: number; lng: number }, entry.spatial_zip_radius_mi as number),
+        deps.zipMembers, m);
+      out.push(...kept);
+    } else {
+      out.push(...rows);
+    }
     if (rows.length < pageSize) break;
     offset += pageSize;
   }

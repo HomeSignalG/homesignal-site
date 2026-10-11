@@ -68,8 +68,8 @@ ok(JSON.stringify(linksOf(siteNav).map((l) => [l.text, l.href])) === JSON.string
 ok(linksOf(siteNav).filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', '1h2 exactly one item is marked as the current section: Enterprise');
 const brandHref = (bar.match(/<a class="sb-brand" href="([^"]+)"/) || [])[1];
 ok(brandHref === ((shellHtml.match(/<a class="hs-brand" href="([^"]+)"/) || [])[1]) && brandHref === 'index.html', '1h3 the HomeSignal logo links where the shell\'s does (the homepage)', brandHref);
-ok(!/class="entnav"|Enterprise overview|>My reports</.test(headerTop + bar), '1h4 no second Enterprise row (Enterprise overview | My reports): the site bar already shows Enterprise (founder, 2026-10-11)');
-ok(!/class="brand"|>HomeSignal<\/p>/.test(headerTop), '1h5 no repeated HomeSignal label above the page title');
+ok(!/class="entnav"/.test(page) && !/class="brand"/.test(headerTop), '1h4 below the site bar the page goes straight to its title: no second Enterprise row and no repeated HomeSignal label (the bar already says Enterprise)');
+ok(/<h1>Development Activity Reports<\/h1>/.test(headerTop), '1h5 the header under the bar holds the page title');
 ok(/id="who"/.test(bar) && !/id="who"/.test(headerTop), '1h6 the account area (email and Sign out) lives in the bar, so it is on screen with the navigation');
 ok(!/https?:\/\//.test(siteNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar), '1i ...plain same-site links: no address of another site, no new window, no script');
 ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && !/rel="stylesheet"/.test(page), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document');
@@ -258,6 +258,18 @@ ok(/function authKeys\(e\)\{[\s\S]*?e\.key === 'Escape'[\s\S]*?closeAuth\(\)[\s\
 ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code) && /if \(epochAtAsk !== sessionEpoch\) \{ attempt = null; return; \}/.test(code)
    && run.indexOf('if (epochAtAsk !== sessionEpoch)') > 0 && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("var V = window.HS && window.HS.daReportView;") && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("if (body.plan && typeof body.plan.state"),
   '10c a report that arrives after the person signed out (or another signed in) is dropped before anything of it is shown or kept');
+
+// ---- 11. layout (founder, 2026-10-11): Create is full width above the workspace; usage is a quiet account strip in the header --------------------------
+{
+  const html = read(PAGE);
+  const body = html.slice(html.indexOf('<body>'));
+  const iHeaderEnd = body.indexOf('</header>', body.indexOf('<header class="top"')), iCreate = body.indexOf('id="create-title"'), iWs = body.indexOf('<div class="ws">'), iRail = body.indexOf('<aside class="rail"');
+  ok(iCreate > iHeaderEnd && iCreate < iWs && iWs < iRail, '11a Create a property report sits above the two-column workspace, not inside the rail');
+  ok(body.indexOf('id="rf"') === body.lastIndexOf('id="rf"') && body.indexOf('id="go"') === body.lastIndexOf('id="go"') && body.indexOf('id="trial-cta"') === body.lastIndexOf('id="trial-cta"'), '11b one form, one Generate button and one Subscribe / Manage plan button: nothing is duplicated');
+  const iTrial = body.indexOf('id="trial"');
+  ok(iTrial > 0 && iTrial < iHeaderEnd && body.indexOf('id="trial-cta"') < iHeaderEnd && body.indexOf('id="trial-count"') < iHeaderEnd, '11c the report usage and its Subscribe / Manage plan action are in the header account strip, not above the form');
+  ok(!/<section class="card" id="trial"/.test(body), '11d usage is no longer a large card');
+}
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

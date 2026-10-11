@@ -74,6 +74,7 @@ import {
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
 import { scopePolicy, zipScopeBounds } from "./sources/zip-bounds.ts";
+import { zipMembershipRpc } from "./sources/scope-members.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -642,6 +643,9 @@ async function handleRequest(req: Request): Promise<Response> {
     const policy = scopePolicy((k) => Deno.env.get(k), zip);
     // Fail-safe: null bounds ⇒ the legacy centroid scope, i.e. what ran before this read existed.
     const scope = policy.on ? await zipScopeBounds(supabase, zip) : { bounds: null, reason: policy.why };
+    // Widened-only records are tested against the canonical polygon through ONE batch RPC; the box is
+    // never used without it (sources/scope-members.ts).
+    const zipMembers = zipMembershipRpc(supabase, zip);
     if (policy.on && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
@@ -714,6 +718,7 @@ async function handleRequest(req: Request): Promise<Response> {
       appToken: Deno.env.get("SOCRATA_APP_TOKEN") || undefined,
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
+      zipMembers: scope.bounds ? zipMembers : null,
       noteFence,
     });
     // TASK 1 (ArcGIS twin) — same generic, coverage-gated connector for Esri/ArcGIS FeatureServer
@@ -730,6 +735,7 @@ async function handleRequest(req: Request): Promise<Response> {
       // the engine's standard centroid+radius ZIP approximation; records keep their own points.
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
+      zipMembers: scope.bounds ? zipMembers : null,
       noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals
@@ -760,6 +766,7 @@ async function handleRequest(req: Request): Promise<Response> {
       },
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
+      zipMembers: scope.bounds ? zipMembers : null,
       noteFence,
     });
     // TASK 1 (Carto twin) — same generic, coverage-gated connector for Carto SQL-API portals

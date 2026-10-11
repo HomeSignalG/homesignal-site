@@ -124,7 +124,9 @@ body:not(:has(#account .card:not([hidden]))) .acct-btn{display:none}
   .sb-acct{display:contents}
   .acct-btn{order:1;margin-left:auto}
   nav.sb-nav{order:2;flex:0 0 100%;gap:24px;overflow-x:auto}
-  #trial{order:3;flex:0 0 100%;justify-content:space-between;padding:4px 0}
+  #trial{order:3;flex:0 0 100%;flex-wrap:nowrap;justify-content:space-between;padding:4px 0}
+  #trial .count{white-space:normal;flex:1 1 auto;min-width:0}
+  #trial .trial-cta{flex:none}
   header.sitebar .who{order:4;flex:0 0 100%;display:block;text-align:left;line-height:1.35;padding-bottom:2px}
   #trial-cta-status{text-align:right}
   header.top h1{font-size:20px}
@@ -698,7 +700,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
-      count.textContent = left === 1 ? '1 free report left' : left + ' free reports left';
+      // usage reads as "7 of 10 free reports used"; only when the allowance is not yet known does it fall back to the count left
+      count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
         ? 'A report with no development data (“No data ingested”) does not use one.'
         : "Shared by everyone on your brokerage. A report with no development data (“No data ingested”) does not use one.";
@@ -706,7 +709,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
     } else if (a === 'complete') {
-      count.textContent = 'All ' + freeWords() + ' are used'; count.className = 'count out';
+      count.textContent = freeLimit !== null ? freeLimit + ' of ' + freeLimit + ' free reports used' : 'All ' + freeWords() + ' are used'; count.className = 'count out';
       sub.textContent = mine() ? 'Your free trial is complete. Your saved reports stay available.' : "Your brokerage's free trial is complete.";
     } else if (a === 'ended') {
       count.textContent = 'This trial has ended'; count.className = 'count out';
@@ -720,11 +723,11 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var end = monthEndWords(), n = plan.credits_remaining;
       if (n > 0) {
         count.className = 'count';
-        count.textContent = n === 1 ? '1 report left this month' : n + ' reports left this month';
+        count.textContent = typeof plan.credits_used === 'number' && typeof plan.credit_limit === 'number' ? plan.credits_used + ' of ' + plan.credit_limit + ' reports used' : (n === 1 ? '1 report left this month' : n + ' reports left this month');
         sub.textContent = (mine() ? 'Your $79/month plan includes 100 new reports each month' : "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it") + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
       } else {
         count.className = 'count out';
-        count.textContent = 'All 100 reports for this month are used';
+        count.textContent = typeof plan.credit_limit === 'number' ? plan.credit_limit + ' of ' + plan.credit_limit + ' reports used' : 'All 100 reports for this month are used';
         sub.textContent = (end ? 'A new month of 100 reports starts ' + end + '. ' : '') + 'Your saved reports stay available.';
       }
     }

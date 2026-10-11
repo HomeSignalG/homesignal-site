@@ -32,8 +32,11 @@ const BOUNDS: Record<string, { xmin: number; ymin: number; xmax: number; ymax: n
 };
 const CENTROID: Record<string, [number, number]> = { "76247": [33.0734, -97.3093], "76258": [33.371, -96.9446], "76227": [33.292, -96.9879] };
 
-interface Calls { rpc: string[]; denton: string[] }
-let calls: Calls = { rpc: [], denton: [] };
+interface Calls { rpc: string[]; denton: string[]; members: { zip: string; pts: number[][] }[] }
+let calls: Calls = { rpc: [], denton: [], members: [] };
+// Denton features to serve (point geometry, lng/lat); empty by default.
+let dentonFeatures: { attributes: Record<string, unknown>; geometry: { x: number; y: number } }[] = [];
+let membersMode: "ok" | "error" = "ok";
 const jsonRes = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json" } });
 
 globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) => {
@@ -44,6 +47,13 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
       calls.rpc.push(zip);
       return jsonRes(BOUNDS[zip] ? [BOUNDS[zip]] : []);
     }
+    if (url.pathname.endsWith("/rpc/zip_scope_members")) {
+      const b = JSON.parse(String(init?.body ?? "{}")) as { p_zip: string; p_pts: number[][] };
+      calls.members.push({ zip: b.p_zip, pts: b.p_pts });
+      if (membersMode === "error") return jsonRes({ message: "membership unavailable" }, 500);
+      // stand-in verdicts: northern half of the box is "outside" (the real SQL is proven on PostGIS)
+      return jsonRes(b.p_pts.map((p, i) => ({ ord: i + 1, verdict: p[0] > 33.40 ? "outside" : "member" })));
+    }
     if (url.pathname.endsWith("/rest/v1/communities")) {
       const sel = url.searchParams.get("select") ?? "";
       return jsonRes(sel.includes("state") ? [{ state: "TX", county: "Denton" }] : [{ id: "00000000-0000-0000-0000-000000000001" }]);
@@ -52,7 +62,7 @@ globalThis.fetch = (async (input: Request | URL | string, init?: RequestInit) =>
   }
   if (url.hostname === "gis.dentoncounty.gov") {           // the real Denton registry entry
     calls.denton.push(url.href);
-    return jsonRes({ features: [], exceededTransferLimit: false });
+    return jsonRes({ features: dentonFeatures, exceededTransferLimit: false });
   }
   return jsonRes([]);                                      // every other publisher: nothing
 }) as typeof fetch;
@@ -61,7 +71,7 @@ await import("./index.ts");
 if (!handler) { console.log("FAIL index.ts did not register a Deno.serve handler"); Deno.exit(1); }
 
 async function zipRun(zip: string, extra: Record<string, unknown> = {}) {
-  calls = { rpc: [], denton: [] };
+  calls = { rpc: [], denton: [], members: [] };
   const [lat, lng] = CENTROID[zip];
   const res = await handler!(new Request("https://stub.functions.test/get-address-report", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -71,7 +81,7 @@ async function zipRun(zip: string, extra: Record<string, unknown> = {}) {
   let body: Record<string, unknown> = {};
   try { body = JSON.parse(text); } catch { /* keep {} */ }
   const geom = calls.denton.length ? new URL(calls.denton[0]).searchParams.get("geometry") : null;
-  return { status: res.status, body, geom, rpc: [...calls.rpc], text };
+  return { status: res.status, body, geom, rpc: [...calls.rpc], members: [...calls.members], text };
 }
 const legacyGeom = (zip: string) => {
   const [lat, lng] = CENTROID[zip];
@@ -150,6 +160,30 @@ Deno.env.set("ZIP_SCOPE_BOUNDS_ZIPS", "76247");
   const r = await zipRun("76247");
   BOUNDS["76247"] = orig;
   ok("policy on but no boundary row ⇒ legacy scope and a 200 (fail-safe)", r.status === 200 && near(parse(r.geom), legacyGeom("76247")), String(r.geom));
+}
+
+// ── 7. widened-only containment through the real handler ───────────────────────────────────
+Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "all");
+{
+  const f = (lng: number, lat: number, id: string) => ({ attributes: { OBJECTID: id }, geometry: { x: lng, y: lat } });
+  const [cLat, cLng] = CENTROID["76258"];
+  // legacy: at the centroid. widened-only: east of the square (inside / "outside" by the stub's rule).
+  dentonFeatures = [f(cLng, cLat, "legacy"), f(-96.84, 33.38, "wide-in"), f(-96.84, 33.43, "wide-out")];
+  const r = await zipRun("76258");
+  const sent = r.members.flatMap((m) => m.pts);
+  ok("handler: membership RPC is called once with only the widened-only points",
+    r.members.length === 1 && r.members[0].zip === "76258" && sent.length === 2 &&
+    sent.some((p) => p[0] === 33.38 && p[1] === -96.84) && sent.some((p) => p[0] === 33.43) && !sent.some((p) => p[0] === cLat),
+    JSON.stringify(r.members));
+  ok("handler: a 200 with the membership answer applied", r.status === 200);
+  membersMode = "error";
+  const e = await zipRun("76258");
+  membersMode = "ok";
+  ok("handler: membership RPC failure ⇒ still a 200 (legacy scope for that source, never an error page)", e.status === 200 && e.members.length >= 1, String(e.status));
+  Deno.env.set("ZIP_SCOPE_BOUNDS_MODE", "off");
+  const o = await zipRun("76258");
+  ok("handler: mode off ⇒ the membership RPC is never called", o.members.length === 0 && o.rpc.length === 0, JSON.stringify(o.members));
+  dentonFeatures = [];
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

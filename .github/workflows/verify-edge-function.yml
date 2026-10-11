@@ -119,7 +119,8 @@ jobs:
             "${FN_DIR}/sources/socrata.ts" \
             "${FN_DIR}/sources/csv.ts" \
             "${FN_DIR}/sources/zip-bounds.ts" \
-            "${FN_DIR}/sources/scope-box.ts" > "${RUNNER_TEMP}/check.out" 2>&1
+            "${FN_DIR}/sources/scope-box.ts" \
+            "${FN_DIR}/sources/scope-members.ts" > "${RUNNER_TEMP}/check.out" 2>&1
           echo "deno check exit: $?"
           set -e
           cat "${RUNNER_TEMP}/check.out"
