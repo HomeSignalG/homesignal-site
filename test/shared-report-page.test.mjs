@@ -56,7 +56,7 @@ const jwts = [...page.matchAll(/eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_
 ok(jwts.length === 1 && jwts[0].role === 'anon' && jwts[0].ref === 'qwnnmljucajnexpxdgxr', '2a the one key on the page is the public anon key of this project', jwts.map((j) => j.role));
 ok(!/service_role|SERVICE_ROLE|sb_secret_/.test(page) && !/supabase-js|createClient|\.auth\b|getSession|\bsession\b/i.test(code), '2b no service-role key, no supabase client and no session: a client has no account');
 const urls = [...new Set([...code.matchAll(/https:\/\/[^'"\s)]+/g)].map((m) => m[0]))];
-ok(JSON.stringify(urls) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shared-report']), '2c the only address the page names is the view-shared-report function on this project', urls);
+ok(JSON.stringify(urls.filter((u) => !/^https:\/\/homesignal\.net\/#follow=$/.test(u))) === JSON.stringify(['https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shared-report']), '2c the only address the page FETCHES is the view-shared-report function on this project (the one other address is the home page the follow link opens)', urls);
 ok((code.match(/\bfetch\(/g) || []).length === 1 && /method: 'POST'/.test(code) && /body: JSON\.stringify\(\{ token: token \}\)/.test(code), '2d one request, a POST, whose body is the token and nothing else');
 ok(/referrerPolicy: 'no-referrer'/.test(code) && /cache: 'no-store'/.test(code), '2e the request sends no referrer and is never cached');
 ok(!/\?[^'"\s]*token|token=|\+ token/.test(code.replace(/\{ token: token \}/g, '')), '2f the token is never put into a URL or a query string');
@@ -101,7 +101,7 @@ ok(/Open the link you were sent/.test(missing) && /if \(!token\) \{ missing\(\);
 
 // ---- 7. the PDF and the paper -------------------------------------------------------------------------------------------------------------------------------------
 ok(/\$\('pdf'\)\.addEventListener\('click', function\(\)\{ window\.print\(\); \}\)/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib/i.test(page), '7a Download PDF is the browser\'s own print window and nothing else');
-ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note and the notices off the paper');
+ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript,a\.follow\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note, the notices and the follow buttons off the paper');
 ok(/id="pdf" hidden/.test(page) && /\$\('pdf'\)\.hidden = false/.test(sh), '7c the button appears only when there is a report to print');
 ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" content="width=device-width,initial-scale=1"/.test(page) && /id="status" role="status" aria-live="polite"/.test(page), '7d a page without JavaScript says so, the status line is announced, and the page scales to a phone');
 
@@ -111,13 +111,25 @@ ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" 
   ok(inv.length === 1, '8a exactly one invitation in the page', inv.length);
   const a = inv[0] || '';
   ok(/<h2>Follow quality-of-life intelligence for this property\.<\/h2>/.test(a) && /<p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about\.<\/p>/.test(a) && />Explore HomeSignal &rarr;<\/a>/.test(a), '8b the approved wording, whole');
-  ok((a.match(/<a /g) || []).length === 1 && /<a href="https:\/\/homesignal\.net\/" rel="noopener noreferrer">/.test(a), '8c one link, to the public home page on the production domain (the plain fallback), sending no referrer');
+  ok((a.match(/<a /g) || []).length === 2 && /<a href="https:\/\/homesignal\.net\/" rel="noopener noreferrer">/.test(a) && /<a class="go follow" id="follow2"/.test(a), '8c two links: the plain home-page link (sending no referrer) and the second Follow this property button');
   ok(/inv\.href = where \? base \+ '#address=' \+ encodeURIComponent\(where\) : base;/.test(sh) && !/[?&]address=|\?addr/.test(sh) && /typeof body\.address === 'string'/.test(sh),
     '8h the link carries the property address in the URL FRAGMENT only (never a query), and only while the report still has one');
   ok(page.indexOf('id="private"') < page.indexOf('id="invite"') && page.indexOf('id="invite"') > page.indexOf('id="report"') && page.indexOf('</main>') > page.indexOf('id="invite"') && !/<(?:main|div|p)[^>]*id="[^"]*"[^>]*>[^<]*<\/(?:main)>\s*<main/.test(page), '8d it comes after the report, its id and the privacy note');
   ok(/id="invite" class="invite" hidden/.test(page) && /\$\('invite'\)\.hidden = false/.test(sh) && /\$\('invite'\)\.hidden = true/.test(fn('start')), '8e it shows only with a report and is hidden again when a link opens nothing');
   ok(!/(?:#private,|,#private)[^{]*\.invite|\.invite\{[^}]*display:none/.test(page), '8f the print stylesheet keeps it, so a saved PDF carries the clickable link');
   ok(!/<form|<input/.test(a), '8g it asks for nothing: no form, no sign-in');
+}
+
+// ---- 9. FOLLOW THIS PROPERTY (the conversion path) ------------------------------------------------------------------------------------------------------
+{
+  const top = (page.match(/<header class="top">[\s\S]*?<\/header>/) || [''])[0];
+  ok(/<a class="go follow" id="follow" href="#" hidden>Follow this property<\/a>/.test(top) && top.indexOf('id="follow"') < top.indexOf('id="pdf"'), '9a the header carries "Follow this property", before and beside Download PDF');
+  ok(/class="go sec" id="pdf"/.test(top) && /\.go\.sec\{background:var\(--panel\)/.test(page) && !/class="go[^"]*" id="pdf"[^>]*class/.test(top), '9b Download PDF is the quieter style; Follow this property is the one green primary');
+  const sh = (code.match(/function show\(body\)\{[\s\S]*?\n  \}/) || [''])[0];
+  ok(/\['follow', 'follow2'\]\.forEach/.test(sh) && (code.match(/#follow=/g) || []).length === 1, '9c both buttons get the SAME href from ONE builder (one follow action)');
+  ok(/where\.length <= 200/.test(sh) && /a\.hidden = !fhref/.test(sh), '9d with no address on file neither button is shown');
+  ok(/encodeURIComponent\(where\)/.test(sh) && !/localStorage|sessionStorage\.setItem\([^)]*follow/.test(code), '9e the address rides in the link fragment only; this page stores nothing about the follow');
+  ok(!/app_follows|app_properties|\.rpc\(/i.test(code), '9f this page makes no follow write of its own');
 }
 
 // ---- audit fix 8 (2026-10-07): a stalled connection ends in the "could not load" message ------------------------------------------------

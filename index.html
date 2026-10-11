@@ -129,7 +129,7 @@
 <script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=cd599ef9"></script>
+<script src="shell.js?v=fbc80522"></script>
 <script>
 (function () {
   // EXPLORE SEARCH. A search hands the visitor to the Development Map (Map 1, homesignalmap.html)
@@ -168,6 +168,20 @@
         location.replace('homesignalmap.html');
       } catch (err) { document.documentElement.style.visibility = ''; /* blocked storage: an ordinary homepage visit */ }
     } else { document.documentElement.style.visibility = ''; }
+  }
+
+  // "Follow this property" on a buyer's shared report arrives as /#follow=<address>. Same rules as #address= above (fragment, never a
+  // query; removed from the address bar; must be a plausible street address), but it does NOT leave the page: the address is parked in this
+  // tab's sessionStorage and the shell's own add-an-address flow (shell.js, HS.consumeFollowHandoff) picks it up once it has booted.
+  // That flow signs the visitor in if needed, confirms the address with the Census, and saves it through the one writer.
+  var follow = /^#follow=(.+)$/.exec(location.hash || '');
+  if (follow) {
+    var fwanted = '';
+    try { fwanted = decodeURIComponent(follow[1].replace(/\+/g, ' ')).trim(); } catch (err) { fwanted = ''; }
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (err) {}
+    if (fwanted.length <= 200 && searchKind(fwanted) === 'address') {
+      try { sessionStorage.setItem('hs.followProperty', fwanted); } catch (err) { /* blocked storage: an ordinary homepage visit */ }
+    }
   }
 
   // ---- the map ----------------------------------------------------------------------

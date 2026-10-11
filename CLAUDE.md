@@ -5039,6 +5039,10 @@ attribute preserved — that event architecture is a separate unit and is not bu
 - Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
   `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
+## SHARED REPORT: "Follow this property" IS A HAND-OFF INTO THE EXISTING ADD-AN-ADDRESS FLOW (2026-10-11)
+
+`shared-report.html` stays isolated (one request, no shell, no account). Its top button (beside Download PDF, green primary; Download PDF is the quiet one) and the second one in the bottom invitation are the SAME link, built once: `https://homesignal.net/#follow=<address>`. `index.html` parks a plausible address in this tab's sessionStorage (`hs.followProperty`); `shell.js::HS.consumeFollowHandoff` reads it once and calls `HS.openHome(address)`: the existing sign-in modal (resuming after the code), Census confirmation, then the resident's own Save through the one writer (`savePlaceRow`, idempotent by `app_properties_user_place_key`). Nothing new stores a follow; the share token authorizes nothing; no report is made, no credit used. With no address on file (private layer purged) neither button shows. Events `shared_report_follow_clicked` / `_completed` carry no payload. The shared page cannot show "Following": it has no session, and browser-local state is not an authority. Pinned by `test/shared-report-follow-handoff.test.mjs` and sections 9/5a3 of the shared-report tests.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are

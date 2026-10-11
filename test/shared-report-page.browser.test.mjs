@@ -103,12 +103,12 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   ok((await page.$$('.da-rv-label')).length === 0 && !(await page.content()).includes('client_label'), '1g no client label is shown or even present: the function never sends one');
   ok((await page.$$('.da-rv-actions')).length === 0 && (await page.$$('.da-rv-act')).length === 0, '1h the report\'s own action bar (Compare, Watch, Share, PDF) is left out for a client');
   ok((await page.$$('.da-rv-table tbody tr')).length > 0 && /Search radius 0\.5 mile/.test(await text(page, '.da-rv-meta')), '1i it is the full report: the records table, and the half-mile radius in the header');
-  const href = await page.getAttribute('#invite a', 'href');
+  const href = await page.getAttribute('#invite a:not(.follow)', 'href');
   ok(href === 'https://homesignal.net/#address=' + encodeURIComponent(ADDRESS) && !/[?]/.test(href), '1j4 the invitation links to the property: the address rides in the URL FRAGMENT only (no query), exactly encoded', href);
-  ok((await page.getAttribute('#invite a', 'rel')) === 'noopener noreferrer', '1j5 the link sends no referrer, so the report page is not named to the destination');
+  ok((await page.getAttribute('#invite a:not(.follow)', 'rel')) === 'noopener noreferrer', '1j5 the link sends no referrer, so the report page is not named to the destination');
   ok(await visible(page, '#pdf') && (await text(page, '#rid')) === 'Report ID ' + RID, '1j the Download PDF button and the permanent report id are shown');
   ok(/private link/.test(await text(page, '#private')) && /six months/.test(await text(page, '#private')) && /withdraw it at any time/.test(await text(page, '#private')), '1k the page tells the client the link is private, how long it lasts and that the brokerage can withdraw it');
-  ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Follow quality-of-life intelligence for this property.' && (await page.getAttribute('#invite a', 'href')).startsWith('https://homesignal.net/') && (await text(page, '#invite a')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
+  ok((await page.$$('#invite')).length === 1 && await visible(page, '#invite') && (await text(page, '#invite h2')) === 'Follow quality-of-life intelligence for this property.' && (await page.getAttribute('#invite a:not(.follow)', 'href')).startsWith('https://homesignal.net/') && (await text(page, '#invite a:not(.follow)')).startsWith('Explore HomeSignal'), '1j2 the invitation is shown once, with the approved heading and a link to https://homesignal.net/');
   ok(await page.evaluate(() => { const i = document.getElementById('invite'); const r = document.getElementById('report'); const p = document.getElementById('private'); return !!(r.compareDocumentPosition(i) & 4) && !!(p.compareDocumentPosition(i) & 4) && !r.contains(i) && /Brokerage|Acme/.test(r.textContent); }), '1j3 it sits after the report and the privacy note, outside the report, and the brokerage is still in the report');
   ok(!(await text(page, 'body')).includes('Sign in') && (await page.$$('input')).length === 0, '1l there is no sign-in and no form: a client needs no account');
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
@@ -186,7 +186,8 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   const { ctx, page } = await open({ w });
   await settled(page);
   const addr = await text(page, '.da-rv-addr');
-  ok((await page.getAttribute('#invite a', 'href')) === 'https://homesignal.net/', '5a2 with no address the invitation links to the plain home page: nothing is invented, no empty #address=');
+  ok((await page.getAttribute('#invite a:not(.follow)', 'href')) === 'https://homesignal.net/', '5a2 with no address the invitation links to the plain home page: nothing is invented, no empty #address=');
+  ok(!(await visible(page, '#follow')) && !(await visible(page, '#follow2')), '5a3 with no address there is no property to follow: neither Follow button is shown');
   ok((await stateOf(page)) === 'report' && !addr.includes('Evergreen') && addr.length > 0, '5a once the address has been purged the report still opens, with the report\'s own words where the address was', addr);
   await ctx.close();
 }
@@ -212,7 +213,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   const { ctx, page } = await open({ width: 390, height: 844 });
   await settled(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  ok(await visible(page, '#invite a') && (await page.$eval('#invite a', (a) => a.getBoundingClientRect().height)) >= 44, '7a2 on a phone the link is visible and a full-size tap target');
+  ok(await visible(page, '#invite a:not(.follow)') && (await page.$eval('#invite a:not(.follow)', (a) => a.getBoundingClientRect().height)) >= 44, '7a2 on a phone the link is visible and a full-size tap target');
   ok((await stateOf(page)) === 'report' && wide <= 0, '7a on a 390 px screen the report is shown and the page does not scroll sideways', wide);
   await ctx.close();
   const d = await open({ hash: '#share=' + UNKNOWN, width: 390, height: 844 });
@@ -233,6 +234,37 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
   ok(m.h2 >= 20 && m.weight >= 600 && m.upper === 'none', '8b a section heading is at least 20 px, semibold and not small uppercase', m);
   ok(m.addr > m.h2, '8c the property address is the strongest element, larger than any section heading', m);
   await ctx.close();
+}
+
+// ---- 9. FOLLOW THIS PROPERTY: top of the report, primary, one action -------------------------------------------------------------------------------------
+{
+  const { ctx, page, calls } = await open({ width: 1280, height: 800 });
+  await settled(page);
+  const want = 'https://homesignal.net/#follow=' + encodeURIComponent(ADDRESS);
+  ok((await text(page, '#follow')) === 'Follow this property' && await visible(page, '#follow'), '9a "Follow this property" is visible at the top without scrolling');
+  const m = await page.evaluate(() => {
+    const f = document.getElementById('follow').getBoundingClientRect(), p = document.getElementById('pdf').getBoundingClientRect();
+    const cs = (id) => getComputedStyle(document.getElementById(id));
+    return { fRight: f.right, pLeft: p.left, fTop: f.top, pTop: p.top, fBottom: f.bottom, fBg: cs('follow').backgroundColor, pBg: cs('pdf').backgroundColor, pRight: p.right, vw: innerWidth };
+  });
+  ok(m.fRight <= m.pLeft + 1 && Math.abs(m.fTop - m.pTop) < 2 && m.fBottom < 200, '9b on desktop it sits left of Download PDF on the same row, in the top header', m);
+  ok(m.fBg !== m.pBg && m.fBg === 'rgb(21, 122, 73)' && m.pBg === 'rgb(255, 255, 255)', '9c it is the green primary; Download PDF is the quieter secondary', m);
+  ok((await page.getAttribute('#follow', 'href')) === want && (await page.getAttribute('#follow2', 'href')) === want && !/[?]/.test(want), '9d the top and bottom buttons carry the SAME link, the address in the fragment only', want);
+  ok(await visible(page, '#follow2') && (await text(page, '#follow2')) === 'Follow this property', '9e the bottom invitation also offers it, and keeps its heading and Explore link');
+  ok(calls.length === 1, '9f the page still makes exactly one request: showing the buttons creates no report and writes nothing', calls.length);
+  await page.emulateMedia({ media: 'print' });
+  ok(!(await visible(page, '#follow')) && !(await visible(page, '#follow2')) && await visible(page, '#invite'), '9g the follow buttons are left off the printed report; the invitation stays');
+  await page.emulateMedia({ media: 'screen' });
+  ok(await page.evaluate(() => document.getElementById('pdf').hidden === false), '9h Download PDF is still offered');
+  await ctx.close();
+  const ph = await open({ width: 390, height: 844 });
+  await settled(ph.page);
+  const mm = await ph.page.evaluate(() => {
+    const f = document.getElementById('follow').getBoundingClientRect(), p = document.getElementById('pdf').getBoundingClientRect();
+    return { fTop: f.top, pTop: p.top, fH: f.height, w: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  ok(mm.fTop < mm.pTop && mm.fH >= 44 && mm.w <= 0, '9i on a phone the two stack, Follow first, each a full-size tap target, no sideways scroll', mm);
+  await ph.ctx.close();
 }
 
 await browser.close();

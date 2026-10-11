@@ -1527,10 +1527,15 @@
   //     get the sign-in modal — the nudge doubles as the signup prompt.
   let _homeMatch = null;
   let _homeInput = null;   // FIX 17 — the resident's TYPED line; the only unit-bearing value (Census drops APT/UNIT/STE/#)
-  HS.openHome = function () {
+  // `prefill` (optional) is an address a link carried here (a buyer's shared report, "Follow this property"). It goes through the SAME
+  // steps a typed address does - sign-in, Census confirmation, the resident's own Save - so nothing is saved until they confirm, and the one
+  // writer (savePlaceRow, idempotent by the database's unique index) is the only thing that ever creates the relationship.
+  let _followSource = null;
+  HS.openHome = function (prefill) {
     if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding an address needs the live site.'); return; }
+    const want = typeof prefill === 'string' ? prefill.trim() : '';
     if (!state.session || state.session.demo) {
-      HS.openAuth();
+      HS.openAuth(want ? function () { return HS.openHome(want); } : undefined);
       const sub = $('authSub');
       if (sub) sub.textContent = 'Sign in first — then add an address to see what’s changing around it.';
       return;
@@ -1546,7 +1551,18 @@
     $('homeMsg').textContent = 'Your address is stored on your account only — never shared, never public.';
     const a = $('homeAddr'); a.value = ''; a.style.borderColor = '';
     HS.openModal('homeModal');
-    setTimeout(() => { if (a) a.focus(); }, 50);
+    if (want) { a.value = want; HS.findHome(); }
+    else setTimeout(() => { if (a) a.focus(); }, 50);
+  };
+  // The shared report's "Follow this property" leaves the address in this tab's sessionStorage (it is never in a URL that reaches a server).
+  // Read once and removed at once, so a reload never repeats it. It only OPENS the add-an-address flow above.
+  HS.consumeFollowHandoff = function () {
+    let want = '';
+    try { want = String(sessionStorage.getItem('hs.followProperty') || '').trim(); sessionStorage.removeItem('hs.followProperty'); } catch (e) { want = ''; }
+    if (!want || want.length > 200) return;
+    _followSource = 'shared_report';
+    logEvent('shared_report_follow_clicked');
+    HS.openHome(want);
   };
   // "Add a home / area" entry points: a signed-in resident gets the Census-confirmed
   // home flow (private, owner-only rows); a signed-out visitor gets the no-login ZIP
@@ -1692,6 +1708,7 @@
       return;
     }
     if (r.existed) $('homeConfirmMsg').textContent = 'This address is already in My Places.';
+    if (_followSource === 'shared_report') { _followSource = null; logEvent('shared_report_follow_completed'); }
     LS.set('activeProp', r.data.id);
     HS.announcePlaceSaved({
       zip: m.zip,
@@ -2683,6 +2700,7 @@
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
     if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
+    else if (!IS_EMBED) HS.consumeFollowHandoff();
     _resolveReady(HS);
   }
 

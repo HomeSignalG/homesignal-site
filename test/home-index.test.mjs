@@ -98,9 +98,10 @@ ok(!/addr|address|lat=|lng=/i.test(urls), 'no address or coordinate is ever plac
 ok(/HANDOFF_KEY = 'hs\.homeSearchAddress'/.test(pageScript) && /sessionStorage\.getItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html'))
    && /sessionStorage\.removeItem\("hs\.homeSearchAddress"\)/.test(read('homesignalmap.html')),
   'Map 1 reads the same key and removes it in the same step');
-ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.match(/history\.replaceState/g) || []).length === 1
-   && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(pageScript),
-  'no search touches browser history: the ONE replaceState only removes the #address= fragment (below), and nothing pushes history or sets the hash');
+ok(!/history\.pushState|location\.hash\s*=/.test(pageScript) && (pageScript.match(/history\.replaceState/g) || []).length === 2
+   && /history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(pageScript)
+   && /hs\.followProperty/.test(pageScript) && /hs\.followProperty/.test(read('shell.js')),
+  'no search touches browser history: the TWO replaceStates only remove the #address= / #follow= fragment (below), and nothing pushes history or sets the hash');
 // A buyer's shared report arrives with the property address in the URL FRAGMENT (2026-10-09, founder: link to the full address).
 // 2026-10-09, later: it must be acted on AS THE PAGE SCRIPT RUNS, not in HS.onReady (which waits for the shell's whole network boot:
 // the visitor sat on the homepage for seconds before being moved).
