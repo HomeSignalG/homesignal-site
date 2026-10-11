@@ -84,7 +84,8 @@ header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch
    non-dismissible onboarding overlay, none of which belongs in the agent's workspace. So the site bar is page-local and carries the shell's
    LOOK (partials/shell.html: logo, Explore, My Places, Enterprise, the account on the right) with plain same-site links and no script.
    Its labels and addresses are pinned to partials/shell.html by test/development-activity-reports.test.mjs (1h), so the two cannot drift.
-   Enterprise is the active section. The bar is hidden by the print rule below, with header.top. */
+   Enterprise is the active section, so the page goes straight from the bar to its title: no second Enterprise row, no repeated HomeSignal label.
+   The right of the bar is the ACCOUNT ZONE: report usage and the one plan action, the Account control, and who is signed in. The bar is hidden by the print rule below. */
 header.sitebar{background:var(--panel);border-bottom:1px solid var(--line)}
 header.sitebar .in{max-width:1800px;margin:0 auto;padding:0 24px;min-height:72px;display:flex;flex-wrap:wrap;align-items:center;gap:0 32px}
 .sb-brand{display:inline-flex;align-items:center;gap:9px;min-height:44px;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none;flex:none}
@@ -97,24 +98,52 @@ nav.sb-nav a:hover{color:var(--ink)}
 nav.sb-nav a[aria-current=page]{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:10px}
 header.sitebar .who{margin:0 0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;min-height:44px}
 header.sitebar a:focus-visible,header.sitebar button:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
+/* the account zone: usage + plan action | Account | who */
+.sb-acct{margin:0 0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:2px 18px;min-width:0}
+.sb-acct .who{margin:0}
+#trial{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:2px 12px;padding:0;background:none;border:0;border-radius:0}
+#trial .count{font-size:14px;font-weight:600;white-space:nowrap}
+#trial .trial-cta{margin:0}
+#trial .trial-cta .go{padding:6px 14px;min-height:36px;font-size:13.5px}
+#trial-cta-status{flex-basis:100%;text-align:right}
+/* the sentence under the count is a disclosure, not furniture: it opens only when asked for and floats over the page */
+.usage-more{font-size:12.5px;order:1}
+#trial .trial-cta{order:2}
+.usage-more:has(#trial-sub:empty){display:none}
+.usage-more>summary{cursor:pointer;list-style:none;color:var(--accent);font-weight:600;min-height:28px;display:inline-flex;align-items:center}
+.usage-more>summary::-webkit-details-marker{display:none}
+.usage-more>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.usage-more[open]>#trial-sub{position:absolute;right:0;top:100%;z-index:30;width:min(340px,86vw);margin:6px 0 0;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.14);text-align:left}
+.acct-btn{font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 14px;min-height:36px;cursor:pointer}
+.acct-btn:hover{background:var(--panel2)}
+.acct-btn:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+body:not(:has(#account .card:not([hidden]))) .acct-btn{display:none}
 @media(max-width:700px){
-  header.sitebar .in{gap:0 16px;padding-top:6px}
-  header.sitebar .who{order:2;display:block;flex:1 1 0;min-width:0;text-align:right;line-height:1.35}
-  nav.sb-nav{order:3;flex:0 0 100%;gap:24px;overflow-x:auto}
+  /* phone: row 1 logo + Account, row 2 the site links, row 3 usage + plan action, row 4 who is signed in */
+  header.sitebar .in{gap:0 12px;padding-top:4px;padding-bottom:4px;min-height:0}
+  .sb-acct{display:contents}
+  .acct-btn{order:1;margin-left:auto}
+  nav.sb-nav{order:2;flex:0 0 100%;gap:24px;overflow-x:auto}
+  #trial{order:3;flex:0 0 100%;flex-wrap:nowrap;justify-content:space-between;padding:4px 0}
+  #trial .count{white-space:normal;flex:1 1 auto;min-width:0}
+  #trial .trial-cta{flex:none}
+  header.sitebar .who{order:4;flex:0 0 100%;display:block;text-align:left;line-height:1.35;padding-bottom:2px}
+  #trial-cta-status{text-align:right}
+  header.top h1{font-size:20px}
   nav.sb-nav a{white-space:nowrap}
 }
 .who{font-size:13px;color:var(--muted)}
+.who button{min-height:36px}
 .who button{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
 .wrap{max-width:1800px;margin:0 auto;padding:12px 24px 56px;display:grid;gap:18px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
-#trial{display:grid;gap:4px}
-#trial .count{margin:0;font-size:17px;font-weight:600}
+#trial .count{margin:0}
 #trial .count.out{color:var(--red)}
-#trial .trial-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 0 auto;flex-basis:auto}
+#trial .trial-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 #trial .trial-cta[hidden]{display:none}
 #trial-cta-status{font-size:13.5px;color:var(--muted)}
 #trial-cta-status.err{color:var(--red)}
-#trial .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
+#trial .sub{margin:0;font-size:13px;color:var(--muted)}
 #billing{display:grid;gap:10px}
 #billing h2{margin:0;font-size:17px}
 #billing .plan{margin:0;font-size:17px;font-weight:600}
@@ -204,38 +233,23 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
    Order: account strip, Create a property report, Current property report (the primary feature), Saved reports (one library, comparison included),
    Account and administration (secondary, closed until wanted).
    ============================================================================ */
-header.top{padding:8px 24px 12px}
+header.top{padding:8px 0 12px}
 header.top .in{padding:0 24px}
 header.top h1{font-size:26px;letter-spacing:-.01em}
 header.top .meta{font-size:14px;margin-top:4px;max-width:none}
 .wrap{gap:14px;padding-top:14px}
 .sec-h{margin:0 0 12px;font-size:19px;letter-spacing:-.01em}
-/* REPORT USAGE is account information, not the page's first message (founder, 2026-10-11): it sits in the header's account strip, under the sign-in
-   line, as a count and its one commercial action ("Subscribe — $79/month", or "Manage plan" once paid). The explanatory line stays, small. */
-header.top .acct-strip{display:grid;justify-items:end;gap:4px;text-align:right;max-width:460px}
-#trial{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px 12px;padding:0;background:none;border:0;border-radius:0}
-#trial .count{font-size:13.5px;font-weight:600}
-#trial .trial-cta{margin:0;flex-basis:auto}
-#trial .trial-cta .go{min-height:36px;padding:7px 14px;font-size:13.5px}
-#trial .sub{order:3;flex-basis:100%;font-size:12px;line-height:1.4;max-width:none}
-#trial-cta-status{font-size:12.5px}
 input[type=text],input[type=search]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
 input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
-/* Create a property report: the starting action of the whole page, so a full-width section ABOVE the two-column workspace, not a card in the rail.
-   Desktop: address, client label and the button on one row. Narrow: they stack. */
-.create{padding:18px 24px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
+/* Create a property report: full width. Address gets the most room; the client label is secondary; Generate is the obvious action. */
+.create{padding:16px 20px 20px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
 .create .sec-h{margin-bottom:10px}
-.create form{gap:8px}
-.create-row{display:grid;gap:12px;align-items:end;grid-template-columns:1fr}
-.create-addr{min-width:0}
-.create-addr input{font-size:17px;padding:13px 16px}
-.create-label{min-width:0}
-.create-label input{font-size:17px;padding:13px 16px}
-.create-row .go{justify-self:stretch;padding:13px 26px;font-size:16px;min-height:50px;white-space:nowrap}
-@media(min-width:760px){
-  .create-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto}
-  .create-row .go{justify-self:auto}
-}
+.create-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.create-addr{flex:3 1 340px;min-width:0}
+.create-addr input,.create-label input{font-size:16px;padding:13px 14px}
+.create-label{flex:1 1 220px;min-width:0}
+.create-row .go{justify-self:auto;padding:13px 28px;font-size:16px;min-height:52px;white-space:nowrap}
+@media(max-width:700px){.create-row{flex-direction:column;align-items:stretch}.create-addr,.create-label{flex:0 0 auto}.create-row .go{width:100%}}
 /* Current property report */
 .stage{display:grid;gap:14px}
 .stage>.sec-h{margin:0}
@@ -244,15 +258,15 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #report-empty .empty-t{margin:0 0 4px;font-size:17px;font-weight:600}
 #report-empty .empty-s{margin:0 auto;max-width:56ch;font-size:14px;color:var(--muted)}
 /* THE TWO-COLUMN WORKSPACE (desktop): the rail on the left holds the agent's tools, the report on the right takes everything else.
-   Below 1000px the rail dissolves and the sections stack in the order below, so the phone reads: create (above the workspace), this report's tools, the report, saved, account. */
+   Below 1000px the rail dissolves and the sections stack in the order below, so the phone reads: create, this report's tools, the report, saved, account. */
 .ws{display:flex;flex-direction:column;gap:18px}
 .rail{display:contents}
-.rail>.rail-sec{order:2}.ws>.stage{order:3}.rail>#saved{order:4}
-.wrap>.acct{margin-top:18px}
+.rail>.rail-sec{order:1}.ws>.stage{order:2}.rail>#saved{order:3}
 .rail-sec{display:grid;gap:12px}
 .rail-sec>.sec-h{margin:0}
 #rail-actions{display:grid;gap:8px;--rv-ink:var(--ink);--rv-ink2:var(--muted);--rv-line:var(--line);--rv-green:var(--accent);--rv-deep:#0f5c37;--rv-tint:#e9f5ee}
 #rail-actions:empty{display:none}
+#rail-actions .da-rv-act[data-da-action="pdf"]{grid-column:1/-1}
 /* management is quiet: it opens from the action, never sits beside it */
 .mgmt{background:transparent;border:0;padding:0;font-size:13px;color:var(--muted)}
 .mgmt>summary{cursor:pointer;list-style:none;min-height:32px;padding:4px 2px;font-weight:600;color:var(--muted)}
@@ -263,15 +277,13 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .mgmt[open]{display:grid;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 12px 12px;background:var(--panel)}
 .mgmt:not([open]){display:block}
 .mgmt .hint,.mgmt p{margin:0}
-#sb-account{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
 #rail-actions .da-rv-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;padding:0;border:0}
 #rail-actions .da-rv-act{min-height:44px;padding:10px 12px;font-size:14px;border-radius:10px}
+#rail-actions .da-rv-act--live{border-color:var(--line);color:var(--ink);background:#fff}
+#rail-actions .da-rv-act--live:hover{background:var(--panel2)}
 #rail-actions .da-rv-act[data-da-action="share"]{grid-column:1/-1;min-height:48px;background:var(--accent);border-color:var(--accent);color:#fff}
 #rail-actions .da-rv-act[data-da-action="share"]:hover{background:#0f5c37}
-#rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent)}
-#rail-actions .da-rv-act[data-da-action="pdf"]{grid-column:1/-1}
-#rail-actions .da-rv-act[data-da-action="pdf"],#rail-actions .da-rv-act[data-da-action="compare"]{min-height:40px;font-weight:500;font-size:13.5px;color:var(--muted);border-color:var(--line);background:var(--panel2)}
-#rail-actions .da-rv-act[data-da-action="pdf"]:hover,#rail-actions .da-rv-act[data-da-action="compare"]:hover{color:var(--ink);background:#eef2ee}
+#rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent);background:#fff}
 #rail-actions .da-rv-soon{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
 .rail .card{padding:12px 14px}
 .rail .card,.rail-sec{gap:8px}
@@ -311,8 +323,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .sv-pick{flex:none;display:flex;align-items:center;justify-content:center;width:40px;min-height:36px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
 .sv-pick input{width:18px;height:18px;margin:0}
 .sv-pick input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-/* Account and administration: secondary, closed until wanted, and not drawn at all while none of its cards may show */
-.acct{background:var(--panel2);border:1px solid var(--line);border-radius:12px}
+/* Account and administration: secondary, closed until wanted, full width below the workspace, and not drawn at all while none of its cards may show */
+#compare-mode{color:var(--ink);border-color:var(--line)}
+.acct{scroll-margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px}
 .acct:not(:has(.card:not([hidden]))){display:none}
 .acct>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px;padding:14px 18px;min-height:48px;border-radius:12px}
 .acct>summary::-webkit-details-marker{display:none}
@@ -324,10 +337,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .to-billing .wrap{padding-bottom:calc(100vh - 120px)}
 .acct-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:0 18px 18px;align-items:start}
 @media(max-width:620px){
-  .create{padding:16px}
+  .create{padding:18px}
   header.top h1{font-size:22px}
-  header.top .acct-strip{flex-basis:100%;justify-items:start;text-align:left;max-width:none}
-  #trial{justify-content:flex-start}
 }
 /* PRINT: only the report goes on the paper (build step 8). Every card, the form, the status lines and the sign-in are left off; the report's
    own stylesheet (lib/da-report-view.js) takes care of the report. */
@@ -358,7 +369,19 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   <div class="in">
     <a class="sb-brand" href="index.html"><span class="sb-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span>Signal</span></span></a>
     <nav class="sb-nav" aria-label="HomeSignal site"><a href="index.html">Explore</a><a href="properties.html">My Places</a><a href="development-activity.html" aria-current="page">Enterprise</a></nav>
-    <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
+    <div class="sb-acct">
+      <!-- Report usage is ACCOUNT STATUS, not page content: the trial function's own words and the one plan action, here in the account zone. -->
+      <section id="trial" aria-live="polite">
+        <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
+        <div class="trial-cta" id="trial-cta-wrap" hidden>
+          <button type="button" class="go" id="trial-cta"></button>
+          <span id="trial-cta-status" role="status" aria-live="polite"></span>
+        </div>
+        <details class="usage-more"><summary>Details</summary><p class="sub" id="trial-sub"></p></details>
+      </section>
+      <button type="button" class="acct-btn" id="acct-btn">Account</button>
+      <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
+    </div>
   </div>
 </header>
 <header class="top">
@@ -366,18 +389,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <div>
       <h1>Development Activity Reports</h1>
       <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
-    </div>
-    <!-- Account strip: where the report allowance stands (who is signed in is in the site bar above). Usage is secondary account information (founder, 2026-10-11), so it lives here, not above the form. -->
-    <div class="acct-strip">
-      <section id="trial" aria-live="polite" aria-label="Report usage">
-        <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
-        <!-- The commercial action always sits with the count, so nobody hunts the page for how to continue: "Subscribe — $79/month" until the plan is paid, then "Manage plan". -->
-        <div class="trial-cta" id="trial-cta-wrap" hidden>
-          <button type="button" class="go" id="trial-cta"></button>
-          <span id="trial-cta-status" role="status" aria-live="polite"></span>
-        </div>
-        <p class="sub" id="trial-sub"></p>
-      </section>
     </div>
   </div>
 </header>
@@ -393,7 +404,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <p id="signup-status" role="status" aria-live="polite"></p>
   </section>
 
-  <!-- Create a property report: the start of the whole workflow, full width above the two-column workspace. Same form, same ids, same handler. -->
+  <!-- Create a property report: full width, above the workspace. The form, its ids and its handler are unchanged. -->
   <section class="card create" aria-labelledby="create-title">
     <h2 class="sec-h" id="create-title">Create a property report</h2>
     <form id="rf" novalidate>
@@ -401,10 +412,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <label class="create-addr">Property address
           <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
         </label>
-        <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
+        <label class="create-label" title="Appears in the report header. A saved report keeps it with the address, not in the report itself.">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
         <button type="submit" class="go" id="go">Generate report</button>
       </div>
-      <p class="hint">Appears in the report header. A saved report keeps it with the address, not in the report itself.</p>
     </form>
   </section>
 
@@ -412,8 +422,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <!-- LEFT: the agent workspace. Every card keeps its id, its form and its handler; only where it sits changed. On a narrow screen the rail dissolves
          (display:contents) and the sections stack in the `order` set in the style block: create, current-report tools, report, saved reports, account. -->
     <aside class="rail" id="rail" aria-label="Agent workspace">
-
-
       <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title" hidden>
         <h2 class="sec-h" id="rail-report-title">This report</h2>
         <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF). The section is drawn only while they are here. -->
@@ -442,8 +450,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       </div>
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
-      <h2 class="sec-h" id="saved-title">Saved reports</h2>
-      <p class="hint">Reopening a saved report does not use a report.</p>
+      <h2 class="sec-h" id="saved-title" title="Reopening a saved report does not use a report.">Saved reports</h2>
       <div class="sv-tools" id="saved-tools" hidden>
         <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
         <div class="row sv-modes" id="compare-modes" hidden><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
@@ -471,12 +478,13 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       <div id="report"></div>
       <div class="empty" id="report-empty">
         <p class="empty-t">No report is open</p>
-        <p class="empty-s">Enter an address and press Generate report, or open a saved report.</p>
+        <p class="empty-s">Enter an address above or open a saved report.</p>
       </div>
       <div id="compare-result"></div>
     </section>
   </div>
 
+  <!-- Account and administration: infrequent, so it is NOT in the workspace rail. Full width below the workspace; the Account control in the bar opens it. -->
   <details class="acct" id="account">
     <summary><span class="acct-t">Account and administration</span></summary>
     <div class="acct-in">
@@ -1565,18 +1573,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     } catch (e) { select(); }
   }
 
-  /** Header "Account": opens the existing Account and administration section (Billing, Your name, Invite an agent) and brings it into view. */
-  function openAccount(){
-    var a = $('account'); if (!a) return;
-    a.open = true; a.scrollIntoView();
-    var sm = a.querySelector('summary'); if (sm) sm.focus({ preventScroll: true });
-  }
-  /** The control is offered only while the section has a card to show (the section itself is not drawn otherwise). */
-  function syncAccountBtn(){
-    var b = $('sb-account'); if (!b) return;
-    b.hidden = !document.querySelector('#account .card:not([hidden])');
-    var dot = b.nextSibling; if (dot && dot.nodeType === 3) dot.textContent = b.hidden ? '' : ' · ';
-  }
   function onSession(s){
     var was = session && session.user ? session.user.id : null;
     session = s && s.access_token ? s : null;
@@ -1586,10 +1582,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (session) {
       var email = session.user && session.user.email ? session.user.email : 'an account';
       who.appendChild(document.createTextNode('Signed in as ' + email + ' · '));
-      var acctBtn = document.createElement('button'); acctBtn.type = 'button'; acctBtn.id = 'sb-account'; acctBtn.textContent = 'Account';
-      acctBtn.addEventListener('click', openAccount);
-      who.appendChild(acctBtn); who.appendChild(document.createTextNode(' · '));
-      syncAccountBtn();
       var out = document.createElement('button'); out.type = 'button'; out.textContent = 'Sign out';
       out.addEventListener('click', function(){ client.auth.signOut(); });
       who.appendChild(out);
@@ -1734,7 +1726,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('share-pop-close').addEventListener('click', closeSharePop);
     $('share-pop').addEventListener('click', function(e){ if (e.target === $('share-pop')) closeSharePop(); });
     document.addEventListener('keydown', sharePopKeys);
-    if (window.MutationObserver) new MutationObserver(syncAccountBtn).observe($('account'), { subtree: true, attributes: true, attributeFilter: ['hidden'] });
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
     $('compare-modes').hidden = !COMPARE_AT_LAUNCH;
@@ -1756,6 +1747,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     function fitRail(){ var r = $('rail'); if (!r) return; var fits = window.matchMedia('(min-width:1000px)').matches && r.offsetHeight > 0 && r.offsetHeight <= window.innerHeight - 24; r.classList.toggle('rail-fits', fits); }
     if (window.ResizeObserver) new ResizeObserver(fitRail).observe($('rail'));
     window.addEventListener('resize', fitRail); fitRail();
+    $('acct-btn').addEventListener('click', function(){ var a = $('account'); a.open = true; a.scrollIntoView({ block: 'start' }); a.querySelector('summary').focus({ preventScroll: true }); });
     $('compare-mode').addEventListener('click', function(){ setCompareMode(!$('saved').classList.contains('cmp-on')); });
     $('saved-more').addEventListener('click', function(){ savedAll = !savedAll; filterSaved(); });
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
