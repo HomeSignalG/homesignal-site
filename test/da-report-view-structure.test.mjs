@@ -187,7 +187,9 @@ const C = code(SRC);
     // build step 5c: the customer page for invited trial members, and its tests
     CUSTOMER_PAGE, 'test/development-activity-reports.test.mjs', 'test/development-activity-reports.browser.test.mjs',
     // build step 8: the client's page for a private share link, its tests, and the structural test of the whole share unit
-    CLIENT_PAGE, 'test/shared-report-page.test.mjs', 'test/shared-report-page.browser.test.mjs', 'test/report-share-delivery-structure.test.mjs',
+    CLIENT_PAGE, 'test/shared-report-page.test.mjs', 'test/shared-report-page.browser.test.mjs', 'test/shared-report-follow-inline.browser.test.mjs',
+    // 2026-10-11: inline Follow on that page; the browser test mounts the real report through the view's test world
+    'test/report-share-delivery-structure.test.mjs',
     // build step 10: the side-by-side comparison READS the view's functions (read, typeCounts, outcomeText, describe...) so its counts are the report's own;
     // it is a module, not a page, and the customer page loads it beside the view. Its tests, its mutation harness and its record are listed with it.
     'lib/da-report-compare.js', 'test/da-report-compare.test.mjs', 'test/da-report-compare-structure.test.mjs',

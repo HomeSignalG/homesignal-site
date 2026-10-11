@@ -101,7 +101,7 @@ ok(/Open the link you were sent/.test(missing) && /if \(!token\) \{ missing\(\);
 
 // ---- 7. the PDF and the paper -------------------------------------------------------------------------------------------------------------------------------------
 ok(/\$\('pdf'\)\.addEventListener\('click', function\(\)\{ window\.print\(\); \}\)/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib/i.test(page), '7a Download PDF is the browser\'s own print window and nothing else');
-ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript,a\.follow\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note, the notices and the follow buttons off the paper');
+ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript,a\.follow,\.follow-panel\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note, the notices and the follow buttons off the paper');
 ok(/id="pdf" hidden/.test(page) && /\$\('pdf'\)\.hidden = false/.test(sh), '7c the button appears only when there is a report to print');
 ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" content="width=device-width,initial-scale=1"/.test(page) && /id="status" role="status" aria-live="polite"/.test(page), '7d a page without JavaScript says so, the status line is announced, and the page scales to a phone');
 
@@ -128,7 +128,7 @@ ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" 
   const sh = (code.match(/function show\(body\)\{[\s\S]*?\n  \}/) || [''])[0];
   ok(/\['follow', 'follow2'\]\.forEach/.test(sh) && (code.match(/#follow=/g) || []).length === 1, '9c both buttons get the SAME href from ONE builder (one follow action)');
   ok(/where\.length <= 200/.test(sh) && /a\.hidden = !fhref/.test(sh), '9d with no address on file neither button is shown');
-  ok(/encodeURIComponent\(where\)/.test(sh) && !/localStorage|sessionStorage\.setItem\([^)]*follow/.test(code), '9e the address rides in the link fragment only; this page stores nothing about the follow');
+  ok(/encodeURIComponent\(followAddr\)/.test(sh) && !/localStorage|sessionStorage\.setItem\([^)]*follow/.test(code), '9e the address rides in the link fragment only; this page stores nothing about the follow');
   ok(!/app_follows|app_properties|\.rpc\(/i.test(code), '9f this page makes no follow write of its own');
 }
 
