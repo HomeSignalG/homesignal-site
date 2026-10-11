@@ -2,12 +2,12 @@ name: dev-change-recovery-suite
 
 # HISTORICAL-RECOVERY PROTECTION (docs/dev-change-recovery.sql). Runs the SHIPPED migration against a DISPOSABLE
 # Postgres whose ledger is built from the repo's own SQL of record (proved equal to the live bodies by md5 inside the
-# run): 81 checks (rule_version 3: a stamped first sighting is the one-time BASELINE for its ZIP x source only until that
-# pair is verified READY; after it a new record is an ordinary first detection; an incomplete/failed source HOLDS records
-# and cannot establish readiness; fallback lapses readiness; neighbouring ZIPs sharing a key never double-announce; legacy
-# unstamped records unchanged; deferral on any unsynchronised cache/materialisation state — one current plus stale rows,
-# empty materialisation, invalid or missing generation, concurrent collector write or failure-row commit during the probe,
-# with a positive control), idempotence, three refusals, then every prohibited mutation (32) —
+# run): 107 checks (rule_version 4: per ZIP x source x scope-version readiness from the source COMPLETION RECEIPT — an empty
+# expanded read baselines, the first arrival after it is news, a changed scope version / any break in complete expanded reads
+# re-baselines, incomplete / fallback / failed / missing receipts HOLD records and are reported unhealthy, sources are suspended
+# and re-established independently, OFF/ON cycles, breaks the ledger never observed, neighbouring ZIPs sharing a key, legacy
+# unstamped records unchanged, deferral on any unsynchronised cache/materialisation state with a concurrent-write positive
+# control), idempotence, three refusals, then every prohibited mutation (40) —
 # each MUST fail the suite. Never addresses production.
 
 on:

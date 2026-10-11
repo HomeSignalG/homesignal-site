@@ -3,49 +3,44 @@
 Scope: PR #1829 (`docs/dev-change-recovery.sql`, NOT applied, NOT merged). No production change was made; the only
 production access was read-only `EXPLAIN ANALYZE` / `SELECT`.
 
-## 1. The rule (rule_version 3) — baseline once, then ordinary news
+## 1. The rule (rule_version 4) — a positive receipt, a per-source baseline, a continuity test
 
-Revision 1 of this PR (rule_version 2) treated every `scope_origin = polygon_member` first sighting as
-`coverage_recovered` forever. That is a permanent blind spot: months after a ZIP's expanded coverage is established, a
-genuinely new filing in the ring would still be silent. Corrected:
+Revision 3 proved a source was monitored by the presence of a stamped record and by the absence of a failure log. Two defects:
+(1) an expanded read with an EMPTY ring could not establish a baseline, so the first genuine arrival after it was silent; (2) "no
+failure row" was read as completeness. Revision 4 replaces both with a positive **source completion receipt**
+(PR #1840: `scope-receipt.ts`, `docs/dev-source-receipt.sql`) — per ZIP x source: the scope that ran (`expanded|fallback|legacy|failed`),
+its **scope version** (rule + envelope + radius), and `complete` (no truncation, no failed/unresolved membership test, no
+overflow). It is linked to the cache generation by `tick_at = development_reports.refreshed_at`. `dev_refresh_collect` is untouched.
 
-| situation, per **ZIP x source (registry_id)**, evaluated by the ledger's one writer | outcome of a NEW comparable stamped identity |
+| new comparable stamped identity, per ZIP x source | outcome |
 |---|---|
-| pair not READY, generation clean | `coverage_recovered` — the baseline: non-material, audited, never announced |
-| pair READY, generation clean | ordinary `first_detected`: material, reportable (a genuine arrival after the verified baseline) |
-| generation NOT clean (source `fetch_failed` / `truncated` in that same collector tick) | **HELD**: not observed at all this time; a later clean generation classifies it. Nothing is inferred |
-| unstamped (legacy scope) | untouched, byte for byte |
+| complete expanded read, CONTINUOUS baseline at the same version | ordinary `first_detected` (material, reportable) |
+| complete expanded read, no continuous baseline (first expansion, changed version, or any break) | `coverage_recovered`: the baseline / re-baseline — silent, audited |
+| incomplete / fallback / failed / no receipt | HELD: not observed; a later complete read classifies it |
+| unstamped (legacy scope) | unchanged |
 
-**No date decides anything.** Nor does the ledger claim "new to HomeSignal" = "newly filed": the baseline is silence
-(no claim), the audit records the publisher date/kind descriptively.
+**Readiness** (`dev_change_scope_ready`, per ZIP x source, bound to a scope version) is established by a complete expanded
+receipt **even when the ring is empty**, so the first record to arrive afterwards is news (E01–E03). It is **continuous** only while
+every receipt since the baseline's verified generation is also a complete expanded read at the same version, the verified
+generation's own receipt is still on record, no response was `lost`, and the row is not suspended. A break the ledger never observed
+(G01), a pruned anchor (G03) and a lost response (G04) all break it; an unobserved complete generation does not (G02).
 
-**Readiness evidence** — one new row per ZIP x source, `public.dev_change_scope_ready`, written only by the ledger's
-one writer. A pair becomes READY at a **synchronised** observation that (a) shows >= 1 stamped record of that source
-(a stamp is itself proof the widening was on for that source in that generation) and (b) is **clean**: no
-`dev_refresh_source_failures` row of kind `fetch_failed`/`truncated` for the source whose `seen_at` equals the cache
-clock — `dev_refresh_collect` writes both with `now()` of one transaction, so this is an exact match, not a window.
-Existing authorities reused: canonical refresh (`development_reports.refreshed_at`), source health
-(`dev_refresh_source_failures`), cache-generation/materialisation evidence (`app_projects.provenance.refreshed_at`),
-and the change ledger. No second state authority: readiness is derived-and-cached evidence, lapsed or rebuilt from them.
+**Per-source independence.** A source that is not a complete expanded read (or is missing from a ZIP that has receipts) suspends
+**its own** baseline only and is listed in `public.dev_change_scope_health`; other sources keep theirs (M01–M08, J01–J02). A
+persistently incomplete source never reaches readiness, holds its records on every observation, and stays listed (H01).
 
-**Lapse** — a synchronised observation that shows **no** stamped record anywhere in the ZIP while readiness rows exist
-means the widening is no longer evidenced (mode off, RPC fell back to the legacy scope): all the ZIP's readiness lapses.
-When coverage returns the ring is re-baselined silently; known identities are never re-announced (absence is never an
-event); records that appeared during the gap are not claimed as genuine.
+**Policy for "what happens at the next successful comparable read"** (decided from coverage evidence, not from dates): continuity
+intact => normal detection; any break => re-baseline, because records that arrive across a coverage gap cannot be told from
+backfill and HomeSignal must not manufacture new-development alerts from them. The cost is that a genuine arrival during a gap is
+quiet; the gap itself is visible (`scope_ready_suspended`, `coverage_held`, the health view).
 
-**Product tradeoff, stated plainly.** HomeSignal will not manufacture "new development" alerts from historical backfill,
-and will announce genuinely new arrivals once a source's expanded coverage is verified. The price: the *first*
-widened record of a ZIP x source with no stamp at expansion time, a record that first appears in a source whose fetch is
-persistently truncated/failing, and records published during an un-observed disable window, are not announced.
+## 2. Synchronisation (`dev_change_recovery_probe`)
 
-## 2. Synchronisation (`dev_change_recovery_probe`) — answers to the review
-
-One STABLE SQL statement = one snapshot, reading in that snapshot: the cache clock, every development row's generation
-(equality with the clock, never max/>=), requested-key binding, the stamped elements, and the same-tick failure rows.
-Concurrency is *executed*, not argued (`run.sh` C01–C05): a collector write (C01) or a failure-row commit (C04) landing
-**during** the probe is invisible to it and visible to the next; a positive control (C03) swaps in the volatile-helper
-shape and the same scenario then splits the snapshot, proving the check can fail. The observation itself runs under the
-ledger's advisory lock and one transaction; readiness is read and written by that same writer.
+One STABLE SQL statement = one snapshot, reading together: the cache clock, every development row's generation (equality, never
+max/>=), requested-key binding, the stamped elements, the receipts of that generation and the readiness rows. Concurrency is
+*executed* (`run.sh` C01–C05): a collector write (C01) or a receipt commit (C04) landing during the probe is invisible to it and
+visible to the next; a positive control (C03) shows the scenario really splits a volatile helper. The observation runs under the
+ledger's advisory lock in one transaction.
 
 ## 3. Benchmarks (read-only on production; the new function is NOT installed, so these time the exact statements)
 
@@ -70,15 +65,15 @@ Unchanged and kept independent of this PR: the ZIP tile counts permit/applicatio
 only an upper-bound proxy for projects and **is not implemented as a count**. Proposed, not implemented, needs approval: label
 the tile "Development records" and show a distinct-project figure only where a canonical project identity exists.
 
-## 5. Remaining unsupported assumptions
+## 5. Remaining risks / unsupported assumptions
 
-- Cleanliness is only as good as the failure record: an incomplete fetch the refresh did not record is invisible.
-- The first widened record of a pair with an empty ring at expansion is silent once (no per-generation scope-mode evidence
-  is persisted; adding it needs an Edge Function change, out of this PR's boundary).
-- A disable/enable that falls wholly between two observations of a ZIP is not seen, so readiness survives it.
-- A source that is truncated on every refresh never reaches readiness; its ring records are held (visible as
-  `coverage_held` and as failure rows), not announced.
+- Nothing exists in production yet: the receipt SQL, the receipt collect job and the connector change are all undeployed (PR #1840);
+  until then there are NO receipts and every stamped record is held (fail closed). The ledger SQL refuses to apply without the receipt tables.
+- The receipt collect job links a receipt to its generation through the collector's cursor; a response whose receipt is not recorded
+  within the cache's next generation (job down) leaves that generation without evidence (held, listed).
+- Receipts are kept 7 days; a baseline older than that cannot prove continuity and is re-baselined (quiet) — a design bound, not a defect.
+- A genuine arrival during a coverage gap is baselined silently (stated above).
 - Duplicate twins of one identity never differ in `scope_origin`.
 - `ZIP_SCOPE_BOUNDS_MODE` is believed unset; secrets cannot be read.
-- Whether `dev_refresh_collect` writes failure rows and the cache clock in one transaction was read from the SQL of record
-  (`refreshed_at = now()`, `seen_at default now()`), not observed live (no widened ZIP exists yet).
+- The ledger test fixture carries the receipt table/view DDL as a copy of PR #1840's; a CI parity check between the two files should
+  be added when #1840 merges.

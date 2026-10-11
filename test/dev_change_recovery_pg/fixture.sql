@@ -19,11 +19,40 @@ $$;
 -- A cache refresh followed (optionally) by the materialisation of it, as dev_refresh_collect + app_refresh_zip do:
 -- the cache gets the sites and refreshed_at; app_projects gets one row per site keyed by app_source_key, every row's
 -- provenance.refreshed_at = the cache's refreshed_at; rows whose key is no longer in the set are removed (the reaper).
-create or replace function public.sim_refresh(p_zip text, p_sites jsonb, p_at timestamptz, p_materialize boolean default true)
+-- Stand-ins for docs/dev-source-receipt.sql (the source completion receipt PR): the SAME table and view DDL.
+create table if not exists public.dev_refresh_source_receipt (
+  zip text not null, registry_id text not null, response_id bigint not null, tick_at timestamptz not null,
+  scope text not null check (scope in ('expanded','fallback','legacy','failed','refused','lost','processed')),
+  scope_version text, complete boolean not null, fetched integer, recorded_at timestamptz not null default now(),
+  primary key (zip, registry_id, response_id),
+  constraint dev_source_receipt_version check ((scope = 'expanded') = (scope_version is not null)));
+create index if not exists dev_refresh_source_receipt_tick_idx on public.dev_refresh_source_receipt (zip, tick_at);
+create or replace view public.dev_source_receipt_current with (security_invoker = true) as
+select r.zip, r.registry_id, r.scope, r.scope_version, r.complete, r.tick_at, (r.tick_at = d.refreshed_at) as describes_current_cache
+  from public.dev_refresh_source_receipt r join public.development_reports d on d.zip = r.zip
+ where r.registry_id <> '' and r.tick_at = (select max(x.tick_at) from public.dev_refresh_source_receipt x where x.zip = r.zip and x.registry_id = r.registry_id);
+create sequence if not exists public.sim_resp_seq;
+-- a receipt for the CURRENT cache generation of a ZIP (tick_at = its refreshed_at)
+create or replace function public.sim_rcpt(p_zip text, p_reg text, p_scope text, p_complete boolean, p_ver text default 'v1:A') returns void
+language sql as $$
+  insert into public.dev_refresh_source_receipt (zip, registry_id, response_id, tick_at, scope, scope_version, complete)
+  select p_zip, p_reg, nextval('public.sim_resp_seq'), d.refreshed_at, p_scope, case when p_scope = 'expanded' then p_ver end, p_complete
+    from public.development_reports d where d.zip = p_zip
+$$;
+
+create or replace function public.sim_refresh(p_zip text, p_sites jsonb, p_at timestamptz, p_materialize boolean default true, p_rcpt jsonb default null)
 returns void language plpgsql as $$
 begin
   insert into public.development_reports (zip, sites, refreshed_at) values (p_zip, p_sites, p_at)
   on conflict (zip) do update set sites = excluded.sites, refreshed_at = excluded.refreshed_at;
+  if p_rcpt is null then
+    perform public.sim_rcpt(p_zip, r.reg, 'expanded', true)
+       from (select distinct coalesce(e->>'source_registry_id', '') as reg from jsonb_array_elements(p_sites) e
+              where e->>'scope_origin' = 'polygon_member') r;
+  else
+    perform public.sim_rcpt(p_zip, x->>'reg', x->>'scope', coalesce((x->>'complete')::boolean, true), coalesce(x->>'ver', 'v1:A'))
+       from jsonb_array_elements(p_rcpt) x;
+  end if;
   if not p_materialize then return; end if;
   delete from public.app_projects a where a.zip = p_zip
      and not exists (select 1 from jsonb_array_elements(p_sites) e where public.app_source_key(e) = a.source_key);

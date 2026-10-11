@@ -1,7 +1,7 @@
 import sys
 s = open(sys.argv[1]).read()
-a = 'if cardinality(_rp.stamped_regs) = 0 then'
-b = 'if false then'
+a = 'and rd.lapsed_at is null and rd.ver = rc.ver'
+b = 'and rd.lapsed_at is null'
 if s.count(a) < 1:
     sys.exit("anchor missing: " + a[:70])
 sys.stdout.write(s.replace(a, b))
