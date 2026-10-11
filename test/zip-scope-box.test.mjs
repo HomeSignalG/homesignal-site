@@ -51,6 +51,8 @@ const Z = {
   '76266': { lat: 33.3563, lng: -97.1814, xmin: -97.385545, ymin: 33.278295, xmax: -97.036074, ymax: 33.457186 },
 };
 const bounds = (z) => ({ xmin: Z[z].xmin, ymin: Z[z].ymin, xmax: Z[z].xmax, ymax: Z[z].ymax });
+// membership stub: every widened-only record is a polygon MEMBER (this file tests the SCOPE; zip-scope-members.test.mjs tests containment)
+const ALLMEM = async (pts) => pts.map(() => 'member');
 const cen = (z) => ({ lat: Z[z].lat, lng: Z[z].lng });
 // Real points in/near 76247. MISSING = inside the polygon, never stored (outside the square).
 const MISSING = [[20120859, -97.3614509872001, 33.0678140389034], [20121110, -97.3475625458436, 33.156062611357],
@@ -132,7 +134,7 @@ const ALL = [...MISSING, ...STORED].map(([id, x, y]) => feat(id, x, y));
   ok(Math.abs(g0[0] - sq.xmin) < 1e-9 && Math.abs(g0[3] - sq.ymax) < 1e-9, 'legacy geometry param = the centroid square');
   ok(legacy.out.sites.length === 4, `legacy: only the 4 in-square records are returned (got ${legacy.out.sites.length})`);
 
-  const wide = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }, {}, ALL);
+  const wide = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }, {}, ALL);
   const g1 = new URL(wide.urls[0]).searchParams.get('geometry').split(',').map(Number);
   const box = scopeBox(cen('76247'), R, bounds('76247'));
   ok(Math.abs(g1[0] - box.xmin) < 1e-9 && Math.abs(g1[1] - box.ymin) < 1e-9 && Math.abs(g1[2] - box.xmax) < 1e-9 && Math.abs(g1[3] - box.ymax) < 1e-9,
@@ -145,13 +147,13 @@ const ALL = [...MISSING, ...STORED].map(([id, x, y]) => feat(id, x, y));
     'only the extent changed — same inSR / spatialRel / geometryType');
 
   // a ZIP the polygon does not widen ⇒ identical request
-  const tight = await run({ zipCentroid: cen('76207'), zipBounds: { xmin: -97.19, ymin: 33.22, xmax: -97.17, ymax: 33.24 } }, {}, ALL);
+  const tight = await run({ zipCentroid: cen('76207'), zipBounds: { xmin: -97.19, ymin: 33.22, xmax: -97.17, ymax: 33.24 }, zipMembers: ALLMEM }, {}, ALL);
   const tightLegacy = await run({ zipCentroid: cen('76207') }, {}, ALL);
   ok(tight.urls[0] === tightLegacy.urls[0], 'bounds inside the square ⇒ request identical to legacy (zero behaviour change)');
 
   // ── max_rows: widening must never make a report WORSE
   const many = Array.from({ length: 150 }, (_, i) => feat(30000 + i, -97.40 + (i % 10) * 0.0001, 33.01 + Math.floor(i / 10) * 0.001));
-  const capped = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 100 }, [...many, ...STORED.map(([id, x, y]) => feat(id, x, y))]);
+  const capped = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }, { max_rows: 100 }, [...many, ...STORED.map(([id, x, y]) => feat(id, x, y))]);
   ok(capped.out.reports[0].truncated_at_max_rows == null, 'widened fetch hit the cap ⇒ re-run on the legacy square, report is NOT truncated');
   ok(capped.out.sites.length === 4, 'fallback returns exactly the legacy result (4 in-square records)');
   ok(capped.out.reports[0].quarantined.some((q) => /fell back to the legacy centroid square/.test(q.reason)), 'the fallback is reported, not silent');
@@ -169,8 +171,8 @@ console.log('\n3) socrata connector request');
   const wheres = [];
   const mk = (deps) => ({ fetch: async (u) => { wheres.push(new URL(String(u)).searchParams.get('$where')); return { ok: true, status: 200, json: async () => [] }; }, ...deps });
   await soc.socrataForZip('76247', [{ state: 'TX', county: 'Denton' }], [sEntry], mk({ zipCentroid: cen('76247') }));
-  await soc.socrataForZip('76247', [{ state: 'TX', county: 'Denton' }], [sEntry], mk({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }));
-  await soc.socrataForZip('76207', [{ state: 'TX', county: 'Denton' }], [sEntry], mk({ zipCentroid: cen('76207'), zipBounds: { xmin: -97.19, ymin: 33.22, xmax: -97.17, ymax: 33.24 } }));
+  await soc.socrataForZip('76247', [{ state: 'TX', county: 'Denton' }], [sEntry], mk({ zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }));
+  await soc.socrataForZip('76207', [{ state: 'TX', county: 'Denton' }], [sEntry], mk({ zipCentroid: cen('76207'), zipBounds: { xmin: -97.19, ymin: 33.22, xmax: -97.17, ymax: 33.24 }, zipMembers: ALLMEM }));
   ok(/^within_circle\(location, 33\.0734, -97\.3093, 4828\)/.test(wheres[0]), 'no bounds ⇒ the legacy within_circle');
   const box = scopeBox(cen('76247'), R, bounds('76247'));
   ok(wheres[1].startsWith(`within_box(location, ${box.ymax}, ${box.xmin}, ${box.ymin}, ${box.xmax})`), 'widened ⇒ within_box over the union box');
@@ -190,7 +192,7 @@ console.log('\n4) csv connector');
   const text = ['ID,T,A,ST,D,LAT,LNG', ...rows].join('\n');
   const mk = (deps) => ({ fetch: async () => ({ ok: true, status: 200, text: async () => text, headers: new Headers() }), ...deps });
   const a = await csvm.csvForZip('76247', [{ state: 'TX', county: 'Denton' }], [cEntry], mk({ zipCentroid: cen('76247') }));
-  const b = await csvm.csvForZip('76247', [{ state: 'TX', county: 'Denton' }], [cEntry], mk({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }));
+  const b = await csvm.csvForZip('76247', [{ state: 'TX', county: 'Denton' }], [cEntry], mk({ zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }));
   const na = a.reports[0].fetched, nb = b.reports[0].fetched;
   ok(na === 4 && nb === 10, `legacy keeps 4 rows; with bounds 10 (missing 6 recovered) — got ${na} / ${nb}`);
   ok(b.reports[0].scope_widened === true, 'csv report flags the widened scope');
@@ -258,7 +260,7 @@ console.log('\n7) widened-fetch failure modes');
   const noSleep = { sleep: async () => {} };
   for (const [label, f] of Object.entries(modes)) {
     const a = await arc.arcgisForZip('76247', [{ state: 'TX', county: 'Denton' }], [{ ...entry }],
-      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), ...noSleep });
+      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM, ...noSleep });
     const ar = a.reports[0];
     ok(a.sites.length === 0 && ar.quarantined.some((q) => /^fetch failed:/.test(q.reason)),
       `arcgis widened — ${label} ⇒ \`fetch failed:\` quarantine (cache-preserving), not an honest zero`, JSON.stringify(ar.quarantined));
@@ -277,7 +279,7 @@ console.log('\n7) widened-fetch failure modes');
   };
   for (const [label, f] of Object.entries(smodes)) {
     const s = await soc.socrataForZip('76247', [{ state: 'TX', county: 'Denton' }], [sEntry],
-      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), ...noSleep });
+      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM, ...noSleep });
     const sr = s.reports[0];
     ok(s.sites.length === 0 && sr.quarantined.some((q) => /^fetch failed:/.test(q.reason)),
       `socrata widened — ${label} ⇒ \`fetch failed:\` quarantine (cache-preserving), not an honest zero`, JSON.stringify(sr.quarantined));
@@ -293,7 +295,7 @@ console.log('\n7) widened-fetch failure modes');
 console.log('\n8) overflow: fallback is reported, never presented as recovery');
 {
   const many = Array.from({ length: 150 }, (_, i) => feat(30000 + i, -97.40 + (i % 10) * 0.0001, 33.01 + Math.floor(i / 10) * 0.001));
-  const capped = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 100 }, [...many, ...STORED.map(([id, x, y]) => feat(id, x, y))]);
+  const capped = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }, { max_rows: 100 }, [...many, ...STORED.map(([id, x, y]) => feat(id, x, y))]);
   ok(capped.out.reports[0].scope_fallback === 'legacy_after_overflow', 'arcgis: overflow ⇒ report.scope_fallback = legacy_after_overflow (consumers must not count polygon-only records as recovered)');
 }
 
@@ -315,19 +317,19 @@ console.log('\n9) csv cap regression');
   // widened rows and drop every legacy row.
   const FILE = [...MISSING, ...STORED];
   const legacy = await go(FILE, { zipCentroid: cen('76247') });
-  const wide = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') });
+  const wide = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM });
   ok(ids(legacy).length === 4, 'legacy: the 4 in-square rows');
   ok(STORED.every(([id]) => ids(wide).includes(String(id))), 'widened + cap exceeded: EVERY legacy row is still emitted (none displaced)');
   ok(ids(wide).length === 6 && wide.reports[0].truncated_at_max_rows === 6, 'cap respected: 4 legacy + 2 widened = 6, report says truncated');
   ok(wide.reports[0].scope_widened_rows_dropped === 4, `the 4 dropped rows are counted as polygon-bbox rows (got ${wide.reports[0].scope_widened_rows_dropped})`);
   ok(wide.reports[0].quarantined.some((q) => /polygon-bbox row\(s\) were NOT included; every legacy-scope row was kept/.test(q.reason)), 'overflow is reported honestly (not claimed as full recovery)');
   // legacy alone exceeds the cap → identical to the legacy emit (first N in file order)
-  const tiny = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 3 });
+  const tiny = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }, { max_rows: 3 });
   const tinyLegacy = await go(FILE, { zipCentroid: cen('76247') }, { max_rows: 3 });
   ok(JSON.stringify(ids(tiny)) === JSON.stringify(ids(tinyLegacy)), 'legacy alone overflows the cap ⇒ output identical to the pre-change connector');
   ok(tiny.reports[0].scope_widened_rows_dropped === undefined, '…and no widened-row drop is claimed there');
   // with room to spare nothing is dropped
-  const roomy = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 50 });
+  const roomy = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247'), zipMembers: ALLMEM }, { max_rows: 50 });
   ok(ids(roomy).length === 10 && roomy.reports[0].truncated_at_max_rows == null, 'cap not reached ⇒ all 10 recovered, not truncated');
 }
 

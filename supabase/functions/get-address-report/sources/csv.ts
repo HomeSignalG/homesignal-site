@@ -32,6 +32,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import { pointInBox, validBounds, type ZipBounds } from "./scope-box.ts";
+import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -115,6 +116,11 @@ export interface CsvRunReport {
   /** > 0 ⇒ the cap dropped this many polygon-bbox-only rows; legacy rows were all retained.
    *  Those ZIP-polygon records are NOT recovered in this report. */
   scope_widened_rows_dropped?: number;
+  /** set ⇒ polygon membership could not be KNOWN, so only the legacy-radius rows were used. */
+  scope_fallback?: "legacy_after_membership_error";
+  /** Widened-scope accounting (sources/scope-members.ts); present only when box candidates existed.
+   *  Polygon exclusions are `outside_excluded` there — correct, never a drop and never a quarantine. */
+  scope_membership?: ScopeMetrics;
 }
 
 export interface CsvDeps {
@@ -128,6 +134,8 @@ export interface CsvDeps {
    *  within the legacy radius of the centroid OR inside this box — a strict superset of before.
    *  Absent/invalid ⇒ the radius test alone. A prefilter; membership stays polygon-based. */
   zipBounds?: ZipBounds | null;
+  /** Tests box-only rows against the canonical polygon; the box is used only together with it. */
+  zipMembers?: MembershipFn | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -214,13 +222,34 @@ async function runEntry(
     // room; legacy alone overflows ⇒ the first max_rows legacy rows in file order, i.e. exactly what
     // the connector emitted before this change.
     const legacyRows: Record<string, unknown>[] = [];
-    const widenedRows: Record<string, unknown>[] = [];
+    const boxOnly: { r: Record<string, unknown>; lat: number; lng: number }[] = [];
+    const bounds = widenedBounds(deps.zipBounds, deps.zipMembers);
     for (const r of fileRows) {
       const lat = numOrNull(readCol(r, entry.column_map.lat));
       const lng = numOrNull(readCol(r, entry.column_map.lng));
       if (lat == null || lng == null) { report.skipped_no_coords++; continue; }
       if (milesBetween(cLat, cLng, lat, lng) <= radius) { legacyRows.push(r); continue; }
-      if (validBounds(deps.zipBounds) && pointInBox(lat, lng, deps.zipBounds)) { widenedRows.push(r); report.scope_widened = true; }
+      if (validBounds(bounds) && pointInBox(lat, lng, bounds)) boxOnly.push({ r, lat, lng });
+    }
+    // Rows kept ONLY because of the box are tested against the canonical polygon; members are kept,
+    // the rest are excluded (counted as `outside_excluded`, not as dropped). If membership cannot be
+    // KNOWN, the legacy rows alone are used — never an unfiltered box.
+    let widenedRows: Record<string, unknown>[] = [];
+    if (boxOnly.length && deps.zipMembers) {
+      const m = newScopeMetrics();
+      try {
+        widenedRows = (await keepMembers(boxOnly, (x) => ({ cls: "widened", lat: x.lat, lng: x.lng }), deps.zipMembers, m)).map((x) => x.r);
+        if (widenedRows.length) report.scope_widened = true;
+      } catch (e) {
+        if (!(e instanceof ScopeMembershipError)) throw e;
+        m.legacy_fallback = e.reason === "candidate_limit" ? "candidate_limit" : "membership_error";
+        report.scope_fallback = "legacy_after_membership_error";
+        report.quarantined.push({
+          reason: `polygon membership unavailable (${e.message}); used the legacy radius rows only for this ZIP`,
+          sample: entry.registry_id,
+        });
+      }
+      report.scope_membership = m;
     }
     legacyCount = legacyRows.length;
     zipRows = [...legacyRows, ...widenedRows];
@@ -253,6 +282,7 @@ async function runEntry(
       if (rowIdx >= legacyCount) {
         // Only polygon-box rows are being dropped: every legacy-scope row was already emitted.
         report.scope_widened_rows_dropped = zipRows.length - rowIdx;
+        if (report.scope_membership) report.scope_membership.capacity_truncated = true;
         report.quarantined.push({
           reason: `max_rows cap of ${maxRows} bound the emit — ${zipRows.length - rowIdx} polygon-bbox row(s) were NOT included; every legacy-scope row was kept`,
           sample: entry.registry_id,
