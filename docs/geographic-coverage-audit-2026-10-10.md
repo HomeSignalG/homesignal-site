@@ -99,19 +99,34 @@ every stored record). Only the fetch scope is wrong. So the change is to the sco
 * `index.ts` — ZIP mode only. **Address mode is untouched**; the property's 0.5-mile read radius is `n5_projects_within_radius`
   over serving membership and is not part of this path at all.
 
-Properties, each pinned by `test/zip-scope-box.test.mjs` (73 checks; 5 deliberate breaks each fail it on exit code):
+Properties, each pinned by `test/zip-scope-box.test.mjs` (plus `supabase/functions/get-address-report/zip-scope.handler.test.ts`, which runs the shipped handler under Deno; every guard below was broken on purpose and each break fails a test on exit code):
 
 1. **Superset, never a subset.** The scope contains the legacy square, so nothing fetched today can stop being fetched.
    (A pure polygon scope was rejected: records near a ZIP edge that lie in a *neighbouring uncovered-county* polygon
    are reachable today only through this ZIP's halo — dropping the halo would lose them.)
 2. **Fail-safe.** No bounds / invalid bounds / RPC missing / ZIP has no boundary ⇒ the legacy query string, identical.
-3. **Never worse.** If widening is what runs a fetch into `max_rows`, the connector re-runs on the legacy scope and
-   reports it (`quarantined` note), instead of returning a truncated sample.
-4. **Observable.** A run that used the wider scope says so (`scope_widened`).
-5. **Staged.** The scope ships **OFF**: `ZIP_SCOPE_BOUNDS=1` (function secret) enables it for all ZIPs, or a request may
-   carry `{"scope_bounds": true|false}` for a targeted canary. Without this, deploying the engine would start a national
-   re-fetch through the rolling refresh (~240 ZIPs/hour, ~53 h per sweep) without anyone deciding to.
-6. **A prefilter, not a boundary.** The box is wider than the polygon (it also contains neighbours' records). Those are
+3. **Never worse.** If widening is what runs a fetch into `max_rows`, ArcGIS/Socrata re-run on the legacy scope and set
+   `scope_fallback = "legacy_after_overflow"` (plus a `quarantined` note). **A report carrying `scope_fallback`, or
+   `truncated_at_max_rows`, or `scope_widened_rows_dropped`, did NOT recover the polygon-only records and must never be
+   counted as recovery.** CSV is legacy-first: legacy rows are emitted before any widened-only row, so the cap can drop
+   only widened rows (`scope_widened_rows_dropped`), never a legacy one (test: a file with widened rows *ahead of*
+   legacy rows and cap 6 keeps all 4 legacy rows; legacy-alone overflow is identical to the pre-change output).
+4. **Widened-fetch errors are not an honest zero.** For the widened query only, a response with no `features` array
+   (ArcGIS) / no row array (Socrata) throws into the existing `fetch failed:` quarantine; network failure, timeout,
+   `200 + {error}`, HTTP 400/403/500 already land there. `dev_refresh_collect` already refuses to overwrite a
+   contributing source's cached data on a `fetch failed:` reason (`docs/dev-refresh-source-failure-guard.sql`,
+   `test/fetch-failure-reason-contract.test.mjs`) — that is the only preservation authority used; no new fallback was
+   added. Tested for both connectors across seven failure modes (`test/zip-scope-box.test.mjs` §7). The legacy scope's
+   behaviour on the same responses is unchanged.
+5. **Observable.** A run that used the wider scope says so (`scope_widened`).
+6. **Server-controlled rollout (no caller control).** The endpoint is public (`--no-verify-jwt`), so the request body
+   has no scope flag at all (a body `scope_bounds` is ignored, and the type does not declare it). Rollout is two
+   function secrets, read per request: `ZIP_SCOPE_BOUNDS_MODE` = `off` (default; unset/unknown ⇒ off) | `allowlist` |
+   `all`, and `ZIP_SCOPE_BOUNDS_ZIPS` (5-digit tokens; malformed tokens are ignored, empty list enables nothing).
+   Proven by running the real handler under Deno with stubbed network: default, unknown modes, body flags in both
+   directions, allowlist add/remove, `all`, and "policy on but no boundary ⇒ legacy scope, HTTP 200".
+   `all` is the national switch and needs its own approval; rolling refresh converges over ~53 h once it is on.
+7. **A prefilter, not a boundary.** The box is wider than the polygon (it also contains neighbours' records). Those are
    stored under this ZIP exactly as halo records are today, and are *served* only where `geo.n5_serving_membership`
    puts them — which is polygon-based. No centroid approximation is presented as a boundary.
 
@@ -134,13 +149,13 @@ test for CSV. Decide after the canary measures row size.
 
 ### Staged rollout (needs explicit approval at each step; none was started)
 
+Runbook, preflight results, apply/rollback and the canary gates: `docs/zip-scope-bounds-runbook.md`.
+
 1. Apply `docs/zip-scope-bounds.sql` (additive, one function, locked).
-2. Deploy the engine with the switch OFF (inert).
-3. Canary: targeted refresh of the nine pilot ZIPs with `{"scope_bounds": true}` (≈9 reports, not a sweep).
-4. Verify: pilot polygon members vs source (expect 20,705 → all present after the next generation), row bytes/latency,
-   `served ⊆ polygon`, distinct keys, `Decided` count = 20, mail/social counts unchanged, Rule D plane diff.
-5. Only then decide on `ZIP_SCOPE_BOUNDS=1` nationally; the rolling refresh then converges over ~53 h with no manual run.
-6. N5 membership for the recovered rows appears with the next serving generation (daily), not instantly.
+2. Deploy the engine with `ZIP_SCOPE_BOUNDS_MODE` unset (inert).
+3. Canary: set `ZIP_SCOPE_BOUNDS_MODE=allowlist`, `ZIP_SCOPE_BOUNDS_ZIPS=76258`, refresh that ZIP; then 76247; then 76227.
+4. Verify per ZIP (runbook gates). N5 membership for recovered rows appears with the next serving generation.
+5. Only then decide on `ZIP_SCOPE_BOUNDS_MODE=all`.
 
 ## 5. Geography and freshness are two results
 

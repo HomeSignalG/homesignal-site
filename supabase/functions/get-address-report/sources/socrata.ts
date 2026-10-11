@@ -293,6 +293,9 @@ export interface SocrataRunReport {
   truncated_at_max_rows: number | null;
   /** true ⇒ the fetch used the polygon-bbox scope (wider than the legacy centroid circle). */
   scope_widened?: boolean;
+  /** set ⇒ widened scope REQUESTED but this is the LEGACY-scope result (widened fetch overflowed
+   *  max_rows); the polygon-only records were NOT recovered for this ZIP. */
+  scope_fallback?: "legacy_after_overflow";
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
@@ -433,7 +436,8 @@ async function runEntry(
     if (fetchMeta.truncated && fetchMeta.widened && deps.zipBounds) {
       const widenedCap = fetchMeta.cap;
       fetchMeta = { truncated: false, cap: 0 };
-      rows = await fetchRows(entry, zip, zipCol, { ...deps, zipBounds: null }, fetchMeta);
+      rows = await fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null }, fetchMeta);
+      report.scope_fallback = "legacy_after_overflow";
       report.quarantined.push({
         reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid circle for this ZIP`,
         sample: entry.registry_id,
@@ -657,6 +661,12 @@ async function fetchRows(
     url.searchParams.set("$limit", String(pageSize));
     url.searchParams.set("$offset", String(offset));
     const page = await getWithBackoff(url.toString(), deps);
+    // WIDENED SCOPE ONLY (mirror of arcgis.ts): a non-array answer to the wider within_box query is a
+    // server that did not understand it, not "no records". Throw into the established `fetch failed:`
+    // path so the source-failure guard preserves the cached result. Legacy scope unchanged.
+    if (meta.widened && !entry.geographic && !Array.isArray(page)) {
+      throw new Error("Socrata response was not a row array for the widened spatial query");
+    }
     const rows = entry.geographic ? geojsonRows(page) : (page as Record<string, unknown>[]);
     if (!Array.isArray(rows) || rows.length === 0) break;
     out.push(...rows);

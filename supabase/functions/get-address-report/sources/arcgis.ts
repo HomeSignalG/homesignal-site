@@ -219,6 +219,9 @@ export interface ArcgisRunReport {
   truncated_at_max_rows: number | null;
   /** true ⇒ the fetch used the polygon-bbox scope (wider than the legacy centroid square). */
   scope_widened?: boolean;
+  /** set ⇒ the widened scope was REQUESTED but this report is the LEGACY-scope result, because the
+   *  widened fetch overflowed max_rows. The polygon-only records were NOT recovered for this ZIP. */
+  scope_fallback?: "legacy_after_overflow";
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
@@ -369,6 +372,7 @@ async function runEntry(
       const widenedCap = fetchMeta.cap;
       fetchMeta = { truncated: false, cap: 0 };
       rows = await fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null }, fetchMeta);
+      report.scope_fallback = "legacy_after_overflow";
       report.quarantined.push({
         reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid square for this ZIP`,
         sample: entry.registry_id,
@@ -732,6 +736,15 @@ async function fetchRows(
       error?: { message?: string };
     };
     if (page?.error) throw new Error(`ArcGIS error: ${page.error.message ?? "unknown"}`);
+    // WIDENED SCOPE ONLY: a response with no features ARRAY is not "no records" — it is a server that
+    // did not understand (or ignored) the wider spatial query. Without this it would read as an
+    // honest zero and replace a valid cached result with silence. Throwing routes it through the
+    // established `fetch failed:` quarantine, which dev_refresh_collect already refuses to overwrite
+    // a contributing source with (docs/dev-refresh-source-failure-guard.sql). The legacy scope keeps
+    // its exact prior behaviour.
+    if (meta.widened && !Array.isArray(page?.features)) {
+      throw new Error("ArcGIS response carried no features array for the widened spatial query");
+    }
     const feats = Array.isArray(page?.features) ? page.features : [];
     if (feats.length === 0) break;
     for (const f of feats) {

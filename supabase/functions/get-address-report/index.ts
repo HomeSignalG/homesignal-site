@@ -73,7 +73,7 @@ import {
   type EchoCallOutcome,
 } from "./sources/echo-cwa.ts";
 import { resolvePlanes } from "./sources/planes.ts";
-import { zipScopeBounds } from "./sources/zip-bounds.ts";
+import { scopePolicy, zipScopeBounds } from "./sources/zip-bounds.ts";
 import { tabsForZip, type TabsPins } from "./sources/tdlr-tabs.ts";
 import { siteKey, tceqForZip, type TceqCommunityRow, type TceqEntity } from "./sources/tceq-cr.ts";
 import tabsPinsTravis from "./pins/tdlr-tabs-projects.travis.json" with { type: "json" };
@@ -634,13 +634,15 @@ async function handleRequest(req: Request): Promise<Response> {
     const communityIds = await resolveCommunityIds(supabase, zip);
     // Polygon bounding box of this ZIP for the radius-scoped connectors (sources/scope-box.ts).
     // Fail-safe: null ⇒ the legacy centroid scope, i.e. what ran before this read existed.
-    // STAGED ROLLOUT SWITCH: the rolling refresh re-fetches every ZIP every ~53 h, so deploying this
-    // code with the scope ON would be a national re-fetch by another name. It ships OFF: the
-    // function secret ZIP_SCOPE_BOUNDS=1 turns it on for every ZIP; a request may opt in/out for a
-    // targeted canary with {"scope_bounds": true|false}, which wins over the secret.
-    const scopeOn = typeof body.scope_bounds === "boolean" ? body.scope_bounds : Deno.env.get("ZIP_SCOPE_BOUNDS") === "1";
-    const scope = scopeOn ? await zipScopeBounds(supabase, zip) : { bounds: null, reason: "polygon-bbox scope disabled (ZIP_SCOPE_BOUNDS)" };
-    if (scopeOn && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
+    // STAGED ROLLOUT, SERVER-CONTROLLED (sources/zip-bounds.ts::scopePolicy). The rolling refresh
+    // re-fetches every ZIP every ~53 h, so deploying this with the scope ON would be a national
+    // re-fetch by another name. It ships OFF. Only function secrets decide (ZIP_SCOPE_BOUNDS_MODE =
+    // off | allowlist | all, plus ZIP_SCOPE_BOUNDS_ZIPS for the canary); NOTHING in the request
+    // body is read, because this endpoint is reachable with the public anon key.
+    const policy = scopePolicy((k) => Deno.env.get(k), zip);
+    // Fail-safe: null bounds ⇒ the legacy centroid scope, i.e. what ran before this read existed.
+    const scope = policy.on ? await zipScopeBounds(supabase, zip) : { bounds: null, reason: policy.why };
+    if (policy.on && !scope.bounds) console.warn(`[scope] ${zip}: legacy centroid scope — ${scope.reason}`);
     // UNIT 4 — the two planes run concurrently under separate deadlines (sources/planes.ts).
     // The join still waits for both; overlay is capped at 45s+grace instead of the unbounded
     // FRS ladder. Core still throws on failure (the refresh layer keeps the previous cached

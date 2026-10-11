@@ -30,3 +30,31 @@ export async function zipScopeBounds(db: Rpc, zip: string): Promise<ZipBoundsRes
     return { bounds: null, reason: `rpc threw: ${(e as Error).message}` };
   }
 }
+
+// ── ROLLOUT POLICY (server-controlled; a caller cannot touch it) ─────────────────────────────
+// Whether a ZIP-mode request widens its spatial scope is decided ONLY by function secrets, never by
+// anything in the request body: the endpoint is reachable with the public anon key, and an
+// unauthenticated caller must not be able to turn a production-wide behaviour on or off, nor force
+// the heavier fetch on a ZIP that has not been canaried.
+//
+//   ZIP_SCOPE_BOUNDS_MODE   "off" (default) | "allowlist" | "all"
+//   ZIP_SCOPE_BOUNDS_ZIPS   comma/space separated 5-digit ZIPs; read ONLY when mode is "allowlist"
+//
+// FAIL CLOSED: an unset, misspelt or unknown mode is "off"; in allowlist mode a token that is not
+// exactly five digits is ignored, so a typo narrows the canary rather than widening it; an empty
+// allowlist enables nothing. "all" is the national switch and needs its own approval.
+export type ScopeMode = "off" | "allowlist" | "all";
+export interface ScopePolicy { on: boolean; mode: ScopeMode; why: string }
+
+export function scopePolicy(get: (name: string) => string | undefined, zip: string): ScopePolicy {
+  const raw = (get("ZIP_SCOPE_BOUNDS_MODE") ?? "").trim().toLowerCase();
+  const mode: ScopeMode = raw === "all" ? "all" : raw === "allowlist" ? "allowlist" : "off";
+  if (mode === "off") {
+    return { on: false, mode, why: raw && raw !== "off" ? `unknown ZIP_SCOPE_BOUNDS_MODE "${raw}" — treated as off` : "polygon-bbox scope off" };
+  }
+  if (mode === "all") return { on: true, mode, why: "mode=all" };
+  const allowed = new Set((get("ZIP_SCOPE_BOUNDS_ZIPS") ?? "").split(/[\s,]+/).filter((z) => /^\d{5}$/.test(z)));
+  return allowed.has(zip)
+    ? { on: true, mode, why: "ZIP on the canary allowlist" }
+    : { on: false, mode, why: "ZIP not on the canary allowlist" };
+}

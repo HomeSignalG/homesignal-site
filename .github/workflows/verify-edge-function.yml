@@ -75,9 +75,9 @@ jobs:
         run: |
           set -o pipefail
           run_helper() {
-            local file="$1" label="$2"
+            local file="$1" label="$2" flags="${3:-}"
             local out
-            out="$(deno run "${file}")"
+            out="$(deno run ${flags} "${file}")"
             printf '%s\n' "$out"
             if printf '%s\n' "$out" | grep -q '^FAIL '; then
               echo "::error::${label} helper tests reported failures"; exit 1
@@ -90,6 +90,8 @@ jobs:
           run_helper "${FN_DIR}/sources/geo-input.test.ts" "geo-input"
           run_helper "${FN_DIR}/geocode-cache.test.ts" "geocode-cache"
           run_helper "supabase/functions/geocode-address/geocode-address.test.ts" "geocode-address"
+          # the SHIPPED handler under Deno: rollout is server-policy only (no request-body control)
+          run_helper "${FN_DIR}/zip-scope.handler.test.ts" "zip-scope-handler" "--allow-env --allow-read"
 
       - name: Type-check the new geocoder helper (strict, must be clean)
         run: |
@@ -114,7 +116,10 @@ jobs:
             "${FN_DIR}/index.ts" \
             "${FN_DIR}/sources/geo-input.ts" \
             "${FN_DIR}/sources/arcgis.ts" \
-            "${FN_DIR}/sources/socrata.ts" > "${RUNNER_TEMP}/check.out" 2>&1
+            "${FN_DIR}/sources/socrata.ts" \
+            "${FN_DIR}/sources/csv.ts" \
+            "${FN_DIR}/sources/zip-bounds.ts" \
+            "${FN_DIR}/sources/scope-box.ts" > "${RUNNER_TEMP}/check.out" 2>&1
           echo "deno check exit: $?"
           set -e
           cat "${RUNNER_TEMP}/check.out"

@@ -203,9 +203,9 @@ console.log('\n5) wiring');
   const zipMode = idx.slice(idx.indexOf('── ZIP MODE ──'), idx.indexOf('── ZIP MODE ──') + 40000);
   ok((zipMode.match(/zipBounds: scope\.bounds/g) || []).length === 3, 'ZIP mode passes zipBounds to exactly the three radius-capable connectors (arcgis, socrata, csv)');
   ok(/zipScopeBounds\(supabase, zip\)/.test(zipMode), 'ZIP mode reads the bounds once through zipScopeBounds');
-  ok(/typeof body\.scope_bounds === "boolean" \? body\.scope_bounds : Deno\.env\.get\("ZIP_SCOPE_BOUNDS"\) === "1"/.test(zipMode),
-    'rollout switch: OFF unless ZIP_SCOPE_BOUNDS=1; a request {"scope_bounds":bool} overrides (targeted canary) — deploying alone changes nothing');
-  ok(/scopeOn \? await zipScopeBounds\(supabase, zip\) : \{ bounds: null/.test(zipMode), 'switch OFF ⇒ no bounds read, legacy scope, zero extra queries');
+  ok(!/scope_bounds|scopeBounds/.test(idx), 'the request body has NO scope flag at all (public endpoint: callers cannot steer the rollout)');
+  ok(/scopePolicy\(\(k\) => Deno\.env\.get\(k\), zip\)/.test(zipMode), 'rollout decided by server env policy (scopePolicy over Deno.env) only');
+  ok(/policy\.on \? await zipScopeBounds\(supabase, zip\) : \{ bounds: null/.test(zipMode), 'policy OFF ⇒ no bounds read, legacy scope, zero extra queries');
   ok(!/zipBounds/.test(idx.slice(idx.indexOf('── ZIP MODE ──') + 40000)), 'ADDRESS mode never receives zipBounds (the property radius is untouched)');
   const okRpc = (data, error = null) => ({ rpc: async () => ({ data, error }) });
   const r1 = await zb.zipScopeBounds(okRpc([{ xmin: -97.4, ymin: 33.0, xmax: -97.2, ymax: 33.2 }]), '76247');
@@ -222,6 +222,113 @@ console.log('\n5) wiring');
     'the SQL reads the ONE boundary authority (geo.zip_membership_boundary), not the table directly');
   ok(/revoke all on function public\.zip_scope_bounds\(text\) from anon, authenticated;/.test(sql) && /grant execute on function public\.zip_scope_bounds\(text\) to service_role;/.test(sql),
     'the SQL locks the function to service_role by NAME (a revoke from public alone is not a lock)');
+}
+
+
+// ── 6. rollout policy (pure) ─────────────────────────────────────────────────────
+console.log('\n6) scopePolicy');
+{
+  const env = (o) => (k) => o[k];
+  const P = (o, z = '76258') => zb.scopePolicy(env(o), z);
+  ok(!P({}).on, 'unset ⇒ off');
+  for (const m of ['off', 'OFF', 'on', 'true', '1', 'yes', 'allow', '']) ok(!P({ ZIP_SCOPE_BOUNDS_MODE: m, ZIP_SCOPE_BOUNDS_ZIPS: '76258' }).on, `mode "${m}" ⇒ off (fail closed)`);
+  ok(P({ ZIP_SCOPE_BOUNDS_MODE: 'all' }, '12345').on, 'mode all ⇒ every ZIP on');
+  ok(P({ ZIP_SCOPE_BOUNDS_MODE: ' ALLOWLIST ', ZIP_SCOPE_BOUNDS_ZIPS: '76258, 76247 76227' }).on, 'allowlist (case/space tolerant) ⇒ listed ZIP on');
+  ok(!P({ ZIP_SCOPE_BOUNDS_MODE: 'allowlist', ZIP_SCOPE_BOUNDS_ZIPS: '76258' }, '76247').on, 'allowlist ⇒ unlisted ZIP off');
+  ok(!P({ ZIP_SCOPE_BOUNDS_MODE: 'allowlist', ZIP_SCOPE_BOUNDS_ZIPS: '' }).on, 'empty allowlist ⇒ nothing on');
+  ok(!P({ ZIP_SCOPE_BOUNDS_MODE: 'allowlist', ZIP_SCOPE_BOUNDS_ZIPS: '7625 762588 abcde 76258;76247' }).on, 'malformed tokens never match');
+}
+
+// ── 7. widened-fetch FAILURES must not become an honest zero ─────────────────────
+// The established authority: a `fetch failed:` / `fetch/parse failed:` quarantine reason makes
+// dev_refresh_collect refuse to overwrite a contributing source's cached data
+// (docs/dev-refresh-source-failure-guard.sql; test/fetch-failure-reason-contract.test.mjs).
+console.log('\n7) widened-fetch failure modes');
+{
+  const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, headers: new Headers(), json: async () => body, text: async () => JSON.stringify(body) });
+  const modes = {
+    'network failure': async () => { throw new TypeError('fetch failed'); },
+    'timeout': async () => { const e = new Error('The operation timed out'); e.name = 'TimeoutError'; throw e; },
+    'HTTP 200 + {error} (unsupported spatial query)': async () => resp(200, { error: { code: 400, message: 'Unable to perform query' } }),
+    'HTTP 200 + no features array': async () => resp(200, { unexpected: true }),
+    'HTTP 400': async () => resp(400, { error: { message: 'bad request' } }),
+    'HTTP 403': async () => resp(403, {}),
+    'HTTP 500': async () => resp(500, {}),
+  };
+  const noSleep = { sleep: async () => {} };
+  for (const [label, f] of Object.entries(modes)) {
+    const a = await arc.arcgisForZip('76247', [{ state: 'TX', county: 'Denton' }], [{ ...entry }],
+      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), ...noSleep });
+    const ar = a.reports[0];
+    ok(a.sites.length === 0 && ar.quarantined.some((q) => /^fetch failed:/.test(q.reason)),
+      `arcgis widened — ${label} ⇒ \`fetch failed:\` quarantine (cache-preserving), not an honest zero`, JSON.stringify(ar.quarantined));
+    ok(!ar.scope_widened && !ar.scope_fallback, `arcgis widened — ${label} ⇒ no recovery is claimed`);
+  }
+  const sEntry = {
+    registry_id: 'fx-soc', platform: 'socrata', domain: 'data.example.test', dataset_id: 'abcd-1234', dataset_url: 'https://data.example.test/d/abcd-1234',
+    coverage: [{ state: 'TX', county: 'Denton' }], spatial_zip_radius_mi: 3, spatial_point_col: 'location',
+    column_map: { title: 'T', address: 'A', case_number: 'ID', status_raw: 'ST', type_source: 'T', file_date: 'D', lat: 'lat', lng: 'lng' },
+    status_to_bucket: { approved: ['Approved'], proposed: [], operating: [], exclude: [] },
+  };
+  const smodes = {
+    'network failure': modes['network failure'], 'timeout': modes['timeout'],
+    'HTTP 200 + error object (unsupported within_box)': async () => resp(200, { error: true, message: 'query.soql.no-such-function' }),
+    'HTTP 400': modes['HTTP 400'], 'HTTP 403': modes['HTTP 403'], 'HTTP 500': modes['HTTP 500'],
+  };
+  for (const [label, f] of Object.entries(smodes)) {
+    const s = await soc.socrataForZip('76247', [{ state: 'TX', county: 'Denton' }], [sEntry],
+      { fetch: f, zipCentroid: cen('76247'), zipBounds: bounds('76247'), ...noSleep });
+    const sr = s.reports[0];
+    ok(s.sites.length === 0 && sr.quarantined.some((q) => /^fetch failed:/.test(q.reason)),
+      `socrata widened — ${label} ⇒ \`fetch failed:\` quarantine (cache-preserving), not an honest zero`, JSON.stringify(sr.quarantined));
+    ok(!sr.scope_widened && !sr.scope_fallback, `socrata widened — ${label} ⇒ no recovery is claimed`);
+  }
+  // the legacy scope keeps its exact prior behaviour on the same failures (no new strictness)
+  const legacyEmpty = await arc.arcgisForZip('76247', [{ state: 'TX', county: 'Denton' }], [{ ...entry }],
+    { fetch: async () => resp(200, { unexpected: true }), zipCentroid: cen('76247'), ...noSleep });
+  ok(!legacyEmpty.reports[0].quarantined.some((q) => /^fetch failed:/.test(q.reason)), 'legacy scope: unchanged behaviour on a features-less 200 (strictness applies only to the widened query)');
+}
+
+// ── 8. overflow honesty ──────────────────────────────────────────────────────────
+console.log('\n8) overflow: fallback is reported, never presented as recovery');
+{
+  const many = Array.from({ length: 150 }, (_, i) => feat(30000 + i, -97.40 + (i % 10) * 0.0001, 33.01 + Math.floor(i / 10) * 0.001));
+  const capped = await run({ zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 100 }, [...many, ...STORED.map(([id, x, y]) => feat(id, x, y))]);
+  ok(capped.out.reports[0].scope_fallback === 'legacy_after_overflow', 'arcgis: overflow ⇒ report.scope_fallback = legacy_after_overflow (consumers must not count polygon-only records as recovered)');
+}
+
+// ── 9. csv cap: widened rows can never displace legacy rows ──────────────────────
+console.log('\n9) csv cap regression');
+{
+  const cEntry = {
+    registry_id: 'fx-csv', platform: 'csv', url: 'https://example.test/f.csv', dataset_url: 'https://example.test/d',
+    coverage: [{ state: 'TX', county: 'Denton' }], spatial_zip_radius_mi: 3, max_rows: 6,
+    column_map: { title: 'T', address: 'A', case_number: 'ID', status_raw: 'ST', type_source: 'T', file_date: 'D', lat: 'LAT', lng: 'LNG' },
+    status_to_bucket: { approved: ['Approved'], proposed: [], operating: [], exclude: [] },
+  };
+  const line = ([id, x, y]) => `${id},HOUSE,${id} ST,Approved,2023-01-05,${y},${x}`;
+  const mkText = (rs) => ['ID,T,A,ST,D,LAT,LNG', ...rs.map(line)].join('\n');
+  const go = async (rs, deps, over = {}) => csvm.csvForZip('76247', [{ state: 'TX', county: 'Denton' }], [{ ...cEntry, ...over }],
+    { fetch: async () => ({ ok: true, status: 200, text: async () => mkText(rs), headers: new Headers() }), ...deps });
+  const ids = (o) => o.sites.map((s) => String(s.case_number)).sort();
+  // 6 widened-only rows FIRST in the file, then 4 legacy rows, cap 6 → file order would emit the 6
+  // widened rows and drop every legacy row.
+  const FILE = [...MISSING, ...STORED];
+  const legacy = await go(FILE, { zipCentroid: cen('76247') });
+  const wide = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') });
+  ok(ids(legacy).length === 4, 'legacy: the 4 in-square rows');
+  ok(STORED.every(([id]) => ids(wide).includes(String(id))), 'widened + cap exceeded: EVERY legacy row is still emitted (none displaced)');
+  ok(ids(wide).length === 6 && wide.reports[0].truncated_at_max_rows === 6, 'cap respected: 4 legacy + 2 widened = 6, report says truncated');
+  ok(wide.reports[0].scope_widened_rows_dropped === 4, `the 4 dropped rows are counted as polygon-bbox rows (got ${wide.reports[0].scope_widened_rows_dropped})`);
+  ok(wide.reports[0].quarantined.some((q) => /polygon-bbox row\(s\) were NOT included; every legacy-scope row was kept/.test(q.reason)), 'overflow is reported honestly (not claimed as full recovery)');
+  // legacy alone exceeds the cap → identical to the legacy emit (first N in file order)
+  const tiny = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 3 });
+  const tinyLegacy = await go(FILE, { zipCentroid: cen('76247') }, { max_rows: 3 });
+  ok(JSON.stringify(ids(tiny)) === JSON.stringify(ids(tinyLegacy)), 'legacy alone overflows the cap ⇒ output identical to the pre-change connector');
+  ok(tiny.reports[0].scope_widened_rows_dropped === undefined, '…and no widened-row drop is claimed there');
+  // with room to spare nothing is dropped
+  const roomy = await go(FILE, { zipCentroid: cen('76247'), zipBounds: bounds('76247') }, { max_rows: 50 });
+  ok(ids(roomy).length === 10 && roomy.reports[0].truncated_at_max_rows == null, 'cap not reached ⇒ all 10 recovered, not truncated');
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
