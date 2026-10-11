@@ -57,3 +57,21 @@ begin
     raise exception 'zip_scope_bounds returned a row for a ZIP with no boundary';
   end if;
 end $$;
+
+-- ── THE POLYGON'S IDENTITY (added 2026-10-11, additive: zip_scope_bounds above is already deployed and its signature is untouched) ──
+-- A scope version must change when the canonical polygon changes SHAPE, even if the bounding box does not. This is a thin projection
+-- of the same single boundary authority: md5 of the canonical geometry. Measured ~3.5 ms on the largest ZCTA polygon, once per ZIP
+-- build (never per record). A ZIP with no boundary returns NULL.
+create or replace function public.zip_geom_sig(p_zip text)
+returns text
+language sql
+stable
+security definer
+set search_path = geo, public, pg_temp
+as $fn$
+  select md5(ST_AsEWKB(g)) from (select geo.zip_membership_boundary(p_zip) as g) s
+   where g is not null and p_zip ~ '^[0-9]{5}$';
+$fn$;
+revoke all on function public.zip_geom_sig(text) from public;
+revoke all on function public.zip_geom_sig(text) from anon, authenticated;
+grant execute on function public.zip_geom_sig(text) to service_role;

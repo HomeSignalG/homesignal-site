@@ -25,7 +25,14 @@ export async function zipScopeBounds(db: Rpc, zip: string): Promise<ZipBoundsRes
     if (!row) return { bounds: null, reason: "no boundary for this ZIP (not_measured)" };
     const b = { xmin: Number(row.xmin), ymin: Number(row.ymin), xmax: Number(row.xmax), ymax: Number(row.ymax) };
     if (!validBounds(b)) return { bounds: null, reason: "boundary box failed validation" };
-    return { bounds: b, reason: null };
+    // The polygon's own identity (md5 of its canonical geometry). Carried ON the bounds object so every connector's receipt can
+    // include it without new plumbing; absent (older database) => receipts cannot be versioned and the ledger holds.
+    let sig: string | null = null;
+    try {
+      const g = await db.rpc("zip_geom_sig", { p_zip: zip });
+      if (!g.error && typeof g.data === "string" && /^[0-9a-f]{32}$/.test(g.data)) sig = g.data;
+    } catch { /* no signature => the receipt cannot be versioned => the ledger holds (fail closed) */ }
+    return { bounds: sig ? { ...b, geom_sig: sig } as ZipBounds : b, reason: null };
   } catch (e) {
     return { bounds: null, reason: `rpc threw: ${(e as Error).message}` };
   }
