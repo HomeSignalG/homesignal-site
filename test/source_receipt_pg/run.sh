@@ -185,10 +185,8 @@ run_checks() {
 
 echo "== the shipped receipt SQL, against the live collector"
 run_checks "$root/docs/dev-source-receipt.sql" | tee "$tmp/shipped"
-tf=$(grep -c '|f|' "$tmp/shipped" || true); tn=$(grep -c '|[tf]' "$tmp/shipped" || true)
-echo "SHIPPED: $tn checks, $tf failed"
-[ "$tn" -ge 52 ] || { echo "FAIL -- fewer checks ran than the suite defines"; exit 1; }
-[ "$tf" -eq 0 ] || { echo "FAIL -- the shipped SQL does not pass"; exit 1; }
+echo "SHIPPED: $(grep -cE '\|[tf](\||$)' "$tmp/shipped") result lines"
+bash "$root/test/lib/require_exact_ids.sh" "$here/required_checks.txt" "$tmp/shipped" || { echo "FAIL -- the shipped SQL does not pass, or a required check did not report"; exit 1; }
 
 # applying the file twice must be harmless
 build "$root/docs/dev-source-receipt.sql"; P -f "$root/docs/dev-source-receipt.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL -- not idempotent"; exit 1; }
@@ -205,7 +203,8 @@ if s.count(a) != 1:
     sys.exit(1)
 open(dst, 'w').write(s.replace(a, b))
 PY
-  if ! run_checks "$tmp/m.sql" >"$tmp/mout" 2>"$tmp/merr"; then echo "KILLED   $name (suite aborted)"; return 0; fi
+  # a mutation is killed ONLY by a check that ran and failed: a crashed suite or a SQL error is a broken harness, not evidence
+  run_checks "$tmp/m.sql" >"$tmp/mout" 2>"$tmp/merr" || { echo "HARNESS  $name -- the mutated suite aborted before it could report"; return 2; }
   local k; k="$(grep '|f|' "$tmp/mout" | cut -d'|' -f1 | tr -s ' \n' ' ' || true)"
   if [ -n "$k" ]; then echo "KILLED   $name by $k"; else echo "SURVIVED $name"; return 1; fi
 }
@@ -226,4 +225,6 @@ mut absent_is_silent "when m.scope_in = 'absent' and (not coalesce(m.o_ever, fal
 mut idempotence_guard_dropped "   where t.last_tick_at < excluded.last_tick_at;" ";" || st=1
 mut diagnostics_prune_removes_continuity "delete from public.dev_refresh_generation g where g.zip = new.zip and g.recorded_at < now() - interval '7 days';" "delete from public.dev_source_continuity g where g.updated_at < now() - interval '7 days'; delete from public.dev_refresh_generation g where g.zip = new.zip and g.recorded_at < now() - interval '7 days';" || st=1
 mut failed_fetch_read_as_legacy "when r.r->>'registry_id' in (select registry_id from f) then 'failed'" "when false then 'failed'" || st=1
-[ "$st" -eq 0 ] && echo "MUTATIONS: every prohibited weakening is killed" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }
+n_mut=$(grep -c '^mut ' "$here/run.sh" || true)
+[ "$n_mut" -eq 14 ] || { echo "FAIL -- expected 14 mutations, the runner defines $n_mut"; exit 1; }
+[ "$st" -eq 0 ] && echo "MUTATIONS: 14 of 14 prohibited weakenings are killed" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }

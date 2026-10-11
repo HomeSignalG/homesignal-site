@@ -36,7 +36,7 @@ checks() {
 }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 echo "== shipped"; checks "$root/docs/zip-scope-bounds.sql" | tee "$tmp/o"
-tf=$(grep -c '|f|' "$tmp/o" || true); echo "SHIPPED: $(grep -c '|[tf]' "$tmp/o") checks, $tf failed"; [ "$tf" -eq 0 ] || exit 1
+bash "$root/test/lib/require_exact_ids.sh" "$here/required_checks.txt" "$tmp/o" || { echo "FAIL -- the shipped SQL does not pass, or a required check did not report"; exit 1; }
 st=0
 mut() { python3 - "$root/docs/zip-scope-bounds.sql" "$tmp/m.sql" "$2" "$3" <<'PY' || { echo "HARNESS  $1"; st=1; return; }
 import sys
@@ -44,9 +44,11 @@ s = open(sys.argv[1]).read()
 if s.count(sys.argv[3]) != 1: sys.exit(1)
 open(sys.argv[2], 'w').write(s.replace(sys.argv[3], sys.argv[4]))
 PY
-  checks "$tmp/m.sql" >"$tmp/mo" 2>&1 || true
+  checks "$tmp/m.sql" >"$tmp/mo" 2>&1 || true   # a kill needs a check that RAN and failed (a '|f|' line), never a crash
   if grep -q '|f|' "$tmp/mo"; then echo "KILLED   $1 by $(grep '|f|' "$tmp/mo" | cut -d'|' -f1 | tr -s '\n' ' ')"; else echo "SURVIVED $1"; st=1; fi; }
 mut identity_is_the_bbox "select md5(ST_AsEWKB(g)) from (select geo.zip_membership_boundary(p_zip) as g) s" "select md5(ST_AsEWKB(ST_Envelope(g))) from (select geo.zip_membership_boundary(p_zip) as g) s"
 mut identity_is_rounded "select md5(ST_AsEWKB(g)) from (select geo.zip_membership_boundary(p_zip) as g) s" "select md5(ST_AsText(ST_ReducePrecision(g, 0.5))) from (select geo.zip_membership_boundary(p_zip) as g) s"
 mut open_to_anon "revoke all on function public.zip_geom_sig(text) from anon, authenticated;" "grant execute on function public.zip_geom_sig(text) to anon;"
+[ "$(grep -c '^mut ' "$here/run.sh")" -eq 3 ] || { echo 'FAIL -- expected 3 mutations'; exit 1; }
+[ $st -eq 0 ] && echo 'MUTATIONS: 3 of 3 killed'
 exit $st
