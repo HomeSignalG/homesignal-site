@@ -1,0 +1,26 @@
+name: canary-collection-verifier
+
+# scripts/verify-canary-collection.sql against a DISPOSABLE Postgres: the lost-canary-then-later-rolling-refresh case must
+# FAIL (and the previous script must PASS it, proving the scenario is real). Never addresses production.
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-canary-collection.sql'
+      - 'test/canary_collection_pg/**'
+      - '.github/workflows/canary-collection-verifier.yml'
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: canary }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: canary }
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash test/canary_collection_pg/run.sh
