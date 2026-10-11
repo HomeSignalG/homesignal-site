@@ -75,25 +75,25 @@
    "Share this report with your client" box (seen live in Manual Test Part B, 2026-10-04). Keep it ABOVE every display rule's reach: !important. */
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header.top .in{max-width:1600px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+header.top{padding:20px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{max-width:1800px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
 header.top h1{margin:0;font-size:20px}
 header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
 /* THE WAY BACK TO THE SITE (founder, 2026-10-05: "so they can get back to this page"; this is the other direction). This page has no site header
    by design, so before this row an agent who arrived from the header's Enterprise > My reports had no link off it. Two plain same-site links, inside
    header.top so the print rule below hides them with it. */
-header.top .sitenav{flex:0 0 100%;display:flex;gap:18px;margin:-8px 0 0}
+header.top .sitenav{flex:0 0 100%;display:flex;gap:18px;margin:-10px 0 -6px}
 header.top .sitenav a{display:inline-flex;align-items:center;min-height:44px;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}
 header.top .sitenav a:hover{text-decoration:underline}
 header.top .sitenav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
 .who{font-size:13px;color:var(--muted)}
 .who button{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
-.wrap{max-width:1600px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:18px}
+.wrap{max-width:1800px;margin:0 auto;padding:12px 24px 56px;display:grid;gap:18px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
 #trial{display:grid;gap:4px}
 #trial .count{margin:0;font-size:17px;font-weight:600}
 #trial .count.out{color:var(--red)}
-#trial .trial-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:6px;flex-basis:100%}
+#trial .trial-cta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 0 auto;flex-basis:auto}
 #trial .trial-cta[hidden]{display:none}
 #trial-cta-status{font-size:13.5px;color:var(--muted)}
 #trial-cta-status.err{color:var(--red)}
@@ -187,13 +187,14 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
    Order: account strip, Create a property report, Current property report (the primary feature), Saved reports (one library, comparison included),
    Account and administration (secondary, closed until wanted).
    ============================================================================ */
-header.top{padding:22px 16px 18px}
+header.top{padding:8px 24px 12px}
+header.top .in{padding:0 24px}
 header.top h1{font-size:26px;letter-spacing:-.01em}
 header.top .brand{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-header.top .meta{font-size:14.5px;margin-top:6px}
-.wrap{gap:22px;padding-top:24px}
+header.top .meta{font-size:14px;margin-top:4px;max-width:none}
+.wrap{gap:14px;padding-top:14px}
 .sec-h{margin:0 0 12px;font-size:19px;letter-spacing:-.01em}
-#trial{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 18px;padding:12px 18px}
+#trial{display:flex;flex-wrap:wrap;align-items:center;gap:2px 18px;padding:8px 18px}
 #trial .count{font-size:15.5px}
 input[type=text],input[type=search]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
 input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
@@ -228,7 +229,19 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #rail-actions .da-rv-act[data-da-action="share"]:hover{background:#0f5c37}
 #rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent)}
 #rail-actions .da-rv-soon{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
-.rail .card{padding:14px}
+.rail .card{padding:12px 14px}
+.rail .card,.rail-sec{gap:8px}
+.more{font-size:12.5px;color:var(--muted)}
+.more>summary{cursor:pointer;min-height:24px;padding:2px 0;list-style:none;font-weight:600;color:var(--accent)}
+.more>summary::-webkit-details-marker{display:none}
+.more>summary::before{content:"\25B8\00a0"}
+.more[open]>summary::before{content:"\25BE\00a0"}
+.more>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.more>.sub,.more>.hint{margin:4px 0 0}
+.rail #share-list{max-height:7.5rem;overflow-y:auto;gap:6px}
+.rail #share-list li{padding:5px 10px;font-size:12.5px}
+.rail #share-list button{min-height:30px;padding:3px 10px}
+.rail #share-new .go,.rail #share-new label{font-size:13px}
 .rail .card h2,.rail .sec-h{font-size:15px}
 .rail .sub,.rail .hint{font-size:12.5px}
 .rail .row{flex-wrap:wrap}
@@ -238,25 +251,25 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .rail .create-addr input{font-size:15px;padding:11px 12px}
 .rail .create-label{max-width:none}
 @media(min-width:1000px){
-  .ws{display:grid;grid-template-columns:minmax(300px,340px) minmax(0,1fr);gap:28px;align-items:start}
+  .ws{display:grid;grid-template-columns:minmax(300px,340px) minmax(0,1fr);gap:24px;align-items:start}
   .rail{display:flex;flex-direction:column;gap:16px;grid-column:1;grid-row:1}
   .ws>.stage{grid-column:2;grid-row:1;min-width:0}
 }
-/* The rail stays in view while a long report scrolls, but only where the screen is tall enough to hold it; otherwise it scrolls with the page.
-   It never traps the wheel: at its own end the page scrolls on. */
-@media(min-width:1000px) and (min-height:760px){
-  .rail{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto;overscroll-behavior:auto;padding:2px 4px 2px 2px;margin:-2px}
+/* The rail stays in view while a long report scrolls, but only when the WHOLE rail fits in the window (fitRail sets .rail-fits). It never scrolls on its own:
+   when it does not fit, it scrolls away with the page, so nothing in it is ever hidden behind an inner scrollbar. */
+@media(min-width:1000px){
+  .rail.rail-fits{position:sticky;top:12px}
 }
 /* Saved reports: one library. Each row opens the report and holds its own comparison checkbox. */
 .sv-search{max-width:420px}
-#saved-list{max-height:20rem;overflow-y:auto;padding:2px}
+#saved-list{max-height:15rem;overflow-y:auto;padding:2px;display:grid;gap:4px}
 #saved-list:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
 .sv-row{display:flex;gap:10px;align-items:stretch}
-.sv-row button{flex:1;min-width:0}
+.sv-row button{flex:1;min-width:0;min-height:36px;padding:6px 10px;font-size:13px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* comparing is a mode: a saved report is a plain link until the agent chooses Compare reports */
 #saved:not(.cmp-on) .sv-pick{display:none}
 .sv-modes{margin-top:8px}
-.sv-pick{flex:none;display:flex;align-items:center;justify-content:center;width:46px;min-height:44px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.sv-pick{flex:none;display:flex;align-items:center;justify-content:center;width:40px;min-height:36px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
 .sv-pick input{width:18px;height:18px;margin:0}
 .sv-pick input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 /* Account and administration: secondary, closed until wanted, and not drawn at all while none of its cards may show */
@@ -347,7 +360,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
           <button type="submit" class="go" id="go">Generate report</button>
         </div>
         <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
-        <p class="hint">The client label appears in this report's header. A saved report keeps it with the address, not in the report itself, so you see it when you reopen the report.</p>
+        <details class="more"><summary>About the client label</summary><p class="hint">The client label appears in this report's header. A saved report keeps it with the address, not in the report itself, so you see it when you reopen the report.</p></details>
       </form>
     </section>
 
@@ -359,7 +372,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <p class="hint rail-note">Generate or open a report to share it, watch the property, save it as a PDF or compare it.</p>
       <section class="card" id="share" aria-labelledby="share-title" hidden>
         <h2 id="share-title">Share this report with your client</h2>
-        <p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p>
+        <details class="more"><summary>How it works</summary><p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p></details>
         <div class="row">
           <button type="button" class="go" id="share-make">Make a client link</button>
           <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
@@ -374,7 +387,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       </section>
       <section class="card" id="watch" aria-labelledby="watch-title" hidden>
         <h2 id="watch-title">Watch this property</h2>
-        <p class="sub">HomeSignal checks the area around this property once a day. When the official status of a nearby project changes, it emails you at the address you signed in with. The email names this report by its number and date and does not include the property's address: open the report here to see which property it is.</p>
+        <details class="more"><summary>How it works</summary><p class="sub">HomeSignal checks the area around this property once a day. When the official status of a nearby project changes, it emails you at the address you signed in with. The email names this report by its number and date and does not include the property's address: open the report here to see which property it is.</p></details>
         <div class="row">
           <button type="button" class="go" id="watch-start">Watch this property</button>
           <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
@@ -386,7 +399,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
       <h2 class="sec-h" id="saved-title">Saved reports</h2>
-      <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report. Use Compare reports to choose 2 to 5 and see them side by side.</p>
+      <details class="more"><summary>How it works</summary><p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report. Use Compare reports to choose 2 to 5 and see them side by side.</p></details>
       <div class="sv-tools" id="saved-tools" hidden>
         <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
         <div class="row sv-modes"><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
@@ -1013,7 +1026,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
       pick.appendChild(cb);
       b.type = 'button';
-      b.textContent = text;
+      b.textContent = text; b.title = text; // one line in the rail; the whole line on hover
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
       li.appendChild(pick); li.appendChild(b); list.appendChild(li);
     });
@@ -1664,6 +1677,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     }
     $('report').addEventListener('click', onReportAction);
     $('rail-actions').addEventListener('click', onReportAction); // the buttons now sit in the rail: one handler, two homes
+    // sticky only while the whole rail fits the window (see the .rail-fits rule): measured, never assumed
+    function fitRail(){ var r = $('rail'); if (!r) return; var fits = window.matchMedia('(min-width:1000px)').matches && r.offsetHeight > 0 && r.offsetHeight <= window.innerHeight - 24; r.classList.toggle('rail-fits', fits); }
+    if (window.ResizeObserver) new ResizeObserver(fitRail).observe($('rail'));
+    window.addEventListener('resize', fitRail); fitRail();
     $('compare-mode').addEventListener('click', function(){ setCompareMode(!$('saved').classList.contains('cmp-on')); });
     $('saved-more').addEventListener('click', function(){ savedAll = !savedAll; filterSaved(); });
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
