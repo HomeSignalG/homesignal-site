@@ -24,6 +24,10 @@
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
+import {
+  keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
+  type MembershipFn, type RowClass, type ScopeMetrics,
+} from "./scope-members.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -221,14 +225,18 @@ export interface ArcgisRunReport {
   scope_widened?: boolean;
   /** set ⇒ the widened scope was REQUESTED but this report is the LEGACY-scope result, because the
    *  widened fetch overflowed max_rows. The polygon-only records were NOT recovered for this ZIP. */
-  scope_fallback?: "legacy_after_overflow";
+  scope_fallback?: "legacy_after_overflow" | "legacy_after_membership_error";
+  /** Widened-scope accounting (sources/scope-members.ts). Present only when the widened scope ran.
+   *  Polygon exclusions are `outside_excluded` here — they are CORRECT, not a loss, and are never
+   *  a quarantine or a truncation. */
+  scope_membership?: ScopeMetrics;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
  *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
  *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
  *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
-interface FetchMeta { truncated: boolean; cap: number; widened?: boolean }
+interface FetchMeta { truncated: boolean; cap: number; widened?: boolean; metrics?: ScopeMetrics }
 
 export interface ArcgisDeps {
   fetch: typeof fetch;
@@ -247,6 +255,10 @@ export interface ArcgisDeps {
    *  record inside the ZIP polygon but beyond the centroid square is no longer lost. Absent/invalid
    *  ⇒ the legacy square exactly. A PREFILTER only — membership stays polygon-based downstream. */
   zipBounds?: ZipBounds | null;
+  /** Tests widened-only records against the canonical polygon (sources/scope-members.ts). The box is
+   *  used ONLY together with this: without it the scope stays the legacy one, so a box can never
+   *  admit a neighbouring ZIP's records unfiltered. */
+  zipMembers?: MembershipFn | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -361,17 +373,42 @@ async function runEntry(
   const caseFold = new Map<string, CaseFoldMatch>();
   const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
-  let fetchMeta: FetchMeta = { truncated: false, cap: 0 };
+  const widenedOk = !!widenedBounds(deps.zipBounds, deps.zipMembers);
+  const metrics = newScopeMetrics();
+  let fetchMeta: FetchMeta = { truncated: false, cap: 0, metrics };
   let rows: Record<string, unknown>[];
+  const legacyRun = async () => {
+    fetchMeta = { truncated: false, cap: 0 };
+    return fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null, zipMembers: null }, fetchMeta);
+  };
+  let widenedRan = false;
   try {
-    rows = await fetchRows(entry, zip, zipCol ?? "", deps, fetchMeta);
-    // NEVER WORSE THAN BEFORE: if widening the scope to the polygon box is what ran the fetch into
-    // the max_rows cap, that report would be a truncated sample of a larger set. Re-run on the
-    // legacy square (complete for what it covers, exactly today's behaviour) and say so.
-    if (fetchMeta.truncated && fetchMeta.widened && deps.zipBounds) {
+    try {
+      rows = await fetchRows(entry, zip, zipCol ?? "", deps, fetchMeta);
+      widenedRan = !!fetchMeta.widened;
+    } catch (e) {
+      // Membership could not be KNOWN (RPC error / wrong answer / too many candidates / scan limit).
+      // Never serve an unfiltered widened result: re-run the LEGACY scope, which is complete for what
+      // it covers and is exactly today's behaviour, and say so.
+      if (!(e instanceof ScopeMembershipError) || !widenedOk) throw e;
+      widenedRan = true;
+      metrics.legacy_fallback = e.reason === "candidate_limit" ? "candidate_limit"
+        : e.reason === "scan_limit" ? "scan_limit" : "membership_error";
+      rows = await legacyRun();
+      report.scope_fallback = "legacy_after_membership_error";
+      report.quarantined.push({
+        reason: `polygon membership unavailable (${e.message}); used the legacy centroid scope for this ZIP`,
+        sample: entry.registry_id,
+      });
+    }
+    // NEVER WORSE THAN BEFORE: if the widened scope (members + legacy rows, AFTER polygon filtering)
+    // is what ran the fetch into the max_rows cap, that report would be a truncated sample of a
+    // larger set. Re-run on the legacy scope and say so.
+    if (fetchMeta.truncated && fetchMeta.widened && widenedOk) {
       const widenedCap = fetchMeta.cap;
-      fetchMeta = { truncated: false, cap: 0 };
-      rows = await fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null }, fetchMeta);
+      metrics.capacity_truncated = true;
+      metrics.legacy_fallback = "capacity_overflow";
+      rows = await legacyRun();
       report.scope_fallback = "legacy_after_overflow";
       report.quarantined.push({
         reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid square for this ZIP`,
@@ -382,6 +419,7 @@ async function runEntry(
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.service_url });
     return { records, report };
   }
+  if (widenedRan) report.scope_membership = metrics;
   report.fetched = rows.length;
   if (fetchMeta.widened) report.scope_widened = true;
   // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
@@ -571,6 +609,38 @@ const finite2 = (x: unknown, y: unknown): { lng: number; lat: number } | null =>
     ? { lng: x, lat: y }
     : null;
 
+/** Legacy-vs-widened-only for one returned feature. A feature is LEGACY when its geometry extent
+ *  intersects the legacy centroid square (what the legacy envelope query would have returned), so a
+ *  polygon/line feature the legacy query already included is never subjected to the polygon test.
+ *  Only a feature wholly outside the square is widened-only; it is tested at the point the engine
+ *  places it (featurePoint) — never at an invented coordinate. */
+function featureScopeClass(
+  f: ArcgisFeature, row: Record<string, unknown>, pt: { lng: number; lat: number } | null,
+  centroid: { lat: number; lng: number }, radiusMi: number,
+  attrCols?: { lat: string; lng: string },
+): RowClass {
+  const sq = centroidSquare(centroid.lat, centroid.lng, radiusMi);
+  let lat: number | null = null, lng: number | null = null;
+  if (attrCols) {
+    const a = Number(row[attrCols.lat]), b = Number(row[attrCols.lng]);
+    lat = Number.isFinite(a) ? a : null; lng = Number.isFinite(b) ? b : null;
+  } else if (pt) { lat = pt.lat; lng = pt.lng; }
+  if (lat == null || lng == null) return { cls: "no_point" };
+  const g = f.geometry;
+  const parts = !attrCols ? (g?.rings ?? g?.paths) : undefined;
+  if (Array.isArray(parts)) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const part of parts) for (const p of Array.isArray(part) ? part : []) {
+      if (!finite2(p?.[0], p?.[1])) continue;
+      if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+      if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+    }
+    if (x0 <= x1 && !(x1 < sq.xmin || x0 > sq.xmax || y1 < sq.ymin || y0 > sq.ymax)) return { cls: "legacy" };
+  }
+  return lat >= sq.ymin && lat <= sq.ymax && lng >= sq.xmin && lng <= sq.xmax
+    ? { cls: "legacy" } : { cls: "widened", lat, lng };
+}
+
 /**
  * The map pin for one feature, taken from the feature's OWN geometry — never guessed, never
  * defaulted to a jurisdiction centre. A feature that yields no point returns null and the
@@ -698,7 +768,7 @@ async function fetchRows(
   // the same envelope AND'd into WHERE instead — a geometry param is meaningless on a table.
   const attrCols = entry.spatial_latlng_cols;
   const env = (entry.spatial_zip_radius_mi ?? 0) > 0 && deps.zipCentroid
-    ? scopeBox(deps.zipCentroid, entry.spatial_zip_radius_mi as number, deps.zipBounds)
+    ? scopeBox(deps.zipCentroid, entry.spatial_zip_radius_mi as number, widenedBounds(deps.zipBounds, deps.zipMembers))
     : null;
   if (env && deps.zipCentroid && widensLegacy(env, deps.zipCentroid, entry.spatial_zip_radius_mi as number)) meta.widened = true;
   const spatial = env && !attrCols ? env : null;
@@ -708,9 +778,13 @@ async function fetchRows(
 
   const out: Record<string, unknown>[] = [];
   let offset = 0;
+  const m = meta.widened ? (meta.metrics ??= newScopeMetrics()) : null;
+  const scanCap = maxRows * SCAN_FACTOR;
   // Deliberately `<=`: fetch ONE row past the cap so truncation is EXACT. A full final page
   // does NOT prove more rows exist — a source holding precisely max_rows records is COMPLETE, and
   // inferring truncation from a full page would cry wolf on exactly that case.
+  // `out` holds only KEPT rows (legacy + polygon members) when widened, so records the polygon
+  // excludes never consume capacity and cannot hide valid in-polygon records behind the cap.
   while (out.length <= maxRows) {
     const url = new URL(`${entry.service_url.replace(/\/$/, "")}/query`);
     url.searchParams.set("where", where + attrWhere);
@@ -747,6 +821,7 @@ async function fetchRows(
     }
     const feats = Array.isArray(page?.features) ? page.features : [];
     if (feats.length === 0) break;
+    const pageItems: { row: Record<string, unknown>; cls: RowClass }[] = [];
     for (const f of feats) {
       const row = { ...(f.attributes ?? {}) } as Record<string, unknown>;
       // flatten the feature's OWN geometry so a column_map can read lat/lng from
@@ -754,7 +829,14 @@ async function fetchRows(
       // outSR=4326 is {x:lng,y:lat}.
       const pt = featurePoint(f);
       if (pt) { row.__lng = pt.lng; row.__lat = pt.lat; }
-      out.push(row);
+      pageItems.push({ row, cls: m && deps.zipCentroid ? featureScopeClass(f, row, pt, deps.zipCentroid, entry.spatial_zip_radius_mi as number, attrCols) : { cls: "legacy" } });
+    }
+    if (m && deps.zipMembers) {
+      m.rows_scanned += feats.length;
+      if (m.rows_scanned > scanCap) throw new ScopeMembershipError("scan_limit", `scanned more than ${scanCap} rows`);
+      for (const it of await keepMembers(pageItems, (x) => x.cls, deps.zipMembers, m)) out.push(it.row);
+    } else {
+      for (const it of pageItems) out.push(it.row);
     }
     // SERVER-CAPPED PAGING (fixed 2026-08-03). A layer may cap page size BELOW our request via its
     // own `maxRecordCount` — Portland's is 200 against a default pageSize of 1000 — and answers with
