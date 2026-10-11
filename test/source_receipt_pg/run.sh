@@ -11,6 +11,12 @@ n=0; bad=0
 t() { n=$((n+1)); if [ "$2" = "$3" ]; then echo "  $1|t"; else echo "  $1|f|got=[$2] want=[$3]"; bad=$((bad+1)); fi; }
 
 build() { # $1 = sql file under test
+  # a bare CI Postgres has none of Supabase's roles; the privilege checks (V18) need them to exist
+  P -c "do \$\$ begin
+    if not exists (select 1 from pg_roles where rolname='anon') then create role anon nologin; end if;
+    if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+    if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+  end \$\$;" >/dev/null
   P -c "drop schema if exists public cascade; create schema public;" >/dev/null 2>&1
   P -f "$here/fixture.sql" >/dev/null
   sed -n '/^create or replace function public.dev_failed_sources/,/^\$\$;/p' "$root/docs/dev-refresh-source-failure-guard.sql" | P >/dev/null   # the REAL failure authority
