@@ -945,8 +945,9 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '9m the report\'s own bar has Share with Client, Watch Property, Download PDF and Compare (build steps 8, 9, 10) all live, in that order', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
-  await page.$eval('#share-pdf', (e) => e.click());   // 2026-10-11: drawn no more (the rail's This report bar already has Download PDF) but still wired
-  ok((await page.evaluate(() => window.__prints)) === 2, '9n both Download PDF buttons open the browser\'s print window (no PDF is made on a server)');
+  ok((await page.evaluate(() => window.__prints)) === 1 && !(await page.$('#share-pdf')) && (await page.$$('button')).length > 0
+     && (await page.$$eval('button', (bs) => bs.filter((b) => /^Download PDF$/.test(b.textContent.trim())).length)) === 1,
+    '9n there is exactly ONE visible Download PDF control (the report\'s own, in the rail) and it opens the browser\'s print window (no PDF is made on a server)');
   // the report's own Share button opens a popup that makes the private link and offers it right there (follow-up to build step 8, founder 2026-10-04)
   const createCount = () => shareCalls.filter((c) => c.body.action === 'create').length;
   const popState = () => page.evaluate(() => ({ open: !document.getElementById('share-pop').hidden, body: !document.getElementById('share-pop-body').hidden, link: document.getElementById('share-pop-link').value,
