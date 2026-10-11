@@ -180,10 +180,8 @@ run_checks() {
 
 echo "== the shipped SQL, every layer real"
 run_checks "$root/docs/dev-change-recovery.sql" | tee "$tmp/shipped"
-tf=$(grep -c '|f|' "$tmp/shipped" || true); tn=$(grep -c '|[tf]' "$tmp/shipped" || true)
-echo "SHIPPED: $tn checks, $tf failed"
-[ "$tn" -ge 29 ] || { echo "FAIL -- fewer checks ran than the suite defines"; exit 1; }
-[ "$tf" -eq 0 ] || { echo "FAIL -- the integration does not pass"; exit 1; }
+echo "SHIPPED: $(grep -cE '\|[tf](\||$)' "$tmp/shipped") result lines"
+bash "$root/test/lib/require_exact_ids.sh" "$here/required_checks.txt" "$tmp/shipped" || { echo "FAIL -- the integration does not pass, or a required check did not report"; exit 1; }
 
 # ── mutations across the layers: each prohibited weakening must fail the INTEGRATION test ─────────────────────────────────────────
 mut() { # file name anchor replacement
@@ -205,9 +203,12 @@ PY
     out="$(run_checks "$tmp/m.sql" 2>&1 || true)"
   fi
   local k; k="$(grep '|f|' <<<"$out" | cut -d'|' -f1 | tr -s ' \n' ' ' || true)"
-  if [ -n "$k" ] || ! grep -q '|t$' <<<"$out"; then echo "KILLED   $name by ${k:-(did not run)}"; else echo "SURVIVED $name"; return 1; fi
+  # a kill is a check that RAN and failed; a mutated stack that merely crashed is a broken harness, not evidence
+  if [ -n "$k" ]; then echo "KILLED   $name by $k"; else echo "SURVIVED $name (or the mutated stack never reported)"; return 1; fi
 }
 st=0
+# the mutated receipt file is swapped into docs/ for the run: restore it however this script ends
+trap '[ -f "$tmp/receipt.orig" ] && cp "$tmp/receipt.orig" "$root/docs/dev-source-receipt.sql"; rm -rf "$tmp"' EXIT
 mut dev-source-receipt.sql receipt_refused_counts_as_accepted "  if new.refreshed_at is not null and new.refreshed_at > coalesce(old.refreshed_at, '-infinity'::timestamptz) then" "  if (new.refreshed_at is not null and new.refreshed_at > coalesce(old.refreshed_at, '-infinity'::timestamptz)) or moved then" || st=1
 mut dev-source-receipt.sql receipt_break_never_moves "case when z.cont then z.o_break else z.gen_n end," "coalesce(z.o_break, z.gen_n)," || st=1
 mut dev-source-receipt.sql receipt_version_not_compared "(q.ok_n and q.prev_ok and q.o_version = q.v_in)" "(q.ok_n and q.prev_ok)" || st=1
@@ -219,4 +220,6 @@ mut dev-change-recovery.sql ledger_ignores_scope_version "(rc.scope = 'expanded'
 mut dev-change-recovery.sql ledger_baselines_incomplete "case when s.scope = ''expanded'' and s.complete then s.gen_seq end," "case when s.scope = ''expanded'' then s.gen_seq end," || st=1
 mut dev-change-recovery.sql ledger_holds_nothing "when s.reg is null or s.scope <> ''expanded'' or not s.complete then ''hold''" "when s.reg is null then ''hold''" || st=1
 mut dev-change-recovery.sql ledger_all_sources_share_readiness "and not exists (select 1 from _dc_scopesrc s where s.reg = r.registry_id and s.scope = ''expanded'' and s.complete);" "and not exists (select 1 from _dc_scopesrc s where s.scope = ''expanded'' and s.complete);" || st=1
-[ "$st" -eq 0 ] && echo "MUTATIONS: every prohibited weakening is killed across the layers" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }
+n_mut=$(grep -c '^mut ' "$here/run.sh" || true)
+[ "$n_mut" -eq 11 ] || { echo "FAIL -- expected 11 mutations, the runner defines $n_mut"; exit 1; }
+[ "$st" -eq 0 ] && echo "MUTATIONS: 11 of 11 prohibited weakenings are killed across the layers" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }
