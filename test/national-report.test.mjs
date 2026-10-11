@@ -455,5 +455,61 @@ const FIELD = {
   ok(rd('filed', null) === null && rd('filed', 'not a day') === null && rd('filed', '2026-02-30') === null, '12g no date, an unparseable one, or an impossible one gives nothing');
 }
 
+// ---- 13: when the report asks the reader to verify a record (audit 2026-10-11): the LATEST OFFICIAL DATE and the stage, never the filing age alone -----------
+{
+  const T = '2026-09-29';
+  const rdf = (kind, day) => M.recordDate({ date_kind: kind, submitted_at: day }, T);
+  const v = (kind, day, stage, later = []) => M.verification(rdf(kind, day), stage, later, T);
+  // (a) the Brigham City shape: permitted, the only date is a filing from 2024, no later official date
+  const a = v('filed', '2024-08-26', 'permitted');
+  ok(a && a.reason === 'filing_only' && a.latest_official_date === '2024-08-26' && a.rule === 'freshness-1', '13a a permitted record whose only date is an old filing is flagged as filing_only, naming that date and the rule', a);
+  ok(Object.keys(a).sort().join() === 'latest_official_date,reason,rule', '13a2 the verdict carries exactly the rule, the reason and the date: no place, source, stage word or coordinate');
+  // (b) an old filing with RECENT source-stated activity is not stale
+  ok(v('filed', '2024-08-26', 'permitted', ['2026-08-20']) === null, '13b old filing + a later official date within a year: no warning');
+  ok(v('filed', '2024-08-26', 'proposed', ['2026-08-20']) === null && v('filed', '2024-08-26', 'approved', ['2026-08-20']) === null && v('filed', '2024-08-26', null, ['2026-08-20']) === null, '13b2 the same holds for every stage: a later official date is what refreshes a record, not the stage');
+  // (c) genuinely stale records keep their warning, in every stage
+  const c = ['proposed', 'approved', null].map((st) => v('filed', '2024-08-26', st));
+  ok(c.every((x) => x && x.reason === 'old_date' && x.latest_official_date === '2024-08-26'), '13c an old filing in a Proposed, Approved or unstaged record still warns, as before', c);
+  const d = v('issued', '2023-05-01', 'permitted');
+  ok(d && d.reason === 'old_date' && d.latest_official_date === '2023-05-01', '13d a permitted record with an OLD ISSUE date and nothing later still warns (nothing is removed from permitted records)', d);
+  const e = v('filed', '2024-08-26', 'permitted', ['2025-01-15']);
+  ok(e && e.reason === 'old_date' && e.latest_official_date === '2025-01-15', '13e a later official date that is itself over a year old does not clear it, and it names the LATEST date (no longer filing-only)', e);
+  // (d) the boundary is the one the date flag already had
+  ok(v('issued', '2025-09-29', 'approved') === null && v('issued', '2025-09-28', 'approved') !== null, '13f exactly 365 days is current; 366 warns (same boundary as older_than_a_year)');
+  // (e) missing, sentinel, future and unparseable dates never refresh a record and never invent one
+  ok(M.verification(null, 'permitted', ['2026-08-20'], T) === null, '13g no record date: no verdict and no invented date, whatever else is known');
+  const g = v('filed', '2024-08-26', 'permitted', ['2099-02-12', '1900-01-01', '1969-12-31', null, undefined, 'not a day', '2026-09-30']);
+  ok(g && g.reason === 'filing_only' && g.latest_official_date === '2024-08-26', '13h a sentinel, a future date, a blank or an unparseable one is not later activity', g);
+  // (f) through the real assembly: the ledger, not a retrieval time
+  const stale = { rows: [row('k1', 0.2)], projects: [proj('k1', { status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' })] };
+  const rdOf = (r) => r.intelligence.projects[0].record_date;
+  const f0 = run({ ...stale });
+  ok(rdOf(f0).verify && rdOf(f0).verify.reason === 'filing_only' && rdOf(f0).older_than_a_year === true && f0.intelligence.projects[0].stage.key === 'permitted', '13i the engine puts the verdict on record_date; the original older_than_a_year flag and the stage are unchanged', rdOf(f0));
+  const f1 = run({ ...stale, ledger: [led('k1')], events: [ev('k1', { publisher_event_type: 'issued', publisher_event_date: '2026-09-20' })] });
+  ok(rdOf(f1).verify === null && rdOf(f1).older_than_a_year === true, '13j a proven change whose source-stated date is recent clears the warning, and the filing date stays what it was', rdOf(f1));
+  const f2 = run({ ...stale, ledger: [led('k1', { change_ready: false })], events: [ev('k1', { publisher_event_type: 'issued', publisher_event_date: '2026-09-20' })] });
+  ok(rdOf(f2).verify && rdOf(f2).verify.reason === 'filing_only', '13k an event on a project that is not change-ready proves nothing (the same gate as every other detected change)', rdOf(f2));
+  const f3 = run({ ...stale, ledger: [led('k1', { last_observed_at: '2026-09-29T11:59:00Z', observation_count: 40 })], events: [] });
+  ok(rdOf(f3).verify && rdOf(f3).verify.reason === 'filing_only', '13l HomeSignal reading a record again is not project activity: a fresh observation time does not clear the warning', rdOf(f3));
+  const f4 = run({ ...stale, ledger: [led('k1')], events: [ev('k1', { event_type: 'refreshed', material: false, publisher_event_type: 'issued', publisher_event_date: '2026-09-20' })] });
+  ok(rdOf(f4).verify && rdOf(f4).verify.reason === 'filing_only', '13m a non-material event (a refresh) does not clear it', rdOf(f4));
+  const f5 = run({ rows: [row('k1', 0.2)], projects: [proj('k1', { status: 'Approved', stage: 'Not Yet Advertised', date_kind: 'issued', submitted_at: '2026-09-10' })] });
+  ok(rdOf(f5).verify === null && rdOf(f5).older_than_a_year === false, '13n a recent date needs no verification', rdOf(f5));
+  const f6 = run({ rows: [row('k1', 0.2)], projects: [proj('k1', { status: 'Proposed', stage: 'Pending', date_kind: 'scheduled', submitted_at: '2029-09-17' })] });
+  ok(rdOf(f6) === null, '13o a plan date is no record date, so nothing is verified and nothing is invented (unchanged)');
+  // (g) the same record, every stage: the verdict depends on the stage only through "permitted + filing only"
+  const mixed = run({ rows: [row('a', 0.1), row('b', 0.2), row('c', 0.3)], projects: [
+    proj('a', { status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' }),
+    proj('b', { status: 'Approved', stage: 'Advertised', date_kind: 'filed', submitted_at: '2024-08-26' }),
+    proj('c', { status: 'Proposed', stage: 'Pending', date_kind: 'filed', submitted_at: '2024-08-26' })] });
+  const rs = Object.fromEntries(mixed.intelligence.projects.map((p) => [p.project_id, p.record_date.verify && p.record_date.verify.reason]));
+  ok(rs.a === 'filing_only' && rs.b === 'old_date' && rs.c === 'old_date', '13p same filing date: permitted reads filing_only, approved and proposed keep the plain warning (no record loses its warning)', rs);
+  // (h) the rule reads no place, source or stage word of its own
+  const code = readFileSync(new URL('../supabase/functions/_shared/national-report.ts', import.meta.url), 'utf8');
+  const i = code.indexOf('export function verification('), j = code.indexOf('\n}\n', i);
+  const body13 = code.slice(i, j);
+  ok(i > 0 && !/zip|county|registry|source_key|brigham|utah|under construction|permit issued|last_observed|first_observed|refreshed|Date\.now|new Date/i.test(body13), '13q the freshness function reads no place, source, stage vocabulary, observation time or clock (today is passed in)', body13.length);
+}
+
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

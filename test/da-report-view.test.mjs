@@ -173,6 +173,30 @@ try {
   const old = rowNamed(html, 'Willow Creek Plat'), fresh = rowNamed(html, 'Menchaca Apartments');
   ok(/data-da-stale/.test(old.cells[1]) && /Verify:<\/b> Issued Jan 10, 2025, over a year old\. Confirm it is still active\./.test(old.cells[1]), '3c a record whose official date is over a year old carries a concise Verify line IN its Stage cell', textOf(old.cells[1]));
   ok(!/data-da-stale|over a year old/.test(rowsOf(html).filter((r) => r.name !== 'Willow Creek Plat').map((r) => r.cells[1]).join('')), '3d and no other row does: a recent record is never marked stale');
+  // ---- 3d2. the Verify line follows the engine's freshness verdict (audit 2026-10-11), and a saved report without one still behaves as before ----
+  {
+    const withRd = (mut) => { const r = clone(W); const p = r.report.projects.find((x) => x.name === 'Willow Creek Plat'); mut(p.record_date); return r; };
+    const stale = (r) => { const h = view(r); const c = rowNamed(h, 'Willow Creek Plat').cells[1]; return { c: textOf(c), has: /data-da-stale/.test(c), brief: textOf(h) }; };
+    const base = stale(W);
+    ok(base.has && /over a year old/.test(base.c) && /records? carr(?:y|ies) (?:an )?official dates?/.test(base.brief), '3d2a the fixture\'s old record is flagged in its row AND counted in the briefing (the baseline, and the positive control, for the checks below)', base.brief);
+    const fo = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'filing_only', latest_official_date: e.date }; }));
+    ok(fo.has && /Verify: Issued Jan 10, 2025\. No later official date is on record\. Confirm it is still active\./.test(fo.c) && !/over a year old/.test(fo.c), '3d2b a filing_only verdict says the date is the only one on record, and does not call the project old', fo.c);
+    const cleared = stale(withRd((e) => { e.verify = null; }));
+    ok(!cleared.has && !/over a year old/.test(cleared.c) && !/records? carr(?:y|ies) (?:an )?official dates?/.test(cleared.brief), '3d2c verify: null (a later official date exists) clears the Verify line AND the briefing count, though the date is still over a year old', cleared);
+    const plain = stale(withRd((e) => { e.verify = { rule: 'freshness-1', reason: 'old_date', latest_official_date: e.date }; }));
+    ok(plain.has && /Issued Jan 10, 2025, over a year old\. Confirm it is still active\./.test(plain.c), '3d2d an old_date verdict keeps the plain wording');
+    const unknown = stale(withRd((e) => { e.verify = { rule: 'freshness-9', reason: 'something_new', latest_official_date: e.date }; }));
+    ok(unknown.has && /over a year old/.test(unknown.c) && !/No later official date/.test(unknown.c), '3d2e a verdict with a reason this view does not know still warns, in the plain wording (never silent, never a wrong claim)', unknown.c);
+    const saved = stale(withRd((e) => { delete e.verify; }));
+    ok(saved.has && /over a year old/.test(saved.c), '3d2f a report saved before the rule (no verify field) is judged by the old flag, exactly as before');
+    const savedFresh = stale(withRd((e) => { delete e.verify; e.older_than_a_year = false; }));
+    ok(!savedFresh.has, '3d2g and a saved report whose flag says it is not old is not flagged');
+    for (const bad of [true, 'old', 7, []]) {
+      const m = stale(withRd((e) => { e.verify = bad; }));
+      ok(m.has && /over a year old/.test(m.c), '3d2h a malformed verify (' + JSON.stringify(bad) + ') is not trusted: the old flag decides, so it can never silence a warning', m.c);
+    }
+    ok(!/undefined|null|NaN/.test(fo.c + plain.c + unknown.c), '3d2i no placeholder text in any verdict wording');
+  }
   const dec = rowNamed(html, 'Oak Grove Townhomes');
   ok(!/Source agency status/.test(dec.cells[1]) && /da-rv-decided/.test(dec.cells[1]), '3e a Decided record shows the Decided stage and no invented publisher stage');
   // the publisher's stage is shown verbatim and escaped; absent when the engine has none

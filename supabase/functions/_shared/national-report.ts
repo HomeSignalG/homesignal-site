@@ -313,6 +313,36 @@ export function recordDate(p: Pick<ProjectRow, 'date_kind' | 'submitted_at'>, to
   return { kind, label: EVENT_KINDS[kind], date, older_than_a_year: date < addDays(today, -OLD_RECORD_DAYS) };
 }
 
+/**
+ * FRESHNESS (audit 2026-10-11): when the report asks the reader to verify that a record is still active.
+ *
+ * The age of an original FILING is not, by itself, evidence that an active development is stale: a project the agency lists as under construction
+ * can have been filed years ago. So the warning is judged on the LATEST OFFICIAL DATE the report holds for the record, not on the date the record
+ * was filed, and on what that date IS:
+ *   latest official date = the newest of the record's own date and any later date the SOURCE stated for a ledger-proven change (`later`);
+ *   it is never a retrieval time, a refresh time or an observation time (HomeSignal reading a record again proves nothing about the project).
+ *   - latest official date within OLD_RECORD_DAYS ............................... no warning;
+ *   - older, in a Permitted / Under Construction record whose ONLY date is its filing and no later official date is recorded ... `filing_only`
+ *     (the line says so: the filing is old and nothing later is on record; it does not say the project is old);
+ *   - older, in every other case (an old issue / decision / award date, any Proposed or Approved record, an unstaged record) ... `old_date`,
+ *     the same warning as before.
+ * Nothing is removed from a permitted record: an old permit with no later official date still warns. A record with no usable date has no
+ * `record_date` at all, so no date is invented and no warning is made (unchanged).
+ * Pure: reads no clock (`today` is passed), no stage vocabulary of its own (the stage key comes from presentationStage), and no place or source.
+ */
+export const FRESHNESS_RULE = 'freshness-1';
+export type Verification = { rule: string; reason: 'old_date' | 'filing_only'; latest_official_date: string } | null;
+export function verification(
+  rd: { kind: string; date: string } | null, stage: Stage | null, later: Array<string | null | undefined>, today: string,
+): Verification {
+  if (!rd) return null;
+  const real = later.filter((d): d is string => validDay(d) && d <= today && d >= RECORD_DATE_FLOOR);
+  const latest = [rd.date, ...real].reduce((a, b) => (a >= b ? a : b));
+  if (latest >= addDays(today, -OLD_RECORD_DAYS)) return null;
+  const filingOnly = stage === 'permitted' && rd.kind === 'filed' && real.length === 0;
+  return { rule: FRESHNESS_RULE, reason: filingOnly ? 'filing_only' : 'old_date', latest_official_date: latest };
+}
+
 // ── the boundary ─────────────────────────────────────────────────────────────────────────────────────────
 
 /** Whether `needle` occurs in `text` with no letter or digit directly before or after it. */
@@ -514,7 +544,7 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_status: p.status,
       publisher_stage: p.stage,
       publisher_event: ev,
-      record_date: recordDate(p, today),
+      record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(recordDate(p, today)),
       developer: p.developer, size: p.size, investment: p.investment,
       source: { url: p.source_ref, attribution: grant ? (grant.attribution || null) : null },
       homesignal_observation: led
