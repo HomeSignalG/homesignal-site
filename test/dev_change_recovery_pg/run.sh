@@ -39,6 +39,7 @@ checks() {
   if ! P -tA -F'|' -f "$here/suite.sql" 2>"$tmp/suite_err"; then
     emit 'suite' f "the suite CRASHED: $(tr '\n' ' ' <"$tmp/suite_err" | head -c 300)"
   fi
+  conc_check
   # idempotence
   apply_base; apply_file "$f" || true; fp1="$(fp)"
   if apply_file "$f"; then fp2="$(fp)"; else fp2="re-apply refused: $(tr '\n' ' ' <"$tmp/err" | head -c 200)"; fi
@@ -59,11 +60,38 @@ checks() {
     tf 'A05 refuses a half-applied pair' "$(grep -c 'half-applied' "$tmp/err")" '1'; fi
 }
 
+# CONCURRENCY: a collector write landing WHILE the probe runs must not split the probe's snapshot. The probe is one
+# statement, and dev_sites_deduped is STABLE SQL as in production, so it reads the caller's snapshot even while a slow
+# helper lets another session commit. A POSITIVE CONTROL swaps in a volatile plpgsql helper (the shape that would split):
+# the same scenario then returns a result that contradicts the probe's own clock, so the check can fail.
+conc_check() {
+  local a b
+  P -c "select public.sim_refresh('76270', jsonb_build_array(public.sim_site('C1','Issued','2024-01-01', true)), now() - interval '2 hours')" >/dev/null
+  ( PGOPTIONS="-c test.dsd_sleep=2" psql -X -qtA -F'|' -c "select synchronized, reason, stamped_keys from public.dev_change_recovery_probe('76270', array['arcgis:fixture:C1'])" > "$tmp/conc_a" 2>&1 ) &
+  sleep 0.7
+  P -c "update public.development_reports set sites = '[]'::jsonb, refreshed_at = now() where zip='76270'" >/dev/null
+  wait
+  a="$(cat "$tmp/conc_a")"
+  tf 'C01 a collector write landing DURING the probe does not split its snapshot (clock, rows and stamps agree)' "$a" 't|ok|{arcgis:fixture:C1}'
+  tf 'C02 …and the NEXT probe sees the write: the ZIP is no longer synchronised' "$(Q "select reason from public.dev_change_recovery_probe('76270', '{}')")" 'rows_not_from_current_cache'
+  # positive control: a volatile, per-statement-snapshot helper WOULD split it
+  P -c "create or replace function public.dev_sites_deduped(p_zip text) returns table (el jsonb) language plpgsql volatile as \$\$ begin perform pg_sleep(nullif(current_setting('test.dsd_sleep', true), '')::float8); return query select e from public.development_reports d, jsonb_array_elements(d.sites) e where d.zip = p_zip; end \$\$" >/dev/null
+  P -c "select public.sim_refresh('76271', jsonb_build_array(public.sim_site('C2','Issued','2024-01-01', true)), now() - interval '2 hours')" >/dev/null
+  ( PGOPTIONS="-c test.dsd_sleep=2" psql -X -qtA -F'|' -c "select synchronized, reason, stamped_keys from public.dev_change_recovery_probe('76271', array['arcgis:fixture:C2'])" > "$tmp/conc_b" 2>&1 ) &
+  sleep 0.7
+  P -c "update public.development_reports set sites = '[]'::jsonb, refreshed_at = now() where zip='76271'" >/dev/null
+  wait
+  b="$(cat "$tmp/conc_b")"
+  tf 'C03 CONTROL: a volatile helper splits the snapshot (this scenario can detect a split)' "$([ "$b" != 't|ok|{arcgis:fixture:C2}' ] && echo split || echo "not-detected: $b")" 'split'
+  # restore the production-shaped helper
+  P -f "$here/fixture.sql" >/dev/null 2>&1 || true
+}
+
 emit_mut() { :; }
 out="$(checks "$SQL")"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(grep -c '|f|' <<<"$out" || true)
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 38 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+if [ "$n_all" -lt 64 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
 
 status=0
 for m in "$here"/mutations/*.py; do

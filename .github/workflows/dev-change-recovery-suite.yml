@@ -2,9 +2,11 @@ name: dev-change-recovery-suite
 
 # HISTORICAL-RECOVERY PROTECTION (docs/dev-change-recovery.sql). Runs the SHIPPED migration against a DISPOSABLE
 # Postgres whose ledger is built from the repo's own SQL of record (proved equal to the live bodies by md5 inside the
-# run): 38 scenario checks (recovered historical / undated / future-dated / recent / unstamped records, repeat
-# refresh, genuine change after recovery, the materialisation barrier, a cache write during the stamp read,
-# disable + re-enable, baseline untouched, privileges), idempotence, three refusals, then every prohibited mutation —
+# run): 64 checks (a stamped first sighting is coverage_recovered whatever its date kind or age; unstamped
+# behaviour unchanged; deferral on any unsynchronised cache/materialisation state — one current plus stale rows,
+# empty materialisation, invalid or missing generation, cache movement, a concurrent collector write during the
+# probe, with a positive control; lazy probe; disable + re-enable; baseline untouched; privileges), idempotence,
+# three refusals, then every prohibited mutation —
 # each MUST fail the suite. Never addresses production.
 
 on:
