@@ -104,7 +104,7 @@ emit_mut() { :; }
 out="$(checks "$SQL")"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(grep -c '|f|' <<<"$out" || true)
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 109 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+if [ "$n_all" -lt 110 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
 
 status=0
 for m in "$here"/mutations/*.py; do

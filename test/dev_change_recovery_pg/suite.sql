@@ -541,6 +541,14 @@ select pg_temp.chk('K01 continuity that does not describe the CURRENT cache gene
   pg_temp.rep('nU2') = 0 and not exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nU2')
   and not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:nU2')); 
 
+select pg_temp.mk_ready('76333', 'nV');
+-- defence in depth: continuity is unbroken, but the standing baseline was taken under a DIFFERENT version -> not comparable
+update public.dev_change_scope_ready set scope_version = 'v1:OLD' where zip = '76333';
+select public.sim_refresh('76333', pg_temp.cache('76333') || jsonb_build_array(public.sim_site('nV2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
+select public.sim_observe('76333');
+select pg_temp.chk('K02 a baseline taken under another scope version is not continuity even when no break was recorded: the arrival is baselined, not announced',
+  pg_temp.rep('nV2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nV2'));
+
 -- ── 18. A PERSISTENTLY INCOMPLETE SOURCE fails closed and stays reported ────────────────────────────────────────────
 select public.sim_refresh('76308', jsonb_build_array(public.sim_site('nP0','Issued','2024-01-01')), now() - interval '90 hours');
 select public.sim_observe('76308', true);
