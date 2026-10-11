@@ -452,12 +452,12 @@ select public.sim_observe('76302');
 select public.sim_refresh('76302', pg_temp.cache('76302') || jsonb_build_array(public.sim_site('nS2','Issued','2022-01-02', true, 'filed')), now() - interval '20 hours',
    true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v1:B"}]'::jsonb);                      -- the envelope / rule changed
 select public.sim_observe('76302');
-select pg_temp.chk('C01 a CHANGED scope version re-baselines: the record that appears with it is silent and the baseline moves to the new version',
+select pg_temp.chk('V01 a CHANGED scope version re-baselines: the record that appears with it is silent and the baseline moves to the new version',
   pg_temp.rep('nS2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nS2') and pg_temp.ready('76302','fixture') = 'v1:B');
 select public.sim_refresh('76302', pg_temp.cache('76302') || jsonb_build_array(public.sim_site('nS3','Issued','2022-01-03', true, 'filed')), now() - interval '10 hours',
    true, '[{"reg":"fixture","scope":"expanded","complete":true,"ver":"v1:B"}]'::jsonb);
 select public.sim_observe('76302');
-select pg_temp.chk('C02 …and the next arrival under the new version is news', pg_temp.rep('nS3') = 1);
+select pg_temp.chk('V02 …and the next arrival under the new version is news', pg_temp.rep('nS3') = 1);
 
 -- ── 16. OFF / ON CYCLES and successful reactivation ───────────────────────────────────────────────────────────────────
 select public.sim_refresh('76303', jsonb_build_array(public.sim_site('nO0','Issued','2024-01-01')), now() - interval '90 hours');

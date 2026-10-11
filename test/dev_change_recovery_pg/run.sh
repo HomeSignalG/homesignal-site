@@ -6,6 +6,7 @@ set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+psql -X -qtA -v ON_ERROR_STOP=1 -c 'select 1' >/dev/null 2>&1 || { echo "FAIL — cannot connect to PostgreSQL (a suite that cannot run is a failure, never a skip)"; exit 1; }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 Q() { P -tA -c "$1"; }
@@ -104,16 +105,22 @@ conc_check() {
 
 emit_mut() { :; }
 out="$(checks "$SQL")"; echo "$out" | sed 's/^/  /'
-n_all=$(grep -c '|' <<<"$out"); n_fail=$(grep -c '|f|' <<<"$out" || true)
-echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 112 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+echo "$out" > "$tmp/shipped"
+echo "SHIPPED: $(grep -cE '\|[tf](\||$)' "$tmp/shipped") result lines"
+bash "$root/test/lib/require_exact_ids.sh" "$here/required_checks.txt" "$tmp/shipped" || { echo "FAIL — the shipped SQL does not pass, or a required check did not report"; exit 1; }
 
-status=0
+status=0; killed=0
+n_mut=$(ls "$here"/mutations/*.py | wc -l)
+[ "$n_mut" -eq 40 ] || { echo "FAIL — expected 40 mutations, found $n_mut"; exit 1; }
 for m in "$here"/mutations/*.py; do
   name="$(basename "$m" .py)"
   python3 "$m" "$SQL" > "$tmp/mut.sql" || { echo "HARNESS FAILURE — mutation $name did not apply (anchor missing)"; status=1; continue; }
   cmp -s "$SQL" "$tmp/mut.sql" && { echo "HARNESS FAILURE — mutation $name changed nothing"; status=1; continue; }
-  mo="$(checks "$tmp/mut.sql" || true)"; nf=$(grep -c '|f|' <<<"$mo" || true)
-  if [ "$nf" -gt 0 ]; then echo "KILLED   $name — $nf check(s) failed"; else echo "SURVIVED $name"; status=1; fi
+  mo="$(checks "$tmp/mut.sql" || true)"
+  # a kill is a check that ran and FAILED; an apply refusal or a crashed suite is a broken mutation, not evidence
+  nf=$(grep -E '\|f(\||$)' <<<"$mo" | grep -vE '^[[:space:]]*(apply|suite)[|[:space:]]' | wc -l || true)
+  if [ "$nf" -gt 0 ]; then echo "KILLED   $name — $nf check(s) failed"; killed=$((killed+1)); else echo "SURVIVED $name (or it only broke the harness)"; status=1; fi
 done
+echo "MUTATIONS: $killed of $n_mut killed"
+[ "$killed" -eq "$n_mut" ] || status=1
 exit $status
