@@ -5,9 +5,9 @@ const r = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 const page = r('shared-report.html'), frame = r('follow-embed.html'), shell = r('shell.js'), stage = r('scripts/stage_site.py'), robots = r('robots.txt');
 let fails = 0;
 const ok = (c, n) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) fails++; };
-const code = page.slice(page.indexOf('<script>', page.indexOf('da-report-view.js')));
+const code = page.slice(page.indexOf('<script>', page.indexOf('project-type.js')));
 
-ok(!/<iframe/i.test(page.slice(0, page.indexOf('<script>', page.indexOf('da-report-view.js')))), '1 the report markup carries no frame: it is created only by the click');
+ok(!/<iframe/i.test(page.slice(0, page.indexOf('<script>', page.indexOf('project-type.js')))), '1 the report markup carries no frame: it is created only by the click');
 ok((code.match(/createElement\('iframe'\)/g) || []).length === 1 && /function followOpen[\s\S]*createElement\('iframe'\)/.test(code), '2 exactly one place makes the frame, inside the click handler path');
 ok(/e\.origin !== location\.origin/.test(code) && /e\.source !== followFrame\.contentWindow/.test(code), '3 the page believes only its own frame on its own origin');
 ok(/src = 'follow-embed\.html#address=' \+ encodeURIComponent\(followAddr\)/.test(code) && !/[?]address=/.test(code), '4 the address goes in the frame URL fragment only');
