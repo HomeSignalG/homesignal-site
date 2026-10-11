@@ -28,7 +28,7 @@ build() { # $1 = the recovery SQL under test
   sed -n '/^create or replace function public.app_source_key_basis(el jsonb)/,/^\$\$;/p' "$root/docs/app-projects-stable-key-migration.sql" >> "$tmp/key.sql"
   P -f "$tmp/key.sql" >/dev/null
   P -f "$root/test/dev_change_recovery_pg/fixture.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; exit 1; }
-  P -f "$root/docs/dev-source-receipt.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL — the receipt SQL does not apply"; exit 1; }
+  P -f "${RECEIPT_SQL:-$root/docs/dev-source-receipt.sql}" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL — the receipt SQL does not apply"; exit 1; }
   P -f "$root/test/source_receipt_pg/helpers.sql" >/dev/null
   P -1 -f "$1" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL — the recovery SQL does not apply"; exit 1; }
 }
@@ -197,8 +197,8 @@ PY
   # a mutated RECEIPT file is applied in place of the real one
   local out
   if [ "$file" = "dev-source-receipt.sql" ]; then
-    cp "$root/docs/dev-source-receipt.sql" "$tmp/receipt.orig"; cp "$tmp/m.sql" "$root/docs/dev-source-receipt.sql"
-    out="$(run_checks "$root/docs/dev-change-recovery.sql" 2>&1 || true)"; cp "$tmp/receipt.orig" "$root/docs/dev-source-receipt.sql"
+    # the mutated receipt is applied from a TEMPORARY copy through RECEIPT_SQL; no tracked file is ever overwritten
+    out="$(RECEIPT_SQL="$tmp/m.sql" run_checks "$root/docs/dev-change-recovery.sql" 2>&1 || true)"
   else
     out="$(run_checks "$tmp/m.sql" 2>&1 || true)"
   fi
@@ -207,8 +207,6 @@ PY
   if [ -n "$k" ]; then echo "KILLED   $name by $k"; else echo "SURVIVED $name (or the mutated stack never reported)"; return 1; fi
 }
 st=0
-# the mutated receipt file is swapped into docs/ for the run: restore it however this script ends
-trap '[ -f "$tmp/receipt.orig" ] && cp "$tmp/receipt.orig" "$root/docs/dev-source-receipt.sql"; rm -rf "$tmp"' EXIT
 mut dev-source-receipt.sql receipt_refused_counts_as_accepted "  if new.refreshed_at is not null and new.refreshed_at > coalesce(old.refreshed_at, '-infinity'::timestamptz) then" "  if (new.refreshed_at is not null and new.refreshed_at > coalesce(old.refreshed_at, '-infinity'::timestamptz)) or moved then" || st=1
 mut dev-source-receipt.sql receipt_break_never_moves "case when z.cont then z.o_break else z.gen_n end," "coalesce(z.o_break, z.gen_n)," || st=1
 mut dev-source-receipt.sql receipt_version_not_compared "(q.ok_n and q.prev_ok and q.o_version = q.v_in)" "(q.ok_n and q.prev_ok)" || st=1
