@@ -271,6 +271,36 @@ console.log('\n7) csv');
     'members beyond the cap ARE counted as capacity drops (3), legacy rows all kept; the 8 outsiders are not part of that count');
 }
 
+// ── 9. counts: the headline is the cached point-scope record count ───────────────────
+console.log('\n9) counts and cross-ZIP publication');
+{
+  // `app_refresh_zip` writes the "Development projects" tile as _ndp = count(cached sites where relevance =
+  // 'development' AND scope = 'point' AND record_url <> ''). It reads the CACHE, so it is exactly as honest as
+  // the connector's output. Pilot Point proportions (259 widened-only outside the polygon, 124 inside).
+  const z = '76258', P = pointsFor(z, 40, 124, 259);
+  const all = [...P.widenedOut, ...P.legacy, ...P.widenedIn];
+  const withUrl = (o) => o.sites.filter((s) => (s.record_url || s.url || '').trim() !== '' && s.scope === 'point').length;
+  const off = await arcRun(z, all, { zipCentroid: cen(z) });
+  const on = await arcRun(z, all, { zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: memberFn(z) }, { max_rows: 5000 });
+  const polyMembers = all.filter(([x, y]) => inRing(polyFor(z), x, y)).length;
+  ok(withUrl(off) === 40, 'OFF: headline input = the 40 legacy records');
+  ok(withUrl(on) === 40 + 124, `ON: headline input = 40 legacy + 124 recovered members = 164 (got ${withUrl(on)}); the 259 outside-polygon records contribute 0`);
+  ok(rep(on).scope_membership.outside_excluded === 259, 'the 259 are accounted for as EXCLUDED, not lost');
+  ok(withUrl(on) <= polyMembers + 40, 'headline input never exceeds (polygon members + legacy-scope records)');
+  // neighbour ZIP: complement polygon over the same bbox. Each widened-only record is published by AT MOST one ZIP.
+  const comp = async (pts) => pts.map(([lat, lng]) => inRing(polyFor(z), lng, lat) ? 'outside' : 'member');
+  const nb = await arcRun(z, all, { zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: comp }, { max_rows: 5000 });
+  const legacyIds = new Set(ids(off));
+  const wide = (o) => new Set(ids(o).filter((i) => !legacyIds.has(i)));
+  const A = wide(on), B = wide(nb);
+  ok(A.size === 124 && B.size === 259 && [...A].every((i) => !B.has(i)), 'a record in the neighbour polygon is published by the neighbour only (124 + 259, disjoint)');
+  ok(A.size + B.size === 383, 'together they cover every widened-only record exactly once');
+  // the RPC is parameterised by the REQUESTED zip, never by a record's own stated ZIP
+  const seen = []; const spy = { rpc: async (fn, args) => { seen.push(args.p_zip); return { data: args.p_pts.map((_, i) => ({ ord: i + 1, verdict: 'member' })), error: null }; } };
+  await arcRun(z, all, { zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: sm.zipMembershipRpc(spy, '75009') }, { max_rows: 5000 });
+  ok(seen.length > 0 && seen.every((x) => x === '75009'), 'membership is always asked of the ZIP being built (75009 here), never of a neighbour');
+}
+
 // ── 8. wiring: one authority, no ZIP in logic ──────────────────────────────────────────
 console.log('\n8) wiring');
 {
