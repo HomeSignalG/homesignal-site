@@ -690,6 +690,7 @@ body[data-explore="activity"] .hs-navsub a[data-sub="activity"]{font-weight:600;
 .home-index__helper{font-size:13px;color:var(--ink-3);margin:10px 0 0}
 /* the one Enterprise card */
 .home-index__report{display:grid;grid-template-columns:minmax(0,.35fr) minmax(0,.65fr);column-gap:20px;align-items:center;padding:36px 20px 36px 40px;margin:12px auto 8px;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:linear-gradient(135deg,var(--green-tint) 0%,#fff 100%)}
+.home-index__enterprise-text{align-self:start}
 .home-index__eyebrow{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green-deep);margin:0 0 10px}
 .home-index__enterprise-heading{font-size:34px;font-weight:700;line-height:1.08;margin:0 0 10px;color:var(--ink)}
 .home-index__enterprise-body{font-size:17px;line-height:1.5;color:var(--ink-2);margin:0 0 10px}
