@@ -8,6 +8,9 @@ create or replace function pg_temp.ev(p_key text) returns table (material boolea
 language sql as $$ select material, is_baseline, event_type from public.dev_change_event where identity_key = 'arcgis:fixture:' || p_key order by id $$;
 create or replace function pg_temp.rep(p_key text) returns int language sql as
 $$ select count(*)::int from public.dev_change_event_reportable where identity_key = 'arcgis:fixture:' || p_key $$;
+create or replace function pg_temp.unhealthy(p_zip text, p_reg text) returns boolean language sql as
+$$ select exists (select 1 from public.dev_change_scope_health h where h.zip = p_zip and h.registry_id = p_reg
+                   and h.monitoring_state in ('suspended','failed_or_incomplete','legacy_scope_fallback','source_not_reported','no_accepted_generation_evidence')) $$;
 create or replace function pg_temp.k(p_ids text[]) returns text[] language sql as
 $$ select array(select 'arcgis:fixture:' || x from unnest(p_ids) x) $$;
 
@@ -376,9 +379,6 @@ select pg_temp.chk('X01 no 5-digit ZIP literal and no source id in the probe or 
   and (select count(*) from pg_proc where proname = 'dev_change_observe_zip' and prosrc like '%dev_change_scope_ready%') = 1);
 
 -- ── 13. EMPTY EXPANDED COVERAGE: a complete expanded read with ZERO widened-only records baselines the pair ───────────────
-create or replace function pg_temp.unhealthy(p_zip text, p_reg text) returns boolean language sql as
-$$ select exists (select 1 from public.dev_change_scope_health h where h.zip = p_zip and h.registry_id = p_reg
-                   and h.monitoring_state in ('suspended','failed_or_incomplete','legacy_scope_fallback','source_not_reported','no_accepted_generation_evidence')) $$;
 create or replace function pg_temp.cache(p_zip text) returns jsonb language sql as $$ select sites from public.development_reports where zip = p_zip $$;
 create or replace function pg_temp.ready(p_zip text, p_reg text) returns text language sql as
 $$ select coalesce((select scope_version || case when lapsed_at is null then '' else '(suspended)' end from public.dev_change_scope_ready where zip = p_zip and registry_id = p_reg and baseline_gen_seq is not null), '(none)') $$;

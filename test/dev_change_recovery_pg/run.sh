@@ -43,6 +43,8 @@ checks() {
   if ! P -tA -F'|' -f "$here/suite.sql" 2>"$tmp/suite_err"; then
     emit 'suite' f "the suite CRASHED: $(tr '\n' ' ' <"$tmp/suite_err" | head -c 300)"
   fi
+  # a statement that errors inside the suite (ON_ERROR_STOP is off so one bad check cannot hide the rest) is a missing check, never a pass
+  if grep -q 'ERROR' "$tmp/suite_err"; then emit 'suite' f "the suite had SQL errors: $(grep 'ERROR' "$tmp/suite_err" | head -3 | tr '\n' ' ' | head -c 300)"; fi
   conc_check
   # idempotence
   apply_base; apply_file "$f" || true; fp1="$(fp)"
