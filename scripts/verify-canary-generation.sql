@@ -22,11 +22,13 @@ with p as (
   select
     coalesce((select count(*) = 1 from g), false)                                                         as g1,
     coalesce((select g.tick_at = d.refreshed_at from g, d), false)                                        as g2,
-    coalesce((select count(*) = cardinality(p.expected_sources) and cardinality(p.expected_sources) > 0
-                 and bool_and(c.scope = 'expanded' and c.complete and c.scope_version is not null
-                              and c.last_response_id = p.request_id and c.last_tick_at = d.refreshed_at)
-                from public.dev_source_continuity c, p, d
-               where c.zip = p.zip and c.registry_id = any(p.expected_sources)), false)                    as g3,
+    coalesce((select cardinality(p.expected_sources) > 0
+                 and (select count(*) from public.dev_source_continuity c where c.zip = p.zip and c.registry_id = any(p.expected_sources)) = cardinality(p.expected_sources)
+                 and not exists (select 1 from public.dev_source_continuity c, d
+                                  where c.zip = p.zip and c.registry_id = any(p.expected_sources)
+                                    and not (c.scope = 'expanded' and c.complete and c.scope_version is not null
+                                             and c.last_response_id = p.request_id and c.last_tick_at = d.refreshed_at))
+                from p), false)                                                                            as g3,
     coalesce((select count(*) = 0 from public.dev_source_continuity c, p
                where c.zip = p.zip and c.registry_id = any(p.expected_sources) and c.impaired_since is not null), false) as g4
 )

@@ -549,6 +549,19 @@ select public.sim_observe('76333');
 select pg_temp.chk('K02 a baseline taken under another scope version is not continuity even when no break was recorded: the arrival is baselined, not announced',
   pg_temp.rep('nV2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nV2'));
 
+-- a standing baseline is SUSPENDED by a generation with no evidence even when no new record arrived (the probe must still run)
+select pg_temp.mk_ready('76335', 'nW');
+select public.sim_refresh('76335', pg_temp.cache('76335'), now() - interval '60 hours');
+update public.dev_source_continuity set last_tick_at = last_tick_at - interval '1 minute' where zip = '76335';
+select public.sim_observe('76335');
+select pg_temp.chk('K03 with a standing baseline and NO new record, a generation without evidence still suspends the baseline',
+  pg_temp.ready('76335','fixture') = 'v1:A(suspended)');
+-- an incomplete expanded read with nothing held and no baseline leaves NO readiness row at all
+select public.sim_refresh('76334', jsonb_build_array(public.sim_site('nQ0','Issued','2024-01-01')), now() - interval '60 hours', true, '[{"reg":"fixture","scope":"expanded","complete":false}]'::jsonb);
+select public.sim_observe('76334');
+select pg_temp.chk('K04 an incomplete expanded read creates no readiness row when nothing was held and no baseline exists',
+  not exists (select 1 from public.dev_change_scope_ready where zip = '76334'));
+
 -- ── 18. A PERSISTENTLY INCOMPLETE SOURCE fails closed and stays reported ────────────────────────────────────────────
 select public.sim_refresh('76308', jsonb_build_array(public.sim_site('nP0','Issued','2024-01-01')), now() - interval '90 hours');
 select public.sim_observe('76308', true);
