@@ -153,6 +153,9 @@ jobs:
           # "Failed to load resource" (its Leaflet fetch) on several runs.
           npm install --no-audit --no-fund playwright@1.56.0 leaflet@1.9.4
           npx playwright install --with-deps chromium
+      # The homepage report-preview check (test/home-report-preview-check.browser.test.mjs) decodes the committed WebP with Pillow.
+      - name: Install Pillow (report-preview check)
+        run: python3 -m pip install --quiet pillow
       - name: Verify playwright is actually available to the suites
         run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — browser assertions would silently skip');process.exit(1)})"
       # The FULL suite, not just the browser slice: this job is the one that proves

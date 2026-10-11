@@ -6,7 +6,11 @@
 // "Illustrative sample" caption. It decides no Type, Stage, impact wording, ordering or distance; the engine and the view do.
 // Re-run it whenever lib/da-report-view.js changes the table, or the sample property changes:
 //   node scripts/build-home-report-preview.mjs            (writes the asset; needs playwright and Python Pillow)
-//   node scripts/build-home-report-preview.mjs --check    (renders and compares to the committed asset's recorded fingerprint input; writes nothing)
+//   node scripts/build-home-report-preview.mjs --check    (READ-ONLY: renders into a temp dir, compares the decoded pixels with the committed asset,
+//                                                          prints PASS/FAIL, exits 0/1; the tracked asset is never opened for writing, pass or fail)
+//   options: --out <file>      where the normal build writes (default: the tracked asset; ignored by --check)
+//            --against <file>  what --check compares with (default: the tracked asset)
+//   --check tolerance: mean absolute difference per channel <= CHECK_TOLERANCE (anti-aliasing and webp encoder noise), same dimensions required.
 // Output is a PNG in the scratch dir, then converted to webp by Python Pillow (the repo has no image dependency; this is a build-time tool only).
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -19,7 +23,12 @@ import { tmpdir } from 'node:os';
 import { wire, FAM_A, FAM_B, RIGHTS_AB, row, proj } from '../test/lib/da-report-view-world.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(root, 'assets', 'home-development-activity-report-preview.webp');
+const TRACKED = join(root, 'assets', 'home-development-activity-report-preview.webp');
+const CHECK = process.argv.includes('--check');
+const argOf = (f) => { const i = process.argv.indexOf(f); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : null; };
+const OUT = argOf('--out') || TRACKED;          // only the normal build ever writes here, and never in --check mode
+const AGAINST = argOf('--against') || TRACKED;
+const CHECK_TOLERANCE = 1.0;
 const SAMPLE_ADDRESS = '1234 Sample Street';
 const W = 1448; // intrinsic width kept from the asset it replaces, so the homepage layout and its 60/40 column do not move
 
@@ -94,6 +103,7 @@ await browser.close(); server.close();
 writeFileSync(join(dir, 'resp.json'), JSON.stringify(resp, null, 1));
 console.log('rendered', png);
 if (process.argv.includes('--png-only')) process.exit(0);
+const target = CHECK ? join(dir, 'candidate.webp') : OUT;   // check mode renders ONLY into the temp dir
 execFileSync('python3', ['-I', '-c', `
 import sys
 from PIL import Image
@@ -102,4 +112,22 @@ w = ${W}; h = round(im.height * w / im.width)
 im = im.resize((w, h), Image.LANCZOS)
 im.save(sys.argv[2], 'WEBP', quality=88, method=6)
 print(w, h)
-`, png, OUT], { stdio: 'inherit' });
+`, png, target], { stdio: 'inherit' });
+if (CHECK) {
+  // Read the committed file only; compare decoded pixels. Exit 0 = the committed preview matches what the current renderer produces.
+  let verdict = '';
+  try {
+    verdict = execFileSync('python3', ['-I', '-c', `
+import sys
+from PIL import Image, ImageChops, ImageStat
+a = Image.open(sys.argv[1]).convert('RGB'); b = Image.open(sys.argv[2]).convert('RGB')
+if a.size != b.size:
+    print('FAIL size %s vs %s' % (a.size, b.size)); sys.exit(1)
+m = sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
+tol = float(sys.argv[3])
+print(('PASS' if m <= tol else 'FAIL') + ' mean abs diff %.3f (tolerance %.1f)' % (m, tol))
+sys.exit(0 if m <= tol else 1)
+`, AGAINST, target, String(CHECK_TOLERANCE)], { encoding: 'utf8' });
+    console.log(verdict.trim()); process.exit(0);
+  } catch (e) { console.log(((e.stdout || '') + (e.stderr || '') || String(e)).trim()); process.exit(1); }
+}
