@@ -110,49 +110,52 @@ try {
   const men = rowNamed(html, 'Menchaca Apartments');
   const dev = textOf(men.cells[0]);
   ok(/^Menchaca Apartments Residential 0\.2 mi north · Map 1 Official source/.test(dev), '2d the Development cell: name, Type, distance and direction, map number, then a short source link', dev);
-  ok(/Stage: Approved \/ Coming Agency stage: Advertised/.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
+  ok(/Stage: Approved \/ Coming Source agency status: Advertised/.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
   ok(/Potential construction noise and traffic/.test(textOf(men.cells[2])) && /Not site-verified/.test(textOf(men.cells[2])), '2f the impact cell is the qualified rule text');
   // no record's name appears as a heading anywhere else: the evidence block carries only what the row does not
   ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8, '2g one supporting-evidence entry per record');
   const ev = evOf(html).find((e) => e.name === 'Menchaca Apartments').html;
   ok(!/Potential construction|Quality-of-Life|0\.2 mi/.test(textOf(ev)), '2h the evidence entry repeats neither the impact text nor the distance (they are in the row)', textOf(ev));
-  ok(/Official record:<\/span> Issued · Sep 24, 2026/.test(ev) && /Source agency status:<\/span> Approved/.test(ev) && /Data: WSDOT/.test(ev), '2i it keeps the evidence the row does not: filing/issue date, the agency status, the source attribution');
-  // ---- 2i2. the agency's status is labelled as the agency's, shown only when it adds something, and a disagreement is never dropped ----
+  ok(/Official record:<\/span> Issued · Sep 24, 2026/.test(ev) && !/HomeSignal lifecycle|Status in HomeSignal/.test(ev) && /Data: WSDOT/.test(ev), '2i it keeps the evidence the row does not: filing/issue date and the source attribution (the Approved bucket is not repeated: the stage "Approved / Coming" already says it; the agency\'s own word is in the Stage cell)');
+  // ---- 2i2. WHOSE WORD IS WHOSE: the Stage column is HomeSignal's stage; the agency's own word is labelled the source agency's; HomeSignal's own bucket is not printed beside it ----
+  // (`app_projects.stage` holds the agency's word and `app_projects.status` only HomeSignal's four buckets: measured on production 2026-10-11, see the note in the view.
+  // Build-steps 491 took the lifecycle line out of the customer view because beside the agency's word it read as a contradiction; "Status in HomeSignal's record" was the same bucket.)
   {
-    const OLD_LABEL = /Status in HomeSignal/;
     const one = async (x, opts) => { // one record, in a world of its own, through the real handler and the real view
       const w = await wire({ rows: [row('k-x', 0.2, FAM_A)], projects: [proj('k-x', FAM_A, { name: 'Case X', ...x })], ledger: [], events: [], health: [] });
       return { w, html: opts ? V.html(w, { subject: ADDRESS, ...opts }) : view(w) };
     };
-    const ev1 = (h) => evOf(h)[0] ? evOf(h)[0].html : '';
-    // (a) the Brigham City shape: HomeSignal's stage is Permitted / Under Construction, the agency's status word is Approved
+    const ev1 = (h) => (evOf(h)[0] ? evOf(h)[0].html : '');
+    const cell = (h) => textOf(rowsOf(h)[0].cells[1]);
+    const OLD = /Status in HomeSignal|Agency stage:/;
+    // (a) the Brigham City shape: HomeSignal's stage is Permitted / Under Construction, its bucket is Approved, the agency's own word is Under Construction
     const a = await one({ status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' });
-    ok(a.w.report.projects[0].stage.key === 'permitted' && a.w.report.projects[0].publisher_status === 'Approved', '2i2a the record is stage Permitted with the agency status Approved (the shape that read as a contradiction)');
-    ok(/Source agency status:<\/span> Approved/.test(ev1(a.html)) && !OLD_LABEL.test(a.html), '2i2b the agency\'s word is printed under "Source agency status", and the old "Status in HomeSignal\'s record" wording is gone from the page', textOf(ev1(a.html)));
-    ok(/Permitted \/ Under Construction/.test(textOf(rowsOf(a.html)[0].cells[1])) && !/Source agency status/.test(rowsOf(a.html)[0].cells[1]), '2i2c HomeSignal\'s stage stays in the Stage column; the agency status is not mixed into it');
-    // (b) the same words already printed for the record are not printed twice
-    const b = await one({ status: 'Under Construction', stage: 'Under Construction' });
-    ok(!/Source agency status/.test(b.html) && /Agency stage: Under Construction/.test(textOf(b.html)), '2i2d a status that is word for word the agency stage already in the Stage cell is not repeated', textOf(ev1(b.html)));
-    const b2 = await one({ status: 'under-construction', stage: 'Under Construction' });
-    ok(!/Source agency status/.test(b2.html), '2i2e "same words" ignores case and punctuation');
-    // (c) anything that differs from what is printed is shown, so a disagreement is never silent
-    for (const [status, stage, life] of [['Proposed', 'Under Construction', 'proposed'], ['Withdrawn', 'Construction', 'withdrawn'], ['Active', null, 'x'], ['Approved', null, 'approved']]) {
-      const c = await one({ status, stage });
-      ok(new RegExp('Source agency status:</span> ' + status).test(ev1(c.html)), '2i2f an agency status "' + status + '" (stage "' + stage + '") is shown whenever its words are not already on the record', textOf(ev1(c.html)));
-    }
-    // (d) the lifecycle line, when the page shows one, already carries HomeSignal's word; an agency status with the same words is not repeated beside it, and is shown where no lifecycle line is
-    const d = await one({ status: 'Approved', stage: null });
-    const dLife = V.html(d.w, { subject: ADDRESS, showLifecycle: true });
-    ok(/HomeSignal lifecycle:<\/span> Approved/.test(ev1(dLife)) && !/Source agency status/.test(ev1(dLife)), '2i2g with the lifecycle line shown, an agency status that is the same word is not repeated', textOf(ev1(dLife)));
-    ok(/Source agency status:<\/span> Approved/.test(ev1(d.html)), '2i2h without the lifecycle line the same status IS shown (nothing is hidden that the page does not already say)');
-    // (e) nothing stated, nothing invented
-    const e = await one({ status: null, stage: 'Under Construction' });
-    ok(!/Source agency status/.test(e.html) && !/undefined|null/.test(textOf(ev1(e.html))), '2i2i no agency status: no line, and no placeholder text');
-    // (f) the response keeps the original value whether or not the page prints it
-    ok(b.w.report.projects[0].publisher_status === 'Under Construction' && a.w.report.projects[0].publisher_status === 'Approved', '2i2j the engine\'s response still carries the agency\'s original status word for every record');
-    // (g) the decision reads no date, no source family and no place
-    const fn = /function statusLine\(p, k, showLifecycle\) \{[\s\S]*?\n  \}/.exec(readFileSync(join(root, 'lib/da-report-view.js'), 'utf8'));
-    ok(fn && !/record_date|submitted_at|source_family|registry|zip|county|brigham|utah/i.test(fn[0]), '2i2k the decision uses only the record\'s own words: no date, source, county or place', fn && fn[0].length);
+    ok(a.w.report.projects[0].stage.key === 'permitted' && a.w.report.projects[0].publisher_status === 'Approved' && a.w.report.projects[0].publisher_stage === 'Under Construction', '2i2a the record is stage Permitted, HomeSignal bucket Approved, agency word Under Construction (the shape that read as a contradiction)');
+    ok(/Permitted \/ Under Construction/.test(cell(a.html)) && /Source agency status: Under Construction/.test(cell(a.html)), '2i2b the Stage cell shows HomeSignal\'s stage and, under it, the agency\'s own word labelled "Source agency status"', cell(a.html));
+    ok(!/Approved/.test(textOf(ev1(a.html))) && !OLD.test(a.html), '2i2c the evidence card no longer prints HomeSignal\'s Approved bucket beside the stage, and neither old wording ("Status in HomeSignal\'s record", "Agency stage:") is on the page', textOf(ev1(a.html)));
+    // (b) a Decided record: HomeSignal's stage says so, the agency's own word (Denied) is kept
+    const bd = await one({ status: 'Decided', stage: 'Denied', date_kind: 'decided', submitted_at: '2026-09-20' });
+    ok(/Decided \(denied or withdrawn\)/.test(cell(bd.html)) && /Source agency status: Denied/.test(cell(bd.html)) && /Outcome:/.test(textOf(ev1(bd.html))), '2i2d a Decided record keeps the agency\'s word (Denied) and its Outcome line', cell(bd.html));
+    // (c) a DISAGREEMENT is never dropped: the agency says construction, HomeSignal's bucket is Proposed, so the stage reads Proposed and the agency's word stays beside it
+    const c = await one({ status: 'Proposed', stage: 'Construction' });
+    ok(c.w.report.projects[0].stage.key === 'proposed' && /Proposed \/ Under Review/.test(cell(c.html)) && /Source agency status: Construction/.test(cell(c.html)), '2i2e an agency word that disagrees with HomeSignal\'s stage is shown beside it, never suppressed', cell(c.html));
+    // (d) the agency's word is the original source evidence: hidden ONLY when it is exactly the words HomeSignal's own stage already prints
+    const d1 = await one({ status: 'Approved', stage: 'Approved - Coming' });
+    ok(!/Source agency status/.test(cell(d1.html)), '2i2f an agency word that is exactly HomeSignal\'s stage wording (ignoring case and punctuation) is not printed twice');
+    const d2 = await one({ status: 'Approved', stage: 'Approved' });
+    ok(/Source agency status: Approved/.test(cell(d2.html)), '2i2g an agency word that is only PART of HomeSignal\'s wording is still shown (it is evidence, not a repeat)');
+    // (e) the internal view, which asks for the lifecycle line, still prints HomeSignal's lifecycle, once
+    const f = V.html(a.w, { subject: ADDRESS, showLifecycle: true });
+    ok((ev1(f).match(/HomeSignal lifecycle/g) || []).length === 1, '2i2h the internal view still prints HomeSignal\'s lifecycle, exactly once', textOf(ev1(f)));
+    // (f) nothing stated, nothing invented
+    const g = await one({ status: 'Approved', stage: null });
+    ok(!/Source agency status/.test(g.html) && !/undefined|null/.test(cell(g.html)), '2i2i no agency word: no line, and no placeholder text', cell(g.html));
+    // (g) the response keeps both original values whether or not the page prints them
+    ok(a.w.report.projects[0].publisher_status === 'Approved' && bd.w.report.projects[0].publisher_stage === 'Denied' && d1.w.report.projects[0].publisher_stage === 'Approved - Coming', '2i2j the engine\'s response still carries the original agency word and bucket for every record');
+    // (h) the decision reads only the record's own words: no date, source, county or place
+    const code = readFileSync(join(root, 'lib/da-report-view.js'), 'utf8');
+    const fns = ['function sameWords(a, b) {', 'function shownStageText(p, k) {'].map((h) => { const i = code.indexOf(h); return i < 0 ? '' : code.slice(i, code.indexOf('\n', code.indexOf('}', i + h.length)) + 1); }).join('\n');
+    ok(fns.length > 100 && !/record_date|submitted_at|source_family|registry|zip|county|brigham|utah/i.test(fns), '2i2k the decision uses only the record\'s own words: no date, source, county or place', fns.length);
   }
   const nums = rows.map((r) => (/Map (\d+)/.exec(r.cells[0]) || [])[1]).filter(Boolean);
   ok(nums.join() === '1,2,3,4,5,6' && evOf(html).map((e) => (/Map (\d+)/.exec(e.html) || [])[1]).filter(Boolean).join() === '1,2,3,4,5,6', '2j the Map numbers in the table, the evidence and the map agree', nums);
@@ -171,12 +174,12 @@ try {
   ok(/data-da-stale/.test(old.cells[1]) && /Verify:<\/b> Issued Jan 10, 2025, over a year old\. Confirm it is still active\./.test(old.cells[1]), '3c a record whose official date is over a year old carries a concise Verify line IN its Stage cell', textOf(old.cells[1]));
   ok(!/data-da-stale|over a year old/.test(rowsOf(html).filter((r) => r.name !== 'Willow Creek Plat').map((r) => r.cells[1]).join('')), '3d and no other row does: a recent record is never marked stale');
   const dec = rowNamed(html, 'Oak Grove Townhomes');
-  ok(!/Agency stage/.test(dec.cells[1]) && /da-rv-decided/.test(dec.cells[1]), '3e a Decided record shows the Decided stage and no invented publisher stage');
+  ok(!/Source agency status/.test(dec.cells[1]) && /da-rv-decided/.test(dec.cells[1]), '3e a Decided record shows the Decided stage and no invented publisher stage');
   // the publisher's stage is shown verbatim and escaped; absent when the engine has none
   const two = clone(W); two.report.projects.find((p) => p.project_id === 'k-approved').publisher_stage = '<b>Final</b> review';
-  ok(/Agency stage: &lt;b&gt;Final&lt;\/b&gt; review/.test(rowNamed(view(two), 'Menchaca Apartments').cells[1]), '3f the publisher\'s stage is escaped text');
+  ok(/Source agency status: &lt;b&gt;Final&lt;\/b&gt; review/.test(rowNamed(view(two), 'Menchaca Apartments').cells[1]), '3f the publisher\'s stage is escaped text');
   const none = clone(W); delete none.report.projects.find((p) => p.project_id === 'k-approved').publisher_stage;
-  ok(!/Agency stage/.test(rowNamed(view(none), 'Menchaca Apartments').cells[1]), '3g with none stated there is no Agency stage line (nothing is guessed)');
+  ok(!/Source agency status/.test(rowNamed(view(none), 'Menchaca Apartments').cells[1]), '3g with none stated there is no Agency stage line (nothing is guessed)');
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 // ---- 4. Quality-of-Life Impact: one canonical rule, qualified, no invented measurement ------------------------------------------------------------------
@@ -304,7 +307,7 @@ try {
   const evil = '<script>alert(1)</script>';
   const inj = clone(W);
   const P = (k) => inj.report.projects.find((p) => p.project_id === k);
-  P('k-approved').name = evil; P('k-approved').publisher_status = '"><img src=x onerror=alert(1)>'; P('k-approved').type = { key: 'residential', label: '<b>Residential</b>' };
+  P('k-approved').name = evil; P('k-approved').publisher_stage = '"><img src=x onerror=alert(1)>'; P('k-approved').type = { key: 'residential', label: '<b>Residential</b>' };
   P('k-approved').source.attribution = '<i>Data</i> & "co"'; P('k-approved').lifecycle.label = '<u>Approved</u>';
   P('k-approved').homesignal_detected_changes[0].changes[0] = { field: '<f>', from: '<from>', to: evil };
   P('k-approved').publisher_event.label = '<em>Issued</em>';
@@ -480,7 +483,7 @@ try {
   try { hb = V.html(bare, { subject: ADDRESS }); } catch (e) { thrown = true; }
   ok(!thrown && rowsOf(hb).length === 8, '13a a record with no Type, publisher stage, source link or name still renders as a row');
   const r0 = rowsOf(hb).find((r) => /Unnamed record/.test(r.name));
-  ok(r0 && !/<a\b/.test(r0.cells[0]) && !/Agency stage/.test(r0.cells[1]) && !/da-rv-sub--type/.test(r0.cells[0]), '13b with nothing to link there is no link, no Agency stage, and no invented Type', r0 && r0.cells[0]);
+  ok(r0 && !/<a\b/.test(r0.cells[0]) && !/Source agency status/.test(r0.cells[1]) && !/da-rv-sub--type/.test(r0.cells[0]), '13b with nothing to link there is no link, no Agency stage, and no invented Type', r0 && r0.cells[0]);
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 
