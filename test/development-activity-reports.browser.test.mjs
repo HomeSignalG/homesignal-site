@@ -2166,7 +2166,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
     return { rail: r('#rail'), report: r('#report .da-rv'), vw: innerWidth,
       underReport: [...document.getElementById('current').children].map((e) => e.id || e.tagName).filter((id) => id !== 'current-title' && id !== 'status' && id !== 'creditnote' && id !== 'report' && id !== 'report-empty' && id !== 'compare-result'),
       onceEach: ['share', 'watch', 'saved', 'compare', 'account', 'rail-actions'].map((id) => document.querySelectorAll('#' + id).length),
-      railHas: ['#rail-actions', '#share', '#watch', '#saved', '#compare', '#account'].every((q) => !!document.querySelector('#rail ' + q)),
+      railHas: ['#rail-actions', '#share', '#watch', '#saved', '#compare'].every((q) => !!document.querySelector('#rail ' + q)) && ['#rf', '#account', '#billing', '#profile', '#team'].every((q) => !document.querySelector('#rail ' + q)),
       reportHas: !!rep.querySelector('#share, #watch, #saved, #account, .da-rv-actions') };
   });
   ok(g.rail.w >= 300 && g.rail.w <= 360 && g.rail.l < g.report.l, `L5a at ${width}px the rail is 300-360px wide and sits left of the report`, g.rail);
@@ -2175,17 +2175,17 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   const h = await page.evaluate(() => {
     const box = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top + scrollY, b: r.bottom + scrollY, w: r.width, h: r.height }; };
     const c = document.getElementById('rf').closest('section'), ws = document.querySelector('.ws'), rail = document.getElementById('rail'), stage = document.getElementById('current');
-    const tr = document.getElementById('trial'), hd = document.querySelector('header.top');
+    const tr = document.getElementById('trial'), hd = document.querySelector('header.sitebar');
     return { create: box(c), ws: box(ws), rail: box(rail), stage: box(stage), inRail: rail.contains(c), trial: box(tr), trialInHeader: hd.contains(tr), headerB: box(hd).b,
       addr: box(document.getElementById('addr')), label: box(document.getElementById('label')), go: box(document.getElementById('go')), cta: box(document.getElementById('trial-cta')), count: document.getElementById('trial-count').textContent };
   });
   ok(!h.inRail && Math.abs(h.create.l - h.ws.l) <= 2 && Math.abs(h.create.r - h.ws.r) <= 2 && h.create.b <= h.rail.t + 1 && h.create.b <= h.stage.t + 1, `L5q at ${width}px Create a property report spans the whole workspace width and sits above both columns`, [h.create, h.ws]);
   ok(h.create.h < 190 && Math.abs(h.addr.t - h.go.t) < 12 && h.label.l > h.addr.r - 1 && h.go.l > h.label.r - 1 && h.addr.w > h.go.w * 3, `L5r at ${width}px address, client label and Generate report share one row and the section stays compact`, [h.create.h, h.addr, h.label, h.go]);
-  ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 free reports used$|^\d+ of 10 free reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the header account strip, small, above the form`, h);
+  ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 free reports used$|^\d+ of 10 free reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the site bar's account zone, small, above the form`, h);
 
   { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
     ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / g.vw >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the window)`, { w: g.report.w, surface, vw: g.vw }); }
-  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px report tools, Saved, Compare and Account are in the rail, once each, and nothing but the report is on the right`, g);
+  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px report tools, Saved and Compare are in the rail, Create and Account are not, each once, and nothing but the report is on the right`, g);
   // the six most recent are listed; the rest wait behind "View all saved reports"
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 6 && !(await drawn(page, '#saved-more')) , `L5d six saved reports show without a "view all" button`);
   await make(page, A1 + ' ');   // a seventh report
@@ -2236,8 +2236,8 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   const t = { create: await topOf(page, '#rf'), actions: await topOf(page, '#rail-actions'), report: await topOf(page, '#report .da-rv'), saved: await topOf(page, '#saved'), account: await topOf(page, '#account') };
   ok(t.create < t.actions && t.actions < t.report && t.report < t.saved && t.saved < t.account, 'L6a at 390px the order is Create, this report\'s tools, the report, Saved reports, Account', t);
   ok(await noSideways(page), 'L6b at 390px nothing scrolls sideways');
-  { const u = await page.evaluate(() => ({ trialInHeader: document.querySelector('header.top').contains(document.getElementById('trial')), tr: document.getElementById('trial').getBoundingClientRect().height, ctaVisible: document.getElementById('trial-cta').getClientRects().length > 0, count: document.getElementById('trial-count').textContent, cta: document.getElementById('trial-cta').textContent, addr: document.getElementById('addr').getBoundingClientRect(), label: document.getElementById('label').getBoundingClientRect(), go: document.getElementById('go').getBoundingClientRect() }));
-    ok(u.trialInHeader && u.ctaVisible && u.tr < 140 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe — $79/month', 'L6c at 390px usage and Subscribe stay visible and compact in the header', u);
+  { const u = await page.evaluate(() => ({ trialInHeader: document.querySelector('header.sitebar').contains(document.getElementById('trial')), tr: document.getElementById('trial').getBoundingClientRect().height, ctaVisible: document.getElementById('trial-cta').getClientRects().length > 0, count: document.getElementById('trial-count').textContent, cta: document.getElementById('trial-cta').textContent, addr: document.getElementById('addr').getBoundingClientRect(), label: document.getElementById('label').getBoundingClientRect(), go: document.getElementById('go').getBoundingClientRect() }));
+    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe — $79/month', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
     ok(u.addr.bottom <= u.label.top + 1 && u.label.bottom <= u.go.top + 1 && Math.abs(u.addr.width - u.go.width) < 4, 'L6d at 390px the form stacks: address, client label, then a full-width Generate report', u); }
   await ctx.close();
 }
@@ -2252,6 +2252,57 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   await page.click('#compare-mode');
   await make(page, A3);
   ok((await page.$$('#rail-actions .da-rv-actions')).length === 1 && !(await page.$('#report .da-rv-actions')), 'L7b opening another report replaces the rail\'s buttons rather than adding to them');
+  await ctx.close();
+}
+
+// ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
+for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
+  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true, compare: false });
+  await waitCount(page, /free reports left/);
+  await make(page, A1);
+  await waitBoxes(page, 1);
+  if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }
+  const g = await page.evaluate(() => {
+    const q = (s) => document.querySelector(s), r = (s) => { const e = q(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
+    return {
+      createInRail: !!q('.rail #rf'), createInWs: !!q('.ws #rf'), accountInRail: !!q('.rail #account'), accountInWs: !!q('.ws #account'),
+      trialInBar: !!q('header.sitebar #trial'), trialCtaInBar: !!q('header.sitebar #trial-cta'), acctBtnInBar: !!q('header.sitebar #acct-btn'),
+      create: r('.create'), ws: r('.ws'), rail: r('#rail'), stage: r('#current'), report: r('#report'), account: r('#account'), wrapW: r('main.wrap'),
+      top: r('header.sitebar'), count: (q('#trial-count') || {}).textContent, cta: (q('#trial-cta') || {}).textContent, ctaShown: !!q('#trial-cta') && q('#trial-cta').getBoundingClientRect().width > 0,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      entnav: !!q('.entnav'), brandLabel: !!q('header.top .brand'),
+      railHeads: [...document.querySelectorAll('#rail .sec-h')].map((e) => e.textContent.trim()),
+      railHasAdmin: !!q('#rail #billing, #rail #profile, #rail #team, #rail details.acct'),
+      addr: r('#addr'), label: r('#label'), go: r('#go'),
+    };
+  });
+  const tag = `M at ${w}px`;
+  ok(!g.createInRail && g.createInWs === false && g.create && g.ws && g.create.b <= g.ws.y + 1, `${tag}: Create a property report is outside the rail and sits above the workspace`, g);
+  ok(g.create.w >= g.ws.w - 2, `${tag}: Create spans the full workspace width`, g.create);
+  ok(!g.accountInRail && !g.accountInWs && !g.railHasAdmin && g.account && g.account.y >= g.ws.b - 1, `${tag}: Account and administration is out of the rail and below the workspace`, g);
+  ok(g.railHeads.join('|') === 'This report|Saved reports', `${tag}: the rail holds only this report's tools and saved reports`, g.railHeads);
+  ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /free reports used/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
+  ok(!g.entnav && !g.brandLabel, `${tag}: no Enterprise row and no repeated HomeSignal label`, g);
+  ok(g.overflow <= 0, `${tag}: nothing scrolls sideways`, g.overflow);
+  ok(await page.evaluate(() => ![...document.querySelectorAll('[data-da-action="compare"], #compare-mode, #compare, .sv-pick')].some((e) => e.getClientRects().length) && ![...document.querySelectorAll('button')].some((b) => /compare/i.test(b.textContent) && b.getClientRects().length)), `${tag}: no Compare button, selection UI or report-level Compare action anywhere (launch scope)`);
+  if (w >= 1000) {
+    ok(g.rail.w >= 295 && g.rail.w <= 345 && g.stage.w >= g.wrapW.w * 0.6, `${tag}: the rail stays about 300-340px and the report column takes the rest`, { rail: g.rail.w, stage: g.stage.w, wrap: g.wrapW.w });
+    ok(g.addr.w > g.label.w && g.go.w > 100 && Math.abs(g.addr.y - g.go.y) < 60 && Math.abs(g.addr.y - g.label.y) < 60, `${tag}: address, client label and Generate share one row, address widest`, { a: g.addr, l: g.label, g: g.go });
+    ok(g.create.h < 170, `${tag}: the Create section is not tall`, g.create.h);
+  } else {
+    ok(g.create.y < (await page.$eval('#rail-report', (e) => e.getBoundingClientRect().y)) && g.create.y < g.stage.y && g.stage.y < (await page.$eval('#saved', (e) => e.getBoundingClientRect().y)), `${tag}: order is create, this report's tools, the report, saved reports`, g);
+    ok(g.go.h >= 44, `${tag}: Generate is a 44px target`, g.go);
+  }
+  // Account control opens the administration section
+  await page.click('header.sitebar #acct-btn');
+  ok(await page.$eval('#account', (e) => e.open) && await page.$eval('#billing', (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.y < innerHeight; }), `${tag}: the Account control opens administration and brings it into view`);
+  ok(errors.length === 0, `${tag}: no page error`, errors);
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ signedIn: false, compare: false });
+  ok(await page.$eval('header.sitebar #acct-btn', (e) => getComputedStyle(e).display === 'none'), 'M signed out: there is no Account control (nothing to administer)');
+  ok(await page.$eval('#report-empty', (e) => getComputedStyle(e).display !== 'none' && /No report is open/.test(e.textContent) && /Enter an address above or open a saved report\./.test(e.textContent)), 'M the empty state is the restrained two-line one');
   await ctx.close();
 }
 
@@ -2303,6 +2354,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   ok(watchCalls.filter((c) => c.body.action === 'start').length === w0 + 1 && !(await page.$eval('#watch-stop', (e) => e.hidden)), 'N6 Watch Property still starts watching the property');
   // generating a report still works and still counts
   await make(page, A3);
+  await page.waitForFunction((u) => document.getElementById('trial-count').textContent !== u, used, { timeout: 8000 }).catch(() => {});   // the count follows the report by a moment: wait for it, then assert it changed
   ok((await page.$$eval('#saved-list li', (l) => l.length)) === 3 && (await text(page, '#trial-count')) !== used && (await page.$('#report .da-rv')) !== null, 'N7 generating a report still works, is saved, and uses one report');
   await gone('after generating another report');
   ok(errors.length === 0, 'N8 no page error', errors);
