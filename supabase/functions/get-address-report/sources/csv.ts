@@ -31,6 +31,7 @@
 // Types and values are imported separately: Node's type stripping (used by the offline
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
+import { pointInBox, validBounds, type ZipBounds } from "./scope-box.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -109,6 +110,11 @@ export interface CsvRunReport {
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the emit and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
+  /** true ⇒ at least one row was kept only because of the polygon-bbox scope. */
+  scope_widened?: boolean;
+  /** > 0 ⇒ the cap dropped this many polygon-bbox-only rows; legacy rows were all retained.
+   *  Those ZIP-polygon records are NOT recovered in this report. */
+  scope_widened_rows_dropped?: number;
 }
 
 export interface CsvDeps {
@@ -118,6 +124,10 @@ export interface CsvDeps {
   >;
   /** ZIP centroid for entries using spatial_zip_radius_mi. */
   zipCentroid?: { lat: number; lng: number };
+  /** Bounding box of the ZIP's canonical polygon (sources/scope-box.ts). A row is kept when it is
+   *  within the legacy radius of the centroid OR inside this box — a strict superset of before.
+   *  Absent/invalid ⇒ the radius test alone. A prefilter; membership stays polygon-based. */
+  zipBounds?: ZipBounds | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -191,18 +201,29 @@ async function runEntry(
 
   // ZIP scoping — native column, else each row's OWN point vs the ZIP centroid.
   let zipRows: Record<string, unknown>[];
+  let legacyCount = Number.POSITIVE_INFINITY;   // rows before this index are the legacy scope's
   if (zipCol) {
     zipRows = fileRows.filter((r) => String(r[zipCol] ?? "").trim().slice(0, 5) === zip);
   } else {
     const radius = entry.spatial_zip_radius_mi as number;
     const { lat: cLat, lng: cLng } = deps.zipCentroid as { lat: number; lng: number };
-    zipRows = [];
+    // LEGACY ROWS FIRST, then rows kept only because of the polygon box (each group in file order).
+    // The max_rows cap below counts EMITTED records, so a file where widened rows precede legacy
+    // rows would otherwise let them displace the very records this ZIP already had. With this
+    // order: legacy fits the cap ⇒ every legacy row is emitted and widened rows only use the spare
+    // room; legacy alone overflows ⇒ the first max_rows legacy rows in file order, i.e. exactly what
+    // the connector emitted before this change.
+    const legacyRows: Record<string, unknown>[] = [];
+    const widenedRows: Record<string, unknown>[] = [];
     for (const r of fileRows) {
       const lat = numOrNull(readCol(r, entry.column_map.lat));
       const lng = numOrNull(readCol(r, entry.column_map.lng));
       if (lat == null || lng == null) { report.skipped_no_coords++; continue; }
-      if (milesBetween(cLat, cLng, lat, lng) <= radius) zipRows.push(r);
+      if (milesBetween(cLat, cLng, lat, lng) <= radius) { legacyRows.push(r); continue; }
+      if (validBounds(deps.zipBounds) && pointInBox(lat, lng, deps.zipBounds)) { widenedRows.push(r); report.scope_widened = true; }
     }
+    legacyCount = legacyRows.length;
+    zipRows = [...legacyRows, ...widenedRows];
   }
   report.fetched = zipRows.length;
 
@@ -223,15 +244,25 @@ async function runEntry(
   const caseFold = new Map<string, CaseFoldMatch>();
   const maxRows = entry.max_rows ?? 20000;
 
-  for (const row of zipRows) {
+  for (let rowIdx = 0; rowIdx < zipRows.length; rowIdx++) {
+    const row = zipRows[rowIdx];
     // A capped emit is INCOMPLETE and must say so — the same silent-truncation hazard the paged
     // connectors carry, in the one connector that caps while EMITTING rather than while fetching.
     if (records.length >= maxRows) {
       report.truncated_at_max_rows = maxRows;
-      report.quarantined.push({
-        reason: `max_rows cap of ${maxRows} bound the emit — the file has MORE matching rows than this report contains`,
-        sample: entry.registry_id,
-      });
+      if (rowIdx >= legacyCount) {
+        // Only polygon-box rows are being dropped: every legacy-scope row was already emitted.
+        report.scope_widened_rows_dropped = zipRows.length - rowIdx;
+        report.quarantined.push({
+          reason: `max_rows cap of ${maxRows} bound the emit — ${zipRows.length - rowIdx} polygon-bbox row(s) were NOT included; every legacy-scope row was kept`,
+          sample: entry.registry_id,
+        });
+      } else {
+        report.quarantined.push({
+          reason: `max_rows cap of ${maxRows} bound the emit — the file has MORE matching rows than this report contains`,
+          sample: entry.registry_id,
+        });
+      }
       break;
     }
     const statusRaw = String(readCol(row, entry.column_map.status_raw) ?? "").trim();

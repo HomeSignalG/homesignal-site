@@ -23,6 +23,7 @@
 // outSR=4326, resultOffset/resultRecordCount paging, exceededTransferLimit honored. Point
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
+import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, NormalizedRecord, StatusToBucket,
   ExcludedStatus, UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -216,13 +217,18 @@ export interface ArcgisRunReport {
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the fetch and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
+  /** true ⇒ the fetch used the polygon-bbox scope (wider than the legacy centroid square). */
+  scope_widened?: boolean;
+  /** set ⇒ the widened scope was REQUESTED but this report is the LEGACY-scope result, because the
+   *  widened fetch overflowed max_rows. The polygon-only records were NOT recovered for this ZIP. */
+  scope_fallback?: "legacy_after_overflow";
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
  *  records than this report contains. Silent truncation is the dangerous shape: a capped result and
  *  a complete one are indistinguishable apart from the count, so a truncated page reads as "we have
  *  everything". (2026-08-02 hardening — see QUEUE.md "the 20,000 is a SILENT CAP".) */
-interface FetchMeta { truncated: boolean; cap: number }
+interface FetchMeta { truncated: boolean; cap: number; widened?: boolean }
 
 export interface ArcgisDeps {
   fetch: typeof fetch;
@@ -236,6 +242,11 @@ export interface ArcgisDeps {
   /** ZIP centroid of the report being built — required only by entries using
    *  spatial_zip_radius_mi (the engine passes its home lat/lng). */
   zipCentroid?: { lat: number; lng: number } | null;
+  /** Bounding box of the ZIP's canonical polygon (sources/scope-box.ts). When present, a
+   *  spatial_zip_radius_mi entry fetches the UNION of the legacy centroid square and this box, so a
+   *  record inside the ZIP polygon but beyond the centroid square is no longer lost. Absent/invalid
+   *  ⇒ the legacy square exactly. A PREFILTER only — membership stays polygon-based downstream. */
+  zipBounds?: ZipBounds | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -350,15 +361,29 @@ async function runEntry(
   const caseFold = new Map<string, CaseFoldMatch>();
   const unmappedSample = new Map<string, string>();   // status → first case/permit no seen
 
-  const fetchMeta: FetchMeta = { truncated: false, cap: 0 };
+  let fetchMeta: FetchMeta = { truncated: false, cap: 0 };
   let rows: Record<string, unknown>[];
   try {
     rows = await fetchRows(entry, zip, zipCol ?? "", deps, fetchMeta);
+    // NEVER WORSE THAN BEFORE: if widening the scope to the polygon box is what ran the fetch into
+    // the max_rows cap, that report would be a truncated sample of a larger set. Re-run on the
+    // legacy square (complete for what it covers, exactly today's behaviour) and say so.
+    if (fetchMeta.truncated && fetchMeta.widened && deps.zipBounds) {
+      const widenedCap = fetchMeta.cap;
+      fetchMeta = { truncated: false, cap: 0 };
+      rows = await fetchRows(entry, zip, zipCol ?? "", { ...deps, zipBounds: null }, fetchMeta);
+      report.scope_fallback = "legacy_after_overflow";
+      report.quarantined.push({
+        reason: `polygon-bbox scope hit the max_rows cap of ${widenedCap}; fell back to the legacy centroid square for this ZIP`,
+        sample: entry.registry_id,
+      });
+    }
   } catch (e) {
     report.quarantined.push({ reason: `fetch failed: ${(e as Error).message}`, sample: entry.service_url });
     return { records, report };
   }
   report.fetched = rows.length;
+  if (fetchMeta.widened) report.scope_widened = true;
   // A capped fetch is INCOMPLETE and must say so. Surfaced twice on purpose: a machine-readable
   // field, and a quarantine note so it appears wherever quarantines are already read.
   if (fetchMeta.truncated) {
@@ -673,8 +698,9 @@ async function fetchRows(
   // the same envelope AND'd into WHERE instead — a geometry param is meaningless on a table.
   const attrCols = entry.spatial_latlng_cols;
   const env = (entry.spatial_zip_radius_mi ?? 0) > 0 && deps.zipCentroid
-    ? envelopeFor(deps.zipCentroid.lat, deps.zipCentroid.lng, entry.spatial_zip_radius_mi as number)
+    ? scopeBox(deps.zipCentroid, entry.spatial_zip_radius_mi as number, deps.zipBounds)
     : null;
+  if (env && deps.zipCentroid && widensLegacy(env, deps.zipCentroid, entry.spatial_zip_radius_mi as number)) meta.widened = true;
   const spatial = env && !attrCols ? env : null;
   const attrWhere = env && attrCols
     ? ` AND (${attrCols.lat} >= ${env.ymin} AND ${attrCols.lat} <= ${env.ymax} AND ${attrCols.lng} >= ${env.xmin} AND ${attrCols.lng} <= ${env.xmax})`
@@ -710,6 +736,15 @@ async function fetchRows(
       error?: { message?: string };
     };
     if (page?.error) throw new Error(`ArcGIS error: ${page.error.message ?? "unknown"}`);
+    // WIDENED SCOPE ONLY: a response with no features ARRAY is not "no records" — it is a server that
+    // did not understand (or ignored) the wider spatial query. Without this it would read as an
+    // honest zero and replace a valid cached result with silence. Throwing routes it through the
+    // established `fetch failed:` quarantine, which dev_refresh_collect already refuses to overwrite
+    // a contributing source with (docs/dev-refresh-source-failure-guard.sql). The legacy scope keeps
+    // its exact prior behaviour.
+    if (meta.widened && !Array.isArray(page?.features)) {
+      throw new Error("ArcGIS response carried no features array for the widened spatial query");
+    }
     const feats = Array.isArray(page?.features) ? page.features : [];
     if (feats.length === 0) break;
     for (const f of feats) {
@@ -955,9 +990,7 @@ function sleep(ms: number): Promise<void> { return new Promise((r) => setTimeout
 
 /** WGS84 envelope of ±radius miles around a point (1° lat ≈ 69 mi; lng scaled by cos(lat)). */
 export function envelopeFor(lat: number, lng: number, radiusMi: number): { xmin: number; ymin: number; xmax: number; ymax: number } {
-  const dLat = radiusMi / 69;
-  const dLng = radiusMi / (69 * Math.max(Math.cos(lat * Math.PI / 180), 0.1));
-  return { xmin: lng - dLng, ymin: lat - dLat, xmax: lng + dLng, ymax: lat + dLat };
+  return centroidSquare(lat, lng, radiusMi);   // the one copy lives in scope-box.ts
 }
 
 /** The geofence now lives in ONE place — sources/geo-fence.ts — because it was previously
