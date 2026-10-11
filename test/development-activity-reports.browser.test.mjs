@@ -381,6 +381,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '2b one request, with the person\'s token, the customer view and a random v4 key, and nothing else', reports.map((r) => r.body));
   ok(w.used === 4 && (await page.$$('#report .da-rv-sec')).length > 0 && /used 1 of your brokerage/.test(await text(page, '#creditnote')),
     '2c a report that shows development is drawn and says it used one free report', await text(page, '#creditnote'));
+  await waitCount(page, /^6 free reports left$/); // the count is re-read from the trial function after the report; on a slow runner it lands a moment after the report is drawn
   ok(/^6 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
   // a fresh world with nothing cleared: a "No data ingested" report
   await ctx.close();
