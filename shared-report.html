@@ -42,6 +42,15 @@ a.go[hidden]{display:none}
 .go.sec{background:var(--panel);color:var(--accent);border:1px solid var(--line);font-weight:500}
 header.top .acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .invite a.go{margin-top:12px;padding:10px 18px;color:#fff;text-decoration:none}
+.follow-panel{margin:12px 0 0;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--ink)}
+.follow-panel[hidden]{display:none}
+.follow-panel .fp-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 6px}
+.follow-panel .fp-bar b{font-size:14px}
+.follow-panel .fp-close{border:0;background:none;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:8px 4px;min-height:44px}
+.follow-panel iframe{display:block;width:100%;height:150px;border:0;background:#fff}
+.follow-panel .fp-fallback{margin:6px 0 0;font-size:13px}
+.go.follow.done{background:#eaf4ee;color:#1f5f3e;border:1px solid #cfe5d7;cursor:default;pointer-events:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){header.top .acts{flex-direction:column;align-items:stretch;width:100%}header.top .acts .go{width:100%}}
 .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:14px}
 #status{margin:0;font-size:15px;min-height:1.5em}
@@ -61,7 +70,7 @@ header.top .acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 noscript p{margin:16px;font-weight:600}
 @media print{
   body{background:#fff;font-size:12.5px}
-  header.top,#status,#private,.notice,noscript,a.follow{display:none!important}
+  header.top,#status,#private,.notice,noscript,a.follow,.follow-panel{display:none!important}
   .wrap{max-width:none;padding:0}
   #rid{color:#444}
 }
@@ -75,6 +84,7 @@ noscript p{margin:16px;font-weight:600}
     <a class="go follow" id="follow" href="#" hidden>Follow this property</a>
     <button type="button" class="go sec" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
     </div>
+    <div id="followTop"></div>
   </div>
 </header>
 <main class="wrap">
@@ -87,10 +97,17 @@ noscript p{margin:16px;font-weight:600}
     <h2>Follow quality-of-life intelligence for this property.</h2>
     <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
     <p id="followNote" hidden>Get notified when HomeSignal finds new development or meaningful project changes near this property.</p>
-    <a class="go follow" id="follow2" href="#" hidden>Follow this property</a><br>
+    <a class="go follow" id="follow2" href="#" hidden>Follow this property</a>
+    <div id="followBottom"></div>
     <a href="https://homesignal.net/" rel="noopener noreferrer">Explore HomeSignal &rarr;</a>
   </aside>
 </main>
+<section id="followPanel" class="follow-panel" hidden aria-label="Follow this property">
+  <div class="fp-bar"><b>Follow this property</b><button type="button" class="fp-close" id="followClose">Close</button></div>
+  <div id="followFrameWrap"></div>
+  <p class="fp-fallback" id="followFallback" hidden><a id="followFallbackLink" href="#" target="_blank" rel="noopener noreferrer">Continue on HomeSignal</a></p>
+</section>
+<p class="sr-only" id="followStatus" role="status" aria-live="polite"></p>
 <noscript><p>This report needs JavaScript to be shown. Please turn it on, or ask the person who sent you the link for a printed copy.</p></noscript>
 <script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/da-report-view.js?v=3a41075f"></script>
@@ -148,6 +165,50 @@ noscript p{margin:16px;font-weight:600}
     notice('The report couldn’t be loaded just now', ['Nothing is wrong with your link. Try again in a minute.'], true);
   }
 
+  // ---- inline Follow this property: ONE state shared by both buttons -------------------------------------------------------------------------
+  var followAddr = '', followState = 'idle', followFrame = null, followFrom = null;
+  function followClose(){
+    var panel = $('followPanel'); panel.hidden = true;
+    if (followFrame) { followFrame.remove(); followFrame = null; }
+    $('followFallback').hidden = true;
+    if (followState === 'open') followState = 'idle';
+    if (followFrom && followState === 'idle') { try { followFrom.focus(); } catch (e) {} }
+  }
+  function followOpen(btn){
+    if (followState === 'following' || !followAddr) return;
+    followFrom = btn;
+    var panel = $('followPanel');
+    (btn.id === 'follow' ? $('followTop') : $('followBottom')).appendChild(panel);
+    if (!followFrame) {
+      followFrame = document.createElement('iframe');
+      followFrame.title = 'Follow this property';
+      followFrame.setAttribute('referrerpolicy', 'no-referrer');
+      followFrame.src = 'follow-embed.html#address=' + encodeURIComponent(followAddr);
+      $('followFrameWrap').appendChild(followFrame);
+    }
+    followState = 'open';
+    panel.hidden = false;
+    try { followFrame.focus(); } catch (e) {}
+  }
+  function followDone(){
+    followState = 'following';
+    ['follow', 'follow2'].forEach(function(id){
+      var a = $(id); if (!a) return;
+      a.textContent = 'Following this property \u2713'; a.classList.add('done');
+      a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true');
+    });
+    followClose();
+    $('followStatus').textContent = 'Following this property.';
+  }
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    // only our own frame, on our own origin, speaking our own small vocabulary
+    if (e.origin !== location.origin || !followFrame || e.source !== followFrame.contentWindow || !d || d.hsFollow !== true) return;
+    if (d.type === 'height' && typeof d.h === 'number') followFrame.style.height = Math.max(110, Math.min(520, Math.ceil(d.h))) + 'px';
+    else if (d.type === 'following') followDone();
+    else if (d.type === 'unavailable') $('followFallback').hidden = false;
+  });
+
   function show(body){
     var V = window.HS && window.HS.daReportView;
     $('gone').hidden = true;
@@ -169,12 +230,14 @@ noscript p{margin:16px;font-weight:600}
       var base = inv.href.split('#')[0];
       inv.href = where ? base + '#address=' + encodeURIComponent(where) : base;
     }
-    // "Follow this property": ONE link, built ONCE, used by the top button and the one under the invitation, so there is one follow action.
-    // It opens HomeSignal's own add-an-address flow (sign-in, Census confirmation, the visitor's own Save); this page saves nothing, makes
-    // no account and never touches the report. With no address (once the private layer has purged it) there is no property to follow, so
-    // neither button is shown.
-    var fhref = where && where.length <= 200 ? 'https://homesignal.net/#follow=' + encodeURIComponent(where) : '';
+    // "Follow this property": two buttons, ONE action. Clicking either opens HomeSignal's own sign-in and add-an-address steps INLINE, in a
+    // same-origin frame that is created only on that click (nothing loads, and no sign-in is asked for, while the report is read). This page
+    // saves nothing, makes no account and never touches the report. The link on each button is the same no-script fallback. With no address
+    // (once the private layer has purged it) there is no property to follow, so neither button is shown.
+    followAddr = where && where.length <= 200 ? where : '';
+    var fhref = followAddr ? 'https://homesignal.net/#follow=' + encodeURIComponent(followAddr) : '';
     ['follow', 'follow2'].forEach(function(id){ var a = $(id); if (!a) return; if (fhref) { a.href = fhref; a.rel = 'noopener noreferrer'; } a.hidden = !fhref; });
+    $('followFallbackLink').href = fhref || '#';
     $('followNote').hidden = !fhref;
     $('invite').hidden = false;
     $('pdf').hidden = false;
@@ -204,6 +267,14 @@ noscript p{margin:16px;font-weight:600}
 
   document.addEventListener('DOMContentLoaded', function(){
     $('pdf').addEventListener('click', function(){ window.print(); });
+    ['follow', 'follow2'].forEach(function(id){
+      $(id).addEventListener('click', function(ev){
+        if (followState === 'following') { ev.preventDefault(); return; }
+        if (!followAddr) return;            // no address: leave the link to do its plain thing
+        ev.preventDefault(); followOpen(ev.currentTarget);
+      });
+    });
+    $('followClose').addEventListener('click', followClose);
     start();
   });
 })();

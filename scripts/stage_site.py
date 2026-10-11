@@ -63,6 +63,8 @@ ROOT_FILES = (
     # The client's page for a private share link (build step 8): noindex, robots-disallowed, linked from nowhere, reached only from a link an
     # agent made. It sends no referrer and holds no sign-in; its one function (view-shared-report) answers only a token the database says is usable.
     'shared-report.html',
+    # The frame a shared report opens inline, only after the visitor clicks Follow this property: HomeSignal's own sign-in + add-an-address steps.
+    'follow-embed.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
