@@ -323,7 +323,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  // "Account and administration" (Billing, Your name on reports, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
+  // "Account and administration" (Billing, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
   // checks of those cards are about the cards, so they are read with the section open; the closed default is asserted on its own (Part L, accountClosed).
   if (!accountClosed) await page.evaluate(() => { document.getElementById('account').open = true; });
   return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
@@ -427,7 +427,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const removed = await so.page.evaluate(() => { let n = 0; for (const sh of document.styleSheets) { for (let i = sh.cssRules.length - 1; i >= 0; i--) { const t = sh.cssRules[i].selectorText; if (t === '[hidden]') { sh.deleteRule(i); n++; } else if (t && t.includes(':has(')) sh.deleteRule(i); } } return n; });
   const drawnOld = await drawnCards(so.page);
   ok(removed === 1 && JSON.stringify(drawnOld.slice().sort()) === JSON.stringify(CARDS.slice().sort()),
-    '2i without the page\'s [hidden] rule the same read finds all seven hidden cards drawn: this check fails on the old page', { removed, drawnOld });
+    '2i without the page\'s [hidden] rule the same read finds the hidden cards drawn: this check fails on the old page', { removed, drawnOld });
   ok(so.errors.length === 0 && so.foreign.length === 0, '2j signed out: no page error, nothing foreign fetched', { e: so.errors, f: so.foreign });
   await so.ctx.close();
 }
@@ -752,25 +752,32 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 
 // ---- 8. the header and "Your name on reports" (build step 7) -------------------------------------------------------------------------------
 const profileShown = (page) => page.$eval('#profile', (e) => !e.hidden);
+const editBy = (page) => page.click('#by-edit'); // the name box is behind "Edit" on the Report by line
+const byName = (page) => page.$eval('#by-name', (e) => e.textContent.trim());
 const whoLine = (page) => page.$eval('#report .da-rv-who', (e) => e.textContent.trim()).catch(() => null);
 const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textContent.trim()).catch(() => null);
 {
   const w = world();
   const { ctx, page, errors, foreign, reports } = await open({ w });
   await waitCount(page, /free reports used/);
-  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && /Your name on reports/.test(await text(page, '#profile-title')),
-    '8a a trial member sees the "Your name on reports" card, with the box empty when they have given no name');
+  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && (await byName(page)) === 'Not set' && (await page.$eval('#by-edit', (e) => e.textContent)) === 'Add name' && await page.$eval('#profile', (e) => !!e.closest('.create') && !e.closest('#account')) && !(await page.$eval('#pf', (e) => e.checkVisibility())),
+    '8a a trial member sees "Report by: Not set" with an Add name button inside Create a property report (not Account), the box empty and closed');
   await page.fill('#label', 'Smith buyers');
   await make(page);
   ok(await whoLine(page) === 'Acme Realty' && await labelLine(page) === 'Smith buyers' && reports[0].body.label === 'Smith buyers',
     '8b a report shows the brokerage\'s name from the account, and the client label the person typed, in its header (no name yet, so none is invented)', [await whoLine(page), await labelLine(page)]);
+  await editBy(page);
   await page.fill('#agent-name', '  Pat   Agent ');
   await page.click('#save-name');
   await page.waitForFunction(() => /^Saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
   const upd = await page.evaluate(() => window.__sb.updates);
   ok(upd.length === 1 && JSON.stringify(upd[0]) === '{"data":{"full_name":"Pat Agent"}}' && /^Saved/.test(await text(page, '#profile-status')),
     '8c saving sends ONE update to the sign-in account, with the name as one clean line and nothing else, and says it is saved', upd);
-  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8c2 and the box shows the cleaned name');
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent' && (await byName(page)) === 'Pat Agent' && !(await page.$eval('#pf', (e) => e.checkVisibility())) && (await page.$eval('#by-edit', (e) => e.textContent)) === 'Edit',
+    '8c2 and the line shows the cleaned name with an Edit button, the editor closed');
+  await editBy(page); await page.fill('#agent-name', 'Someone Else'); await page.click('#cancel-name');
+  ok((await byName(page)) === 'Pat Agent' && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent' && (await page.evaluate(() => window.__sb.updates.length)) === 1 && !(await page.$eval('#pf', (e) => e.checkVisibility())),
+    '8c3 Cancel leaves the saved name unchanged, sends nothing and closes the editor');
   await page.fill('#label', ''); // the second report is made with no client label
   await make(page, OTHER);
   ok(await whoLine(page) === 'Acme Realty · Pat Agent', '8d the next report\'s header carries the name', await whoLine(page));
@@ -791,7 +798,8 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const w = world(); w.header = { brokerage: 'Acme Realty', agent: 'Jo Agent' };
   const { ctx, page } = await open({ w, name: 'Jo Agent' });
   await waitCount(page, /free reports used/);
-  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent', '8h the box starts with the name already on the person\'s account');
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent' && (await byName(page)) === 'Jo Agent', '8h the line and the box start with the name already on the person\'s account');
+  await editBy(page);
   await page.fill('#agent-name', 'Jo Q. Agent');
   await make(page);
   ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Q. Agent' && await whoLine(page) === 'Acme Realty · Jo Agent',
@@ -811,6 +819,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const { ctx, page } = await open({ w });
   await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateFails = true; });
+  await editBy(page);
   await page.fill('#agent-name', 'Pat Agent');
   await page.click('#save-name');
   await page.waitForFunction(() => /could not be saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -873,6 +882,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
   await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateHold = true; });
+  await editBy(page);
   await page.fill('#agent-name', 'Pat Q. Agent');
   await page.click('#save-name');
   ok(/Saving/.test(await text(page, '#profile-status')) && (await page.$eval('#save-name', (e) => e.disabled)), '8t (control) while the answer is on its way the page says it is saving and the button waits');
@@ -2127,11 +2137,11 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   const bar = await page.evaluate(() => { const n = document.querySelector('#rail-actions > .da-rv-actions'); return { inRail: !!n && !!n.closest('#rail'), inReport: !!document.querySelector('#report .da-rv-actions'), labels: n ? [...n.querySelectorAll('button')].map((b) => b.textContent) : [] }; });
   ok(bar.inRail && !bar.inReport && JSON.stringify(bar.labels) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF', 'Compare']), 'L2d the report\'s action buttons sit in the rail, not under the report: Share with Client, Watch Property, Download PDF, Compare', bar);
   ok(await drawn(page, '#rail-report') && !(await drawn(page, '#share')) && !(await drawn(page, '#watch')), 'L2e a saved report shows This report with its actions; the client-link and watch management are not drawn until used');
-  ok(!(await page.$eval('#account', (e) => e.open)) && (await drawn(page, '#account > summary')) && !(await page.$eval('#billing', (e) => e.checkVisibility())) && !(await page.$eval('#team', (e) => e.checkVisibility())) && !(await page.$eval('#profile', (e) => e.checkVisibility())),
-    'L2f the account section is closed by default: its heading is drawn, Billing, Invite an agent and Your name on reports are not');
+  ok(!(await page.$eval('#account', (e) => e.open)) && (await drawn(page, '#account > summary')) && !(await page.$eval('#billing', (e) => e.checkVisibility())) && !(await page.$eval('#team', (e) => e.checkVisibility())) && (await drawn(page, '#profile')) && !(await page.$eval('#account #profile', (e) => !!e).catch(() => false)),
+    'L2f the account section is closed by default: its heading is drawn, Billing and Invite an agent are not; "Report by" is drawn in Create and is not in the account section');
   await shot(page, 'L2-report-desktop');
   await page.click('#account > summary');
-  ok((await drawn(page, '#billing')) && (await drawn(page, '#team')) && (await drawn(page, '#profile')), 'L2g opening it shows Billing, Your name on reports and Invite an agent');
+  ok((await drawn(page, '#billing')) && (await drawn(page, '#team')) && (await drawn(page, '#profile')), 'L2g opening it shows Billing and Invite an agent (Report by is already in Create)');
   await shot(page, 'L2-account-open-desktop');
   await page.click('#account > summary');
   // the one library: every row opens a report and holds its own checkbox, and there is no second list
