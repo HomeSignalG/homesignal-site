@@ -96,7 +96,7 @@ ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'in
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
 ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|report-rights|\.cleared\b|\.rights\b|\.stage\.key|\.lifecycle\.key|creditDecision|uses_report/.test(code),
   '3d no lifecycle, Type, stage, rights or credit rule on the page');
-ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
+ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
 ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
@@ -246,7 +246,7 @@ ok(wa.length === 1 && /\$\('share-pop-wa'\)\.href = 'https:\/\/wa\.me\/\?text=' 
   '9l the only non-project URL is the WhatsApp link, written once onto the popup\'s own anchor (a link the person follows, never a request the page makes)');
 ok(/else if \(act === 'share'\) shareFromReport\(b\);/.test(code) && !/\$\('share'\)\.scrollIntoView/.test(code) && /var made = await makeShare\(\);/.test(code),
   '9m the report\'s Share button runs shareFromReport, which makes the link through makeShare (the old scroll-to-the-card is gone)');
-ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\]/g) || []).length === 2,
+ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\]/g) || []).length === 2,
   '9n a report that was not saved gets a plain explanation from the Share button (never a silent click), on both ways a report reaches the page');
 ok(!/'#share='|share=' \+|\+ '#share/.test(code.replace(/var SHARE_LINK = [^\n]*\n/, '')), '9o the page builds no part of the client link: it only checks the one the server made against SHARE_LINK');
 

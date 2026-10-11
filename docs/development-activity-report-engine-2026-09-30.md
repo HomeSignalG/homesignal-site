@@ -379,7 +379,7 @@ property:
 - How PostgREST turns the database's refusals into HTTP answers is still unchecked against production (now including
   `NOT_ENTITLED` from the mint).
 
-`publisher_status` is the publisher's word, verbatim, and is never replaced by the lifecycle. `homesignal_observation` is
+`publisher_stage` is the publisher's own word, verbatim (app_projects.stage). `publisher_status` is NOT the publisher's word: it is app_projects.status, HomeSignal's own four-value lifecycle bucket (Operating, Approved, Proposed, Decided; measured on production 2026-10-11, 29,546 sampled development rows, against 299 distinct stage values), whatever its name says. Neither is replaced by the lifecycle. See docs/development-activity-freshness-2026-10-11.md. `homesignal_observation` is
 HomeSignal's own retrieval times, labelled as observations. `homesignal_detected_changes` exists only where the ledger proves a
 change, and states `from` and `to` for each changed field.
 
