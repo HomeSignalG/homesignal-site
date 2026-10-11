@@ -25,6 +25,10 @@ apply_base() {
   sed -n '/^create or replace function public.app_source_key_basis(el jsonb)/,/^\$\$;/p' "$root/docs/app-projects-stable-key-migration.sql" >> "$tmp/key.sql"
   P -f "$tmp/key.sql" >/dev/null
   P -f "$here/fixture.sql" >/dev/null
+  # the REAL accepted-generation receipt (PR #1840's docs/dev-source-receipt.sql) and the REAL failure authority it reads
+  P -c "drop schema if exists net cascade; create schema net; create table net._http_response (id bigint primary key, status_code integer, content_type text, headers jsonb, content text, timed_out boolean, error_msg text, created timestamptz not null default now());" >/dev/null 2>&1
+  python3 "$root/test/dev_collect_harness/real_helpers.py" | P >/dev/null 2>&1
+  P -f "$root/docs/dev-source-receipt.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL — docs/dev-source-receipt.sql does not apply"; exit 1; }
 }
 apply_file() { P -1 -f "$1" >/dev/null 2>"$tmp/err"; }
 fp() { Q "select md5(coalesce((select string_agg(pg_get_functiondef(p.oid), '' order by p.proname collate \"C\") from pg_proc p where p.proname in ('dev_change_observe_zip','dev_change_tick')),'') || pg_get_viewdef('public.dev_change_event_reportable'::regclass))"; }
@@ -85,22 +89,22 @@ conc_check() {
   tf 'C03 CONTROL: a volatile helper splits the snapshot (this scenario can detect a split)' "$([ "$b" != 't|ok|{arcgis:fixture:C2}' ] && echo split || echo "not-detected: $b")" 'split'
   # restore the production-shaped helper
   P -f "$here/fixture.sql" >/dev/null 2>&1 || true
-  # a SOURCE RECEIPT committed by the receipt collector DURING the probe is not seen by that probe (one snapshot with the cache and
-  # the rows it judged), and is seen by the next one
-  P -c "select public.sim_refresh('76272', jsonb_build_array(public.sim_site('C4','Issued','2024-01-01', true, null, 'cz')), now() - interval '2 hours', true, '[]'::jsonb)" >/dev/null
+  # a NEW GENERATION committed DURING the probe (the cache clock and the source continuity move together, in the collector's one
+  # transaction) is not seen by that probe — one snapshot — and is seen by the next one
+  P -c "select public.sim_refresh('76272', jsonb_build_array(public.sim_site('C4','Issued','2024-01-01', true, null, 'cz')), now() - interval '2 hours', true, '[{\"reg\":\"cz\",\"scope\":\"expanded\",\"complete\":true}]'::jsonb)" >/dev/null
   ( PGOPTIONS="-c test.dsd_sleep=2" psql -X -qtA -F'|' -c "select jsonb_array_length(sources) from public.dev_change_recovery_probe('76272', '{}', true)" > "$tmp/conc_c" 2>&1 ) &
   sleep 0.7
-  P -c "select public.sim_rcpt('76272', 'cz', 'expanded', true)" >/dev/null
+  P -c "select public.sim_refresh('76272', (select sites from public.development_reports where zip='76272'), now() - interval '1 hour', false, '[]'::jsonb)" >/dev/null
   wait
-  tf 'C04 a receipt committed DURING the probe does not leak into it (readiness is judged on one consistent snapshot)' "$(cat "$tmp/conc_c")" '0'
-  tf 'C05 …and the NEXT probe sees it' "$(Q "select jsonb_array_length(sources) from public.dev_change_recovery_probe('76272', '{}', true)")" '1'
+  tf 'C04 a generation (cache clock + continuity) committed DURING the probe does not leak into it' "$(cat "$tmp/conc_c")" '1'
+  tf 'C05 …and the NEXT probe sees it (the materialisation no longer matches, so nothing is judged)' "$(Q "select jsonb_array_length(sources) from public.dev_change_recovery_probe('76272', '{}', true)")" '0'
 }
 
 emit_mut() { :; }
 out="$(checks "$SQL")"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(grep -c '|f|' <<<"$out" || true)
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 107 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+if [ "$n_all" -lt 109 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
 
 status=0
 for m in "$here"/mutations/*.py; do

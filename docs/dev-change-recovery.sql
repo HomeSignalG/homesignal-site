@@ -1,5 +1,5 @@
 -- ============================================================================
--- DEVELOPMENT CHANGE LEDGER — COVERAGE-RECOVERY PROTECTION   (PR B; SQL OF RECORD, NOT APPLIED)   rule_version 4
+-- DEVELOPMENT CHANGE LEDGER — COVERAGE-RECOVERY PROTECTION   (PR B; SQL OF RECORD, NOT APPLIED)   rule_version 5
 --
 -- THE PROBLEM
 --   When the ZIP-mode scope is widened to the polygon (docs/zip-scope-members.sql, sources/scope-members.ts) a ZIP
@@ -9,39 +9,42 @@
 --   development appeared. A baseline run would suppress it but also hides a genuine filing that arrives in the same
 --   window, and it needs a human per ZIP. Neither is acceptable at 12,722.
 --
--- WHAT THIS DOES (one rule, evaluated by the ledger's ONE writer, in the transaction that creates the identity)   rule_version 4
+-- WHAT THIS DOES (one rule, evaluated by the ledger's ONE writer, in the transaction that creates the identity)   rule_version 5
 --   "HomeSignal began looking here" and "the publisher published something" are different facts. The first produces a one-time
 --   BASELINE; once a source has a VERIFIED, CONTINUOUS baseline in a ZIP, a record that is new after it is ordinary news again.
---   (rule_version 2 treated every stamped first sighting as recovery forever: a permanent blind spot. rule_version 3 proved a
---   source was monitored by the presence of a stamped record and by the absence of a failure log: an empty expanded read could not
---   establish a baseline, and "no failure row" was read as success. rule_version 4 replaces both with a positive receipt.)
---   1. EVIDENCE = THE SOURCE COMPLETION RECEIPT (docs/dev-source-receipt.sql, from the connectors' scope_receipt). For each ZIP x
---      source it states the scope that RAN (expanded | fallback | legacy | failed), the scope VERSION (rule + envelope + radius) and
---      whether the read COMPLETED (no truncation, no failed or unresolved membership test, no overflow). It is linked to the cache
---      generation by its tick_at = development_reports.refreshed_at. A stamped record is never needed as proof; completeness is never
---      inferred from the absence of a failure.
---   2. READINESS (public.dev_change_scope_ready, one row per ZIP x source, bound to a scope version). A complete EXPANDED receipt
---      baselines the pair at that version — even when the ring is EMPTY. It is CONTINUOUS only while every receipt since the
---      baseline's verified generation is also a complete expanded read at the same version; any other receipt (incomplete, fallback,
---      legacy, failed), a missing receipt, a 'lost' response, a changed scope version or a suspended row breaks it.
+--   (rule_version 2 treated every stamped first sighting as recovery forever: a permanent blind spot. rule_version 3 proved a source
+--   was monitored by the presence of a stamped record and the absence of a failure log. rule_version 4 read a positive receipt but
+--   derived continuity from a seven-day receipt history and from a poller that inferred which response produced the cache. Version 5
+--   reads the DURABLE source continuity that an accepted cache write itself records, atomically — docs/dev-source-receipt.sql.)
+--   1. EVIDENCE = the accepted-generation receipt and the durable continuity of each ZIP x source (docs/dev-source-receipt.sql). The
+--      collector's one row update moves `refreshed_at` and the response cursor together; a trigger on that update records which
+--      response produced which generation and advances the source's generation sequence (gen_seq) and its BREAK sequence (break_seq: the
+--      generation of the latest read that was not an unbroken, comparable, complete continuation). A scope VERSION covers the rule, the
+--      envelope, the radius, the canonical polygon's geometry identity and the source's material configuration. A refused response is
+--      never an accepted generation; a write nobody can attribute, or whose response cannot be read, is a break.
+--   2. READINESS (public.dev_change_scope_ready, one row per ZIP x source). A complete EXPANDED read baselines the pair at its scope
+--      version and continuity generation — even when the ring is EMPTY. The baseline is CONTINUOUS iff baseline_gen_seq >= break_seq
+--      and the version is unchanged: every generation since was a complete read of the same scope, observed or not. No receipt
+--      history is read, so no retention window can force a re-baseline of a source that was monitored continuously.
 --   3. CLASSIFICATION of a NEW comparable stamped identity, per ZIP x source, NO DATE EVER DECIDES:
 --        complete expanded read, continuous baseline ..... ordinary first_detected: material, reportable (a GENUINE ARRIVAL)
 --        complete expanded read, no continuous baseline ... coverage_recovered: non-material, is_baseline, audited (the BASELINE,
 --                                                            or the RE-BASELINE after a break: records new across a coverage gap
 --                                                            cannot be told from backfill, so they are not claimed as news)
---        incomplete / fallback / failed / no receipt ...... HELD: not observed at all this time; a later complete read classifies it
+--        incomplete / fallback / legacy / failed / unattributed / no continuity row ... HELD: not observed at all this time; a later
+--                                                            complete read classifies it
 --      An UNSTAMPED record (legacy scope) is untouched: byte for byte the old behaviour.
---   4. SUSPENSION, per source. A synchronised observation that finds a source's receipt is not a complete expanded read (or has no
---      receipt while its ZIP has others) suspends THAT source's baseline (lapsed_at) and nothing else: source A's health never
---      keeps source B ready. A suspended source is listed in public.dev_change_scope_health, explicitly, until a complete expanded
---      read re-baselines it. A persistently incomplete source stays HELD and listed; it is never presented as verified.
+--   4. SUSPENSION and HEALTH, per source. A synchronised observation that finds a source is not a complete expanded read suspends THAT
+--      source's baseline (lapsed_at) and nothing else: source A's health never keeps source B ready. public.dev_change_scope_health
+--      lists every expected ZIP x source (derived from the continuity rows and the readiness rows — no registry of its own) with a
+--      monitoring_state, the open gap's start and the duration of past gaps, and per-source counts of held and quietly re-baselined
+--      observations. public.dev_monitoring_coverage counts them, plus ZIPs with a cache and no accepted-generation evidence.
 --   5. SYNCHRONISATION (fail closed). The stamps live in the cache and the identities in app_projects; they describe the same
 --      records only when app_projects was materialised from the CURRENT cache generation. One SQL statement (one snapshot):
 --      public.dev_change_recovery_probe(zip, keys, scan) reads the cache clock, every development row's generation (equality, never
---      >= / max), the key binding, the stamps, the receipts and the readiness rows together. If not synchronised the observation
---      returns {status:'deferred'} and writes NOTHING; dev_change_tick does not advance the ZIP's cursor. With nothing new to
---      classify an unsynchronised ZIP is observed normally and readiness upkeep waits. The probe runs only when there is a new
---      comparable identity, a standing baseline, or a non-legacy receipt for the current generation; before any widening, never.
+--      >= / max), the key binding, the stamps, the durable continuity of THIS generation and the readiness rows together. If not
+--      synchronised the observation returns {status:'deferred'} and writes NOTHING; dev_change_tick does not advance the ZIP's cursor.
+--      With nothing new to classify an unsynchronised ZIP is observed normally and readiness upkeep waits.
 --   6. THE READER RULE moves with the decision owner: public.dev_change_event_reportable additionally excludes events with
 --      is_baseline = true. Today that excludes NOTHING (measured 2026-10-11: 0 of 50,183 ordinary-run events are is_baseline).
 --
@@ -53,9 +56,12 @@
 --
 -- RESIDUAL RISKS (stated; see docs/zip-scope-recovery-review-2026-10-11.md)
 --   * Records that arrive across a coverage gap (a break in complete expanded reads) are baselined silently, not announced.
---   * Receipts are kept 7 days: a baseline whose verified generation has been pruned cannot prove continuity and is re-baselined.
---   * A response whose receipt is never recorded (lost / refused) leaves that generation without evidence: new stamped records are HELD.
---   * Until the receipt PR is deployed and its collect job scheduled there are NO receipts: every stamped record is held (fail closed).
+--   * Until docs/dev-source-receipt.sql is applied there is no continuity: every stamped record is held (fail closed). The receipt
+--     starts empty, so the first complete expanded read of each source is a baseline, never news.
+--   * A receipt trigger that cannot record a generation (it never blocks the collector) leaves that generation without evidence:
+--     new stamped records are HELD until a later complete read re-baselines.
+--   * The collector (dev_refresh_collect) is a known recorded-timeout incident, separate from this work; the trigger adds measured
+--     per-generation work to it (docs/zip-scope-recovery-review-2026-10-11.md §3), it does not fix or hide it.
 --
 -- HOW IT IS APPLIED: by splicing the LIVE bodies (pg_get_functiondef) at apply time — never a retyped copy (CLAUDE.md
 -- ingest rule 7). It refuses unless the live bodies fingerprint to the ones this was written against, proves each splice
@@ -73,8 +79,9 @@ begin
      or to_regclass('public.dev_change_event_reportable') is null
      or to_regprocedure('public.dev_sites_deduped(text)') is null
      or to_regprocedure('public.app_source_key(jsonb)') is null
-     or to_regclass('public.dev_refresh_source_receipt') is null or to_regclass('public.dev_source_receipt_current') is null then
-    raise exception 'dev_change_recovery: the ledger, its tick, the reportable view, dev_sites_deduped, app_source_key or the source completion receipt (docs/dev-source-receipt.sql) is missing';
+     or to_regclass('public.dev_source_continuity') is null or to_regclass('public.dev_source_continuity_state') is null
+     or to_regclass('public.dev_refresh_generation') is null then
+    raise exception 'dev_change_recovery: the ledger, its tick, the reportable view, dev_sites_deduped, app_source_key or the accepted-generation receipt and durable source continuity (docs/dev-source-receipt.sql) is missing';
   end if;
   if to_regprocedure('pg_input_is_valid(text, text)') is null then
     raise exception 'dev_change_recovery: pg_input_is_valid (PostgreSQL 16+) is required to read generation stamps without raising';
@@ -119,16 +126,23 @@ revoke all on public.dev_change_recovery from public, anon, authenticated, servi
 grant select, insert on public.dev_change_recovery to service_role;
 
 -- READINESS: the minimal durable evidence that a source's expanded coverage in a ZIP has a verified baseline. State, not
--- history (history is dev_change_recovery, the ledger and the receipts): one row per ZIP x source, updated in place by the one
--- writer. It is bound to the SCOPE VERSION the baseline was taken under; a different version is a different baseline.
+-- history (history is dev_change_recovery and the ledger; the continuity of the SOURCE is dev_source_continuity, owned by
+-- docs/dev-source-receipt.sql): one row per ZIP x source, updated in place by the one writer. The baseline is bound to the SCOPE
+-- VERSION it was taken under (a different version is a different baseline) and to the continuity GENERATION it was verified at:
+-- it is CONTINUOUS now iff baseline_gen_seq >= the source's break_seq. No receipt history, and so no retention window, is involved.
 create table if not exists public.dev_change_scope_ready (
   zip                  text not null,
   registry_id          text not null,
-  scope_version        text not null,
-  established_cache_at timestamptz not null,   -- the generation whose complete expanded receipt baselined the pair
+  scope_version        text,                   -- version of the standing baseline; null = none yet
+  baseline_gen_seq     bigint,                 -- the continuity generation the baseline was last verified at; null = no baseline
+  established_cache_at timestamptz,            -- the cache generation at which the standing run of baselines was (re-)established
   established_run_id   uuid references public.dev_change_run (id),
-  verified_cache_at    timestamptz not null,   -- the newest generation with a complete expanded receipt at this version
-  lapsed_at            timestamptz,            -- set when an observation saw the pair NOT complete+expanded; reported, not silent
+  verified_cache_at    timestamptz,            -- the newest cache generation whose complete expanded read verified it
+  lapsed_at            timestamptz,            -- set when an observation saw the pair NOT complete+expanded while a baseline stood
+  held_observations    bigint not null default 0,            -- new identities HELD (not observed) because this source was not clean
+  quiet_rebaselined_identities bigint not null default 0,    -- new identities recorded as coverage recovery (the baseline / a re-baseline)
+  rebaseline_events    integer not null default 0,           -- times a standing baseline was re-established after a break
+  last_rebaseline_at   timestamptz,
   rule_version         smallint not null,
   primary key (zip, registry_id)
 );
@@ -136,20 +150,59 @@ alter table public.dev_change_scope_ready enable row level security;
 revoke all on public.dev_change_scope_ready from public, anon, authenticated, service_role;
 grant select, insert, update on public.dev_change_scope_ready to service_role;
 
--- The unhealthy sources, explicitly: pairs whose newest receipt is not a complete expanded read, plus pairs with a baseline that
--- is suspended. A persistently incomplete source stays here until a complete expanded read replaces it.
+-- MONITORING HEALTH, explicitly, per ZIP x source. Expected sources are derived from state that already exists (the durable
+-- continuity rows and the ledger's readiness rows) — there is no registry of its own — so a source with no current row anywhere
+-- still shows. monitoring_state:
+--   complete_verified               a verified, continuous baseline stands and the latest generation continues it
+--   initial_baseline_pending        a complete expanded read is on record; the ledger has not baselined it yet
+--   rebaseline_in_progress          a break happened; the next observation re-baselines quietly
+--   monitoring_restored             re-established after a gap within the last 7 days
+--   suspended                       a baseline WAS established and the source is now impaired (the cause is in continuity_state)
+--   failed_or_incomplete | legacy_scope_fallback | source_not_reported | no_accepted_generation_evidence
+--                                   impaired with no baseline yet (the same causes)
+--   scope_version_changed           the source/polygon identity moved; the old baseline is not inherited
+--   collection_delayed              the cache itself has not been refreshed for 72 hours
+--   no_accepted_generation_evidence a readiness row exists but no accepted generation has ever been recorded for it
+--   legacy_scope | retired          informational: never expanded / explained retirement
 create or replace view public.dev_change_scope_health with (security_invoker = true) as
-select c.zip, c.registry_id, c.scope, c.scope_version, c.complete, c.tick_at, c.describes_current_cache,
-       (s.zip is not null) as has_baseline, s.lapsed_at is not null as baseline_suspended, s.scope_version as baseline_version
-  from public.dev_source_receipt_current c
-  left join public.dev_change_scope_ready s on s.zip = c.zip and s.registry_id = c.registry_id
- where c.scope in ('fallback', 'failed') or (c.scope = 'expanded' and not c.complete) or s.lapsed_at is not null;
+select coalesce(c.zip, r.zip) as zip, coalesce(c.registry_id, r.registry_id) as registry_id,
+       case
+         when c.registry_id is null                                                      then 'no_accepted_generation_evidence'
+         when c.continuity_state in ('retired', 'legacy_scope')                          then c.continuity_state
+         when c.continuity_state in ('failed_or_incomplete', 'legacy_scope_fallback', 'source_not_reported',
+                                     'no_accepted_generation_evidence') and r.baseline_gen_seq is not null then 'suspended'
+         when c.continuity_state in ('failed_or_incomplete', 'legacy_scope_fallback', 'source_not_reported',
+                                     'no_accepted_generation_evidence')                  then c.continuity_state
+         when c.continuity_state = 'collection_delayed'                                  then 'collection_delayed'
+         when r.baseline_gen_seq is null                                                 then 'initial_baseline_pending'
+         when r.scope_version is distinct from c.scope_version                           then 'scope_version_changed'
+         when r.baseline_gen_seq < c.break_seq                                           then 'rebaseline_in_progress'
+         when c.last_restored_at is not null and c.last_restored_at > now() - interval '7 days'
+              and r.established_cache_at >= c.last_restored_at                           then 'monitoring_restored'
+         else 'complete_verified' end as monitoring_state,
+       c.continuity_state, c.scope, c.scope_version, c.complete, c.gen_seq, c.break_seq, c.break_reason, c.describes_current_cache,
+       r.baseline_gen_seq, r.scope_version as baseline_version, r.lapsed_at is not null as baseline_suspended,
+       c.impaired_since, c.gap_generations, c.gaps_total, c.gap_seconds_total, c.last_gap_seconds, c.last_restored_at,
+       r.held_observations, r.quiet_rebaselined_identities, r.rebaseline_events, r.last_rebaseline_at
+  from public.dev_source_continuity_state c
+  full join public.dev_change_scope_ready r on r.zip = c.zip and r.registry_id = c.registry_id;
 revoke all on public.dev_change_scope_health from public, anon, authenticated, service_role;
 grant select on public.dev_change_scope_health to service_role;
 
+-- The census: how many ZIP x source pairs are in each state, plus the ZIPs that hold a cache with NO accepted-generation evidence
+-- at all (never recorded since the receipt trigger was installed).
+create or replace view public.dev_monitoring_coverage with (security_invoker = true) as
+select h.monitoring_state, count(*)::bigint as pairs from public.dev_change_scope_health h group by 1
+union all
+select 'zip_without_any_generation_evidence', count(*)::bigint
+  from public.development_reports d
+ where d.refreshed_at is not null and not exists (select 1 from public.dev_source_continuity c where c.zip = d.zip);
+revoke all on public.dev_monitoring_coverage from public, anon, authenticated, service_role;
+grant select on public.dev_monitoring_coverage to service_role;
+
 -- ---- 2. THE RULE VERSION AND THE PROBE ---------------------------------------------------------------------------------
 create or replace function public.dev_change_recovery_rule_version() returns smallint
-language sql immutable as $$ select 4::smallint $$;
+language sql immutable as $$ select 5::smallint $$;
 
 -- THE PROBE. ONE SQL statement = ONE snapshot, so the generation check, the binding of the identities being classified,
 -- the stamp read, the source receipts and the readiness rows cannot straddle a concurrent collector write, receipt write or
@@ -215,25 +268,21 @@ language sql stable security definer set search_path = public, pg_temp as $fn$
                and coalesce(d.el->>'record_url', d.el->>'url','') <> ''
                and public.app_source_key(d.el) is not null) x
   ), rc as (
-    select distinct on (r.registry_id) r.registry_id as reg, r.scope, r.scope_version as ver, r.complete
-      from public.dev_refresh_source_receipt r
-     where (select want.on from want) and r.zip = p_zip and r.registry_id <> '' and r.tick_at = (select c.refreshed_at from c)
-     order by r.registry_id, r.response_id desc
+    -- the DURABLE continuity of each source for THIS cache generation (written by the accepted-generation trigger in the same
+    -- transaction as the cache write): a source with no row whose last_tick_at is the cache clock has no evidence for it
+    select sc.registry_id as reg, sc.scope, sc.scope_version as ver, sc.complete, sc.gen_seq, sc.break_seq
+      from public.dev_source_continuity sc
+     where (select want.on from want) and sc.zip = p_zip and sc.last_tick_at = (select c.refreshed_at from c)
   ), rd as (
-    select sr.registry_id as reg, sr.scope_version as ver, sr.verified_cache_at as vat, sr.lapsed_at
+    select sr.registry_id as reg, sr.scope_version as ver, sr.baseline_gen_seq as bgs
       from public.dev_change_scope_ready sr where (select want.on from want) and sr.zip = p_zip
   ), src as (
-    select rc.reg, rc.scope, rc.ver, rc.complete,
-           (rd.reg is not null) as baseline,
-           (rc.scope = 'expanded' and rc.complete and rd.reg is not null and rd.lapsed_at is null and rd.ver = rc.ver
-            and exists (select 1 from public.dev_refresh_source_receipt a
-                         where a.zip = p_zip and a.registry_id = rc.reg and a.tick_at = rd.vat
-                           and a.scope = 'expanded' and a.complete and a.scope_version = rd.ver)
-            and not exists (select 1 from public.dev_refresh_source_receipt b
-                             where b.zip = p_zip and b.tick_at > rd.vat and b.tick_at < (select c.refreshed_at from c)
-                               and ((b.registry_id = rc.reg and not (b.scope = 'expanded' and b.complete and b.scope_version = rd.ver))
-                                    or (b.registry_id = '' and b.scope = 'lost')))
-           ) as continuous
+    select rc.reg, rc.scope, rc.ver, rc.complete, rc.gen_seq, rc.break_seq,
+           (rd.bgs is not null) as baseline,
+           -- CONTINUOUS: a complete EXPANDED read now, a baseline at the SAME version, taken at or after the source's last break
+           -- (every generation since was therefore a complete read of the same scope, observed or not), and not from the future
+           (rc.scope = 'expanded' and rc.complete and rd.bgs is not null and rd.ver = rc.ver
+            and rd.bgs >= rc.break_seq and rd.bgs <= rc.gen_seq) as continuous
       from rc left join rd on rd.reg = rc.reg
   )
   select v.reason in ('ok', 'no_cache'),
@@ -243,6 +292,7 @@ language sql stable security definer set search_path = public, pg_temp as $fn$
          (select k.requested from k), (select k.unmatched from k),
          coalesce((select array_agg(distinct st.sk) from st where st.sk = any(p_keys)), '{}'::text[]),
          coalesce((select jsonb_agg(jsonb_build_object('reg', src.reg, 'scope', src.scope, 'version', src.ver, 'complete', src.complete,
+                                                      'gen_seq', src.gen_seq, 'break_seq', src.break_seq,
                                                       'baseline', src.baseline, 'continuous', src.continuous)) from src), '[]'::jsonb)
     from v
 $fn$;
@@ -272,7 +322,7 @@ begin
           E'  _newconf integer := 0;  -- new identities recorded non-comparable because their copies already contradict\n  _rec_supp integer := 0;   -- dev_change_recovery: stamped first sightings classified as coverage recovery (not news)\n  _rec_keys text[];         -- dev_change_recovery: the new comparable identities to classify\n  _rp record;               -- dev_change_recovery: the synchronisation probe\n  _rec_cache_at timestamptz; -- dev_change_recovery: the cache generation the probe saw\n  _rec_held integer := 0;   -- dev_change_recovery: stamped first sightings HELD (not observed) because their source was not clean\n  _rdy_ok integer := 0;     -- dev_change_recovery: ZIP x source readiness rows established or re-verified\n  _rdy_lapsed integer := 0; -- dev_change_recovery: readiness rows lapsed (the widening is no longer evidenced)\nbegin'],
     -- classification, before the new identities are written
     array[E'  -- New identities (state first, so events can reference them). One whose copies already contradict is',
-          E'  -- dev_change_recovery (rule_version 4): classify first sightings of identities the polygon widening alone reached, per ZIP x\n  -- source x SCOPE VERSION, from the source COMPLETION RECEIPT of this very cache generation (docs/dev-source-receipt.sql), never by\n  -- date and never from the absence of a failure. Receipt = a complete EXPANDED read and a CONTINUOUS verified baseline at the same\n  -- version -> an ordinary first_detected (a genuine arrival). Complete expanded read but no continuous baseline -> coverage_recovered\n  -- (the baseline, or a re-baseline after any break). No receipt / incomplete / fallback / failed -> HELD: the identity is not created\n  -- now, so a later complete read classifies it. A pair is baselined by its receipt ALONE: a complete expanded read with an empty ring\n  -- establishes readiness, so the first record to arrive afterwards is news. Ordinary runs only. The probe runs when there is a\n  -- comparable new identity, a standing baseline, or a non-legacy receipt for the current generation, in ONE statement (one snapshot).\n  -- Nothing has been written yet, so deferring here is clean; the tick retries the ZIP. Evaluated by the one writer.\n  create temp table if not exists _dc_recovery (identity_key text primary key, outcome text not null) on commit delete rows;\n  create temp table if not exists _dc_scopecls (identity_key text primary key, cls text not null) on commit delete rows;\n  create temp table if not exists _dc_scopesrc (reg text primary key, scope text, ver text, complete boolean, baseline boolean, continuous boolean) on commit delete rows;\n  truncate _dc_recovery;\n  truncate _dc_scopecls;\n  truncate _dc_scopesrc;\n  if not _baseline then\n    select array_agg(o.identity_key) into _rec_keys\n      from _dc_obs o\n     where o.is_new and o.here_comparable\n       and not exists (select 1 from _dc_conflict k where k.identity_key = o.identity_key);\n    if _rec_keys is not null\n       or exists (select 1 from public.dev_change_scope_ready r where r.zip = p_zip and r.lapsed_at is null)\n       or exists (select 1 from public.dev_refresh_source_receipt rr\n                    join public.development_reports dd on dd.zip = rr.zip and dd.refreshed_at = rr.tick_at\n                   where rr.zip = p_zip and rr.scope in (''expanded'', ''fallback'', ''failed'')) then\n      select * into _rp from public.dev_change_recovery_probe(p_zip, coalesce(_rec_keys, ''{}''::text[]), true);\n      -- A deferral is needed only when an identity must be classified; with nothing new, an unsynchronised ZIP is simply\n      -- observed as before and the readiness upkeep below waits for a synchronised generation.\n      if not _rp.synchronized and _rec_keys is not null then\n        return jsonb_build_object(''status'', ''deferred'', ''reason'', _rp.reason, ''zip'', p_zip);\n      end if;\n      _rec_cache_at := _rp.cache_refreshed_at;\n      if _rp.synchronized and _rp.reason = ''ok'' then\n        insert into _dc_scopesrc (reg, scope, ver, complete, baseline, continuous)\n        select x.reg, x.scope, x.version, x.complete, x.baseline, x.continuous\n          from jsonb_to_recordset(_rp.sources) as x(reg text, scope text, version text, complete boolean, baseline boolean, continuous boolean);\n        insert into _dc_scopecls (identity_key, cls)\n        select o.identity_key,\n               case when s.reg is null or s.scope <> ''expanded'' or not s.complete then ''hold''\n                    when s.continuous then ''genuine''\n                    else ''recover'' end\n          from _dc_obs o left join _dc_scopesrc s on s.reg = coalesce(o.registry_id, '''')\n         where o.identity_key = any(_rp.stamped_keys);\n        insert into _dc_recovery (identity_key, outcome)\n        select c.identity_key, ''coverage_recovered'' from _dc_scopecls c where c.cls = ''recover'';\n        get diagnostics _rec_supp = row_count;\n        delete from _dc_obs o using _dc_scopecls c where c.identity_key = o.identity_key and c.cls = ''hold'';\n        get diagnostics _rec_held = row_count;\n        -- READINESS, per source: a complete expanded read verifies (or, after any break, re-establishes) the baseline at its version\n        insert into public.dev_change_scope_ready as sr\n          (zip, registry_id, scope_version, established_cache_at, established_run_id, verified_cache_at, rule_version)\n        select p_zip, s.reg, s.ver, _rec_cache_at, p_run, _rec_cache_at, public.dev_change_recovery_rule_version()\n          from _dc_scopesrc s where s.scope = ''expanded'' and s.complete\n        on conflict (zip, registry_id) do update\n          set scope_version = excluded.scope_version,\n              verified_cache_at = excluded.verified_cache_at,\n              established_cache_at = case when (select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id) then sr.established_cache_at else excluded.established_cache_at end,\n              established_run_id = case when (select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id) then sr.established_run_id else excluded.established_run_id end,\n              lapsed_at = null,\n              rule_version = excluded.rule_version;\n        get diagnostics _rdy_ok = row_count;\n        -- …and a source that is NOT a complete expanded read this generation (incomplete, fallback, legacy, failed, or missing from a\n        -- ZIP that has receipts) SUSPENDS its own baseline, explicitly and independently of every other source.\n        if exists (select 1 from _dc_scopesrc) then\n          update public.dev_change_scope_ready r set lapsed_at = now()\n           where r.zip = p_zip and r.lapsed_at is null\n             and not exists (select 1 from _dc_scopesrc s where s.reg = r.registry_id and s.scope = ''expanded'' and s.complete);\n          get diagnostics _rdy_lapsed = row_count;\n        end if;\n      end if;\n    end if;\n  end if;\n\n  -- New identities (state first, so events can reference them). One whose copies already contradict is'],
+          E'  -- dev_change_recovery (rule_version 5): classify first sightings of identities the polygon widening alone reached, per ZIP x\n  -- source x SCOPE VERSION, from the DURABLE SOURCE CONTINUITY of this very cache generation (docs/dev-source-receipt.sql: the\n  -- accepted-generation receipt, bound to the accepted cache write), never by date and never from the absence of a failure.\n  --   complete expanded read AND a baseline taken at or after the source''s last break, same version -> ordinary first_detected\n  --   complete expanded read, no such baseline (first, version change, or ANY break) ................. coverage_recovered (quiet)\n  --   incomplete / fallback / legacy / failed / unattributed / no continuity row ..................... HELD (not observed; retried)\n  -- A pair is baselined by its continuity row ALONE: a complete expanded read with an empty ring establishes readiness, so the\n  -- first record to arrive afterwards is news. Ordinary runs only. The probe runs when there is a comparable new identity, a\n  -- standing baseline, or an expanded source for the current generation, in ONE statement (one snapshot). Nothing has been\n  -- written yet, so deferring here is clean; the tick retries the ZIP. Evaluated by the one writer.\n  create temp table if not exists _dc_recovery (identity_key text primary key, outcome text not null) on commit delete rows;\n  create temp table if not exists _dc_scopecls (identity_key text primary key, cls text not null) on commit delete rows;\n  create temp table if not exists _dc_scopesrc (reg text primary key, scope text, ver text, complete boolean, gen_seq bigint, break_seq bigint, baseline boolean, continuous boolean) on commit delete rows;\n  create temp table if not exists _dc_scopecnt (reg text primary key, held bigint not null, rec bigint not null) on commit delete rows;\n  truncate _dc_recovery;\n  truncate _dc_scopecls;\n  truncate _dc_scopesrc;\n  truncate _dc_scopecnt;\n  if not _baseline then\n    select array_agg(o.identity_key) into _rec_keys\n      from _dc_obs o\n     where o.is_new and o.here_comparable\n       and not exists (select 1 from _dc_conflict k where k.identity_key = o.identity_key);\n    if _rec_keys is not null\n       or exists (select 1 from public.dev_change_scope_ready r where r.zip = p_zip and r.baseline_gen_seq is not null)\n       or exists (select 1 from public.dev_source_continuity cc\n                    join public.development_reports dd on dd.zip = cc.zip and dd.refreshed_at = cc.last_tick_at\n                   where cc.zip = p_zip and cc.ever_expanded) then\n      select * into _rp from public.dev_change_recovery_probe(p_zip, coalesce(_rec_keys, ''{}''::text[]), true);\n      -- A deferral is needed only when an identity must be classified; with nothing new, an unsynchronised ZIP is simply\n      -- observed as before and the readiness upkeep below waits for a synchronised generation.\n      if not _rp.synchronized and _rec_keys is not null then\n        return jsonb_build_object(''status'', ''deferred'', ''reason'', _rp.reason, ''zip'', p_zip);\n      end if;\n      _rec_cache_at := _rp.cache_refreshed_at;\n      if _rp.synchronized and _rp.reason = ''ok'' then\n        insert into _dc_scopesrc (reg, scope, ver, complete, gen_seq, break_seq, baseline, continuous)\n        select x.reg, x.scope, x.version, x.complete, x.gen_seq, x.break_seq, x.baseline, x.continuous\n          from jsonb_to_recordset(_rp.sources) as x(reg text, scope text, version text, complete boolean, gen_seq bigint, break_seq bigint, baseline boolean, continuous boolean);\n        insert into _dc_scopecls (identity_key, cls)\n        select o.identity_key,\n               case when s.reg is null or s.scope <> ''expanded'' or not s.complete then ''hold''\n                    when s.continuous then ''genuine''\n                    else ''recover'' end\n          from _dc_obs o left join _dc_scopesrc s on s.reg = coalesce(o.registry_id, '''')\n         where o.identity_key = any(_rp.stamped_keys);\n        insert into _dc_scopecnt (reg, held, rec)\n        select coalesce(o.registry_id, ''''), count(*) filter (where c.cls = ''hold''), count(*) filter (where c.cls = ''recover'')\n          from _dc_scopecls c join _dc_obs o on o.identity_key = c.identity_key\n         group by 1;\n        insert into _dc_recovery (identity_key, outcome)\n        select c.identity_key, ''coverage_recovered'' from _dc_scopecls c where c.cls = ''recover'';\n        get diagnostics _rec_supp = row_count;\n        delete from _dc_obs o using _dc_scopecls c where c.identity_key = o.identity_key and c.cls = ''hold'';\n        get diagnostics _rec_held = row_count;\n        -- READINESS, per source and independently: a complete expanded read verifies (or, after ANY break, re-establishes) the\n        -- baseline at its version and generation; the per-source counts of held and quietly re-baselined identities ride along.\n        insert into public.dev_change_scope_ready as sr\n          (zip, registry_id, scope_version, baseline_gen_seq, established_cache_at, established_run_id, verified_cache_at,\n           held_observations, quiet_rebaselined_identities, rule_version)\n        select p_zip, u.reg,\n               case when s.scope = ''expanded'' and s.complete then s.ver end,\n               case when s.scope = ''expanded'' and s.complete then s.gen_seq end,\n               case when s.scope = ''expanded'' and s.complete then _rec_cache_at end,\n               case when s.scope = ''expanded'' and s.complete then p_run end,\n               case when s.scope = ''expanded'' and s.complete then _rec_cache_at end,\n               coalesce(n.held, 0), coalesce(n.rec, 0), public.dev_change_recovery_rule_version()\n          from (select reg from _dc_scopesrc union select reg from _dc_scopecnt) u\n          left join _dc_scopesrc s on s.reg = u.reg\n          left join _dc_scopecnt n on n.reg = u.reg\n         where (s.scope = ''expanded'' and s.complete) or coalesce(n.held, 0) > 0 or coalesce(n.rec, 0) > 0\n        on conflict (zip, registry_id) do update\n          set scope_version = coalesce(excluded.scope_version, sr.scope_version),\n              baseline_gen_seq = coalesce(excluded.baseline_gen_seq, sr.baseline_gen_seq),\n              verified_cache_at = coalesce(excluded.verified_cache_at, sr.verified_cache_at),\n              established_cache_at = case when excluded.baseline_gen_seq is null\n                                            or coalesce((select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id), false)\n                                          then sr.established_cache_at else excluded.established_cache_at end,\n              established_run_id = case when excluded.baseline_gen_seq is null\n                                          or coalesce((select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id), false)\n                                        then sr.established_run_id else excluded.established_run_id end,\n              rebaseline_events = sr.rebaseline_events + case when excluded.baseline_gen_seq is not null and sr.baseline_gen_seq is not null\n                                    and not coalesce((select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id), false) then 1 else 0 end,\n              last_rebaseline_at = case when excluded.baseline_gen_seq is not null and sr.baseline_gen_seq is not null\n                                    and not coalesce((select x.continuous from _dc_scopesrc x where x.reg = sr.registry_id), false)\n                                   then now() else sr.last_rebaseline_at end,\n              lapsed_at = case when excluded.baseline_gen_seq is not null then null else sr.lapsed_at end,\n              held_observations = sr.held_observations + excluded.held_observations,\n              quiet_rebaselined_identities = sr.quiet_rebaselined_identities + excluded.quiet_rebaselined_identities,\n              rule_version = excluded.rule_version;\n        _rdy_ok := (select count(*) from _dc_scopesrc x where x.scope = ''expanded'' and x.complete);\n        -- …and a source that is NOT a complete expanded read this generation (incomplete, fallback, legacy, failed, unattributed,\n        -- or missing) SUSPENDS its own standing baseline, explicitly and independently of every other source.\n        update public.dev_change_scope_ready r set lapsed_at = now()\n         where r.zip = p_zip and r.baseline_gen_seq is not null and r.lapsed_at is null\n           and not exists (select 1 from _dc_scopesrc s where s.reg = r.registry_id and s.scope = ''expanded'' and s.complete);\n        get diagnostics _rdy_lapsed = row_count;\n      end if;\n    end if;\n  end if;\n\n  -- New identities (state first, so events can reference them). One whose copies already contradict is'],
     -- the first_detected insert: not news when classified as recovery
     array[E'  select o.identity_key, ''first_detected'', not _baseline, _baseline, o.observed_at, null, o.facts, null,\n         o.fp, ''{}''::text[], o.date_kind, o.submitted_at, o.registry_id, _dv, _fv, p_run\n    from _dc_obs o\n   where o.is_new and o.here_comparable\n',
           E'  select o.identity_key, ''first_detected'',\n         not (_baseline or rc.identity_key is not null),\n         (_baseline or rc.identity_key is not null),\n         o.observed_at, null, o.facts, null,\n         o.fp, ''{}''::text[], o.date_kind, o.submitted_at, o.registry_id, _dv, _fv, p_run\n    from _dc_obs o left join _dc_recovery rc on rc.identity_key = o.identity_key\n   where o.is_new and o.here_comparable\n'],

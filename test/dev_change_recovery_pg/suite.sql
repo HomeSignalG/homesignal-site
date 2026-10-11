@@ -109,8 +109,8 @@ select pg_temp.chk('S15 …and its later genuine change IS announced',
 
 -- ── 4. SYNCHRONISATION AT OBSERVATION LEVEL (the probe runs only when a new identity must be classified) ──
 -- 4a. the cache moved on (newer clock) and now holds a new stamped record; its row exists only from the PREVIOUS generation
-update public.development_reports set refreshed_at = now() - interval '2 hours',
-       sites = sites || jsonb_build_array(public.sim_site('R12','Issued','2021-05-05', true)) where zip='76258';
+select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258') || jsonb_build_array(public.sim_site('R12','Issued','2021-05-05', true)),
+                          now() - interval '2 hours', false);
 insert into public.app_projects (zip, name, type, status, stage, submitted_at, date_kind, record_kind, registry_id, provenance, source_key, source_key_basis, source_seq)
 select '76258','Permit R12','Industrial','Proposed','Issued','2021-05-05','filed','development','fixture',
        jsonb_build_object('refreshed_at', now() - interval '5 hours'), public.app_source_key(public.sim_site('R12','Issued','2021-05-05', true)),
@@ -286,7 +286,7 @@ select pg_temp.chk('S33 the audit and readiness tables are RLS-protected',
   and (select relrowsecurity from pg_class where oid='public.dev_change_scope_ready'::regclass));
 select pg_temp.chk('S34 events stay immutable', (select count(*) from pg_trigger where tgrelid='public.dev_change_event'::regclass and not tgisinternal) >= 1);
 select pg_temp.chk('S35 the rule no longer carries a date window: no news_days function exists',
-  to_regprocedure('public.dev_change_recovery_news_days()') is null and public.dev_change_recovery_rule_version() = 4);
+  to_regprocedure('public.dev_change_recovery_news_days()') is null and public.dev_change_recovery_rule_version() = 5);
 
 -- ── 9. INCOMPLETE OR FAILED SOURCE: cannot establish readiness, and nothing is inferred ─────────────────────────────
 select public.sim_refresh('76290', jsonb_build_array(public.sim_site('U0','Issued','2024-01-01')), now() - interval '30 hours');
@@ -299,19 +299,20 @@ select pg_temp.chk('U01 a stamped record of an INCOMPLETE source is HELD: no ide
   not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:X1') and (select count(*) from pg_temp.ev('X1')) = 0
   and ((:'u_res'::jsonb)->>'coverage_held')::int = 1, :'u_res');
 select pg_temp.chk('U02 …and that source did NOT become ready, while the complete source in the same ZIP did and its record is the baseline',
-  not exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx')
-  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fy' and lapsed_at is null)
+  not exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx' and baseline_gen_seq is not null)
+  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fy' and lapsed_at is null and baseline_gen_seq is not null)
   and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:X2') and pg_temp.rep('X2') = 0);
 select pg_temp.chk('U02b the incomplete source is explicitly UNHEALTHY in the report view',
-  exists (select 1 from public.dev_change_scope_health where zip='76290' and registry_id='fx' and scope='expanded' and not complete)
-  and not exists (select 1 from public.dev_change_scope_health where zip='76290' and registry_id='fy'));
+  exists (select 1 from public.dev_change_scope_health where zip='76290' and registry_id='fx' and scope='expanded' and not complete
+          and monitoring_state = 'failed_or_incomplete' and held_observations = 1)
+  and not pg_temp.unhealthy('76290', 'fy'));
 select public.sim_refresh('76290', (select sites from public.development_reports where zip='76290'), now() - interval '8 hours');   -- next generation: complete
 select public.sim_observe('76290');
 select pg_temp.chk('U03 the next COMPLETE read baselines the held record silently and makes the source READY',
   exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:X1') and pg_temp.rep('X1') = 0
-  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx' and lapsed_at is null));
+  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx' and lapsed_at is null and baseline_gen_seq is not null));
 select pg_temp.chk('U03b …and it leaves the unhealthy list',
-  not exists (select 1 from public.dev_change_scope_health where zip='76290' and registry_id='fx'));
+  not pg_temp.unhealthy('76290', 'fx'));
 -- a FAILED fetch and a FALLBACK are as disqualifying as truncation
 select public.sim_refresh('76291', jsonb_build_array(public.sim_site('V0','Issued','2024-01-01')), now() - interval '30 hours');
 select public.sim_observe('76291', true);
@@ -330,7 +331,8 @@ select public.sim_refresh('76292', jsonb_build_array(public.sim_site('W0','Issue
 select public.sim_observe('76292') as res \gset w0_
 select pg_temp.chk('U05 a stamped record with NO receipt is HELD (the absence of evidence is not evidence of completeness)',
   not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:W1') and ((:'w0_res'::jsonb)->>'coverage_held')::int = 1
-  and not exists (select 1 from public.dev_change_scope_ready where zip='76292'), :'w0_res');
+  and not exists (select 1 from public.dev_change_scope_ready where zip='76292' and baseline_gen_seq is not null)
+  and exists (select 1 from public.dev_change_scope_health where zip='76292' and registry_id='fq' and monitoring_state = 'no_accepted_generation_evidence'), :'w0_res');
 
 -- ── 10. FALLBACK DURING THE FIRST EXPANSION cannot establish readiness ───────────────────────────────────────────────
 select public.sim_refresh('76296', jsonb_build_array(public.sim_site('F0','Issued','2024-01-01')), now() - interval '30 hours');
@@ -374,9 +376,12 @@ select pg_temp.chk('X01 no 5-digit ZIP literal and no source id in the probe or 
   and (select count(*) from pg_proc where proname = 'dev_change_observe_zip' and prosrc like '%dev_change_scope_ready%') = 1);
 
 -- ── 13. EMPTY EXPANDED COVERAGE: a complete expanded read with ZERO widened-only records baselines the pair ───────────────
+create or replace function pg_temp.unhealthy(p_zip text, p_reg text) returns boolean language sql as
+$$ select exists (select 1 from public.dev_change_scope_health h where h.zip = p_zip and h.registry_id = p_reg
+                   and h.monitoring_state in ('suspended','failed_or_incomplete','legacy_scope_fallback','source_not_reported','no_accepted_generation_evidence')) $$;
 create or replace function pg_temp.cache(p_zip text) returns jsonb language sql as $$ select sites from public.development_reports where zip = p_zip $$;
 create or replace function pg_temp.ready(p_zip text, p_reg text) returns text language sql as
-$$ select coalesce((select scope_version || case when lapsed_at is null then '' else '(suspended)' end from public.dev_change_scope_ready where zip = p_zip and registry_id = p_reg), '(none)') $$;
+$$ select coalesce((select scope_version || case when lapsed_at is null then '' else '(suspended)' end from public.dev_change_scope_ready where zip = p_zip and registry_id = p_reg and baseline_gen_seq is not null), '(none)') $$;
 select public.sim_refresh('76300', jsonb_build_array(public.sim_site('nE0','Issued','2024-01-01')), now() - interval '40 hours');
 select public.sim_observe('76300', true);
 select public.sim_refresh('76300', pg_temp.cache('76300'), now() - interval '30 hours', true, '[{"reg":"fixture","scope":"expanded","complete":true}]'::jsonb);   -- NO ring records
@@ -412,8 +417,8 @@ select pg_temp.chk('M02 A and C keep their baselines and announce their new arri
 select pg_temp.chk('M03 B alone is SUSPENDED (its baseline is not kept ready by A or C) and listed as unhealthy',
   pg_temp.ready('76301','sb') = 'v1:A(suspended)' and pg_temp.ready('76301','sa') = 'v1:A' and pg_temp.ready('76301','sc') = 'v1:A'
   and ((:'m2_res'::jsonb)->>'scope_ready_suspended')::int = 1
-  and exists (select 1 from public.dev_change_scope_health where zip='76301' and registry_id='sb' and baseline_suspended and scope='fallback')
-  and not exists (select 1 from public.dev_change_scope_health where zip='76301' and registry_id in ('sa','sc')));
+  and exists (select 1 from public.dev_change_scope_health where zip='76301' and registry_id='sb' and baseline_suspended and scope='fallback' and monitoring_state = 'suspended')
+  and not pg_temp.unhealthy('76301', 'sa') and not pg_temp.unhealthy('76301', 'sc'));
 -- B returns with a NEW record published during its gap, while A also gains one
 select public.sim_refresh('76301', pg_temp.cache('76301') || jsonb_build_array(public.sim_site('nB2','Issued','2022-01-02', true, 'filed', 'sb'),
    public.sim_site('nB1','Issued','2023-01-02', true, 'filed', 'sb'), public.sim_site('nA3','Issued',(current_date-1)::date, true, 'filed', 'sa')), now() - interval '30 hours');
@@ -422,7 +427,7 @@ select pg_temp.chk('M04 B returns: its record new across the gap (B2) is BASELIN
   pg_temp.rep('nB2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nB2')
   and (select count(*) from pg_temp.ev('nB1')) = 1 and pg_temp.rep('nA3') = 1);
 select pg_temp.chk('M05 B is READY again, re-established at this generation; the unhealthy list is empty',
-  pg_temp.ready('76301','sb') = 'v1:A' and not exists (select 1 from public.dev_change_scope_health where zip='76301'));
+  pg_temp.ready('76301','sb') = 'v1:A' and not pg_temp.unhealthy('76301','sa') and not pg_temp.unhealthy('76301','sb') and not pg_temp.unhealthy('76301','sc'));
 select public.sim_refresh('76301', pg_temp.cache('76301') || jsonb_build_array(public.sim_site('nB3','Issued',(current_date-1)::date, true, 'filed', 'sb')), now() - interval '20 hours');
 select public.sim_observe('76301');
 select pg_temp.chk('M06 after the re-established baseline B3 is announced', pg_temp.rep('nB3') = 1);
@@ -495,17 +500,46 @@ select public.sim_refresh('76305', pg_temp.cache('76305') || jsonb_build_array(p
 select public.sim_observe('76305');
 select pg_temp.chk('G02 …whereas an unobserved COMPLETE generation keeps continuity: the arrival is news', pg_temp.rep('nJ2') = 1);
 select pg_temp.mk_ready('76306', 'nI');
-delete from public.dev_refresh_source_receipt where zip = '76306' and tick_at = (select verified_cache_at from public.dev_change_scope_ready where zip = '76306');   -- retention pruned the anchor
+-- RETENTION: every diagnostic row (which response produced which generation) is long gone. The durable continuity does not depend on it.
+delete from public.dev_refresh_generation where zip = '76306';
 select public.sim_refresh('76306', pg_temp.cache('76306') || jsonb_build_array(public.sim_site('nI2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
 select public.sim_observe('76306');
-select pg_temp.chk('G03 a baseline whose verified generation is no longer on record cannot prove continuity: re-baselined, not announced',
-  pg_temp.rep('nI2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nI2'));
+select pg_temp.chk('G03 diagnostics pruned (seven-day retention) does NOT break continuity: the arrival is still news, not silently re-baselined',
+  pg_temp.rep('nI2') = 1 and not exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nI2'));
 select pg_temp.mk_ready('76307', 'nH');
-insert into public.dev_refresh_source_receipt (zip, registry_id, response_id, tick_at, scope, complete)
-  values ('76307', '', nextval('public.sim_resp_seq'), now() - interval '70 hours', 'lost', false);                  -- a response that vanished between the two
+-- a cache write NOBODY can attribute to a response (a direct update of the clock) between the two observations
+update public.development_reports set refreshed_at = now() - interval '70 hours' where zip = '76307';
 select public.sim_refresh('76307', pg_temp.cache('76307') || jsonb_build_array(public.sim_site('nH2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
 select public.sim_observe('76307');
-select pg_temp.chk('G04 a LOST response between the two observations is a break', pg_temp.rep('nH2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nH2'));
+select pg_temp.chk('G04 an UNATTRIBUTED cache write between the two observations is a break: the arrival is baselined, not announced',
+  pg_temp.rep('nH2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nH2'));
+select pg_temp.mk_ready('76330', 'nG');
+-- an accepted write whose response cannot be read (the cursor names a response that is gone)
+update public.development_reports set refreshed_at = now() - interval '70 hours', last_collected_response_id = nextval('public.sim_resp_seq') where zip = '76330';
+select public.sim_refresh('76330', pg_temp.cache('76330') || jsonb_build_array(public.sim_site('nG2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
+select public.sim_observe('76330');
+select pg_temp.chk('G05 an accepted-but-UNREADABLE generation (no evidence) is a break: the arrival is baselined, not announced',
+  pg_temp.rep('nG2') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nG2')
+  and exists (select 1 from public.dev_refresh_generation where zip = '76330' and outcome = 'unreadable'));
+select pg_temp.mk_ready('76331', 'nF');
+-- a REFUSED response (the cursor moves, the cache does not) is not a generation: the accepted one still describes the cache
+update public.development_reports set last_collected_response_id = nextval('public.sim_resp_seq') where zip = '76331';
+select pg_temp.chk('G06 a refused response leaves continuity untouched and still describing the current cache',
+  exists (select 1 from public.dev_source_continuity_state where zip = '76331' and describes_current_cache)
+  and (select count(*) from public.dev_refresh_generation where zip = '76331' and outcome = 'refused') = 1
+  and not exists (select 1 from public.dev_source_continuity c join public.development_reports d on d.zip = c.zip where c.zip = '76331' and c.last_tick_at <> d.refreshed_at));
+select public.sim_refresh('76331', pg_temp.cache('76331') || jsonb_build_array(public.sim_site('nF2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
+select public.sim_observe('76331');
+select pg_temp.chk('G07 …and the arrival after it is news (the refusal broke nothing)', pg_temp.rep('nF2') = 1);
+
+select pg_temp.mk_ready('76332', 'nU');
+select public.sim_refresh('76332', pg_temp.cache('76332') || jsonb_build_array(public.sim_site('nU2','Issued',(current_date-1)::date, true, 'filed')), now() - interval '60 hours');
+-- the durable row describes an EARLIER generation than the cache (the receipt for this one was never recorded): there is NO evidence
+update public.dev_source_continuity set last_tick_at = last_tick_at - interval '1 minute' where zip = '76332';
+select public.sim_observe('76332');
+select pg_temp.chk('K01 continuity that does not describe the CURRENT cache generation is no evidence: the new record is HELD, neither announced nor baselined',
+  pg_temp.rep('nU2') = 0 and not exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:nU2')
+  and not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:nU2')); 
 
 -- ── 18. A PERSISTENTLY INCOMPLETE SOURCE fails closed and stays reported ────────────────────────────────────────────
 select public.sim_refresh('76308', jsonb_build_array(public.sim_site('nP0','Issued','2024-01-01')), now() - interval '90 hours');

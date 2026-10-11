@@ -160,6 +160,23 @@ run_checks() {
   gen 73001 "$(EXP s1 v1)" >/dev/null
   t 'C04 continuity for a ZIP whose cache has been quiet for nine days survives other ZIPs generations and any diagnostic pruning' "$(C 73002 s1 "gen_seq||'/'||break_seq")" "1/1"
 
+  # ═══ E. the canary gate, bound to the exact request ═════════════════════════════════════════════════════════════════════════════
+  vg() { # zip request_id expected-array-literal
+    sed -e "s/'76258'::text as zip/'$1'::text as zip/" -e "s/0::bigint as request_id/$2::bigint as request_id/" -e "s/array\[''\]::text\[\] as expected_sources/$3::text[] as expected_sources/" \
+      "$root/scripts/verify-canary-generation.sql" | P -F'|' | awk -F'|' '{print $NF}'; }
+  Q "select public.t_reset()" >/dev/null; Q "select public.t_zip('74001')" >/dev/null
+  ce="$(gen 74001 "$(EXP s1 v1),$(EXP s2 v1)")"
+  t 'E01 the canary request that produced the accepted generation PASSES' "$(vg 74001 "$ce" "array['s1','s2']")" t
+  t 'E02 a different request id FAILS (the gate is bound to the one request)' "$(vg 74001 "$((ce+1))" "array['s1','s2']")" f
+  t 'E03 an expected source that is not monitored FAILS' "$(vg 74001 "$ce" "array['s1','s9']")" f
+  t 'E04 an EMPTY expected set FAILS (a zero proves nothing)' "$(vg 74001 "$ce" "array[]")" f
+  ce2="$(gen 74001 "$(EXP s1 v1),$(INC s2 v1)")"
+  t 'E05 once a LATER generation superseded it the earlier request FAILS (rerun the canary, do not infer)' "$(vg 74001 "$ce" "array['s1']")" f
+  t 'E06 an expected source with an open gap FAILS even though the generation was accepted' "$(vg 74001 "$ce2" "array['s1','s2']")" f
+  Q "select public.t_zip('74002', '[]', '{\"development\":3}', '1 hour')" >/dev/null
+  cr="$(fire 74002 "$(EXP s1 v1)")"; collect >/dev/null
+  t 'E07 a response the collector REFUSED FAILS (collection is not acceptance)' "$(vg 74002 "$cr" "array['s1']")" f
+
   # ═══ D. connector contract: the receipt as the response payload carries it ═════════════════════════════════════════════════════
   t 'D01 an expanded receipt without a version is demoted to legacy/incomplete, never stored as an unverifiable claim' "$(Q "select scope||'/'||complete::text||'/'||coalesce(scope_version,'-') from public.dev_source_receipts('{\"arcgis_reports\":[{\"registry_id\":\"u\",\"scope_receipt\":{\"scope\":\"expanded\",\"version\":null,\"complete\":true}}]}'::jsonb)")" "legacy/false/-"
   t 'D02 a pre-receipt payload (no scope_receipt) is legacy, complete only if not truncated' "$(Q "select string_agg(registry_id||':'||scope||':'||complete::text, ',' order by registry_id) from public.dev_source_receipts('{\"csv_reports\":[{\"registry_id\":\"a\"},{\"registry_id\":\"b\",\"truncated_at_max_rows\":20000}]}'::jsonb)")" "a:legacy:true,b:legacy:false"
@@ -170,7 +187,7 @@ echo "== the shipped receipt SQL, against the live collector"
 run_checks "$root/docs/dev-source-receipt.sql" | tee "$tmp/shipped"
 tf=$(grep -c '|f|' "$tmp/shipped" || true); tn=$(grep -c '|[tf]' "$tmp/shipped" || true)
 echo "SHIPPED: $tn checks, $tf failed"
-[ "$tn" -ge 45 ] || { echo "FAIL -- fewer checks ran than the suite defines"; exit 1; }
+[ "$tn" -ge 52 ] || { echo "FAIL -- fewer checks ran than the suite defines"; exit 1; }
 [ "$tf" -eq 0 ] || { echo "FAIL -- the shipped SQL does not pass"; exit 1; }
 
 # applying the file twice must be harmless

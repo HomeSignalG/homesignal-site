@@ -4,7 +4,8 @@
 create table if not exists public.development_reports (
   zip          text primary key,
   sites        jsonb not null default '[]'::jsonb,
-  refreshed_at timestamptz
+  refreshed_at timestamptz,
+  last_collected_response_id bigint      -- the collector's cursor (docs/dev-refresh-collect-once-per-response.sql)
 );
 -- stand-in for public.dev_sites_deduped, with the PRODUCTION shape: a STABLE SQL function (provolatile 's'), so inside one
 -- statement it reads the caller's snapshot. `test.dsd_sleep` makes it slow so a concurrent writer can be interleaved.
@@ -19,41 +20,48 @@ $$;
 -- A cache refresh followed (optionally) by the materialisation of it, as dev_refresh_collect + app_refresh_zip do:
 -- the cache gets the sites and refreshed_at; app_projects gets one row per site keyed by app_source_key, every row's
 -- provenance.refreshed_at = the cache's refreshed_at; rows whose key is no longer in the set are removed (the reaper).
--- Stand-ins for docs/dev-source-receipt.sql (the source completion receipt PR): the SAME table and view DDL.
-create table if not exists public.dev_refresh_source_receipt (
-  zip text not null, registry_id text not null, response_id bigint not null, tick_at timestamptz not null,
-  scope text not null check (scope in ('expanded','fallback','legacy','failed','refused','lost','processed')),
-  scope_version text, complete boolean not null, fetched integer, recorded_at timestamptz not null default now(),
-  primary key (zip, registry_id, response_id),
-  constraint dev_source_receipt_version check ((scope = 'expanded') = (scope_version is not null)));
-create index if not exists dev_refresh_source_receipt_tick_idx on public.dev_refresh_source_receipt (zip, tick_at);
-create or replace view public.dev_source_receipt_current with (security_invoker = true) as
-select r.zip, r.registry_id, r.scope, r.scope_version, r.complete, r.tick_at, (r.tick_at = d.refreshed_at) as describes_current_cache
-  from public.dev_refresh_source_receipt r join public.development_reports d on d.zip = r.zip
- where r.registry_id <> '' and r.tick_at = (select max(x.tick_at) from public.dev_refresh_source_receipt x where x.zip = r.zip and x.registry_id = r.registry_id);
+-- The receipt is the REAL docs/dev-source-receipt.sql (run.sh loads it before this ledger SQL): nothing here fakes a receipt or a
+-- continuity row. sim_refresh performs what dev_refresh_collect step (d) does to the cache row — ONE row update that moves
+-- `refreshed_at` and `last_collected_response_id` together, from a pg_net-shaped response — and the real trigger records the
+-- accepted generation and advances the durable continuity. (The full collector itself runs in the integration suite.)
 create sequence if not exists public.sim_resp_seq;
--- a receipt for the CURRENT cache generation of a ZIP (tick_at = its refreshed_at)
-create or replace function public.sim_rcpt(p_zip text, p_reg text, p_scope text, p_complete boolean, p_ver text default 'v1:A') returns void
+
+-- the response payload a collector would have received: one connector report per source in p_rcpt
+-- ([{reg, scope: expanded|fallback|legacy|failed, complete, ver}]); a source left OUT of p_rcpt is simply not reported.
+create or replace function public.sim_payload(p_zip text, p_sites jsonb, p_rcpt jsonb) returns jsonb
 language sql as $$
-  insert into public.dev_refresh_source_receipt (zip, registry_id, response_id, tick_at, scope, scope_version, complete)
-  select p_zip, p_reg, nextval('public.sim_resp_seq'), d.refreshed_at, p_scope, case when p_scope = 'expanded' then p_ver end, p_complete
-    from public.development_reports d where d.zip = p_zip
+  select jsonb_build_object('zip', p_zip, 'mode', 'zip', 'sites', p_sites, 'counts', '{"development":0}'::jsonb,
+    'arcgis_reports', coalesce((
+      select jsonb_agg(case x->>'scope'
+        when 'failed' then jsonb_build_object('registry_id', x->>'reg', 'fetched', 0,
+                             'quarantined', jsonb_build_array(jsonb_build_object('reason', 'fetch failed: fixture', 'sample', 's')))
+        else jsonb_build_object('registry_id', x->>'reg', 'fetched', 1, 'quarantined', '[]'::jsonb, 'truncated_at_max_rows', null,
+                             'scope_receipt', jsonb_build_object('scope', x->>'scope',
+                                'version', case when x->>'scope' = 'expanded' then coalesce(x->>'ver', 'v1:A') end,
+                                'complete', coalesce((x->>'complete')::boolean, true))) end)
+        from jsonb_array_elements(p_rcpt) x), '[]'::jsonb))
 $$;
 
 create or replace function public.sim_refresh(p_zip text, p_sites jsonb, p_at timestamptz, p_materialize boolean default true, p_rcpt jsonb default null)
 returns void language plpgsql as $$
+declare rid bigint := nextval('public.sim_resp_seq'); rc jsonb;
 begin
-  insert into public.development_reports (zip, sites, refreshed_at) values (p_zip, p_sites, p_at)
-  on conflict (zip) do update set sites = excluded.sites, refreshed_at = excluded.refreshed_at;
-  if p_rcpt is null then
-    perform public.sim_rcpt(p_zip, r.reg, 'expanded', true)
-       from (select distinct coalesce(e->>'source_registry_id', '') as reg from jsonb_array_elements(p_sites) e
-              where e->>'scope_origin' = 'polygon_member') r;
-  else
-    perform public.sim_rcpt(p_zip, x->>'reg', x->>'scope', coalesce((x->>'complete')::boolean, true), coalesce(x->>'ver', 'v1:A'))
-       from jsonb_array_elements(p_rcpt) x;
-  end if;
+  rc := coalesce(p_rcpt, (select coalesce(jsonb_agg(jsonb_build_object('reg', r.reg, 'scope', 'expanded', 'complete', true)), '[]'::jsonb)
+                            from (select distinct coalesce(e->>'source_registry_id', '') as reg from jsonb_array_elements(p_sites) e
+                                   where e->>'scope_origin' = 'polygon_member') r));
+  insert into net._http_response (id, status_code, content, created) values (rid, 200, public.sim_payload(p_zip, p_sites, rc)::text, p_at);
+  insert into public.development_reports (zip, sites, refreshed_at) values (p_zip, '[]'::jsonb, null) on conflict (zip) do nothing;
+  update public.development_reports set sites = p_sites, refreshed_at = p_at, last_collected_response_id = rid where zip = p_zip;
   if not p_materialize then return; end if;
+  perform public.sim_materialize(p_zip, p_sites, p_at);
+end $$;
+
+-- the materialisation stand-in (app_refresh_zip builds app_projects from the cache; its body is not reproduced here): one row per
+-- site keyed by app_source_key, every row's provenance.refreshed_at = the cache generation it was built from; the reaper removes
+-- rows whose key left the set.
+create or replace function public.sim_materialize(p_zip text, p_sites jsonb, p_at timestamptz) returns void
+language plpgsql as $$
+begin
   delete from public.app_projects a where a.zip = p_zip
      and not exists (select 1 from jsonb_array_elements(p_sites) e where public.app_source_key(e) = a.source_key);
   insert into public.app_projects (zip, name, type, status, stage, submitted_at, date_kind, address, record_kind, registry_id,
