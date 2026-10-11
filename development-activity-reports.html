@@ -84,8 +84,7 @@ header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch
    non-dismissible onboarding overlay, none of which belongs in the agent's workspace. So the site bar is page-local and carries the shell's
    LOOK (partials/shell.html: logo, Explore, My Places, Enterprise, the account on the right) with plain same-site links and no script.
    Its labels and addresses are pinned to partials/shell.html by test/development-activity-reports.test.mjs (1h), so the two cannot drift.
-   Enterprise is the active section; the row under the title says which Enterprise page this is (Enterprise overview | My reports).
-   Both rows are hidden by the print rule below, with header.top. */
+   Enterprise is the active section. The bar is hidden by the print rule below, with header.top. */
 header.sitebar{background:var(--panel);border-bottom:1px solid var(--line)}
 header.sitebar .in{max-width:1600px;margin:0 auto;padding:0 16px;min-height:72px;display:flex;flex-wrap:wrap;align-items:center;gap:0 32px}
 .sb-brand{display:inline-flex;align-items:center;gap:9px;min-height:44px;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none;flex:none}
@@ -97,11 +96,7 @@ nav.sb-nav a{display:inline-flex;align-items:center;min-height:44px;font-size:15
 nav.sb-nav a:hover{color:var(--ink)}
 nav.sb-nav a[aria-current=page]{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:10px}
 header.sitebar .who{margin:0 0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;min-height:44px}
-header.sitebar a:focus-visible,header.sitebar button:focus-visible,header.top .entnav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
-header.top .entnav{flex:0 0 100%;display:flex;flex-wrap:wrap;gap:4px;margin:-10px 0 6px -14px}
-header.top .entnav a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);text-decoration:none}
-header.top .entnav a:hover{background:var(--panel2);color:var(--ink)}
-header.top .entnav a[aria-current=page]{background:#e9f5ee;color:#0f5c37}
+header.sitebar a:focus-visible,header.sitebar button:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
 @media(max-width:700px){
   header.sitebar .in{gap:0 16px;padding-top:6px}
   header.sitebar .who{order:2;display:block;flex:1 1 0;min-width:0;text-align:right;line-height:1.35}
@@ -211,7 +206,6 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
    ============================================================================ */
 header.top{padding:22px 16px 18px}
 header.top h1{font-size:26px;letter-spacing:-.01em}
-header.top .brand{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 header.top .meta{font-size:14.5px;margin-top:6px}
 .wrap{gap:22px;padding-top:24px}
 .sec-h{margin:0 0 12px;font-size:19px;letter-spacing:-.01em}
@@ -331,9 +325,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 </header>
 <header class="top">
   <div class="in">
-    <nav class="entnav" aria-label="Enterprise"><a href="development-activity.html">Enterprise overview</a><a href="development-activity-reports.html" aria-current="page">My reports</a></nav>
     <div>
-      <p class="brand">HomeSignal</p>
       <h1>Development Activity Reports</h1>
       <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
     </div>

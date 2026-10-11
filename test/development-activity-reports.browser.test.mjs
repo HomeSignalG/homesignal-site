@@ -1994,29 +1994,30 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
   await ctx.close();
 }
-// ---- 15. the site bar: logo, Explore, My Places, Enterprise, and the Enterprise row (Enterprise overview | My reports) -------------------------------------
+// ---- 15. the site bar: logo, Explore, My Places, Enterprise -------------------------------------
 // This page is a standalone document on purpose (no shell), so it carries a page-local bar in the shell's look (2026-10-11). The links are plain same-site links with no
 // state; they must show whether or not anyone is signed in, ask nothing of any function, and sit in the headers the print rule removes.
-const NAV_SEL = 'header.sitebar a, header.top .entnav a';
+const NAV_SEL = 'header.sitebar a';
 const navLinks = (page) => page.evaluate((sel) => {
   const box = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return { shown: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0, h: Math.round(r.height) }; };
   const links = [...document.querySelectorAll(sel)];
   return {
-    labels: ['header.sitebar .sb-nav', 'header.top .entnav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
+    labels: ['header.sitebar .sb-nav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
+    extra: document.querySelectorAll('header.top .entnav, header.top .brand').length,
     links: links.map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href'), current: a.getAttribute('aria-current') === 'page', ...box(a) })),
     who: !!document.querySelector('header.sitebar #who'),
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 }, NAV_SEL);
-const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html', 'Enterprise overview=development-activity.html', 'My reports=development-activity-reports.html'];
+const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html'];
 for (const [who, signedIn] of [['signed out', false], ['signed in', true]]) {
   const { ctx, page, errors, reports, trials, billingCalls } = await open({ signedIn });
   const n = await navLinks(page);
-  ok(n && n.labels[0] === 'HomeSignal site' && n.labels[1] === 'Enterprise', `15a ${who}: the page has a site navigation and an Enterprise navigation`, n);
+  ok(n && n.labels[0] === 'HomeSignal site' && n.extra === 0, `15a ${who}: the page has the site navigation and no second Enterprise row or repeated HomeSignal label under it`, n);
   ok(n && JSON.stringify(n.links.map((l) => l.text + '=' + l.href)) === JSON.stringify(WANT_LINKS),
-    `15b ${who}: it holds the logo, Explore, My Places, Enterprise, Enterprise overview and My reports, as plain same-site links`, n && n.links);
+    `15b ${who}: it holds the logo, Explore, My Places and Enterprise, as plain same-site links`, n && n.links);
   ok(n && n.links.every((l) => l.shown && l.h >= 44), `15c ${who}: every one is drawn, and tall enough to tap (44px)`, n && n.links);
-  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise,My reports', `15c2 ${who}: Enterprise and My reports are marked as where you are, and nothing else`, n && n.links);
+  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', `15c2 ${who}: Enterprise is marked as the current section, and nothing else`, n && n.links);
   ok(n && n.who, `15c3 ${who}: the account area (email and Sign out, or Sign in) is in the bar`, n);
   // the page itself reads the plan when someone is signed in, so the claim is about the LINKS: touching them makes no request of its own
   await page.waitForTimeout(500);
@@ -2032,7 +2033,7 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15f. a phone, a tablet and a desktop: everything visible, and the bars do not make the page scroll sideways
   const { ctx, page } = await open({ width: w, height: h, signedIn: true });
   const n = await navLinks(page);
-  ok(n && n.links.length === 6 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all six links are drawn at tap size and nothing scrolls sideways`, n);
+  ok(n && n.links.length === 4 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all four links are drawn at tap size and nothing scrolls sideways`, n);
   await ctx.close();
 }
 {
@@ -2054,17 +2055,17 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15h. keyboard: each link can be focused, and the focus ring is drawn
   const { ctx, page } = await open();
   const focused = await page.evaluate((sel) => [...document.querySelectorAll(sel)].map((a) => { a.focus(); return document.activeElement === a; }), NAV_SEL);
-  ok(focused.length === 6 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
+  ok(focused.length === 4 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
   await page.focus('header.sitebar .sb-nav a:text-is("Explore")');
   const ring = await page.$eval('header.sitebar .sb-nav a:text-is("Explore")', (a) => getComputedStyle(a).outlineStyle + ' ' + getComputedStyle(a).outlineWidth);
   ok(/^solid [1-9]/.test(ring), '15h2 a focused link shows a visible outline', ring);
   await ctx.close();
 }
-for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/], ['header.top .entnav a:text-is("Enterprise overview")', /\/development-activity\.html$/]]) {
+for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/]]) {
   // 15i. they really go there (a real navigation to the real page, not a request the page makes)
   const { ctx, page } = await open();
   await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click(sel)]);
-  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking ${sel.replace(/header\.(sitebar|top) /, '')} opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
+  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking ${sel.replace(/header\.sitebar /, '')} opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
   await ctx.close();
 }
 
