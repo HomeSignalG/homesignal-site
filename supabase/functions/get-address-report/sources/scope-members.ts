@@ -92,6 +92,7 @@ export function classifyByCircle(
  */
 export async function keepMembers<T>(
   rows: readonly T[], classify: (r: T) => RowClass, member: MembershipFn, m: ScopeMetrics,
+  onMember?: (r: T) => void,
 ): Promise<T[]> {
   const cls = rows.map(classify);
   const idx: number[] = [];
@@ -123,7 +124,7 @@ export async function keepMembers<T>(
     if (c.cls === "legacy") { kept.push(r); return; }
     if (c.cls === "no_point") { m.no_point_kept++; kept.push(r); return; }
     const v = verdictAt.get(i);
-    if (v === "member") { m.members_recovered++; kept.push(r); }
+    if (v === "member") { m.members_recovered++; onMember?.(r); kept.push(r); }
     else if (v === "outside") m.outside_excluded++;
     else m.unresolved_excluded++;
   });
@@ -149,6 +150,14 @@ export function zipMembershipRpc(db: Rpc, zip: string): MembershipFn {
     });
   };
 }
+
+/** Recovery provenance carried on a record kept ONLY because the polygon widening reached it (never on a
+ *  record the legacy scope already returned). The change ledger reads it from the cached `sites` to tell
+ *  "historical records newly visible because coverage improved" from genuine new filings
+ *  (docs/dev-change-recovery.sql). It is provenance, not a decision: nothing here reads it. */
+export const SCOPE_ORIGIN_MEMBER = "polygon_member" as const;
+export type ScopeOrigin = typeof SCOPE_ORIGIN_MEMBER;
+export const SCOPE_ORIGIN_KEY = "__scope_origin";
 
 /** Widening is only allowed when BOTH the polygon bounds AND a way to test membership exist. */
 export function widenedBounds<B>(bounds: B | null | undefined, member: MembershipFn | null | undefined): B | null {

@@ -32,7 +32,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import { pointInBox, validBounds, type ZipBounds } from "./scope-box.ts";
-import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
+import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -238,7 +238,8 @@ async function runEntry(
     if (boxOnly.length && deps.zipMembers) {
       const m = newScopeMetrics();
       try {
-        widenedRows = (await keepMembers(boxOnly, (x) => ({ cls: "widened", lat: x.lat, lng: x.lng }), deps.zipMembers, m)).map((x) => x.r);
+        widenedRows = (await keepMembers(boxOnly, (x) => ({ cls: "widened", lat: x.lat, lng: x.lng }), deps.zipMembers, m,
+          (x) => { x.r[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; })).map((x) => x.r);
         if (widenedRows.length) report.scope_widened = true;
       } catch (e) {
         if (!(e instanceof ScopeMembershipError)) throw e;
@@ -429,6 +430,7 @@ async function normalizeRow(
     record_url_precision: precision,
     ...geoQuality,
   };
+  if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
   return rec;
 }
 
