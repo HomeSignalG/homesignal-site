@@ -85,13 +85,22 @@ conc_check() {
   tf 'C03 CONTROL: a volatile helper splits the snapshot (this scenario can detect a split)' "$([ "$b" != 't|ok|{arcgis:fixture:C2}' ] && echo split || echo "not-detected: $b")" 'split'
   # restore the production-shaped helper
   P -f "$here/fixture.sql" >/dev/null 2>&1 || true
+  # a SOURCE-FAILURE row committed by the collector DURING the probe is not seen by that probe (one snapshot with the cache and
+  # the rows it judged), and is seen by the next one
+  P -c "select public.sim_refresh('76272', jsonb_build_array(public.sim_site('C4','Issued','2024-01-01', true, null, 'cz')), now() - interval '2 hours')" >/dev/null
+  ( PGOPTIONS="-c test.dsd_sleep=2" psql -X -qtA -F'|' -c "select unclean_regs, stamped_regs from public.dev_change_recovery_probe('76272', '{}', true)" > "$tmp/conc_c" 2>&1 ) &
+  sleep 0.7
+  P -c "select public.sim_fail('76272', 'cz', 'truncated')" >/dev/null
+  wait
+  tf 'C04 a failure row committed DURING the probe does not leak into it (readiness is judged on one consistent snapshot)' "$(cat "$tmp/conc_c")" '{}|{cz}'
+  tf 'C05 …and the NEXT probe sees it: the source is unclean' "$(Q "select unclean_regs from public.dev_change_recovery_probe('76272', '{}', true)")" '{cz}'
 }
 
 emit_mut() { :; }
 out="$(checks "$SQL")"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(grep -c '|f|' <<<"$out" || true)
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 64 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+if [ "$n_all" -lt 81 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
 
 status=0
 for m in "$here"/mutations/*.py; do

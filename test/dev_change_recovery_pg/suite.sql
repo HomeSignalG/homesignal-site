@@ -1,4 +1,4 @@
--- Executable scenarios for docs/dev-change-recovery.sql (rule_version 2) on a DISPOSABLE Postgres (never production).
+-- Executable scenarios for docs/dev-change-recovery.sql (rule_version 3: per-ZIP x source readiness) on a DISPOSABLE Postgres (never production).
 -- ZIP 76258 stands for any ZIP; nothing in the SQL under test names one.
 \set ON_ERROR_STOP 0
 create temp table res(name text, ok boolean, detail text);
@@ -71,6 +71,10 @@ select pg_temp.chk('S10 nothing was deleted: every recovered identity and its ev
   (select count(*) from public.dev_change_project where identity_key like 'arcgis:fixture:R%') = 10
   and (select count(*) from public.dev_change_event where identity_key like 'arcgis:fixture:R%') = 10);
 
+select pg_temp.chk('T01 the first successful, clean expansion made the pair READY (and only that pair)',
+  (select count(*) from public.dev_change_scope_ready where zip='76258' and registry_id='fixture' and lapsed_at is null) = 1
+  and (select count(*) from public.dev_change_scope_ready where zip='76258') = 1);
+
 -- ── 2. REPEAT REFRESH: the same cache again creates nothing new ─────────────────────────────────
 select (select count(*) from public.dev_change_event) as n_ev, (select count(*) from public.dev_change_recovery) as n_rec \gset b_
 select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258'), now() - interval '9 hours');
@@ -87,15 +91,20 @@ select pg_temp.chk('S12 a real publisher status change on a recovered record IS 
 select pg_temp.chk('S13 R2 (stage already Final) emitted no change; R1 (Issued -> Final) did',
   pg_temp.rep('R2') = 0 and pg_temp.rep('R1') = 1);
 
--- ── 3b. A STAMPED RECORD THAT FIRST APPEARS IN A LATER GENERATION is also recovery (the stated product trade) ──
-select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258') || jsonb_build_array(public.sim_site('R11','Issued',(current_date - 1)::date, true, 'filed')), now() - interval '7 hours');
-select public.sim_observe('76258');
-select pg_temp.chk('S14 a stamped record first seen in a later generation is recorded, not announced as new',
-  pg_temp.rep('R11') = 0 and (select count(*) from pg_temp.ev('R11')) = 1);
+-- ── 3b. AFTER THE VERIFIED BASELINE a stamped record that is NEW is a genuine arrival: ordinary first detection ──
+-- Whatever its date: a RECENT filing and a 2019 one are alike (no date decides), and neither is "recovery".
+select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258') || jsonb_build_array(
+   public.sim_site('R11','Issued',(current_date - 1)::date, true, 'filed'),
+   public.sim_site('R11b','Issued','2019-04-04', true, 'filed')), now() - interval '7 hours');
+select public.sim_observe('76258') as res \gset r11_
+select pg_temp.chk('S14 a stamped record new AFTER the baseline is announced as a first detection (material, reportable) whatever its date',
+  pg_temp.rep('R11') = 1 and pg_temp.rep('R11b') = 1
+  and not exists (select 1 from public.dev_change_recovery where identity_key in ('arcgis:fixture:R11','arcgis:fixture:R11b'))
+  and (select count(*) from pg_temp.ev('R11') where material and not is_baseline and event_type='first_detected') = 1, :'r11_res');
 select public.sim_refresh('76258', (select jsonb_agg(case when e->>'case_number' = 'R11' then jsonb_set(e,'{stage}','"Final"') else e end)
                                       from public.development_reports d, jsonb_array_elements(d.sites) e where d.zip='76258'), now() - interval '6 hours');
 select public.sim_observe('76258');
-select pg_temp.chk('S15 …and its first genuine change IS announced',
+select pg_temp.chk('S15 …and its later genuine change IS announced',
   exists (select 1 from public.dev_change_event_reportable where identity_key='arcgis:fixture:R11' and event_type='status_changed' and material));
 
 -- ── 4. SYNCHRONISATION AT OBSERVATION LEVEL (the probe runs only when a new identity must be classified) ──
@@ -131,8 +140,8 @@ select public.dev_change_finish_run(:'t_run'::uuid);
 select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258'), (select refreshed_at from public.development_reports where zip='76258'));
 select pg_temp.chk('S20 after materialisation the ZIP is synchronised', public.dev_change_materialization_current('76258'));
 select public.sim_observe('76258');
-select pg_temp.chk('S21 the previously-deferred stamped record was classified at first sighting: not news',
-  pg_temp.rep('R12') = 0 and (select outcome from public.dev_change_recovery where identity_key='arcgis:fixture:R12') = 'coverage_recovered');
+select pg_temp.chk('S21 the previously-deferred stamped record is a genuine arrival (the pair was already verified): announced once',
+  pg_temp.rep('R12') = 1 and not exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:R12'));
 
 -- 4b. LAZY: a stale ZIP with NOTHING new to classify is observed normally (the probe is not on the ordinary path)
 select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258'), (select refreshed_at from public.development_reports where zip='76258') + interval '1 hour', false);
@@ -160,8 +169,10 @@ select pg_temp.chk('S26 a row with NO generation stamp ⇒ deferred (invalid_row
   (:'g_res'::jsonb)->>'status' = 'deferred' and (:'g_res'::jsonb)->>'reason' = 'invalid_row_generation', :'g_res');
 select public.sim_refresh('76260', (select sites from public.development_reports where zip='76260'), (select refreshed_at from public.development_reports where zip='76260'));
 select public.sim_observe('76260') as res \gset h_
-select pg_temp.chk('S27 once synchronised the stamped record is classified as recovery', (:'h_res'::jsonb)->>'status' = 'ok'
-  and pg_temp.rep('M4') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:M4'), :'h_res');
+select pg_temp.chk('S27 once synchronised, the FIRST stamped record of a pair with no baseline is the baseline: recovery, and the pair becomes READY',
+  (:'h_res'::jsonb)->>'status' = 'ok'
+  and pg_temp.rep('M4') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:M4')
+  and exists (select 1 from public.dev_change_scope_ready where zip='76260' and registry_id='fixture' and lapsed_at is null), :'h_res');
 
 -- ── 5. PROBE UNIT CASES (direct calls; ZIP 76261) ────────────────────────────────────────────────────
 select public.sim_refresh('76261', jsonb_build_array(public.sim_site('P1','Issued','2024-01-01', true), public.sim_site('P2','Issued','2024-01-02'),
@@ -219,25 +230,37 @@ select pg_temp.chk('P17 …and it is SECURITY DEFINER with a pinned search_path'
 
 -- cost pin: with no requested keys the stamped-element scan must not run (results are identical either way, so only the source shows it)
 select pg_temp.chk('P18 the stamped scan is guarded by "keys were requested" (no full-cache scan when nothing is new)',
-  (select pg_get_functiondef(p.oid) ~ 'reason = ''ok'' and \(select k\.requested from k\) > 0' from pg_proc p where p.proname = 'dev_change_recovery_probe'));
+  (select pg_get_functiondef(p.oid) ~ 'coalesce\(p_scan, false\) or \(select k\.requested from k\) > 0' from pg_proc p where p.proname = 'dev_change_recovery_probe'));
+select public.sim_refresh('76265', jsonb_build_array(public.sim_site('Q1','Issued','2024-01-01', true, null, 'qa'), public.sim_site('Q2','Issued','2024-01-01', false, null, 'qb')), now() - interval '3 hours');
+select * from public.dev_change_recovery_probe('76265', '{}', true) \gset p19_
+select * from public.dev_change_recovery_probe('76265', '{}', false) \gset p20_
+select pg_temp.chk('P19 p_scan returns the sources that show the widening (stamped only); without it the cache is not scanned',
+  :'p19_stamped_regs' = '{qa}' and :'p20_stamped_regs' = '{}');
 
--- ── 6. DISABLE → legacy refresh → the recovered rows lapse; no event is invented ─────────────────
-select (select count(*) from public.dev_change_event) as n_ev \gset k_
+-- ── 6. SCOPE FALLS BACK (mode off / RPC fallback) → readiness lapses → coverage returns: re-baselined, never mis-announced ──
+select (select count(*) from public.dev_change_event) as n_ev, (select count(*) from public.dev_change_project where identity_key like 'arcgis:fixture:R%') as n_r \gset k_
 select public.sim_refresh('76258', jsonb_build_array(public.sim_site('L1','Issued','2024-03-01'), public.sim_site('L2','Issued','2024-04-01'),
    public.sim_site('L3','Issued','2024-05-01'), public.sim_site('G1','Issued',(current_date-3)::date), public.sim_site('G2','Issued','2020-01-01')), now() - interval '1 hours');
-select public.sim_observe('76258');
-select pg_temp.chk('S28 mode OFF + legacy refresh: recovered rows are gone from app_projects',
+select public.sim_observe('76258') as res \gset lp_
+select pg_temp.chk('S28 mode OFF / fallback to the legacy scope: recovered rows are gone from app_projects',
   not exists (select 1 from public.app_projects where zip='76258' and source_key like 'arcgis:fixture:R%'));
-select pg_temp.chk('S29 …the ledger keeps their history (absence is never an event) and writes nothing for the lapse',
-  (select count(*) from public.dev_change_project where identity_key like 'arcgis:fixture:R%') = 12
-  and (select count(*) from public.dev_change_event) = :k_n_ev);
+select pg_temp.chk('S29 …the ledger keeps their history, writes no event for the lapse, and the pair is no longer READY (the widening is not evidenced)',
+  (select count(*) from public.dev_change_project where identity_key like 'arcgis:fixture:R%') = :k_n_r
+  and (select count(*) from public.dev_change_event) = :k_n_ev
+  and not exists (select 1 from public.dev_change_scope_ready where zip='76258' and lapsed_at is null)
+  and ((:'lp_res'::jsonb)->>'scope_ready_lapsed')::int = 1, :'lp_res');
 select public.sim_refresh('76258', (select jsonb_agg(e) from (
    select public.sim_site('L1','Issued','2024-03-01') e union all select public.sim_site('R1','Final','2023-02-10', true, 'filed')
-   union all select public.sim_site('R4','Issued',(current_date - 10)::date, true, 'filed')) q), now());
-select public.sim_observe('76258');
-select pg_temp.chk('S30 re-enable: already-known recovered identities are not announced again and not re-classified',
+   union all select public.sim_site('R4','Issued',(current_date - 10)::date, true, 'filed')
+   union all select public.sim_site('N1','Issued',(current_date - 2)::date, true, 'filed')) q), now());
+select public.sim_observe('76258') as res \gset re_
+select pg_temp.chk('S30 re-enable: known identities are not announced again; a record that appeared during the gap is NOT claimed as genuine (baselined silently); the pair is READY again',
   pg_temp.rep('R4') = 0 and (select count(*) from pg_temp.ev('R4')) = 1 and pg_temp.rep('R1') = 1
-  and (select count(*) from public.dev_change_recovery where zip = '76258') = 12);
+  and pg_temp.rep('N1') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:N1')
+  and exists (select 1 from public.dev_change_scope_ready where zip='76258' and registry_id='fixture' and lapsed_at is null), :'re_res');
+select public.sim_refresh('76258', (select sites from public.development_reports where zip='76258') || jsonb_build_array(public.sim_site('N2','Issued',(current_date - 1)::date, true, 'filed')), now() + interval '1 second');
+select public.sim_observe('76258');
+select pg_temp.chk('S30b …and a record new AFTER the re-established baseline is announced again', pg_temp.rep('N2') = 1);
 
 -- ── 7. A BASELINE RUN IS UNTOUCHED ────────────────────────────────────────────────────────────────
 select public.sim_refresh('76259', jsonb_build_array(public.sim_site('B1','Issued','2019-01-01', true)), now() - interval '1 hours');
@@ -248,14 +271,104 @@ select pg_temp.chk('S31 a baseline run classifies nothing (it already writes non
 
 -- ── 8. SAFETY ──────────────────────────────────────────────────────────────────────────────────────
 select pg_temp.chk('S32 new objects are not reachable by anon/authenticated',
-  not has_function_privilege('anon','public.dev_change_recovery_probe(text,text[])','execute')
+  not has_function_privilege('anon','public.dev_change_recovery_probe(text,text[],boolean)','execute')
+  and not has_table_privilege('anon','public.dev_change_scope_ready','select') and not has_table_privilege('authenticated','public.dev_change_scope_ready','update')
   and not has_function_privilege('authenticated','public.dev_change_materialization_current(text)','execute')
   and not has_table_privilege('anon','public.dev_change_recovery','select')
   and not has_table_privilege('authenticated','public.dev_change_recovery','insert'));
-select pg_temp.chk('S33 the audit table is RLS-protected',
-  (select relrowsecurity from pg_class where oid='public.dev_change_recovery'::regclass));
+select pg_temp.chk('S33 the audit and readiness tables are RLS-protected',
+  (select relrowsecurity from pg_class where oid='public.dev_change_recovery'::regclass)
+  and (select relrowsecurity from pg_class where oid='public.dev_change_scope_ready'::regclass));
 select pg_temp.chk('S34 events stay immutable', (select count(*) from pg_trigger where tgrelid='public.dev_change_event'::regclass and not tgisinternal) >= 1);
 select pg_temp.chk('S35 the rule no longer carries a date window: no news_days function exists',
-  to_regprocedure('public.dev_change_recovery_news_days()') is null and public.dev_change_recovery_rule_version() = 2);
+  to_regprocedure('public.dev_change_recovery_news_days()') is null and public.dev_change_recovery_rule_version() = 3);
+
+-- ── 9. INCOMPLETE OR FAILED SOURCE: cannot establish readiness, and nothing is inferred (tests 5) ──────────────────────
+select public.sim_refresh('76290', jsonb_build_array(public.sim_site('U0','Issued','2024-01-01')), now() - interval '30 hours');
+select public.sim_observe('76290', true);
+select public.sim_refresh('76290', jsonb_build_array(public.sim_site('U0','Issued','2024-01-01'),
+   public.sim_site('X1','Issued','2023-01-01', true, 'filed', 'fx'), public.sim_site('X2','Issued','2023-01-02', true, 'filed', 'fy')), now() - interval '10 hours');
+select public.sim_fail('76290', 'fx', 'truncated');                      -- the fx fetch was cut by max_rows in THIS generation
+select public.sim_observe('76290') as res \gset u_
+select pg_temp.chk('U01 a stamped record of a TRUNCATED source is HELD: no identity, no event, no audit row',
+  not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:X1') and (select count(*) from pg_temp.ev('X1')) = 0
+  and ((:'u_res'::jsonb)->>'coverage_held')::int = 1, :'u_res');
+select pg_temp.chk('U02 …and that source did NOT become ready, while the clean source in the same ZIP did and its record is the baseline',
+  not exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx')
+  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fy' and lapsed_at is null)
+  and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:X2') and pg_temp.rep('X2') = 0);
+select public.sim_refresh('76290', (select sites from public.development_reports where zip='76290'), now() - interval '8 hours');   -- next, clean generation
+select public.sim_observe('76290');
+select pg_temp.chk('U03 the next CLEAN generation classifies the held record correctly: baselined silently, and the source is READY',
+  exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:X1') and pg_temp.rep('X1') = 0
+  and exists (select 1 from public.dev_change_scope_ready where zip='76290' and registry_id='fx' and lapsed_at is null));
+-- fetch_failed is as disqualifying as truncated; a failure of an EARLIER attempt (not this generation's tick) is not
+select public.sim_refresh('76291', jsonb_build_array(public.sim_site('V0','Issued','2024-01-01')), now() - interval '30 hours');
+select public.sim_observe('76291', true);
+select public.sim_refresh('76291', jsonb_build_array(public.sim_site('V0','Issued','2024-01-01'),
+   public.sim_site('Y1','Issued','2023-01-01', true, 'filed', 'fz'), public.sim_site('Y2','Issued','2023-01-02', true, 'filed', 'fw')), now() - interval '10 hours');
+select public.sim_fail('76291', 'fz', 'fetch_failed');
+select public.sim_fail('76291', 'fw', 'fetch_failed', false);
+select public.sim_observe('76291');
+select pg_temp.chk('U04 a fetch_failed source is held; a failure from an earlier attempt does not disqualify this generation',
+  not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:Y1')
+  and exists (select 1 from public.dev_change_scope_ready where zip='76291' and registry_id='fw'));
+-- READY pair + an incomplete generation: a new stamped record is held, then announced by the next clean generation (tests 3, 5)
+select public.sim_refresh('76294', jsonb_build_array(public.sim_site('A0','Issued','2024-01-01')), now() - interval '40 hours');
+select public.sim_observe('76294', true);
+select public.sim_refresh('76294', jsonb_build_array(public.sim_site('A0','Issued','2024-01-01'), public.sim_site('A1','Issued','2022-01-01', true, 'filed', 'fa')), now() - interval '30 hours');
+select public.sim_observe('76294');
+select pg_temp.chk('U05 baseline: the first expansion baselines A1 silently and makes fa READY', pg_temp.rep('A1') = 0
+  and exists (select 1 from public.dev_change_scope_ready where zip='76294' and registry_id='fa' and lapsed_at is null));
+select public.sim_refresh('76294', (select sites from public.development_reports where zip='76294') || jsonb_build_array(public.sim_site('A2','Issued',(current_date - 1)::date, true, 'filed', 'fa')), now() - interval '20 hours');
+select public.sim_fail('76294', 'fa', 'truncated');
+select public.sim_observe('76294') as res \gset w_
+select pg_temp.chk('U06 READY pair + truncated generation: the new record is HELD (uncertain coverage is not a genuine arrival), nothing written',
+  not exists (select 1 from public.dev_change_project where identity_key='arcgis:fixture:A2') and ((:'w_res'::jsonb)->>'coverage_held')::int = 1, :'w_res');
+select public.sim_refresh('76294', (select sites from public.development_reports where zip='76294') || jsonb_build_array(public.sim_site('A3','Issued','2021-01-01', true, 'filed', 'fb')), now() - interval '10 hours');
+select public.sim_observe('76294');
+select pg_temp.chk('U07 the next CLEAN generation: A2 is ANNOUNCED (ready source), A3 of a source with NO baseline is baselined silently (readiness is per source)',
+  pg_temp.rep('A2') = 1 and pg_temp.rep('A3') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:A3')
+  and not exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:A2'));
+
+-- ── 10. FALLBACK DURING THE FIRST EXPANSION cannot establish readiness (RPC fell back to the legacy scope) ──────────
+select public.sim_refresh('76296', jsonb_build_array(public.sim_site('F0','Issued','2024-01-01')), now() - interval '30 hours');
+select public.sim_observe('76296', true);
+select public.sim_refresh('76296', jsonb_build_array(public.sim_site('F0','Issued','2024-01-01'), public.sim_site('F1','Issued','2024-02-01')), now() - interval '5 hours');
+select public.sim_observe('76296');
+select pg_temp.chk('U08 a generation with no widening evidence establishes no readiness; unstamped behaviour is the legacy one (test 10)',
+  not exists (select 1 from public.dev_change_scope_ready where zip='76296') and pg_temp.rep('F1') = 1);
+
+-- ── 11. IDENTICAL SOURCE KEYS ACROSS NEIGHBOURING ZIPs generate no false new event (test 7) ───────────────────────────
+select public.sim_refresh('76281', jsonb_build_array(public.sim_site('N0','Issued','2024-01-01')), now() - interval '40 hours');
+select public.sim_observe('76281', true);
+select public.sim_refresh('76282', jsonb_build_array(public.sim_site('N0b','Issued','2024-01-01')), now() - interval '40 hours');
+select public.sim_observe('76282', true);
+select public.sim_refresh('76283', jsonb_build_array(public.sim_site('N0c','Issued','2024-01-01')), now() - interval '40 hours');
+select public.sim_observe('76283', true);
+select public.sim_refresh('76281', jsonb_build_array(public.sim_site('N0','Issued','2024-01-01'), public.sim_site('Z1','Issued','2022-02-02', true, 'filed', 'fn')), now() - interval '20 hours');
+select public.sim_refresh('76282', jsonb_build_array(public.sim_site('N0b','Issued','2024-01-01'), public.sim_site('Z1','Issued','2022-02-02', true, 'filed', 'fn')), now() - interval '20 hours');
+select public.sim_observe('76281');
+select public.sim_observe('76282');
+select pg_temp.chk('Z01 the same stamped key in two neighbouring ZIPs is ONE identity and ONE silent baseline event, never a second',
+  (select count(*) from pg_temp.ev('Z1')) = 1 and pg_temp.rep('Z1') = 0
+  and exists (select 1 from public.dev_change_scope_ready where zip='76281' and registry_id='fn' and lapsed_at is null)
+  and exists (select 1 from public.dev_change_scope_ready where zip='76282' and registry_id='fn' and lapsed_at is null));
+select public.sim_refresh('76281', (select sites from public.development_reports where zip='76281') || jsonb_build_array(public.sim_site('Z2','Issued',(current_date - 1)::date, true, 'filed', 'fn')), now() - interval '10 hours');
+select public.sim_refresh('76282', (select sites from public.development_reports where zip='76282') || jsonb_build_array(public.sim_site('Z2','Issued',(current_date - 1)::date, true, 'filed', 'fn')), now() - interval '10 hours');
+select public.sim_observe('76281');
+select public.sim_observe('76282');
+select pg_temp.chk('Z02 a genuine arrival visible from two ready neighbours is announced exactly ONCE',
+  (select count(*) from pg_temp.ev('Z2') where event_type='first_detected') = 1 and pg_temp.rep('Z2') = 1);
+select public.sim_refresh('76283', (select sites from public.development_reports where zip='76283') || jsonb_build_array(public.sim_site('Z3','Issued',(current_date - 1)::date, true, 'filed', 'fn')), now() - interval '10 hours');
+select public.sim_observe('76283');
+select pg_temp.chk('Z03 readiness is per ZIP: a source ready in a NEIGHBOUR is not ready here — the first stamped record is a baseline',
+  pg_temp.rep('Z3') = 0 and exists (select 1 from public.dev_change_recovery where identity_key='arcgis:fixture:Z3'));
+
+-- ── 12. ONE SHARED RULE: nothing in the shipped functions names a ZIP or a source (test 9) ───────────────────────────
+select pg_temp.chk('X01 no 5-digit ZIP literal and no source id in the probe or the spliced observation',
+  not exists (select 1 from pg_proc p where p.proname in ('dev_change_recovery_probe','dev_change_observe_zip','dev_change_tick','dev_change_materialization_current')
+                and (pg_get_functiondef(p.oid) ~ '''[0-9]{5}''' or pg_get_functiondef(p.oid) ~* 'fixture|arcgis:'))
+  and (select count(*) from pg_proc where proname = 'dev_change_observe_zip' and prosrc like '%dev_change_scope_ready%') = 1);
 
 select name||'|'||case when ok then 't' else 'f' end||'|'||detail from res order by name;

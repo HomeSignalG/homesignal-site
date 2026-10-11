@@ -1,73 +1,84 @@
-# ZIP scope recovery — blocking-review response (2026-10-11)
+# ZIP scope recovery — blocking-review response (2026-10-11, revision 2)
 
-Scope: PR #1829 (`docs/dev-change-recovery.sql`, NOT applied, NOT merged). Nothing here touched production
-except read-only queries.
+Scope: PR #1829 (`docs/dev-change-recovery.sql`, NOT applied, NOT merged). No production change was made; the only
+production access was read-only `EXPLAIN ANALYZE` / `SELECT`.
 
-## 1. Product tradeoff: first sightings of widened-only records (rule_version 2)
+## 1. The rule (rule_version 3) — baseline once, then ordinary news
 
-**Before:** a widened-only first sighting was suppressed as "historical" when `submitted_at` was more than 45 days old.
-That used a filing/issue/scheduled/estimated/decided date as evidence of *when HomeSignal first learned of it*.
-It is the wrong evidence: delayed government publication makes a genuinely new record look old, and an undated or
-future-dated one escapes the rule.
+Revision 1 of this PR (rule_version 2) treated every `scope_origin = polygon_member` first sighting as
+`coverage_recovered` forever. That is a permanent blind spot: months after a ZIP's expanded coverage is established, a
+genuinely new filing in the ring would still be silent. Corrected:
 
-**Now:** no date decides anything. A first sighting whose identity carries `scope_origin='polygon_member'` is
-`coverage_recovered`: recorded in `dev_change_recovery` (outcome, date kind and state `dated|undated|future`,
-observation clock, cache generation, rule version), written as a baseline-style first-detected row, and never
-announced. Unstamped records (inside the legacy scope) keep today's behaviour exactly. A *later* change to a recovered
-record is a genuine change and is announced as usual.
+| situation, per **ZIP x source (registry_id)**, evaluated by the ledger's one writer | outcome of a NEW comparable stamped identity |
+|---|---|
+| pair not READY, generation clean | `coverage_recovered` — the baseline: non-material, audited, never announced |
+| pair READY, generation clean | ordinary `first_detected`: material, reportable (a genuine arrival after the verified baseline) |
+| generation NOT clean (source `fetch_failed` / `truncated` in that same collector tick) | **HELD**: not observed at all this time; a later clean generation classifies it. Nothing is inferred |
+| unstamped (legacy scope) | untouched, byte for byte |
 
-**Cost, stated plainly:** a genuinely new filing that first appears in the widened-only ring *at the same moment the
-ring is first read* is not announced as "new". The ledger cannot distinguish "new to the publisher" from "new to us"
-because per-source scope mode per generation is not persisted. This is deliberate: a wrong announcement
-("new project near you") is worse than a quiet first sighting that appears on the page. To announce those, we would
-need per-generation scope-mode evidence per source. That is a separate, approvable change, not made here.
+**No date decides anything.** Nor does the ledger claim "new to HomeSignal" = "newly filed": the baseline is silence
+(no claim), the audit records the publisher date/kind descriptively.
 
-## 2. Synchronisation (`dev_change_recovery_probe`)
+**Readiness evidence** — one new row per ZIP x source, `public.dev_change_scope_ready`, written only by the ledger's
+one writer. A pair becomes READY at a **synchronised** observation that (a) shows >= 1 stamped record of that source
+(a stamp is itself proof the widening was on for that source in that generation) and (b) is **clean**: no
+`dev_refresh_source_failures` row of kind `fetch_failed`/`truncated` for the source whose `seen_at` equals the cache
+clock — `dev_refresh_collect` writes both with `now()` of one transaction, so this is an exact match, not a window.
+Existing authorities reused: canonical refresh (`development_reports.refreshed_at`), source health
+(`dev_refresh_source_failures`), cache-generation/materialisation evidence (`app_projects.provenance.refreshed_at`),
+and the change ledger. No second state authority: readiness is derived-and-cached evidence, lapsed or rebuilt from them.
 
-One STABLE SQL statement = one snapshot. Synchronised only when the cache clock exists, every development row's
-`provenance.refreshed_at` parses and **equals** the cache clock (a completed materialisation rewrites every row),
-every requested key is present in that generation, and an empty materialisation is not hiding a non-empty cache.
-Otherwise the ZIP is **deferred**: nothing written, the tick does not advance, the reason is returned
-(`zips_deferred`). No second state authority: it reads `development_reports.refreshed_at` and the existing provenance.
-Tests: one current + stale rows, empty materialisation (3 cases), invalid/missing/impossible timestamps, cache newer or
-rewound, null clock, no cache, unmatched key, a concurrent collector write during the probe (C01/C02) with a
-volatile-helper positive control (C03).
+**Lapse** — a synchronised observation that shows **no** stamped record anywhere in the ZIP while readiness rows exist
+means the widening is no longer evidenced (mode off, RPC fell back to the legacy scope): all the ZIP's readiness lapses.
+When coverage returns the ring is re-baselined silently; known identities are never re-announced (absence is never an
+event); records that appeared during the gap are not claimed as genuine.
 
-## 3. Nationwide performance
+**Product tradeoff, stated plainly.** HomeSignal will not manufacture "new development" alerts from historical backfill,
+and will announce genuinely new arrivals once a source's expanded coverage is verified. The price: the *first*
+widened record of a ZIP x source with no stamp at expansion time, a record that first appears in a source whose fetch is
+persistently truncated/failing, and records published during an un-observed disable window, are not announced.
 
-Evidence and model (not a production measurement of the new function, which is not applied):
-- The probe runs only on a ZIP with ≥1 new comparable non-conflict identity (lazy; pinned by P18 and the
-  `probe_on_every_observation_not_lazy` / `stamps_scanned_with_no_keys` mutations). Ordinary runs observe ≤ ~1,860
-  new-identity ZIPs (≤ ~15% of 12,722).
-- Barrier (clock + row equality) reads only that ZIP's rows: typical ~1–3 ms; a dense ZIP ~45 ms warm. The stamped
-  scan runs only when synchronised and keys were requested, restricted to those keys: dense ZIP ~0.2–0.4 s.
-- Nightly budget: ~84 calls × 60 s ≈ 5,040 s at ~170 ZIPs/call. Upper bound for the added work: 1,860 × ~3 ms +
-  ~1% dense (~19 ZIPs) × ~0.5 s ≈ 15 s, i.e. ~0.3% of the budget. Deferral rate ≈ 15% × 3.9% (observed one-generation
-  lag) ≈ 0.6% of observations, versus ~4% under an unconditional barrier.
-- NOT measured: the exact probe statement on production dense ZIPs (it cannot be installed). A read-only inline run of
-  the statement text is the next measurement step if wanted.
+## 2. Synchronisation (`dev_change_recovery_probe`) — answers to the review
 
-## 4. Records vs distinct real-world projects (item 5)
+One STABLE SQL statement = one snapshot, reading in that snapshot: the cache clock, every development row's generation
+(equality with the clock, never max/>=), requested-key binding, the stamped elements, and the same-tick failure rows.
+Concurrency is *executed*, not argued (`run.sh` C01–C05): a collector write (C01) or a failure-row commit (C04) landing
+**during** the probe is invisible to it and visible to the next; a positive control (C03) swaps in the volatile-helper
+shape and the same scenario then splits the snapshot, proving the check can fail. The observation itself runs under the
+ledger's advisory lock and one transaction; readiness is read and written by that same writer.
 
-The ZIP tile counts permit/application **records**; one real-world project routinely files many records. Measured
-read-only on `app_projects` (development kind), 2026-10-11:
+## 3. Benchmarks (read-only on production; the new function is NOT installed, so these time the exact statements)
 
-| ZIP | records | distinct addresses |
-|---|---:|---:|
-| 76258 | 275 | 208 |
-| 76247 | 341 | 244 |
-| 76227 | 418 | 306 |
-| 78617 | 570 | 347 |
-| 10025 | 792 | 402 |
+Measured 2026-10-11 with `EXPLAIN (ANALYZE)` on the probe's CTEs against production data. The stamp scan finds no stamped
+element today (the widening is off), so it measures scan cost, not stamped-row volume.
 
-Distinct address is an upper-bound proxy for projects (one address may host several projects, one project several
-addresses). **Proposed smallest universal correction (NOT implemented, needs approval):** label the tile count
-"Development records" wherever it is shown, and show the distinct-address figure only where a canonical project
-identity exists. No new identity inference.
+| ZIP | development rows | barrier (clock + generation + failure read) | stamp scan (dedup + filter) |
+|---|---:|---:|---:|
+| 76258 (typical) | 275 | **3.0 ms warm** (621 ms cold, 248 heap reads) | not run (same code path, linear) |
+| 28451 (largest, 13,846 `app_projects` rows / 13,890 cached sites) | 13,846 | **116 ms warm** (2.8 s cold) | **194 ms** (dedup sort spills 16 MB to disk) |
 
-## 5. Unsupported assumptions
+Warm per-row cost ≈ 0.011 ms barrier + 0.014 ms scan. **Estimate (not a measurement)** for the worst case — the probe
+run on *every* ZIP observation of a fully expanded country: ~3.2 M development rows x ~0.025 ms ≈ 80 s per full pass,
+against a nightly change-observation budget of ~84 calls x 60 s ≈ 5,040 s (≈1.6%). The probe is lazy before any expansion
+(runs only for a ZIP with a new comparable identity, readiness rows, or an already-recovered identity), so today's cost is
+zero. The cold number is irrelevant to the marginal cost: the observer reads the same rows first.
 
-- Rows retained by roles outside the expected set could keep a ZIP deferred persistently; prevalence not measured nationally (visible via `zips_deferred`).
-- Dedupe/stamp equivalence: twins of one identity never differ in `scope_origin`.
-- `ZIP_SCOPE_BOUNDS_MODE` is believed unset; secrets cannot be read, so "off" is unverified.
-- The ~4% one-generation lag is observed, its cause (sweep latency) not isolated.
+## 4. Records versus distinct projects
+
+Unchanged and kept independent of this PR: the ZIP tile counts permit/application **records**. Measured read-only:
+76258 275 records / 208 distinct addresses; 76247 341/244; 76227 418/306; 78617 570/347; 10025 792/402. Distinct address is
+only an upper-bound proxy for projects and **is not implemented as a count**. Proposed, not implemented, needs approval: label
+the tile "Development records" and show a distinct-project figure only where a canonical project identity exists.
+
+## 5. Remaining unsupported assumptions
+
+- Cleanliness is only as good as the failure record: an incomplete fetch the refresh did not record is invisible.
+- The first widened record of a pair with an empty ring at expansion is silent once (no per-generation scope-mode evidence
+  is persisted; adding it needs an Edge Function change, out of this PR's boundary).
+- A disable/enable that falls wholly between two observations of a ZIP is not seen, so readiness survives it.
+- A source that is truncated on every refresh never reaches readiness; its ring records are held (visible as
+  `coverage_held` and as failure rows), not announced.
+- Duplicate twins of one identity never differ in `scope_origin`.
+- `ZIP_SCOPE_BOUNDS_MODE` is believed unset; secrets cannot be read.
+- Whether `dev_refresh_collect` writes failure rows and the cache clock in one transaction was read from the SQL of record
+  (`refreshed_at = now()`, `seen_at default now()`), not observed live (no widened ZIP exists yet).

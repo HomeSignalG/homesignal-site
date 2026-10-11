@@ -41,12 +41,12 @@ begin
   on conflict (zip) do update set updated_at = excluded.updated_at;
 end $$;
 
-create or replace function public.sim_site(p_id text, p_stage text, p_file date, p_stamped boolean default false, p_kind text default null)
+create or replace function public.sim_site(p_id text, p_stage text, p_file date, p_stamped boolean default false, p_kind text default null, p_reg text default 'fixture')
 returns jsonb language sql as $$
   select jsonb_strip_nulls(jsonb_build_object(
     'source_id', 'arcgis:fixture:' || p_id, 'case_number', p_id, 'label', 'Permit ' || p_id,
     'stage', p_stage, 'file_date', p_file::text, 'address', p_id || ' Main St', 'scope', 'point',
-    'relevance', 'development', 'record_url', 'https://example.test/' || p_id, 'source_registry_id', 'fixture',
+    'relevance', 'development', 'record_url', 'https://example.test/' || p_id, 'source_registry_id', p_reg,
     'date_kind', p_kind, 'scope_origin', case when p_stamped then 'polygon_member' end))
 $$;
 
@@ -66,4 +66,14 @@ language sql as $$
   update public.app_projects a set provenance = case when p_value is null then a.provenance - 'refreshed_at'
                                                      else jsonb_set(a.provenance, '{refreshed_at}', to_jsonb(p_value)) end
    where a.zip = p_zip and a.record_kind = 'development' and a.source_key = any(p_keys)
+$$;
+
+-- a source failure recorded by the refresh. Same-tick (default) = seen_at is the cache generation's own clock, as in
+-- dev_refresh_collect where both are now() of one transaction; otherwise it belongs to an EARLIER attempt.
+create or replace function public.sim_fail(p_zip text, p_reg text, p_kind text, p_same_tick boolean default true) returns void
+language sql as $$
+  insert into public.dev_refresh_source_failures (zip, registry_id, reason, cached_records, blocked_update, seen_at, kind)
+  select p_zip, p_reg, 'fixture', 0, false,
+         case when p_same_tick then d.refreshed_at else d.refreshed_at - interval '1 hour' end, p_kind
+    from public.development_reports d where d.zip = p_zip
 $$;
