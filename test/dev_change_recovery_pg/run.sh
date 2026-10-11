@@ -119,7 +119,12 @@ for m in "$here"/mutations/*.py; do
   mo="$(checks "$tmp/mut.sql" || true)"
   # a kill is a check that ran and FAILED; an apply refusal or a crashed suite is a broken mutation, not evidence
   nf=$(grep -E '\|f(\||$)' <<<"$mo" | grep -vE '^[[:space:]]*(apply|suite)[|[:space:]]' | wc -l || true)
-  if [ "$nf" -gt 0 ]; then echo "KILLED   $name — $nf check(s) failed"; killed=$((killed+1)); else echo "SURVIVED $name (or it only broke the harness)"; status=1; fi
+  # the file's OWN deliberate post-condition (raise exception 'dev_change_recovery: ...') refusing the weakened SQL is also a kill - it is
+  # the migration defending itself - but a syntax error or any other apply failure is a broken mutation and proves nothing
+  nself=$(grep -E '^[[:space:]]*apply\|f\|does not apply: .*dev_change_recovery:' <<<"$mo" | wc -l || true)
+  if [ "$nf" -gt 0 ]; then echo "KILLED   $name — $nf check(s) failed"; killed=$((killed+1));
+  elif [ "$nself" -gt 0 ]; then echo "KILLED   $name — refused by the migration's own post-condition"; killed=$((killed+1));
+  else echo "SURVIVED $name (or it only broke the harness)"; status=1; fi
 done
 echo "MUTATIONS: $killed of $n_mut killed"
 [ "$killed" -eq "$n_mut" ] || status=1
