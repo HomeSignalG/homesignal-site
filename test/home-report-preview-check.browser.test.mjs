@@ -10,6 +10,10 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The build script needs playwright. Importing it here also makes scripts/run-unit-tests.mjs classify this as a BROWSER suite (it reads each file for a
+// playwright import), so it runs in the `browser` job, which installs playwright and Pillow, and never in the offline required gate.
+await import('playwright');
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = join(root, 'scripts', 'build-home-report-preview.mjs');
 const TRACKED = join(root, 'assets', 'home-development-activity-report-preview.webp');
