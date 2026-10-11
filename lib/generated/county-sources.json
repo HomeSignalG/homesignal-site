@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.",
-  "registry_entries": 240,
+  "registry_entries": 241,
   "statewide": {
     "AK": [
       {
@@ -1892,6 +1892,12 @@
         "label": "City of Frisco",
         "scope": "city",
         "commercial": true
+      },
+      {
+        "id": "frisco-proposed-zoning",
+        "label": "City of Frisco",
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|Dallas": [
@@ -1920,6 +1926,12 @@
         "label": "City of Frisco",
         "scope": "city",
         "commercial": true
+      },
+      {
+        "id": "frisco-proposed-zoning",
+        "label": "City of Frisco",
+        "scope": "city",
+        "commercial": false
       }
     ],
     "TX|El Paso": [

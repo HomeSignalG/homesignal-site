@@ -13219,3 +13219,20 @@ question. ND: 45 pages → **7**, once the 85% of applications that were DECLINE
 NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The first number is the
 dataset's size; only the second is what a resident would see.** Neither state was wired, and in
 both cases the layer-wide figure would have justified a wire that the honest figure does not.
+
+---
+
+## DRAFT (NOT ACTIVATED, NOT RIGHTS-CLEARED) — `frisco-proposed-zoning` (2026-10-11)
+
+City of Frisco's own server, `External_Planning_and_Zoning/MapServer/5` "Proposed Zoning" (polygon). Config-only registry entry; no connector,
+engine, N5 or report change. Full evidence and open decisions: `docs/frisco-proposed-zoning-draft-evidence-2026-10-11.md`.
+
+| | |
+|---|---|
+| Coverage | TX Collin + TX Denton (the city straddles both) |
+| Identity | `PROJECT_NO` (`identity_fields`); repeated polygons share one `source_id` |
+| Status → bucket | `UNDER REVIEW`, `REVISE AND RESUBMIT` → proposed (PROVISIONAL); `REVIEW COMPLETE` → none, surfaced via `unmapped_statuses` + `status_unresolved` |
+| Type | none: no `type_map`, no `use_type_const`; every record `unclassified` → the report keeps "Impact not determined" |
+| Date | `Applied_Date` (string MM/DD/YYYY) as `filed`; no `recency_days` |
+| Privacy | `out_fields` allow-list excludes `Planner`, `Planner_EMail`, `DESCRIPTION` |
+| Rights | not in `_shared/report-rights.json`; `test/report-rights-r7.test.mjs` is red until a new ruling (R8) decides |

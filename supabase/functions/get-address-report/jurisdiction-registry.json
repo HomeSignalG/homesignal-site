@@ -4537,6 +4537,66 @@
       "_receipts": "Verified live 2026-07-27 via pg_net (response ids 155581-155589). DISCOVERY: the AGO search hit for 'Active Building Permits' pointed at mapcache.friscotexas.gov, which does NOT resolve (DNS) -- the real live host was found by walking the city's own 'Construction & Development App' item (3e7e17f60f8649d4bab55c4e0c467f77, modified 2026-06-17) to its web map (9f94555a439648bb91cbfc5e83fbaba6) and reading operationalLayers. First-party: the City of Frisco's own ArcGIS Server. LAYER 1 'Active Building Permits': 753 rows, esriGeometryPoint, geometry returned already in wkid 4326. FRESHNESS: newest Issued_Date is 2026-07-24 (3 days before wiring), oldest 2022-05-04, 86 permits issued in the trailing 30 days -- measured from the PARSED file_date in the live cache, because Issued_Date cannot be ordered server-side: it is a STRING, so `orderByFields=Issued_Date DESC` returns 12/31/2025 (a lexical max, not a chronological one). That artifact is itself the clearest demonstration of why recency_days must not be used here. The layer is the city's ACTIVE permit working set (not a historical ledger), so no recency_days is set -- and MUST NOT BE: Issued_Date is esriFieldTypeString in M/D/YYYY, and recency_days emits a `>= DATE 'yyyy-mm-dd'` literal against it (the Anaheim string-date standing answer). isoDay() already normalizes M/D/YYYY (arcgis.ts:541), so file_date parses with no code change. STATUS is a real column with a single VERBATIM value from a live groupBy: ISSUED = 753 of 753 -> bucket approved (every row IS an issued permit; san-antonio/Detroit precedent, but mapped from the live column rather than status_const because the column exists). TYPE is a clean 4-value vocabulary from a live groupBy, ALL of it real construction, so all four are kept and none is unclassified: Single Family Residential 503, Commercial 226, Multi-Family Residential 22, School 2. No trade/electrical/plumbing/sign noise exists in this layer, so no extra_where drop is needed. RECORD-PRECISION record_url: Hyperlink carries a per-record eTRAKiT deep link (https://etrakit.friscotexas.gov/etrakit/Search/permit.aspx?activityNo=B25-04203). SPATIAL ZIP scoping, not native: Address carries street only ('8050 PRESTON RD'), no ZIP anywhere in the schema, so zip_where_template is impossible -> spatial_zip_radius_mi 3 (the Denver/Minneapolis/Chicago pattern; records keep their OWN per-parcel points). COVERAGE is BOTH counties because the City of Frisco straddles the Collin/Denton line -- confirmed against our own rows: Frisco (75034)/(75035) are Collin pages, Frisco (75033)/(75036) are Denton pages. MEASURED ZIP LIFT (all 753 points fetched and run through the connector's own envelopeFor(lat,lng,3) math against zip_centroids): 8 TX ZIP pages, all currently at dev_markers=0 -- 75035 Frisco 278, 75034 Frisco 221, 75036 Frisco 221, 75078 Prosper 147, 75056 The Colony 67, 75024 Plano 43, 75033 Frisco 21, 75025 Plano 13. SIBLING LAYERS REJECTED WITH RECEIPTS: layer 4 'Submittals' (planning cases), layer 5 'Proposed Zoning' and layer 6 'Proposed Annexations' are all esriGeometryPolygon, and the arcgis connector flattens POINT geometry only, so a polygon layer yields no coordinates and would degrade every record to area scope. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned EXACTLY 1 Status value (ISSUED 753) \u2014 a single-status active-permit layer; the other three buckets are [] by construction. || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `Issued_Date` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8. || issued SWEEP 2026-08-09: PASS. `Issued_Date` is a STRING M/D/YYYY (which is why this entry deliberately carries no recency_days \u2014 that emits a DATE literal, the Anaheim standing answer) and isoDay() parses that form, so the empty esriFieldTypeDate roster is EXPECTED, not a defect. Recorded so the null is not re-investigated. NOT silently 100%: production carries 1,016 of 1,019 records with a parsed date \u2014 3 do not parse one (source-side, permits with no issue date yet)."
     },
     {
+      "registry_id": "frisco-proposed-zoning",
+      "geocode_assemble": true,
+      "platform": "arcgis",
+      "service_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/5",
+      "dataset_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/5",
+      "jurisdiction": "City of Frisco",
+      "coverage": [
+        {
+          "state": "TX",
+          "county": "Collin"
+        },
+        {
+          "state": "TX",
+          "county": "Denton"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECT_NAME",
+          "PROJECT_NO"
+        ],
+        "status_raw": "Status",
+        "file_date": "Applied_Date",
+        "lat": "__lat",
+        "lng": "__lng",
+        "case_number": "PROJECT_NO",
+        "record_url": "Hyperlink"
+      },
+      "file_date_kind": "filed",
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "PROJECT_NO",
+        "Project_Type",
+        "PROJECT_NAME",
+        "Status",
+        "Applied_Date",
+        "Hyperlink"
+      ],
+      "status_to_bucket": {
+        "proposed": [
+          "UNDER REVIEW",
+          "REVISE AND RESUBMIT"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "status_unresolved": [
+        {
+          "value": "REVIEW COMPLETE",
+          "first_seen": "2026-10-11",
+          "records_at_first_seen": 1,
+          "asked": "ASKED 2026-10-11 (founder-authorized pg_net probe). Z25-0009 'SWC Independence & Main - AG to PD-Retail', applied 09/15/2025: Status REVIEW COMPLETE while the layer's own Type text reads 'Zoning: Under Review'. A completed staff review is not a decision, and no Frisco definition was found. Not bucketed: the source states no outcome."
+        }
+      ],
+      "record_url_precision": "record",
+      "_receipts": "Config-only draft 2026-10-11 (NOT activated, NOT rights-cleared). City of Frisco's own ArcGIS Server, External_Planning_and_Zoning layer 5 'Proposed Zoning' (esriGeometryPolygon, classic MapServer: derived shoelace centroid for placement, true rings kept for N5 edge distance). Probed live 2026-10-11: 20 features / 17 distinct PROJECT_NO (SUP26-0007 x3 polygons, Z26-0009 x2 -> one source_id each, identity is PROJECT_NO). Status domain (verbatim, feature counts): UNDER REVIEW 11 + REVISE AND RESUBMIT 8 + REVIEW COMPLETE 1 = 20. UNDER REVIEW and REVISE AND RESUBMIT -> proposed: the layer's own Type column reads 'Zoning: Under Review' / 'Zoning: Revise and Resubmit' and the city describes unscheduled cases as pending; NO official Frisco definition of either value was found, so this mapping is PROVISIONAL pending the city's answer (see docs/frisco-gis-licensing-inquiry-DRAFT.md). REVIEW COMPLETE (Z25-0009) is deliberately in NO bucket: it does not state an outcome and its own Type text still reads 'Zoning: Under Review'; it fails closed, is surfaced in unmapped_statuses, and is recorded in status_unresolved. SUP26-0009 is named '(Withdrawn as SUP25-0008)' yet carries UNDER REVIEW - probably a refiled predecessor, UNCONFIRMED; no per-record exclusion is made (a hack), and the status is the publisher's current word. Applied_Date is a STRING in MM/DD/YYYY (so no recency_days, the frisco-active-building-permits standing answer) and is an application/resubmittal date: Z25-0007 carries 09/14/2026 on a 2025 case number, so it is the LATEST submittal, never an approval or construction date (file_date_kind filed). TYPE: Project_Type is only SUP or ZONING (a process kind, not a land use) and the free-text name is never a classifier -> no type_map, no use_type_const: every record is unclassified and the report keeps 'Impact not determined'. PRIVACY: Planner and Planner_EMail exist on the layer and are excluded by out_fields; DESCRIPTION is empty and also excluded. Hyperlink is a per-project eTRAKiT URL (20/20 on etrakit.friscotexas.gov); multi-polygon projects repeat the same URL. Coverage declares Collin and Denton because the city straddles both (frisco-active-building-permits precedent). PROJECT_NAME is null on Z26-0010 -> title falls back to PROJECT_NO. Rights: no entry in _shared/report-rights.json (R7 does not auto-clear a new id; the corporate rights audit rates the registry family UNCLEAR/HOLD)."
+    },
+    {
       "registry_id": "tucson-commercial-building-permits",
       "geocode_assemble": true,
       "platform": "arcgis",
