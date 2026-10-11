@@ -54,10 +54,10 @@ ok(!/\sheight=|style="[^"]*height/.test(frame), 'the sample iframe carries no fi
 ok(/class="home-index__map-preview is-sample"/.test(tpl), 'its wrapper starts in the sample state');
 ok(/\.home-index__map-preview\.is-sample iframe\{pointer-events:none\}/.test(css), 'the sample wrapper turns pointer interaction off');
 const imgs = tpl.match(/<img\b[^>]*>/g) || [];
-ok(imgs.length === 1 && /src="assets\/home-development-activity-report-preview\.webp"/.test(imgs[0]),
+ok(imgs.length === 1 && /src="assets\/home-development-activity-report-preview\.webp\?v=\d{8}"/.test(imgs[0]),
   'the only image is the approved report preview', imgs);
-ok(/alt="Sample HomeSignal Development Activity report pages"/.test(imgs[0] || '') && /width="1448"/.test(imgs[0] || '')
-   && /height="1086"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || ''),
+ok(/alt="Illustrative sample of the HomeSignal Development Activity report: a three-column table of nearby development, its stage, and potential quality-of-life considerations"/.test(imgs[0] || '') && /width="1448"/.test(imgs[0] || '')
+   && /height="1241"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || ''),
   'the report image has the specified alt, width, height and decoding');
 ok(/\.webp/.test(read('scripts/stage_site.py')), 'the production artifact ships .webp assets');
 ok(!/\.(png|webp|jpe?g)/i.test(pageScript), 'the page script references no image (no map screenshot)');
