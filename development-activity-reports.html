@@ -79,13 +79,35 @@ header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(
 header.top .in{max-width:1600px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
 header.top h1{margin:0;font-size:20px}
 header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
-/* THE WAY BACK TO THE SITE (founder, 2026-10-05: "so they can get back to this page"; this is the other direction). This page has no site header
-   by design, so before this row an agent who arrived from the header's Enterprise > My reports had no link off it. Two plain same-site links, inside
-   header.top so the print rule below hides them with it. */
-header.top .sitenav{flex:0 0 100%;display:flex;gap:18px;margin:-8px 0 0}
-header.top .sitenav a{display:inline-flex;align-items:center;min-height:44px;font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}
-header.top .sitenav a:hover{text-decoration:underline}
-header.top .sitenav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
+/* THE SITE BAR (founder, 2026-10-11: "Development Activity and My Reports belong to one polished, coherent HomeSignal product").
+   This page is a standalone document ON PURPOSE (own styles, own sign-in, no shell): the shell boots account hydration, follows sync and a
+   non-dismissible onboarding overlay, none of which belongs in the agent's workspace. So the site bar is page-local and carries the shell's
+   LOOK (partials/shell.html: logo, Explore, My Places, Enterprise, the account on the right) with plain same-site links and no script.
+   Its labels and addresses are pinned to partials/shell.html by test/development-activity-reports.test.mjs (1h), so the two cannot drift.
+   Enterprise is the active section; the row under the title says which Enterprise page this is (Enterprise overview | My reports).
+   Both rows are hidden by the print rule below, with header.top. */
+header.sitebar{background:var(--panel);border-bottom:1px solid var(--line)}
+header.sitebar .in{max-width:1600px;margin:0 auto;padding:0 16px;min-height:72px;display:flex;flex-wrap:wrap;align-items:center;gap:0 32px}
+.sb-brand{display:inline-flex;align-items:center;gap:9px;min-height:44px;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none;flex:none}
+.sb-mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
+.sb-mark svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sb-brand span span{color:#1f9d5c}
+nav.sb-nav{display:flex;align-items:center;gap:32px}
+nav.sb-nav a{display:inline-flex;align-items:center;min-height:44px;font-size:15px;font-weight:500;color:#2f3d36;text-decoration:none}
+nav.sb-nav a:hover{color:var(--ink)}
+nav.sb-nav a[aria-current=page]{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:2px;text-underline-offset:10px}
+header.sitebar .who{margin:0 0 0 auto;display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:0 4px;min-height:44px}
+header.sitebar a:focus-visible,header.sitebar button:focus-visible,header.top .entnav a:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
+header.top .entnav{flex:0 0 100%;display:flex;flex-wrap:wrap;gap:4px;margin:-10px 0 6px -14px}
+header.top .entnav a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:600;color:var(--muted);text-decoration:none}
+header.top .entnav a:hover{background:var(--panel2);color:var(--ink)}
+header.top .entnav a[aria-current=page]{background:#e9f5ee;color:#0f5c37}
+@media(max-width:700px){
+  header.sitebar .in{gap:0 16px;padding-top:6px}
+  header.sitebar .who{order:2;display:block;flex:1 1 0;min-width:0;text-align:right;line-height:1.35}
+  nav.sb-nav{order:3;flex:0 0 100%;gap:24px;overflow-x:auto}
+  nav.sb-nav a{white-space:nowrap}
+}
 .who{font-size:13px;color:var(--muted)}
 .who button{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
 .wrap{max-width:1600px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:18px}
@@ -279,7 +301,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
    own stylesheet (lib/da-report-view.js) takes care of the report. */
 @media print{
   body{background:#fff}
-  header.top,.card,.sec-h,#status,#creditnote,#report-empty,.acct,.rail,#compare-result,.auth-overlay,#share-pop{display:none!important}
+  header.sitebar,header.top,.card,.sec-h,#status,#creditnote,#report-empty,.acct,.rail,#compare-result,.auth-overlay,#share-pop{display:none!important}
   .wrap{max-width:none;padding:0;display:block}
   .ws{display:block}
   .stage{display:block}
@@ -300,15 +322,21 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 </style>
 </head>
 <body>
+<header class="sitebar">
+  <div class="in">
+    <a class="sb-brand" href="index.html"><span class="sb-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span>Signal</span></span></a>
+    <nav class="sb-nav" aria-label="HomeSignal site"><a href="index.html">Explore</a><a href="properties.html">My Places</a><a href="development-activity.html" aria-current="page">Enterprise</a></nav>
+    <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
+  </div>
+</header>
 <header class="top">
   <div class="in">
-    <nav class="sitenav" aria-label="HomeSignal site"><a href="index.html">HomeSignal</a><a href="development-activity.html">Enterprise</a></nav>
+    <nav class="entnav" aria-label="Enterprise"><a href="development-activity.html">Enterprise overview</a><a href="development-activity-reports.html" aria-current="page">My reports</a></nav>
     <div>
       <p class="brand">HomeSignal</p>
       <h1>Development Activity Reports</h1>
       <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
     </div>
-    <p class="who" id="who"><button type="button" id="signin">Sign in</button></p>
   </div>
 </header>
 
