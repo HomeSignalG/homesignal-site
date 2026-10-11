@@ -79,8 +79,11 @@ ok(/\.eq\('user_id', row\.user_id\)/.test(savePlaceRow),
   '2h the conflict re-read is scoped to the owner — never another account\'s row');
 
 // ───────────────────────── 3. UNITS: input_address IS IDENTITY, NOT DISPLAY ─────────────
-ok(/input_address/.test(saveHome) && /input_address/.test(onb),
-  '3a both writers carry the resident\'s typed line');
+// The row shape is built in ONE place (placeRowFor), which carries input_address; every writer passes its typed line to it.
+const placeRowFor = (shell.match(/function placeRowFor\([\s\S]*?\n  \}/) || [''])[0];
+ok(/input_address:\s*String\(typed/.test(placeRowFor) && /placeRowFor\(m, _homeInput\)/.test(saveHome) && /placeRowFor\(m, addr\)/.test(onb)
+  && /placeRowFor\(m, typed\)/.test(shell),
+  '3a every writer (saveHome, onboarding, followProperty) carries the resident\'s typed line through the one row builder');
 ok(/_homeInput = q;/.test(shell), '3b findHome captures the typed string on a confirmed match');
 ok(/_homeInput = null;/.test(shell), '3c openHome clears it, so one save cannot inherit another\'s input');
 // It must never be rendered: the displayed address stays the Census-confirmed match.

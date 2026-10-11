@@ -741,13 +741,7 @@
     const res = await HS.resolveAddress(addr);
     if (!res.ok) throw new Error(res.message);
     const m = res.match;
-    const row = {
-      user_id: state.session.user.id,
-      address: String(m.matchedAddress || '').split(',')[0],
-      city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home',
-      input_address: String(addr || '').trim() || null
-    };
+    const row = placeRowFor(m, addr);
     // FIX 17 — onboarding uses the SAME saved-place contract as HS.saveHome.
     //
     // It used to find whichever row was isRealHome and UPDATE it, which encoded a
@@ -1644,6 +1638,17 @@
     return String(e.code || '') === DUP_CODE
       || /duplicate key value|app_properties_user_place_key/i.test(String(e.message || ''));
   }
+  // THE ONE SHAPE OF A SAVED-ADDRESS ROW. HS.saveHome, saveOnboardingAddress and HS.followProperty all build it here, so
+  // the three writers cannot drift apart on what an Address is. `typed` is the line the resident typed (the only unit-bearing value).
+  function placeRowFor(m, typed) {
+    return {
+      user_id: state.session.user.id,
+      address: String(m.matchedAddress || '').split(',')[0],
+      city: m.city || null, state: m.state || null, zip: m.zip,
+      lat: m.lat, lng: m.lng, label: 'home',
+      input_address: String(typed || '').trim() || null
+    };
+  }
   async function savePlaceRow(row) {
     let r = null;
     try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
@@ -1678,13 +1683,7 @@
       const b = $('homeSaveBtn'); if (b) { b.disabled = false; b.removeAttribute('aria-busy'); }
     };
     $('homeConfirmMsg').textContent = 'Saving…';
-    const row = {
-      user_id: state.session.user.id,
-      address: String(m.matchedAddress || '').split(',')[0],
-      city: m.city || null, state: m.state || null, zip: m.zip,
-      lat: m.lat, lng: m.lng, label: 'home',
-      input_address: _homeInput || null
-    };
+    const row = placeRowFor(m, _homeInput);
     const r = await savePlaceRow(row);
     if (!r.data) {
       $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
@@ -1712,6 +1711,63 @@
     release();
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
   };
+
+  // FOLLOW THIS PROPERTY - the shared Development Activity report's buttons land here.
+  //
+  // "Following a property" IS a saved Address in My Places: the same app_properties row HS.saveHome writes, through the same
+  // savePlaceRow (idempotent at the database by app_properties_user_place_key), then the same area follow and digest-floor
+  // subscription HS.saveHome does. No second store, no second id, no second alert path. The buyer follows the PROPERTY: nothing
+  // here reads or writes a report, a brokerage, a credit or a share link.
+  //   {ok:true, existed}          saved now, or already followed (the same success to the resident)
+  //   {ok:false, reason, message} signed_out | invalid | unavailable | no_match | invalid_coords | save_failed
+  HS.followProperty = async function (address) {
+    if (!state.session || state.session.demo) return { ok: false, reason: 'signed_out', message: 'Sign in to follow this property.' };
+    const typed = String(address || '').trim();
+    if (typed.length < 8 || typed.length > 200 || typed.indexOf(' ') < 0) return { ok: false, reason: 'invalid', message: "We couldn't read this property's address." };
+    const res = await HS.resolveAddress(typed);
+    if (!res.ok) return { ok: false, reason: res.reason, message: res.message };
+    const m = res.match;
+    const r = await savePlaceRow(placeRowFor(m, typed));
+    if (!r.data) return { ok: false, reason: 'save_failed', message: "Couldn't follow this property - please try again." };
+    try { state.properties = await HS.data.properties(); } catch (e) {}
+    try {
+      if (await HS.data.isCovered(m.zip)) {
+        let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
+        HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+        await HS.ensureAreaSubscribed(m.zip, true, true);   // digest floor only, exactly as HS.saveHome
+      }
+    } catch (e) {}
+    return { ok: true, existed: !!r.existed };
+  };
+  // The hand-off from a shared report: the address rides in THIS TAB's sessionStorage (never a URL), is removed the moment it is read,
+  // and is kept in memory only. A sign-in the visitor abandons therefore leaves nothing behind that a later, unrelated sign-in could fire.
+  // The outcome goes back to the report in sessionStorage; the report decides what to show. Nothing about the address is logged.
+  const FOLLOW_HANDOFF = 'hs.followProperty', FOLLOW_RESULT = 'hs.followPropertyResult', FOLLOW_BACK = /^[a-z0-9-]+\.html$/;   // a page in this folder, named by the page that handed off
+  async function runFollowHandoff(address, back) {
+    const r = await HS.followProperty(address);
+    try { sessionStorage.setItem(FOLLOW_RESULT, r.ok ? 'followed' : 'failed'); } catch (e) {}
+    if (r.ok) { try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('shared_report_follow_completed'); } catch (e) {} }
+    location.replace(back);   // the page that asked is still in this tab with its own state (a report's link token included), so it reopens
+  }
+  // The hand-off is JSON {address, back}: `back` must be a bare file name in this folder (no path, no scheme, no host), or nothing is done.
+  function takeFollowHandoff() {
+    let h = null;
+    try { h = JSON.parse(sessionStorage.getItem(FOLLOW_HANDOFF) || 'null'); sessionStorage.removeItem(FOLLOW_HANDOFF); } catch (e) { h = null; }
+    const a = h && typeof h.address === 'string' ? h.address.trim() : '';
+    const back = h && typeof h.back === 'string' ? h.back : '';
+    return a.length >= 8 && a.length <= 200 && FOLLOW_BACK.test(back) ? { address: a, back: back } : null;
+  }
+  async function consumeFollowHandoff() {
+    const hand = takeFollowHandoff();
+    if (!hand) return false;
+    const address = hand.address, back = hand.back;
+    try { if (typeof window.hsLogEvent === 'function') window.hsLogEvent('shared_report_follow_clicked'); } catch (e) {}
+    if (state.session && !state.session.demo) { await runFollowHandoff(address, back); return true; }
+    HS.openAuth(function () { return runFollowHandoff(address, back); });
+    const sub = $('authSub');
+    if (sub) sub.textContent = 'Sign in or create your free account to follow this property - we\u2019ll email you a 6-digit code.';
+    return true;
+  }
 
   // A-012 REMOVE ADDRESS — the one basic management function that did not exist.
   //
@@ -2682,7 +2738,11 @@
       const optin = sessionStorage.getItem('hs:areaOptin');
       if (optin) { sessionStorage.removeItem('hs:areaOptin'); setTimeout(() => { try { HS.showAreaOptin(JSON.parse(optin)); } catch (e) {} }, 400); }
     } catch (e) {}
-    if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
+    // A shared report's "Follow this property": follow now when signed in, else sign in first and resume. Runs before the onboarding
+    // check so the property it saves counts as the resident's place (the sign-in path does the same, see HS.authSubmit).
+    let followPending = false;
+    if (!IS_EMBED) { try { followPending = await consumeFollowHandoff(); } catch (e) { console.warn('follow-handoff', e); } }
+    if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding() && !followPending) HS.startOnboarding();
     _resolveReady(HS);
   }
 

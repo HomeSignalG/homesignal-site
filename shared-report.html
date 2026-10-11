@@ -36,6 +36,14 @@ header.top .in{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10
 header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--accent)}
 .go{font:inherit;font-size:14.5px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;min-height:44px}
 .go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+/* The header's two actions. "Follow this property" is the one primary action (solid green); "Download PDF" is quieter (outlined), so the
+   two never compete and the report stays the dominant object. On a phone they stack, Follow first, each a full-width tap target. */
+header.top .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.go.alt{background:var(--panel);color:var(--accent);border:1.5px solid var(--accent)}
+.go[aria-disabled="true"]{cursor:default;opacity:.85}
+@media (max-width:560px){header.top .actions{width:100%;flex-direction:column;align-items:stretch}header.top .actions .go{width:100%}}
+.invite .hint{margin:0 0 10px}
+.invite .go{margin-top:12px}
 .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:14px}
 #status{margin:0;font-size:15px;min-height:1.5em}
 #status.err{color:var(--red);font-weight:600}
@@ -55,6 +63,7 @@ noscript p{margin:16px;font-weight:600}
 @media print{
   body{background:#fff;font-size:12.5px}
   header.top,#status,#private,.notice,noscript{display:none!important}
+  .invite .go,.invite .hint{display:none!important}
   .wrap{max-width:none;padding:0}
   #rid{color:#444}
 }
@@ -64,7 +73,10 @@ noscript p{margin:16px;font-weight:600}
 <header class="top">
   <div class="in">
     <p class="brand">HOMESIGNAL DEVELOPMENT ACTIVITY</p>
-    <button type="button" class="go" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+    <div class="actions">
+      <button type="button" class="go follow" id="follow" hidden title="Get notified when HomeSignal finds new development or meaningful project changes near this property.">Follow this property</button>
+      <button type="button" class="go alt" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+    </div>
   </div>
 </header>
 <main class="wrap">
@@ -76,6 +88,8 @@ noscript p{margin:16px;font-weight:600}
   <aside id="invite" class="invite" hidden aria-label="About HomeSignal">
     <h2>Follow quality-of-life intelligence for this property.</h2>
     <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
+    <p class="hint" id="followHint" hidden>Get notified when HomeSignal finds new development or meaningful project changes near this property.</p>
+    <button type="button" class="go follow" id="followBottom" hidden>Follow this property</button>
     <a href="https://homesignal.net/" rel="noopener noreferrer">Explore HomeSignal &rarr;</a>
   </aside>
 </main>
@@ -90,6 +104,12 @@ noscript p{margin:16px;font-weight:600}
   var SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3bm5tbGp1Y2FqbmV4cHhkZ3hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MTAyOTgsImV4cCI6MjA5NTk4NjI5OH0.prpXB6lSIhWMAsdkkaxAfkvEodbojfUUyN4L4JbQE1U';
   var FN = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shared-report';
   var STASH = 'hs-da-share';
+  // "Follow this property": the page has no account and no sign-in of its own, so it hands the PROPERTY (its address, while the private layer
+  // still keeps it) to HomeSignal's own follow, in this tab's sessionStorage and never a URL, and HomeSignal sends the visitor back here with
+  // the outcome. Both buttons do exactly this and nothing else: no follow logic lives on this page, and the link's token is never passed on.
+  var FOLLOW_HANDOFF = 'hs.followProperty', FOLLOW_RESULT = 'hs.followPropertyResult', FOLLOW_LANDING = 'properties.html';
+  var followAddress = '';
+  var FOLLOWING = 'Following this property';
   var TOKEN = /^[A-Za-z0-9_-]{43}$/;
   var FRAGMENT = /^#share=([A-Za-z0-9_-]{43})$/;
   function $(id){ return document.getElementById(id); }
@@ -159,11 +179,33 @@ noscript p{margin:16px;font-weight:600}
     }
     $('invite').hidden = false;
     $('pdf').hidden = false;
+    // Without an address (purged, or never kept) nothing safely identifies the property, so the button is not offered; it is never inferred.
+    var addr = typeof body.address === 'string' ? body.address.trim() : '';
+    followAddress = addr.length >= 8 && addr.length <= 200 && addr.indexOf(' ') > 0 ? addr : '';
+    ['follow', 'followBottom'].forEach(function(id){ $(id).hidden = !followAddress; });
+    $('followHint').hidden = !followAddress;
+    if (followAddress) outcome(takeResult());
+  }
+
+  function takeResult(){ try { var v = sessionStorage.getItem(FOLLOW_RESULT); sessionStorage.removeItem(FOLLOW_RESULT); return v; } catch (e) { return null; } }
+  /** What HomeSignal reported when it sent the visitor back. Only a confirmed follow ever shows the followed state. */
+  function outcome(r){
+    if (r === 'followed') {
+      ['follow', 'followBottom'].forEach(function(id){ var b = $(id); b.textContent = FOLLOWING; b.setAttribute('aria-disabled', 'true'); });
+      say('You’re following this property. HomeSignal will let you know when it finds new development or meaningful project changes nearby.', false);
+    } else if (r === 'failed') {
+      say('We couldn’t follow this property just now. Your report is unchanged. Please try again.', true);
+    }
+  }
+  function follow(){
+    if (!followAddress || $('follow').getAttribute('aria-disabled') === 'true') return;
+    try { sessionStorage.setItem(FOLLOW_HANDOFF, JSON.stringify({ address: followAddress, back: 'shared-report.html' })); } catch (e) { say('We couldn’t start that just now. Your report is unchanged. Please try again.', true); return; }
+    location.href = FOLLOW_LANDING;
   }
 
   async function start(){
     var token = readToken();
-    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('invite').hidden = true; $('pdf').hidden = true;
+    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('invite').hidden = true; $('pdf').hidden = true; $('follow').hidden = true; $('followBottom').hidden = true; followAddress = '';
     if (!token) { missing(); return; }
     state('loading'); say('Loading the report…', false);
     var res;
@@ -185,6 +227,8 @@ noscript p{margin:16px;font-weight:600}
 
   document.addEventListener('DOMContentLoaded', function(){
     $('pdf').addEventListener('click', function(){ window.print(); });
+    $('follow').addEventListener('click', follow);
+    $('followBottom').addEventListener('click', follow);
     start();
   });
 })();

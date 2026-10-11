@@ -5063,6 +5063,18 @@ live.** Full record: `docs/indexnow-seo-freshness.md`. The rules that must not b
 - **`lastmod` moves only when the fingerprint moves, and is omitted when unknown** — never the build day.
 - Query-string map URLs (`homesignalmap.html?zip=`) and `community.html?zip=` are never submitted.
 
+## "FOLLOW THIS PROPERTY" ON THE SHARED DEVELOPMENT ACTIVITY REPORT (2026-10-11)
+
+The shared report's header carries **Follow this property** (solid green, primary) beside **Download PDF** (outlined, secondary); the bottom invitation carries the same button. Both do one thing.
+
+- **Canonical truth path:** a followed property IS a saved Address in My Places, written by `shell.js::HS.followProperty` through the one writer `savePlaceRow` (idempotent at the database by `app_properties_user_place_key`), the same area follow and digest-floor subscription `HS.saveHome` does. Row shape is built once, in `placeRowFor`, for all three writers. Decision owner: `HS.followProperty`. No new table, id, subscription or sign-in.
+- **Not the report follow.** `follow-development-report` is an owner-less, admin-only need on a report's private context (the agent's "Watch"); it is not a buyer follow and this path never calls it. Nothing here touches a report, a brokerage credit or a share link.
+- **The page has no account and loads no shell.** It hands the PROPERTY over in this tab's sessionStorage (`hs.followProperty` = `{address, back}`; never a URL, never the link token) and goes to a shell page. `consumeFollowHandoff` (boot) reads and removes it at once, follows (or opens the existing sign-in and resumes), and returns to `back` with `hs.followPropertyResult` = `followed | failed`. `back` must be a bare `*.html` file name. An abandoned sign-in leaves nothing behind. The shared page shows "Following this property" only on a confirmed `followed`.
+- **No address, no button.** If the private layer no longer keeps the address, the property cannot be identified, so the button is not offered.
+- **Known limit:** the page cannot see the visitor's session, so it cannot show "Following" before a click; a repeat follow is the same idempotent success.
+- Events: `shared_report_follow_clicked` / `_completed` through `HS.logEvent`, no payload.
+- Tests: `shared-report-follow.browser.test.mjs` (page), `shared-report-follow-handoff.browser.test.mjs` (shell), `shared-report-page.test.mjs`.
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
