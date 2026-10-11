@@ -437,7 +437,7 @@ async function runEntry(
   report.scope_receipt = buildScopeReceipt({
     requested: widenedOk, widens: !!fetchMeta.widened, widenedRan: !!fetchMeta.widened,
     fallback: report.scope_fallback, truncatedAt: report.truncated_at_max_rows, metrics: widenedRan ? metrics : null,
-    version: receiptVersion(deps.zipCentroid, entry.spatial_zip_radius_mi, widenedBounds(deps.zipBounds, deps.zipMembers)),
+    version: receiptVersion(deps.zipCentroid, entry.spatial_zip_radius_mi, widenedBounds(deps.zipBounds, deps.zipMembers), entry as unknown as Record<string, unknown>),
   });
 
   for (const row of rows) {

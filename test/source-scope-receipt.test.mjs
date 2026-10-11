@@ -18,7 +18,8 @@ const Z = {
   '76227': { lat: 33.292, lng: -96.9879, xmin: -97.123906, ymin: 33.188336, xmax: -96.863538, ymax: 33.357867 },
 };
 const R = 3;
-const bounds = (z) => ({ xmin: Z[z].xmin, ymin: Z[z].ymin, xmax: Z[z].xmax, ymax: Z[z].ymax });
+const GEO = (z) => 'ab' + z.padEnd(30, 'c');   // a stand-in 32-hex md5 of the polygon, per ZIP
+const bounds = (z) => ({ xmin: Z[z].xmin, ymin: Z[z].ymin, xmax: Z[z].xmax, ymax: Z[z].ymax, geom_sig: GEO(z) });
 const cen = (z) => ({ lat: Z[z].lat, lng: Z[z].lng });
 const jit = (z) => { const sq = sb.centroidSquare(Z[z].lat, Z[z].lng, R), b = bounds(z); return { sq, b }; };
 // a legacy point (inside the square) and widened points (inside the bbox, outside the square)
@@ -45,8 +46,8 @@ const R0 = (o) => o.reports[0].scope_receipt;
 
 console.log('1) the pure builder');
 {
-  const base = { requested: true, widens: true, widenedRan: true, fallback: null, truncatedAt: null, metrics: { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false }, version: 'v1:x' };
-  ok(JSON.stringify(sr.buildScopeReceipt(base)) === '{"scope":"expanded","version":"v1:x","complete":true}', 'a clean widened run is expanded + complete');
+  const base = { requested: true, widens: true, widenedRan: true, fallback: null, truncatedAt: null, metrics: { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false }, version: 'v2:x' };
+  ok(JSON.stringify(sr.buildScopeReceipt(base)) === '{"scope":"expanded","version":"v2:x","complete":true}', 'a clean widened run is expanded + complete');
   ok(sr.buildScopeReceipt({ ...base, truncatedAt: 20 }).complete === false, 'truncation is incomplete');
   ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, unresolved_excluded: 1 } }).complete === false, 'an unresolved membership test is incomplete');
   ok(sr.buildScopeReceipt({ ...base, metrics: { ...base.metrics, rpc_failures: 1 } }).complete === false, 'a failed membership call is incomplete');
@@ -55,10 +56,25 @@ console.log('1) the pure builder');
   const fb = sr.buildScopeReceipt({ ...base, fallback: 'legacy_after_membership_error' });
   ok(fb.scope === 'fallback' && fb.version === null && fb.complete === false, 'a fallback is a fallback, with no version');
   ok(sr.buildScopeReceipt({ ...base, requested: false }).scope === 'legacy' && sr.buildScopeReceipt({ ...base, widens: false }).scope === 'legacy', 'not requested / does not widen ⇒ legacy');
-  const v = (z, b) => sr.receiptVersion(cen(z), R, b);
+  const ENTRY = { registry_id: 'e1', platform: 'arcgis', dataset_url: 'https://x/y', extra_where: "A = 'b'", type_map: { A: 'Commercial' } };
+  const v = (z, b, e = ENTRY) => sr.receiptVersion(cen(z), R, b, e);
   ok(v('76258', bounds('76258')) === v('76258', bounds('76258')) && v('76258', bounds('76258')) !== v('76258', { ...bounds('76258'), xmax: bounds('76258').xmax + 0.01 }), 'the version moves when the envelope moves, and only then');
-  ok(v('76258', null) === null && sr.receiptVersion(null, R, bounds('76258')) === null, 'no bounds / no centroid ⇒ no version');
-  ok(sr.scopeVersion(sb.scopeBox(cen('76258'), R, bounds('76258')), 3) !== sr.scopeVersion(sb.scopeBox(cen('76258'), R, bounds('76258')), 4), 'the radius is part of the version');
+  ok(v('76258', null) === null && sr.receiptVersion(null, R, bounds('76258'), ENTRY) === null, 'no bounds / no centroid ⇒ no version');
+  ok(sr.scopeVersion(sb.scopeBox(cen('76258'), R, bounds('76258')), 3, 'g', 'c') !== sr.scopeVersion(sb.scopeBox(cen('76258'), R, bounds('76258')), 4, 'g', 'c'), 'the radius is part of the version');
+  // ── NEW: the polygon's SHAPE and the source's configuration are part of the version ──
+  const b0 = bounds('76258');
+  ok(v('76258', { ...b0, geom_sig: 'f'.repeat(32) }) !== v('76258', b0), 'a polygon edit that keeps the SAME bounding box moves the version');
+  ok(v('76258', { xmin: b0.xmin, ymin: b0.ymin, xmax: b0.xmax, ymax: b0.ymax }) === null, 'no polygon identity (older database) ⇒ no version ⇒ never READY');
+  ok(v('76258', { ...b0, geom_sig: 'not-hex' }) === null, 'a malformed polygon identity is not accepted');
+  ok(v('76258', b0, { ...ENTRY, extra_where: "A = 'c'" }) !== v('76258', b0), 'a changed query filter moves the version');
+  ok(v('76258', b0, { ...ENTRY, type_map: { A: 'Industrial' } }) !== v('76258', b0), 'a changed eligibility/type mapping moves the version');
+  ok(v('76258', b0, { ...ENTRY, dataset_url: 'https://x/z' }) !== v('76258', b0), 'a different endpoint/dataset moves the version');
+  ok(v('76258', b0, { ...ENTRY, identity_fields: ['ID'] }) !== v('76258', b0), 'a changed identity mapping moves the version');
+  ok(v('76258', b0, { ...ENTRY, new_unknown_key: 1 }) !== v('76258', b0), 'an UNKNOWN new registry key is material by default (a safe rebaseline, never a silent inherit)');
+  ok(v('76258', b0, { ...ENTRY, _receipts: 'x', jurisdiction: 'Y', coverage: [{ state: 'TX' }], out_fields: 'A', page_size: 50, observed_types_unreviewed: [1] }) === v('76258', b0), 'audit notes, labels, coverage gating, projection and paging do NOT move it');
+  ok(v('76258', b0, { type_map: { A: 'Commercial' }, extra_where: "A = 'b'", dataset_url: 'https://x/y', platform: 'arcgis', registry_id: 'e1' }) === v('76258', b0), 'key order never matters');
+  ok(sr.fnv64('') === 'cbf29ce484222325' && sr.fnv64('a') === 'af63dc4c8601ec8c', 'the hash is the standard FNV-1a 64 (pinned, so it cannot drift between runtimes)');
+  ok(sr.buildScopeReceipt({ requested: true, widens: true, widenedRan: true, fallback: null, truncatedAt: null, metrics: { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false }, version: null }).complete === false, 'an expanded run whose version is unknown is never complete');
 }
 
 for (const z of Object.keys(Z)) {
@@ -66,7 +82,7 @@ for (const z of Object.keys(Z)) {
   const L = legacyPts(z, 5), W = widenedPts(z, 6);
   const deps = (mem) => ({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: mem });
   const e1 = await arcRun(z, [...L, ...W], deps(allMember));
-  ok(R0(e1).scope === 'expanded' && R0(e1).complete === true && /^v1:/.test(R0(e1).version), 'members found ⇒ expanded, complete, versioned', JSON.stringify(R0(e1)));
+  ok(R0(e1).scope === 'expanded' && R0(e1).complete === true && /^v2:/.test(R0(e1).version), 'members found ⇒ expanded, complete, versioned', JSON.stringify(R0(e1)));
   const e2 = await arcRun(z, [...L, ...W], deps(allOutside));
   ok(e2.sites.length === 5 && R0(e2).scope === 'expanded' && R0(e2).complete === true, 'EMPTY ring (every widened record outside the polygon) ⇒ still expanded + complete', JSON.stringify(R0(e2)));
   const e3 = await arcRun(z, L, deps(allMember));
@@ -100,7 +116,7 @@ console.log('\n3) csv (the connector that used to set scope_widened only when a 
   const d = (mem) => ({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: mem });
   const r = (o) => o.reports[0].scope_receipt;
   const e1 = await go([...L, ...W], d(allMember));
-  ok(r(e1).scope === 'expanded' && r(e1).complete === true && /^v1:/.test(r(e1).version), 'members found ⇒ expanded + complete');
+  ok(r(e1).scope === 'expanded' && r(e1).complete === true && /^v2:/.test(r(e1).version), 'members found ⇒ expanded + complete');
   const e2 = await go([...L, ...W], d(allOutside));
   ok(e2.reports[0].scope_widened !== true && r(e2).scope === 'expanded' && r(e2).complete === true, 'EMPTY ring: scope_widened stays unset (nothing kept) but the RECEIPT still proves the expanded read', JSON.stringify(r(e2)));
   const e3 = await go(L, d(allMember));

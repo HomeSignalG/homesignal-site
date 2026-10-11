@@ -1,12 +1,18 @@
 name: source-receipt-suite
 
-# docs/dev-source-receipt.sql against a DISPOSABLE Postgres (receipts are positive, generation-linked, fail-closed; 8 mutations
-# must be killed) and the connector receipt test. Never addresses production; holds no database secret.
+# docs/dev-source-receipt.sql against the LIVE dev_refresh_collect() (rebuilt, fingerprinted to production) on a DISPOSABLE Postgres: the
+# accepted response is bound to the accepted cache write, continuity is durable per ZIP x source, and 14 mutations must be killed; plus
+# the connector receipt test. Never addresses production; holds no database secret.
 on:
   pull_request:
     paths:
       - 'docs/dev-source-receipt.sql'
       - 'test/source_receipt_pg/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/dev_refresh_restart_pg/**'
+      - 'docs/dev-refresh-collect-*.sql'
+      - 'docs/dev-refresh-source-failure-guard.sql'
+      - 'docs/zip-scope-bounds.sql'
       - 'test/source-scope-receipt.test.mjs'
       - 'supabase/functions/get-address-report/sources/**'
       - '.github/workflows/source-receipt-suite.yml'

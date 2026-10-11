@@ -263,7 +263,7 @@ async function runEntry(
       requested: !!deps.zipMembers && validBounds(bounds), widens, widenedRan: widens && !report.scope_fallback,
       fallback: report.scope_fallback, truncatedAt: report.truncated_at_max_rows,
       metrics: report.scope_membership ?? { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false },
-      version: receiptVersion({ lat: cLat, lng: cLng }, radius, bounds),
+      version: receiptVersion({ lat: cLat, lng: cLng }, radius, bounds, entry as unknown as Record<string, unknown>),
     });
   }
   report.fetched = zipRows.length;
