@@ -2162,6 +2162,8 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   });
   ok(g.rail.w >= 300 && g.rail.w <= 360 && g.rail.l < g.report.l, `L5a at ${width}px the rail is 300-360px wide and sits left of the report`, g.rail);
   ok(g.report.w > g.rail.w * 2.8 && g.report.r > g.vw * 0.9 - 40, `L5b at ${width}px the report takes the far larger share of the width`, [g.report.w, g.rail.w, g.vw]);
+  { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
+    ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / g.vw >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the window)`, { w: g.report.w, surface, vw: g.vw }); }
   ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px Create, report tools, Saved, Compare and Account are in the rail, once each, and nothing but the report is on the right`, g);
   // the six most recent are listed; the rest wait behind "View all saved reports"
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 6 && !(await drawn(page, '#saved-more')) , `L5d six saved reports show without a "view all" button`);
@@ -2171,6 +2173,12 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   await page.click('#saved-more');
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 7, 'L5f View all shows every saved report');
   await page.click('#saved-more');
+  if (SHOTS) {   // review screenshots only (never in CI): true 100% zoom, the worst case for the rail (three client links), window then whole page
+    for (let i = 0; i < 3; i++) { await page.click('#share-make'); await page.waitForFunction((n) => document.querySelectorAll('#share-list li').length >= n, i + 1, { timeout: 8000 }).catch(() => {}); }
+    await page.evaluate(() => { scrollTo(0, 0); document.getElementById('rail').scrollTop = 0; });
+    await page.screenshot({ path: SHOTS + '/V-' + width + 'x' + height + '.png' });
+    await page.screenshot({ path: SHOTS + '/F-' + width + 'x' + height + '.png', fullPage: true });
+  }
   // comparing is a mode: plain links first, checkboxes only inside it, Cancel clears the choice
   ok((await page.$$eval('#saved-list .sv-pick', (els) => els.every((e) => e.getClientRects().length === 0))) && !(await drawn(page, '#compare-go')), 'L5g normally the saved reports show no checkboxes and no Compare button');
   await page.click('#compare-mode');
@@ -2184,11 +2192,16 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   // the comparison itself opens on the right, under the report, not in the rail
   await page.click('#compare-mode'); await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input'); await page.click('#compare-go'); await waitCompared(page);
   ok(await page.$eval('#compare-result', (e) => !e.closest('#rail') && !!e.closest('#current') && e.textContent.trim().length > 0), 'L5l the comparison appears on the right with the report, not in the rail');
-  // the rail stays in view while a long report scrolls (tall enough screen), and the page itself still scrolls
+  // the rail never scrolls on its own; it stays in view only when the whole rail fits the window, and otherwise scrolls away with the page
+  const rl = await page.evaluate(() => { const r = document.getElementById('rail'), c = getComputedStyle(r); return { fits: r.classList.contains('rail-fits'), h: r.offsetHeight, ih: innerHeight, pos: c.position, ov: c.overflowY, mh: c.maxHeight }; });
+  ok(rl.ov === 'visible' && rl.mh === 'none', `L5m at ${width}x${height} the rail has no inner scrollbar`, rl);
+  ok(rl.fits === (rl.h <= rl.ih - 24) && (rl.pos === 'sticky') === rl.fits, `L5n at ${width}x${height} the rail is sticky exactly when all of it fits the window`, rl);
   await page.evaluate(() => scrollTo(0, 600));
   const top = await page.$eval('#rail', (e) => e.getBoundingClientRect().top);
-  ok(top >= 0 && top <= 20 && (await page.evaluate(() => scrollY)) > 0, `L5m at ${width}x${height} the rail stays in view while the page scrolls`, top);
-  await shot(page, `L5-${width}`);
+  ok(rl.fits ? top >= 0 && top <= 20 : top < 0, `L5o at ${width}x${height} scrolling the page ${rl.fits ? 'leaves the rail in view' : 'moves the rail with it'}`, [top, rl]);
+  // a tall window holds the whole rail, so it stays in view
+  await page.setViewportSize({ width, height: 2400 }); await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(150);
+  ok(await page.$eval('#rail', (e) => e.classList.contains('rail-fits') && getComputedStyle(e).position === 'sticky'), `L5p at ${width} wide in a tall window the whole rail fits and stays in view`);
   await ctx.close();
 }
 {
