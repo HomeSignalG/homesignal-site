@@ -1602,6 +1602,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
     '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
   ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe for \$79\/month$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe for $79/month"');
+  ok(await page.$eval('#trial-cta', (e) => !e.closest('#trial').hidden && !e.parentElement.hidden && e.textContent === 'Subscribe — $79/month'), '12c3 the status tile itself carries "Subscribe — $79/month" while free reports remain');
   ok(!(await page.content()).includes(BKID) && !(await page.evaluate(() => document.body.innerText)).includes(BKID), '12c2 the brokerage\'s id is nowhere on the page');
   await page.click('#subscribe');
   await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
@@ -1666,6 +1667,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(/^97 reports left this month$/.test(await text(page, '#trial-count')) && /100 new reports each month/.test(await text(page, '#trial-sub')) && /this month ends November 4, 2026/.test(await text(page, '#trial-sub')),
     '12i a brokerage whose free reports are used and whose plan is paid is told how many of the month\'s reports are left and when the month ends', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   const t = await billingText(page);
+  ok(await page.$eval('#trial-cta', (e) => !e.parentElement.hidden && e.textContent === 'Manage plan'), '12j2 once subscribed the tile CTA is "Manage plan"');
   ok(/\$79\/month plan: 3 of 100 reports used this month/.test(t) && /kept as they were/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, and no second checkout');
   ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
   await make(page);
@@ -1698,6 +1700,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     const w = world({ role: 'owner', used: 10, plan: state });
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
+    ok(await page.$eval('#trial-cta', (e, st) => !e.parentElement.hidden && e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe — $79/month'), state), '12p2 a ' + state + ' plan on a used-up trial: the tile still carries the right commercial action');
     ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /All 10 free reports are used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
