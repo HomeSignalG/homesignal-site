@@ -945,7 +945,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '9m the report\'s own bar has Share with Client, Watch Property, Download PDF and Compare (build steps 8, 9, 10) all live, in that order', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
-  await page.click('#share-pdf');
+  await page.$eval('#share-pdf', (e) => e.click());   // 2026-10-11: drawn no more (the rail's This report bar already has Download PDF) but still wired
   ok((await page.evaluate(() => window.__prints)) === 2, '9n both Download PDF buttons open the browser\'s print window (no PDF is made on a server)');
   // the report's own Share button opens a popup that makes the private link and offers it right there (follow-up to build step 8, founder 2026-10-04)
   const createCount = () => shareCalls.filter((c) => c.body.action === 'create').length;
@@ -1994,29 +1994,29 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
   await ctx.close();
 }
-// ---- 15. the site bar: logo, Explore, My Places, Enterprise, and the Enterprise row (Enterprise overview | My reports) -------------------------------------
+// ---- 15. the site bar: logo, Explore, My Places, Enterprise, (no second Enterprise row, no repeated HomeSignal label: founder 2026-10-11) -------------------------------------
 // This page is a standalone document on purpose (no shell), so it carries a page-local bar in the shell's look (2026-10-11). The links are plain same-site links with no
 // state; they must show whether or not anyone is signed in, ask nothing of any function, and sit in the headers the print rule removes.
-const NAV_SEL = 'header.sitebar a, header.top .entnav a';
+const NAV_SEL = 'header.sitebar a';
 const navLinks = (page) => page.evaluate((sel) => {
   const box = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return { shown: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0, h: Math.round(r.height) }; };
   const links = [...document.querySelectorAll(sel)];
   return {
-    labels: ['header.sitebar .sb-nav', 'header.top .entnav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
+    labels: ['header.sitebar .sb-nav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
     links: links.map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href'), current: a.getAttribute('aria-current') === 'page', ...box(a) })),
     who: !!document.querySelector('header.sitebar #who'),
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 }, NAV_SEL);
-const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html', 'Enterprise overview=development-activity.html', 'My reports=development-activity-reports.html'];
+const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html'];
 for (const [who, signedIn] of [['signed out', false], ['signed in', true]]) {
   const { ctx, page, errors, reports, trials, billingCalls } = await open({ signedIn });
   const n = await navLinks(page);
-  ok(n && n.labels[0] === 'HomeSignal site' && n.labels[1] === 'Enterprise', `15a ${who}: the page has a site navigation and an Enterprise navigation`, n);
+  ok(n && n.labels[0] === 'HomeSignal site' && !await page.$('header.top .entnav'), `15a ${who}: the page has the site navigation and no second Enterprise row`, n);
   ok(n && JSON.stringify(n.links.map((l) => l.text + '=' + l.href)) === JSON.stringify(WANT_LINKS),
-    `15b ${who}: it holds the logo, Explore, My Places, Enterprise, Enterprise overview and My reports, as plain same-site links`, n && n.links);
+    `15b ${who}: it holds the logo, Explore, My Places and Enterprise, as plain same-site links`, n && n.links);
   ok(n && n.links.every((l) => l.shown && l.h >= 44), `15c ${who}: every one is drawn, and tall enough to tap (44px)`, n && n.links);
-  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise,My reports', `15c2 ${who}: Enterprise and My reports are marked as where you are, and nothing else`, n && n.links);
+  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', `15c2 ${who}: Enterprise is marked as where you are, and nothing else`, n && n.links);
   ok(n && n.who, `15c3 ${who}: the account area (email and Sign out, or Sign in) is in the bar`, n);
   // the page itself reads the plan when someone is signed in, so the claim is about the LINKS: touching them makes no request of its own
   await page.waitForTimeout(500);
@@ -2032,7 +2032,7 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15f. a phone, a tablet and a desktop: everything visible, and the bars do not make the page scroll sideways
   const { ctx, page } = await open({ width: w, height: h, signedIn: true });
   const n = await navLinks(page);
-  ok(n && n.links.length === 6 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all six links are drawn at tap size and nothing scrolls sideways`, n);
+  ok(n && n.links.length === 4 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all four links are drawn at tap size and nothing scrolls sideways`, n);
   await ctx.close();
 }
 {
@@ -2054,13 +2054,13 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15h. keyboard: each link can be focused, and the focus ring is drawn
   const { ctx, page } = await open();
   const focused = await page.evaluate((sel) => [...document.querySelectorAll(sel)].map((a) => { a.focus(); return document.activeElement === a; }), NAV_SEL);
-  ok(focused.length === 6 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
+  ok(focused.length === 4 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
   await page.focus('header.sitebar .sb-nav a:text-is("Explore")');
   const ring = await page.$eval('header.sitebar .sb-nav a:text-is("Explore")', (a) => getComputedStyle(a).outlineStyle + ' ' + getComputedStyle(a).outlineWidth);
   ok(/^solid [1-9]/.test(ring), '15h2 a focused link shows a visible outline', ring);
   await ctx.close();
 }
-for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/], ['header.top .entnav a:text-is("Enterprise overview")', /\/development-activity\.html$/]]) {
+for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/]]) {
   // 15i. they really go there (a real navigation to the real page, not a request the page makes)
   const { ctx, page } = await open();
   await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click(sel)]);
@@ -2083,7 +2083,7 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   ok(/Generate report/.test(await text(page, '#go')) && /Create a property report/.test(await text(page, '#create-title')) && /Current property report/.test(await text(page, '#current-title')),
     'L1c the form is titled "Create a property report" with a "Generate report" button, and the report area is titled "Current property report"');
   { const x = await page.evaluate(() => ({ c: document.getElementById('create-title').getBoundingClientRect(), r: document.getElementById('current-title').getBoundingClientRect() }));
-  ok(x.c.left < x.r.left && Math.abs(x.c.top - x.r.top) < 80, 'L1d Create is in the left rail and the current report starts beside it on the right', x); }
+  ok(x.c.top < x.r.top && x.c.left <= x.r.left, 'L1d Create is full width ABOVE the workspace, and the current report starts below it (no longer in the rail)', x); }
   await shot(page, 'L1-signed-out-desktop');
   await ctx.close();
 }
@@ -2157,14 +2157,14 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
     return { rail: r('#rail'), report: r('#report .da-rv'), vw: innerWidth,
       underReport: [...document.getElementById('current').children].map((e) => e.id || e.tagName).filter((id) => id !== 'current-title' && id !== 'status' && id !== 'creditnote' && id !== 'report' && id !== 'report-empty' && id !== 'compare-result'),
       onceEach: ['share', 'watch', 'saved', 'compare', 'account', 'rail-actions'].map((id) => document.querySelectorAll('#' + id).length),
-      railHas: ['#rf', '#rail-actions', '#share', '#watch', '#saved', '#compare', '#account'].every((q) => !!document.querySelector('#rail ' + q)),
+      railHas: ['#rail-actions', '#share', '#watch', '#saved', '#compare'].every((q) => !!document.querySelector('#rail ' + q)) && ['#rf', '#account', '#billing', '#profile', '#team'].every((q) => !document.querySelector('#rail ' + q)),
       reportHas: !!rep.querySelector('#share, #watch, #saved, #account, .da-rv-actions') };
   });
   ok(g.rail.w >= 300 && g.rail.w <= 360 && g.rail.l < g.report.l, `L5a at ${width}px the rail is 300-360px wide and sits left of the report`, g.rail);
   ok(g.report.w > g.rail.w * 2.8 && g.report.r > g.vw * 0.9 - 40, `L5b at ${width}px the report takes the far larger share of the width`, [g.report.w, g.rail.w, g.vw]);
   { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
     ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / g.vw >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the window)`, { w: g.report.w, surface, vw: g.vw }); }
-  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px Create, report tools, Saved, Compare and Account are in the rail, once each, and nothing but the report is on the right`, g);
+  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px report tools, Saved and Compare are in the rail, Create and Account are not, each once, and nothing but the report is on the right`, g);
   // the six most recent are listed; the rest wait behind "View all saved reports"
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 6 && !(await drawn(page, '#saved-more')) , `L5d six saved reports show without a "view all" button`);
   await make(page, A1 + ' ');   // a seventh report
@@ -2226,6 +2226,56 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   await page.click('#compare-mode');
   await make(page, A3);
   ok((await page.$$('#rail-actions .da-rv-actions')).length === 1 && !(await page.$('#report .da-rv-actions')), 'L7b opening another report replaces the rail\'s buttons rather than adding to them');
+  await ctx.close();
+}
+
+// ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
+for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
+  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true });
+  await waitCount(page, /free reports left/);
+  await make(page, A1);
+  await waitBoxes(page, 1);
+  if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }
+  const g = await page.evaluate(() => {
+    const q = (s) => document.querySelector(s), r = (s) => { const e = q(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
+    return {
+      createInRail: !!q('.rail #rf'), createInWs: !!q('.ws #rf'), accountInRail: !!q('.rail #account'), accountInWs: !!q('.ws #account'),
+      trialInBar: !!q('header.sitebar #trial'), trialCtaInBar: !!q('header.sitebar #trial-cta'), acctBtnInBar: !!q('header.sitebar #acct-btn'),
+      create: r('.create'), ws: r('.ws'), rail: r('#rail'), stage: r('#current'), report: r('#report'), account: r('#account'), wrapW: r('main.wrap'),
+      top: r('header.sitebar'), count: (q('#trial-count') || {}).textContent, cta: (q('#trial-cta') || {}).textContent, ctaShown: !!q('#trial-cta') && q('#trial-cta').getBoundingClientRect().width > 0,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      entnav: !!q('.entnav'), brandLabel: !!q('header.top .brand'),
+      railHeads: [...document.querySelectorAll('#rail .sec-h')].map((e) => e.textContent.trim()),
+      railHasAdmin: !!q('#rail #billing, #rail #profile, #rail #team, #rail details.acct'),
+      addr: r('#addr'), label: r('#label'), go: r('#go'),
+    };
+  });
+  const tag = `M at ${w}px`;
+  ok(!g.createInRail && g.createInWs === false && g.create && g.ws && g.create.b <= g.ws.y + 1, `${tag}: Create a property report is outside the rail and sits above the workspace`, g);
+  ok(g.create.w >= g.ws.w - 2, `${tag}: Create spans the full workspace width`, g.create);
+  ok(!g.accountInRail && !g.accountInWs && !g.railHasAdmin && g.account && g.account.y >= g.ws.b - 1, `${tag}: Account and administration is out of the rail and below the workspace`, g);
+  ok(g.railHeads.join('|') === 'This report|Saved reports', `${tag}: the rail holds only this report's tools and saved reports`, g.railHeads);
+  ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /free reports left/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
+  ok(!g.entnav && !g.brandLabel, `${tag}: no Enterprise row and no repeated HomeSignal label`, g);
+  ok(g.overflow <= 0, `${tag}: nothing scrolls sideways`, g.overflow);
+  if (w >= 1000) {
+    ok(g.rail.w >= 295 && g.rail.w <= 345 && g.stage.w >= g.wrapW.w * 0.6, `${tag}: the rail stays about 300-340px and the report column takes the rest`, { rail: g.rail.w, stage: g.stage.w, wrap: g.wrapW.w });
+    ok(g.addr.w > g.label.w && g.go.w > 100 && Math.abs(g.addr.y - g.go.y) < 60 && Math.abs(g.addr.y - g.label.y) < 60, `${tag}: address, client label and Generate share one row, address widest`, { a: g.addr, l: g.label, g: g.go });
+    ok(g.create.h < 170, `${tag}: the Create section is not tall`, g.create.h);
+  } else {
+    ok(g.create.y < (await page.$eval('#rail-report', (e) => e.getBoundingClientRect().y)) && g.create.y < g.stage.y && g.stage.y < (await page.$eval('#saved', (e) => e.getBoundingClientRect().y)), `${tag}: order is create, this report's tools, the report, saved reports`, g);
+    ok(g.go.h >= 44, `${tag}: Generate is a 44px target`, g.go);
+  }
+  // Account control opens the administration section
+  await page.click('header.sitebar #acct-btn');
+  ok(await page.$eval('#account', (e) => e.open) && await page.$eval('#billing', (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.y < innerHeight; }), `${tag}: the Account control opens administration and brings it into view`);
+  ok(errors.length === 0, `${tag}: no page error`, errors);
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ signedIn: false });
+  ok(await page.$eval('header.sitebar #acct-btn', (e) => getComputedStyle(e).display === 'none'), 'M signed out: there is no Account control (nothing to administer)');
+  ok(await page.$eval('#report-empty', (e) => getComputedStyle(e).display !== 'none' && /No report is open/.test(e.textContent) && /Enter an address above or open a saved report\./.test(e.textContent)), 'M the empty state is the restrained two-line one');
   await ctx.close();
 }
 
