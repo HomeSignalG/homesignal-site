@@ -1,18 +1,28 @@
 name: source-receipt-suite
 
-# docs/dev-source-receipt.sql against the LIVE dev_refresh_collect() (rebuilt, fingerprinted to production) on a DISPOSABLE Postgres: the
-# accepted response is bound to the accepted cache write, continuity is durable per ZIP x source, and 14 mutations must be killed; plus
-# the connector receipt test. Never addresses production; holds no database secret.
+# docs/dev-source-receipt.sql (PR #1840: the accepted-generation receipt and durable per-ZIP x source continuity) against the LIVE
+# dev_refresh_collect() (rebuilt on a disposable Postgres and fingerprinted to production). Three independent jobs, then one gate:
+#   receipt   - connector receipt test + test/source_receipt_pg (52 required check IDs: acceptance binding A, continuity B, retention C,
+#               connector contract D, canary generation gate E) + 14 mutations, each of which MUST be killed by a check that ran and failed
+#   geometry  - public.zip_geom_sig on a disposable PostGIS (7 required check IDs, 3 mutations)
+#   gate      - fails unless BOTH jobs concluded `success`; a job that was skipped, cancelled or never ran cannot be represented as green
+# The required check IDs live in required_checks.txt next to each suite: a missing, duplicated, unexpected or failed ID fails the run.
+# Never addresses production; holds no database secret.
 on:
   pull_request:
     paths:
       - 'docs/dev-source-receipt.sql'
       - 'test/source_receipt_pg/**'
+      - 'test/zip_geom_sig_pg/**'
+      - 'test/lib/**'
       - 'test/dev_collect_harness/**'
       - 'test/dev_refresh_restart_pg/**'
+      - 'test/zip_membership_pg/**'
       - 'docs/dev-refresh-collect-*.sql'
       - 'docs/dev-refresh-source-failure-guard.sql'
       - 'docs/zip-scope-bounds.sql'
+      - 'docs/zip-membership-canonical.sql'
+      - 'scripts/verify-canary-generation.sql'
       - 'test/source-scope-receipt.test.mjs'
       - 'supabase/functions/get-address-report/sources/**'
       - '.github/workflows/source-receipt-suite.yml'
@@ -21,6 +31,7 @@ on:
 jobs:
   receipt:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       pg:
         image: postgres:17
@@ -31,7 +42,48 @@ jobs:
     env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: receipt_disposable }
     steps:
       - uses: actions/checkout@v4
+      - name: Refuse to run if any production credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
       - uses: actions/setup-node@v4
         with: { node-version: '22.18' }
       - run: node test/source-scope-receipt.test.mjs
-      - run: bash test/source_receipt_pg/run.sh
+      - name: Receipt suite and mutations
+        run: |
+          set -o pipefail
+          psql -X -c 'select 1' >/dev/null   # a database that cannot be reached is a failure, never a skipped suite
+          bash test/source_receipt_pg/run.sh 2>&1 | tee /tmp/receipt.log
+          grep -q '^MUTATIONS: 14 of 14 prohibited weakenings are killed' /tmp/receipt.log
+          grep -q '^IDS OK — all 52 required check IDs' /tmp/receipt.log
+
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      pg:
+        image: postgis/postgis:16-3.4
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: zip_geom_sig_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: zip_geom_sig_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
+      - name: Polygon identity suite and mutations
+        run: |
+          set -o pipefail
+          psql -X -c 'select postgis_version()' >/dev/null
+          bash test/zip_geom_sig_pg/run.sh 2>&1 | tee /tmp/geom.log
+          grep -q '^IDS OK — all 7 required check IDs' /tmp/geom.log
+          grep -q '^MUTATIONS: 3 of 3 killed' /tmp/geom.log
+
+  gate:
+    if: always()
+    needs: [receipt, geometry]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "receipt=${{ needs.receipt.result }} geometry=${{ needs.geometry.result }}"
+          [ "${{ needs.receipt.result }}" = success ] && [ "${{ needs.geometry.result }}" = success ]

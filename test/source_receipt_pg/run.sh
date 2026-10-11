@@ -160,6 +160,23 @@ run_checks() {
   gen 73001 "$(EXP s1 v1)" >/dev/null
   t 'C04 continuity for a ZIP whose cache has been quiet for nine days survives other ZIPs generations and any diagnostic pruning' "$(C 73002 s1 "gen_seq||'/'||break_seq")" "1/1"
 
+  # ═══ E. the canary gate, bound to the exact request ═════════════════════════════════════════════════════════════════════════════
+  vg() { # zip request_id expected-array-literal
+    sed -e "s/'76258'::text as zip/'$1'::text as zip/" -e "s/0::bigint as request_id/$2::bigint as request_id/" -e "s/array\[''\]::text\[\] as expected_sources/$3::text[] as expected_sources/" \
+      "$root/scripts/verify-canary-generation.sql" | P -F'|' | awk -F'|' '{print $NF}'; }
+  Q "select public.t_reset()" >/dev/null; Q "select public.t_zip('74001')" >/dev/null
+  ce="$(gen 74001 "$(EXP s1 v1),$(EXP s2 v1)")"
+  t 'E01 the canary request that produced the accepted generation PASSES' "$(vg 74001 "$ce" "array['s1','s2']")" t
+  t 'E02 a different request id FAILS (the gate is bound to the one request)' "$(vg 74001 "$((ce+1))" "array['s1','s2']")" f
+  t 'E03 an expected source that is not monitored FAILS' "$(vg 74001 "$ce" "array['s1','s9']")" f
+  t 'E04 an EMPTY expected set FAILS (a zero proves nothing)' "$(vg 74001 "$ce" "array[]")" f
+  ce2="$(gen 74001 "$(EXP s1 v1),$(INC s2 v1)")"
+  t 'E05 once a LATER generation superseded it the earlier request FAILS (rerun the canary, do not infer)' "$(vg 74001 "$ce" "array['s1']")" f
+  t 'E06 an expected source with an open gap FAILS even though the generation was accepted' "$(vg 74001 "$ce2" "array['s1','s2']")" f
+  Q "select public.t_zip('74002', '[]', '{\"development\":3}', '1 hour')" >/dev/null
+  cr="$(fire 74002 "$(EXP s1 v1)")"; collect >/dev/null
+  t 'E07 a response the collector REFUSED FAILS (collection is not acceptance)' "$(vg 74002 "$cr" "array['s1']")" f
+
   # ═══ D. connector contract: the receipt as the response payload carries it ═════════════════════════════════════════════════════
   t 'D01 an expanded receipt without a version is demoted to legacy/incomplete, never stored as an unverifiable claim' "$(Q "select scope||'/'||complete::text||'/'||coalesce(scope_version,'-') from public.dev_source_receipts('{\"arcgis_reports\":[{\"registry_id\":\"u\",\"scope_receipt\":{\"scope\":\"expanded\",\"version\":null,\"complete\":true}}]}'::jsonb)")" "legacy/false/-"
   t 'D02 a pre-receipt payload (no scope_receipt) is legacy, complete only if not truncated' "$(Q "select string_agg(registry_id||':'||scope||':'||complete::text, ',' order by registry_id) from public.dev_source_receipts('{\"csv_reports\":[{\"registry_id\":\"a\"},{\"registry_id\":\"b\",\"truncated_at_max_rows\":20000}]}'::jsonb)")" "a:legacy:true,b:legacy:false"
@@ -168,10 +185,8 @@ run_checks() {
 
 echo "== the shipped receipt SQL, against the live collector"
 run_checks "$root/docs/dev-source-receipt.sql" | tee "$tmp/shipped"
-tf=$(grep -c '|f|' "$tmp/shipped" || true); tn=$(grep -c '|[tf]' "$tmp/shipped" || true)
-echo "SHIPPED: $tn checks, $tf failed"
-[ "$tn" -ge 45 ] || { echo "FAIL -- fewer checks ran than the suite defines"; exit 1; }
-[ "$tf" -eq 0 ] || { echo "FAIL -- the shipped SQL does not pass"; exit 1; }
+echo "SHIPPED: $(grep -cE '\|[tf](\||$)' "$tmp/shipped") result lines"
+bash "$root/test/lib/require_exact_ids.sh" "$here/required_checks.txt" "$tmp/shipped" || { echo "FAIL -- the shipped SQL does not pass, or a required check did not report"; exit 1; }
 
 # applying the file twice must be harmless
 build "$root/docs/dev-source-receipt.sql"; P -f "$root/docs/dev-source-receipt.sql" >/dev/null 2>"$tmp/err" || { cat "$tmp/err" >&2; echo "FAIL -- not idempotent"; exit 1; }
@@ -188,7 +203,8 @@ if s.count(a) != 1:
     sys.exit(1)
 open(dst, 'w').write(s.replace(a, b))
 PY
-  if ! run_checks "$tmp/m.sql" >"$tmp/mout" 2>"$tmp/merr"; then echo "KILLED   $name (suite aborted)"; return 0; fi
+  # a mutation is killed ONLY by a check that ran and failed: a crashed suite or a SQL error is a broken harness, not evidence
+  run_checks "$tmp/m.sql" >"$tmp/mout" 2>"$tmp/merr" || { echo "HARNESS  $name -- the mutated suite aborted before it could report"; return 2; }
   local k; k="$(grep '|f|' "$tmp/mout" | cut -d'|' -f1 | tr -s ' \n' ' ' || true)"
   if [ -n "$k" ]; then echo "KILLED   $name by $k"; else echo "SURVIVED $name"; return 1; fi
 }
@@ -209,4 +225,6 @@ mut absent_is_silent "when m.scope_in = 'absent' and (not coalesce(m.o_ever, fal
 mut idempotence_guard_dropped "   where t.last_tick_at < excluded.last_tick_at;" ";" || st=1
 mut diagnostics_prune_removes_continuity "delete from public.dev_refresh_generation g where g.zip = new.zip and g.recorded_at < now() - interval '7 days';" "delete from public.dev_source_continuity g where g.updated_at < now() - interval '7 days'; delete from public.dev_refresh_generation g where g.zip = new.zip and g.recorded_at < now() - interval '7 days';" || st=1
 mut failed_fetch_read_as_legacy "when r.r->>'registry_id' in (select registry_id from f) then 'failed'" "when false then 'failed'" || st=1
-[ "$st" -eq 0 ] && echo "MUTATIONS: every prohibited weakening is killed" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }
+n_mut=$(grep -c '^mut ' "$here/run.sh" || true)
+[ "$n_mut" -eq 14 ] || { echo "FAIL -- expected 14 mutations, the runner defines $n_mut"; exit 1; }
+[ "$st" -eq 0 ] && echo "MUTATIONS: 14 of 14 prohibited weakenings are killed" || { echo "FAIL -- a mutation survived or did not apply"; exit 1; }
