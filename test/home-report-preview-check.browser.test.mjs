@@ -29,7 +29,7 @@ const same = (a, b) => a.sha === b.sha && a.mtime === b.mtime;
 
 const dir = mkdtempSync(join(tmpdir(), 'preview-check-'));
 const t0 = snap(TRACKED);
-const py = (code, ...args) => execFileSync('python3', ['-I', '-c', code, ...args], { encoding: 'utf8' });
+const py = (code, ...args) => execFileSync('python3', ['-c', code, ...args], { encoding: 'utf8' });
 
 // 1. the normal build still works (to --out, never the tracked file); this render is the BASELINE for the rest of the suite
 const base = join(dir, 'baseline.webp');

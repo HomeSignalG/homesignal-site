@@ -96,7 +96,7 @@ const clipB = { x: 40, y: regions.sectTop + 40, width: 1040, height: regions.tab
 const pa = join(dir, 'a.png'), pb = join(dir, 'b.png');
 await page.screenshot({ path: pa, fullPage: true, clip: clipA });
 await page.screenshot({ path: pb, fullPage: true, clip: clipB });
-execFileSync('python3', ['-I', '-c', `
+execFileSync('python3', ['-c', `
 import sys
 from PIL import Image
 a = Image.open(sys.argv[1]).convert('RGB'); b = Image.open(sys.argv[2]).convert('RGB')
@@ -109,7 +109,7 @@ writeFileSync(join(dir, 'resp.json'), JSON.stringify(resp, null, 1));
 console.log('rendered', png);
 if (process.argv.includes('--png-only')) process.exit(0);
 const target = CHECK ? join(dir, 'candidate.webp') : OUT;   // check mode renders ONLY into the temp dir
-execFileSync('python3', ['-I', '-c', `
+execFileSync('python3', ['-c', `
 import sys
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('RGB')
@@ -122,7 +122,7 @@ if (CHECK) {
   // Read the committed file only; compare decoded pixels. Exit 0 = the committed preview matches what the current renderer produces.
   let verdict = '';
   try {
-    verdict = execFileSync('python3', ['-I', '-c', `
+    verdict = execFileSync('python3', ['-c', `
 import sys
 from PIL import Image, ImageChops, ImageStat
 a = Image.open(sys.argv[1]).convert('RGB'); b = Image.open(sys.argv[2]).convert('RGB')
