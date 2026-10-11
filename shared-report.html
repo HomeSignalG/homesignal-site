@@ -36,6 +36,13 @@ header.top .in{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10
 header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--accent)}
 .go{font:inherit;font-size:14.5px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;min-height:44px}
 .go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+a.go{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+a.go[hidden]{display:none}
+/* Follow this property is the one primary action; Download PDF is quieter, so the two never compete. */
+.go.sec{background:var(--panel);color:var(--accent);border:1px solid var(--line);font-weight:500}
+header.top .acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.invite a.go{margin-top:12px;padding:10px 18px;color:#fff;text-decoration:none}
+@media (max-width:560px){header.top .acts{flex-direction:column;align-items:stretch;width:100%}header.top .acts .go{width:100%}}
 .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:14px}
 #status{margin:0;font-size:15px;min-height:1.5em}
 #status.err{color:var(--red);font-weight:600}
@@ -54,7 +61,7 @@ header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;c
 noscript p{margin:16px;font-weight:600}
 @media print{
   body{background:#fff;font-size:12.5px}
-  header.top,#status,#private,.notice,noscript{display:none!important}
+  header.top,#status,#private,.notice,noscript,a.follow{display:none!important}
   .wrap{max-width:none;padding:0}
   #rid{color:#444}
 }
@@ -64,7 +71,10 @@ noscript p{margin:16px;font-weight:600}
 <header class="top">
   <div class="in">
     <p class="brand">HOMESIGNAL DEVELOPMENT ACTIVITY</p>
-    <button type="button" class="go" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+    <div class="acts">
+    <a class="go follow" id="follow" href="#" hidden>Follow this property</a>
+    <button type="button" class="go sec" id="pdf" hidden title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
+    </div>
   </div>
 </header>
 <main class="wrap">
@@ -76,6 +86,8 @@ noscript p{margin:16px;font-weight:600}
   <aside id="invite" class="invite" hidden aria-label="About HomeSignal">
     <h2>Follow quality-of-life intelligence for this property.</h2>
     <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
+    <p id="followNote" hidden>Get notified when HomeSignal finds new development or meaningful project changes near this property.</p>
+    <a class="go follow" id="follow2" href="#" hidden>Follow this property</a><br>
     <a href="https://homesignal.net/" rel="noopener noreferrer">Explore HomeSignal &rarr;</a>
   </aside>
 </main>
@@ -151,19 +163,26 @@ noscript p{margin:16px;font-weight:600}
     $('private').hidden = false;
     // The invitation takes the buyer to the property: the address rides in the link's FRAGMENT (never sent to a server, never in a query), only
     // while the private layer still keeps it. Once it is purged the link is the plain home page.
-    var inv = document.querySelector('#invite a');
+    var inv = document.querySelector('#invite a:not(.follow)');
+    var where = typeof body.address === 'string' ? body.address.trim() : '';
     if (inv) {
       var base = inv.href.split('#')[0];
-      var where = typeof body.address === 'string' ? body.address.trim() : '';
       inv.href = where ? base + '#address=' + encodeURIComponent(where) : base;
     }
+    // "Follow this property": ONE link, built ONCE, used by the top button and the one under the invitation, so there is one follow action.
+    // It opens HomeSignal's own add-an-address flow (sign-in, Census confirmation, the visitor's own Save); this page saves nothing, makes
+    // no account and never touches the report. With no address (once the private layer has purged it) there is no property to follow, so
+    // neither button is shown.
+    var fhref = where && where.length <= 200 ? 'https://homesignal.net/#follow=' + encodeURIComponent(where) : '';
+    ['follow', 'follow2'].forEach(function(id){ var a = $(id); if (!a) return; if (fhref) { a.href = fhref; a.rel = 'noopener noreferrer'; } a.hidden = !fhref; });
+    $('followNote').hidden = !fhref;
     $('invite').hidden = false;
     $('pdf').hidden = false;
   }
 
   async function start(){
     var token = readToken();
-    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('invite').hidden = true; $('pdf').hidden = true;
+    $('gone').hidden = true; $('report').textContent = ''; $('rid').hidden = true; $('private').hidden = true; $('invite').hidden = true; $('pdf').hidden = true; $('follow').hidden = true;
     if (!token) { missing(); return; }
     state('loading'); say('Loading the report…', false);
     var res;
