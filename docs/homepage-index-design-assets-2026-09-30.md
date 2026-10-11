@@ -10,7 +10,7 @@ Use the approved static asset:
 
 It is a placeholder and may be revised later.
 
-**Revised 2026-10-11:** the asset now shows the CURRENT three-column report (Development | Stage | Quality-of-Life Impact). It is not a drawing: `node scripts/build-home-report-preview.mjs` renders the real `lib/da-report-view.js` over a response from the real request handler (generic "Sample …" fixture rows, labelled "Illustrative sample"), crops the report header and the Nearby Development table, and writes the webp (1448x1241). Re-run it when the report table or the sample property changes; the `?v=` on the `<img>` src must be bumped with it. Do not regenerate, redesign, or substitute legacy NYC/future-surroundings UI in the homepage implementation order.
+**Revised 2026-10-11:** the asset now shows the CURRENT three-column report (Development | Stage | Quality-of-Life Impact). It is not a drawing: `node scripts/build-home-report-preview.mjs` renders the real report view module over a response from the real request handler (generic "Sample …" fixture rows, labelled "Illustrative sample"), crops the report header and the Nearby Development table, and writes the webp (1448x1241). Re-run it when the report table or the sample property changes; the `?v=` on the `<img>` src must be bumped with it. Do not regenerate, redesign, or substitute legacy NYC/future-surroundings UI in the homepage implementation order.
 
 ## 2. Development map preview
 
