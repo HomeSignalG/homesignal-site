@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" class="hs-embed hs-follow">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Follow this property</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'none'">
+<link rel="stylesheet" href="app.css?v=3c5d2a61">
+<style>
+/* The frame a shared report opens, only after the visitor clicks "Follow this property". It runs HomeSignal's OWN sign-in and add-an-address
+   steps (partials/shell.html) - restyled to sit inline on the page instead of as a pop-up. Nothing here is a second follow system. */
+html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
+.hs-follow .overlay{position:static;inset:auto;background:none;padding:0;z-index:auto}
+.hs-follow .overlay.show{display:block}
+.hs-follow .modal{box-shadow:none;border-radius:0;max-width:none;animation:none;background:transparent;overflow:visible}
+.hs-follow .mclose,.hs-follow .mbadge{display:none}
+.hs-follow .mhead{padding:0 0 2px}
+.hs-follow .mbody{padding:10px 0 0}
+.hs-follow .modal h3{font-size:16px;margin:0 0 4px}
+.hs-follow .modal p.msub{font-size:13px}
+/* the address step is ONE line - the property we found, with Confirm / Change - not a second form */
+.hs-follow #homeModal .mhead{display:none}
+.hs-follow #homeConfirm .field{flex-direction:row !important;gap:8px !important;flex-wrap:wrap;margin-top:0}
+.hs-follow #homeConfirm .field .mbtn{width:auto;flex:0 0 auto;padding-left:20px;padding-right:20px}
+.hs-follow #homeConfirm .mnote:empty{display:none}
+#hsFollowRoot{padding:2px 2px 4px}
+</style>
+</head>
+<body data-nav="" data-page-type="follow-embed">
+<template id="hs-content"><div id="hsFollowRoot"></div></template>
+<noscript><p>Following a property needs JavaScript.</p></noscript>
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
+<script src="lib/data.js"></script>
+<script src="lib/topic-prefs.js"></script>
+<script src="lib/templates.js?v=6b61281a"></script>
+<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=0973955c"></script>
+<script>
+(function(){
+  'use strict';
+  // The report page talks to this frame by status only: ready / height / following. The address arrives in the URL FRAGMENT (never sent
+  // to a server); nothing identifying the brokerage, agent or client is ever read or sent.
+  var address = '';
+  try {
+    var m = /(?:^#|&)address=([^&]*)/.exec(location.hash || '');
+    address = m ? decodeURIComponent(m[1]).trim() : '';
+    if (history.replaceState) history.replaceState(null, '', location.pathname);
+  } catch (e) { address = ''; }
+  function tell(msg){
+    msg.hsFollow = true;
+    try { parent.postMessage(msg, location.origin); } catch (e) {}
+  }
+  var lastH = 0;
+  function height(){
+    var h = Math.ceil(document.documentElement.scrollHeight);
+    if (h && h !== lastH) { lastH = h; tell({ type: 'height', h: h }); }
+  }
+  if (typeof ResizeObserver === 'function') new ResizeObserver(height).observe(document.body);
+  window.addEventListener('load', height);
+
+  function put(el, text){ if (el && el.textContent !== text) el.textContent = text; }
+  function relabel(){
+    put(document.getElementById('homeSaveBtn'), 'Confirm');
+    put(document.querySelector('#homeConfirm button.mbtn:not(#homeSaveBtn)'), 'Change');
+    put(document.getElementById('authTitle'), 'Sign in to follow this property');
+  }
+  function boot(HS){
+    if (!address || address.length > 200) { tell({ type: 'unavailable' }); return; }
+    var ok = HS.startFollowEmbed(address, {
+      onSaved: function(info){
+        var hm = document.getElementById('homeModal'); if (hm) hm.classList.remove('show');
+        tell({ type: 'following', existed: !!(info && info.existed) });
+      }
+    });
+    if (!ok) { tell({ type: 'unavailable' }); return; }
+    put(document.getElementById('authSub'), 'Enter your email and we\u2019ll send a 6-digit code. No password needed.');
+    relabel();
+    new MutationObserver(relabel).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    tell({ type: 'ready' });
+    height();
+  }
+  var HSg = window.HS;
+  if (HSg && HSg.onReady) HSg.onReady(boot); else tell({ type: 'unavailable' });
+})();
+</script>
+</body>
+</html>

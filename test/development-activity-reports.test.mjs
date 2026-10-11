@@ -52,13 +52,32 @@ ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-ac
     '1f the public landing page links this page exactly once, to its Billing card (#billing): the Join for $79/month link', links);
 }
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
-// 1h. the way back OUT (founder, 2026-10-05 asked for the way in; the page had no way off it). Two plain same-site links, inside header.top so the print rule hides them.
+// 1h. THE SITE BAR (founder, 2026-10-11): this page is a standalone document on purpose (no shell: the shell boots account hydration, a follows sync and a
+// non-dismissible onboarding overlay), so it carries a page-local bar with the SHELL'S labels and addresses. They are read out of partials/shell.html here, so the
+// two cannot drift: a label or address changed there fails this check until the bar is changed to match.
+const bar = (page.match(/<header class="sitebar">[\s\S]*?<\/header>/) || [''])[0];
 const headerTop = (page.match(/<header class="top">[\s\S]*?<\/header>/) || [''])[0];
-const siteNav = (headerTop.match(/<nav class="sitenav" aria-label="HomeSignal site">([\s\S]*?)<\/nav>/) || [])[1] || '';
-ok(JSON.stringify([...siteNav.matchAll(/<a href="([^"]+)">([^<]+)<\/a>/g)].map((m) => m[2] + '=' + m[1])) === JSON.stringify(['HomeSignal=index.html', 'Enterprise=development-activity.html']),
-  '1h the header carries exactly two links off the page: HomeSignal (index.html) and Enterprise (development-activity.html)', siteNav);
-ok(!/https?:\/\//.test(siteNav) && !/target=|rel=|onclick/.test(siteNav), '1i ...both plain same-site links: no address of another site, no new window, no script');
-ok(/header\.top\s*\{display:none!important\}|header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides header.top is still there, so the links never print');
+const siteNav = (bar.match(/<nav class="sb-nav" aria-label="HomeSignal site">([\s\S]*?)<\/nav>/) || [])[1] || '';
+const entNav = (headerTop.match(/<nav class="entnav" aria-label="Enterprise">([\s\S]*?)<\/nav>/) || [])[1] || '';
+const linksOf = (h) => [...h.matchAll(/<a href="([^"]+)"([^>]*)>([^<]+)<\/a>/g)].map((m) => ({ text: m[3], href: m[1], current: /aria-current="page"/.test(m[2]) }));
+const shellHtml = read('partials/shell.html');
+const shellPrimary = (shellHtml.match(/<nav class="hs-nav"[\s\S]*?<\/nav>/) || [''])[0];
+const shellHref = (re) => ((shellPrimary.match(re) || [])[1]);
+const wantNav = [['Explore', shellHref(/<a href="([^"]+)" data-nav="explore">Explore<\/a>/)], ['My Places', shellHref(/<a href="([^"]+)" data-nav="props">My Places<\/a>/)], ['Enterprise', shellHref(/<a href="([^"]+)" data-nav="enterprise">Enterprise<\/a>/)]];
+ok(JSON.stringify(linksOf(siteNav).map((l) => [l.text, l.href])) === JSON.stringify(wantNav) && wantNav.every(([, h]) => h),
+  '1h the site bar carries the shell\'s three primary items (Explore, My Places, Enterprise) with the shell\'s addresses', { have: linksOf(siteNav), wantNav });
+ok(linksOf(siteNav).filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', '1h2 exactly one item is marked as the current section: Enterprise');
+const brandHref = (bar.match(/<a class="sb-brand" href="([^"]+)"/) || [])[1];
+ok(brandHref === ((shellHtml.match(/<a class="hs-brand" href="([^"]+)"/) || [])[1]) && brandHref === 'index.html', '1h3 the HomeSignal logo links where the shell\'s does (the homepage)', brandHref);
+const shellSub = (shellHtml.match(/id="hs-enterprise-sub">([\s\S]*?)<\/div>/) || [])[1] || '';
+const shellEnt = [...shellSub.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]);
+ok(JSON.stringify(linksOf(entNav).map((l) => [l.text, l.href])) === JSON.stringify(shellEnt) && shellEnt.length === 2,
+  '1h4 the row under the bar holds the shell\'s two Enterprise entries (Enterprise overview, My reports), same labels and addresses', { have: linksOf(entNav), shellEnt });
+ok(linksOf(entNav).filter((l) => l.current).map((l) => l.text).join() === 'My reports', '1h5 My reports is marked as the current page');
+ok(/id="who"/.test(bar) && !/id="who"/.test(headerTop), '1h6 the account area (email and Sign out) lives in the bar, so it is on screen with the navigation');
+ok(!/https?:\/\//.test(siteNav + entNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar + entNav), '1i ...plain same-site links: no address of another site, no new window, no script');
+ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && !/rel="stylesheet"/.test(page), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document');
+ok(/header\.sitebar,header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides the header (and now the site bar) is still there, so neither prints');
 
 // ---- 2. keys and sign-in ----------------------------------------------------------------------------------------------------------------------
 const jwts = [...page.matchAll(/eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)\.[A-Za-z0-9_-]+/g)].map((m) => JSON.parse(Buffer.from(m[1], 'base64url').toString('utf8')));
@@ -248,7 +267,7 @@ ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code)
 {
   const html = read(PAGE);
   const body = html.slice(html.indexOf('<body>'));
-  const iHeaderEnd = body.indexOf('</header>'), iCreate = body.indexOf('id="create-title"'), iWs = body.indexOf('<div class="ws">'), iRail = body.indexOf('<aside class="rail"');
+  const iHeaderEnd = body.indexOf('</header>', body.indexOf('<header class="top"')), iCreate = body.indexOf('id="create-title"'), iWs = body.indexOf('<div class="ws">'), iRail = body.indexOf('<aside class="rail"');
   ok(iCreate > iHeaderEnd && iCreate < iWs && iWs < iRail, '11a Create a property report sits above the two-column workspace, not inside the rail');
   ok(body.indexOf('id="rf"') === body.lastIndexOf('id="rf"') && body.indexOf('id="go"') === body.lastIndexOf('id="go"') && body.indexOf('id="trial-cta"') === body.lastIndexOf('id="trial-cta"'), '11b one form, one Generate button and one Subscribe / Manage plan button: nothing is duplicated');
   const iTrial = body.indexOf('id="trial"');

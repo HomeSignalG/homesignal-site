@@ -1096,7 +1096,7 @@
         setTimeout(() => {
           HS.closeModal('authModal');
           const back = new URLSearchParams(location.search).get('return');
-          if (HS.needsOnboarding && HS.needsOnboarding()) {
+          if (HS.needsOnboarding && HS.needsOnboarding() && !HS.followEmbed) {
             HS.startOnboarding();
           } else if (resume) {
             // The resumed action owns this page: stay on it, with ?zip= and utm_* intact.
@@ -1564,6 +1564,17 @@
     logEvent('shared_report_follow_clicked');
     HS.openHome(want);
   };
+  // The inline form of the same thing: follow-embed.html (a same-origin frame a shared report opens only after the visitor clicks Follow) runs
+  // THIS flow - sign-in, Census confirmation, the visitor's own Save - and reports only that it finished.
+  HS.startFollowEmbed = function (address, hooks) {
+    const want = typeof address === 'string' ? address.trim() : '';
+    if (!want || want.length > 200) return false;
+    HS.followEmbed = hooks || { onSaved: function () {} };
+    _followSource = 'shared_report';
+    logEvent('shared_report_follow_clicked');
+    HS.openHome(want);
+    return true;
+  };
   // "Add a home / area" entry points: a signed-in resident gets the Census-confirmed
   // home flow (private, owner-only rows); a signed-out visitor gets the no-login ZIP
   // box so the sample experience never dead-ends at a sign-in wall. Restores the
@@ -1710,6 +1721,20 @@
     if (r.existed) $('homeConfirmMsg').textContent = 'This address is already in My Places.';
     if (_followSource === 'shared_report') { _followSource = null; logEvent('shared_report_follow_completed'); }
     LS.set('activeProp', r.data.id);
+    // Inline "Follow this property" (follow-embed.html, inside a shared report): the SAME writer and the SAME area follow as below, but
+    // no place-saved card and no reload - the report page owns the screen. It hears only that the follow worked (status, never an address).
+    if (HS.followEmbed) {
+      try {
+        if (await HS.data.isCovered(m.zip)) {
+          let meta = null; try { meta = await HS.data.community(m.zip); } catch (e) {}
+          HS.followCommunity({ zip: m.zip, name: (meta && meta.name) || '', state: (meta && meta.state) || '' });
+          await HS.ensureAreaSubscribed(m.zip, true, true);
+        }
+      } catch (e) {}
+      release();
+      try { HS.followEmbed.onSaved({ existed: !!r.existed }); } catch (e) {}
+      return;
+    }
     HS.announcePlaceSaved({
       zip: m.zip,
       kind: 'address',
