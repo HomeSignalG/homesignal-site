@@ -67,10 +67,10 @@ const WCOLD = await wire(COLD);
 const hostile = clone(W);
 const HP = (k) => hostile.report.projects.find((p) => p.project_id === k);
 HP('k-approved').name = 'Unbroken' + 'X'.repeat(140);
-HP('k-approved').publisher_status = 'Status' + 'Y'.repeat(120);
+HP('k-approved').publisher_stage = 'Status' + 'Y'.repeat(120);
 HP('k-approved').source.url = 'https://example.gov/' + 'z'.repeat(200);
 HP('k-first').name = '<script>window.__pwned=1</script><img src=x onerror="window.__pwned=2">';
-HP('k-first').publisher_status = '"><svg onload="window.__pwned=3">';
+HP('k-first').publisher_stage = '"><svg onload="window.__pwned=3">';
 HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</script>"></iframe>';
 
 // ---- 1. desktop ---------------------------------------------------------------------------------------------------------------------------------
@@ -387,8 +387,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       await page.evaluate(() => document.querySelectorAll('.da-rv-detail').forEach((d) => { d.open = true; }));
       const tOpen = text(await pdf('open.pdf', page));
       const n = (t, re) => (t.match(re) || []).length;
-      ok(tClosed === tOpen && n(tClosed, /Status in HomeSignal's record:/g) >= 8 && !/Supporting evidence for each record/.test(tClosed),
-        '12k printing with the evidence collapsed on screen prints exactly what it prints with it open (the whole report), and not the toggle', { same: tClosed === tOpen, status: n(tClosed, /Status in HomeSignal's record:/g) });
+      ok(tClosed === tOpen && n(tClosed, /Official record:/g) >= 7 && !/Supporting evidence for each record/.test(tClosed),
+        '12k printing with the evidence collapsed on screen prints exactly what it prints with it open (the whole report), and not the toggle', { same: tClosed === tOpen, records: n(tClosed, /Official record:/g) });
       ok(/DEVELOPMENT\s+STAGE\s+QUALITY-OF-LIFE IMPACT/i.test(tClosed) && n(tClosed, /Official source/g) >= 16 && n(tClosed, /Potential|Denied or withdrawn:/g) >= 7 && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
         '12l the printed report carries the three-column table, an "Official source" link per record in the table and in its evidence entry, and no raw web address (the links stay clickable in a saved PDF)', { src: n(tClosed, /Official source/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
       ok(/Page 1 of \d/.test(tClosed) && /HomeSignal Development Activity report/.test(tClosed), '12l2 each printed page carries HomeSignal\'s own footer and "Page N of M"');

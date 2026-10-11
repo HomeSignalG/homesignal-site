@@ -84,7 +84,7 @@ const p = after.rep.projects.find((x) => x.project_id === LIGHTSEY);
 ok(p && p.lifecycle.key === 'proposed' && p.stage && p.stage.key === 'proposed' && p.stage.label === 'Proposed / Under Review', '2d the report places it in Proposed / Under Review (the existing Stage authority, no new vocabulary)', p && p.stage);
 ok(p && p.type.key === 'residential' && p.publisher_stage === 'In Review' && p.source.url === real.find((r) => r.source_key === LIGHTSEY).source_ref, '2e verified Type, the publisher\'s own stage, and the official record link are carried');
 const row = after.rowOf('Lightsey Residences');
-ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under Review/.test(row) && /Agency stage: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
+ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under Review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
 ok(row && /Quality-of-Life Impact: Potential construction noise and traffic/.test(row) && /Not site-verified; no effect is established\./.test(row), '2g the Quality-of-Life wording is the existing evidence-aware text and claims no established effect', row);
 
 // ---- 3. the half-mile edge ----
@@ -97,7 +97,7 @@ const decided = after.rep.projects.filter((x) => String(x.publisher_status).toLo
 ok(decided.length === 4, '4a the four real denied / withdrawn records the generation holds are now returned', decided.map((x) => x.name));
 ok(/5 proposed \/ under review/.test(after.headline) && /4 decided \(denied or withdrawn\)/.test(after.headline), '4b the briefing counts 5 open proposals and, separately, 4 decided', after.headline);
 const den = after.rowOf('SWAFFORD');
-ok(den && /Stage: Decided \(denied or withdrawn\)/.test(den) && /Agency stage: Denied/.test(den) && /no development effect is considered unless it is refiled/.test(den), '4c a denied record keeps its decision notation and is not presented as active', den);
+ok(den && /Stage: Decided \(denied or withdrawn\)/.test(den) && /Source agency status: Denied/.test(den) && /no development effect is considered unless it is refiled/.test(den), '4c a denied record keeps its decision notation and is not presented as active', den);
 
 // ---- 5. unresolved Type is not invented ----
 const unres = after.rowOf('South Lamar Blvd Street and Utility Improvements Plan');
