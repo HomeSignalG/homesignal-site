@@ -10,7 +10,8 @@
 //                                                          prints PASS/FAIL, exits 0/1; the tracked asset is never opened for writing, pass or fail)
 //   options: --out <file>      where the normal build writes (default: the tracked asset; ignored by --check)
 //            --against <file>  what --check compares with (default: the tracked asset)
-//   --check tolerance: mean absolute difference per channel <= CHECK_TOLERANCE (anti-aliasing and webp encoder noise), same dimensions required.
+//   --check fails on ANY of: size mismatch; whole-image mean > CHECK_TOLERANCE; any 16x16 tile whose mean difference > CHECK_TILE_TOLERANCE; more than
+//   CHECK_STRONG_PIXELS strongly different pixels. The last two are LOCAL checks: one changed label or sentence barely moves a whole-image mean.
 // Output is a PNG in the scratch dir, then converted to webp by Python Pillow (the repo has no image dependency; this is a build-time tool only).
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
@@ -28,7 +29,11 @@ const CHECK = process.argv.includes('--check');
 const argOf = (f) => { const i = process.argv.indexOf(f); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : null; };
 const OUT = argOf('--out') || TRACKED;          // only the normal build ever writes here, and never in --check mode
 const AGAINST = argOf('--against') || TRACKED;
-const CHECK_TOLERANCE = 1.0;
+const CHECK_TOLERANCE = 1.0;        // whole-image mean absolute difference per channel
+const CHECK_TILE = 16;               // px; the localized check looks at 16x16 tiles
+const CHECK_TILE_TOLERANCE = 3.0;    // no single tile may differ by more than this mean (a changed word/label lands well above it)
+const CHECK_STRONG_DELTA = 96;       // a pixel counts as "strongly different" when any channel moves by more than this
+const CHECK_STRONG_PIXELS = 12;      // ...and no more than this many may (a re-render of the same page gives 0)
 const SAMPLE_ADDRESS = '1234 Sample Street';
 const W = 1448; // intrinsic width kept from the asset it replaces, so the homepage layout and its 60/40 column do not move
 
@@ -123,11 +128,25 @@ from PIL import Image, ImageChops, ImageStat
 a = Image.open(sys.argv[1]).convert('RGB'); b = Image.open(sys.argv[2]).convert('RGB')
 if a.size != b.size:
     print('FAIL size %s vs %s' % (a.size, b.size)); sys.exit(1)
-m = sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
-tol = float(sys.argv[3])
-print(('PASS' if m <= tol else 'FAIL') + ' mean abs diff %.3f (tolerance %.1f)' % (m, tol))
-sys.exit(0 if m <= tol else 1)
-`, AGAINST, target, String(CHECK_TOLERANCE)], { encoding: 'utf8' });
+d = ImageChops.difference(a, b)
+mean = sum(ImageStat.Stat(d).mean) / 3
+# LOCAL checks: a changed label or sentence barely moves the whole-image mean, so look at small tiles and at strongly different pixels too.
+T = ${CHECK_TILE}
+worst, wxy = 0.0, (0, 0)
+for y in range(0, d.height, T):
+    for x in range(0, d.width, T):
+        m = sum(ImageStat.Stat(d.crop((x, y, min(x + T, d.width), min(y + T, d.height)))).mean) / 3
+        if m > worst: worst, wxy = m, (x, y)
+g = d.convert('L').point(lambda v: 255 if v > ${CHECK_STRONG_DELTA} else 0)
+strong = g.histogram()[255]
+tol, ttol, stol = float(sys.argv[3]), float(sys.argv[4]), int(sys.argv[5])
+bad = []
+if mean > tol: bad.append('whole-image mean %.3f > %.1f' % (mean, tol))
+if worst > ttol: bad.append('tile at x=%d,y=%d differs by %.2f > %.1f' % (wxy[0], wxy[1], worst, ttol))
+if strong > stol: bad.append('%d strongly different pixels > %d' % (strong, stol))
+print(('FAIL ' + '; '.join(bad) if bad else 'PASS') + ' [mean %.3f, worst %dpx tile %.2f, strong pixels %d]' % (mean, T, worst, strong))
+sys.exit(1 if bad else 0)
+`, AGAINST, target, String(CHECK_TOLERANCE), String(CHECK_TILE_TOLERANCE), String(CHECK_STRONG_PIXELS)], { encoding: 'utf8' });
     console.log(verdict.trim()); process.exit(0);
   } catch (e) { console.log(((e.stdout || '') + (e.stderr || '') || String(e)).trim()); process.exit(1); }
 }

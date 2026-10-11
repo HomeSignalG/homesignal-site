@@ -41,6 +41,24 @@ ok(r2.status === 1 && /FAIL/.test(r2.stdout), '3 --check FAILS (exit 1, FAIL pri
 ok(same(t0, snap(TRACKED)), '4 a failing --check still left the tracked asset untouched');
 ok(same(badBefore, snap(bad)), '5 a failing --check did not rewrite the file it compared against');
 
+// 2b. LOCALIZED edits: a one-letter label change, a changed word and a changed sentence barely move a whole-image average (each reads < 1.0 mean, which the
+// first version of --check would have PASSED). Each must FAIL, and the failure must come from the LOCAL checks (a tile or strong pixels), not the mean.
+const LOCAL = [
+  ['one letter of the STAGE column label', [562, 438, 572, 454]],
+  ['one letter of a Quality-of-Life sentence', [842, 512, 852, 528]],
+  ['one word of a Quality-of-Life sentence', [1262, 540, 1290, 558]],
+  ['the tail of a Quality-of-Life sentence', [1000, 572, 1180, 590]],
+];
+for (const [label, box] of LOCAL) {
+  const f = join(dir, 'local-' + box.join('-') + '.webp');
+  execFileSync('python3', ['-I', '-c', 'import sys\nfrom PIL import Image, ImageDraw\nim=Image.open(sys.argv[1]).convert("RGB")\nImageDraw.Draw(im).rectangle(tuple(int(v) for v in sys.argv[3:7]),fill=(255,255,255))\nim.save(sys.argv[2],"WEBP",quality=88)', TRACKED, f, ...box.map(String)]);
+  const r = run('--check', '--against', f);
+  const mean = Number((/mean (\d+\.\d+)/.exec(r.stdout) || [])[1]);
+  ok(r.status === 1 && /FAIL (tile|\d+ strongly)/.test(r.stdout) && !/whole-image mean/.test(r.stdout) && mean < 1.0,
+    '4b --check FAILS on a localized edit (' + label + ') through the tile / strong-pixel checks, while the whole-image mean stays under 1.0 (' + mean + ')', r.stdout + r.stderr);
+}
+ok(same(t0, snap(TRACKED)), '4c the tracked asset is untouched after the localized-edit runs');
+
 // 3. a size mismatch is a FAIL too, not a crash-and-pass
 const small = join(dir, 'small.webp');
 execFileSync('python3', ['-I', '-c', 'import sys\nfrom PIL import Image\nImage.open(sys.argv[1]).convert("RGB").resize((200,100)).save(sys.argv[2],"WEBP")', TRACKED, small]);
@@ -66,6 +84,7 @@ ok(same(t0, snap(TRACKED)), '12 the tracked asset was never touched by the regen
 // 6. structure: in check mode the only write target is the temp candidate
 const src = readFileSync(SCRIPT, 'utf8');
 ok(/const target = CHECK \? join\(dir, 'candidate\.webp'\) : OUT;/.test(src), '13 the render target is the temp candidate whenever --check is set');
+ok(/CHECK_TILE_TOLERANCE/.test(src) && /CHECK_STRONG_PIXELS/.test(src) && /bad\.append\('tile at/.test(src), '15 the localized (tile and strong-pixel) checks are wired into --check');
 ok((src.match(/\bOUT\b/g) || []).length === 2, '14 OUT is referenced only where it is declared and chosen as the non-check target', (src.match(/\bOUT\b/g) || []).length);
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nALL PASS');
