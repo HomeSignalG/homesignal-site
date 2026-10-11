@@ -58,7 +58,6 @@ ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no re
 const bar = (page.match(/<header class="sitebar">[\s\S]*?<\/header>/) || [''])[0];
 const headerTop = (page.match(/<header class="top">[\s\S]*?<\/header>/) || [''])[0];
 const siteNav = (bar.match(/<nav class="sb-nav" aria-label="HomeSignal site">([\s\S]*?)<\/nav>/) || [])[1] || '';
-const entNav = (headerTop.match(/<nav class="entnav" aria-label="Enterprise">([\s\S]*?)<\/nav>/) || [])[1] || '';
 const linksOf = (h) => [...h.matchAll(/<a href="([^"]+)"([^>]*)>([^<]+)<\/a>/g)].map((m) => ({ text: m[3], href: m[1], current: /aria-current="page"/.test(m[2]) }));
 const shellHtml = read('partials/shell.html');
 const shellPrimary = (shellHtml.match(/<nav class="hs-nav"[\s\S]*?<\/nav>/) || [''])[0];
@@ -69,13 +68,10 @@ ok(JSON.stringify(linksOf(siteNav).map((l) => [l.text, l.href])) === JSON.string
 ok(linksOf(siteNav).filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', '1h2 exactly one item is marked as the current section: Enterprise');
 const brandHref = (bar.match(/<a class="sb-brand" href="([^"]+)"/) || [])[1];
 ok(brandHref === ((shellHtml.match(/<a class="hs-brand" href="([^"]+)"/) || [])[1]) && brandHref === 'index.html', '1h3 the HomeSignal logo links where the shell\'s does (the homepage)', brandHref);
-const shellSub = (shellHtml.match(/id="hs-enterprise-sub">([\s\S]*?)<\/div>/) || [])[1] || '';
-const shellEnt = [...shellSub.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]);
-ok(JSON.stringify(linksOf(entNav).map((l) => [l.text, l.href])) === JSON.stringify(shellEnt) && shellEnt.length === 2,
-  '1h4 the row under the bar holds the shell\'s two Enterprise entries (Enterprise overview, My reports), same labels and addresses', { have: linksOf(entNav), shellEnt });
-ok(linksOf(entNav).filter((l) => l.current).map((l) => l.text).join() === 'My reports', '1h5 My reports is marked as the current page');
+ok(!/class="entnav"/.test(page) && !/class="brand"/.test(headerTop), '1h4 below the site bar the page goes straight to its title: no second Enterprise row and no repeated HomeSignal label (the bar already says Enterprise)');
+ok(/<h1>Development Activity Reports<\/h1>/.test(headerTop), '1h5 the header under the bar holds the page title');
 ok(/id="who"/.test(bar) && !/id="who"/.test(headerTop), '1h6 the account area (email and Sign out) lives in the bar, so it is on screen with the navigation');
-ok(!/https?:\/\//.test(siteNav + entNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar + entNav), '1i ...plain same-site links: no address of another site, no new window, no script');
+ok(!/https?:\/\//.test(siteNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar), '1i ...plain same-site links: no address of another site, no new window, no script');
 ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && !/rel="stylesheet"/.test(page), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document');
 ok(/header\.sitebar,header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides the header (and now the site bar) is still there, so neither prints');
 
@@ -100,7 +96,7 @@ ok(/var payload = \{ address: address, view: 'customer' \};/.test(code) && !/'in
   '3c a report asks for the customer view only, and never sets a radius (a report is always 0.5 mile, ruling 7)');
 ok(!/canonicalLifecycle|classifyProjectType|STAGE_EVIDENCE|presentationStage|report-rights|\.cleared\b|\.rights\b|\.stage\.key|\.lifecycle\.key|creditDecision|uses_report/.test(code),
   '3d no lifecycle, Type, stage, rights or credit rule on the page');
-ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
+ok(/V\.mount\(\$\('report'\), body, \{ subject: address, label: field\('label'\), brokerage: hd\.brokerage, agent: hd\.agent, live: shareable \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\] \}\)/.test(code) && /<script src="lib\/da-report-view\.js\?v=[0-9a-f]{8}"><\/script>/.test(page),
   '3e the report is drawn by the shared view (lib/da-report-view.js), loaded with its content key');
 const csp = /http-equiv="Content-Security-Policy" content="([^"]*)"/.exec(page)[1];
 ok(/connect-src 'self' https:\/\/qwnnmljucajnexpxdgxr\.supabase\.co wss:\/\/qwnnmljucajnexpxdgxr\.supabase\.co;/.test(csp) && /script-src 'self' 'unsafe-inline' https:\/\/cdn\.jsdelivr\.net;/.test(csp),
@@ -250,7 +246,7 @@ ok(wa.length === 1 && /\$\('share-pop-wa'\)\.href = 'https:\/\/wa\.me\/\?text=' 
   '9l the only non-project URL is the WhatsApp link, written once onto the popup\'s own anchor (a link the person follows, never a request the page makes)');
 ok(/else if \(act === 'share'\) shareFromReport\(b\);/.test(code) && !/\$\('share'\)\.scrollIntoView/.test(code) && /var made = await makeShare\(\);/.test(code),
   '9m the report\'s Share button runs shareFromReport, which makes the link through makeShare (the old scroll-to-the-card is gone)');
-ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\]/g) || []).length === 2,
+ok(/if \(!shareFor \|\| !session \|\| !session\.user\) \{[\s\S]*?was not saved, so it can't be shared with a client/.test(code) && (code.match(/live: [a-zA-Z]+ \? \['share', 'watch', 'pdf', 'compare'\] : \['share', 'pdf'\], hide: COMPARE_AT_LAUNCH \? \[\] : \['compare'\]/g) || []).length === 2,
   '9n a report that was not saved gets a plain explanation from the Share button (never a silent click), on both ways a report reaches the page');
 ok(!/'#share='|share=' \+|\+ '#share/.test(code.replace(/var SHARE_LINK = [^\n]*\n/, '')), '9o the page builds no part of the client link: it only checks the one the server made against SHARE_LINK');
 
@@ -262,6 +258,18 @@ ok(/function authKeys\(e\)\{[\s\S]*?e\.key === 'Escape'[\s\S]*?closeAuth\(\)[\s\
 ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code) && /if \(epochAtAsk !== sessionEpoch\) \{ attempt = null; return; \}/.test(code)
    && run.indexOf('if (epochAtAsk !== sessionEpoch)') > 0 && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("var V = window.HS && window.HS.daReportView;") && run.indexOf('if (epochAtAsk !== sessionEpoch)') < run.indexOf("if (body.plan && typeof body.plan.state"),
   '10c a report that arrives after the person signed out (or another signed in) is dropped before anything of it is shown or kept');
+
+// ---- 11. layout (founder, 2026-10-11): Create is full width above the workspace; usage is a quiet account strip in the header --------------------------
+{
+  const html = read(PAGE);
+  const body = html.slice(html.indexOf('<body>'));
+  const iHeaderEnd = body.indexOf('</header>', body.indexOf('<header class="top"')), iCreate = body.indexOf('id="create-title"'), iWs = body.indexOf('<div class="ws">'), iRail = body.indexOf('<aside class="rail"');
+  ok(iCreate > iHeaderEnd && iCreate < iWs && iWs < iRail, '11a Create a property report sits above the two-column workspace, not inside the rail');
+  ok(body.indexOf('id="rf"') === body.lastIndexOf('id="rf"') && body.indexOf('id="go"') === body.lastIndexOf('id="go"') && body.indexOf('id="trial-cta"') === body.lastIndexOf('id="trial-cta"'), '11b one form, one Generate button and one Subscribe / Manage plan button: nothing is duplicated');
+  const iTrial = body.indexOf('id="trial"');
+  ok(iTrial > 0 && iTrial < iHeaderEnd && body.indexOf('id="trial-cta"') < iHeaderEnd && body.indexOf('id="trial-count"') < iHeaderEnd, '11c the report usage and its Subscribe / Manage plan action are in the header account strip, not above the form');
+  ok(!/<section class="card" id="trial"/.test(body), '11d usage is no longer a large card');
+}
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
 process.exit(bad ? 1 : 0);

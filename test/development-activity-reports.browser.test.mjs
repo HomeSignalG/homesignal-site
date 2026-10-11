@@ -259,7 +259,7 @@ const browser = await chromium.launch();
 
 /** Opens the page on a world. `lose` (a function of the report request body): the server handles that call, but its answer never
  *  reaches the page, the case where a retry could otherwise be charged twice. */
-async function open({ w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '', accountClosed = false } = {}) {
+async function open({ compare = true, w = world(), signedIn = true, hash = '', width = 1280, height = 900, lose = () => false, loseInvite = () => false, name = '', tz = '', accountClosed = false } = {}) {
   const ctx = await browser.newContext(tz ? { viewport: { width, height }, timezoneId: tz } : { viewport: { width, height } });
   await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: base });
   const page = await ctx.newPage();
@@ -272,6 +272,13 @@ async function open({ w = world(), signedIn = true, hash = '', width = 1280, hei
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
   await page.route('**/*', async (route) => {
     const r = route.request(), url = r.url();
+    // Compare is hidden at launch (COMPARE_AT_LAUNCH = false in the page). The comparison tests below keep proving the engine and its UI by serving the page with the
+    // switch ON (open() with compare: true, the default); the launch section (N) opens it exactly as shipped (compare: false).
+    if (compare && url.split('?')[0].endsWith(PAGE)) {
+      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;');
+      if (!html.includes('COMPARE_AT_LAUNCH = true;')) throw new Error('the launch switch is not in the page');
+      return route.fulfill({ status: 200, contentType: 'text/html', body: html });
+    }
     if (url.startsWith(base)) return route.continue();
     if (url.startsWith('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB(signedIn, name) });
     if (url === MANAGE_FN) {
@@ -356,10 +363,10 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok((await page.evaluate(() => window.__sb.otp[0].options.shouldCreateUser)) === true, '1c the sign-in may create an account (an invited person usually has none)');
   await page.fill('#auth-code', '123456');
   await page.click('#auth-submit');
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(trials.length === 1 && trials[0].body.action === 'redeem' && trials[0].body.token === TOKEN && trials[0].auth === 'Bearer user-token',
     '1d after sign-in the page redeems the invite once, with the person\'s own token', trials.map((t) => t.body));
-  ok(w.redeemed === 1 && /^10 free reports left$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
+  ok(w.redeemed === 1 && /^0 of 10 free reports used$/.test(await text(page, '#trial-count')) && /joined/.test(await text(page, '#trial-sub')),
     '1e the panel says the person joined and has 10 free reports left', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   ok((await page.evaluate(() => sessionStorage.getItem('hs-da-invite'))) === null, '1f the per-tab invite slot is emptied once the invite has been used');
   ok(!(await page.$eval('#go', (b) => b.disabled)), '1g "Make report" is offered');
@@ -371,8 +378,8 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world({ used: 3 });
   const { ctx, page, errors, reports, foreign } = await open({ w });
-  await waitCount(page, /^7 free reports left$/);
-  ok(/^7 free reports left$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 7 left');
+  await waitCount(page, /^3 of 10 free reports used$/);
+  ok(/^3 of 10 free reports used$/.test(await text(page, '#trial-count')), '2a signed in, the panel reads the trial: 7 left');
   await page.waitForTimeout(200);
   ok(trialsOf(page).length === 1, '2a2 the trial is read once, though the sign-in library reports the session twice on load (getSession and INITIAL_SESSION)', trialsOf(page).length);
   await make(page);
@@ -381,14 +388,14 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '2b one request, with the person\'s token, the customer view and a random v4 key, and nothing else', reports.map((r) => r.body));
   ok(w.used === 4 && (await page.$$('#report .da-rv-sec')).length > 0 && /used 1 of your brokerage/.test(await text(page, '#creditnote')),
     '2c a report that shows development is drawn and says it used one free report', await text(page, '#creditnote'));
-  ok(/^6 free reports left$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
+  ok(/^4 of 10 free reports used$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
   // a fresh world with nothing cleared: a "No data ingested" report
   await ctx.close();
   const w2 = world({ used: 4, rights: RIGHTS_NONE });
   const o2 = await open({ w: w2 });
-  await waitCount(o2.page, /^6 free reports left$/);
+  await waitCount(o2.page, /^4 of 10 free reports used$/);
   await make(o2.page);
-  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^6 free reports left$/.test(await text(o2.page, '#trial-count')),
+  ok(w2.used === 4 && /did not use a free report: No data ingested/.test(await text(o2.page, '#creditnote')) && /^4 of 10 free reports used$/.test(await text(o2.page, '#trial-count')),
     '2e a "No data ingested" report says it used nothing, and the count stays', [await text(o2.page, '#creditnote'), await text(o2.page, '#trial-count')]);
   // the empty-source state on the launch test location (Brigham City, UT 84302), read off the page the way a person sees it: a plain answer, not a failure
   const hero = await o2.page.$eval('#report .da-rv-sec--outcome', (e) => ({ title: e.querySelector('.da-rv-h2').textContent.trim(), body: e.querySelector('.da-rv-outcome-p').textContent.trim() })).catch(() => null);
@@ -430,7 +437,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const w = world({ used: 0 });
   let lost = 0;
   const { ctx, page, reports } = await open({ w, lose: () => lost++ === 0 }); // the server charges the first request, but its answer never arrives
-  await waitCount(page, /^10 free reports left$/);
+  await waitCount(page, /^0 of 10 free reports used$/);
   await make(page);
   ok(/could not be reached/.test(await text(page, '#status')) && /will not use a second free report/.test(await text(page, '#status')),
     '3a a lost answer says so, and says pressing again will not use a second free report');
@@ -438,7 +445,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
   ok(reports.length === 2 && reports[0].body.idempotency_key === reports[1].body.idempotency_key, '3b pressing again for the same address resends the SAME key', reports.map((r) => r.body.idempotency_key));
   ok(w.used === 1 && /the report you already made for this address/.test(await text(page, '#creditnote')) && /did not use another/.test(await text(page, '#creditnote'))
-     && /^9 free reports left$/.test(await text(page, '#trial-count')),
+     && /^1 of 10 free reports used$/.test(await text(page, '#trial-count')),
     '3c the server had already charged the first request: the retry gets that same report, says it used no second one, and 9 are left', [w.used, await text(page, '#creditnote')]);
   await make(page, OTHER);
   ok(reports.length === 3 && reports[2].body.idempotency_key !== reports[1].body.idempotency_key && V4.test(reports[2].body.idempotency_key) && w.used === 2,
@@ -460,12 +467,12 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   for (const [rate, re, what] of cases) {
     const w = world({ used: 4 });
     const { ctx, page, reports, errors, foreign } = await open({ w });
-    await waitCount(page, /^6 free reports left$/);
+    await waitCount(page, /^4 of 10 free reports used$/);
     w.rate = rate;
     await make(page);
     const st = await page.$eval('#status', (e) => ({ text: e.textContent.trim(), err: e.classList.contains('err') }));
     ok(re.test(st.text) && st.err, '3x ' + what + ': the page says so in plain words and shows it as a refusal', st);
-    ok(w.used === 4 && /^6 free reports left$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 6 free reports left', [w.used, await text(page, '#trial-count')]);
+    ok(w.used === 4 && /^4 of 10 free reports used$/.test(await text(page, '#trial-count')), '3x ' + what + ': nothing was used: the brokerage still has 6 free reports left', [w.used, await text(page, '#trial-count')]);
     ok(reports.length === 1 && (await page.$$('#report .da-rv-sec')).length === 0, '3x ' + what + ': one request was sent and no report is drawn', [reports.length, (await page.$$('#report .da-rv-sec')).length]);
     const shown = await text(page, 'main');
     ok(!/\b429\b|rate_limited|retry_after/.test(shown), '3x ' + what + ': no status code, error code or field name is shown to the person', shown.slice(0, 200));
@@ -476,19 +483,19 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // when the window has passed, the very same page makes the report
   const w = world({ used: 4 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^6 free reports left$/);
+  await waitCount(page, /^4 of 10 free reports used$/);
   w.rate = { retryAfterSeconds: 5, limitedBy: 'user', windowSeconds: 60 };
   await make(page);
   w.rate = null;
   await page.click('#go');
   await page.waitForFunction(() => document.querySelectorAll('#report .da-rv-sec').length > 0, null, { timeout: 8000 }).catch(() => {});
-  ok(w.used === 5 && /^5 free reports left$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 5 left', [w.used]);
+  ok(w.used === 5 && /^5 of 10 free reports used$/.test(await text(page, '#trial-count')), '3x and once the wait is over the same button makes the report: one free report used, 5 left', [w.used]);
   await ctx.close();
 }
 
 // ---- 4. who may make reports, in plain words -----------------------------------------------------------------------------------------------
 for (const [label, w, count, disabled] of [
-  ['a used-up trial', world({ used: 10 }), /All 10 free reports are used/, true],
+  ['a used-up trial', world({ used: 10 }), /10 of 10 free reports used/, true],
   ['no trial', world({ trial: null }), /not part of a trial/, true],
   ['a revoked trial', world({ trial: 'revoked' }), /trial has ended/, true],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/, false],
@@ -521,9 +528,9 @@ for (const [label, w, count, disabled] of [
 {
   const w = world({ used: 9 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^1 free report left$/);
+  await waitCount(page, /^9 of 10 free reports used$/);
   await make(page);
-  ok(w.used === 10 && /All 10 free reports are used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
+  ok(w.used === 10 && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && (await page.$eval('#go', (b) => b.disabled)) && (await page.$$('#report .da-rv-sec')).length > 0,
     '4h the twentieth report is shown, and the panel then says the trial is complete and stops offering reports');
   await ctx.close();
 }
@@ -532,7 +539,7 @@ for (const [label, w, count, disabled] of [
 {
   const w = world({ used: 2 });
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok((await page.$$('#report .da-rv-sec')).length > 0 && wide <= 0, '5a on a 390 px screen the report is drawn and the page does not scroll sideways', wide);
@@ -542,10 +549,10 @@ for (const [label, w, count, disabled] of [
 // ---- 6. an owner invites an agent (build step 5e) ---------------------------------------------------------------------------------------
 const teamShown = (page) => drawn(page, '#team'); // rendered, not the attribute (see `drawn`)
 for (const [label, w, count] of [
-  ['an agent', world({ role: 'agent' }), /free reports left/],
+  ['an agent', world({ role: 'agent' }), /free reports used/],
   ['an admin', world({ trial: null, admin: true }), /HomeSignal admin/],
   ['a person with no trial', world({ trial: null, role: 'owner' }), /not part of a trial/],
-  ['an owner of a used-up trial', world({ role: 'owner', used: 10 }), /All 10 free reports are used/],
+  ['an owner of a used-up trial', world({ role: 'owner', used: 10 }), /10 of 10 free reports used/],
   ['an owner of a revoked trial', world({ role: 'owner', trial: 'revoked' }), /trial has ended/],
 ]) {
   const { ctx, page, errors } = await open({ w });
@@ -556,7 +563,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner', used: 2 });
   const { ctx, page, trials, errors, foreign } = await open({ w });
-  await waitCount(page, /^8 free reports left$/);
+  await waitCount(page, /^2 of 10 free reports used$/);
   ok(await teamShown(page) && /Invite an agent/.test(await text(page, '#team-title')) && (await page.$eval('#minted', (e) => e.hidden)),
     '6b an owner of an active trial sees "Invite an agent", with no link yet');
   await page.click('#mint');
@@ -585,7 +592,7 @@ for (const [label, w, count] of [
   // signed in again as the owner, a link made, and then a DIFFERENT person signs in on the same tab: in the same moment (before the
   // page has asked anything about the new person) the card and the owner's link are gone
   await page.evaluate((s) => { window.__sb.session = s; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', s)); }, { access_token: 'user-token', user: { id: UID, email: 'agent@example.test' } });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => !document.getElementById('team').hidden, null, { timeout: 8000 }).catch(() => {});
   await page.click('#mint');
   await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -603,7 +610,7 @@ for (const [label, w, count] of [
   // the person is an owner when the page loads, but the database refuses at the moment of minting (they were made an agent meanwhile)
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   w.mint = 'refuse';
   await page.click('#mint');
   await page.waitForFunction(() => /owner/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -618,7 +625,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, loseInvite: () => true });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.click('#mint');
   await page.waitForFunction(() => /could not be made/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/could not be made just now\. Try again/.test(await text(page, '#team-status')) && (await page.$eval('#invite-link', (e) => e.value)) === '' && !(await page.$eval('#mint', (b) => b.disabled)),
@@ -628,7 +635,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner', used: 9 });
   const { ctx, page } = await open({ w });
-  await waitCount(page, /^1 free report left$/);
+  await waitCount(page, /^9 of 10 free reports used$/);
   ok(await teamShown(page), '6n an owner with one report left is offered the card');
   await make(page);
   ok(w.used === 10 && !(await teamShown(page)), '6o using the last free report takes the card away (no agent could make a report)');
@@ -637,7 +644,7 @@ for (const [label, w, count] of [
 {
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.click('#mint');
   await page.waitForFunction(() => !document.getElementById('minted').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -653,7 +660,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world();
   const { ctx, page, errors, reports, saved, foreign } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await savedShown(page) && (await rowsOf(page)).length === 0 && /No reports saved yet/.test(await text(page, '#saved-status')),
     '7a a trial member with no report yet sees the card and is told none is saved', await text(page, '#saved-status'));
   await make(page, ADDRESS); await make(page, ADDRESS_2);
@@ -688,7 +695,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   // a different person on the same tab: the first person's list and report are gone in the same moment
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await waitRows(page, 1);
   const swap = await page.evaluate(() => {
@@ -713,9 +720,9 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   // a trial whose 10 reports are used: the card stays, the stored reports reopen, and the page makes no new one
   const w = world({ used: 9 });
   const { ctx, page, reports } = await open({ w });
-  await waitCount(page, /^1 free report left$/);
+  await waitCount(page, /^9 of 10 free reports used$/);
   await make(page);
-  await waitCount(page, /0 free reports left|used/);
+  await waitCount(page, /free reports used/);
   await waitRows(page, 1);
   ok(w.used === 10 && await savedShown(page), '7n after the 10th report the card is still offered', w.used);
   await page.click('#saved-list button');
@@ -726,7 +733,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world(); w.listFails = true;
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => /could not be read/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/could not be read just now/.test(await text(page, '#saved-status')) && (await rowsOf(page)).length === 0, '7p a list that cannot be read says so in plain words and shows no rows', await text(page, '#saved-status'));
   w.listFails = false;
@@ -735,7 +742,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await waitRows(page, 1);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -750,7 +757,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   const w = world();
   const { ctx, page, errors, foreign, reports } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && /Your name on reports/.test(await text(page, '#profile-title')),
     '8a a trial member sees the "Your name on reports" card, with the box empty when they have given no name');
   await page.fill('#label', 'Smith buyers');
@@ -783,7 +790,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // the name already on the account is filled in once, and a report being made never overwrites what is being typed
   const w = world(); w.header = { brokerage: 'Acme Realty', agent: 'Jo Agent' };
   const { ctx, page } = await open({ w, name: 'Jo Agent' });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent', '8h the box starts with the name already on the person\'s account');
   await page.fill('#agent-name', 'Jo Q. Agent');
   await make(page);
@@ -802,7 +809,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // a name that cannot be saved, and one that is too long
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateFails = true; });
   await page.fill('#agent-name', 'Pat Agent');
   await page.click('#save-name');
@@ -819,7 +826,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // a header that cannot be read costs nothing and shows no report
   const w = world(); w.headerFails = true;
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   ok(w.used === 0 && (await page.$$('#report .da-rv-sec')).length === 0 && /could not be read just now/.test(await text(page, '#status')),
     '8m a header that cannot be read: no report, no free report used, and the page says the records could not be read', [w.used, await text(page, '#status')]);
@@ -829,7 +836,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   // text is shown as text
   const w = world(); w.header = { brokerage: '<b>Acme</b> Realty', agent: '<img src=x onerror="window.__pwned=1">' };
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   const who = await page.evaluate(() => ({ text: (document.querySelector('#report .da-rv-who') || {}).textContent || '', imgs: document.querySelectorAll('#report .da-rv-who *').length, pwned: window.__pwned === 1 }));
   ok(who.text === '<b>Acme</b> Realty · <img src=x onerror="window.__pwned=1">' && who.imgs === 0 && !who.pwned, '8n a name and a brokerage with markup in them are printed as text, never run', who);
@@ -845,14 +852,14 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
     await ctx.close();
   }
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8p (control) a trial member with a name on file sees the card with it filled in');
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
   await page.waitForTimeout(200);
   ok(!(await profileShown(page)) && (await page.$eval('#agent-name', (e) => e.value)) === '', '8q signing out hides the card and empties the box');
   await ctx.close();
   const o2 = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(o2.page, /free reports left/);
+  await waitCount(o2.page, /free reports used/);
   const swap = await o2.page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
@@ -864,7 +871,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   // a save still on its way when ANOTHER person signs in must not write its answer onto that person's page
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateHold = true; });
   await page.fill('#agent-name', 'Pat Q. Agent');
   await page.click('#save-name');
@@ -885,7 +892,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(await profileShown(page) && wide <= 0, '8s on a 390 px screen the card is shown and the page does not scroll sideways', wide);
@@ -903,7 +910,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page, errors, shareCalls, foreign } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await shareHidden(page), '9a before any report, the share card is not shown');
   await make(page);
   ok(!(await shareHidden(page)) && /Share this report with your client/.test(await text(page, '#share-title')), '9b a report that was saved shows the share card');
@@ -945,8 +952,9 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '9m the report\'s own bar has Share with Client, Watch Property, Download PDF and Compare (build steps 8, 9, 10) all live, in that order', bar);
   await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
   await page.click('.da-rv-act[data-da-action="pdf"]');
-  await page.click('#share-pdf');
-  ok((await page.evaluate(() => window.__prints)) === 2, '9n both Download PDF buttons open the browser\'s print window (no PDF is made on a server)');
+  ok((await page.evaluate(() => window.__prints)) === 1 && !(await page.$('#share-pdf')) && (await page.$$('button')).length > 0
+     && (await page.$$eval('button', (bs) => bs.filter((b) => /^Download PDF$/.test(b.textContent.trim())).length)) === 1,
+    '9n there is exactly ONE visible Download PDF control (the report\'s own, in the rail) and it opens the browser\'s print window (no PDF is made on a server)');
   // the report's own Share button opens a popup that makes the private link and offers it right there (follow-up to build step 8, founder 2026-10-04)
   const createCount = () => shareCalls.filter((c) => c.body.action === 'create').length;
   const popState = () => page.evaluate(() => ({ open: !document.getElementById('share-pop').hidden, body: !document.getElementById('share-pop-body').hidden, link: document.getElementById('share-pop-link').value,
@@ -1026,7 +1034,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
   const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, shareCalls } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   ok(w.made.size === 0 && (await shareHidden(page)) && shareCalls.length === 0, '9r a report that was not saved gets no share card and makes no share request');
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
@@ -1037,7 +1045,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // opening a saved report shows its card; another report, or another person, never inherits the link
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await page.click('#share-make');
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -1064,7 +1072,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the ways it can fail are said in plain words, and a failure never shows a link
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   w.shareFails = true;
   await page.click('#share-make');
@@ -1087,7 +1095,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await page.click('#share-make');
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
@@ -1117,7 +1125,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page, errors, watchCalls, foreign } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await watchHidden(page), '10a before any report, the Watch card is not shown');
   await make(page);
   ok(!(await watchHidden(page)) && /Watch this property/.test(await text(page, '#watch-title')), '10b a report that was saved shows the Watch card');
@@ -1184,7 +1192,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a report that was not saved cannot be watched
   const w = world({ rights: RIGHTS_NONE });
   const { ctx, page, watchCalls } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   ok(w.made.size === 0 && (await watchHidden(page)) && watchCalls.length === 0, '10q a report that was not saved gets no Watch card and makes no Watch request');
   const bar = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ live: e.classList.contains('da-rv-act--live'), act: e.getAttribute('data-da-action') })));
@@ -1195,7 +1203,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the ways it can fail are said in plain words; a refusal never leaves the card in a state the server did not give
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await waitWatch(page, /not watching/);
   w.watchFails = true;
@@ -1225,7 +1233,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a list that cannot be read: starting is still offered (it does nothing twice), and the failure is said
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   w.watchListFails = true;
   await make(page);
   await waitWatch(page, /could not be done/);
@@ -1237,7 +1245,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // another report, and another person, never inherit a watch
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await page.click('#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1255,7 +1263,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a different person signing in on the same tab takes the card, its state and its message away at once
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await page.click('#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1272,7 +1280,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // a late answer for the report the person has since left is ignored: it must not paint a watch onto the report now on screen
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   w.holdNextWatchList = true;
   await make(page);                                   // report 1; its list is held on the server's side
   w.watches.push({ watch_id: 'e0000000-0000-4000-8000-0000000000aa', report_id: 'c0000000-0000-4000-8000-000000000001', created_at: '2026-10-03T12:00:00+00:00', last_run_at: null, last_outcome: null, next_due_at: '2026-10-03T12:00:00+00:00' });
@@ -1287,7 +1295,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 {
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page);
   await page.click('#watch-start');
   await waitWatch(page, /You are watching this property, since/);
@@ -1316,7 +1324,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // before there are two reports there is nothing to compare, and the card says so
   const w = world();
   const { ctx, page, saved, foreign, errors } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => /Comparing needs at least 2/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok((await compareHidden(page)) && /Comparing needs at least 2 saved reports/.test(await text(page, '#compare-status')) && (await page.$eval('#compare-go', (b) => b.disabled)),
     '11a with no saved report the card says comparing needs at least two, and the button is off (the card itself waits for Compare reports)', await text(page, '#compare-status'));
@@ -1332,7 +1340,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // three saved reports: the card lists them, two to five can be chosen, and comparing opens exactly the chosen ones
   const w = world();
   const { ctx, page, saved, reports, foreign, errors } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
   const labels = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
@@ -1348,7 +1356,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCompared(page);
   const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
   ok(opens.length === 3 && opens.every((c) => c.auth === 'Bearer user-token' && Object.keys(c.body).sort().join() === 'action,report_id' && /^[0-9a-f-]{36}$/.test(c.body.report_id)), '11h comparing opens exactly the three chosen saved reports, each with the person\'s own token and nothing in the request but the action and the report id', opens.map((c) => c.body));
-  ok(reports.length === madeBefore && w.used === usedBefore && /^7 free reports left$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 7', [reports.length, w.used, await text(page, '#trial-count')]);
+  ok(reports.length === madeBefore && w.used === usedBefore && /^3 of 10 free reports used$/.test(await text(page, '#trial-count')), '11i it made no report and used no free report: the count is still 7', [reports.length, w.used, await text(page, '#trial-count')]);
   ok(/Compared 3 saved reports\. Opening them did not use a free report\./.test(await text(page, '#compare-status')), '11j the card says it compared three and that opening them used no free report');
   const t = await tableOf(page);
   ok(t.heads.join() === 'Report 3,Report 2,Report 1', '11k the columns are in the saved list\'s order, newest first, not the order they were ticked', t.heads);
@@ -1370,7 +1378,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // comparison used to say "Oct 5" while the list said "October 4"
   const w = world(); w.generatedAt = '2026-10-05T02:00:00+00:00';
   const { ctx, page } = await open({ w, tz: 'America/Denver' });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const listed = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
@@ -1386,7 +1394,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // the limit: five may be chosen and no sixth; a changed choice clears the old comparison
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
   await waitBoxes(page, 6);
   for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1405,7 +1413,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // a column that cannot say what is nearby says so; it is never a zero
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = clone(WNONE_REPORT);                   // report 1 is stored as the engine saves a report with no data ingested
@@ -1424,7 +1432,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // refusals: a report that cannot be found, and reports made over different distances. Nothing partial is drawn.
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
   for (let i = 1; i <= 3; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1446,7 +1454,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // the report's own "Compare property" button adds the report on screen to the choice
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live'), label: e.textContent.trim() })));
@@ -1462,7 +1470,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // another person, signing out, and a late answer: nothing of one person's reports is left for the next
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
@@ -1478,7 +1486,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
 {
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
@@ -1496,7 +1504,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // a late answer for a person who has since signed out is dropped: it must not paint a comparison for nobody
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
@@ -1516,7 +1524,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // a phone: five reports side by side never scroll the page sideways, and each cell says which report it is
   const w = world();
   const { ctx, page } = await open({ w, width: 390, height: 844 });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   for (const a of [A1, A2, A3, A4, A5]) await make(page, a);
   await waitBoxes(page, 5);
   for (let i = 1; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
@@ -1530,7 +1538,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   ok(m.wide <= 0 && m.tag !== 'none' && m.head === 'absolute' && m.tableDisplay === 'block', '11z4 on a 390 px screen the comparison stacks (each cell starts with its report number) and the page does not scroll sideways', m);
   await ctx.close();
   const d = await open({ w: world() });
-  await waitCount(d.page, /free reports left/);
+  await waitCount(d.page, /free reports used/);
   await make(d.page, A1); await make(d.page, A2);
   await waitBoxes(d.page, 2);
   await d.page.check('#saved-list li:nth-child(1) input'); await d.page.check('#saved-list li:nth-child(2) input');
@@ -1545,7 +1553,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // the report's own Compare button is live on a REOPENED saved report too, and not only on a report just made
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#saved-list button');
@@ -1558,7 +1566,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // a saved list that cannot be read empties the card's list and says so; it never leaves a stale list to compare
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#compare-mode');
@@ -1575,7 +1583,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // a report that comes back but is not a report the page can show is never compared (the same answer as one that cannot be found)
   const w = world();
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
@@ -1667,8 +1675,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12i-12m. a paid brokerage: the month's reports, whose number the page shows and never works out
   const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 3 });
   const { ctx, page, reports, errors, foreign } = await open({ w });
-  await waitCount(page, /reports left this month/);
-  ok(/^97 reports left this month$/.test(await text(page, '#trial-count')) && /100 new reports each month/.test(await text(page, '#trial-sub')) && /this month ends November 4, 2026/.test(await text(page, '#trial-sub')),
+  await waitCount(page, /of 100 reports used/);
+  ok(/^3 of 100 reports used$/.test(await text(page, '#trial-count')) && /100 new reports each month/.test(await text(page, '#trial-sub')) && /this month ends November 4, 2026/.test(await text(page, '#trial-sub')),
     '12i a brokerage whose free reports are used and whose plan is paid is told how many of the month\'s reports are left and when the month ends', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   const t = await billingText(page);
   ok(await page.$eval('#trial-cta', (e) => !e.parentElement.hidden && e.textContent === 'Manage plan'), '12j2 once subscribed the tile CTA is "Manage plan"');
@@ -1676,7 +1684,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
   await make(page);
   ok(reports.length === 1 && V4.test(reports[0].body.idempotency_key), '12k2 a report made on the paid plan carries a random key, like every member report', reports.map((r) => r.body));
-  ok(w.paidUsed === 4 && w.used === 10 && /^96 reports left this month$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
+  ok(w.paidUsed === 4 && w.used === 10 && /^4 of 100 reports used$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
     '12l the report used one of the MONTH\'s (4 used, 96 left), the 10 free ones are untouched, and the page says which it used', [w.paidUsed, w.used, await text(page, '#trial-count'), await text(page, '#creditnote')]);
   ok(/\$79\/month plan: 4 of 100 reports used this month/.test(await billingText(page)), '12l2 the Billing card follows the report, from the database\'s own answer');
   // a retry of a finished paid report
@@ -1687,8 +1695,8 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12n-12o. a paid month that is used up
   const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 100 });
   const { ctx, page, reports } = await open({ w });
-  await waitCount(page, /All 100 reports for this month are used/);
-  ok(/All 100 reports for this month are used/.test(await text(page, '#trial-count')) && await page.$eval('#trial-count', (e) => e.className === 'count out') && /November 4, 2026/.test(await text(page, '#trial-sub')),
+  await waitCount(page, /100 of 100 reports used/);
+  ok(/100 of 100 reports used/.test(await text(page, '#trial-count')) && await page.$eval('#trial-count', (e) => e.className === 'count out') && /November 4, 2026/.test(await text(page, '#trial-sub')),
     '12n a month whose 100 reports are used says so, and says when the next month starts');
   ok(await page.$eval('#go', (e) => e.disabled), '12n2 "Make report" is off');
   await page.fill('#addr', ADDRESS);
@@ -1705,7 +1713,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
     ok(await page.$eval('#trial-cta', (e, st) => !e.parentElement.hidden && e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe — $79/month'), state), '12p2 a ' + state + ' plan on a used-up trial: the tile still carries the right commercial action');
-    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /All 10 free reports are used/.test(await text(page, '#trial-count')) && reports.length === 0,
+    ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
   }
@@ -1730,7 +1738,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   w.plan = 'paid'; w.paidUsed = 0; w.used = 10;
   await page.click('#billing-refresh');
   await waitBilling(page, /\$79\/month plan/);
-  ok(/\$79\/month plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^100 reports left this month$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
+  ok(/\$79\/month plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^0 of 100 reports used$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
     '12u2 once the database says the plan is paid, "Check again" shows it, and "Make report" opens: the page changed nothing until it was told');
   // the plan can no longer be read: the card says so and forgets the plan it showed (never the old figures)
   w.billingFails = true;
@@ -1836,7 +1844,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   await page.click('#signup-go');
   await page.waitForFunction(() => document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(w.signedUp.length === 1 && w.signedUp[0] === 'Ann Agent', '14d one signup call carrying the cleaned name', w.signedUp);
-  ok(/^10 free reports left$/.test(await text(page, '#trial-count')) && /Your account is ready\./.test(await text(page, '#trial-sub')) && !/brokerage/i.test(await text(page, '#trial-sub')),
+  ok(/^0 of 10 free reports used$/.test(await text(page, '#trial-count')) && /Your account is ready\./.test(await text(page, '#trial-sub')) && !/brokerage/i.test(await text(page, '#trial-sub')),
     '14e the card goes away and the panel reads ten free reports, in words for one person (no brokerage)', await text(page, '#trial-sub'));
   ok(await page.$eval('#team', (e) => e.hidden), '14f an individual account is never offered the team / invite card');
   await ctx.close();
@@ -1852,7 +1860,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 }
 {
   const { ctx, page } = await open({ w: world({ trial: 'active', role: 'owner' }) });
-  await page.waitForFunction(() => /free reports left/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
+  await page.waitForFunction(() => /free reports used/.test(document.getElementById('trial-count').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => e.hidden), '14h a person who already has an account never sees the signup card');
   await ctx.close();
 }
@@ -1874,7 +1882,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 {
   const w = world({ role: 'owner' });
   const { ctx, page, trials, errors, foreign } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => document.querySelectorAll('#team-list li').length > 0, null, { timeout: 8000 }).catch(() => {});
   const rows = await page.$$eval('#team-list li', (ls) => ls.map((l) => ({ text: l.querySelector('.who').textContent, btn: l.querySelector('button').textContent })));
   ok(rows.length === 3 && /^Agent a\*\*\*@example\.test · joined October 3, 2026$/.test(rows[0].text) && rows[0].btn === 'Remove' && /^Agent j\*\*\*@brokerage\.test/.test(rows[1].text)
@@ -1911,7 +1919,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
   // a new invite appears in the list; the list is empty-state honest; a refusal and an outage are plain words
   const w = world({ role: 'owner' }); w.team = { members: [], invites: [] };
   const { ctx, page } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => !document.getElementById('team-empty').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#team-empty', (e) => !e.hidden && /No agents have joined yet/.test(e.textContent)) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0, '15j with nobody on the team the page says so, in plain words');
   w.team.invites.push({ ref: TEAM_I1, created_at: '2026-10-08T12:00:00+00:00', expires_at: '2026-10-22T12:00:00+00:00' });
@@ -1927,7 +1935,7 @@ for (const [label, opts, expect] of [['refused', { trial: null, signup: 'refuse'
 {
   const w = world({ role: 'owner' }); w.teamFails = true;
   const { ctx, page, errors } = await open({ w });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await page.waitForFunction(() => /could not be read/.test(document.getElementById('team-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/The team could not be read just now/.test(await text(page, '#team-status')) && (await page.$$eval('#team-list li', (ls) => ls.length)) === 0 && errors.filter((e) => !/502/.test(e)).length === 0,
     '15m a team that cannot be read says so and shows no list (never an empty team passed off as the real one)', [errors, await text(page, '#team-status'), await page.$$eval('#team-list li', (ls) => ls.length)]);
@@ -1994,29 +2002,30 @@ for (const [label, w] of [['an agent', world({ role: 'agent' })], ['a person wit
   ok((await overlay()) === 'none', '14g Escape closes it from the email step too');
   await ctx.close();
 }
-// ---- 15. the site bar: logo, Explore, My Places, Enterprise, and the Enterprise row (Enterprise overview | My reports) -------------------------------------
+// ---- 15. the site bar: logo, Explore, My Places, Enterprise -------------------------------------
 // This page is a standalone document on purpose (no shell), so it carries a page-local bar in the shell's look (2026-10-11). The links are plain same-site links with no
 // state; they must show whether or not anyone is signed in, ask nothing of any function, and sit in the headers the print rule removes.
-const NAV_SEL = 'header.sitebar a, header.top .entnav a';
+const NAV_SEL = 'header.sitebar a';
 const navLinks = (page) => page.evaluate((sel) => {
   const box = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return { shown: s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0, h: Math.round(r.height) }; };
   const links = [...document.querySelectorAll(sel)];
   return {
-    labels: ['header.sitebar .sb-nav', 'header.top .entnav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
+    labels: ['header.sitebar .sb-nav'].map((q) => (document.querySelector(q) || { getAttribute: () => null }).getAttribute('aria-label')),
+    extra: document.querySelectorAll('header.top .entnav, header.top .brand').length,
     links: links.map((a) => ({ text: a.textContent.trim(), href: a.getAttribute('href'), current: a.getAttribute('aria-current') === 'page', ...box(a) })),
     who: !!document.querySelector('header.sitebar #who'),
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
   };
 }, NAV_SEL);
-const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html', 'Enterprise overview=development-activity.html', 'My reports=development-activity-reports.html'];
+const WANT_LINKS = ['HomeSignal=index.html', 'Explore=index.html', 'My Places=properties.html', 'Enterprise=development-activity.html'];
 for (const [who, signedIn] of [['signed out', false], ['signed in', true]]) {
   const { ctx, page, errors, reports, trials, billingCalls } = await open({ signedIn });
   const n = await navLinks(page);
-  ok(n && n.labels[0] === 'HomeSignal site' && n.labels[1] === 'Enterprise', `15a ${who}: the page has a site navigation and an Enterprise navigation`, n);
+  ok(n && n.labels[0] === 'HomeSignal site' && n.extra === 0, `15a ${who}: the page has the site navigation and no second Enterprise row or repeated HomeSignal label under it`, n);
   ok(n && JSON.stringify(n.links.map((l) => l.text + '=' + l.href)) === JSON.stringify(WANT_LINKS),
-    `15b ${who}: it holds the logo, Explore, My Places, Enterprise, Enterprise overview and My reports, as plain same-site links`, n && n.links);
+    `15b ${who}: it holds the logo, Explore, My Places and Enterprise, as plain same-site links`, n && n.links);
   ok(n && n.links.every((l) => l.shown && l.h >= 44), `15c ${who}: every one is drawn, and tall enough to tap (44px)`, n && n.links);
-  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise,My reports', `15c2 ${who}: Enterprise and My reports are marked as where you are, and nothing else`, n && n.links);
+  ok(n && n.links.filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', `15c2 ${who}: Enterprise is marked as the current section, and nothing else`, n && n.links);
   ok(n && n.who, `15c3 ${who}: the account area (email and Sign out, or Sign in) is in the bar`, n);
   // the page itself reads the plan when someone is signed in, so the claim is about the LINKS: touching them makes no request of its own
   await page.waitForTimeout(500);
@@ -2032,7 +2041,7 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15f. a phone, a tablet and a desktop: everything visible, and the bars do not make the page scroll sideways
   const { ctx, page } = await open({ width: w, height: h, signedIn: true });
   const n = await navLinks(page);
-  ok(n && n.links.length === 6 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all six links are drawn at tap size and nothing scrolls sideways`, n);
+  ok(n && n.links.length === 4 && n.links.every((l) => l.shown && l.h >= 44) && n.overflow <= 0, `15f at ${w}px wide all four links are drawn at tap size and nothing scrolls sideways`, n);
   await ctx.close();
 }
 {
@@ -2054,17 +2063,17 @@ for (const [w, h] of [[390, 844], [768, 1024], [1440, 900]]) {
   // 15h. keyboard: each link can be focused, and the focus ring is drawn
   const { ctx, page } = await open();
   const focused = await page.evaluate((sel) => [...document.querySelectorAll(sel)].map((a) => { a.focus(); return document.activeElement === a; }), NAV_SEL);
-  ok(focused.length === 6 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
+  ok(focused.length === 4 && focused.every(Boolean), '15h every link can be reached by keyboard focus', focused);
   await page.focus('header.sitebar .sb-nav a:text-is("Explore")');
   const ring = await page.$eval('header.sitebar .sb-nav a:text-is("Explore")', (a) => getComputedStyle(a).outlineStyle + ' ' + getComputedStyle(a).outlineWidth);
   ok(/^solid [1-9]/.test(ring), '15h2 a focused link shows a visible outline', ring);
   await ctx.close();
 }
-for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/], ['header.top .entnav a:text-is("Enterprise overview")', /\/development-activity\.html$/]]) {
+for (const [sel, want] of [['header.sitebar .sb-nav a:text-is("Enterprise")', /\/development-activity\.html$/], ['header.sitebar .sb-brand', /\/index\.html$/], ['header.sitebar .sb-nav a:text-is("My Places")', /\/properties\.html$/]]) {
   // 15i. they really go there (a real navigation to the real page, not a request the page makes)
   const { ctx, page } = await open();
   await Promise.all([page.waitForURL(want, { timeout: 15000 }).catch(() => null), page.click(sel)]);
-  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking ${sel.replace(/header\.(sitebar|top) /, '')} opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
+  ok(want.test(page.url().split('?')[0].split('#')[0]), `15i clicking ${sel.replace(/header\.sitebar /, '')} opens ${want.source.replace(/\\/g, '').replace(/\$$/, '')}`, page.url());
   await ctx.close();
 }
 
@@ -2082,8 +2091,8 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   ok(!(await drawn(page, '#account')) && (await drawnCards(page)).length === 0, 'L1b signed out: the account section is not drawn at all (no empty bar), and no member card is');
   ok(/Generate report/.test(await text(page, '#go')) && /Create a property report/.test(await text(page, '#create-title')) && /Current property report/.test(await text(page, '#current-title')),
     'L1c the form is titled "Create a property report" with a "Generate report" button, and the report area is titled "Current property report"');
-  { const x = await page.evaluate(() => ({ c: document.getElementById('create-title').getBoundingClientRect(), r: document.getElementById('current-title').getBoundingClientRect() }));
-  ok(x.c.left < x.r.left && Math.abs(x.c.top - x.r.top) < 80, 'L1d Create is in the left rail and the current report starts beside it on the right', x); }
+  { const x = await page.evaluate(() => ({ c: document.getElementById('create-title').closest('section').getBoundingClientRect(), r: document.getElementById('current-title').getBoundingClientRect() }));
+  ok(x.c.bottom <= x.r.top + 1, 'L1d Create is a full-width section ABOVE the workspace: it ends before the current report begins', x); }
   await shot(page, 'L1-signed-out-desktop');
   await ctx.close();
 }
@@ -2091,14 +2100,14 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   // L2. a signed-in owner with saved reports: the order, the report as the dominant element, the actions under its heading, the closed account section
   const w = world({ role: 'owner' });
   const { ctx, page } = await open({ w, accountClosed: true });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   ok(await drawn(page, '#report-empty') && !(await drawn(page, '#share')) && !(await drawn(page, '#watch')), 'L2a before any report is open, the empty note is shown and the Share and Watch cards are not');
   await shot(page, 'L2-empty-member-desktop');
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
   ok(!(await drawn(page, '#report-empty')) && (await drawn(page, '#report .da-rv')), 'L2b with a report open the empty note is gone and the report is drawn');
   const t = { create: await topOf(page, '#create-title'), actions: await topOf(page, '#rail-actions'), saved: await topOf(page, '#saved'), account: await topOf(page, '#account') };
-  ok(t.create < t.actions && t.actions < t.saved && t.saved < t.account, 'L2c the rail runs Create, This report\'s tools, Saved reports, Account and administration', t);
+  ok(t.create < t.actions && t.actions < t.saved && t.saved < t.account && !(await page.$('#rail #rf')), 'L2c Create sits above the workspace; the rail then runs This report\'s tools, Saved reports, Account and administration', t);
   const bar = await page.evaluate(() => { const n = document.querySelector('#rail-actions > .da-rv-actions'); return { inRail: !!n && !!n.closest('#rail'), inReport: !!document.querySelector('#report .da-rv-actions'), labels: n ? [...n.querySelectorAll('button')].map((b) => b.textContent) : [] }; });
   ok(bar.inRail && !bar.inReport && JSON.stringify(bar.labels) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF', 'Compare']), 'L2d the report\'s action buttons sit in the rail, not under the report: Share with Client, Watch Property, Download PDF, Compare', bar);
   ok(await drawn(page, '#share') && await drawn(page, '#watch'), 'L2e the client-link and watch cards are drawn once a saved report is open');
@@ -2125,7 +2134,7 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
 for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
   // L3. no sideways scroll at desktop, tablet and phone widths, with a report, the library and the account section open
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width, height });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
@@ -2148,7 +2157,7 @@ for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
 for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   // L5. THE TWO-COLUMN WORKSPACE: a narrow tools rail on the left, the report taking the rest, nothing left under the report
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width, height, accountClosed: true });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   for (const a of [A1, A2, A3, A4, A5, A6]) await make(page, a);
   await waitBoxes(page, 6);
   const g = await page.evaluate(() => {
@@ -2157,14 +2166,26 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
     return { rail: r('#rail'), report: r('#report .da-rv'), vw: innerWidth,
       underReport: [...document.getElementById('current').children].map((e) => e.id || e.tagName).filter((id) => id !== 'current-title' && id !== 'status' && id !== 'creditnote' && id !== 'report' && id !== 'report-empty' && id !== 'compare-result'),
       onceEach: ['share', 'watch', 'saved', 'compare', 'account', 'rail-actions'].map((id) => document.querySelectorAll('#' + id).length),
-      railHas: ['#rf', '#rail-actions', '#share', '#watch', '#saved', '#compare', '#account'].every((q) => !!document.querySelector('#rail ' + q)),
+      railHas: ['#rail-actions', '#share', '#watch', '#saved', '#compare'].every((q) => !!document.querySelector('#rail ' + q)) && ['#rf', '#account', '#billing', '#profile', '#team'].every((q) => !document.querySelector('#rail ' + q)),
       reportHas: !!rep.querySelector('#share, #watch, #saved, #account, .da-rv-actions') };
   });
   ok(g.rail.w >= 300 && g.rail.w <= 360 && g.rail.l < g.report.l, `L5a at ${width}px the rail is 300-360px wide and sits left of the report`, g.rail);
   ok(g.report.w > g.rail.w * 2.8 && g.report.r > g.vw * 0.9 - 40, `L5b at ${width}px the report takes the far larger share of the width`, [g.report.w, g.rail.w, g.vw]);
+  // THE FULL-WIDTH CREATE SECTION and the quieter usage strip (founder, 2026-10-11)
+  const h = await page.evaluate(() => {
+    const box = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top + scrollY, b: r.bottom + scrollY, w: r.width, h: r.height }; };
+    const c = document.getElementById('rf').closest('section'), ws = document.querySelector('.ws'), rail = document.getElementById('rail'), stage = document.getElementById('current');
+    const tr = document.getElementById('trial'), hd = document.querySelector('header.sitebar');
+    return { create: box(c), ws: box(ws), rail: box(rail), stage: box(stage), inRail: rail.contains(c), trial: box(tr), trialInHeader: hd.contains(tr), headerB: box(hd).b,
+      addr: box(document.getElementById('addr')), label: box(document.getElementById('label')), go: box(document.getElementById('go')), cta: box(document.getElementById('trial-cta')), count: document.getElementById('trial-count').textContent };
+  });
+  ok(!h.inRail && Math.abs(h.create.l - h.ws.l) <= 2 && Math.abs(h.create.r - h.ws.r) <= 2 && h.create.b <= h.rail.t + 1 && h.create.b <= h.stage.t + 1, `L5q at ${width}px Create a property report spans the whole workspace width and sits above both columns`, [h.create, h.ws]);
+  ok(h.create.h < 190 && Math.abs(h.addr.t - h.go.t) < 12 && h.label.l > h.addr.r - 1 && h.go.l > h.label.r - 1 && h.addr.w > h.go.w * 3, `L5r at ${width}px address, client label and Generate report share one row and the section stays compact`, [h.create.h, h.addr, h.label, h.go]);
+  ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 free reports used$|^\d+ of 10 free reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the site bar's account zone, small, above the form`, h);
+
   { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
     ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / g.vw >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the window)`, { w: g.report.w, surface, vw: g.vw }); }
-  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px Create, report tools, Saved, Compare and Account are in the rail, once each, and nothing but the report is on the right`, g);
+  ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px report tools, Saved and Compare are in the rail, Create and Account are not, each once, and nothing but the report is on the right`, g);
   // the six most recent are listed; the rest wait behind "View all saved reports"
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 6 && !(await drawn(page, '#saved-more')) , `L5d six saved reports show without a "view all" button`);
   await make(page, A1 + ' ');   // a seventh report
@@ -2199,6 +2220,8 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   await page.evaluate(() => scrollTo(0, 600));
   const top = await page.$eval('#rail', (e) => e.getBoundingClientRect().top);
   ok(rl.fits ? top >= 0 && top <= 20 : top < 0, `L5o at ${width}x${height} scrolling the page ${rl.fits ? 'leaves the rail in view' : 'moves the rail with it'}`, [top, rl]);
+  await page.evaluate(() => { scrollTo(0, 0); document.getElementById('rail').scrollTop = 0; });
+  await shot(page, `L5-${width}`);
   // a tall window holds the whole rail, so it stays in view
   await page.setViewportSize({ width, height: 2400 }); await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(150);
   ok(await page.$eval('#rail', (e) => e.classList.contains('rail-fits') && getComputedStyle(e).position === 'sticky'), `L5p at ${width} wide in a tall window the whole rail fits and stays in view`);
@@ -2207,18 +2230,21 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 {
   // L6. a phone: the sections stack, in the order create, this report's tools, the report, saved reports, account
   const { ctx, page } = await open({ w: world({ role: 'owner' }), width: 390, height: 844, accountClosed: true });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   const t = { create: await topOf(page, '#rf'), actions: await topOf(page, '#rail-actions'), report: await topOf(page, '#report .da-rv'), saved: await topOf(page, '#saved'), account: await topOf(page, '#account') };
   ok(t.create < t.actions && t.actions < t.report && t.report < t.saved && t.saved < t.account, 'L6a at 390px the order is Create, this report\'s tools, the report, Saved reports, Account', t);
   ok(await noSideways(page), 'L6b at 390px nothing scrolls sideways');
+  { const u = await page.evaluate(() => ({ trialInHeader: document.querySelector('header.sitebar').contains(document.getElementById('trial')), tr: document.getElementById('trial').getBoundingClientRect().height, ctaVisible: document.getElementById('trial-cta').getClientRects().length > 0, count: document.getElementById('trial-count').textContent, cta: document.getElementById('trial-cta').textContent, addr: document.getElementById('addr').getBoundingClientRect(), label: document.getElementById('label').getBoundingClientRect(), go: document.getElementById('go').getBoundingClientRect() }));
+    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe — $79/month', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
+    ok(u.addr.bottom <= u.label.top + 1 && u.label.bottom <= u.go.top + 1 && Math.abs(u.addr.width - u.go.width) < 4, 'L6d at 390px the form stacks: address, client label, then a full-width Generate report', u); }
   await ctx.close();
 }
 {
   // L7. the buttons in the rail still do the report's work: Compare from the report's own button opens compare mode with that report chosen
   const { ctx, page } = await open({ w: world({ role: 'owner' }), accountClosed: true });
-  await waitCount(page, /free reports left/);
+  await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
   await page.click('#rail-actions [data-da-action="compare"]');
@@ -2226,6 +2252,120 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   await page.click('#compare-mode');
   await make(page, A3);
   ok((await page.$$('#rail-actions .da-rv-actions')).length === 1 && !(await page.$('#report .da-rv-actions')), 'L7b opening another report replaces the rail\'s buttons rather than adding to them');
+  await ctx.close();
+}
+
+// ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
+for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
+  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true, compare: false });
+  await waitCount(page, /free reports left/);
+  await make(page, A1);
+  await waitBoxes(page, 1);
+  if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }
+  const g = await page.evaluate(() => {
+    const q = (s) => document.querySelector(s), r = (s) => { const e = q(s); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height, r: b.right, b: b.bottom }; };
+    return {
+      createInRail: !!q('.rail #rf'), createInWs: !!q('.ws #rf'), accountInRail: !!q('.rail #account'), accountInWs: !!q('.ws #account'),
+      trialInBar: !!q('header.sitebar #trial'), trialCtaInBar: !!q('header.sitebar #trial-cta'), acctBtnInBar: !!q('header.sitebar #acct-btn'),
+      create: r('.create'), ws: r('.ws'), rail: r('#rail'), stage: r('#current'), report: r('#report'), account: r('#account'), wrapW: r('main.wrap'),
+      top: r('header.sitebar'), count: (q('#trial-count') || {}).textContent, cta: (q('#trial-cta') || {}).textContent, ctaShown: !!q('#trial-cta') && q('#trial-cta').getBoundingClientRect().width > 0,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      entnav: !!q('.entnav'), brandLabel: !!q('header.top .brand'),
+      railHeads: [...document.querySelectorAll('#rail .sec-h')].map((e) => e.textContent.trim()),
+      railHasAdmin: !!q('#rail #billing, #rail #profile, #rail #team, #rail details.acct'),
+      addr: r('#addr'), label: r('#label'), go: r('#go'),
+    };
+  });
+  const tag = `M at ${w}px`;
+  ok(!g.createInRail && g.createInWs === false && g.create && g.ws && g.create.b <= g.ws.y + 1, `${tag}: Create a property report is outside the rail and sits above the workspace`, g);
+  ok(g.create.w >= g.ws.w - 2, `${tag}: Create spans the full workspace width`, g.create);
+  ok(!g.accountInRail && !g.accountInWs && !g.railHasAdmin && g.account && g.account.y >= g.ws.b - 1, `${tag}: Account and administration is out of the rail and below the workspace`, g);
+  ok(g.railHeads.join('|') === 'This report|Saved reports', `${tag}: the rail holds only this report's tools and saved reports`, g.railHeads);
+  ok(g.trialInBar && g.trialCtaInBar && g.ctaShown && /free reports used/.test(g.count) && /Subscribe/.test(g.cta) && g.acctBtnInBar, `${tag}: usage, the plan action and the Account control are in the account zone of the bar`, g);
+  ok(!g.entnav && !g.brandLabel, `${tag}: no Enterprise row and no repeated HomeSignal label`, g);
+  ok(g.overflow <= 0, `${tag}: nothing scrolls sideways`, g.overflow);
+  ok(await page.evaluate(() => ![...document.querySelectorAll('[data-da-action="compare"], #compare-mode, #compare, .sv-pick')].some((e) => e.getClientRects().length) && ![...document.querySelectorAll('button')].some((b) => /compare/i.test(b.textContent) && b.getClientRects().length)), `${tag}: no Compare button, selection UI or report-level Compare action anywhere (launch scope)`);
+  if (w >= 1000) {
+    ok(g.rail.w >= 295 && g.rail.w <= 345 && g.stage.w >= g.wrapW.w * 0.6, `${tag}: the rail stays about 300-340px and the report column takes the rest`, { rail: g.rail.w, stage: g.stage.w, wrap: g.wrapW.w });
+    ok(g.addr.w > g.label.w && g.go.w > 100 && Math.abs(g.addr.y - g.go.y) < 60 && Math.abs(g.addr.y - g.label.y) < 60, `${tag}: address, client label and Generate share one row, address widest`, { a: g.addr, l: g.label, g: g.go });
+    ok(g.create.h < 170, `${tag}: the Create section is not tall`, g.create.h);
+  } else {
+    ok(g.create.y < (await page.$eval('#rail-report', (e) => e.getBoundingClientRect().y)) && g.create.y < g.stage.y && g.stage.y < (await page.$eval('#saved', (e) => e.getBoundingClientRect().y)), `${tag}: order is create, this report's tools, the report, saved reports`, g);
+    ok(g.go.h >= 44, `${tag}: Generate is a 44px target`, g.go);
+  }
+  // Account control opens the administration section
+  await page.click('header.sitebar #acct-btn');
+  ok(await page.$eval('#account', (e) => e.open) && await page.$eval('#billing', (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.y < innerHeight; }), `${tag}: the Account control opens administration and brings it into view`);
+  ok(errors.length === 0, `${tag}: no page error`, errors);
+  await ctx.close();
+}
+{
+  const { ctx, page } = await open({ signedIn: false, compare: false });
+  ok(await page.$eval('header.sitebar #acct-btn', (e) => getComputedStyle(e).display === 'none'), 'M signed out: there is no Account control (nothing to administer)');
+  ok(await page.$eval('#report-empty', (e) => getComputedStyle(e).display !== 'none' && /No report is open/.test(e.textContent) && /Enter an address above or open a saved report\./.test(e.textContent)), 'M the empty state is the restrained two-line one');
+  await ctx.close();
+}
+
+// ---- N. LAUNCH SCOPE (founder, 2026-10-11): Compare is hidden; the page is opened exactly as shipped (compare: false) ---------------------------------------------
+{
+  const w = world();
+  const { ctx, page, errors, shareCalls, watchCalls } = await open({ w, compare: false });
+  await waitCount(page, /free reports used/);
+  await make(page, A1); await make(page, A2);
+  await page.waitForFunction(() => document.querySelectorAll('#saved-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
+  const used = await text(page, '#trial-count');
+  const gone = async (where) => {
+    const v = await page.evaluate(() => {
+      const shown = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
+      return { mode: shown(document.getElementById('compare-mode')), card: shown(document.getElementById('compare')), go: shown(document.getElementById('compare-go')),
+        count: shown(document.getElementById('compare-count')), picks: document.querySelectorAll('#saved-list .sv-pick, #saved-list input').length, rowKids: [...document.querySelectorAll('#saved-list li')].map((l) => l.children.length),
+        acts: [...document.querySelectorAll('[data-da-action]')].map((b) => b.getAttribute('data-da-action')), soon: document.querySelectorAll('.da-rv-soon, .da-rv-act[aria-disabled="true"]').length,
+        words: /compar/i.test(document.body.innerText), savedRail: document.getElementById('rail').innerText };
+    });
+    ok(!v.mode && !v.card && !v.go && !v.count && v.picks === 0 && v.rowKids.every((n) => n === 1) && !v.acts.includes('compare') && v.soon === 0 && !v.words,
+      `N1 ${where}: no Compare reports / Cancel comparing button, no checkboxes, no Compare properties card, no Compare selected reports button, no report-level Compare action, no "available soon" and no Compare wording anywhere on the page`, v);
+    return v;
+  };
+  await gone('with reports listed');
+  ok(JSON.stringify(await page.$$eval('#rail-actions .da-rv-act', (b) => b.map((e) => e.textContent.trim()))) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']),
+    'N2 the current report offers Share with Client, Watch Property and Download PDF, and nothing else');
+  // the saved list is still a plain list of clickable rows and reopens a report without using one
+  const before = (await page.evaluate(() => document.getElementById('trial-count').textContent));
+  await page.click('#saved-list li:nth-child(2) button');
+  await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
+  ok(/Saved report/.test(await text(page, '#saved-status')) && (await page.$('#report .da-rv')) !== null && (await text(page, '#trial-count')) === before && before === used,
+    'N3 a saved report still reopens from its row, and reopening it does not change the report count');
+  ok(JSON.stringify(await page.$$eval('#rail-actions .da-rv-act', (b) => b.map((e) => e.textContent.trim()))) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']), 'N3b a reopened report has the same three actions');
+  await gone('on a reopened saved report');
+  // Share, Watch and Download PDF still work
+  await page.evaluate(() => { window.__prints = 0; window.print = function(){ window.__prints++; }; });
+  await page.click('#rail-actions .da-rv-act[data-da-action="pdf"]');
+  ok((await page.evaluate(() => window.__prints)) === 1, 'N4 Download PDF still opens the browser\'s print window');
+  const c0 = shareCalls.filter((c) => c.body.action === 'create').length;
+  await page.click('#rail-actions .da-rv-act[data-da-action="share"]');
+  await page.waitForFunction(() => !document.getElementById('share-pop-body').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(shareCalls.filter((c) => c.body.action === 'create').length === c0 + 1 && /^https:\/\//.test(await page.$eval('#share-pop-link', (e) => e.value)), 'N5 Share with Client still makes one private link and shows it');
+  await page.keyboard.press('Escape');
+  await page.click('#rail-actions .da-rv-act[data-da-action="watch"]');
+  await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'watch-start', null, { timeout: 4000 }).catch(() => {});
+  const w0 = watchCalls.filter((c) => c.body.action === 'start').length;
+  await page.click('#watch-start');
+  await page.waitForFunction(() => !document.getElementById('watch-stop').hidden, null, { timeout: 8000 }).catch(() => {});
+  ok(watchCalls.filter((c) => c.body.action === 'start').length === w0 + 1 && !(await page.$eval('#watch-stop', (e) => e.hidden)), 'N6 Watch Property still starts watching the property');
+  // generating a report still works and still counts
+  await make(page, A3);
+  await page.waitForFunction((u) => document.getElementById('trial-count').textContent !== u, used, { timeout: 8000 }).catch(() => {});   // the count follows the report by a moment: wait for it, then assert it changed
+  ok((await page.$$eval('#saved-list li', (l) => l.length)) === 3 && (await text(page, '#trial-count')) !== used && (await page.$('#report .da-rv')) !== null, 'N7 generating a report still works, is saved, and uses one report');
+  await gone('after generating another report');
+  ok(errors.length === 0, 'N8 no page error', errors);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  if (SHOTS) { await page.evaluate(() => scrollTo(0, 0)); await page.screenshot({ path: SHOTS + '/N-launch-1440x900.png' }); await page.screenshot({ path: SHOTS + '/N-launch-full.png', fullPage: true }); await (await page.$('#saved')).screenshot({ path: SHOTS + '/N-launch-saved.png' }); }
+  await ctx.close();
+}
+{
+  // signed out: the card and its button stay out of the page too
+  const { ctx, page } = await open({ signedIn: false, compare: false });
+  ok(!(await drawn(page, '#compare-mode')) && !(await drawn(page, '#compare')) && !/compar/i.test(await page.evaluate(() => document.body.innerText)), 'N9 signed out, there is no Compare control or wording either');
   await ctx.close();
 }
 

@@ -42,7 +42,7 @@ req('No account required.', 'helper');
 req('For real estate professionals', 'Enterprise eyebrow (uppercased by CSS)');
 req('Development Activity reports for agents & brokerages.', 'Enterprise heading');
 req('Know what’s changing around a property before your client does.', 'Enterprise body');
-req('Explore Enterprise →', 'Enterprise CTA');
+req('Explore Agent Reports →', 'agent-report CTA');
 req('See an example: 78657 · Horseshoe Bay, Texas', 'sample heading');
 req('Explore this ZIP →', 'sample CTA');
 req('Recent development records in 78657', 'records heading');
@@ -56,7 +56,7 @@ req('Search an address or ZIP Find a property or explore a ZIP.', 'step 1');
 req('See what’s changing See development on the map, plus government activity, meetings and local updates.', 'step 2');
 req('Follow what matters Save places and get updates over time.', 'step 3');
 req('Built from public records. Every item links to its source.', 'trust line');
-ok((text.match(/Explore Enterprise/g) || []).length === 1, 'the Enterprise message appears once: no bottom banner');
+ok((text.match(/Explore Agent Reports/g) || []).length === 1, 'the agent-report CTA appears once: no bottom banner');
 
 // The live-result copy lives in the script, word for word
 const script = html.replace(/[\s\S]*<\/template>/, '');
