@@ -403,7 +403,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <p class="sub">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p>
         <div class="row">
           <button type="button" class="go" id="share-make">Make a client link</button>
-          <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
         </div>
         <div id="share-new" hidden>
           <label>Client link<input type="text" id="share-link" readonly></label>
@@ -1688,7 +1687,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('share-pop-close').addEventListener('click', closeSharePop);
     $('share-pop').addEventListener('click', function(e){ if (e.target === $('share-pop')) closeSharePop(); });
     document.addEventListener('keydown', sharePopKeys);
-    $('share-pdf').addEventListener('click', printReport);
     $('watch-start').addEventListener('click', startWatch);
     $('watch-stop').addEventListener('click', stopWatch);
     $('compare-go').addEventListener('click', runCompare);
