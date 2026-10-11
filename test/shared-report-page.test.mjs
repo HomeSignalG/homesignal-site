@@ -101,7 +101,7 @@ ok(/Open the link you were sent/.test(missing) && /if \(!token\) \{ missing\(\);
 
 // ---- 7. the PDF and the paper -------------------------------------------------------------------------------------------------------------------------------------
 ok(/\$\('pdf'\)\.addEventListener\('click', function\(\)\{ window\.print\(\); \}\)/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib/i.test(page), '7a Download PDF is the browser\'s own print window and nothing else');
-ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript,a\.follow,\.follow-panel\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note, the notices and the follow buttons off the paper');
+ok(/@media print\{[\s\S]*?header\.top,#status,#private,\.notice,noscript,a\.follow,\.follow-panel,\.follow-top\{display:none!important\}/.test(page), '7b the print stylesheet leaves the header, the status line, the privacy note, the notices and the follow buttons off the paper');
 ok(/id="pdf" hidden/.test(page) && /\$\('pdf'\)\.hidden = false/.test(sh), '7c the button appears only when there is a report to print');
 ok(/<noscript>/.test(page) && /<html lang="en">/.test(page) && /name="viewport" content="width=device-width,initial-scale=1"/.test(page) && /id="status" role="status" aria-live="polite"/.test(page), '7d a page without JavaScript says so, the status line is announced, and the page scales to a phone');
 
