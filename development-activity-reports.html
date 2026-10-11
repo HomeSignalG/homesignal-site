@@ -387,7 +387,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
         <button type="submit" class="go" id="go">Generate report</button>
       </div>
-      <p class="hint">The client label appears in this report's header. A saved report keeps it with the address, not in the report itself, so you see it when you reopen the report.</p>
+      <p class="hint">Appears in the report header. A saved report keeps it with the address, not in the report itself.</p>
     </form>
   </section>
 
@@ -401,10 +401,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <h2 class="sec-h" id="rail-report-title">This report</h2>
         <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF, Compare) -->
         <div id="rail-actions"></div>
-        <p class="hint rail-note">Generate or open a report to share it, watch the property, save it as a PDF or compare it.</p>
+        <p class="hint rail-note">Open a report to share, watch, download or compare it.</p>
       <section class="card" id="share" aria-labelledby="share-title" hidden>
         <h2 id="share-title">Share this report with your client</h2>
-        <p class="sub">Make a private link your client can open without signing in. They see this report exactly as saved, with the property's street address and your brokerage's name, and nothing else: not your name, not your client label. The link works for 6 months, and you can withdraw it here at any time.</p>
+        <p class="sub">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p>
         <div class="row">
           <button type="button" class="go" id="share-make">Make a client link</button>
           <button type="button" class="go ghost" id="share-pdf" title="Opens your browser's print window. Choose &ldquo;Save as PDF&rdquo; there.">Download PDF</button>
@@ -419,7 +419,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       </section>
       <section class="card" id="watch" aria-labelledby="watch-title" hidden>
         <h2 id="watch-title">Watch this property</h2>
-        <p class="sub">HomeSignal checks the area around this property once a day. When the official status of a nearby project changes, it emails you at the address you signed in with. The email names this report by its number and date and does not include the property's address: open the report here to see which property it is.</p>
+        <p class="sub">Checked once a day. If a nearby project's official status changes, we email the address you signed in with. The email does not include the property's address.</p>
         <div class="row">
           <button type="button" class="go" id="watch-start">Watch this property</button>
           <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
@@ -431,7 +431,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
       <h2 class="sec-h" id="saved-title">Saved reports</h2>
-      <p class="sub">Every report your brokerage has made is saved. Open one to see it again exactly as it was saved. Opening a saved report does not use a free report. Use Compare reports to choose 2 to 5 and see them side by side.</p>
+      <p class="hint">Reopening a saved report does not use a report.</p>
       <div class="sv-tools" id="saved-tools" hidden>
         <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
         <div class="row sv-modes"><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
@@ -442,7 +442,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       <p id="saved-status" role="status" aria-live="polite"></p>
       <div class="cmp" id="compare" aria-labelledby="compare-title" role="group" hidden>
         <h3 id="compare-title">Compare properties</h3>
-        <p class="sub">Choose 2 to 5 of your saved reports to see them side by side: what changed, what is approved, proposed or under construction, the project Types, and what each report says about its own coverage. It sets facts next to each other and does not score or rank properties. To compare a new address, make its report first. Comparing does not use a free report.</p>
+        <p class="sub">Select 2–5 saved reports. Facts side by side; no scoring or ranking. Comparing does not use a report.</p>
         <p class="hint" id="compare-count"></p>
         <div class="row"><button type="button" class="go" id="compare-go" disabled>Compare selected reports</button></div>
         <p id="compare-status" role="status" aria-live="polite"></p>
@@ -450,7 +450,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     </section>
 
     <details class="acct" id="account">
-      <summary><span class="acct-t">Account and administration</span><span class="acct-s">Billing, report branding, invite an agent</span></summary>
+      <summary><span class="acct-t">Account and administration</span></summary>
       <div class="acct-in">
         <section class="card" id="billing" aria-labelledby="billing-title" hidden>
           <h2 id="billing-title">Billing</h2>
@@ -460,12 +460,12 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
             <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
             <button type="button" class="go ghost" id="billing-refresh">Check again</button>
           </div>
-          <p class="hint" id="billing-hint" hidden>Back from the payment page? Press Check again: your plan appears here once the payment provider has confirmed it.</p>
+          <p class="hint" id="billing-hint" hidden>Back from payment? Press Check again.</p>
           <p id="billing-status" role="status" aria-live="polite"></p>
         </section>
         <section class="card" id="profile" aria-labelledby="profile-title" hidden>
           <h2 id="profile-title">Your name on reports</h2>
-          <p class="sub">Every report you make or reopen shows your brokerage's name and your name at the top. Your brokerage's name comes from its account; your name is whatever you type here.</p>
+          <p class="sub">Shown at the top of every report, beside your brokerage's name.</p>
           <form id="pf" novalidate>
             <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
             <button type="submit" class="go" id="save-name">Save my name</button>
@@ -474,7 +474,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         </section>
         <section class="card" id="team" aria-labelledby="team-title" hidden>
           <h2 id="team-title">Invite an agent</h2>
-          <p class="sub">Each invite link lets one agent join your brokerage's trial and share its free reports. Make a new link for each agent.</p>
+          <p class="sub">One link per agent. They join your brokerage's trial.</p>
           <button type="button" class="go" id="mint">Make an invite link</button>
           <div id="minted" hidden>
             <label>Agent invite link<input type="text" id="invite-link" readonly></label>
@@ -482,7 +482,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
             <p class="hint" id="invite-note"></p>
           </div>
           <h3 id="team-list-title">Your team</h3>
-          <p class="hint">Agents who have joined, and invite links nobody has used yet. Removing an agent ends their access to your brokerage's reports; their saved reports and the count of reports used stay as they are. Withdrawing an invite link makes it stop working.</p>
+          <p class="hint">Removing an agent ends their access; saved reports and usage counts stay.</p>
           <ul id="team-list" aria-labelledby="team-list-title"></ul>
           <p class="hint" id="team-empty" hidden>No agents have joined yet, and no invite links are waiting.</p>
           <p id="team-status" role="status" aria-live="polite"></p>
@@ -499,7 +499,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       <div id="report"></div>
       <div class="empty" id="report-empty">
         <p class="empty-t">No report is open</p>
-        <p class="empty-s">Enter a property address and press Generate report, or open one from Saved reports. The report appears here.</p>
+        <p class="empty-s">Enter an address and press Generate report, or open a saved report.</p>
       </div>
       <div id="compare-result"></div>
     </section>
@@ -685,8 +685,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       // usage reads as "7 of 10 free reports used"; only when the allowance is not yet known does it fall back to the count left
       count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
-        ? 'Your free trial includes ' + (freeLimit === null ? 'a set number of' : freeLimit) + ' reports. A report with no development data for its area (“No data ingested”) does not use one.'
-        : "Your brokerage's trial includes " + (freeLimit === null ? 'a set number of' : freeLimit) + " reports, shared by everyone on it. A report with no development data for its area (“No data ingested”) does not use one.";
+        ? 'A report with no development data (“No data ingested”) does not use one.'
+        : "Shared by everyone on your brokerage. A report with no development data (“No data ingested”) does not use one.";
     } else if (a === 'admin') {
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
