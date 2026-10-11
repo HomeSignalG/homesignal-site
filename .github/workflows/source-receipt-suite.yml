@@ -1,0 +1,31 @@
+name: source-receipt-suite
+
+# docs/dev-source-receipt.sql against a DISPOSABLE Postgres (receipts are positive, generation-linked, fail-closed; 8 mutations
+# must be killed) and the connector receipt test. Never addresses production; holds no database secret.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-source-receipt.sql'
+      - 'test/source_receipt_pg/**'
+      - 'test/source-scope-receipt.test.mjs'
+      - 'supabase/functions/get-address-report/sources/**'
+      - '.github/workflows/source-receipt-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  receipt:
+    runs-on: ubuntu-latest
+    services:
+      pg:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: receipt_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: receipt_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22.18' }
+      - run: node test/source-scope-receipt.test.mjs
+      - run: bash test/source_receipt_pg/run.sh

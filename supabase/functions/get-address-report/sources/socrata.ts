@@ -28,6 +28,7 @@
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
+import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
   classifyByCircle, keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
   type MembershipFn, type ScopeMetrics,
@@ -302,6 +303,8 @@ export interface SocrataRunReport {
   scope_fallback?: "legacy_after_overflow" | "legacy_after_membership_error";
   /** Widened-scope accounting (sources/scope-members.ts); present only when the widened scope ran. */
   scope_membership?: ScopeMetrics;
+  /** The completion receipt for this ZIP x source (sources/scope-receipt.ts). Absent when the fetch failed. */
+  scope_receipt?: ScopeReceipt;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
@@ -490,6 +493,11 @@ async function runEntry(
       sample: entry.registry_id,
     });
   }
+  report.scope_receipt = buildScopeReceipt({
+    requested: widenedOk, widens: !!fetchMeta.widened, widenedRan: !!fetchMeta.widened,
+    fallback: report.scope_fallback, truncatedAt: report.truncated_at_max_rows, metrics: widenedRan ? metrics : null,
+    version: receiptVersion(deps.zipCentroid, entry.spatial_zip_radius_mi, widenedBounds(deps.zipBounds, deps.zipMembers)),
+  });
 
   for (const row of rows) {
     const rawStatus = entry.column_map.status_raw

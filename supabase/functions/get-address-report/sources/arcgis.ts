@@ -24,6 +24,7 @@
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
+import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
   keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
   type MembershipFn, type RowClass, type ScopeMetrics,
@@ -230,6 +231,8 @@ export interface ArcgisRunReport {
    *  Polygon exclusions are `outside_excluded` here — they are CORRECT, not a loss, and are never
    *  a quarantine or a truncation. */
   scope_membership?: ScopeMetrics;
+  /** The completion receipt for this ZIP x source (sources/scope-receipt.ts). Absent when the fetch failed. */
+  scope_receipt?: ScopeReceipt;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
@@ -431,6 +434,11 @@ async function runEntry(
       sample: entry.registry_id,
     });
   }
+  report.scope_receipt = buildScopeReceipt({
+    requested: widenedOk, widens: !!fetchMeta.widened, widenedRan: !!fetchMeta.widened,
+    fallback: report.scope_fallback, truncatedAt: report.truncated_at_max_rows, metrics: widenedRan ? metrics : null,
+    version: receiptVersion(deps.zipCentroid, entry.spatial_zip_radius_mi, widenedBounds(deps.zipBounds, deps.zipMembers)),
+  });
 
   for (const row of rows) {
     const statusRaw = String(entry.status_const ?? readCol(row, entry.column_map.status_raw) ?? "").trim();
