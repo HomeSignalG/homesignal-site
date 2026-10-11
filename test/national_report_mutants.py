@@ -37,6 +37,19 @@ def m(name, file, old, new):
     M[name] = [(file, old, new)]
 
 
+# ---- freshness: when a record is asked to be verified (audit 2026-10-11) ------------------------------------------------------
+m('freshness_filing_age_alone', MOD, "if (latest >= addDays(today, -OLD_RECORD_DAYS)) return null;", "if (rd.date >= addDays(today, -OLD_RECORD_DAYS)) return null;")
+m('freshness_permitted_never_warns', MOD, "if (latest >= addDays(today, -OLD_RECORD_DAYS)) return null;", "if (latest >= addDays(today, -OLD_RECORD_DAYS) || stage === 'permitted') return null;")
+m('freshness_stage_ignored', MOD, "const filingOnly = stage === 'permitted' && rd.kind === 'filed' && real.length === 0;", "const filingOnly = rd.kind === 'filed' && real.length === 0;")
+m('freshness_issue_date_softened', MOD, "const filingOnly = stage === 'permitted' && rd.kind === 'filed' && real.length === 0;", "const filingOnly = stage === 'permitted' && real.length === 0;")
+m('freshness_boundary_off_by_one', MOD, "if (latest >= addDays(today, -OLD_RECORD_DAYS)) return null;", "if (latest > addDays(today, -OLD_RECORD_DAYS)) return null;")
+m('freshness_future_date_counts', MOD, "validDay(d) && d <= today && d >= RECORD_DATE_FLOOR", "validDay(d) && d >= RECORD_DATE_FLOOR")
+m('freshness_sentinel_counts', MOD, "validDay(d) && d <= today && d >= RECORD_DATE_FLOOR", "validDay(d) && d <= today")
+m('freshness_picks_oldest', MOD, "reduce((a, b) => (a >= b ? a : b))", "reduce((a, b) => (a <= b ? a : b))")
+m('freshness_reason_never_filing_only', MOD, "reason: filingOnly ? 'filing_only' : 'old_date'", "reason: 'old_date'")
+m('freshness_counts_observation_time', MOD, "verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today)", "verification(rd, stage, [ev?.date, led?.last_observed_at?.slice(0, 10), ...material.map((e) => e.publisher_event_date)], today)")
+m('freshness_counts_unproven_events', MOD, "...material.map((e) => e.publisher_event_date)], today)", "...(eventsByKey.get(p.source_key) ?? []).map((e) => e.publisher_event_date)], today)")
+
 # ---- the rights gate ----------------------------------------------------------------------------------------------------
 m('rights_gate_off', MOD, "if (view === 'customer') { excluded.no_rights", "if (false) { excluded.no_rights")
 m('unlisted_family_cleared', MOD, "const grant = cleared.get(family);", "const grant = cleared.get(family) ?? { registry_id: family, cleared_on: '2026-01-01', audit_ref: 'x', attribution: '' };")
