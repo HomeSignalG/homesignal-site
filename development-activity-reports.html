@@ -216,18 +216,32 @@ header.top .brand{margin:0 0 2px;font-size:12px;font-weight:700;letter-spacing:.
 header.top .meta{font-size:14px;margin-top:4px;max-width:none}
 .wrap{gap:14px;padding-top:14px}
 .sec-h{margin:0 0 12px;font-size:19px;letter-spacing:-.01em}
-#trial{display:flex;flex-wrap:wrap;align-items:center;gap:2px 18px;padding:8px 18px}
-#trial .count{font-size:15.5px}
+/* REPORT USAGE is account information, not the page's first message (founder, 2026-10-11): it sits in the header's account strip, under the sign-in
+   line, as a count and its one commercial action ("Subscribe — $79/month", or "Manage plan" once paid). The explanatory line stays, small. */
+header.top .acct-strip{display:grid;justify-items:end;gap:4px;text-align:right;max-width:460px}
+#trial{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px 12px;padding:0;background:none;border:0;border-radius:0}
+#trial .count{font-size:13.5px;font-weight:600}
+#trial .trial-cta{margin:0;flex-basis:auto}
+#trial .trial-cta .go{min-height:36px;padding:7px 14px;font-size:13.5px}
+#trial .sub{order:3;flex-basis:100%;font-size:12px;line-height:1.4;max-width:none}
+#trial-cta-status{font-size:12.5px}
 input[type=text],input[type=search]{font:inherit;font-size:15px;width:100%;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--ink)}
 input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
-/* Create a property report */
-.create{padding:24px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
-.create .sec-h{margin-bottom:14px}
-.create-row{display:flex;gap:12px;align-items:flex-end}
-.create-addr{flex:1;min-width:0}
-.create-addr input{font-size:17px;padding:14px 16px}
-.create-row .go{justify-self:auto;padding:14px 26px;font-size:16px;min-height:52px;white-space:nowrap}
-.create-label{max-width:360px}
+/* Create a property report: the starting action of the whole page, so a full-width section ABOVE the two-column workspace, not a card in the rail.
+   Desktop: address, client label and the button on one row. Narrow: they stack. */
+.create{padding:18px 24px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
+.create .sec-h{margin-bottom:10px}
+.create form{gap:8px}
+.create-row{display:grid;gap:12px;align-items:end;grid-template-columns:1fr}
+.create-addr{min-width:0}
+.create-addr input{font-size:17px;padding:13px 16px}
+.create-label{min-width:0}
+.create-label input{font-size:17px;padding:13px 16px}
+.create-row .go{justify-self:stretch;padding:13px 26px;font-size:16px;min-height:50px;white-space:nowrap}
+@media(min-width:760px){
+  .create-row{grid-template-columns:minmax(0,2fr) minmax(0,1fr) auto}
+  .create-row .go{justify-self:auto}
+}
 /* Current property report */
 .stage{display:grid;gap:14px}
 .stage>.sec-h{margin:0}
@@ -236,10 +250,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #report-empty .empty-t{margin:0 0 4px;font-size:17px;font-weight:600}
 #report-empty .empty-s{margin:0 auto;max-width:56ch;font-size:14px;color:var(--muted)}
 /* THE TWO-COLUMN WORKSPACE (desktop): the rail on the left holds the agent's tools, the report on the right takes everything else.
-   Below 1000px the rail dissolves and the sections stack in the order below, so the phone reads: create, this report's tools, the report, saved, account. */
+   Below 1000px the rail dissolves and the sections stack in the order below, so the phone reads: create (above the workspace), this report's tools, the report, saved, account. */
 .ws{display:flex;flex-direction:column;gap:18px}
 .rail{display:contents}
-.rail>.create{order:1}.rail>.rail-sec{order:2}.ws>.stage{order:3}.rail>#saved{order:4}.rail>.acct{order:5}
+.rail>.rail-sec{order:2}.ws>.stage{order:3}.rail>#saved{order:4}.rail>.acct{order:5}
 .rail-sec{display:grid;gap:12px}
 .rail-sec>.sec-h{margin:0}
 #rail-actions{display:grid;gap:8px;--rv-ink:var(--ink);--rv-ink2:var(--muted);--rv-line:var(--line);--rv-green:var(--accent);--rv-deep:#0f5c37;--rv-tint:#e9f5ee}
@@ -250,6 +264,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #rail-actions .da-rv-act[data-da-action="share"]{grid-column:1/-1;min-height:48px;background:var(--accent);border-color:var(--accent);color:#fff}
 #rail-actions .da-rv-act[data-da-action="share"]:hover{background:#0f5c37}
 #rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent)}
+#rail-actions .da-rv-act[data-da-action="pdf"],#rail-actions .da-rv-act[data-da-action="compare"]{min-height:40px;font-weight:500;font-size:13.5px;color:var(--muted);border-color:var(--line);background:var(--panel2)}
+#rail-actions .da-rv-act[data-da-action="pdf"]:hover,#rail-actions .da-rv-act[data-da-action="compare"]:hover{color:var(--ink);background:#eef2ee}
 #rail-actions .da-rv-soon{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
 .rail .card{padding:12px 14px}
 .rail .card,.rail-sec{gap:8px}
@@ -267,11 +283,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .rail .card h2,.rail .sec-h{font-size:15px}
 .rail .sub,.rail .hint{font-size:12.5px}
 .rail .row{flex-wrap:wrap}
-.rail .create{padding:16px}
-.rail .create-row{flex-direction:column;align-items:stretch}
-.rail .create-row .go{width:100%}
-.rail .create-addr input{font-size:15px;padding:11px 12px}
-.rail .create-label{max-width:none}
 @media(min-width:1000px){
   .ws{display:grid;grid-template-columns:minmax(300px,340px) minmax(0,1fr);gap:24px;align-items:start}
   .rail{display:flex;flex-direction:column;gap:16px;grid-column:1;grid-row:1}
@@ -307,8 +318,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .to-billing .wrap{padding-bottom:calc(100vh - 120px)}
 .acct-in{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;padding:0 18px 18px;align-items:start}
 @media(max-width:620px){
-  .create{padding:18px}
+  .create{padding:16px}
   header.top h1{font-size:22px}
+  header.top .acct-strip{flex-basis:100%;justify-items:start;text-align:left;max-width:none}
+  #trial{justify-content:flex-start}
 }
 /* PRINT: only the report goes on the paper (build step 8). Every card, the form, the status lines and the sign-in are left off; the report's
    own stylesheet (lib/da-report-view.js) takes care of the report. */
@@ -350,20 +363,22 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       <h1>Development Activity Reports</h1>
       <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
     </div>
+    <!-- Account strip: where the report allowance stands (who is signed in is in the site bar above). Usage is secondary account information (founder, 2026-10-11), so it lives here, not above the form. -->
+    <div class="acct-strip">
+      <section id="trial" aria-live="polite" aria-label="Report usage">
+        <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
+        <!-- The commercial action always sits with the count, so nobody hunts the page for how to continue: "Subscribe — $79/month" until the plan is paid, then "Manage plan". -->
+        <div class="trial-cta" id="trial-cta-wrap" hidden>
+          <button type="button" class="go" id="trial-cta"></button>
+          <span id="trial-cta-status" role="status" aria-live="polite"></span>
+        </div>
+        <p class="sub" id="trial-sub"></p>
+      </section>
+    </div>
   </div>
 </header>
 
 <main class="wrap">
-  <!-- 1. Where the account stands: the free reports or the month's reports left (the trial function's words, unchanged). -->
-  <section class="card" id="trial" aria-live="polite">
-    <p class="count" id="trial-count">Sign in to see your brokerage's free reports.</p>
-    <p class="sub" id="trial-sub"></p>
-    <!-- The commercial action always sits in the tile, so nobody hunts the page for how to continue: "Subscribe — $79/month" until the plan is paid, then "Manage plan". -->
-    <div class="trial-cta" id="trial-cta-wrap" hidden>
-      <button type="button" class="go" id="trial-cta"></button>
-      <span id="trial-cta-status" role="status" aria-live="polite"></span>
-    </div>
-  </section>
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
     <p class="sub">For individual real estate agents: 10 free Development Activity reports, then $79/month for 100 reports. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
@@ -374,23 +389,25 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <p id="signup-status" role="status" aria-live="polite"></p>
   </section>
 
+  <!-- Create a property report: the start of the whole workflow, full width above the two-column workspace. Same form, same ids, same handler. -->
+  <section class="card create" aria-labelledby="create-title">
+    <h2 class="sec-h" id="create-title">Create a property report</h2>
+    <form id="rf" novalidate>
+      <div class="create-row">
+        <label class="create-addr">Property address
+          <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
+        </label>
+        <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
+        <button type="submit" class="go" id="go">Generate report</button>
+      </div>
+      <p class="hint">Appears in the report header. A saved report keeps it with the address, not in the report itself.</p>
+    </form>
+  </section>
+
   <div class="ws">
     <!-- LEFT: the agent workspace. Every card keeps its id, its form and its handler; only where it sits changed. On a narrow screen the rail dissolves
          (display:contents) and the sections stack in the `order` set in the style block: create, current-report tools, report, saved reports, account. -->
     <aside class="rail" id="rail" aria-label="Agent workspace">
-    <section class="card create" aria-labelledby="create-title">
-      <h2 class="sec-h" id="create-title">Create a property report</h2>
-      <form id="rf" novalidate>
-        <div class="create-row">
-          <label class="create-addr">Property address
-            <input type="text" id="addr" name="address" autocomplete="street-address" placeholder="20 N Main St, Brigham City, UT 84302" maxlength="200" required>
-          </label>
-          <button type="submit" class="go" id="go">Generate report</button>
-        </div>
-        <label class="create-label">Client label (optional)<input type="text" id="label" maxlength="80" placeholder="Smith buyers"></label>
-        <p class="hint">Appears in the report header. A saved report keeps it with the address, not in the report itself.</p>
-      </form>
-    </section>
 
 
       <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title">
@@ -678,7 +695,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
-      count.textContent = left === 1 ? '1 free report left' : left + ' free reports left';
+      // usage reads as "7 of 10 free reports used"; only when the allowance is not yet known does it fall back to the count left
+      count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
         ? 'A report with no development data (“No data ingested”) does not use one.'
         : "Shared by everyone on your brokerage. A report with no development data (“No data ingested”) does not use one.";
@@ -686,7 +704,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       count.textContent = 'Signed in as a HomeSignal admin';
       sub.textContent = 'Reports you make here show what a customer sees, and never use a free report.';
     } else if (a === 'complete') {
-      count.textContent = 'All ' + freeWords() + ' are used'; count.className = 'count out';
+      count.textContent = freeLimit !== null ? freeLimit + ' of ' + freeLimit + ' free reports used' : 'All ' + freeWords() + ' are used'; count.className = 'count out';
       sub.textContent = mine() ? 'Your free trial is complete. Your saved reports stay available.' : "Your brokerage's free trial is complete.";
     } else if (a === 'ended') {
       count.textContent = 'This trial has ended'; count.className = 'count out';
@@ -700,11 +718,11 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var end = monthEndWords(), n = plan.credits_remaining;
       if (n > 0) {
         count.className = 'count';
-        count.textContent = n === 1 ? '1 report left this month' : n + ' reports left this month';
+        count.textContent = typeof plan.credits_used === 'number' && typeof plan.credit_limit === 'number' ? plan.credits_used + ' of ' + plan.credit_limit + ' reports used' : (n === 1 ? '1 report left this month' : n + ' reports left this month');
         sub.textContent = (mine() ? 'Your $79/month plan includes 100 new reports each month' : "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it") + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
       } else {
         count.className = 'count out';
-        count.textContent = 'All 100 reports for this month are used';
+        count.textContent = typeof plan.credit_limit === 'number' ? plan.credit_limit + ' of ' + plan.credit_limit + ' reports used' : 'All 100 reports for this month are used';
         sub.textContent = (end ? 'A new month of 100 reports starts ' + end + '. ' : '') + 'Your saved reports stay available.';
       }
     }
