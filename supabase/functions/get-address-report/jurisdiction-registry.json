@@ -4538,7 +4538,6 @@
     },
     {
       "registry_id": "frisco-proposed-zoning",
-      "geocode_assemble": true,
       "platform": "arcgis",
       "service_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/5",
       "dataset_url": "https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/5",
