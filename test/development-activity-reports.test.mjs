@@ -213,7 +213,7 @@ ok(/\$\('share-link'\)\.value = ''/.test(hs) && /\$\('share-list'\)\.textContent
 ok(code.split('hideShare();').length - 1 >= 5, '9f the card is hidden whenever a new report starts, a saved report is opened, or the person signs out or changes (five places call it)');
 ok(/session\.user\.id !== forUser \|\| shareFor !== forReport/.test(mk) && /session\.user\.id !== forUser \|\| shareFor !== forReport/.test(rf) && /session\.user\.id !== forUser \|\| shareFor !== forReport/.test(wd),
   '9g an answer that arrives after the person or the report changed is never shown (create, list and withdraw each check)');
-ok(/<section class="card" id="share"[^>]*\shidden>/.test(page) && /var shareable = body\.stored === true && typeof body\.report_id === 'string'/.test(code),
+ok(/<details class="mgmt" id="share"[^>]*\shidden>/.test(page) && /var shareable = body\.stored === true && typeof body\.report_id === 'string'/.test(code),
   '9h the card is hidden until a report that was SAVED is on screen: an unsaved report has no permanent id to share');
 ok(/function printReport\(\)\{ window\.print\(\); \}/.test(code) && !/jspdf|html2canvas|toBlob|createObjectURL|pdf-lib|\.pdf\b/i.test(page.replace(/Download PDF|Save as PDF|\bPDF\b/g, '')),
   '9i "Download PDF" is the browser\'s own print window and nothing else: no PDF library, no canvas, no file made');
