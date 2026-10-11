@@ -58,7 +58,6 @@ ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no re
 const bar = (page.match(/<header class="sitebar">[\s\S]*?<\/header>/) || [''])[0];
 const headerTop = (page.match(/<header class="top">[\s\S]*?<\/header>/) || [''])[0];
 const siteNav = (bar.match(/<nav class="sb-nav" aria-label="HomeSignal site">([\s\S]*?)<\/nav>/) || [])[1] || '';
-const entNav = (headerTop.match(/<nav class="entnav" aria-label="Enterprise">([\s\S]*?)<\/nav>/) || [])[1] || '';
 const linksOf = (h) => [...h.matchAll(/<a href="([^"]+)"([^>]*)>([^<]+)<\/a>/g)].map((m) => ({ text: m[3], href: m[1], current: /aria-current="page"/.test(m[2]) }));
 const shellHtml = read('partials/shell.html');
 const shellPrimary = (shellHtml.match(/<nav class="hs-nav"[\s\S]*?<\/nav>/) || [''])[0];
@@ -69,13 +68,10 @@ ok(JSON.stringify(linksOf(siteNav).map((l) => [l.text, l.href])) === JSON.string
 ok(linksOf(siteNav).filter((l) => l.current).map((l) => l.text).join() === 'Enterprise', '1h2 exactly one item is marked as the current section: Enterprise');
 const brandHref = (bar.match(/<a class="sb-brand" href="([^"]+)"/) || [])[1];
 ok(brandHref === ((shellHtml.match(/<a class="hs-brand" href="([^"]+)"/) || [])[1]) && brandHref === 'index.html', '1h3 the HomeSignal logo links where the shell\'s does (the homepage)', brandHref);
-const shellSub = (shellHtml.match(/id="hs-enterprise-sub">([\s\S]*?)<\/div>/) || [])[1] || '';
-const shellEnt = [...shellSub.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]);
-ok(JSON.stringify(linksOf(entNav).map((l) => [l.text, l.href])) === JSON.stringify(shellEnt) && shellEnt.length === 2,
-  '1h4 the row under the bar holds the shell\'s two Enterprise entries (Enterprise overview, My reports), same labels and addresses', { have: linksOf(entNav), shellEnt });
-ok(linksOf(entNav).filter((l) => l.current).map((l) => l.text).join() === 'My reports', '1h5 My reports is marked as the current page');
+ok(!/class="entnav"/.test(page) && !/class="brand"/.test(headerTop), '1h4 below the site bar the page goes straight to its title: no second Enterprise row and no repeated HomeSignal label (the bar already says Enterprise)');
+ok(/<h1>Development Activity Reports<\/h1>/.test(headerTop), '1h5 the header under the bar holds the page title');
 ok(/id="who"/.test(bar) && !/id="who"/.test(headerTop), '1h6 the account area (email and Sign out) lives in the bar, so it is on screen with the navigation');
-ok(!/https?:\/\//.test(siteNav + entNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar + entNav), '1i ...plain same-site links: no address of another site, no new window, no script');
+ok(!/https?:\/\//.test(siteNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar), '1i ...plain same-site links: no address of another site, no new window, no script');
 ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && !/rel="stylesheet"/.test(page), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document');
 ok(/header\.sitebar,header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides the header (and now the site bar) is still there, so neither prints');
 
