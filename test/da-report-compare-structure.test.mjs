@@ -107,10 +107,12 @@ const PAGE_SRC = read(PAGE);
   ok(/hideCompare\(\)/.test(showSaved), '5j leaving the saved list (sign-out, another person) clears the comparison with it, so one person\'s reports are never left for the next');
   ok(/paintCompare\(null\)/.test(PC) && /paintCompare\(offered\)/.test(PC), '5k a saved list that cannot be read says so on the card, and a read one fills it');
   ok((PC.match(/'share', 'watch', 'pdf', 'compare'/g) || []).length === 2, '5l the report\'s own "Compare property" button is live exactly where Share and Watch are: on a report that was saved');
-  ok(/act === 'compare' && !\$\('compare'\)\.hidden\) chooseForCompare\(shareFor\)/.test(PC), '5m that button adds the report on screen to the choice and moves to the card; it compares nothing by itself');
+  ok(/act === 'compare' && !\$\('saved'\)\.hidden\) chooseForCompare\(shareFor\)/.test(PC), '5m that button (now in the workspace rail) adds the report on screen to the choice, starts comparing and moves to the list; it compares nothing by itself');
   ok(/c\.disabled = !c\.checked && n >= max;/.test(PC) && /\$\('compare-go'\)\.disabled = comparing \|\| n < min \|\| n > max;/.test(PC), '5n at most five can be ticked and the button needs two to five');
   const printRule = /@media print\{[\s\S]*?\.card[^{]*\{display:none!important/.test(PAGE_SRC);
-  ok(printRule && /<section class="card" id="saved"[\s\S]*?id="compare"[\s\S]*?<\/section>\s*<!--/.test(PAGE_SRC), '5o the comparison is inside the Saved reports card, and cards are left off the printed page (printing the comparison is not part of this step)');
+  const savedCard = (PAGE_SRC.match(/<section class="card" id="saved"[\s\S]*?<\/section>/) || [''])[0];
+  const printBlock = (PAGE_SRC.match(/@media print\{[\s\S]*?\n\}/) || [''])[0];
+  ok(printRule && /id="compare"/.test(savedCard) && !/id="compare-result"/.test(savedCard) && /<section class="stage"[\s\S]*?id="compare-result"[\s\S]*?<\/section>/.test(PAGE_SRC) && /#compare-result/.test(printBlock), '5o the choosing (count and button) is inside the Saved reports card, the comparison itself is drawn beside the report, and both are left off the printed page (printing the comparison is not part of this step)');
   ok(PAGE_SRC.indexOf('lib/da-report-view.js?v=') > 0 && PAGE_SRC.indexOf('lib/da-report-view.js?v=') < PAGE_SRC.indexOf('lib/da-report-compare.js?v='), '5p the page loads the report view first, then the comparison');
   ok(/<script src="lib\/da-report-compare\.js\?v=[0-9a-f]{8}"><\/script>/.test(PAGE_SRC), '5q the comparison is loaded with a content key (the cache-key test pins the value)');
 }
