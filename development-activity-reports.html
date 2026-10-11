@@ -1626,6 +1626,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var body = r.body || {};
     if (body.plan && typeof body.plan.state === 'string' && typeof body.plan.credits_remaining === 'number' && (access === 'trial' || access === 'complete')) plan = body.plan; // the plan as the database left it after this report
     if (body.trial && typeof body.trial.credits_remaining === 'number' && (access === 'trial' || access === 'complete')) {
+      showTrial(body.trial.status === 'complete' ? 'complete' : 'trial', body.trial, '');
       showBilling(true);
     }
     if (r.status === 401) { session = null; pendingRun = true; openAuth(); }
