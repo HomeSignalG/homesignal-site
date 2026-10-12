@@ -9,7 +9,7 @@
 //   1. the logo and Explore lead to index.html, and a signed-in resident with a saved
 //      Address STAYS there (no dashboard bounce), with Explore lit;
 //   2. on a return visit, when the viewed ZIP is the resident's own, the homepage's sample
-//      still reads the sample ZIP its heading names (78657), never the resident's;
+//      still reads the sample ZIP its heading names (75034), never the resident's;
 //   3. every page lights the item of the section it belongs to (the active-item matrix);
 //   4. My Places shows "What's Changed" and "Alert Settings" above the place list;
 //   5. the six support links sit in the ONE shared footer, in order, without overflow at
@@ -198,9 +198,9 @@ ok(JSON.stringify(c.lit) === JSON.stringify(['explore']), '1 Explore is the one 
 // Measured on a RETURN visit. On the first load nothing has stored the resident's ZIP yet,
 // so the viewed ZIP falls back to the default; the first boot's follow sync stores
 // hs:myZip = 84302, so on the second load the viewed ZIP is the resident's own, which is
-// exactly the case a sample must ignore. The sample's ZIP is fixed (78657) by the founder's
+// exactly the case a sample must ignore. The sample's ZIP is fixed (75034) by the founder's
 // Revised Index Design: its list read and its map iframe both name it.
-console.log('--- 2. the homepage sample is 78657 ---');
+console.log('--- 2. the homepage sample is 75034 ---');
 await D.page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 await D.page.waitForFunction(() => (window.__navRpcs || []).some((x) => x.fn === 'app_projects_for_zip'), null, { timeout: 15000 }).catch(() => {});
@@ -210,9 +210,9 @@ const reads = await D.page.evaluate(() => (window.__navRpcs || [])
 const view = await D.page.evaluate(() => ({ viewed: window.HS.state.zip, frame: document.getElementById('homeMapFrame').getAttribute('src') }));
 ok(view.viewed === SAVED.zip,
   '2 on the return visit the viewed ZIP is the resident’s own ' + SAVED.zip + ' (positive control)', view);
-ok(reads.length === 1 && reads[0].zip === '78657' && reads[0].kind === 'development',
-  '2 the homepage made exactly one development read, for the sample ZIP 78657, not the resident’s ' + SAVED.zip, reads);
-ok(view.frame === 'homesignalmap.html?embed=1&preview=1&zip=78657', '2 the sample map names 78657 too', view.frame);
+ok(reads.length === 1 && reads[0].zip === '75034' && reads[0].kind === 'development',
+  '2 the homepage made exactly one development read, for the sample ZIP 75034, not the resident’s ' + SAVED.zip, reads);
+ok(view.frame === 'homesignalmap.html?embed=1&preview=1&zip=75034', '2 the sample map names 75034 too', view.frame);
 
 // The logo click from another page lands back on Explore, and stays.
 await D.page.goto(base + '/properties.html', { waitUntil: 'domcontentloaded' });
