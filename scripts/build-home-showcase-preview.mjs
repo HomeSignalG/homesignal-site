@@ -9,7 +9,7 @@
 //   node scripts/build-home-showcase-preview.mjs --check   READ-ONLY: re-renders into a temp dir and compares the RENDERED TEXT with the committed receipt
 //                                                           (font-independent), and the committed webp sizes. Exits 0/1. Never writes a tracked file.
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -21,6 +21,8 @@ const FIXTURE = join(root, 'data/home-showcase/touraine-75034-report-body.json')
 const RECEIPT = join(root, 'data/home-showcase/preview-receipt.json');
 const ASSET = { desktop: join(root, 'assets/home-report-example-desktop.webp'), mobile: join(root, 'assets/home-report-example-mobile.webp') };
 const CHECK = process.argv.includes('--check');
+const STRICT_PIXELS = process.argv.includes('--strict-pixels');   // only meaningful where the SAME fonts as the machine that built the assets are installed
+const VIEW_SHA = createHash('sha256').update(readFileSync(join(root, 'lib/da-report-view.js'))).digest('hex');
 
 export const FIXTURE_MD5 = '0cf8f5d321b5fbf4849f380362bb9ba4';   // md5 of the stored report body for report eaf8c17c-1063-4b72-9467-dbf0e1a13909, read from production 2026-10-12
 export const SUBJECT = '3999 Touraine Dr, Frisco, TX 75034';
@@ -32,7 +34,9 @@ export const KEEP = [
   'arcgis:txdot-projects-info-all:091824314',          // Roads & infrastructure, proposed / under review
 ];
 const CAPTION = 'Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source.';
-const FRAMES = { desktop: { w: 700, vw: 700 }, mobile: { w: 344, vw: 344 } };   // CSS px; deviceScaleFactor 2 => intrinsic 1400 / 688 wide
+// CSS px; deviceScaleFactor 2 => intrinsic 1600 / 688 wide. The report view stacks each record below 760px of ITS OWN width (lib/da-report-view.js STACK_AT), so the
+// desktop frame must be wide enough for the real four-column table (800 - 32 padding = 768 >= 760); the mobile frame is the view's own stacked form of the same four fields.
+const FRAMES = { desktop: { w: 800, vw: 800, layout: 'four-column' }, mobile: { w: 344, vw: 344, layout: 'stacked' } };
 
 const body = readFileSync(FIXTURE);
 if (createHash('md5').update(body).digest('hex') !== FIXTURE_MD5) { console.error('FAIL fixture md5 differs from the production snapshot'); process.exit(1); }
@@ -42,7 +46,8 @@ for (const id of KEEP) if (!projectsById.has(id)) { console.error('FAIL kept pro
 
 const browser = await chromium.launch();
 const dir = mkdtempSync(join(tmpdir(), 'home-showcase-'));
-const out = { fixture_md5: FIXTURE_MD5, subject: SUBJECT, caption: CAPTION, report_counts: { records: report.projects.length }, kept: KEEP, frames: {} };
+const freshThumb = {};
+const out = { view_sha256: VIEW_SHA, fixture_md5: FIXTURE_MD5, subject: SUBJECT, caption: CAPTION, report_counts: { records: report.projects.length }, kept: KEEP, frames: {} };
 
 for (const [name, f] of Object.entries(FRAMES)) {
   const ctx = await browser.newContext({ viewport: { width: f.vw, height: 1400 }, deviceScaleFactor: 2 });
@@ -60,12 +65,16 @@ for (const [name, f] of Object.entries(FRAMES)) {
     // Keep the rows asked for; identify a row by the record's own address text, which the view prints in the name.
     const wanted = keep.map((id) => rep.projects.find((p) => p.project_id === id));
     const rows = [...host.querySelectorAll('table tbody tr')];
-    const kept = [];
+    const kept = [], identity = [], problems = [];
+    // A row is kept only if its printed name matches exactly ONE report project AND that project is one of the wanted ids; a name shared by two projects is refused.
     rows.forEach((tr) => {
       const name = tr.querySelector('.da-rv-name').textContent;
-      const hit = wanted.some((p) => p.name === name);
-      if (hit) { kept.push(tr); } else { tr.remove(); }
+      const owners = rep.projects.filter((p) => p.name === name);
+      const hit = owners.length === 1 && wanted.some((p) => p.project_id === owners[0].project_id);
+      if (owners.length !== 1 && wanted.some((p) => p.name === name)) problems.push('kept name is shared by ' + owners.length + ' projects: ' + name);
+      if (hit) { kept.push(tr); identity.push({ project_id: owners[0].project_id, name, type: tr.getAttribute('data-da-type'), stage: tr.getAttribute('data-da-stage'), stage_text: tr.querySelector('.da-rv-td--stage').innerText.replace(/\s+/g, ' ').replace(/^Stage: /, '').trim() }); } else { tr.remove(); }
     });
+    identity.forEach((i) => { const p = rep.projects.find((q) => q.project_id === i.project_id); if (p.type.key !== i.type) problems.push('type mismatch for ' + i.project_id); });
     // Keep the briefing's FIRST line (the counts) and drop the rest; remove the "Map N" references (no map is in frame).
     host.querySelectorAll('[data-da-briefing] li:not(:first-child)').forEach((li) => li.remove());
     host.querySelectorAll('.da-rv-sub').forEach((s) => { s.innerHTML = s.innerHTML.replace(/\s*·\s*Map \d+/, '').replace(/^Map \d+$/, ''); if (!s.textContent.trim()) s.remove(); });
@@ -75,9 +84,21 @@ for (const [name, f] of Object.entries(FRAMES)) {
     const brief = host.querySelector('[data-da-briefing]');
     const table = host.querySelector('table');
     const head = host.querySelector('header, .da-rv-head');
-    return { ok, rows: kept.length, briefBottom: top(brief) + brief.getBoundingClientRect().height, tableTop: top(table.closest('.da-rv-tablewrap')), tableBottom: top(table) + table.getBoundingClientRect().height, headTop: head ? top(head) : 0, text: [document.getElementById('cap'), head, brief, table].map((e) => (e ? e.innerText : '')).join(' ') };
+    // Layout truth: four visible columns (one header cell per column, laid out side by side) or the view's stacked form; no horizontal overflow; no clipped cell text.
+    const ths = [...host.querySelectorAll('table thead th')].map((th) => ({ t: th.textContent.trim(), w: th.getBoundingClientRect().width, x: Math.round(th.getBoundingClientRect().left) }));
+    const sideBySide = ths.length === 4 && ths.every((t) => t.w > 20) && new Set(ths.map((t) => t.x)).size === 4;
+    const frameEl = document.getElementById('frame');
+    const clipped = [...host.querySelectorAll('td, th[scope=row]')].filter((c) => c.scrollWidth > c.clientWidth + 1).length;
+    const overflow = Math.max(frameEl.scrollWidth - frameEl.clientWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    return { problems, identity, headers: ths.map((t) => t.t), layout: sideBySide ? 'four-column' : 'stacked', clipped, overflow, ok, rows: kept.length, briefBottom: top(brief) + brief.getBoundingClientRect().height, tableTop: top(table.closest('.da-rv-tablewrap')), tableBottom: top(table) + table.getBoundingClientRect().height, headTop: head ? top(head) : 0, text: [document.getElementById('cap'), head, brief, table].map((e) => (e ? e.innerText : '')).join(' ') };
   }, [report, SUBJECT, KEEP, CAPTION]);
   if (!r.ok || r.rows !== KEEP.length) { console.error('FAIL ' + name + ': view mounted=' + r.ok + ' rows=' + r.rows); await browser.close(); process.exit(1); }
+  const lay = [];
+  if (r.problems.length) lay.push(...r.problems);
+  if (r.layout !== f.layout) lay.push(name + ': layout is ' + r.layout + ', expected ' + f.layout);
+  if (r.headers.join('|') !== 'Development|Stage|Quality-of-Life Impact|Supporting Evidence') lay.push(name + ': column headings are ' + r.headers.join('|'));
+  if (r.clipped) lay.push(name + ': ' + r.clipped + ' cell(s) have clipped text'); if (r.overflow > 0) lay.push(name + ': horizontal overflow of ' + r.overflow + 'px');
+  if (lay.length) { console.error('FAIL ' + lay.join('; ')); await browser.close(); process.exit(1); }
   // Stitch: caption + header + briefing line, then the table. Nothing between them (the chip filters / paragraph) is in frame.
   const shot = async (clip, file) => page.screenshot({ path: file, fullPage: true, clip });
   const pa = join(dir, name + '-a.png'), pb = join(dir, name + '-b.png');
@@ -87,7 +108,9 @@ for (const [name, f] of Object.entries(FRAMES)) {
   execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\na=Image.open(sys.argv[1]).convert("RGB");b=Image.open(sys.argv[2]).convert("RGB")\ngap=24\no=Image.new("RGB",(a.width,a.height+gap+b.height),"white");o.paste(a,(0,0));o.paste(b,(0,a.height+gap));o.save(sys.argv[3])', pa, pb, png]);
   const target = CHECK ? join(dir, name + '.webp') : ASSET[name];
   const size = execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert("RGB");im.save(sys.argv[2],"WEBP",quality=90,method=6);print(im.width,im.height)', png, target], { encoding: 'utf8' }).trim().split(' ').map(Number);
-  out.frames[name] = { width: size[0], height: size[1], text: r.text.replace(/\s+/g, ' ').trim() };
+  const thumb = (file) => execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert("L");w=96;h=max(1,round(im.height*w/im.width));print(w,h,*Image.open(sys.argv[1]).convert("L").resize((w,h),Image.LANCZOS).tobytes())', file], { encoding: 'utf8' });
+  out.frames[name] = { width: size[0], height: size[1], layout: r.layout, headers: r.headers, rows: r.identity, text: r.text.replace(/\s+/g, ' ').trim() };
+  freshThumb[name] = thumb(target);
   await ctx.close();
 }
 await browser.close();
@@ -101,10 +124,31 @@ if (CHECK) {
     const [w, h] = sizes(ASSET[name]);
     if (w !== committed.frames[name].width || h !== committed.frames[name].height) bad.push(name + ': committed webp is ' + w + 'x' + h + ', receipt says ' + committed.frames[name].width + 'x' + committed.frames[name].height);
     if (w !== out.frames[name].width) bad.push(name + ': width differs from a fresh render');
+    // The committed IMAGE must be the one the receipt describes (a regenerated receipt with an old image, or the reverse, cannot pass) ...
+    const sha = createHash('sha256').update(readFileSync(ASSET[name])).digest('hex');
+    if (sha !== committed.frames[name].asset_sha256) bad.push(name + ': committed webp sha256 ' + sha.slice(0, 12) + ' is not the receipt\'s ' + String(committed.frames[name].asset_sha256).slice(0, 12));
+    // ... and, only with --strict-pixels (same fonts as the build machine; CI runners do not have them, so text wraps differently there), must LOOK like a fresh render
+    //     (96px-wide grayscale layout thumbnail, mean absolute difference; heights must match). Font-independent staleness is caught by view_sha256 below.
+    if (STRICT_PIXELS) {
+      const tn = (f) => execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert("L");w=96;h=max(1,round(im.height*w/im.width));print(w,h,*im.resize((w,h),Image.LANCZOS).tobytes())', f], { encoding: 'utf8' }).trim().split(' ').map(Number);
+      const a = tn(ASSET[name]), b = freshThumb[name].trim().split(' ').map(Number);
+      if (a[1] !== b[1]) bad.push(name + ': committed image layout height differs from a fresh render (' + a[1] + ' vs ' + b[1] + ')');
+      else { let d = 0; for (let i = 2; i < a.length; i++) d += Math.abs(a[i] - b[i]); d /= (a.length - 2); if (d > 6) bad.push(name + ': committed image differs from a fresh render (mean thumbnail difference ' + d.toFixed(1) + ' > 6)'); }
+    }
+    if (JSON.stringify(committed.frames[name].rows) !== JSON.stringify(out.frames[name].rows) || committed.frames[name].layout !== out.frames[name].layout) bad.push(name + ': kept-row identities or layout differ from the receipt');
   }
+  // the homepage must reference the assets at their real size and the receipt's version of them
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  for (const name of Object.keys(FRAMES)) {
+    const fr = committed.frames[name], file = 'assets/home-report-example-' + name + '.webp';
+    if (!html.includes(file) || !new RegExp(file.replace(/[.]/g, '\\.') + '[^>]*?(?:width="' + fr.width + '"[^>]*height="' + fr.height + '")', 's').test(html)) bad.push('index.html does not reference ' + file + ' at ' + fr.width + 'x' + fr.height);
+  }
+  // The images were built from a particular version of the report view. If the view has changed since, they are stale whatever the fonts: regenerate.
+  if (committed.view_sha256 !== VIEW_SHA) bad.push('lib/da-report-view.js changed since the images were built (receipt view_sha256 ' + String(committed.view_sha256).slice(0, 12) + ', now ' + VIEW_SHA.slice(0, 12) + '): regenerate with node scripts/build-home-showcase-preview.mjs');
   if (JSON.stringify(committed.kept) !== JSON.stringify(out.kept) || committed.fixture_md5 !== out.fixture_md5) bad.push('kept rows or fixture md5 differ');
   console.log(bad.length ? 'FAIL ' + bad.join('; ') : 'PASS rendered text, kept rows, fixture md5 and webp sizes match the committed receipt');
   process.exit(bad.length ? 1 : 0);
 }
+for (const name of Object.keys(FRAMES)) out.frames[name].asset_sha256 = createHash('sha256').update(readFileSync(ASSET[name])).digest('hex');
 writeFileSync(RECEIPT, JSON.stringify(out, null, 1) + '\n');
 console.log(JSON.stringify({ desktop: out.frames.desktop, mobile: out.frames.mobile }, (k, v) => (k === 'text' ? v.slice(0, 80) + '…' : v), 1));

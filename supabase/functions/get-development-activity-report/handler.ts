@@ -45,6 +45,7 @@ import { planSummary } from '../_shared/billing-reads.ts';
 import type { BillingUsage } from '../_shared/billing-reads.ts';
 import type { RateVerdict } from '../_shared/rate-reads.ts';
 import { UUID } from '../_shared/evaluation-reads.ts';
+import { ArchiveInvalid, ARCHIVE_MAX_IDS, SavedReportNotFound } from '../_shared/evaluation-reads.ts';
 import type { OpenedReport, ReportHeader, SavedReport } from '../_shared/evaluation-reads.ts';
 import type { EvaluationIssue, PrivateContext } from '../_shared/report-snapshot.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
@@ -80,7 +81,10 @@ export type Deps = {
   storedReport: (reportId: string) => Promise<string | null>;
   contextMatches: (contextId: string, address: string) => Promise<'match' | 'mismatch' | 'unknown'>;
   // saved reports (build step 6)
-  savedReports: (userId: string) => Promise<SavedReport[]>;
+  /** The caller's reports not removed from their own list, or (archived) the ones they removed. Filtered by the database, never by the page. */
+  savedReports: (userId: string, archived?: boolean) => Promise<SavedReport[]>;
+  /** Remove reports from the caller's own list (true) or restore them (false), all or nothing; returns how many rows this call changed. Writes no ledger, snapshot, share or watch. */
+  archiveReports: (userId: string, reportIds: string[], archived: boolean) => Promise<number>;
   openSavedReport: (userId: string, reportId: string) => Promise<OpenedReport | null>;
   /** The address and client label a stored report was made for, while the private layer still keeps them; null once they have been purged. */
   subjectOf: (contextId: string | null) => Promise<{ address: string | null; label: string | null }>;
@@ -100,12 +104,12 @@ export class GeocoderUnavailable extends Error {}
 export function capability() {
   return {
     product: 'HOMESIGNAL DEVELOPMENT ACTIVITY',
-    method: 'POST { address, radius_mi?, view?, label?, idempotency_key? } | { action: "list" } | { action: "open", report_id }',
+    method: 'POST { address, radius_mi?, view?, label?, idempotency_key? } | { action: "list", archived? } | { action: "open", report_id } | { action: "archive" | "restore", report_ids }',
     radius_mi: [REPORT_RADIUS_MI],
     recent_days: RECENT_DAYS,
     access: 'signed-in: an internal admin (dashboard_admins), or an invited trial member with an active trial (customer view only).',
     stores_reports: 'only a member\'s report that uses a report from the allotment (credit rule): a free one, or one of the paid month\'s; never an admin report',
-    saved_reports: 'list: the stored reports of a trial member\'s trial; open: one of them by its id, as stored, never charged',
+    saved_reports: 'list: the stored reports of a trial member\'s trial that they have not removed from their own list (archived: true, the ones they removed); open: one of them by its id, as stored, never charged; archive / restore: take reports off or put them back on the caller\'s own list, changing nothing else',
     credit_rule: CREDIT_RULE_VERSION,
     rate_limit: 'a signed-in member\'s report requests are rate limited; a full window answers 429 rate_limited with retry_after_seconds (the limits are set in the database)',
   };
@@ -142,19 +146,30 @@ export function makeHandler(deps: Deps) {
     const paid = plan?.state === 'paid';
     // saved reports (build step 6): a request with an action reads what is already stored, and carries nothing else
     if (b.action !== undefined) {
-      if (b.action !== 'list' && b.action !== 'open') return reply(req, { error: 'invalid_request', detail: 'action' }, 400);
-      const allowed = b.action === 'open' ? ['action', 'report_id'] : ['action'];
+      if (b.action !== 'list' && b.action !== 'open' && b.action !== 'archive' && b.action !== 'restore') return reply(req, { error: 'invalid_request', detail: 'action' }, 400);
+      const allowed = b.action === 'open' ? ['action', 'report_id'] : b.action === 'list' ? ['action', 'archived'] : ['action', 'report_ids'];
       const extra = Object.keys(b).filter((k) => !allowed.includes(k));
       if (extra.length) return reply(req, { error: 'invalid_request', detail: 'unknown field: ' + extra[0] }, 400);
       // only a trial member has a brokerage's stored reports; an admin's reports are never stored
       if (!trial) return reply(req, { error: 'forbidden' }, 403);
       try {
+        if (b.action === 'archive' || b.action === 'restore') {
+          // the caller's OWN list: the user id is the verified sign-in's, never a field of the request
+          const ids = b.report_ids;
+          if (!Array.isArray(ids) || ids.length < 1 || ids.length > ARCHIVE_MAX_IDS || !ids.every((x) => typeof x === 'string' && UUID.test(x))) {
+            return reply(req, { error: 'invalid_request', detail: 'report_ids' }, 400);
+          }
+          const changed = await deps.archiveReports(trial.userId, ids as string[], b.action === 'archive');
+          return reply(req, { status: 'OK', action: b.action, requested: new Set((ids as string[]).map((x) => x.toLowerCase())).size, changed, trial: trialSummary(trial.trial), ...planInfo });
+        }
         if (b.action === 'list') {
-          const rows = await deps.savedReports(trial.userId);
+          if (b.archived !== undefined && typeof b.archived !== 'boolean') return reply(req, { error: 'invalid_request', detail: 'archived' }, 400);
+          const archived = b.archived === true;
+          const rows = await deps.savedReports(trial.userId, archived);
           const reports = await Promise.all(rows.map(async (r) => ({
             report_id: r.report_id, number: r.number, generated_at: r.generated_at, address: (await deps.subjectOf(r.private_context_id)).address,
           })));
-          return reply(req, { status: 'OK', reports, trial: trialSummary(trial.trial), ...planInfo });
+          return reply(req, { status: 'OK', archived, reports, trial: trialSummary(trial.trial), ...planInfo });
         }
         if (typeof b.report_id !== 'string' || !UUID.test(b.report_id)) return reply(req, { error: 'invalid_request', detail: 'report_id' }, 400);
         const opened = await deps.openSavedReport(trial.userId, b.report_id);
@@ -171,6 +186,8 @@ export function makeHandler(deps: Deps) {
           address: subject.address, client_label: subject.label, header, charged: false, trial: trialSummary(trial.trial), ...planInfo,
         });
       } catch (e) {
+        if (e instanceof SavedReportNotFound) return reply(req, { error: 'not_found' }, 404);
+        if (e instanceof ArchiveInvalid) return reply(req, { error: 'invalid_request', detail: 'report_ids' }, 400);
         if (e instanceof DataUnavailable) return reply(req, { error: 'data_unavailable' }, 502);
         return reply(req, { error: 'internal' }, 500);
       }

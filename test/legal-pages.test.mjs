@@ -19,9 +19,31 @@ for (const [f, title] of Object.entries(pages)) {
   ok(h.includes('hello@homesignal.net'), f + ' carries the contact address');
   ok(h.includes('<noscript>') && ['privacy.html', 'terms.html', 'refund-policy.html'].every((x) => h.includes('href="' + x + '"')), f + ' links the three policies without script');
   ok(!/Lemon\s*Squeezy|lemonsqueezy/i.test(h), f + ' does not name Lemon Squeezy');
-  ok(!/Paddle/i.test(h), f + ' does not announce Paddle before it is approved and live');
+  // Paddle (2026-10-12): accurate, conditional Merchant of Record disclosures are allowed; a claim that Paddle is approved or processing live payments is not.
+  ok(!/Paddle\s+(is|has been|was)\s+(now\s+|currently\s+|already\s+)?(approved|active|live|processing)|\b(is|are)\s+(now\s+|currently\s+|already\s+)?processing\s+(live\s+)?payments|approved\s+by\s+Paddle|Paddle[- ]approved|now\s+live/i.test(text(h)), f + ' does not claim Paddle is approved or processing live payments');
+  ok(!/9\.99/.test(text(h)), f + ' does not advertise the $9.99 ZIP alerts product');
+  ok((text(h).match(/571-601-9432/g) || []).length >= 1 && (h.match(/571-601-9432/g) || []).length === (h.match(/<a href="tel:\+15716019432">571-601-9432<\/a>/g) || []).length, f + ' shows 571-601-9432 only as a tel:+15716019432 link');
 }
 const terms = text(read('terms.html'));
+const rp = text(read('refund-policy.html')), rph = read('refund-policy.html'), th = read('terms.html'), ph = read('privacy.html'), ch = read('contact.html');
+// Paddle disclosures and links
+ok(/Paddle acts as the online reseller and Merchant of Record/.test(terms), 'Terms disclose Paddle as Merchant of Record for Paddle-processed orders');
+ok(/The payment provider and applicable terms are identified during checkout/.test(terms), 'Terms say the provider is identified at checkout');
+ok(th.includes('href="https://www.paddle.com/legal/refund-policy"') && rph.includes('href="https://www.paddle.com/legal/refund-policy"'), 'Terms and Refund Policy link the Paddle Refund Policy');
+ok(th.includes('href="https://paddle.net"') && rph.includes('href="https://paddle.net"'), 'Terms and Refund Policy link Paddle buyer support (paddle.net)');
+ok(ph.includes('href="https://www.paddle.com/legal/privacy"') && /Paddle acts as the Merchant of Record/.test(text(ph)), 'Privacy links the Paddle Privacy Notice and discloses Merchant of Record');
+ok(/When paid checkout is available/.test(text(ph)), 'Privacy payment text is conditional on paid checkout being available');
+// Plan facts, eligibility, free evaluation
+ok(/Professional plan for individual real estate agents at \$79 per month/.test(terms) && /100 new Development Activity reports each month/.test(terms), 'Terms: individual-agent Professional plan, $79/month, 100 reports');
+ok(/10 free evaluation reports without purchasing a subscription/.test(terms), 'Terms: 10 reports are a free evaluation');
+ok(/custom quote/.test(terms), 'Terms: brokerage/team/enterprise by custom quote');
+ok(/\$79 per month for 100 new Development Activity reports each month/.test(rp) && /free evaluation reports do not require payment/i.test(rp), 'Refund Policy states the plan and that free evaluation reports need no payment');
+// Cancellation and refund are consistent across Terms and Refund Policy
+ok(/Cancellation prevents future renewal charges\. It does not automatically refund payments already made/.test(terms) && /Cancellation does not automatically refund previous charges/.test(rp) && /does not automatically refund a payment already made/.test(rp), 'Terms and Refund Policy keep cancellation separate from refunds');
+ok(!/\b\d+[- ]day\b|money-back|guaranteed refund/i.test(rp), 'Refund Policy promises no window or guarantee');
+// Phone on all four pages
+for (const [n, h] of Object.entries({ 'terms.html': th, 'privacy.html': ph, 'refund-policy.html': rph, 'contact.html': ch })) ok(h.includes('<a href="tel:+15716019432"') && text(h).includes('571-601-9432'), n + ' carries the support phone as a tel:+15716019432 link');
+ok(!/\b(hours|business hours|within \d+|response time)\b/i.test(text(ch).slice(text(ch).indexOf('Other ways to reach us'))), 'Contact page invents no hours or response-time promise');
 ok(!/personal, non-commercial/i.test(terms), 'Terms do not carry the personal, non-commercial clause');
 ok(/HomeSignal/.test(terms), 'Terms name HomeSignal');
 ok(/\$79 per month/.test(terms) && /100 new Development Activity reports/.test(terms), 'Terms state the $79/month, 100-report plan');

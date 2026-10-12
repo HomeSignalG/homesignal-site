@@ -53,9 +53,9 @@ ok(/rollback-begin/i.test(read('docs/saved-reports.sql')) && /drop function if e
 // 3. the shared module is the one reader
 const READS = stripJs(read('supabase/functions/_shared/evaluation-reads.ts'));
 const DATA = stripJs(read('supabase/functions/get-development-activity-report/data.ts'));
-ok(/rpc\('evaluation_reports_of'/.test(READS) && /rpc\('evaluation_report_open'/.test(READS), '3a the shared module calls both functions (positive control)');
+ok(/rpc\('saved_reports_listed'/.test(READS) && /rpc\('evaluation_report_open'/.test(READS), '3a the shared module calls both functions (positive control)');
 for (const f of ['supabase/functions/get-development-activity-report/handler.ts', 'supabase/functions/get-development-activity-report/data.ts', 'supabase/functions/development-activity-trial/handler.ts', 'supabase/functions/development-activity-trial/data.ts', 'supabase/functions/follow-development-report/handler.ts']) {
-  ok(!/evaluation_report(s_of|_open)/.test(stripJs(read(f))), '3b ' + f + ' does not call the SQL functions directly');
+  ok(!/evaluation_report(s_of|_open)|saved_reports_(listed|archive_set)/.test(stripJs(read(f))), '3b ' + f + ' does not call the SQL functions directly');
 }
 const DATA_ALLOWED = /report_private_context_read/;
 ok(DATA_ALLOWED.test(DATA) && !/rest\(\s*['"`]report_snapshot|from\('report_snapshot'|\/report_snapshot/.test(DATA), '3c the data layer reads the address only through the private layer\'s own reader and never reads a snapshot table itself');

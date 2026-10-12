@@ -1,4 +1,5 @@
 {
+ "view_sha256": "1304916fa5018ff1bf6e4c424c7a658eb67fec54b072808a5a232e85353a5255",
  "fixture_md5": "0cf8f5d321b5fbf4849f380362bb9ba4",
  "subject": "3999 Touraine Dr, Frisco, TX 75034",
  "caption": "Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source.",
@@ -13,14 +14,90 @@
  ],
  "frames": {
   "desktop": {
-   "width": 1400,
-   "height": 1900,
-   "text": "Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source. HOMESIGNAL DEVELOPMENT ACTIVITY 3999 Touraine Dr, Frisco, TX 75034 Search radius 0.5 miles · ZIP 75034 Generated Oct 12, 2026 As of Oct 12, 2026, 9 official records within 0.5 miles of this property: 8 permitted / under construction · 1 proposed / under review. Types: 1 Residential, 6 Commercial, 1 Roads & infrastructure, 1 Civic & public. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT CS 268033 Widen Road - Add Lanes Roads & infrastructure Proposed / Under Review Source agency status: Planning Potential construction noise and traffic/access disruption. Effects not verified. Single Family Residential 3998 TOURAINE DR Residential Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active. Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Commercial 5729 LEBANON RD Commercial Permitted / Under Construction Source agency status: ISSUED Potential construction and customer traffic, parking and noise, and change to the view. Not site-verified; no effect is established. School 3651 COMPASS DR Civic & public Permitted / Under Construction Source agency status: ISSUED Potential construction disruption and possible change to public access or amenities. Not site-verified; no effect is established."
+   "width": 1600,
+   "height": 2034,
+   "layout": "four-column",
+   "headers": [
+    "Development",
+    "Stage",
+    "Quality-of-Life Impact",
+    "Supporting Evidence"
+   ],
+   "rows": [
+    {
+     "project_id": "arcgis:txdot-projects-info-all:091824314",
+     "name": "CS 268033 Widen Road - Add Lanes",
+     "type": "infrastructure",
+     "stage": "proposed",
+     "stage_text": "Proposed / Under Review Source agency status: Planning"
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B25-02756",
+     "name": "Single Family Residential 3998 TOURAINE DR",
+     "type": "residential",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active."
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B25-03418",
+     "name": "Commercial 5729 LEBANON RD",
+     "type": "commercial",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED"
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B26-01529",
+     "name": "School 3651 COMPASS DR",
+     "type": "civic",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED"
+    }
+   ],
+   "text": "Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source. HOMESIGNAL DEVELOPMENT ACTIVITY 3999 Touraine Dr, Frisco, TX 75034 Search radius 0.5 miles · ZIP 75034 Generated Oct 12, 2026 As of Oct 12, 2026, 9 official records within 0.5 miles of this property: 8 permitted / under construction · 1 proposed / under review. Types: 1 Residential, 6 Commercial, 1 Roads & infrastructure, 1 Civic & public. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE CS 268033 Widen Road - Add Lanes Roads & infrastructure Proposed / Under Review Source agency status: Planning Potential construction noise and traffic/access disruption. Effects not verified. Official source → for CS 268033 Widen Road - Add Lanes (opens in a new tab) Single Family Residential 3998 TOURAINE DR Residential Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active. Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Official record: Issued · Aug 27, 2025 Official source → for Single Family Residential 3998 TOURAINE DR (opens in a new tab) Commercial 5729 LEBANON RD Commercial Permitted / Under Construction Source agency status: ISSUED Potential construction and customer traffic, parking and noise, and change to the view. Not site-verified; no effect is established. Official record: Issued · Nov 7, 2025 Official source → for Commercial 5729 LEBANON RD (opens in a new tab) School 3651 COMPASS DR Civic & public Permitted / Under Construction Source agency status: ISSUED Potential construction disruption and possible change to public access or amenities. Not site-verified; no effect is established. Official record: Issued · Jun 24, 2026 Official source → for School 3651 COMPASS DR (opens in a new tab)",
+   "asset_sha256": "19d61a210abded3f42675f694fb0f26d682132d53b90214f01209101a5386105"
   },
   "mobile": {
    "width": 688,
-   "height": 2974,
-   "text": "Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source. HOMESIGNAL DEVELOPMENT ACTIVITY 3999 Touraine Dr, Frisco, TX 75034 Search radius 0.5 miles · ZIP 75034 Generated Oct 12, 2026 As of Oct 12, 2026, 9 official records within 0.5 miles of this property: 8 permitted / under construction · 1 proposed / under review. Types: 1 Residential, 6 Commercial, 1 Roads & infrastructure, 1 Civic & public. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT CS 268033 Widen Road - Add Lanes Roads & infrastructure Stage: Proposed / Under Review Source agency status: Planning Quality-of-Life Impact: Potential construction noise and traffic/access disruption. Effects not verified. Single Family Residential 3998 TOURAINE DR Residential Stage: Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active. Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Commercial 5729 LEBANON RD Commercial Stage: Permitted / Under Construction Source agency status: ISSUED Quality-of-Life Impact: Potential construction and customer traffic, parking and noise, and change to the view. Not site-verified; no effect is established. School 3651 COMPASS DR Civic & public Stage: Permitted / Under Construction Source agency status: ISSUED Quality-of-Life Impact: Potential construction disruption and possible change to public access or amenities. Not site-verified; no effect is established."
+   "height": 3904,
+   "layout": "stacked",
+   "headers": [
+    "Development",
+    "Stage",
+    "Quality-of-Life Impact",
+    "Supporting Evidence"
+   ],
+   "rows": [
+    {
+     "project_id": "arcgis:txdot-projects-info-all:091824314",
+     "name": "CS 268033 Widen Road - Add Lanes",
+     "type": "infrastructure",
+     "stage": "proposed",
+     "stage_text": "Proposed / Under Review Source agency status: Planning"
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B25-02756",
+     "name": "Single Family Residential 3998 TOURAINE DR",
+     "type": "residential",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active."
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B25-03418",
+     "name": "Commercial 5729 LEBANON RD",
+     "type": "commercial",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED"
+    },
+    {
+     "project_id": "arcgis:frisco-active-building-permits:B26-01529",
+     "name": "School 3651 COMPASS DR",
+     "type": "civic",
+     "stage": "permitted",
+     "stage_text": "Permitted / Under Construction Source agency status: ISSUED"
+    }
+   ],
+   "text": "Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source. HOMESIGNAL DEVELOPMENT ACTIVITY 3999 Touraine Dr, Frisco, TX 75034 Search radius 0.5 miles · ZIP 75034 Generated Oct 12, 2026 As of Oct 12, 2026, 9 official records within 0.5 miles of this property: 8 permitted / under construction · 1 proposed / under review. Types: 1 Residential, 6 Commercial, 1 Roads & infrastructure, 1 Civic & public. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Development: CS 268033 Widen Road - Add Lanes Roads & infrastructure Stage: Proposed / Under Review Source agency status: Planning Quality-of-Life Impact: Potential construction noise and traffic/access disruption. Effects not verified. Supporting Evidence: Official source → for CS 268033 Widen Road - Add Lanes (opens in a new tab) Development: Single Family Residential 3998 TOURAINE DR Residential Stage: Permitted / Under Construction Source agency status: ISSUED Verify: Issued Aug 27, 2025, over a year old. Confirm it is still active. Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Supporting Evidence: Official record: Issued · Aug 27, 2025 Official source → for Single Family Residential 3998 TOURAINE DR (opens in a new tab) Development: Commercial 5729 LEBANON RD Commercial Stage: Permitted / Under Construction Source agency status: ISSUED Quality-of-Life Impact: Potential construction and customer traffic, parking and noise, and change to the view. Not site-verified; no effect is established. Supporting Evidence: Official record: Issued · Nov 7, 2025 Official source → for Commercial 5729 LEBANON RD (opens in a new tab) Development: School 3651 COMPASS DR Civic & public Stage: Permitted / Under Construction Source agency status: ISSUED Quality-of-Life Impact: Potential construction disruption and possible change to public access or amenities. Not site-verified; no effect is established. Supporting Evidence: Official record: Issued · Jun 24, 2026 Official source → for School 3651 COMPASS DR (opens in a new tab)",
+   "asset_sha256": "2ee35fd156836cf45ba7f12e782997e74937e633e80872e8f24f6eff95d8176a"
   }
  }
 }
