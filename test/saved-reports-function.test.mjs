@@ -190,9 +190,9 @@ function stub(routes) {
 }
 const dbRow = { report_id: R1, number: 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: CTX1 };
 const dataFor = (routes) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', rights: { version: 1, cleared: [] } }, stub(routes));
-let d = dataFor([[/rpc\/evaluation_reports_of$/, () => json([dbRow, { ...dbRow, report_id: R2, number: 2, private_context_id: null }])]]);
+let d = dataFor([[/rpc\/saved_reports_listed$/, () => json([dbRow, { ...dbRow, report_id: R2, number: 2, private_context_id: null }])]]);
 let rows = await d.savedReports(UID);
-ok(rows.length === 2 && JSON.stringify(seen.map((s) => s.path)) === JSON.stringify(['/rest/v1/rpc/evaluation_reports_of']) && JSON.stringify(seen[0].body) === JSON.stringify({ p_user_id: UID }) && seen[0].auth === 'Bearer svc-key',
+ok(rows.length === 2 && JSON.stringify(seen.map((s) => s.path)) === JSON.stringify(['/rest/v1/rpc/saved_reports_listed']) && JSON.stringify(seen[0].body) === JSON.stringify({ p_user_id: UID, p_archived: false }) && seen[0].auth === 'Bearer svc-key',
   '8a the list is ONE database function call, with the service key, asked for by the person\'s own id', seen);
 seen.length = 0;
 d = dataFor([[/rpc\/evaluation_report_open$/, () => json([{ ...dbRow, body: JSON.stringify(STORED) }])]]);
@@ -219,7 +219,7 @@ for (const [label, route, call] of [
   ['a list over the bound (1001 rows)', () => json(Array.from({ length: 1001 }, () => ({ ...dbRow }))), (x) => x.savedReports(UID)],
   ['a list, database refusing', () => json({ message: 'nope' }, 400), (x) => x.savedReports(UID)],
 ]) {
-  const got2 = await badOf([[/rpc\/evaluation_report(s_of|_open)$/, route]], call);
+  const got2 = await badOf([[/rpc\/(saved_reports_listed|evaluation_report_open)$/, route]], call);
   ok(got2 === 'unavailable', '8e ' + label + ' is a fault (unavailable), never a report or an empty list', got2);
 }
 const subjectSeen = [];

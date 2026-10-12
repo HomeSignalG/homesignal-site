@@ -25,10 +25,10 @@ const count = (s, re) => (s.match(re) || []).length;
 // ---- 1. the setup script --------------------------------------------------------------------------------------------------------------------
 const RUN = stripSh(read('test/launch_gate_pg/run.sh'));
 const LAYERS = ['brokerage-account-spine', 'report-private-context', 'report-snapshot', 'evaluation-entitlement', 'saved-reports', 'report-share', 'report-share-delivery',
-  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'report-rate-limit', 'da-owner-safeguards', 'individual-agent-signup'];
+  'property-watch', 'payment-event-ledger', 'report-header', 'brokerage-billing', 'saved-reports-archive', 'report-rate-limit', 'da-owner-safeguards', 'individual-agent-signup'];
 const applied = (/for f in ([^;]+); do/.exec(RUN) || [, ''])[1].trim().split(/\s+/);
 ok(RUN.length > 400 && applied.length > 5, '1a the setup script is read and lists the layers it applies (positive control)', applied.length);
-ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the fourteen layers the product stands on, in the order production applied them (the billing file, the report rate limit, the owner safeguards, then the individual-agent signup, which the trial function status now reads)', applied.join(','));
+ok(JSON.stringify(applied) === JSON.stringify(LAYERS), '1b it applies exactly the fifteen layers the product stands on, in the order production applied them (the billing file, remove-from-my-list, the report rate limit, the owner safeguards, then the individual-agent signup, which the trial function status now reads)', applied.join(','));
 ok(/case "\$PGDATABASE" in \*disposable\*\)/.test(RUN) && /exit 1/.test(RUN) && /SUPABASE_DB_URL/.test(RUN) && /SUPABASE_ACCESS_TOKEN/.test(RUN) && /SUPABASE_WRITE_KEY/.test(RUN),
   '1c it refuses a database not named disposable and refuses to run when any Supabase credential is present');
 ok(LAYERS.every((f) => existsSync(join(ROOT, 'docs', f + '.sql'))) && existsSync(join(ROOT, 'test/evaluation_entitlement_pg/fixture.sql')), '1d every layer it applies, and the roles fixture, exist');
@@ -51,7 +51,7 @@ ok(WANT.every((f) => importsOf.includes(f)) && WANT.every((f) => existsSync(join
 ok(importsOf.every((f) => f.startsWith('../../supabase/functions/')), '2c and imports nothing else: no helper that could stand in for a layer');
 const rpcBlock = (/const RPC = \{([\s\S]*?)\n\};/.exec(RT) || [, ''])[1];
 const rpcNames = [...rpcBlock.matchAll(/^\s{2}(\w+): \(a\) =>/gm)].map((m) => m[1]);
-ok(rpcNames.length >= 10 && ['brokerage_report_issue', 'billing_usage', 'billing_event_apply', 'evaluation_usage', 'evaluation_reports_of', 'evaluation_report_open'].every((f) => rpcNames.includes(f)),
+ok(rpcNames.length >= 10 && ['brokerage_report_issue', 'billing_usage', 'billing_event_apply', 'evaluation_usage', 'saved_reports_listed', 'evaluation_report_open'].every((f) => rpcNames.includes(f)),
   '2d the database allowlist names the plan read, the ONE issue function, the webhook\'s one writer and the saved-report reads', rpcNames.join(','));
 ok(!rpcNames.includes('evaluation_report_issue') && !/public\.evaluation_report_issue\(/.test(rpcBlock),
   '2e and does NOT answer the free evaluation\'s own issue function: a handler calling it directly would be a second way to charge a report, and an unlisted call stops the run');

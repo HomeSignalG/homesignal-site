@@ -63,7 +63,7 @@ m('missing_body_accepted', " || typeof r.body !== 'string') {", ") {", [FNT], RE
 m('malformed_id_asked_of_the_database', "      if (!UUID.test(reportId)) return null;\n      const { data, error } = await rpc('evaluation_report_open'", "      const { data, error } = await rpc('evaluation_report_open'", [FNT], READS)
 m('database_error_called_not_found', "      if (error) throw new DataUnavailable('evaluation_report_open');", "      if (error) return null;", [FNT, PG], READS)
 m('list_unbounded', " || data.length > 1000) throw new DataUnavailable('shape');\n      return data.map(savedRow);", ") throw new DataUnavailable('shape');\n      return data.map(savedRow);", [FNT], READS)
-m('list_error_called_empty', "      if (error) throw new DataUnavailable('evaluation_reports_of');", "      if (error) return [];", [FNT], READS)
+m('list_error_called_empty', "      if (error) throw new DataUnavailable('saved_reports_listed');", "      if (error) return [];", [FNT], READS)
 
 # ---- the data layer: the address is shown only while the private layer keeps it ---------------------------------------------------------------
 m('purged_address_shown', "if (!c || c.state !== 'active') return null;", "if (!c) return null;", [FNT, PG], SUBJ)

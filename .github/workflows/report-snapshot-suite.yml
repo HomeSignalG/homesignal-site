@@ -131,6 +131,8 @@ on:
       - 'supabase/functions/development-activity-trial/**'
       - 'docs/report-share-delivery.sql'
       - 'docs/saved-reports.sql'
+      - 'docs/saved-reports-archive.sql'
+      - 'test/saved_reports_archive_pg/**'
       - 'test/report_share_delivery_pg/**'
       - 'test/report-share-delivery-structure.test.mjs'
       - 'supabase/functions/_shared/share-reads.ts'
@@ -220,6 +222,8 @@ on:
       - 'supabase/functions/development-activity-trial/**'
       - 'docs/report-share-delivery.sql'
       - 'docs/saved-reports.sql'
+      - 'docs/saved-reports-archive.sql'
+      - 'test/saved_reports_archive_pg/**'
       - 'test/report_share_delivery_pg/**'
       - 'test/report-share-delivery-structure.test.mjs'
       - 'supabase/functions/_shared/share-reads.ts'
@@ -394,6 +398,16 @@ jobs:
         run: |
           set -o pipefail
           bash test/trial_report_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/trial.log
+      - name: Remove from my list passes (people's lists are separate, exact sets, all or nothing, fail-closed, nothing refunded); two sessions racing never error; it applies twice and rolls back exactly; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_disposable
+        run: |
+          set -o pipefail
+          bash test/saved_reports_archive_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/saved-archive.log
       - name: A brokerage's member makes a 6-month link to its own stored report, lists and revokes it; a client who holds it reads the report; two sessions racing for the last place cannot both have it; every prohibited mutation is killed
         env:
           PGHOST: localhost

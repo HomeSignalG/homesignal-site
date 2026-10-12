@@ -1,0 +1,41 @@
+name: denton-launch-audit
+
+# READ-ONLY audit of the 32 Denton County ZIP pages (founder directive 2026-10-12).
+# Manual dispatch only. Writes nothing to production: every SQL statement is a SELECT inside
+# `begin read only` (scripts/denton-launch-audit.py refuses anything else), publisher calls are
+# GET/POST queries to public ArcGIS endpoints, page checks load public pages.
+# Results are in the job log between BEGIN/END markers (artifacts are unreadable from the sandbox).
+on:
+  workflow_dispatch:
+    inputs:
+      site_base:
+        description: "Origin to check (defaults to production)"
+        required: false
+        default: "https://homesignal.net"
+
+permissions:
+  contents: read
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Database + publisher audit (read only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/denton-launch-audit.py
+  pages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -D playwright@1.47.2 && npx playwright install --with-deps chromium
+      - name: Live pages, desktop and mobile
+        env:
+          SITE_BASE: ${{ github.event.inputs.site_base || 'https://homesignal.net' }}
+        run: node scripts/denton-launch-pages.mjs

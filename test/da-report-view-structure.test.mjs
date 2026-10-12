@@ -197,6 +197,8 @@ const C = code(SRC);
     // audit fix 10 (2026-10-07): the CI job that runs the mutation loops names them (and so the file they edit)
     '.github/workflows/da-report-mutants.yml',
     // 2026-10-10: the end-to-end proof that a serving-generation project reaches the report renders real rows through the view; its record names it
+    // 2026-10-12: the Saved reports remove-from-my-list browser suite opens a real saved report through the view, using the same report world
+    'test/saved-reports-archive.browser.test.mjs',
     'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md',
     // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
     'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md']);

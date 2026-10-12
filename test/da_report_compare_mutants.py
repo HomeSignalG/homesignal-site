@@ -118,7 +118,7 @@ m('late_answer_is_painted', "    if (!session || !session.user || session.user.i
 m('a_sixth_report_can_be_ticked', "c.disabled = !c.checked && n >= max;", "c.disabled = false;", PAGEOFF + [PB], PAGE)
 m('one_report_can_be_compared', "$('compare-go').disabled = comparing || n < min || n > max;", "$('compare-go').disabled = comparing || n > max;", PAGEOFF + [PB], PAGE)
 m('button_free_while_opening', "$('compare-go').disabled = comparing || n < min || n > max;", "$('compare-go').disabled = n < min || n > max;", PAGEOFF + [PB], PAGE)
-m('signing_out_keeps_the_comparison', "$('saved').hidden = true; hideCompare(); return; }", "$('saved').hidden = true; return; }", PAGEOFF + [PB], PAGE)
+m('signing_out_keeps_the_comparison', "$('saved').hidden = true; hideCompare(); return;", "$('saved').hidden = true; return;", PAGEOFF + [PB], PAGE)
 m('changing_the_choice_keeps_the_comparison', "cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });", "cb.addEventListener('change', function(){ syncCompare(); });", PAGEOFF + [PB], PAGE)
 m('compare_action_not_live_on_a_reopened_report', "live: canShare ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']", "live: canShare ? ['share', 'watch', 'pdf'] : ['share', 'pdf']", PAGEOFF + [PB], PAGE)  # re-anchored 2026-10-07 (audit fix 10)
 m('compare_action_not_live_on_a_new_report', "live: shareable ? ['share', 'watch', 'pdf', 'compare'] : ['share', 'pdf']", "live: shareable ? ['share', 'watch', 'pdf'] : ['share', 'pdf']", PAGEOFF + [PB], PAGE)  # re-anchored 2026-10-07 (audit fix 10)

@@ -37,9 +37,9 @@ const ADDR_OUTAGE = '99 Outage Rd, Austin TX';
 const ADDR_BADPOINT = '7 Bad Point Rd, Austin TX';
 const MATCH = { matchedAddress: '1 HI CIRCLE N, HORSESHOE BAY, TX, 78657', lat: 30.54, lng: -98.37, zip: '78657', city: 'HORSESHOE BAY', state: 'TX' };
 const STUB = {
-  projects: { '78657': PROJECTS_78657, '78702': [], '78601': [{ id: 'z1', name: 'Slow ZIP record', type: 'Commercial', status: 'Proposed' }] },
+  projects: { '78657': PROJECTS_78657, '75034': PROJECTS_78657, '78702': [], '78601': [{ id: 'z1', name: 'Slow ZIP record', type: 'Commercial', status: 'Proposed' }] },
   failProjects: ['78701'],
-  meta: { '78657': { zip: '78657', name: 'Horseshoe Bay', state: 'TX' }, '78601': { zip: '78601', name: 'Slowtown', state: 'TX' } },
+  meta: { '78657': { zip: '78657', name: 'Horseshoe Bay', state: 'TX' }, '75034': { zip: '75034', name: 'Frisco', state: 'TX' }, '78601': { zip: '78601', name: 'Slowtown', state: 'TX' } },
   delayRpc: { '78601': 1500 }, delayTable: { '78601': 1500 },
   geocode: {
     [ADDR_OK]: MATCH,
@@ -157,13 +157,13 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(JSON.stringify(h.enterpriseLinks) === JSON.stringify(['Enterprise', 'Enterprise overview', 'Explore Agent Reports →']), '1 the Enterprise message appears once (header item, its dropdown\'s overview entry + hero card; no bottom banner)', h.enterpriseLinks);
   ok(h.h1 === 'See what’s changing around a property.' && h.h1Lines === 2, '1 H1 copy, in two lines at 1440px', h);
   ok(h.searchRow && h.btnW === 136, '1 input and 136px Search button on one row', h);
-  ok(/home-report-example-desktop\.webp\?v=\d{8}\|true\|1400$/.test(h.img || ''), '1 the example-report preview loads (1400px wide)', h.img);
+  ok(/home-report-example-desktop\.webp\?v=\d{8}\|true\|1600$/.test(h.img || ''), '1 the example-report preview loads (1600px wide)', h.img);
 
   console.log('--- 2. the sample map is Map 1 in preview mode ---');
-  await waitForMap(page, /homesignalmap\.html\?embed=1&preview=1&zip=78657/);
+  await waitForMap(page, /homesignalmap\.html\?embed=1&preview=1&zip=75034/);
   await page.waitForTimeout(600);
   const f = await frameInfo(page);
-  ok(f.src === 'homesignalmap.html?embed=1&preview=1&zip=78657', '2 initial src is exactly the preview shape', f.src);
+  ok(f.src === 'homesignalmap.html?embed=1&preview=1&zip=75034', '2 initial src is exactly the preview shape', f.src);
   ok(f.loading === 'lazy' && f.tabindex === '-1' && f.title === 'Sample HomeSignal development map', '2 lazy, tabindex -1, meaningful title', f);
   ok(f.sample && f.pointer === 'none', '2 the sample is pointer-locked', f.pointer);
   ok(f.preview === true && f.embed === true, '2 the frame document is in embed + preview mode', f);
@@ -192,8 +192,8 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   ok(r.cards.every((c, i) => c.href === 'development.html?id=' + PROJECTS_78657[i].id && c.source === PROJECTS_78657[i].source_ref),
     '3 each card links its project page and its official record', r.cards);
   const s1 = await ui(page);
-  ok(s1.recordsHeading === 'Recent development records in 78657' && s1.seeAllHref === 'development.html?zip=78657' && s1.ctaHref === 'homesignalmap.html?zip=78657' && s1.cta === 'Explore this ZIP →',
-    '3 sample heading, "Explore this ZIP →" and "See all development →" point at 78657', s1);
+  ok(s1.recordsHeading === 'Recent development records in 75034' && s1.seeAllHref === 'development.html?zip=75034' && s1.ctaHref === 'homesignalmap.html?zip=75034' && s1.cta === 'Explore this ZIP →',
+    '3 sample heading, "Explore this ZIP →" and "See all development →" point at 75034', s1);
   ok(s1.viewZip === null, '10 the sample map did not write the tab\'s viewed ZIP', s1.viewZip);
   ok(s1.storage.length === 0 || s1.storage.every((k) => !/myZip|myCommunities|follows|activeProp/.test(k)), '3 loading the homepage saved no place', s1.storage);
 
@@ -208,7 +208,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
   await search(page, '78657');
   await page.waitForFunction(() => location.pathname === '/homesignalmap.html', null, { timeout: 8000 }).catch(() => {});
   ok(went === '?zip=78657', '4 a ZIP search opens homesignalmap.html?zip=78657', went);
-  ok(before.heading === 'See an example: 78657 · Horseshoe Bay, Texas' && before.sub === null && before.records, '4 before it, the homepage still shows only the static example', before);
+  ok(before.heading === 'See an example: 75034 · Frisco, Texas' && before.sub === null && before.records, '4 before it, the homepage still shows only the static example', before);
 
   ok(errors.length === 0, '1–4 no page or console errors across load and a search', errors);
   await ctx.close();
