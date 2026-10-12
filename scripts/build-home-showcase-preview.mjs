@@ -2,7 +2,7 @@
 //
 // WHAT IT IS: the REAL report for 3999 Touraine Dr, Frisco, TX 75034 (report snapshot eaf8c17c-..., generated 2026-10-12), rendered by the one presentation
 // authority lib/da-report-view.js over the report body stored in data/home-showcase/touraine-75034-report-body.json. That file is the stored body BYTE FOR BYTE
-// (md5 below equals md5(body) read from public.report_snapshot). This script invents no project, stage, date, distance or impact sentence, and decides no
+// (md5 below equals md5(body) read from the stored-report table). This script invents no project, stage, date, distance or impact sentence, and decides no
 // Type or impact: the view does. What it chooses by hand is ONLY which four rows to keep (one per kind) and the caption saying so.
 //
 //   node scripts/build-home-showcase-preview.mjs           writes the two webp files and the receipt (needs playwright + Python Pillow)
@@ -22,7 +22,7 @@ const RECEIPT = join(root, 'data/home-showcase/preview-receipt.json');
 const ASSET = { desktop: join(root, 'assets/home-report-example-desktop.webp'), mobile: join(root, 'assets/home-report-example-mobile.webp') };
 const CHECK = process.argv.includes('--check');
 
-export const FIXTURE_MD5 = '0cf8f5d321b5fbf4849f380362bb9ba4';   // md5(report_snapshot.body) for report eaf8c17c-1063-4b72-9467-dbf0e1a13909, read from production 2026-10-12
+export const FIXTURE_MD5 = '0cf8f5d321b5fbf4849f380362bb9ba4';   // md5 of the stored report body for report eaf8c17c-1063-4b72-9467-dbf0e1a13909, read from production 2026-10-12
 export const SUBJECT = '3999 Touraine Dr, Frisco, TX 75034';
 // One record per kind, so the four different considerations are visible. Chosen by project_id; the view still renders each row in full.
 export const KEEP = [

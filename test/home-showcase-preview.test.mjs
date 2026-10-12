@@ -15,7 +15,7 @@ let fails = 0;
 const ok = (c, n, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) { fails++; if (d !== undefined) console.log('   ' + String(d).slice(0, 400)); } };
 
 const bodyBuf = rd('data/home-showcase/touraine-75034-report-body.json');
-ok(createHash('md5').update(bodyBuf).digest('hex') === '0cf8f5d321b5fbf4849f380362bb9ba4', '1 the report body is byte-identical to the production snapshot (md5 of report_snapshot.body, report eaf8c17c)');
+ok(createHash('md5').update(bodyBuf).digest('hex') === '0cf8f5d321b5fbf4849f380362bb9ba4', '1 the report body is byte-identical to the production snapshot (md5 of the stored report body, report eaf8c17c)');
 const rep = JSON.parse(bodyBuf.toString('utf8'));
 const by = (k) => rep.projects.filter((p) => p.type.key === k).length;
 ok(rep.projects.length === 9 && rep.radius_mi === 0.5 && rep.zip === '75034' && rep.as_of === '2026-10-12', '2 nine official records, 0.5-mile radius, ZIP 75034, as of 2026-10-12');
