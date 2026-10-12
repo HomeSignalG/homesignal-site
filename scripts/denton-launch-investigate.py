@@ -63,7 +63,7 @@ dups = {k: v for k, v in by.items() if len(v) > 1}
 out["distinct_permit_ids"] = len(by); out["duplicated_permit_ids"] = len(dups)
 far = []
 for k, v in dups.items():
-    pts = [(r["x"], r["y"]) for r in v if r["x"] is not None]
+    pts = [(float(r["x"]), float(r["y"])) for r in v if r["x"] is not None and r["y"] is not None]
     d = max((hav(a[0], a[1], b[0], b[1]) for a in pts for b in pts), default=0)
     if d > 30: far.append((k, round(d)))
 out["duplicated_ids_with_features_>30m_apart"] = len(far)

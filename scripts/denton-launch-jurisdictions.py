@@ -30,7 +30,7 @@ def get(url, params=None):
             if a == 2: return {"_err": str(e)}
             time.sleep(3)
 ext = sql("select min(ST_XMin(g)) x0,min(ST_YMin(g)) y0,max(ST_XMax(g)) x1,max(ST_YMax(g)) y1 from (select geo.zip_membership_boundary(z) g from unnest(array[" + ",".join(f"'{z}'" for z in ZIPS) + "]) z) s")[0]
-svc = "https://tigerweb.ecm.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer"
+svc = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer"
 meta = get(svc + "?f=json"); layers = [l for l in meta.get("layers", []) if re.search(r"incorporated places|census designated places", l["name"], re.I)]
 out = {"extent": ext, "layers": [l["name"] for l in layers], "meta_err": meta.get("_err")}
 places = []
