@@ -13,7 +13,7 @@ on:
         required: false
         default: "https://homesignal.net"
       task:
-        description: "audit = full 32-ZIP audit; pages = live pages only; jurisdictions = which places each ZIP overlaps; investigate = duplicate permit ids, TxDOT line check, 76262 centroid marker"
+        description: "audit = full 32-ZIP audit; pages = live pages only; jurisdictions = which places each ZIP overlaps; coverage = ZIPs intersecting Denton County vs the 32-ZIP list; investigate = duplicate permit ids, TxDOT line check, 76262 centroid marker"
         required: false
         default: "audit"
 
@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   data:
-    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'pages' && github.event.inputs.task != 'jurisdictions' }}
+    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'pages' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -32,7 +32,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/denton-launch-audit.py
   pages:
-    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'jurisdictions' }}
+    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -65,3 +65,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/denton-launch-jurisdictions.py
+  coverage:
+    if: ${{ github.event.inputs.task == 'coverage' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: County coverage vs the 32-ZIP list (read only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/denton-launch-coverage.py
