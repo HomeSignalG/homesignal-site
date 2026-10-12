@@ -422,6 +422,16 @@ try {
   const items = hist.split('<li class="da-rv-hist">').slice(1);
   ok(items.length === 6 && items.map((i) => decode(/<h3 class="da-rv-title">([\s\S]*?)<\/h3>/.exec(i)[1])).join() === 'Menchaca Apartments,Lakeline Medical Office,Highway 99 Widening,Oak Grove Townhomes,Fire Station 12,Riverside Retail Center',
     '7e Change History lists the records that have a detected change or a publisher event, in the engine\'s order', items.length);
+  // ---- 7e2. each history card carries the SAME Map number the table gives that record, so records that share a name stay distinguishable ----
+  {
+    const numOf = (name) => (/Map (\d+)/.exec(rowNamed(html, name).cells[0]) || [])[1];
+    const cardNums = items.map((i) => ({ name: decode(/<h3 class="da-rv-title">([\s\S]*?)<\/h3>/.exec(i)[1]), map: (/<p class="da-rv-sub da-rv-histmap">Map (\d+)<\/p>/.exec(i) || [])[1] }));
+    ok(cardNums.every((c) => c.map === numOf(c.name)) && cardNums.filter((c) => c.map).length >= 4, '7e2 every history card shows the table\'s own Map number for its record (records with no number show none)', cardNums);
+    const twin = { rows: [row('t1', 0.2, FAM_A), row('t2', 0.3, FAM_A)], projects: [proj('t1', FAM_A, { name: 'Commercial 3501 WELLNESS WAY', status: 'Approved', date_kind: 'issued', submitted_at: '2026-07-22' }), proj('t2', FAM_A, { name: 'Commercial 3501 WELLNESS WAY', status: 'Approved', date_kind: 'issued', submitted_at: '2026-07-22' })], ledger: [], events: [], health: [] };
+    const ht = sec(view(await wire(twin)), 'history').html.split('<li class="da-rv-hist">').slice(1);
+    const tm = ht.map((i) => (/histmap">Map (\d+)</.exec(i) || [])[1]);
+    ok(ht.length === 2 && tm[0] && tm[1] && tm[0] !== tm[1], '7e3 two permits with the same name and date get two different Map numbers on their history cards, so they do not read as one record shown twice', tm);
+  }
   const men = items[0];
   ok(/<h4 class="da-rv-h4">Official record<\/h4><p class="da-rv-p">Issued · Sep 24, 2026<\/p>/.test(men) && /<h4 class="da-rv-h4">HomeSignal detected<\/h4>/.test(men), '7f a record with both has two separate, labelled lanes: Official record, and HomeSignal detected');
   ok(textOf(men).includes('Status changed · detected Sep 27, 2026') && textOf(men).includes('Publisher stage: Pending → Advertised') && textOf(men).includes('Status: Proposed → Approved'),
@@ -590,7 +600,7 @@ try {
   const one = Object.values(shapes).map((x) => [...x]);
   ok(Object.keys(shapes).sort().join() === 'approved,operating,proposed,unknown' && one.every((x) => x.length === 1) && new Set(one.map((x) => x[0])).size === 4, '14m the four lifecycle shapes on the page are four different drawings, one per key', Object.keys(shapes));
   ok(/stroke-dasharray/.test([...shapes.proposed][0]) && /fill="none"/.test([...shapes.proposed][0]) && !/fill="none"/.test([...shapes.approved][0]), '14n Proposed is a dashed hollow outline and Approved is solid');
-  const histLabel = (t) => decode((new RegExp('<h3 class="da-rv-title">' + t + '</h3><span class="da-rv-life[^>]*><svg[^>]*>.*?</svg><span class="da-rv-lifetext">([^<]*)</span>').exec(sec(html, 'history').html) || [, ''])[1]);
+  const histLabel = (t) => decode((new RegExp('<h3 class="da-rv-title">' + t + '</h3>(?:<p class="da-rv-sub da-rv-histmap">[^<]*</p>)?<span class="da-rv-life[^>]*><svg[^>]*>.*?</svg><span class="da-rv-lifetext">([^<]*)</span>').exec(sec(html, 'history').html) || [, ''])[1]);
   ok(histLabel('Menchaca Apartments') === 'Approved' && histLabel('Lakeline Medical Office') === 'Proposed' && !/coming/i.test(histLabel('Lakeline Medical Office')), '14o Change History states the engine\'s own lifecycle label: Proposed is never called "coming"');
   // the evidence entry's dates
   const evMen = evOf(html).find((e) => e.name === 'Menchaca Apartments').html;
