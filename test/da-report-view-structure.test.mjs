@@ -197,6 +197,8 @@ const C = code(SRC);
     // audit fix 10 (2026-10-07): the CI job that runs the mutation loops names them (and so the file they edit)
     '.github/workflows/da-report-mutants.yml',
     // 2026-10-10: the end-to-end proof that a serving-generation project reaches the report renders real rows through the view; its record names it
+    // 2026-10-12: the Saved reports remove-from-my-list browser suite opens a real saved report through the view, using the same report world
+    'test/saved-reports-archive.browser.test.mjs',
     'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');

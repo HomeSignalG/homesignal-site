@@ -60,7 +60,7 @@ m('confirmation_misnames_the_count', "$('saved-confirm-text').textContent = 'Rem
 m('confirm_sends_live_selection', "var ids = confirmIds; hideConfirm(); if (ids && ids.length) changeList(ids, true, 'bulk');", "var ids = manageIds(); hideConfirm(); if (ids && ids.length) changeList(ids, true, 'bulk');", PAGE)
 m('page_bound_wrong', "var MAX_PER_CALL = 100;", "var MAX_PER_CALL = 1000;", PAGE)
 m('stale_answer_painted', "      if (!session || !session.user || session.user.id !== forUser) { archiveBusy = false; return false; } // another person is signed in now: touch nothing", "", PAGE)
-m('normal_list_sends_a_flag', "archivedView ? { action: 'list', archived: true } : { action: 'list' }", "{ action: 'list', archived: archivedView }", PAGE)
+m('normal_list_sends_a_flag', "await post(REPORT_FN, { action: 'list' });\n    if (!session", "await post(REPORT_FN, { action: 'list', archived: false });\n    if (!session", PAGE)
 m('list_kept_in_the_browser', "  function hideToast(){ if (toastTimer)", "  function hideToast(){ try { localStorage.setItem('hs-saved', 'x'); } catch (e) {} if (toastTimer)", PAGE)
 m('compare_reads_every_input', "return Array.prototype.filter.call($('saved-list').querySelectorAll('.sv-pick input'), function(c){ return c.checked; })", "return Array.prototype.filter.call($('saved-list').querySelectorAll('input'), function(c){ return c.checked; })", PAGE)
 m('restore_button_archives', "changeList([rep.report_id], false, 'restore');", "changeList([rep.report_id], true, 'restore');", PAGE)

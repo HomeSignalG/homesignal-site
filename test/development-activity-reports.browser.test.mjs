@@ -655,8 +655,8 @@ for (const [label, w, count] of [
 // ---- 7. saved reports (build step 6): the brokerage's stored reports, opened as stored, never charged ---------------------------------
 const ADDRESS_2 = addressNo(2);
 const savedShown = (page) => page.$eval('#saved', (e) => !e.hidden);
-const rowsOf = (page) => page.$$eval('#saved-list button', (bs) => bs.map((b) => b.textContent.trim()));
-const waitRows = (page, k) => page.waitForFunction((c) => document.querySelectorAll('#saved-list button').length === c, k, { timeout: 8000 }).catch(() => {});
+const rowsOf = (page) => page.$$eval('#saved-list .sv-open', (bs) => bs.map((b) => b.textContent.trim()));
+const waitRows = (page, k) => page.waitForFunction((c) => document.querySelectorAll('#saved-list .sv-open').length === c, k, { timeout: 8000 }).catch(() => {});
 {
   const w = world();
   const { ctx, page, errors, reports, saved, foreign } = await open({ w });
@@ -672,7 +672,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   const lists = saved.filter((r) => r.body.action === 'list');
   ok(lists.length >= 1 && lists.every((r) => JSON.stringify(r.body) === '{"action":"list"}' && r.auth === 'Bearer user-token'), '7d a list request carries the action and the person\'s own token, nothing else', lists.map((r) => r.body));
   await page.evaluate(() => { document.getElementById('report').textContent = ''; });
-  await page.click('#saved-list li:nth-child(2) button');
+  await page.click('#saved-list li:nth-child(2) .sv-open');
   await page.waitForFunction(() => /Saved report 1/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   const opens = saved.filter((r) => r.body.action === 'open');
   ok(opens.length === 1 && opens[0].body.report_id === 'c0000000-0000-4000-8000-000000000001' && Object.keys(opens[0].body).sort().join() === 'action,report_id', '7e opening sends the action and the report id only (no address, no key)', opens.map((o) => o.body));
@@ -701,7 +701,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   const swap = await page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
-    return { hidden: document.getElementById('saved').hidden, rows: document.querySelectorAll('#saved-list button').length };
+    return { hidden: document.getElementById('saved').hidden, rows: document.querySelectorAll('#saved-list .sv-open').length };
   });
   ok(swap.hidden && swap.rows === 0, '7l a different person signing in takes the list away at once', swap);
   await ctx.close();
@@ -725,7 +725,7 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
   await waitCount(page, /free reports used/);
   await waitRows(page, 1);
   ok(w.used === 10 && await savedShown(page), '7n after the 10th report the card is still offered', w.used);
-  await page.click('#saved-list button');
+  await page.click('#saved-list .sv-open');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/Saved report 1/.test(await text(page, '#saved-status')) && reports.length === 1 && w.used === 10, '7o a complete trial reopens a saved report and uses nothing', await text(page, '#saved-status'));
   await ctx.close();
@@ -782,11 +782,11 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   await make(page, OTHER);
   ok(await whoLine(page) === 'Acme Realty · Pat Agent', '8d the next report\'s header carries the name', await whoLine(page));
   // reopening an earlier report: its header is the viewer\'s NOW, and its label is the one saved with it
-  await page.waitForFunction(() => document.querySelectorAll('#saved-list button').length === 2, null, { timeout: 8000 }).catch(() => {});
-  await page.click('#saved-list li:last-child button');
+  await page.waitForFunction(() => document.querySelectorAll('#saved-list .sv-open').length === 2, null, { timeout: 8000 }).catch(() => {});
+  await page.click('#saved-list li:last-child .sv-open');
   await page.waitForFunction(() => /Saved report 1/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(await whoLine(page) === 'Acme Realty · Pat Agent' && await labelLine(page) === 'Smith buyers', '8e a reopened report shows the viewer\'s header and the client label saved with it', [await whoLine(page), await labelLine(page)]);
-  await page.click('#saved-list li:first-child button');
+  await page.click('#saved-list li:first-child .sv-open');
   await page.waitForFunction(() => /Saved report 2/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(await whoLine(page) === 'Acme Realty · Pat Agent' && await labelLine(page) === null, '8e2 a report made with no client label shows none', await labelLine(page));
   ok((await page.evaluate(() => JSON.stringify(sessionStorage) + JSON.stringify(localStorage))).indexOf('Pat') === -1, '8f the name is kept in the sign-in account only: nothing about it is in the browser\'s storage');
@@ -1076,7 +1076,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.waitForFunction(() => /Report ready|Making/.test(document.getElementById('status').textContent), null, { timeout: 8000 }).catch(() => {});
   await page.waitForTimeout(300);
   ok((await page.$eval('#share-link', (e) => e.value)) === '' && (await page.$eval('#share-new', (e) => e.hidden)), '9u making the next report clears the previous report\'s link from the page');
-  await page.click('#saved-list li:last-child button');
+  await page.click('#saved-list li:last-child .sv-open');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(!(await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '', '9v opening a saved report shows its card with no link on it (a link is never shown a second time)');
   await makeLink(page);
@@ -1182,7 +1182,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   let allWords = true; const seen = {};
   for (const [outcome, re] of Object.entries(WORDS)) {
     w.watches[0].last_run_at = '2026-10-03T15:00:00+00:00'; w.watches[0].last_outcome = outcome;
-    await page.click('#saved-list button');
+    await page.click('#saved-list .sv-open');
     await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
     await waitWatch(page, /Last checked/);
     const t = await text(page, '#watch-state'); seen[outcome] = t;
@@ -1190,7 +1190,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   }
   ok(allWords, '10j each of the six outcomes the database can record is told in its own plain words, and a watch that has been checked no longer says its first check is coming', seen);
   w.watches[0].last_run_at = null; w.watches[0].last_outcome = null;
-  await page.click('#saved-list button');
+  await page.click('#saved-list .sv-open');
   await waitWatch(page, /first check runs/);
 
   // the report's own bar: Watch is live and takes the person to the card
@@ -1332,8 +1332,8 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 
 // ---- 11. build step 10: comparing saved reports side by side ------------------------------------------------------------------------------
 const compareHidden = (page) => page.$eval('#compare', (e) => e.hidden);
-const compareBoxes = (page) => page.$$eval('#saved-list input', (els) => els.map((e) => ({ checked: e.checked, disabled: e.disabled })));
-const waitBoxes = (page, n) => page.waitForFunction((k) => document.querySelectorAll('#saved-list input').length === k, n, { timeout: 8000 }).catch(() => {});
+const compareBoxes = (page) => page.$$eval('#saved-list .sv-pick input', (els) => els.map((e) => ({ checked: e.checked, disabled: e.disabled })));
+const waitBoxes = (page, n) => page.waitForFunction((k) => document.querySelectorAll('#saved-list .sv-pick input').length === k, n, { timeout: 8000 }).catch(() => {});
 const waitCompared = (page) => page.waitForFunction(() => document.querySelector('#compare-result .da-cmp') !== null || /could not|cannot|Choose|not made over|Sign in/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
 const tableOf = (page) => page.evaluate(() => {
   const rows = [...document.querySelectorAll('#compare-result .da-cmp-table tbody tr')].filter((tr) => tr.querySelector('.da-cmp-rowh'));
@@ -1369,15 +1369,15 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2); await make(page, A3);
   await waitBoxes(page, 3);
-  const labels = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
+  const labels = await page.$$eval('#saved-list li .sv-open', (els) => els.map((e) => e.textContent.trim()));
   ok(labels.length === 3 && /^Report 3 · 3 Third Ave/.test(labels[0]) && /^Report 1 · 1 First Ave/.test(labels[2]), '11d the card lists the saved reports, newest first, each as "Report N · address · date"', labels);
   ok((await compareBoxes(page)).every((b) => !b.checked && !b.disabled) && (await page.$eval('#compare-go', (b) => b.disabled)) && /Choose 2 to 5 reports\./.test(await text(page, '#compare-count')), '11e nothing is ticked at first: the button is off and the count says to choose 2 to 5');
-  await page.check('#saved-list li:nth-child(1) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input');
   ok((await page.$eval('#compare-go', (b) => b.disabled)) && /1 report chosen\./.test(await text(page, '#compare-count')), '11f one chosen is not enough');
-  await page.check('#saved-list li:nth-child(3) input');
+  await page.check('#saved-list li:nth-child(3) .sv-pick input');
   ok(!(await page.$eval('#compare-go', (b) => b.disabled)) && /2 reports chosen\./.test(await text(page, '#compare-count')), '11g two chosen turns the button on');
   const usedBefore = w.used, madeBefore = reports.length, listsBefore = saved.length;
-  await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   const opens = saved.slice(listsBefore).filter((c) => c.body && c.body.action === 'open');
@@ -1390,7 +1390,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   // the numbers equal what each report shows when it is opened on its own (same report rules, in the real page)
   const own = [];
   for (const num of [3, 2, 1]) {
-    await page.click('#saved-list li:nth-child(' + (4 - num) + ') button');
+    await page.click('#saved-list li:nth-child(' + (4 - num) + ') .sv-open');
     await page.waitForFunction((k) => new RegExp('Saved report ' + k).test(document.getElementById('saved-status').textContent), num, { timeout: 8000 }).catch(() => {});
     own.push(await page.evaluate(() => { const t = document.getElementById('report').textContent.replace(/\s+/g, ' '); const f = /As of [^:]*: ([^.]*)\./.exec(t); if (!f) return null; const g = (re) => { const x = re.exec(f[1]); return x ? x[1] : '0'; }; return [g(/(\d+) permitted \/ under construction/), g(/(\d+) approved \/ coming/), g(/(\d+) proposed \/ under review/)]; }));
   }
@@ -1407,8 +1407,8 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  const listed = await page.$$eval('#saved-list li button', (els) => els.map((e) => e.textContent.trim()));
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  const listed = await page.$$eval('#saved-list li .sv-open', (els) => els.map((e) => e.textContent.trim()));
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   const t2 = await tableOf(page);
@@ -1431,7 +1431,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCompared(page);
   let t = await tableOf(page);
   ok(t.heads.length === 5 && t.rows.length === 15 && t.rows.every((r) => r.cells.length === 5), '11p five reports compare: five columns and fifteen rows (the thirteen plus the Decided row, which shows when any report has a decided application, plus the Civic & public Type row)', [t.heads, t.rows.length]);
-  await page.uncheck('#saved-list li:nth-child(1) input');
+  await page.uncheck('#saved-list li:nth-child(1) .sv-pick input');
   ok((await page.$$('#compare-result .da-cmp')).length === 0 && (await text(page, '#compare-status')) === '' && !(await compareBoxes(page))[5].disabled, '11q changing the choice clears the comparison, so it never sits beside a different choice, and frees the sixth box');
   await ctx.close();
 }
@@ -1444,7 +1444,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = clone(WNONE_REPORT);                   // report 1 is stored as the engine saves a report with no data ingested
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   const t = await tableOf(page);
@@ -1499,7 +1499,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   ok((await page.$$('#compare-result .da-cmp')).length === 1, '11x a comparison is on screen');
@@ -1515,7 +1515,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   const swap = await page.evaluate(() => {
@@ -1533,7 +1533,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   w.holdNextOpen = true;
   await page.click('#compare-go');
   await page.waitForFunction(() => /Opening 2 saved reports/.test(document.getElementById('compare-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -1567,7 +1567,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(d.page, /free reports used/);
   await make(d.page, A1); await make(d.page, A2);
   await waitBoxes(d.page, 2);
-  await d.page.check('#saved-list li:nth-child(1) input'); await d.page.check('#saved-list li:nth-child(2) input');
+  await d.page.check('#saved-list li:nth-child(1) .sv-pick input'); await d.page.check('#saved-list li:nth-child(2) .sv-pick input');
   await d.page.click('#compare-go');
   await waitCompared(d.page);
   const desk = await d.page.evaluate(() => ({ tag: getComputedStyle(document.querySelector('#compare-result .da-cmp-table tbody td .da-cmp-r')).display, tableDisplay: getComputedStyle(document.querySelector('#compare-result .da-cmp-table')).display, wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }));
@@ -1582,7 +1582,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.click('#saved-list button');
+  await page.click('#saved-list .sv-open');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   const btn = await page.$$eval('.da-rv-act', (els) => els.map((e) => ({ act: e.getAttribute('data-da-action'), live: e.classList.contains('da-rv-act--live') })));
   ok(/Saved report/.test(await text(page, '#saved-status')) && btn.some((b) => b.act === 'compare' && b.live), '11z6 on a REOPENED saved report the "Compare property" button is live too', btn);
@@ -1612,7 +1612,7 @@ const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // th
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   const keys = [...w.made.keys()];
   w.made.get(keys[0]).report = { not: 'a report' };
   await page.click('#compare-go');
@@ -2146,11 +2146,11 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   await page.click('#account > summary');
   // the one library: every row opens a report and holds its own checkbox, and there is no second list
   ok((await page.$$('#saved-list li')).length === 3 && (await page.$$('#saved-list li input[type=checkbox]')).length === 3 && (await page.$$('#compare-list')).length === 0, 'L2h Saved reports is one list: three rows, each with its own checkbox, and no second list');
-  await page.check('#saved-list li:nth-child(1) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input');
   await page.fill('#saved-search', 'second');
   const f1 = await page.$$eval('#saved-list li', (els) => els.map((e) => !e.hidden));
   ok(f1.filter(Boolean).length === 1 && /Second/.test(await page.$eval('#saved-list li:not([hidden]) button', (b) => b.textContent)), 'L2i searching narrows the list to the matching report', f1);
-  ok(/1 report chosen\./.test(await text(page, '#compare-count')) && (await page.$eval('#saved-list li:nth-child(1) input', (e) => e.checked)), 'L2j a ticked report that the search hides stays ticked and still counts');
+  ok(/1 report chosen\./.test(await text(page, '#compare-count')) && (await page.$eval('#saved-list li:nth-child(1) .sv-pick input', (e) => e.checked)), 'L2j a ticked report that the search hides stays ticked and still counts');
   await page.fill('#saved-search', 'no such street');
   ok(await drawn(page, '#saved-nomatch') && (await page.$$eval('#saved-list li', (els) => els.every((e) => e.hidden))), 'L2k a search with no match says so');
   await page.fill('#saved-search', '');
@@ -2163,11 +2163,11 @@ for (const [width, height] of [[1280, 900], [768, 1024], [390, 844]]) {
   await waitCount(page, /free reports used/);
   await make(page, A1); await make(page, A2);
   await waitBoxes(page, 2);
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   await page.click('#compare-go');
   await waitCompared(page);
   ok(await noSideways(page), `L3 at ${width}px wide nothing scrolls sideways (report, library, comparison and account section all drawn)`, await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]));
-  const small = await page.$$eval('#rail-actions .da-rv-act, #go, #saved-list li button, #saved-list li .sv-pick', (els) => els.filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { h: r.height, w: r.width, t: e.tagName }; }).filter((x) => x.h < 24 || x.w < 18));
+  const small = await page.$$eval('#rail-actions .da-rv-act, #go, #saved-list li .sv-open, #saved-list li .sv-pick', (els) => els.filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return { h: r.height, w: r.width, t: e.tagName }; }).filter((x) => x.h < 24 || x.w < 18));
   ok(small.length === 0, `L3b at ${width}px the action buttons, Generate report and every library row can be touched (none smaller than 24px)`, small);
   await shot(page, `L3-${width}`);
   await ctx.close();
@@ -2230,14 +2230,14 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   ok((await page.$$eval('#saved-list .sv-pick', (els) => els.every((e) => e.getClientRects().length === 0))) && !(await drawn(page, '#compare-go')), 'L5g normally the saved reports show no checkboxes and no Compare button');
   await page.click('#compare-mode');
   ok((await page.$$eval('#saved-list li:not([hidden]) .sv-pick', (els) => els.every((e) => e.getClientRects().length > 0))) && await drawn(page, '#compare-go') && /Cancel comparing/.test(await text(page, '#compare-mode')), 'L5h Compare reports shows a checkbox on every listed report and the Compare button');
-  await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input');
+  await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input');
   ok(!(await page.$eval('#compare-go', (b) => b.disabled)) && /2 reports chosen/.test(await text(page, '#compare-count')), 'L5i two chosen turns Compare selected on');
   for (let i = 3; i <= 5; i++) await page.check('#saved-list li:nth-child(' + i + ') input');
-  ok(await page.$eval('#saved-list li:nth-child(6) input', (e) => e.disabled), 'L5j five is the most that can be chosen');
+  ok(await page.$eval('#saved-list li:nth-child(6) .sv-pick input', (e) => e.disabled), 'L5j five is the most that can be chosen');
   await page.click('#compare-mode');
   ok((await compareBoxes(page)).every((b) => !b.checked) && !(await drawn(page, '#compare-go')) && /Compare reports/.test(await text(page, '#compare-mode')), 'L5k Cancel comparing clears the choice and puts the list back to plain links');
   // the comparison itself opens on the right, under the report, not in the rail
-  await page.click('#compare-mode'); await page.check('#saved-list li:nth-child(1) input'); await page.check('#saved-list li:nth-child(2) input'); await page.click('#compare-go'); await waitCompared(page);
+  await page.click('#compare-mode'); await page.check('#saved-list li:nth-child(1) .sv-pick input'); await page.check('#saved-list li:nth-child(2) .sv-pick input'); await page.click('#compare-go'); await waitCompared(page);
   ok(await page.$eval('#compare-result', (e) => !e.closest('#rail') && !!e.closest('#current') && e.textContent.trim().length > 0), 'L5l the comparison appears on the right with the report, not in the rail');
   // the rail never scrolls on its own; it stays in view only when the whole rail fits the window, and otherwise scrolls away with the page
   const rl = await page.evaluate(() => { const r = document.getElementById('rail'), c = getComputedStyle(r); return { fits: r.classList.contains('rail-fits'), h: r.offsetHeight, ih: innerHeight, pos: c.position, ov: c.overflowY, mh: c.maxHeight }; });
@@ -2344,7 +2344,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
     const v = await page.evaluate(() => {
       const shown = (e) => { const s = getComputedStyle(e), r = e.getBoundingClientRect(); return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0; };
       return { mode: shown(document.getElementById('compare-mode')), card: shown(document.getElementById('compare')), go: shown(document.getElementById('compare-go')),
-        count: shown(document.getElementById('compare-count')), picks: document.querySelectorAll('#saved-list .sv-pick, #saved-list input').length, rowKids: [...document.querySelectorAll('#saved-list li')].map((l) => l.children.length),
+        count: shown(document.getElementById('compare-count')), picks: document.querySelectorAll('#saved-list .sv-pick, #saved-list .sv-pick input').length, rowKids: [...document.querySelectorAll('#saved-list li')].map((l) => [...l.children].filter((c) => !c.classList.contains('sv-kebab')).length),
         acts: [...document.querySelectorAll('[data-da-action]')].map((b) => b.getAttribute('data-da-action')), soon: document.querySelectorAll('.da-rv-soon, .da-rv-act[aria-disabled="true"]').length,
         words: /compar/i.test(document.body.innerText), savedRail: document.getElementById('rail').innerText };
     });
@@ -2357,7 +2357,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
     'N2 the current report offers Share with Client, Watch Property and Download PDF, and nothing else');
   // the saved list is still a plain list of clickable rows and reopens a report without using one
   const before = (await page.evaluate(() => document.getElementById('trial-count').textContent));
-  await page.click('#saved-list li:nth-child(2) button');
+  await page.click('#saved-list li:nth-child(2) .sv-open');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/Saved report/.test(await text(page, '#saved-status')) && (await page.$('#report .da-rv')) !== null && (await text(page, '#trial-count')) === before && before === used,
     'N3 a saved report still reopens from its row, and reopening it does not change the report count');

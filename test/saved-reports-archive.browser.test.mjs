@@ -59,10 +59,10 @@ window.supabase = { createClient: function () { return { auth: {
 
 /** The world behind the functions: the stored reports of two brokerages and each person's own archive set. */
 async function makeWorld({ reportsA = 8 } = {}) {
-  const w = { reports: [], archive: new Set(), revoked: new Set(), calls: [], fail: null, hold: null, expireToken: new Set(), keySeq: 0, issued: 0 };
+  const w = { reports: [], archive: new Set(), vanished: new Set(), revoked: new Set(), calls: [], fail: null, hold: null, expireToken: new Set(), keySeq: 0, issued: 0 };
   const key = (u, id) => u + '|' + id;
   const brokerageOf = (u) => (w.revoked.has(u) ? null : BROKERAGE[u] || null);
-  const visible = (u) => { const b = brokerageOf(u); return b ? w.reports.filter((r) => r.brokerage === b) : []; };
+  const visible = (u) => { const b = brokerageOf(u); return b ? w.reports.filter((r) => r.brokerage === b && !w.vanished.has(r.id)) : []; };
   const usedOf = (u) => visible(u).length;
   const state = (u) => (brokerageOf(u) ? { status: usedOf(u) >= 10 ? 'complete' : 'active', credits_used: usedOf(u), credits_remaining: 10 - usedOf(u), expired: false } : null);
   const gate = { authenticate: async (t) => (w.expireToken.has(t) ? null : TOKENS[t] || null), isAdmin: async () => false };
@@ -308,6 +308,7 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
   ok(/^Remove 1 report from Saved Reports\? You can restore it/.test(await text(page, '#saved-confirm-text')), '5c the confirmation says "1 report", singular');
   await page.fill('#saved-search', '');
   ok(await page.$eval('#saved-confirm', (e) => e.hidden), '5d changing what is shown withdraws a pending confirmation');
+  ok((await text(page, '#saved-count')) === '1 selected', '5d2 and the five reports the search hid were let go: clearing the search does not bring their ticks back (1 selected, not 6)', await text(page, '#saved-count'));
   await page.click('#saved-cancel');
   ok(await page.$eval('#saved-bulk', (e) => e.hidden) && archiveCalls(d).length === 0 && w.archive.size === 0 && (await numbers(page)).join() === '8,7,6,5,4,3', '5e Cancel leaves Manage mode and changes nothing');
   await page.click('#saved-more');
@@ -379,6 +380,18 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
   ok(await a.page.$eval('#auth-overlay', (e) => getComputedStyle(e).display !== 'none') && !w.archive.has(U1 + '|' + idOf(w, 'A', 5)), '7e an expired session asks the person to sign in, and nothing is stored');
   for (const x of [a, b, c]) await x.ctx.close();
 }
+{
+  const w = await makeWorld();
+  const d = await device(w);
+  const { page } = d;
+  w.vanished.add(idOf(w, 'A', 5));
+  await openMenu(page, 5); await page.click('#saved-menu-remove');
+  await page.waitForFunction(() => /no longer available to you/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 });
+  await settle(page, 400);
+  ok(/no longer available to you/.test(await status(page)) && (await numbers(page)).join() === '8,7,6,4,3,2' && !(await toast(page)).shown,
+    '7f a report that is no longer the person\'s (404): the list is read again WITHOUT it, the words stay on screen, and no "Removed" notice appears', { s: await status(page), n: await numbers(page) });
+  await d.ctx.close();
+}
 
 // ---- 8. shares and watches are keyed on the report, not the list: the page calls no share or watch function while removing ----------------------
 {
@@ -417,6 +430,11 @@ const archiveCalls = (d) => d.saved.filter((b) => b.action === 'archive' || b.ac
     return { inView: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth, topIsItem: !!top && top.id === 'saved-menu-remove' };
   });
   ok(geo.inView && geo.topIsItem, '9e a menu opened on the last row of the scrolling list is fully visible and on top (not clipped by the list)', geo);
+  ok(await page.evaluate(() => { document.getElementById('saved-list').dispatchEvent(new Event('scroll')); return !document.getElementById('saved-menu').hidden; }),
+    '9e2 a scroll event that did not move the button (focus landing on the menu fires one) leaves the menu open');
+  await page.evaluate(() => { const l = document.getElementById('saved-list'); l.scrollTop = Math.max(0, l.scrollTop - 40); });
+  await page.waitForFunction(() => document.getElementById('saved-menu').hidden, null, { timeout: 3000 }).catch(() => {});
+  ok(await page.$eval('#saved-menu', (m) => m.hidden), '9e3 and when the list really scrolls the button away, the menu closes with it');
   await page.keyboard.press('Escape');
   const lay = async () => page.evaluate(() => {
     const list = document.getElementById('saved-list').getBoundingClientRect();

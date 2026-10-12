@@ -116,7 +116,7 @@ const SAVED_SCRIPT = PAGE.slice(PAGE.indexOf('var SAVED_RECENT = 6'), PAGE.index
 ok(SAVED_SCRIPT.length > 3000 && !/localStorage|sessionStorage|indexedDB|document\.cookie/.test(SAVED_SCRIPT), '5h nothing about a person\'s list is kept in the browser: the server is the only memory');
 ok(!/\b(confirm|alert|prompt)\(/.test(SAVED_SCRIPT) && !/window\.(confirm|alert|prompt)/.test(SAVED_SCRIPT), '5i no browser dialog: the confirmation is drawn in the card');
 ok(!/\u{1F5D1}|trash|bin-icon|class="[^"]*\b(del|delete)\b/iu.test(SAVED_SCRIPT + PAGE_RAW.slice(PAGE_RAW.indexOf('id="saved"'), PAGE_RAW.indexOf('id="compare"'))), '5j no trash icon and no delete control on a row');
-ok(/post\(REPORT_FN, archivedView \? \{ action: 'list', archived: true \} : \{ action: 'list' \}\)/.test(PAGE), '5k the normal list is asked for exactly as before ({ action: "list" }); only the archived list sends `archived`');
+ok(/archivedView \? await post\(REPORT_FN, \{ action: 'list', archived: true \}\) : await post\(REPORT_FN, \{ action: 'list' \}\)/.test(PAGE), '5k the normal list is asked for exactly as before ({ action: "list" }); only the archived list sends `archived`');
 const HTML = PAGE_RAW.slice(PAGE_RAW.indexOf('<section class="card" id="saved"'), PAGE_RAW.indexOf('</section>', PAGE_RAW.indexOf('<section class="card" id="saved"')));
 ok(/>Manage<\/button>/.test(HTML) && />View archived<\/button>/.test(HTML) && />Remove from Saved Reports<\/button>/.test(HTML) && /id="saved-undo"[^>]*>Undo</.test(HTML) && /Select all shown</.test(HTML) && />Remove selected<\/button>/.test(HTML) && />Cancel<\/button>/.test(HTML),
   '5l the approved controls and words are on the page: Manage, View archived, Remove from Saved Reports, Undo, Select all shown, Remove selected, Cancel');

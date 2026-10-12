@@ -216,6 +216,10 @@ for (const [label, route, cls] of [
   const t = await attempt([[/rpc\/saved_reports_archive_set$/, route]], (x) => x.archiveReports(UID, [R1, R2], true));
   ok(t instanceof cls, '7e ' + label + ' is ' + cls.name, t && t.constructor.name);
 }
+for (const [label, route] of [['the database refusing', () => json({ message: 'nope' }, 400)], ['the database down', () => json({ message: 'down' }, 503)], ['an answer that is not a list', () => json({ rows: [] })]]) {
+  const t = await attempt([[/rpc\/saved_reports_listed$/, route]], (x) => x.savedReports(UID, false));
+  ok(t instanceof DataUnavailable, '7g the list with ' + label + ' is a fault, never an empty list (an empty list would read as "you have no reports")', t && t.constructor.name);
+}
 ok(!/saved_reports/.test(JSON.stringify(H.capability())) === false && /archive/.test(H.capability().method) && /restore/.test(H.capability().method) && !/brokerage_|evaluation_|saved_reports_/.test(JSON.stringify(H.capability())),
   '7f the capability names archive and restore, and no database function');
 

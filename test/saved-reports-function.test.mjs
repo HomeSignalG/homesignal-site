@@ -219,7 +219,7 @@ for (const [label, route, call] of [
   ['a list over the bound (1001 rows)', () => json(Array.from({ length: 1001 }, () => ({ ...dbRow }))), (x) => x.savedReports(UID)],
   ['a list, database refusing', () => json({ message: 'nope' }, 400), (x) => x.savedReports(UID)],
 ]) {
-  const got2 = await badOf([[/rpc\/evaluation_report(s_of|_open)$/, route]], call);
+  const got2 = await badOf([[/rpc\/(saved_reports_listed|evaluation_report_open)$/, route]], call);
   ok(got2 === 'unavailable', '8e ' + label + ' is a fault (unavailable), never a report or an empty list', got2);
 }
 const subjectSeen = [];

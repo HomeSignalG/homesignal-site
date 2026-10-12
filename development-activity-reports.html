@@ -1157,10 +1157,11 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   }
   async function refreshSaved(keepMessage){
     if (!session || !session.user) return;
-    var forUser = session.user.id, view = savedView, archivedView = view === 'archived';
+    var forUser = session.user.id;
+    var view = savedView, archivedView = view === 'archived';
     savedFresh = true; // one read at a time; a failure below lets the next call try again
     // the normal list is asked for EXACTLY as it always was, so the function that is live today still answers it while this page is the newer of the two
-    var r = await post(REPORT_FN, archivedView ? { action: 'list', archived: true } : { action: 'list' });
+    var r = archivedView ? await post(REPORT_FN, { action: 'list', archived: true }) : await post(REPORT_FN, { action: 'list' });
     if (!session || !session.user || session.user.id !== forUser || savedView !== view) return; // the person or the view changed while the answer was on its way
     var body = r.body || {};
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; $('saved-list').textContent = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; $('saved-manage').hidden = true; $('saved-archived-toggle').hidden = true; setManage(false); savedSay(typeof keepMessage === 'string' ? keepMessage : savedMessage(r.status), true); paintCompare(null); return; }
@@ -1188,13 +1189,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       b.textContent = text; b.title = text; // one line in the rail; the whole line on hover
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
       if (pick) li.appendChild(pick);
-      if (!archivedView) {
-        // Manage mode: a checkbox per row (drawn only while managing); it never opens the report
-        var mp = document.createElement('label'), mc = document.createElement('input');
-        mp.className = 'sv-mpick'; mc.type = 'checkbox'; mc.value = rep.report_id; mc.setAttribute('aria-label', 'Select report ' + rep.number + ' to remove');
-        mc.addEventListener('change', function(){ hideConfirm(); updateBulk(); });
-        mp.appendChild(mc); li.appendChild(mp);
-      }
+      li.setAttribute('data-number', String(rep.number));
+      // Manage mode: a checkbox per row, present ONLY while managing (addPick); it never opens the report
       li.appendChild(b);
       if (archivedView) {
         var rb = document.createElement('button');
@@ -1209,6 +1205,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         kb.addEventListener('keydown', function(e){ if (e.key === 'ArrowDown') { e.preventDefault(); if (menuFor !== rep.report_id) toggleMenu(kb, rep); } });
         li.appendChild(kb);
       }
+      if (!archivedView && savedManage) addPick(li);
       list.appendChild(li);
     });
     $('saved-tools').hidden = offered.length === 0;
@@ -1218,17 +1215,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (offered.length) { if (!keepMessage) savedSay('', false); }
     else if (keepMessage) { /* the words about what just failed stay on screen */ }
     else if (archivedView) savedSay('No archived reports.', false);
-    else emptyActiveMessage(forUser);
+    else savedSay('No reports saved yet. A report is saved when it uses one of your brokerage\u2019s reports. Reports you remove are kept under View archived.', false);
     filterSaved();
     paintCompare(archivedView ? [] : offered);
-  }
-  /** The active list is empty: a person who has not made a report is told how one is saved; a person whose reports are all archived is told where they are. */
-  async function emptyActiveMessage(forUser){
-    savedSay('No reports saved yet. A report is saved when it uses one of your brokerage’s reports.', false);
-    var r = await post(REPORT_FN, { action: 'list', archived: true });
-    if (!session || !session.user || session.user.id !== forUser || savedView !== 'active' || $('saved-list').children.length) return;
-    var b = r.body || {};
-    if (r.status === 200 && b.status === 'OK' && Array.isArray(b.reports) && b.reports.length) savedSay('Every saved report is archived. Choose View archived to restore one.', false);
   }
   /** One saved report, in words: the same line the list has always shown. The search reads this text and nothing else. */
   function savedRowText(rep){
@@ -1282,6 +1271,14 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('saved-toast-text').textContent = text; $('saved-undo').hidden = !undo; $('saved-toast').hidden = false;
     toastTimer = setTimeout(function(){ hideToast(); undoIds = null; }, 12000);
   }
+  /** The Manage checkbox of one row, placed before its report button. Rows have none outside Manage mode. */
+  function addPick(li){
+    if (li.querySelector('.sv-mpick')) return;
+    var mp = document.createElement('label'), mc = document.createElement('input');
+    mp.className = 'sv-mpick'; mc.type = 'checkbox'; mc.value = li.getAttribute('data-id'); mc.setAttribute('aria-label', 'Select report ' + li.getAttribute('data-number') + ' to remove');
+    mc.addEventListener('change', function(){ hideConfirm(); updateBulk(); });
+    mp.appendChild(mc); li.insertBefore(mp, li.querySelector('.sv-open'));
+  }
   function hideConfirm(){ confirmIds = null; var c = $('saved-confirm'); if (c) c.hidden = true; }
   function manageIds(){
     return Array.prototype.filter.call($('saved-list').querySelectorAll('.sv-mpick input'), function(c){ return c.checked && !c.closest('li').hidden; }).map(function(c){ return c.value; });
@@ -1300,8 +1297,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var was = savedManage; savedManage = on;
     $('saved').classList.toggle('mng-on', on); $('saved-bulk').hidden = !on;
     var mb = $('saved-manage'); mb.setAttribute('aria-pressed', on ? 'true' : 'false');
-    if (!on) { Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-mpick input'), function(c){ c.checked = false; }); hideConfirm(); }
-    else closeMenu(false);
+    if (!on) { Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-mpick'), function(l){ l.remove(); }); hideConfirm(); }
+    else { closeMenu(false); Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-row'), addPick); }
     updateBulk();
     if (on && !was) $('saved-all').focus();
   }
@@ -1338,7 +1335,12 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (archive) { undoIds = ids.slice(); showToast(many ? 'Removed ' + what + ' from Saved Reports.' : 'Removed from Saved Reports.', true); }
     else { undoIds = null; showToast(many ? 'Restored ' + what + ' to Saved Reports.' : 'Restored to Saved Reports.', false); }
     if (how === 'bulk') setManage(false);
-    if (!$('saved-list').children.length) { savedFresh = false; refreshSaved(); } else filterSaved();
+    if (!$('saved-list').children.length) {
+      // the person has just emptied their list: say where the reports went (known here, so no extra request is made for it)
+      var emptied = archive ? 'Every saved report is archived. Choose View archived to restore one.' : '';
+      if (emptied) savedSay(emptied, false);
+      savedFresh = false; refreshSaved(emptied || undefined);
+    } else filterSaved();
     if (how !== 'undo') $('saved-list').focus();
     return true;
   }
