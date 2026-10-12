@@ -44,7 +44,7 @@ const r = spawnSync('node', [join(root, 'scripts/build-home-showcase-preview.mjs
 ok(r.status === 0 && /PASS/.test(r.stdout), '15 --check re-renders the real view and reproduces the committed receipt text, kept rows and asset sizes', r.stdout + r.stderr);
 
 // 16-18 STALE OR MISMATCHED ASSETS CANNOT PASS. Each case damages one committed file, runs --check, and restores it in a finally block.
-const checkRun = () => spawnSync('node', [join(root, 'scripts/build-home-showcase-preview.mjs'), '--check'], { encoding: 'utf8', cwd: root, timeout: 180000 });
+const checkRun = (...extra) => spawnSync('node', [join(root, 'scripts/build-home-showcase-preview.mjs'), '--check', ...extra], { encoding: 'utf8', cwd: root, timeout: 180000 });
 const withDamage = (files, damage, fn) => {
   const keep = files.map((f) => [f, readFileSync(join(root, f))]);
   try { damage(); return fn(); } finally { for (const [f, b] of keep) writeFileSync(join(root, f), b); }
@@ -57,8 +57,10 @@ r2 = withDamage([DESK, REC], () => {
   spawnSync('python3', ['-c', 'import sys\nfrom PIL import Image,ImageDraw\nim=Image.open(sys.argv[1]).convert("RGB");d=ImageDraw.Draw(im);d.rectangle((0,im.height//3,im.width,im.height*2//3),fill="black");im.save(sys.argv[1],"WEBP",quality=90)', join(root, DESK)]);
   const rc = JSON.parse(rd(REC).toString('utf8')); const im = readFileSync(join(root, DESK));
   rc.frames.desktop.asset_sha256 = createHash('sha256').update(im).digest('hex'); writeFileSync(join(root, REC), JSON.stringify(rc, null, 1) + '\n');
-}, checkRun);
-ok(r2.status !== 0 && /differs from a fresh render|differ/.test(r2.stdout), '17 a same-size image that does not match a fresh render fails --check even when the receipt is made consistent with it', r2.stdout);
+}, () => checkRun('--strict-pixels'));
+ok(r2.status !== 0 && /committed image differs from a fresh render/.test(r2.stdout), '17 with --strict-pixels (same fonts), a same-size image that does not match a fresh render fails even when the receipt is made consistent with it', r2.stdout);
+r2 = withDamage([REC], () => { const rc = JSON.parse(rd(REC).toString('utf8')); rc.view_sha256 = '0'.repeat(64); writeFileSync(join(root, REC), JSON.stringify(rc, null, 1) + '\n'); }, checkRun);
+ok(r2.status !== 0 && /da-report-view\.js changed since the images were built/.test(r2.stdout), '17b images built from an older report view fail --check on any machine, whatever fonts it has', r2.stdout);
 r2 = withDamage([IDX], () => writeFileSync(join(root, IDX), rd(IDX).toString('utf8').replace('width="1600" height="2034"', 'width="1400" height="1900"')), checkRun);
 ok(r2.status !== 0 && /index\.html does not reference/.test(r2.stdout), '18 the homepage referencing the preview at a stale size fails --check', r2.stdout);
 const post = checkRun();

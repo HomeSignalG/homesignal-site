@@ -21,6 +21,8 @@ const FIXTURE = join(root, 'data/home-showcase/touraine-75034-report-body.json')
 const RECEIPT = join(root, 'data/home-showcase/preview-receipt.json');
 const ASSET = { desktop: join(root, 'assets/home-report-example-desktop.webp'), mobile: join(root, 'assets/home-report-example-mobile.webp') };
 const CHECK = process.argv.includes('--check');
+const STRICT_PIXELS = process.argv.includes('--strict-pixels');   // only meaningful where the SAME fonts as the machine that built the assets are installed
+const VIEW_SHA = createHash('sha256').update(readFileSync(join(root, 'lib/da-report-view.js'))).digest('hex');
 
 export const FIXTURE_MD5 = '0cf8f5d321b5fbf4849f380362bb9ba4';   // md5 of the stored report body for report eaf8c17c-1063-4b72-9467-dbf0e1a13909, read from production 2026-10-12
 export const SUBJECT = '3999 Touraine Dr, Frisco, TX 75034';
@@ -45,7 +47,7 @@ for (const id of KEEP) if (!projectsById.has(id)) { console.error('FAIL kept pro
 const browser = await chromium.launch();
 const dir = mkdtempSync(join(tmpdir(), 'home-showcase-'));
 const freshThumb = {};
-const out = { fixture_md5: FIXTURE_MD5, subject: SUBJECT, caption: CAPTION, report_counts: { records: report.projects.length }, kept: KEEP, frames: {} };
+const out = { view_sha256: VIEW_SHA, fixture_md5: FIXTURE_MD5, subject: SUBJECT, caption: CAPTION, report_counts: { records: report.projects.length }, kept: KEEP, frames: {} };
 
 for (const [name, f] of Object.entries(FRAMES)) {
   const ctx = await browser.newContext({ viewport: { width: f.vw, height: 1400 }, deviceScaleFactor: 2 });
@@ -125,11 +127,14 @@ if (CHECK) {
     // The committed IMAGE must be the one the receipt describes (a regenerated receipt with an old image, or the reverse, cannot pass) ...
     const sha = createHash('sha256').update(readFileSync(ASSET[name])).digest('hex');
     if (sha !== committed.frames[name].asset_sha256) bad.push(name + ': committed webp sha256 ' + sha.slice(0, 12) + ' is not the receipt\'s ' + String(committed.frames[name].asset_sha256).slice(0, 12));
-    // ... and must LOOK like a fresh render of the current view (96px-wide grayscale layout thumbnail, mean absolute difference; heights must match).
-    const tn = (f) => execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert("L");w=96;h=max(1,round(im.height*w/im.width));print(w,h,*im.resize((w,h),Image.LANCZOS).tobytes())', f], { encoding: 'utf8' }).trim().split(' ').map(Number);
-    const a = tn(ASSET[name]), b = freshThumb[name].trim().split(' ').map(Number);
-    if (a[1] !== b[1]) bad.push(name + ': committed image layout height differs from a fresh render (' + a[1] + ' vs ' + b[1] + ')');
-    else { let d = 0; for (let i = 2; i < a.length; i++) d += Math.abs(a[i] - b[i]); d /= (a.length - 2); if (d > 6) bad.push(name + ': committed image differs from a fresh render (mean thumbnail difference ' + d.toFixed(1) + ' > 6)'); }
+    // ... and, only with --strict-pixels (same fonts as the build machine; CI runners do not have them, so text wraps differently there), must LOOK like a fresh render
+    //     (96px-wide grayscale layout thumbnail, mean absolute difference; heights must match). Font-independent staleness is caught by view_sha256 below.
+    if (STRICT_PIXELS) {
+      const tn = (f) => execFileSync('python3', ['-c', 'import sys\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert("L");w=96;h=max(1,round(im.height*w/im.width));print(w,h,*im.resize((w,h),Image.LANCZOS).tobytes())', f], { encoding: 'utf8' }).trim().split(' ').map(Number);
+      const a = tn(ASSET[name]), b = freshThumb[name].trim().split(' ').map(Number);
+      if (a[1] !== b[1]) bad.push(name + ': committed image layout height differs from a fresh render (' + a[1] + ' vs ' + b[1] + ')');
+      else { let d = 0; for (let i = 2; i < a.length; i++) d += Math.abs(a[i] - b[i]); d /= (a.length - 2); if (d > 6) bad.push(name + ': committed image differs from a fresh render (mean thumbnail difference ' + d.toFixed(1) + ' > 6)'); }
+    }
     if (JSON.stringify(committed.frames[name].rows) !== JSON.stringify(out.frames[name].rows) || committed.frames[name].layout !== out.frames[name].layout) bad.push(name + ': kept-row identities or layout differ from the receipt');
   }
   // the homepage must reference the assets at their real size and the receipt's version of them
@@ -138,6 +143,8 @@ if (CHECK) {
     const fr = committed.frames[name], file = 'assets/home-report-example-' + name + '.webp';
     if (!html.includes(file) || !new RegExp(file.replace(/[.]/g, '\\.') + '[^>]*?(?:width="' + fr.width + '"[^>]*height="' + fr.height + '")', 's').test(html)) bad.push('index.html does not reference ' + file + ' at ' + fr.width + 'x' + fr.height);
   }
+  // The images were built from a particular version of the report view. If the view has changed since, they are stale whatever the fonts: regenerate.
+  if (committed.view_sha256 !== VIEW_SHA) bad.push('lib/da-report-view.js changed since the images were built (receipt view_sha256 ' + String(committed.view_sha256).slice(0, 12) + ', now ' + VIEW_SHA.slice(0, 12) + '): regenerate with node scripts/build-home-showcase-preview.mjs');
   if (JSON.stringify(committed.kept) !== JSON.stringify(out.kept) || committed.fixture_md5 !== out.fixture_md5) bad.push('kept rows or fixture md5 differ');
   console.log(bad.length ? 'FAIL ' + bad.join('; ') : 'PASS rendered text, kept rows, fixture md5 and webp sizes match the committed receipt');
   process.exit(bad.length ? 1 : 0);
