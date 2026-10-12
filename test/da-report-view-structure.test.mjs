@@ -197,7 +197,9 @@ const C = code(SRC);
     // audit fix 10 (2026-10-07): the CI job that runs the mutation loops names them (and so the file they edit)
     '.github/workflows/da-report-mutants.yml',
     // 2026-10-10: the end-to-end proof that a serving-generation project reaches the report renders real rows through the view; its record names it
-    'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md']);
+    'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md',
+    // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
+    'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
