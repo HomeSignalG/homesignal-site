@@ -37,7 +37,7 @@
 
    Build step 7: every report a member sees carries a header, "<brokerage> · <agent>" with the optional client label under it. The
    brokerage's name comes from the account and is not editable here; the agent's name is the person's own, saved to their sign-in
-   account (client.auth.updateUser) from the "Your name on reports" card. The report function sends the header with each report and
+   account (client.auth.updateUser) from the "Report by" line in Create a property report. The report function sends the header with each report and
    reads it fresh each time: a report is never stored with a name on it, so a changed name changes every report the next time it is shown.
 
    Build step 8: a report that was saved can be SHARED and SAVED AS A PDF. "Share this report with your client" makes a private, read-only
@@ -174,10 +174,20 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
 #team-list .go{padding:8px 14px;font-size:13.5px}
 #team-status{margin:0;font-size:14px;min-height:1.5em}
 #team-status.err{color:var(--red);font-weight:600}
-#profile{display:grid;gap:10px}
-#profile h2{margin:0;font-size:17px}
-#profile .sub{margin:0;font-size:13.5px;color:var(--muted);max-width:70ch}
-#profile-status{margin:0;font-size:14px;min-height:1.5em}
+/* the Report by line sits in the Create heading row, so it adds no height to the section */
+.create-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:0 16px;margin-bottom:10px}
+.create-head .sec-h{margin:0}
+#profile{display:grid;gap:6px;justify-items:end}
+#profile .by-line{margin:0;font-size:14.5px;color:var(--muted)}
+#profile .by-line strong{color:var(--ink)}
+.by-btn{font:inherit;font-size:14px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 6px;min-height:36px;cursor:pointer}
+.by-btn:focus-visible{outline:3px solid var(--accent);outline-offset:1px;border-radius:4px}
+#pf{width:min(420px,100%)}
+@media(max-width:700px){#profile{justify-items:start;width:100%}}
+#pf .row{display:flex;gap:10px;flex-wrap:wrap}
+#pf .go{padding:10px 18px;min-height:40px}
+#profile-status{margin:0;font-size:14px}
+#profile-status:empty{display:none}
 #profile-status.err{color:var(--red);font-weight:600}
 #saved{display:grid;gap:10px}
 #saved h2{margin:0;font-size:17px}
@@ -244,6 +254,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 /* Create a property report: full width. Address gets the most room; the client label is secondary; Generate is the obvious action. */
 .create{padding:16px 20px 20px;border-color:#cfe3d6;box-shadow:0 1px 2px rgba(15,92,55,.06)}
 .create .sec-h{margin-bottom:10px}
+.create .create-head .sec-h{margin-bottom:0}
 .create-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
 .create-addr{flex:3 1 340px;min-width:0}
 .create-addr input,.create-label input{font-size:16px;padding:13px 14px}
@@ -266,7 +277,17 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .rail-sec>.sec-h{margin:0}
 #rail-actions{display:grid;gap:8px;--rv-ink:var(--ink);--rv-ink2:var(--muted);--rv-line:var(--line);--rv-green:var(--accent);--rv-deep:#0f5c37;--rv-tint:#e9f5ee}
 #rail-actions:empty{display:none}
-#rail-actions:not(:empty)~.rail-note{display:none}
+#rail-actions .da-rv-act[data-da-action="pdf"]{grid-column:1/-1}
+/* management is quiet: it opens from the action, never sits beside it */
+.mgmt{background:transparent;border:0;padding:0;font-size:13px;color:var(--muted)}
+.mgmt>summary{cursor:pointer;list-style:none;min-height:32px;padding:4px 2px;font-weight:600;color:var(--muted)}
+.mgmt>summary::-webkit-details-marker{display:none}
+.mgmt>summary::before{content:"\25B8\00a0"}
+.mgmt[open]>summary::before{content:"\25BE\00a0"}
+.mgmt>summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mgmt[open]{display:grid;gap:8px;border:1px solid var(--line);border-radius:10px;padding:6px 12px 12px;background:var(--panel)}
+.mgmt:not([open]){display:block}
+.mgmt .hint,.mgmt p{margin:0}
 #rail-actions .da-rv-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;padding:0;border:0}
 #rail-actions .da-rv-act{min-height:44px;padding:10px 12px;font-size:14px;border-radius:10px}
 #rail-actions .da-rv-act--live{border-color:var(--line);color:var(--ink);background:#fff}
@@ -396,7 +417,23 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 
   <!-- Create a property report: full width, above the workspace. The form, its ids and its handler are unchanged. -->
   <section class="card create" aria-labelledby="create-title">
-    <h2 class="sec-h" id="create-title">Create a property report</h2>
+    <div class="create-head">
+      <h2 class="sec-h" id="create-title">Create a property report</h2>
+      <!-- Report authorship: the SAME #profile / #pf / #agent-name / #save-name and the same save handler as before, moved here from Account and administration.
+           It sits beside the form (not inside it) because #pf is itself a form. -->
+      <div id="profile" class="by" hidden>
+        <p class="by-line" id="by-view">Report by: <strong id="by-name">Not set</strong> <button type="button" class="by-btn" id="by-edit">Edit</button></p>
+        <form id="pf" novalidate hidden>
+          <label>Your name on reports<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
+          <p class="hint">Shown beside your brokerage name on reports.</p>
+          <div class="row by-actions">
+            <button type="submit" class="go" id="save-name">Save</button>
+            <button type="button" class="go ghost" id="cancel-name">Cancel</button>
+          </div>
+        </form>
+        <p id="profile-status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
     <form id="rf" novalidate>
       <div class="create-row">
         <label class="create-addr">Property address
@@ -412,35 +449,31 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <!-- LEFT: the agent workspace. Every card keeps its id, its form and its handler; only where it sits changed. On a narrow screen the rail dissolves
          (display:contents) and the sections stack in the `order` set in the style block: create, current-report tools, report, saved reports, account. -->
     <aside class="rail" id="rail" aria-label="Agent workspace">
-      <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title">
+      <div class="rail-sec" id="rail-report" role="group" aria-labelledby="rail-report-title" hidden>
         <h2 class="sec-h" id="rail-report-title">This report</h2>
-        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF) -->
+        <!-- the report's own action buttons are moved here by dressActions (Share with Client, Watch Property, Download PDF). The section is drawn only while they are here. -->
         <div id="rail-actions"></div>
-        <p class="hint rail-note">Open a report to share, watch or download it.</p>
-      <section class="card" id="share" aria-labelledby="share-title" hidden>
-        <h2 id="share-title">Share this report with your client</h2>
-        <details class="more"><summary>What your client sees</summary><p class="sub">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p></details>
-        <div class="row">
-          <button type="button" class="go" id="share-make">Make a client link</button>
-        </div>
-        <div id="share-new" hidden>
-          <label>Client link<input type="text" id="share-link" readonly></label>
-          <button type="button" class="go" id="share-copy">Copy link</button>
-          <p class="hint" id="share-note"></p>
-        </div>
-        <ul id="share-list"></ul>
-        <p id="share-status" role="status" aria-live="polite"></p>
-      </section>
-      <section class="card" id="watch" aria-labelledby="watch-title" hidden>
-        <h2 id="watch-title">Watch this property</h2>
-        <details class="more"><summary>How watching works</summary><p class="sub">Checked once a day. If a nearby project's official status changes, we email the address you signed in with. The email does not include the property's address.</p></details>
-        <div class="row">
-          <button type="button" class="go" id="watch-start">Watch this property</button>
-          <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
-        </div>
-        <p id="watch-state"></p>
-        <p id="watch-status" role="status" aria-live="polite"></p>
-      </section>
+        <!-- Management is reached from the action, not shown beside it: client links appear once one exists; the watch panel opens from Watch Property. -->
+        <details class="mgmt" id="share" hidden>
+          <summary>Manage client links</summary>
+          <div id="share-new" hidden>
+            <label>Client link<input type="text" id="share-link" readonly></label>
+            <button type="button" class="go" id="share-copy">Copy link</button>
+            <p class="hint" id="share-note"></p>
+          </div>
+          <ul id="share-list"></ul>
+          <p id="share-status" role="status" aria-live="polite"></p>
+        </details>
+        <details class="mgmt" id="watch" hidden>
+          <summary id="watch-summary">Watch property</summary>
+          <p class="hint">Checked once a day. If a nearby project's official status changes, we email the address you signed in with. The email does not include the property's address.</p>
+          <p id="watch-state"></p>
+          <div class="row">
+            <button type="button" class="go" id="watch-start">Start watching</button>
+            <button type="button" class="go ghost" id="watch-stop" hidden>Stop watching</button>
+          </div>
+          <p id="watch-status" role="status" aria-live="polite"></p>
+        </details>
       </div>
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
@@ -493,15 +526,6 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <p class="hint" id="billing-hint" hidden>Back from payment? Press Check again.</p>
         <p id="billing-status" role="status" aria-live="polite"></p>
       </section>
-      <section class="card" id="profile" aria-labelledby="profile-title" hidden>
-        <h2 id="profile-title">Your name on reports</h2>
-        <p class="sub">Shown at the top of every report, beside your brokerage's name.</p>
-        <form id="pf" novalidate>
-          <label>Your name<input type="text" id="agent-name" maxlength="80" autocomplete="name" placeholder="Pat Agent"></label>
-          <button type="submit" class="go" id="save-name">Save my name</button>
-        </form>
-        <p id="profile-status" role="status" aria-live="polite"></p>
-      </section>
       <section class="card" id="team" aria-labelledby="team-title" hidden>
         <h2 id="team-title">Invite an agent</h2>
         <p class="sub">One link per agent. They join your brokerage's trial.</p>
@@ -524,6 +548,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     <div class="box">
       <h2 id="share-pop-title">Share this report with your client</h2>
       <p class="hint" id="share-pop-msg" role="status" aria-live="polite"></p>
+      <p class="hint">Private link, no sign-in. Shows the street address and your brokerage's name only: not your name, not your client label. Works for 6 months; withdraw it anytime.</p>
       <div id="share-pop-body" hidden>
         <label>Client link<input type="text" id="share-pop-link" readonly></label>
         <div class="row">
@@ -1008,12 +1033,28 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   // ---- your name on reports (build step 7): the agent's own name, saved to their sign-in account ------------------------------
   function profileSay(text, isError){ var s=$('profile-status'); s.textContent=text||''; s.className=isError?'err':''; }
   function ownName(){ var m = session && session.user && session.user.user_metadata; return m && typeof m.full_name === 'string' ? m.full_name : ''; }
-  /** Hide or show the card. Hiding also forgets what was typed, so one person's name is never left in the box for the next. */
+  /** Show the saved name in the "Report by" line; an empty name reads "Not set" and the button offers to add one. */
+  function renderBy(name){
+    var n = (name || '').trim();
+    $('by-name').textContent = n || 'Not set';
+    $('by-edit').textContent = n ? 'Edit' : 'Add name';
+    $('profile').setAttribute('data-saved', n);
+  }
+  function editName(on){
+    $('pf').hidden = !on; $('by-view').hidden = on;
+    if (on) { profileSay('', false); $('agent-name').focus(); } else { $('by-edit').focus(); }
+  }
+  /** Hide or show the line. Hiding also forgets what was typed, so one person's name is never left in the box for the next. */
   function showProfile(on){
-    if (!on) { $('profile').hidden = true; $('agent-name').value = ''; profileSay('', false); return; }
+    if (!on) { $('profile').hidden = true; $('agent-name').value = ''; renderBy(''); $('pf').hidden = true; $('by-view').hidden = false; profileSay('', false); return; }
     var was = $('profile').hidden;
     $('profile').hidden = false;
-    if (was) $('agent-name').value = ownName(); // fill it once; a report being made never overwrites what the person is typing
+    if (was) { $('agent-name').value = ownName(); renderBy(ownName()); } // fill it once; a report being made never overwrites what the person is typing
+  }
+  function cancelName(){
+    if (savingName) return;
+    $('agent-name').value = $('profile').getAttribute('data-saved') || '';
+    profileSay('', false); editName(false);
   }
   async function saveName(){
     if (savingName || !session || !session.user) return;
@@ -1026,7 +1067,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     savingName = false; $('save-name').disabled = false;
     if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
     if (res && !res.error) {
-      $('agent-name').value = name;
+      $('agent-name').value = name; renderBy(name); editName(false);
       profileSay(name ? 'Saved. Reports you make or open from now on show this name.' : 'Your name is removed. Reports you make or open from now on show only your brokerage.', false);
       return;
     }
@@ -1220,17 +1261,15 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   /** Hide the card and forget everything on it. The link in particular is never left on the page for the next report or the next person. */
   function hideShare(){
     shareFor = null; sharing = false;
-    $('share').hidden = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    $('share').hidden = true; $('share').open = false; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
     $('share-pop').hidden = true; $('share-pop-body').hidden = true; $('share-pop-link').value = ''; sharePopFrom = null;
     $('share-list').textContent = ''; shareSay('', false);
-    $('share-make').disabled = false; $('share-make').textContent = 'Make a client link';
   }
   /** Show the card for a report that was saved (it has a permanent id). A report that was not saved cannot be shared, so it gets no card. */
   function showShare(reportId){
     hideShare();
     if (typeof reportId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reportId)) return false;
-    shareFor = reportId;
-    $('share').hidden = false;
+    shareFor = reportId;   // the management section appears when refreshShares finds a link to manage
     refreshShares();
     return true;
   }
@@ -1250,6 +1289,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return; // the person or the report changed while the answer was on its way
     var body = r.body || {};
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.shares)) { shareSay(shareMessage(r.status, body), true); return; }
+    $('share').hidden = !body.shares.length;
     var list = $('share-list');
     list.textContent = '';
     body.shares.forEach(function(sh){
@@ -1267,18 +1307,16 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       }
       list.appendChild(li);
     });
-    if (!body.shares.length) shareSay('No client link has been made for this report yet.', false);
-    else if ($('share-status').className !== 'err') shareSay('', false);
+    if ($('share-status').className !== 'err') shareSay('', false);
   }
   async function makeShare(){
     if (sharing || !session || !session.user || !shareFor) return false;
     var forUser = session.user.id, forReport = shareFor;
-    sharing = true; $('share-make').disabled = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
+    sharing = true; $('share-new').hidden = true; $('share-link').value = ''; $('share-note').textContent = '';
     shareSay('Making the link\u2026', false);
     var r = await post(SHARE_FN, { action: 'create', report_id: forReport });
     sharing = false;
     if (!session || !session.user || session.user.id !== forUser || shareFor !== forReport) return false;
-    $('share-make').disabled = false;
     var body = r.body || {};
     var link = typeof body.link === 'string' ? body.link : '';
     if (r.status === 200 && body.status === 'OK' && SHARE_LINK.test(link)) {
@@ -1398,9 +1436,10 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; bar.appendChild(b); } });
     var note = bar.querySelector('.da-rv-soon'); if (note) bar.appendChild(note);
     rail.appendChild(bar); // the same <nav>, handled by the same click handler (onReportAction), now in the workspace rail
+    $('rail-report').hidden = false;
   }
   /** The rail holds the open report's buttons; whenever the report is cleared or replaced they go with it. */
-  function clearActions(){ var r = $('rail-actions'); if (r) r.textContent = ''; }
+  function clearActions(){ var r = $('rail-actions'); if (r) r.textContent = ''; var s = $('rail-report'); if (s) s.hidden = true; }
   /** "Download PDF" is the browser's own print window: the person chooses "Save as PDF" there. The print stylesheet leaves only the report. */
   function printReport(){ window.print(); }
 
@@ -1416,11 +1455,12 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     EMAIL_FAILED: 'a change was found but the email could not be sent, so HomeSignal will try again.',
     NO_RECIPIENT: 'a change was found but your account has no email address to send it to.'
   };
+  var watchAsked = false; // the agent pressed Watch Property: the panel stays until the report changes
   function watchSay(text, isError){ var s=$('watch-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide the card and forget everything on it, so the next report or the next person never sees this one's watch. */
   function hideWatch(){
-    watchFor = null; watchId = null; watchBusy = false;
-    $('watch').hidden = true;
+    watchFor = null; watchId = null; watchBusy = false; watchAsked = false;
+    $('watch').hidden = true; $('watch').open = false;
     $('watch-start').hidden = false; $('watch-start').disabled = false; $('watch-stop').hidden = true; $('watch-stop').disabled = false;
     $('watch-state').textContent = ''; watchSay('', false);
   }
@@ -1428,8 +1468,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function showWatch(reportId){
     hideWatch();
     if (typeof reportId !== 'string' || !/^[0-9a-f-]{36}$/i.test(reportId)) return false;
-    watchFor = reportId;
-    $('watch').hidden = false;
+    watchFor = reportId;   // the panel appears when a watch exists, or when Watch Property is pressed
     $('watch-start').hidden = true; $('watch-stop').hidden = true;
     $('watch-state').textContent = 'Checking whether you are already watching this property…';
     refreshWatch();
@@ -1448,6 +1487,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   function paintWatch(w){
     watchId = w ? w.watch_id : null;
     $('watch-start').hidden = !!w; $('watch-stop').hidden = !w;
+    $('watch-summary').textContent = w ? 'Watching \u00b7 checked daily' : 'Watch property';
+    $('watch').hidden = !(w || watchAsked);
     var st = $('watch-state');
     if (!w) { st.textContent = 'You are not watching this property.'; return; }
     var since = dateWords(w.created_at), last = dateWords(w.last_run_at), next = dateWords(w.next_due_at);
@@ -1464,7 +1505,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (!session || !session.user || session.user.id !== forUser || watchFor !== forReport) return; // the person or the report changed while the answer was on its way
     var body = r.body || {};
     if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.watches)) {
-      $('watch-state').textContent = ''; $('watch-start').hidden = false; $('watch-stop').hidden = true; // starting is safe to offer: it does nothing twice
+      $('watch-state').textContent = ''; $('watch-start').hidden = false; $('watch-stop').hidden = true; $('watch').hidden = !watchAsked; // starting is safe to offer: it does nothing twice
       watchSay(watchMessage(r.status, body), true);
       return;
     }
@@ -1708,12 +1749,13 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) { pendingRun = false; closeAuth(); } });
     $('rf').addEventListener('submit', function(e){ e.preventDefault(); run(); });
     $('pf').addEventListener('submit', function(e){ e.preventDefault(); saveName(); });
+    $('by-edit').addEventListener('click', function(){ editName(true); });
+    $('cancel-name').addEventListener('click', cancelName);
     $('mint').addEventListener('click', mintInvite);
     $('subscribe').addEventListener('click', subscribe);
     $('trial-cta').addEventListener('click', trialCtaPressed);
     $('billing-refresh').addEventListener('click', function(){ refreshBilling(false); });
     $('copy-invite').addEventListener('click', copyInvite);
-    $('share-make').addEventListener('click', makeShare);
     $('share-copy').addEventListener('click', copyShare);
     $('share-pop-copy').addEventListener('click', copyPop);
     $('share-pop-native').addEventListener('click', nativePop);
@@ -1733,7 +1775,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (act === 'pdf') printReport();
       else if (act === 'share') shareFromReport(b);
       else if (act === 'compare' && !$('saved').hidden) chooseForCompare(shareFor);
-      else if (act === 'watch' && !$('watch').hidden) { $('watch').scrollIntoView(); var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : null); if (wb) wb.focus(); }
+      else if (act === 'watch' && watchFor) { watchAsked = true; $('watch').hidden = false; $('watch').open = true; var wb = !$('watch-start').hidden ? $('watch-start') : (!$('watch-stop').hidden ? $('watch-stop') : $('watch-summary')); wb.focus(); }
     }
     $('report').addEventListener('click', onReportAction);
     $('rail-actions').addEventListener('click', onReportAction); // the buttons now sit in the rail: one handler, two homes
