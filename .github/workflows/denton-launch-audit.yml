@@ -44,7 +44,13 @@ jobs:
       - name: Live pages, desktop and mobile
         env:
           SITE_BASE: ${{ github.event.inputs.site_base || 'https://homesignal.net' }}
-        run: node scripts/denton-launch-pages.mjs
+        run: |
+          # site_base=local serves THIS checkout (the branch under test) on localhost; data still comes from the live read APIs.
+          if [ "$SITE_BASE" = "local" ]; then
+            python3 -m http.server 8099 >/dev/null 2>&1 &
+            sleep 2; export SITE_BASE=http://localhost:8099
+          fi
+          node scripts/denton-launch-pages.mjs
   investigate:
     if: ${{ github.event.inputs.task == 'investigate' }}
     runs-on: ubuntu-latest
