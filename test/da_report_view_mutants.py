@@ -111,7 +111,7 @@ m('css_empty_report_not_prominent', "'.da-rv--empty .da-rv-lims{font-size:16px;f
 m('swap_two_sections', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['proposed', 'approved', 'permitted'];")
 m('permitted_stage_dropped', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['approved', 'proposed'];")
 m('actions_before_evidence', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', '    if (some) parts.push(actionsBar(opts));\n    parts.push(evidenceSection(report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
-m('history_shown_when_empty', "    if (some) parts.push(historySection(history, report));", "    parts.push(historySection(history, report));")
+m('history_shown_when_empty', "    if (some) parts.push(historySection(history, report, m.nums));", "    parts.push(historySection(history, report, m.nums));")
 m('actions_on_empty_report', '    if (some) parts.push(actionsBar(opts));', '    parts.push(actionsBar(opts));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('absence_claim_added', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', "    if (!some) parts.push('<p>No development activity found near this address.</p>');\n    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_report_unmarked', "(some ? '' : ' da-rv--empty')", "''")
@@ -191,7 +191,7 @@ m('words_match_substring', "return !!x && x === wordsOf(b); }", "return !!x && w
 m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])
 m('two_tables', "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); }); });", "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); items.push({ p: p, k: k }); }); });")
 m('records_before_briefing', "    if (m.total) parts.push(briefing(report, m, response));\n    if (!some) parts.push(outcomeSection(report));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    if (m.total) parts.push(recordsSection(m, response, opts.showLifecycle === true));", "    if (m.total) parts.push(recordsSection(m, response, opts.showLifecycle === true));\n    if (m.total) parts.push(briefing(report, m, response));\n    if (!some) parts.push(outcomeSection(report));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));")
-m('history_before_map', "    if (current.length) parts.push(mapSection(m.numbered, response, report));\n    if (some) parts.push(historySection(history, report));", "    if (some) parts.push(historySection(history, report));\n    if (current.length) parts.push(mapSection(m.numbered, response, report));")
+m('history_before_map', "    if (current.length) parts.push(mapSection(m.numbered, response, report));\n    if (some) parts.push(historySection(history, report, m.nums));", "    if (some) parts.push(historySection(history, report, m.nums));\n    if (current.length) parts.push(mapSection(m.numbered, response, report));")
 m('briefing_claims_change_without_history', "if (m.changed.length) items.push(", "if (true) items.push(")
 m('briefing_none_recorded_without_ledger', "else if (changeReady(report)) items.push(", "else if (true) items.push(")
 m('briefing_stale_count_dropped', "if (nOld) items.push(", "if (false) items.push(")
@@ -212,6 +212,8 @@ m('evidence_column_dropped', ", ['evid', 'Supporting Evidence']];", "];")
 m('missing_evidence_invented', "return lines || '<p class=\"da-rv-quiet da-rv-noev\">' + NO_EVIDENCE + '</p>';", "return lines || line('Official record', 'Verified');")
 m('evidence_cell_not_in_row_filter', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + evid + '</tr>'", "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + '</tr>' + evid")
 m('evidence_attribution_dropped', "+ (att ? '<p class=\"da-rv-attr\">' + esc(att) + '</p>' : '')\n      + (link ?", "+ (link ?")
+m('history_map_number_dropped', "(mn !== '' ? '<p class=\"da-rv-sub da-rv-histmap\">Map ' + esc(mn) + '</p>' : '')", "''")
+m('history_map_number_off_by_one', "'<p class=\"da-rv-sub da-rv-histmap\">Map ' + esc(mn) + '</p>'", "'<p class=\"da-rv-sub da-rv-histmap\">Map ' + esc(Number(mn) + 1) + '</p>'")
 m('print_evidence_hidden', "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}',", "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}.da-rv-td--evid{display:none}',", [BROWSER])
 m('print_table_loses_widths', "'.da-rv-table{table-layout:fixed;font-size:11px}.da-rv-th--dev{width:24%}", "'.da-rv-table{table-layout:auto;font-size:11px}.da-rv-th--dev{width:24%}")
 m('stack_never_decided_by_width', "var STACK_AT = 760;", "var STACK_AT = 100000;", [BROWSER])
