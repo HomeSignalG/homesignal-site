@@ -41,7 +41,7 @@ const ADDR_NOMATCH = '1 Nowhere Lane, Atlantis';
 const ADDR_OUTAGE = '99 Outage Rd, Austin TX';
 const MATCH = { matchedAddress: '13313 COOMES DR, DEL VALLE, TX, 78617', city: 'DEL VALLE', state: 'TX', zip: '78617', lat: 30.17, lng: -97.61 };
 const STUB = {
-  projects: { '78657': PROJECTS_78657, '84302': [] },
+  projects: { '78657': PROJECTS_78657, '75034': PROJECTS_78657, '84302': [] },
   meta: { '84302': { zip: '84302', place_name: 'Brigham City', state: 'UT' } },
   geocode: { [ADDR_OK]: MATCH, [ADDR_OUTAGE]: 'OUTAGE' }
 };

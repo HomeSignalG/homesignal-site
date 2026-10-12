@@ -32,7 +32,7 @@ export const PROJECTS_78657 = [
   { id: 'p3', source_key: 'k3', name: 'Applehead Island Townhomes', type: 'Residential', status: 'Operating', source_ref: 'https://example.gov/p3', submitted_at: '2026-07-02', lat: 30.53, lng: -98.38 },
   { id: 'p4', source_key: 'k4', name: 'Fourth record', type: 'Commercial', status: 'Proposed', source_ref: 'https://example.gov/p4', submitted_at: '2026-06-01', lat: 30.53, lng: -98.39 }
 ];
-const ZIP_AUTH = (zip) => zip === '78657' ? { zip, mode: 'development', status: 'boundary_complete',
+const ZIP_AUTH = (zip) => zip === '78657' || zip === '75034' ? { zip, mode: 'development', status: 'boundary_complete',
   projects: PROJECTS_78657.map(p => ({ source_key: p.source_key, project_ref: p.source_key, name: p.name, type: p.type, status: p.status, registry_id: 'x', source_ref: p.source_ref, submitted_at: p.submitted_at, date_kind: 'filed' })),
   markers: PROJECTS_78657.map((p, i) => ({ project_ref: p.source_key, lat: p.lat, lng: p.lng, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 })) }
   : { zip, mode: 'development', status: 'boundary_complete', projects: [], markers: [] };
