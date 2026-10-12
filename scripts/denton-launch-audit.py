@@ -22,6 +22,15 @@ assert len(ZIPS) == 32 and len(set(ZIPS)) == 32
 REGISTRY = json.load(open("supabase/functions/get-address-report/jurisdiction-registry.json"))
 ARC = {e["registry_id"]: e for e in REGISTRY["arcgis"]}
 UA = "Mozilla/5.0 (HomeSignal launch audit; read-only)"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import subprocess
+if subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denton_verdict_selftest.py")]).returncode:
+    sys.exit("acceptance-logic self-test failed: refusing to audit with logic that can mis-grade")
+from denton_verdict import verdict as accept
+# Per-ZIP attestation that the admitted authoritative sources are the complete set for that ZIP (checklist step 9). Absent => nobody has attested.
+ATTEST_FILE = "docs/denton-source-coverage.json"
+ATTESTED = set(json.load(open(ATTEST_FILE)).get("attested_zips", [])) if os.path.exists(ATTEST_FILE) else set()
+PAGES_FILE = os.environ.get("DENTON_PAGES_JSON")   # optional: output of the pages task, to feed page_test_ok
 CENTROID_M = 25.0      # a marker this close to the ZIP centroid is suspicious
 POINT_TOL_M = 30.0     # marker vs publisher point
 
@@ -156,7 +165,7 @@ def chunks(seq, n):
         yield seq[i:i + n]
 
 
-PUBPT = {}  # (reg,id) -> (x,y) or None
+PUBPT = {}  # (reg,id) -> (x,y) | "NONPOINT" | "AMBIGUOUS" (several official features share the id)
 for reg, ids in want.items():
     e = ARC[reg]
     idcol = e["column_map"].get("case_number")
@@ -175,7 +184,8 @@ for reg, ids in want.items():
         for ft in j.get("features", []):
             g, a = ft.get("geometry") or {}, ft["attributes"]
             k = (reg, str(a.get(idcol)))
-            PUBPT[k] = (g["x"], g["y"]) if "x" in g and "y" in g else "NONPOINT"
+            new = (g["x"], g["y"]) if "x" in g and "y" in g else "NONPOINT"
+            PUBPT[k] = "AMBIGUOUS" if k in PUBPT else new
             got += 1
     PUB[reg].setdefault("compare", "ok")
     PUB[reg]["ids_requested"], PUB[reg]["ids_returned"] = len(ids), got
@@ -188,7 +198,8 @@ def hav(x1, y1, x2, y2):
     return 2 * R * math.asin(math.sqrt(a))
 
 for z in ZIPS:
-    cmp_ = {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0}
+    cmp_ = {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0,
+            "ambiguous_identity": 0, "comparison_unavailable": 0}
     bad = []
     for r in BY[z]["dots"]:
         m = key_re.match(r["source_key"] or "")
@@ -196,7 +207,11 @@ for z in ZIPS:
             cmp_["not_arcgis_unverified"] += 1
             continue
         pt = PUBPT.get((m.group(1), m.group(2)))
-        if pt is None:
+        if str(PUB.get(m.group(1), {}).get("compare", "")).startswith("UNVERIFIED"):
+            cmp_["comparison_unavailable"] += 1          # a failed comparison is never "not found" and never a match
+        elif pt == "AMBIGUOUS":
+            cmp_["ambiguous_identity"] += 1
+        elif pt is None:
             cmp_["publisher_not_found"] += 1
         elif pt == "NONPOINT":
             cmp_["nonpoint_unverified"] += 1
@@ -212,6 +227,7 @@ for z in ZIPS:
 
 # eligibility / missing IDs: point layers, publisher point inside ZIP polygon vs serving membership
 ELIG = {}  # zip -> {reg: (eligible, missing_list)}
+DUPIDS = {}  # reg -> ids carried by more than one official feature
 for reg, e in ARC.items():
     if reg not in want and reg not in ("denton-county-dev-permits", "frisco-active-building-permits",
                                          "fort-worth-development-permits"):
@@ -231,6 +247,7 @@ for reg, e in ARC.items():
         continue
     where = e.get("extra_where") or "1=1"
     allrows, off, trunc = [], 0, False
+    idcount = {}
     while True:
         j = http_json(e["service_url"] + "/query", {
             "f": "json", "where": where, "outFields": idcol, "returnGeometry": "true", "outSR": "4326",
@@ -240,6 +257,8 @@ for reg, e in ARC.items():
             allrows = None
             break
         fs = j.get("features", [])
+        for f in fs:
+            idcount[str(f["attributes"][idcol])] = idcount.get(str(f["attributes"][idcol]), 0) + 1
         allrows += [(str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"])
                     for f in fs if f.get("geometry") and "x" in f["geometry"]]
         if not j.get("exceededTransferLimit") and len(fs) < 2000:
@@ -251,6 +270,7 @@ for reg, e in ARC.items():
     if allrows is None:
         continue
     PUB[reg]["eligibility"] = "ok" if not trunc else "TRUNCATED"
+    DUPIDS[reg] = {i for i, n in idcount.items() if n > 1}
     PUB[reg]["source_rows_with_point"] = len(allrows)
     inzip = {}
     for ch in chunks(allrows, 1500):
@@ -258,7 +278,7 @@ for reg, e in ARC.items():
         res = rows(f"""select v.id, b.zip from (values {vals}) v(id,x,y)
           join lateral (select z.zip from unnest(array[{zl}]) z(zip)
             where geo.zip_membership_boundary(z.zip) is not null
-              and ST_Covers(geo.zip_membership_boundary(z.zip), ST_SetSRID(ST_Point(v.x,v.y),4326)) limit 1) b on true""")
+              and ST_Covers(geo.zip_membership_boundary(z.zip), ST_SetSRID(ST_Point(v.x,v.y),4326))) b on true""")   # every valid ZIP, no LIMIT 1
         for r in res:
             inzip.setdefault(r["zip"], set()).add(r["id"])
     for z in ZIPS:
@@ -271,32 +291,35 @@ for reg, e in ARC.items():
     print(f"[pub] {reg}: {len(allrows)} point rows", file=sys.stderr)
 
 # ---------------------------------------------------------------- report
-def verdict(z):
+PAGES = json.load(open(PAGES_FILE)) if PAGES_FILE and os.path.exists(PAGES_FILE) else {}
+def page_ok(z):
+    r = PAGES.get(z)
+    if not r:
+        return None
+    return all((r.get(v) or {}).get("zip_page", {}).get("status") == 200 and not (r.get(v) or {}).get("errors") for v in ("desktop", "mobile"))
+
+def facts(z):
     d = BY[z]
-    if not d["has_boundary"]:
-        return "UNKNOWN", "no canonical boundary: classify (non-ZCTA vs gap); no map dots possible"
-    why = []
-    i = d["issues"]
-    if i["outside_polygon"]:
-        why.append(f"{i['outside_polygon']} dots outside polygon")
-    if i["at_centroid"]:
-        why.append(f"{i['at_centroid']} dots at centroid")
-    if i["duplicate_marker_rows"]:
-        why.append("duplicate markers")
-    if d.get("members_without_marker"):
-        why.append(f"{d['members_without_marker']} members without marker")
-    miss = sum(len(v[1]) for v in ELIG.get(z, {}).values())
-    if miss:
-        why.append(f"{miss} eligible source IDs missing")
-    unver = d["publisher_compare"]["not_arcgis_unverified"] + d["publisher_compare"]["nonpoint_unverified"]
-    if unver:
-        why.append(f"{unver} dots not verifiable against publisher geometry here")
-    regs = {r["registry_id"] for r in d["dots"]}
-    fresh = [PUB[r].get("newest_source_record") for r in regs if r in PUB and r != "txdot-projects-info-all"]
-    cur = [f for f in fresh if f and f >= time.strftime("%Y-%m-%d", time.gmtime(time.time() - 365 * 86400))]
-    if not cur:
-        why.append("no municipal/county source with a record in the last 365 days")
-    return ("FAIL" if why else "UNKNOWN"), "; ".join(why) or "page/report tests pending"
+    incomplete = [reg for reg in PUB
+                  if reg in ARC and str(PUB.get(reg, {}).get("eligibility", "ok")) != "ok"
+                  and any(r["registry_id"] == reg for r in d["dots"])] if d["has_boundary"] else []
+    elig_reg = ELIG.get(z, {})
+    missing = sum(len(v[1]) for v in elig_reg.values())
+    amb = 0
+    for reg, (el, miss) in elig_reg.items():
+        amb += len(DUPIDS.get(reg, set()) & {m.group(2) for r in d["dots"] for m in [key_re.match(r["source_key"] or "")] if m and m.group(1) == reg})
+    return {"has_boundary": d["has_boundary"], "issues": d["issues"], "members_without_marker": d.get("members_without_marker"),
+            "compare": d.get("publisher_compare"), "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
+            "source_coverage_attested": z in ATTESTED, "page_test_ok": page_ok(z)}
+
+def verdict(z):
+    v, why = accept(facts(z))
+    return v, "; ".join(why) or "all checks complete"
+
+def freshness(z):
+    """Reported as a FACT, never a verdict input: newest record each admitted source has published."""
+    regs = {r["registry_id"] for r in BY[z]["dots"]}
+    return {r: PUB[r].get("newest_source_record") for r in sorted(regs) if r in PUB}
 
 out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "publishers": PUB, "zips": {}}
 md = ["| ZIP | Boundary | Members | Dots | Out-of-polygon | At centroid | Reversed | Dup | Pub match/mismatch/unverified | Eligible IDs missing | Verdict | Blocker |",
@@ -310,6 +333,7 @@ for z in ZIPS:
                                           "members_without_marker", "issues", "publisher_compare", "publisher_mismatches")}
     out["zips"][z]["eligible_missing"] = {r: {"eligible": a, "missing": m[:200], "missing_n": len(m)} for r, (a, m) in ELIG.get(z, {}).items()}
     out["zips"][z]["verdict"] = [v, why]
+    out["zips"][z]["freshness_newest_record_by_source"] = freshness(z)
     i = d["issues"]
     md.append(f"| {z} | {'yes' if d['has_boundary'] else 'NO'} | {d['members']} | {len(d['dots'])} | {i['outside_polygon']} | {i['at_centroid']} | {i['lnglat_reversed']} | {i['duplicate_marker_rows']} | "
               f"{pc['match']}/{pc['mismatch']}/{pc['not_arcgis_unverified']+pc['nonpoint_unverified']+pc['publisher_not_found']} | {missn} | {v} | {why} |")
