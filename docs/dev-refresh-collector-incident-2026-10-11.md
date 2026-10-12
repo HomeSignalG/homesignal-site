@@ -76,3 +76,9 @@ HTTP 200, a green workflow, or unrelated successful ticks are not evidence.
 NOT OBSERVED: a live `pg_stat_activity` / `pg_locks` capture of a failing tick (none occurred during the bounded observation). The cause above does not need one: the statement's plan and its cancelled isolated replay are the direct evidence. A lock wait is not required to explain any episode and none was observed.
 
 Fix (draft, not applied): `docs/dev-refresh-collect-blocked-plan-stable.sql` — `exists (...)` → `(select count(*) ...) > 0`; test: `test/dev_collect_plan_pg` / `dev-collect-plan-suite.yml`.
+
+### 2026-10-12 (later) - release-audit hardening of the fix (still NOT applied)
+Migration now fail-closed on md5(prosrc) ORIGINAL `2012877397532a1e8e160b5a7a4c8032` / PATCHED `12b3dcc680b322af7d2cd61734be9b4c`, with an exact reversal and a runbook
+(`docs/dev-refresh-collect-blocked-plan-stable-runbook.md`). COUNT(*) vs the best-case EXISTS, measured on a disposable PG (not production): identical buffers
+(it detoasts the same array either way; step (a)'s `scored` CTE already runs the same COUNT per failed source), at most ~1.3x time in the multi-probe worst
+case (e.g. 5 failed sources on a 40,000-site ZIP: 192 ms vs 196 ms; 16-response batch 243 vs 245 ms). No second form is proposed.

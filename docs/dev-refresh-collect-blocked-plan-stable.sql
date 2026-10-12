@@ -34,14 +34,33 @@
 -- Step (a)'s "scored" CTE already uses this shape and is not touched. No guard, threshold, cap, timeout, retry rule or batch size
 -- changes; no response is skipped or dropped; the cursor, completeness and refusal logic are byte-identical.
 --
--- SPLICE, NOT A RETYPE (CLAUDE.md claims rule 7). Live body before: md5(prosrc) 2012877397532a1e8e160b5a7a4c8032, 15,800 chars.
--- One anchor, must occur exactly once; idempotent; refuses to patch blind; the result is checked and the replacement reversed.
--- Rollback: the same replacement in reverse. NOT APPLIED to production by this file's commit.
+-- SPLICE, NOT A RETYPE (CLAUDE.md claims rule 7), AND FAIL-CLOSED ON TWO FINGERPRINTS (both are md5(pg_proc.prosrc), never md5 of
+-- pg_get_functiondef, which is a different representation):
+--   ORIGINAL  md5 2012877397532a1e8e160b5a7a4c8032, 15,800 chars   (production, read-only, 2026-10-11/12)
+--   PATCHED   md5 12b3dcc680b322af7d2cd61734be9b4c, 16,047 chars   (computed SEPARATELY, in Python, from the production body with this
+--                                                                  file's one replacement; the apply recomputes it BEFORE it executes
+--                                                                  anything and again after, and refuses unless all three agree)
+-- Anything else is refused: a drifted body, a half-patched body, a body that merely carries the PLAN-STABLE marker. Re-applying is a
+-- no-op ONLY on the exact PATCHED fingerprint. Owner, SECURITY DEFINER, search_path, return type, language, volatility, ACL and the
+-- dependency set must be identical before and after, and the function definition with its body removed must be byte-identical.
+-- Everything runs in one transaction with a short lock_timeout; any raise rolls the whole thing back (DDL is transactional).
+-- Reversal: docs/dev-refresh-collect-blocked-plan-stable-reverse.sql.  Procedure: docs/dev-refresh-collect-blocked-plan-stable-runbook.md.
+-- NOT APPLIED to production by this file's commit.
 -- ============================================================================
+
+\set ON_ERROR_STOP on
+\echo APPLY dev_refresh_collect blocked-plan-stable: start
+begin;
+set local lock_timeout = '3s';                       -- DDL waits for the function's lock behind running ticks: bounded, retry later
+set local statement_timeout = '30s';
+set local idle_in_transaction_session_timeout = '60s';
 
 do $mig$
 declare
-  src   text;
+  c_orig_md5 constant text := '2012877397532a1e8e160b5a7a4c8032';
+  c_orig_len constant int  := 15800;
+  c_new_md5  constant text := '12b3dcc680b322af7d2cd61734be9b4c';
+  c_new_len  constant int  := 16047;
   old_  text := $a$    where exists (
       select 1 from public.development_reports d,
                     lateral jsonb_array_elements(d.sites) e
@@ -56,35 +75,88 @@ $a$;
             where d.zip = (r.j->>'zip')
               and e->>'source_registry_id' = f.registry_id) > 0
 $b$;
+  fn   regprocedure;
+  cur  record;
+  props_before text;
+  props_after  text;
+  src_def text; src_body text; expect_body text; after_body text; after_def text;
   n int;
-  after text;
 begin
-  select pg_get_functiondef('public.dev_refresh_collect()'::regprocedure) into src;
-  if src is null then
-    raise exception 'public.dev_refresh_collect() not found; refusing to patch nothing';
+  begin
+    fn := 'public.dev_refresh_collect()'::regprocedure;
+  exception when others then
+    raise exception 'REFUSED: public.dev_refresh_collect() does not exist (%)', sqlerrm;
+  end;
+
+  select pp.prosrc, md5(pp.prosrc) m, length(pp.prosrc) l,
+         pp.prosecdef sd, pp.proconfig cfg, pp.prorettype::regtype::text rt, l.lanname lang, pp.pronargs na, pp.proretset rs,
+         pp.proleakproof lk, pp.proisstrict st, pp.provolatile vol, pp.proparallel par, pp.proowner::regrole::text ow, pp.proacl::text acl
+    into cur from pg_proc pp join pg_language l on l.oid = pp.prolang where pp.oid = fn;
+
+  -- absolute properties: these are what the function IS in production
+  if not (cur.sd and cur.lang = 'plpgsql' and cur.rt = 'integer' and cur.na = 0 and not cur.rs
+          and cur.cfg is not distinct from array['search_path=public, net']::text[]) then
+    raise exception 'REFUSED: signature or security properties differ from the approved ones (secdef %, lang %, returns %, args %, setof %, config %)',
+      cur.sd, cur.lang, cur.rt, cur.na, cur.rs, cur.cfg;
   end if;
-  if position('(PLAN-STABLE' in src) > 0 then
-    raise notice 'blocked plan-stable change already present; no change';
+
+  props_before := concat_ws('|', cur.ow, cur.acl, cur.lk, cur.st, cur.vol, cur.par,
+    (select md5(coalesce(string_agg(d.refclassid::regclass::text || ':' || d.refobjid || ':' || d.deptype::text, ',' order by d.refclassid::regclass::text collate "C", d.refobjid, d.deptype::text), ''))
+       from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = fn::oid),
+    (select count(*) from pg_depend d where d.refclassid = 'pg_proc'::regclass and d.refobjid = fn::oid));
+
+  raise notice 'EVIDENCE before: md5=% len=% owner=% acl=%', cur.m, cur.l, cur.ow, cur.acl;
+
+  if cur.m = c_new_md5 and cur.l = c_new_len then
+    raise notice 'EVIDENCE already at the approved PATCHED fingerprint %; nothing changed', c_new_md5;
     return;
   end if;
-  if position('(0-cap)' in src) = 0 then
-    raise exception 'batch cap missing: apply docs/dev-refresh-collect-batch-cap.sql first';
+  if cur.m <> c_orig_md5 or cur.l <> c_orig_len then
+    raise exception 'REFUSED: md5(prosrc) % / % chars is neither the approved ORIGINAL (% / %) nor the approved PATCHED (% / %); body has drifted or is half-patched',
+      cur.m, cur.l, c_orig_md5, c_orig_len, c_new_md5, c_new_len;
   end if;
-  n := (length(src) - length(replace(src, old_, ''))) / length(old_);
-  if n <> 1 then
-    raise exception 'blocked EXISTS anchor found % times (expected 1); refusing to patch blind', n;
-  end if;
-  execute replace(src, old_, new_);
 
-  select pg_get_functiondef('public.dev_refresh_collect()'::regprocedure) into after;
-  if (length(after) - length(replace(after, '(PLAN-STABLE', ''))) / length('(PLAN-STABLE') <> 1 then
-    raise exception 'plan-stable marker not present exactly once after the splice';
+  n := (length(cur.prosrc) - length(replace(cur.prosrc, old_, ''))) / length(old_);
+  if n <> 1 then
+    raise exception 'REFUSED: the EXISTS anchor occurs % times in the body (expected exactly 1)', n;
   end if;
-  if position(old_ in after) > 0 then
-    raise exception 'the EXISTS form survived the splice';
+  expect_body := replace(cur.prosrc, old_, new_);
+  if md5(expect_body) <> c_new_md5 or length(expect_body) <> c_new_len then
+    raise exception 'REFUSED: the planned replacement fingerprints to % / %, not the approved PATCHED % / %', md5(expect_body), length(expect_body), c_new_md5, c_new_len;
   end if;
-  if replace(after, new_, old_) <> src then
-    raise exception 'reversing the replacement does not give back the original definition';
+
+  src_def := pg_get_functiondef(fn);
+  if (length(src_def) - length(replace(src_def, cur.prosrc, ''))) / length(cur.prosrc) <> 1 then
+    raise exception 'REFUSED: the function definition does not contain its body exactly once';
   end if;
+  execute replace(src_def, old_, new_);
+
+  -- ── verify the result against the SEPARATELY established fingerprint, and that ONLY the intended expression changed ──
+  select prosrc into after_body from pg_proc where oid = fn;
+  if md5(after_body) <> c_new_md5 or length(after_body) <> c_new_len or after_body <> expect_body then
+    raise exception 'ROLLED BACK: patched body is % / %, approved PATCHED is % / %', md5(after_body), length(after_body), c_new_md5, c_new_len;
+  end if;
+  if replace(after_body, new_, old_) <> cur.prosrc then
+    raise exception 'ROLLED BACK: reversing the replacement does not give back the original body';
+  end if;
+  after_def := pg_get_functiondef(fn);
+  if replace(after_def, after_body, '@BODY@') <> replace(src_def, cur.prosrc, '@BODY@') then
+    raise exception 'ROLLED BACK: the function header/attributes changed';
+  end if;
+  select concat_ws('|', p2.proowner::regrole::text, p2.proacl::text, p2.proleakproof, p2.proisstrict, p2.provolatile, p2.proparallel,
+    (select md5(coalesce(string_agg(d.refclassid::regclass::text || ':' || d.refobjid || ':' || d.deptype::text, ',' order by d.refclassid::regclass::text collate "C", d.refobjid, d.deptype::text), ''))
+       from pg_depend d where d.classid = 'pg_proc'::regclass and d.objid = fn::oid),
+    (select count(*) from pg_depend d where d.refclassid = 'pg_proc'::regclass and d.refobjid = fn::oid))
+    into props_after from pg_proc p2 where p2.oid = fn;
+  if props_after <> props_before then
+    raise exception 'ROLLED BACK: owner/ACL/attributes/dependencies changed (% -> %)', props_before, props_after;
+  end if;
+  if (select not (prosecdef and proconfig is not distinct from array['search_path=public, net']::text[]) from pg_proc where oid = fn) then
+    raise exception 'ROLLED BACK: security properties changed';
+  end if;
+  raise notice 'EVIDENCE after: md5=% len=% (approved PATCHED); only the one expression changed; owner/ACL/config/dependencies identical', md5(after_body), length(after_body);
 end
 $mig$;
+
+commit;
+\echo APPLY dev_refresh_collect blocked-plan-stable: committed

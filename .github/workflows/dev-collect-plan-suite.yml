@@ -2,7 +2,10 @@ name: dev-collect-plan-suite
 
 # The plan-flip test for docs/dev-refresh-collect-blocked-plan-stable.sql on a DISPOSABLE Postgres: the live collector (rebuilt from the
 # committed chain and fingerprinted to production) must REPRODUCE the hash-semi-join defect at a 16-response set, and the fix must index-probe at
-# every set size, write exactly the same rows, and keep blocking on a failed source the ZIP stores. Required check IDs:
+# every set size, write exactly the same rows, and keep blocking on a failed source the ZIP stores. It also proves (a) the migration is
+# fail-closed on the original/patched md5(prosrc) fingerprints and its reversal restores the original exactly (forward, reverse, idempotency,
+# drift/marker-only/half-patch refusals, injected-error rollback, bounded lock wait); (b) COMPLETE data equivalence of the original and the
+# patched collector over a scenario matrix; (c) worst-case COUNT(*) behaviour (huge arrays, thousands of one source, many failed sources). Required check IDs:
 # test/dev_collect_plan_pg/required_checks.txt (missing, duplicated, unexpected or failed ID fails the run); the 3 prohibited weakenings must
 # each be killed. The `gate` job fails unless the suite concluded `success`. No production secret is read or needed.
 on:
@@ -19,7 +22,7 @@ on:
 jobs:
   plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     services:
       pg:
         image: postgres:17

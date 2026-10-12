@@ -78,6 +78,7 @@ has() { grep -q "$2" <<<"$1" && echo yes || echo no; }
 
 # ── 0. the LIVE function, rebuilt and fingerprinted ──────────────────────────────────────────────────────────────────────────────
 build; seed_plan_rows
+P -t -c "select pg_get_functiondef('public.dev_refresh_collect()'::regprocedure)" > "$tmp/orig.sql"   # the ORIGINAL definition, kept for the equivalence and migration sections
 t "G01 the rebuilt collector is production's, md5 $LIVE_MD5" "$(Q "select md5(prosrc) from pg_proc where proname='dev_refresh_collect' and pronamespace='public'::regnamespace")" "$LIVE_MD5"
 p16="$(plan_for 16)"; p8="$(plan_for 1)"
 t "G02 CONTROL (live): a 16-response set plans the blocked lookup as a HASH SEMI JOIN" "$(has "$p16" 'Hash Semi Join')" yes
@@ -150,5 +151,7 @@ mutate blocking_removed   's = s.replace(new, new.replace("> 0", "> 1000000000")
 mutate blocking_always_on 's = s.replace(new, new.replace("> 0", ">= 0"))'
 t "X01 all 3 prohibited weakenings are killed" "$survivors" 0
 echo "MUTATIONS: $((3-survivors)) of 3 prohibited weakenings are killed"
+# shellcheck source=extra.sh
+source "$here/extra.sh"
 echo "CHECKS: $n run, $bad failed"
 [ "$bad" -eq 0 ]
