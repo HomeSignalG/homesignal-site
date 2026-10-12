@@ -30,7 +30,7 @@
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
-  classifyByCircle, keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
+  classifyByCircle, keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER,
   type MembershipFn, type ScopeMetrics,
 } from "./scope-members.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
@@ -209,6 +209,8 @@ export type FileDateKind =
  *  `type` is the LIFECYCLE bucket the page renders (built|approved|proposed); the mapped source
  *  classification is `use_type` (kept separate so the two never collide). */
 export interface NormalizedRecord {
+  /** Present ONLY on a record kept because the polygon widening reached it (sources/scope-members.ts). */
+  scope_origin?: "polygon_member";
   source_id: string;                 // socrata:{domain}:{dataset_id}:{case_number|:id}
   source_class: string;              // "socrata"
   // NOT `registry_id` — the page reserves that field for the EPA FRS RegistryId (frsRid) and
@@ -671,6 +673,7 @@ async function normalizeRow(
     record_url_precision: precision,
     ...geoQuality,
   };
+  if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
   return rec;
 }
 
@@ -720,7 +723,7 @@ async function fetchRows(
       const kept = await keepMembers(rows, (r) =>
         classifyByCircle(num(readCol(r, entry.column_map.lat) ?? r.__lat), num(readCol(r, entry.column_map.lng) ?? r.__lng),
           deps.zipCentroid as { lat: number; lng: number }, entry.spatial_zip_radius_mi as number),
-        deps.zipMembers, m);
+        deps.zipMembers, m, (r) => { r[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; });
       out.push(...kept);
     } else {
       out.push(...rows);

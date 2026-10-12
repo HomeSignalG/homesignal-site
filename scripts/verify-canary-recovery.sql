@@ -42,7 +42,8 @@ with p as (
       where v.identity_key in (select k from lr) and v.event_type = 'first_detected' and v.material)           as c3,
     (select count(*) = (select count(*) from lr) from public.dev_change_project pr where pr.identity_key in (select k from lr)) as c4,
     coalesce((select bool_and(exists (select 1 from public.dev_change_scope_ready sr, p
-                                       where sr.zip = p.zip and sr.registry_id = coalesce(pr.registry_id, '') and sr.lapsed_at is null))
+                                       where sr.zip = p.zip and sr.registry_id = coalesce(pr.registry_id, '') and sr.lapsed_at is null
+                                         and sr.baseline_gen_seq is not null))   -- a row that only COUNTS held records is not a baseline
                 from public.dev_change_project pr where pr.identity_key in (select k from lr)), false)         as c5
 )
 select

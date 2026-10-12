@@ -26,7 +26,7 @@
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
-  keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR,
+  keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCAN_FACTOR, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER,
   type MembershipFn, type RowClass, type ScopeMetrics,
 } from "./scope-members.ts";
 import type {
@@ -599,6 +599,7 @@ async function normalizeRow(
     record_url_precision: precision,
     ...geoQuality,
   };
+  if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
   return rec;
 }
 
@@ -842,7 +843,7 @@ async function fetchRows(
     if (m && deps.zipMembers) {
       m.rows_scanned += feats.length;
       if (m.rows_scanned > scanCap) throw new ScopeMembershipError("scan_limit", `scanned more than ${scanCap} rows`);
-      for (const it of await keepMembers(pageItems, (x) => x.cls, deps.zipMembers, m)) out.push(it.row);
+      for (const it of await keepMembers(pageItems, (x) => x.cls, deps.zipMembers, m, (x) => { x.row[SCOPE_ORIGIN_KEY] = SCOPE_ORIGIN_MEMBER; })) out.push(it.row);
     } else {
       for (const it of pageItems) out.push(it.row);
     }

@@ -301,6 +301,48 @@ console.log('\n9) counts and cross-ZIP publication');
   ok(seen.length > 0 && seen.every((x) => x === '75009'), 'membership is always asked of the ZIP being built (75009 here), never of a neighbour');
 }
 
+// ── 10. recovery provenance: only records the widening alone reached carry the stamp ─────
+console.log('\n10) recovery provenance (scope_origin)');
+{
+  const z = '76258', P = pointsFor(z, 6, 5, 7);
+  const all = [...P.widenedOut, ...P.legacy, ...P.widenedIn];
+  const stamped = (o) => o.sites.filter((s) => s.scope_origin === 'polygon_member').length;
+  const anyKey = (o) => o.sites.some((s) => 'scope_origin' in s);
+  const off = await arcRun(z, all, { zipCentroid: cen(z) });
+  const on = await arcRun(z, all, { zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: memberFn(z) });
+  const bad = await arcRun(z, all, { zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: async () => { throw new Error('x'); } });
+  ok(!anyKey(off) && stamped(off) === 0, 'arcgis OFF: no record carries the key at all (output byte-identical to before)');
+  ok(on.sites.length === 11 && stamped(on) === 5, 'arcgis ON: exactly the 5 widened-only members are stamped; the 6 legacy records are not', `${stamped(on)} of ${on.sites.length}`);
+  ok(!anyKey(bad) && bad.sites.length === 6, 'arcgis RPC failure ⇒ legacy result with no stamp');
+  ok(on.sites.filter((s) => s.scope_origin).every((s) => P.widenedIn.some(([x, y]) => String(s.case_number) === pid(x, y))), 'stamps sit on the right records (not on legacy or excluded ones)');
+  const Pc = pointsFor(z, 4, 3, 5, 'circle');
+  const sEntry = {
+    registry_id: 'fx-soc', platform: 'socrata', domain: 'data.example.test', dataset_id: 'abcd-1234', dataset_url: 'https://data.example.test/d/abcd-1234',
+    coverage: [{ state: 'TX', county: 'Denton' }], spatial_zip_radius_mi: R, spatial_point_col: 'location', max_rows: 100,
+    column_map: { title: 'T', address: 'A', case_number: 'ID', status_raw: 'ST', type_source: 'T', file_date: 'D', lat: 'lat', lng: 'lng' },
+    status_to_bucket: { approved: ['Approved'], proposed: [], operating: [], exclude: [] },
+  };
+  const allC = [...Pc.widenedOut, ...Pc.legacy, ...Pc.widenedIn];
+  const rows = allC.map(([x, y], i) => ({ T: 'HOUSE', A: i + ' ST', ID: 'S' + i, ST: 'Approved', D: '2023-01-05T00:00:00.000', lat: String(y), lng: String(x) }));
+  const sgo = (deps) => soc.socrataForZip(z, [{ state: 'TX', county: 'Denton' }], [sEntry], { fetch: async (u) => {
+      const w = new URL(String(u)).searchParams.get('$where'), box = /^within_box/.test(w);
+      const hit = rows.filter((r) => box ? sb.pointInBox(+r.lat, +r.lng, sb.scopeBox(cen(z), R, bounds(z))) : inCircle(z, +r.lng, +r.lat));
+      const q = new URL(String(u)).searchParams, off = Number(q.get('$offset') || 0), lim = Number(q.get('$limit') || 1000);
+      return { ok: true, status: 200, json: async () => hit.slice(off, off + lim) }; }, sleep: async () => {}, ...deps });
+  const soff = await sgo({ zipCentroid: cen(z) }), son = await sgo({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: memberFn(z) });
+  ok(!anyKey(soff) && son.sites.length === 7 && stamped(son) === 3, 'socrata: OFF has no key; ON stamps exactly the 3 widened-only members of 7');
+  const cEntry = {
+    registry_id: 'fx-csv2', platform: 'csv', url: 'https://example.test/provenance.csv', dataset_url: 'https://example.test/d',
+    coverage: [{ state: 'TX', county: 'Denton' }], spatial_zip_radius_mi: R, max_rows: 100,
+    column_map: { title: 'T', address: 'A', case_number: 'ID', status_raw: 'ST', type_source: 'T', file_date: 'D', lat: 'LAT', lng: 'LNG' },
+    status_to_bucket: { approved: ['Approved'], proposed: [], operating: [], exclude: [] },
+  };
+  const text = ['ID,T,A,ST,D,LAT,LNG', ...allC.map(([x, y], i) => `${i},HOUSE,${i} ST,Approved,2023-01-05,${y},${x}`)].join('\n');
+  const cgo = (deps) => csvm.csvForZip(z, [{ state: 'TX', county: 'Denton' }], [cEntry], { fetch: async () => ({ ok: true, status: 200, text: async () => text, headers: new Headers() }), ...deps });
+  const coff = await cgo({ zipCentroid: cen(z) }), con = await cgo({ zipCentroid: cen(z), zipBounds: bounds(z), zipMembers: memberFn(z) });
+  ok(!anyKey(coff) && con.sites.length === 7 && stamped(con) === 3, 'csv: OFF has no key; ON stamps exactly the 3 widened-only members of 7');
+}
+
 // ── 8. wiring: one authority, no ZIP in logic ──────────────────────────────────────────
 console.log('\n8) wiring');
 {
