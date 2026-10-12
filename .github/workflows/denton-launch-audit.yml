@@ -12,12 +12,17 @@ on:
         description: "Origin to check (defaults to production)"
         required: false
         default: "https://homesignal.net"
+      task:
+        description: "audit = full 32-ZIP audit; investigate = duplicate permit ids, TxDOT line check, 76262 centroid marker"
+        required: false
+        default: "audit"
 
 permissions:
   contents: read
 
 jobs:
   data:
+    if: ${{ github.event.inputs.task != 'investigate' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -27,6 +32,7 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: python3 scripts/denton-launch-audit.py
   pages:
+    if: ${{ github.event.inputs.task != 'investigate' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -39,3 +45,13 @@ jobs:
         env:
           SITE_BASE: ${{ github.event.inputs.site_base || 'https://homesignal.net' }}
         run: node scripts/denton-launch-pages.mjs
+  investigate:
+    if: ${{ github.event.inputs.task == 'investigate' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Investigation (read only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 scripts/denton-launch-investigate.py

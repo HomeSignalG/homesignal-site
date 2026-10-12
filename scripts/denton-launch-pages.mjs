@@ -35,6 +35,7 @@ for (const z of ZIPS) {
         return {
           sites: s.length, development: dev.length, facility: s.length - dev.length,
           no_coords: dev.filter(x => x.lat == null || x.lng == null).length,
+          scopes: dev.reduce((o, x) => { o[x.scope || 'none'] = (o[x.scope || 'none'] || 0) + 1; return o; }, {}),
           no_record_url: dev.filter(x => !(x.record_url || x.url)).length,
           sample: dev.slice(0, 5).map(pick),
           text_has_not_measured: /not measured yet|no mapped area|could not be read|couldn.t load/i.test(document.body.innerText || ''),
