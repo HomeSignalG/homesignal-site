@@ -37,7 +37,12 @@ rows = sql(f"""with c as (select st_setsrid(st_geomfromgeojson('{geo}'),4269) g)
  from z, c where st_intersects(z.zg,c.g) order by 1""")
 touch_only = [r['zip'] for r in rows if not r['positive_area']]
 rows = [r for r in rows if r['positive_area']]
-out = {"county": f["properties"], "county_geometry_json_chars": ncoords, "boundary_only_touches": touch_only, "below_0_05_km2": [r for r in rows if float(r["km2_in_denton"]) <= 0.05], "intersecting_zips": len(rows), "in_list": sorted(r["zip"] for r in rows if r["zip"] in LIST),
+# Is every part of the county inside SOME ZIP polygon? (uncovered = county area no canonical ZIP polygon contains)
+gap = sql(f"""with c as (select st_setsrid(st_geomfromgeojson('{geo}'),4269) g),
+ u as (select st_union(b.g) g from public.canonical_zip_registry r join lateral (select geo.zip_membership_boundary(r.zip::text) g) b on true, c where b.g is not null and st_intersects(b.g,c.g))
+ select round((st_area(c.g::geography)/1e6)::numeric,2) county_km2,
+        round((st_area(st_difference(c.g,u.g)::geography)/1e6)::numeric,3) uncovered_km2 from c,u""")
+out = {"county": f["properties"], "territory_gap": gap, "county_geometry_json_chars": ncoords, "boundary_only_touches": touch_only, "below_0_05_km2": [r for r in rows if float(r["km2_in_denton"]) <= 0.05], "intersecting_zips": len(rows), "in_list": sorted(r["zip"] for r in rows if r["zip"] in LIST),
        "list_zips_not_intersecting_denton": sorted(LIST - {r["zip"] for r in rows}),
        "not_in_list": [r for r in rows if r["zip"] not in LIST],
        "nongeographic_have_boundary": [z for z in sorted(NONGEO) if any(r["zip"]==z for r in rows)], "all": rows}
