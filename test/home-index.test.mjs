@@ -47,7 +47,7 @@ console.log('--- 1. one map, and it is Map 1 ---');
 const iframes = tpl.match(/<iframe[\s\S]*?<\/iframe>/g) || [];
 ok(iframes.length === 1, 'the homepage has exactly one iframe', iframes.length);
 const frame = iframes[0] || '';
-ok(/src="homesignalmap\.html\?embed=1&amp;preview=1&amp;zip=78657"/.test(frame), 'its initial src is exactly homesignalmap.html?embed=1&preview=1&zip=78657');
+ok(/src="homesignalmap\.html\?embed=1&amp;preview=1&amp;zip=75034"/.test(frame), 'its initial src is exactly homesignalmap.html?embed=1&preview=1&zip=75034');
 ok(/title="Sample HomeSignal development map"/.test(frame) && /loading="lazy"/.test(frame) && /tabindex="-1"/.test(frame),
   'title, loading="lazy" and tabindex="-1" are as specified');
 ok(!/\sheight=|style="[^"]*height/.test(frame), 'the sample iframe carries no fixed height');
