@@ -94,6 +94,10 @@ ok(/\.\.\.\(subject\.label \? \{ label: subject\.label \} : \{\}\)/.test(reportF
 const PAGE_RAW = read('development-activity-reports.html');
 const PAGE = stripJs(PAGE_RAW);
 ok(/id="profile"[^>]*hidden/.test(PAGE_RAW) && /id="agent-name"[^>]*maxlength="80"/.test(PAGE_RAW), '5a the "Your name on reports" card starts hidden and the box holds at most 80 characters (positive control)');
+{ const acct = PAGE_RAW.slice(PAGE_RAW.indexOf('<details class="acct"'), PAGE_RAW.indexOf('</details>', PAGE_RAW.indexOf('<details class="acct"')));
+  const create = PAGE_RAW.slice(PAGE_RAW.indexOf('<section class="card create"'), PAGE_RAW.indexOf('<div class="ws">'));
+  ok(!/id="profile"|id="agent-name"|id="save-name"|Your name on reports/.test(acct) && /id="profile"/.test(create) && (PAGE_RAW.match(/id="agent-name"/g) || []).length === 1 && (PAGE_RAW.match(/id="pf"/g) || []).length === 1,
+    '5a2 the name editor lives in Create a property report, not Account and administration, and exists exactly once (no second field)'); }
 const saves = PAGE.match(/client\.auth\.updateUser\([^)]*\)/g) || [];
 ok(saves.length === 1 && saves[0] === 'client.auth.updateUser({ data: { full_name: name } })', '5b the page makes ONE call to change the account, and it sets one thing: full_name', saves);
 ok(!/(localStorage|sessionStorage|indexedDB)[^;]*(agent|full_name|name\b)/i.test(PAGE.replace(/hs-da-invite/g, '')), '5c the name is kept in the sign-in account only, never in the browser');

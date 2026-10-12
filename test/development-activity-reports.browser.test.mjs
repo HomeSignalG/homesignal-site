@@ -323,7 +323,7 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
   TRIALS.set(page, trials);
   await page.goto(base + PAGE + hash, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__sb && window.__sb.listeners.length > 0);
-  // "Account and administration" (Billing, Your name on reports, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
+  // "Account and administration" (Billing, Invite an agent) is a <details> that is CLOSED until wanted, so a control inside it has no box. The
   // checks of those cards are about the cards, so they are read with the section open; the closed default is asserted on its own (Part L, accountClosed).
   if (!accountClosed) await page.evaluate(() => { document.getElementById('account').open = true; });
   return { ctx, page, errors, reports, trials, foreign, saved, shareCalls, watchCalls, billingCalls, checkouts, w };
@@ -427,7 +427,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const removed = await so.page.evaluate(() => { let n = 0; for (const sh of document.styleSheets) { for (let i = sh.cssRules.length - 1; i >= 0; i--) { const t = sh.cssRules[i].selectorText; if (t === '[hidden]') { sh.deleteRule(i); n++; } else if (t && t.includes(':has(')) sh.deleteRule(i); } } return n; });
   const drawnOld = await drawnCards(so.page);
   ok(removed === 1 && JSON.stringify(drawnOld.slice().sort()) === JSON.stringify(CARDS.slice().sort()),
-    '2i without the page\'s [hidden] rule the same read finds all seven hidden cards drawn: this check fails on the old page', { removed, drawnOld });
+    '2i without the page\'s [hidden] rule the same read finds the hidden cards drawn: this check fails on the old page', { removed, drawnOld });
   ok(so.errors.length === 0 && so.foreign.length === 0, '2j signed out: no page error, nothing foreign fetched', { e: so.errors, f: so.foreign });
   await so.ctx.close();
 }
@@ -752,25 +752,32 @@ const waitRows = (page, k) => page.waitForFunction((c) => document.querySelector
 
 // ---- 8. the header and "Your name on reports" (build step 7) -------------------------------------------------------------------------------
 const profileShown = (page) => page.$eval('#profile', (e) => !e.hidden);
+const editBy = (page) => page.click('#by-edit'); // the name box is behind "Edit" on the Report by line
+const byName = (page) => page.$eval('#by-name', (e) => e.textContent.trim());
 const whoLine = (page) => page.$eval('#report .da-rv-who', (e) => e.textContent.trim()).catch(() => null);
 const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textContent.trim()).catch(() => null);
 {
   const w = world();
   const { ctx, page, errors, foreign, reports } = await open({ w });
   await waitCount(page, /free reports used/);
-  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && /Your name on reports/.test(await text(page, '#profile-title')),
-    '8a a trial member sees the "Your name on reports" card, with the box empty when they have given no name');
+  ok(await profileShown(page) && (await page.$eval('#agent-name', (e) => e.value)) === '' && (await byName(page)) === 'Not set' && (await page.$eval('#by-edit', (e) => e.textContent)) === 'Add name' && await page.$eval('#profile', (e) => !!e.closest('.create') && !e.closest('#account')) && !(await page.$eval('#pf', (e) => e.checkVisibility())),
+    '8a a trial member sees "Report by: Not set" with an Add name button inside Create a property report (not Account), the box empty and closed');
   await page.fill('#label', 'Smith buyers');
   await make(page);
   ok(await whoLine(page) === 'Acme Realty' && await labelLine(page) === 'Smith buyers' && reports[0].body.label === 'Smith buyers',
     '8b a report shows the brokerage\'s name from the account, and the client label the person typed, in its header (no name yet, so none is invented)', [await whoLine(page), await labelLine(page)]);
+  await editBy(page);
   await page.fill('#agent-name', '  Pat   Agent ');
   await page.click('#save-name');
   await page.waitForFunction(() => /^Saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
   const upd = await page.evaluate(() => window.__sb.updates);
   ok(upd.length === 1 && JSON.stringify(upd[0]) === '{"data":{"full_name":"Pat Agent"}}' && /^Saved/.test(await text(page, '#profile-status')),
     '8c saving sends ONE update to the sign-in account, with the name as one clean line and nothing else, and says it is saved', upd);
-  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent', '8c2 and the box shows the cleaned name');
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent' && (await byName(page)) === 'Pat Agent' && !(await page.$eval('#pf', (e) => e.checkVisibility())) && (await page.$eval('#by-edit', (e) => e.textContent)) === 'Edit',
+    '8c2 and the line shows the cleaned name with an Edit button, the editor closed');
+  await editBy(page); await page.fill('#agent-name', 'Someone Else'); await page.click('#cancel-name');
+  ok((await byName(page)) === 'Pat Agent' && (await page.$eval('#agent-name', (e) => e.value)) === 'Pat Agent' && (await page.evaluate(() => window.__sb.updates.length)) === 1 && !(await page.$eval('#pf', (e) => e.checkVisibility())),
+    '8c3 Cancel leaves the saved name unchanged, sends nothing and closes the editor');
   await page.fill('#label', ''); // the second report is made with no client label
   await make(page, OTHER);
   ok(await whoLine(page) === 'Acme Realty · Pat Agent', '8d the next report\'s header carries the name', await whoLine(page));
@@ -791,7 +798,8 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const w = world(); w.header = { brokerage: 'Acme Realty', agent: 'Jo Agent' };
   const { ctx, page } = await open({ w, name: 'Jo Agent' });
   await waitCount(page, /free reports used/);
-  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent', '8h the box starts with the name already on the person\'s account');
+  ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Agent' && (await byName(page)) === 'Jo Agent', '8h the line and the box start with the name already on the person\'s account');
+  await editBy(page);
   await page.fill('#agent-name', 'Jo Q. Agent');
   await make(page);
   ok((await page.$eval('#agent-name', (e) => e.value)) === 'Jo Q. Agent' && await whoLine(page) === 'Acme Realty · Jo Agent',
@@ -811,6 +819,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const { ctx, page } = await open({ w });
   await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateFails = true; });
+  await editBy(page);
   await page.fill('#agent-name', 'Pat Agent');
   await page.click('#save-name');
   await page.waitForFunction(() => /could not be saved/.test(document.getElementById('profile-status').textContent), null, { timeout: 8000 }).catch(() => {});
@@ -873,6 +882,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
   const { ctx, page } = await open({ w: world(), name: 'Pat Agent' });
   await waitCount(page, /free reports used/);
   await page.evaluate(() => { window.__sb.updateHold = true; });
+  await editBy(page);
   await page.fill('#agent-name', 'Pat Q. Agent');
   await page.click('#save-name');
   ok(/Saving/.test(await text(page, '#profile-status')) && (await page.$eval('#save-name', (e) => e.disabled)), '8t (control) while the answer is on its way the page says it is saving and the button waits');
@@ -905,6 +915,15 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 // see. Who may share, for how long and whether a link works are the database's, proved by test/report_share_delivery_pg.
 const LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
 const shareHidden = (page) => page.$eval('#share', (e) => e.hidden);
+// The card's own "Make a client link" button is gone (founder, 2026-10-11): the report's Share with Client action is the one entry point. This makes a link the way an agent does,
+// and closes the popup so the next step can reach the page. The old button always made a NEW link, so a link already on screen is cleared first (the action reuses it).
+async function makeLink(page){
+  await page.evaluate(() => { document.getElementById('share-new').hidden = true; });
+  await page.click('#rail-actions [data-da-action="share"]');
+  await page.waitForFunction(() => { const m = document.getElementById('share-pop-msg').textContent; return !document.getElementById('share-pop').hidden && m && !/Making/.test(m); }, null, { timeout: 8000 }).catch(() => {});
+  await page.click('#share-pop-close').catch(() => {});
+}
+const openManage = (page) => page.evaluate(() => { document.getElementById('share').open = true; });
 const shareList = (page) => page.$$eval('#share-list li', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
 const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('share-status').textContent + ' ' + document.getElementById('share-list').textContent), re.source, { timeout: 8000 }).catch(() => {});
 {
@@ -913,17 +932,19 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await waitCount(page, /free reports used/);
   ok(await shareHidden(page), '9a before any report, the share card is not shown');
   await make(page);
-  ok(!(await shareHidden(page)) && /Share this report with your client/.test(await text(page, '#share-title')), '9b a report that was saved shows the share card');
-  await waitShare(page, /No client link has been made/);
+  await waitShare(page, /^$/);
+  ok(await shareHidden(page) && (await drawn(page, '#rail-actions [data-da-action="share"]')), '9b a saved report with no client link shows only the Share with Client action: no management section is drawn');
   const first = shareCalls[0];
   ok(first && first.body.action === 'list' && /^c0000000-/.test(first.body.report_id) && Object.keys(first.body).sort().join() === 'action,report_id' && first.auth === 'Bearer user-token',
     '9c the page asked for the report\'s links with the signed-in person\'s own token, naming the saved report and nothing else', first);
-  ok(/6 months/.test(await text(page, '#share .sub')) && /street address/.test(await text(page, '#share .sub')) && /not your name, not your client label/.test(await text(page, '#share .sub')),
-    '9d the card says in plain words what the client sees and for how long');
+  ok(await page.evaluate(() => { const t = document.getElementById('share-pop').textContent; return /6 months/.test(t) && /street address/.test(t) && /not your name, not your client label/.test(t); }),
+    '9d the share popup says in plain words what the client sees and for how long');
 
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   const link = await page.$eval('#share-link', (e) => e.value);
+  ok(!(await shareHidden(page)) && /Manage client links/.test(await text(page, '#share > summary')) && !(await page.$eval('#share', (e) => e.open)), '9d2 once a link exists a quiet "Manage client links" appears, closed');
+  await openManage(page);
   ok(LINK.test(link) && link === SR.shareLink(link.split('#share=')[1]), '9e the link is shown, in the one form the server makes (the page builds none of it)', link);
   const created = shareCalls.filter((c) => c.body.action === 'create');
   ok(created.length === 1 && Object.keys(created[0].body).sort().join() === 'action,report_id', '9f the create request names the report and nothing else: no address, no client label, no expiry, no token');
@@ -935,7 +956,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     '9i the token goes to the server nowhere and into browser storage nowhere');
 
   // a second link, then withdraw the first
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => document.querySelectorAll('#share-list li').length === 2, null, { timeout: 8000 }).catch(() => {});
   ok((await shareList(page)).length === 2 && (await page.$eval('#share-link', (e) => e.value)) !== link, '9j a second link is a different link, and both are listed');
   await page.click('#share-list li:last-child button');
@@ -1047,7 +1068,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const { ctx, page } = await open({ w });
   await waitCount(page, /free reports used/);
   await make(page);
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(LINK.test(await page.$eval('#share-link', (e) => e.value)), '9t (control) a link is on screen');
   await page.fill('#addr', OTHER);
@@ -1058,7 +1079,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.click('#saved-list li:last-child button');
   await page.waitForFunction(() => /Saved report/.test(document.getElementById('saved-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(!(await shareHidden(page)) && (await page.$eval('#share-link', (e) => e.value)) === '', '9v opening a saved report shows its card with no link on it (a link is never shown a second time)');
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   await page.click('.da-rv-act[data-da-action="share"]');
   const openedBefore = await page.evaluate(() => !document.getElementById('share-pop').hidden && document.getElementById('share-pop-link').value !== '');
@@ -1075,10 +1096,10 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await waitCount(page, /free reports used/);
   await make(page);
   w.shareFails = true;
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => /could not be done/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
-  ok(/Try again in a minute/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)) && !(await page.$eval('#share-make', (e) => e.disabled)),
-    '9x an unreachable service says so in plain words, shows no link, and leaves the button free');
+  ok(/Try again in a minute/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)),
+    '9x an unreachable service says so in plain words and shows no link');
   // the same failure reached through the report's own Share button is said inside the popup, not left behind in a card out of sight
   await page.click('#share-pop-close').catch(() => {});
   await page.click('.da-rv-act[data-da-action="share"]');
@@ -1087,7 +1108,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(failPop.open && !failPop.body && failPop.err && /Try again in a minute/.test(failPop.msg) && failPop.link === '', '9x2 when the link cannot be made the popup says so in plain words and shows no link', failPop);
   await page.click('#share-pop-close');
   w.shareFails = false; w.shareLimit = true;
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => /most client links/.test(document.getElementById('share-status').textContent), null, { timeout: 8000 }).catch(() => {});
   ok(/most client links it can have/.test(await text(page, '#share-status')) && (await page.$eval('#share-new', (e) => e.hidden)), '9y a report at the most links it can have says so');
   await ctx.close();
@@ -1097,7 +1118,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const { ctx, page } = await open({ w, width: 390, height: 844 });
   await waitCount(page, /free reports used/);
   await make(page);
-  await page.click('#share-make');
+  await makeLink(page);
   await page.waitForFunction(() => !document.getElementById('share-new').hidden, null, { timeout: 8000 }).catch(() => {});
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(wide <= 0, '9z on a 390 px screen the share card, the link and the list do not scroll the page sideways', wide);
@@ -1120,6 +1141,11 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 // never go to the Watch function, and that another report or another person never inherits a watch. Who may watch, how many a brokerage may
 // have and when a check runs are the database's, proved by test/property_watch_pg.
 const watchHidden = (page) => page.$eval('#watch', (e) => e.hidden);
+// The Watch panel opens from the report's Watch Property action (founder, 2026-10-11); this presses a panel control the way an agent reaches it.
+async function wclick(page, sel){
+  await page.evaluate(() => { const w = document.getElementById('watch'); if (w.hidden || !w.open) document.querySelector('#rail-actions [data-da-action="watch"]').click(); });
+  await page.click(sel);
+}
 const watchButtons = (page) => page.evaluate(() => ({ start: !document.getElementById('watch-start').hidden, stop: !document.getElementById('watch-stop').hidden }));
 const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.getElementById('watch-state').textContent + ' ' + document.getElementById('watch-status').textContent), re.source, { timeout: 8000 }).catch(() => {});
 {
@@ -1128,18 +1154,18 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await waitCount(page, /free reports used/);
   ok(await watchHidden(page), '10a before any report, the Watch card is not shown');
   await make(page);
-  ok(!(await watchHidden(page)) && /Watch this property/.test(await text(page, '#watch-title')), '10b a report that was saved shows the Watch card');
+  ok(await watchHidden(page) && (await drawn(page, '#rail-actions [data-da-action="watch"]')), '10b a saved report with no watch shows only the Watch Property action: the panel is not drawn until it is pressed');
   await waitWatch(page, /not watching/);
   const first = watchCalls[0];
   ok(first && first.body.action === 'list' && Object.keys(first.body).join() === 'action' && first.auth === 'Bearer user-token',
     '10c the page first asked for the person\'s own watches, with their own token, and sent nothing else', first);
-  const sub = await text(page, '#watch .sub');
+  const sub = await text(page, '#watch .hint');
   ok(/once a day/.test(sub) && /address you signed in with/.test(sub) && /does not include the property's address/.test(sub),
     '10d the card says in plain words how often it checks, where the email goes, and that the email leaves the address out', sub);
   ok(JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && /You are not watching this property/.test(await text(page, '#watch-state')),
     '10e not yet watching: "Watch this property" is offered, "Stop watching" is not, and the page says so');
 
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
   const started = watchCalls.filter((c) => c.body.action === 'start');
   ok(started.length === 1 && Object.keys(started[0].body).sort().join() === 'action,report_id' && /^c0000000-/.test(started[0].body.report_id) && started[0].auth === 'Bearer user-token',
@@ -1171,7 +1197,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await page.click('.da-rv-act[data-da-action="watch"]');
   ok(await page.evaluate(() => document.activeElement && document.activeElement.id) === 'watch-stop', '10k the report\'s own Watch button takes the person to the card (focus on "Stop watching" while it is on)');
 
-  await page.click('#watch-stop');
+  await wclick(page, '#watch-stop');
   await waitWatch(page, /no longer watching/);
   await waitWatch(page, /You are not watching this property/); // the card is redrawn from the server's list after the stop answer
   const stopped = watchCalls.filter((c) => c.body.action === 'stop');
@@ -1207,23 +1233,23 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   await make(page);
   await waitWatch(page, /not watching/);
   w.watchFails = true;
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /could not be done/);
   ok(/Try again in a minute/.test(await text(page, '#watch-status')) && JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: true, stop: false }) && !(await page.$eval('#watch-start', (e) => e.disabled)) && w.watches.length === 0,
     '10s an unreachable service says so in plain words, leaves the button free and starts nothing');
   w.watchFails = false; w.watchLimit = true;
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /most properties/);
   ok(/most properties it can/.test(await text(page, '#watch-status')) && w.watches.length === 0, '10t a brokerage at its limit is told so, plainly');
   w.watchLimit = false; w.watchNotKept = true;
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /no longer keeps/);
   ok(/no longer keeps this property.s address/.test(await text(page, '#watch-status')) && /Make a new report/.test(await text(page, '#watch-status')) && w.watches.length === 0, '10u a property whose address has been purged is told so, with what to do');
   w.watchNotKept = false;
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
   w.watchFails = true;
-  await page.click('#watch-stop');
+  await wclick(page, '#watch-stop');
   await waitWatch(page, /could not be done/);
   ok(w.watches.length === 1 && JSON.stringify(await watchButtons(page)) === JSON.stringify({ start: false, stop: true }) && !(await page.$eval('#watch-stop', (e) => e.disabled)),
     '10v a stop that fails leaves the watch on, says so, and leaves the button free');
@@ -1247,7 +1273,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const { ctx, page } = await open({ w });
   await waitCount(page, /free reports used/);
   await make(page);
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
   await page.fill('#addr', OTHER);
   await page.click('#go');
@@ -1265,7 +1291,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const { ctx, page } = await open({ w });
   await waitCount(page, /free reports used/);
   await make(page);
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
   const swap = await page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
@@ -1297,7 +1323,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   const { ctx, page } = await open({ w, width: 390, height: 844 });
   await waitCount(page, /free reports used/);
   await make(page);
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await waitWatch(page, /You are watching this property, since/);
   const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok(wide <= 0, '10z on a 390 px screen the Watch card does not scroll the page sideways', wide);
@@ -2110,12 +2136,12 @@ const noSideways = (page) => page.evaluate(() => document.documentElement.scroll
   ok(t.create < t.actions && t.actions < t.saved && t.saved < t.account && !(await page.$('#rail #rf')), 'L2c Create sits above the workspace; the rail then runs This report\'s tools, Saved reports, Account and administration', t);
   const bar = await page.evaluate(() => { const n = document.querySelector('#rail-actions > .da-rv-actions'); return { inRail: !!n && !!n.closest('#rail'), inReport: !!document.querySelector('#report .da-rv-actions'), labels: n ? [...n.querySelectorAll('button')].map((b) => b.textContent) : [] }; });
   ok(bar.inRail && !bar.inReport && JSON.stringify(bar.labels) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF', 'Compare']), 'L2d the report\'s action buttons sit in the rail, not under the report: Share with Client, Watch Property, Download PDF, Compare', bar);
-  ok(await drawn(page, '#share') && await drawn(page, '#watch'), 'L2e the client-link and watch cards are drawn once a saved report is open');
-  ok(!(await page.$eval('#account', (e) => e.open)) && (await drawn(page, '#account > summary')) && !(await page.$eval('#billing', (e) => e.checkVisibility())) && !(await page.$eval('#team', (e) => e.checkVisibility())) && !(await page.$eval('#profile', (e) => e.checkVisibility())),
-    'L2f the account section is closed by default: its heading is drawn, Billing, Invite an agent and Your name on reports are not');
+  ok(await drawn(page, '#rail-report') && !(await drawn(page, '#share')) && !(await drawn(page, '#watch')), 'L2e a saved report shows This report with its actions; the client-link and watch management are not drawn until used');
+  ok(!(await page.$eval('#account', (e) => e.open)) && (await drawn(page, '#account > summary')) && !(await page.$eval('#billing', (e) => e.checkVisibility())) && !(await page.$eval('#team', (e) => e.checkVisibility())) && (await drawn(page, '#profile')) && !(await page.$eval('#account #profile', (e) => !!e).catch(() => false)),
+    'L2f the account section is closed by default: its heading is drawn, Billing and Invite an agent are not; "Report by" is drawn in Create and is not in the account section');
   await shot(page, 'L2-report-desktop');
   await page.click('#account > summary');
-  ok((await drawn(page, '#billing')) && (await drawn(page, '#team')) && (await drawn(page, '#profile')), 'L2g opening it shows Billing, Your name on reports and Invite an agent');
+  ok((await drawn(page, '#billing')) && (await drawn(page, '#team')) && (await drawn(page, '#profile')), 'L2g opening it shows Billing and Invite an agent (Report by is already in Create)');
   await shot(page, 'L2-account-open-desktop');
   await page.click('#account > summary');
   // the one library: every row opens a report and holds its own checkbox, and there is no second list
@@ -2195,7 +2221,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 7, 'L5f View all shows every saved report');
   await page.click('#saved-more');
   if (SHOTS) {   // review screenshots only (never in CI): true 100% zoom, the worst case for the rail (three client links), window then whole page
-    for (let i = 0; i < 3; i++) { await page.click('#share-make'); await page.waitForFunction((n) => document.querySelectorAll('#share-list li').length >= n, i + 1, { timeout: 8000 }).catch(() => {}); }
+    for (let i = 0; i < 3; i++) { await makeLink(page); await page.waitForFunction((n) => document.querySelectorAll('#share-list li').length >= n, i + 1, { timeout: 8000 }).catch(() => {}); }
     await page.evaluate(() => { scrollTo(0, 0); document.getElementById('rail').scrollTop = 0; });
     await page.screenshot({ path: SHOTS + '/V-' + width + 'x' + height + '.png' });
     await page.screenshot({ path: SHOTS + '/F-' + width + 'x' + height + '.png', fullPage: true });
@@ -2349,7 +2375,7 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   await page.click('#rail-actions .da-rv-act[data-da-action="watch"]');
   await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'watch-start', null, { timeout: 4000 }).catch(() => {});
   const w0 = watchCalls.filter((c) => c.body.action === 'start').length;
-  await page.click('#watch-start');
+  await wclick(page, '#watch-start');
   await page.waitForFunction(() => !document.getElementById('watch-stop').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(watchCalls.filter((c) => c.body.action === 'start').length === w0 + 1 && !(await page.$eval('#watch-stop', (e) => e.hidden)), 'N6 Watch Property still starts watching the property');
   // generating a report still works and still counts
@@ -2366,6 +2392,24 @@ for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
   // signed out: the card and its button stay out of the page too
   const { ctx, page } = await open({ signedIn: false, compare: false });
   ok(!(await drawn(page, '#compare-mode')) && !(await drawn(page, '#compare')) && !/compar/i.test(await page.evaluate(() => document.body.innerText)), 'N9 signed out, there is no Compare control or wording either');
+  await ctx.close();
+}
+
+{
+  // THE LEFT RAIL ANSWERS TWO QUESTIONS ONLY (founder, 2026-10-11): what can I do with THIS report, and which OTHER report do I open.
+  const w = world();
+  const { ctx, page, errors } = await open({ w, compare: false });
+  await waitCount(page, /free reports used/);
+  ok(!(await drawn(page, '#rail-report')) && !/Open a report to share/.test(await page.evaluate(() => document.getElementById('rail').innerText)), 'O1 with no report open the rail has no empty "This report" section');
+  await make(page);
+  ok(await drawn(page, '#rail-report'), 'O2 with a report open, This report is drawn');
+  const rail = await page.evaluate(() => ({ buttons: [...document.querySelectorAll('#rail-report button')].filter((b) => b.getClientRects().length).map((b) => b.textContent.trim()), text: document.getElementById('rail').innerText }));
+  ok(JSON.stringify(rail.buttons) === JSON.stringify(['Share with Client', 'Watch Property', 'Download PDF']), 'O3 the report has exactly one Share, one Watch and one Download PDF entry point', rail.buttons);
+  ok(!/Make a client link|Share this report with your client|Watch this property|Account and administration/.test(rail.text), 'O4 no second Share or Watch card and no account section is in the rail', rail.text);
+  ok((await page.$eval('#watch', (e) => e.hidden)) && (await page.$eval('#share', (e) => e.hidden)), 'O5 no Watch or client-link management is drawn until it is wanted');
+  await page.click('#rail-actions [data-da-action="watch"]');
+  ok((await drawn(page, '#watch-start')) && /Start watching/.test(await text(page, '#watch-start')), 'O6 Watch Property reveals the existing watch panel with its start control');
+  ok(errors.length === 0, 'O7 no page error', errors);
   await ctx.close();
 }
 
