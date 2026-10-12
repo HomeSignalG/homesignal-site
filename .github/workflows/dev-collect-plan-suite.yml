@@ -1,0 +1,51 @@
+name: dev-collect-plan-suite
+
+# The plan-flip test for docs/dev-refresh-collect-blocked-plan-stable.sql on a DISPOSABLE Postgres: the live collector (rebuilt from the
+# committed chain and fingerprinted to production) must REPRODUCE the hash-semi-join defect at a 16-response set, and the fix must index-probe at
+# every set size, write exactly the same rows, and keep blocking on a failed source the ZIP stores. Required check IDs:
+# test/dev_collect_plan_pg/required_checks.txt (missing, duplicated, unexpected or failed ID fails the run); the 3 prohibited weakenings must
+# each be killed. The `gate` job fails unless the suite concluded `success`. No production secret is read or needed.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-refresh-collect-*.sql'
+      - 'test/dev_collect_plan_pg/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/dev_refresh_restart_pg/**'
+      - 'test/lib/**'
+      - '.github/workflows/dev-collect-plan-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      pg:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: dev_collect_plan_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: dev_collect_plan_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any production credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
+      - name: Plan-flip reproduction, fix and prohibited weakenings
+        run: |
+          set -o pipefail
+          psql -X -c 'select 1' >/dev/null
+          bash test/dev_collect_plan_pg/run.sh 2>&1 | tee /tmp/plan.log
+          bash test/lib/require_exact_ids.sh test/dev_collect_plan_pg/required_checks.txt /tmp/plan.log
+          grep -q '^MUTATIONS: 3 of 3 prohibited weakenings are killed' /tmp/plan.log
+
+  gate:
+    if: always()
+    needs: [plan]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "plan=${{ needs.plan.result }}"
+          [ "${{ needs.plan.result }}" = success ]
