@@ -16,10 +16,10 @@ Do **not** create a homepage map PNG/WebP.
 
 Render the existing Map 1 product surface:
 
-`homesignalmap.html?embed=1&zip=78657`
+`homesignalmap.html?embed=1&preview=1&zip=75034`
 
 The initial homepage sample is noninteractive at the host wrapper level, but it must retain Map 1's own **STATUS / PROJECT TYPE / REGULATORY RECORDS** controls, map key, markers, geography, and data. After a user searches, the same Map 1 iframe becomes interactive with the searched ZIP or resolved address.
 
 There is one map implementation: `homesignalmap.html`.
 
-**Revised 2026-10-12 (real example report):** the preview is the REAL report for 3999 Touraine Dr, Frisco, TX 75034, rendered by `lib/da-report-view.js` over the stored report body in `data/home-showcase/touraine-75034-report-body.json` (byte-identical to the production snapshot; md5 pinned). `node scripts/build-home-showcase-preview.mjs` builds both webp files and `data/home-showcase/preview-receipt.json`; `--check` is read-only and compares the rendered TEXT (font-independent) and asset sizes. It shows 4 of the 9 records (one per kind) and says so in the image. Verification screenshots: `docs/receipts/home-showcase/`. The separate ZIP-wide Map 1 example (78657) is unchanged.
+**Revised 2026-10-12 (real example report):** the preview is the REAL report for 3999 Touraine Dr, Frisco, TX 75034, rendered by `lib/da-report-view.js` over the stored report body in `data/home-showcase/touraine-75034-report-body.json` (byte-identical to the production snapshot; md5 pinned). `node scripts/build-home-showcase-preview.mjs` builds both webp files and `data/home-showcase/preview-receipt.json`; `--check` is read-only and compares the rendered TEXT (font-independent) and asset sizes. It shows 4 of the 9 records (one per kind) and says so in the image. Verification screenshots: `docs/receipts/home-showcase/`. The ZIP-wide Map 1 sample now also uses Frisco 75034 (with live ZIP-specific records), matching the 3999 Touraine Dr report example; no fabricated development cards are hardcoded into the homepage.

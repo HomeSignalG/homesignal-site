@@ -26,16 +26,27 @@ export async function serve() {
   return { srv, base: 'http://127.0.0.1:' + srv.address().port };
 }
 
+// Distinct, synthetic Frisco rows for browser-only tests. The live homepage
+// still reads actual app_projects_for_zip data; none of these names ship as content.
+export const PROJECTS_75034 = [
+  { id: 'f1', source_key: 'f-key1', name: 'Frisco Residential Permit (test fixture)', type: 'Residential', status: 'Approved', stage: 'Permit issued', source_ref: 'https://example.gov/f1', submitted_at: '2026-10-06', lat: 33.15, lng: -96.82 },
+  { id: 'f2', source_key: 'f-key2', name: 'Frisco Road Project (test fixture)', type: 'Roads & Infrastructure', status: 'Proposed', stage: 'Under review', source_ref: 'https://example.gov/f2', submitted_at: '2026-10-04', lat: 33.16, lng: -96.83 },
+  { id: 'f3', source_key: 'f-key3', name: 'Frisco Civic Permit (test fixture)', type: 'Civic & Public', status: 'Approved', stage: 'Permit issued', source_ref: 'https://example.gov/f3', submitted_at: '2026-09-20', lat: 33.14, lng: -96.81 },
+  { id: 'f4', source_key: 'f-key4', name: 'Frisco Commercial Permit (test fixture)', type: 'Commercial', status: 'Approved', source_ref: 'https://example.gov/f4', submitted_at: '2026-09-10', lat: 33.15, lng: -96.82 }
+];
+
 export const PROJECTS_78657 = [
   { id: 'p1', source_key: 'k1', name: 'Horseshoe Bay Resort Marina Expansion', type: 'Commercial', status: 'Proposed', stage: 'Site plan under review', source_ref: 'https://example.gov/p1', submitted_at: '2026-09-10', lat: 30.54, lng: -98.37 },
   { id: 'p2', source_key: 'k2', name: 'FM 2147 Bridge Replacement', type: 'Roads & Infrastructure', status: 'Approved', stage: 'Contract awarded', source_ref: 'https://example.gov/p2', submitted_at: '2026-08-20', lat: 30.55, lng: -98.36 },
   { id: 'p3', source_key: 'k3', name: 'Applehead Island Townhomes', type: 'Residential', status: 'Operating', source_ref: 'https://example.gov/p3', submitted_at: '2026-07-02', lat: 30.53, lng: -98.38 },
   { id: 'p4', source_key: 'k4', name: 'Fourth record', type: 'Commercial', status: 'Proposed', source_ref: 'https://example.gov/p4', submitted_at: '2026-06-01', lat: 30.53, lng: -98.39 }
 ];
-const ZIP_AUTH = (zip) => zip === '78657' ? { zip, mode: 'development', status: 'boundary_complete',
-  projects: PROJECTS_78657.map(p => ({ source_key: p.source_key, project_ref: p.source_key, name: p.name, type: p.type, status: p.status, registry_id: 'x', source_ref: p.source_ref, submitted_at: p.submitted_at, date_kind: 'filed' })),
-  markers: PROJECTS_78657.map((p, i) => ({ project_ref: p.source_key, lat: p.lat, lng: p.lng, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 })) }
-  : { zip, mode: 'development', status: 'boundary_complete', projects: [], markers: [] };
+const ZIP_AUTH = (zip) => {
+  const source = zip === '75034' ? PROJECTS_75034 : zip === '78657' ? PROJECTS_78657 : [];
+  return { zip, mode: 'development', status: 'boundary_complete',
+    projects: source.map(p => ({ source_key: p.source_key, project_ref: p.source_key, name: p.name, type: p.type, status: p.status, registry_id: 'x', source_ref: p.source_ref, submitted_at: p.submitted_at, date_kind: 'filed' })),
+    markers: source.map(p => ({ project_ref: p.source_key, lat: p.lat, lng: p.lng, marker_rule: 'POINT_AUTHORITATIVE', marker_seq: 0 })) };
+};
 
 export function supabaseStub(opts = {}) {
   return `
@@ -124,7 +135,7 @@ export async function open(browser, base, path, { width = 1440, height = 1000, s
     }
     if (url.includes('/rest/v1/development_reports')) {
       const z = (url.match(/zip=eq\.(\d{5})/) || [])[1];
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(z ? [{ zip: z, home_lat: 30.54, home_lng: -98.37, counts: {}, refreshed_at: '2026-09-30T00:00:00Z' }] : []) });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(z ? [{ zip: z, home_lat: z === '75034' ? 33.1499 : 30.54, home_lng: z === '75034' ? -96.8241 : -98.37, counts: {}, refreshed_at: '2026-09-30T00:00:00Z' }] : []) });
     }
     if (url.includes('tile.openstreetmap') || url.includes('arcgisonline'))
       return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') });
