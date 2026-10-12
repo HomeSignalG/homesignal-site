@@ -1,0 +1,58 @@
+name: dev-integration-suite
+
+# THE INTEGRATED CHAIN on a DISPOSABLE Postgres, real SQL of record at every layer, nothing re-typed:
+#   the LIVE dev_refresh_collect() (rebuilt from the committed chain, fingerprinted to production)  ->  an accepted or refused cache generation
+#   -> docs/dev-source-receipt.sql (PR #1840: accepted-generation receipt, durable per ZIP x source continuity)
+#   -> the materialiser FIXTURE (the only stand-in: app_refresh_zip's body is not reproduced)  ->  the change ledger
+#   (docs/dev-change-{ledger,baseline,reportable}.sql + docs/dev-change-recovery.sql, PR #1829).
+# Required check IDs: test/dev_integration_pg/required_checks.txt (a missing, duplicated, unexpected or failed ID fails the run);
+# prohibited weakenings across the layers (11) must each be killed by a check that ran and failed. The `gate` job fails unless the
+# suite concluded `success`, so a skipped run cannot read as green. No production secret is read or needed.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-*.sql'
+      - 'docs/dev-source-receipt.sql'
+      - 'docs/dev-refresh-collect-*.sql'
+      - 'docs/dev-refresh-source-failure-guard.sql'
+      - 'docs/zip-scope-bounds.sql'
+      - 'test/dev_integration_pg/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/dev_change_recovery_pg/fixture.sql'
+      - 'test/lib/**'
+      - '.github/workflows/dev-integration-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      pg:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: dev_integration_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: dev_integration_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any production credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
+      - name: Integrated chain and cross-layer mutations
+        run: |
+          set -o pipefail
+          psql -X -c 'select 1' >/dev/null
+          bash test/dev_integration_pg/run.sh 2>&1 | tee /tmp/integration.log
+          grep -qE '^IDS OK — all [0-9]+ required check IDs' /tmp/integration.log
+          grep -q '^MUTATIONS: 11 of 11 prohibited weakenings are killed' /tmp/integration.log
+
+  gate:
+    if: always()
+    needs: [integration]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "integration=${{ needs.integration.result }}"
+          [ "${{ needs.integration.result }}" = success ]

@@ -79,7 +79,9 @@ const rowsOf = (h) => [...h.matchAll(/<tr role="row"([^>]*)>([\s\S]*?)<\/tr>/g)]
   const cells = [...m[2].matchAll(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/g)].map((c) => c[2]);
   return { attrs: m[1], html: m[2], cells, name: decode((/<span class="da-rv-name">([\s\S]*?)<\/span>/.exec(m[2]) || [, ''])[1]) };
 });
-const evOf = (h) => [...h.matchAll(/<li class="da-rv-evrec"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => ({ attrs: m[1], html: m[2], name: decode((/<h3 class="da-rv-evtitle">(?:<span class="da-rv-evnum">[^<]*<\/span> )?([\s\S]*?)<\/h3>/.exec(m[2]) || [, ''])[1]) }));
+// A record's supporting evidence is the fourth cell of ITS OWN row (2026-10-12: there is no second evidence list). evOf reads that cell, so every assertion about "the
+// evidence for record X" is an assertion about the cell in X's row, and a cell that drifted into another row would be caught by the name it is read under.
+const evOf = (h) => rowsOf(h).map((r) => ({ attrs: r.attrs, html: (/<div class="da-rv-evbody">([\s\S]*)<\/div>\s*$/.exec(r.cells[3] || '') || [, ''])[1], name: r.name }));
 const rowNamed = (h, n) => rowsOf(h).find((r) => r.name === n);
 
 // ---- 1. the layout: header, briefing, ONE three-column table, the map, change history, evidence ---------------------------------------------------
@@ -100,20 +102,21 @@ try {
   ok(/Compare property/.test(html), '1j the action bar is still present');
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
-// ---- 2. the table: Development | Stage | Quality-of-Life Impact, one row per record, each record once --------------------------------------------
+// ---- 2. the table: Development | Stage | Quality-of-Life Impact | Supporting Evidence, one row per record, each record once --------------------------------------------
 try {
   const heads = [...html.matchAll(/<th scope="col"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
-  ok(heads.join('|') === 'Development|Stage|Quality-of-Life Impact', '2a exactly three columns, in this order', heads);
+  ok(heads.join('|') === 'Development|Stage|Quality-of-Life Impact|Supporting Evidence', '2a exactly four columns, in this order', heads);
   const rows = rowsOf(html);
-  ok(rows.length === 8 && W.report.projects.length === 8 && rows.every((r) => r.cells.length === 3), '2b one row per record, each with exactly three cells (8 records)', rows.map((r) => r.cells.length));
+  ok(rows.length === 8 && W.report.projects.length === 8 && rows.every((r) => r.cells.length === 4), '2b one row per record, each with exactly four cells (8 records)', rows.map((r) => r.cells.length));
   ok(new Set(rows.map((r) => r.name)).size === 8 && rows.map((r) => r.name).sort().join() === W.report.projects.map((p) => p.name).sort().join(), '2c each record is in the table once, by the engine\'s own name');
   const men = rowNamed(html, 'Menchaca Apartments');
   const dev = textOf(men.cells[0]);
-  ok(/^Menchaca Apartments Residential 0\.2 mi north · Map 1 Official source/.test(dev), '2d the Development cell: name, Type, distance and direction, map number, then a short source link', dev);
+  ok(/^Development: Menchaca Apartments Residential 0\.2 mi north · Map 1$/.test(dev) && !/Official source|<a\b/.test(men.cells[0]), '2d the Development cell: name, Type, distance and direction, map number, and NO source link (the link moved to Supporting Evidence)', dev);
   ok(/Stage: Approved \/ Coming Source agency status: Advertised/.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
   ok(/Potential construction noise and traffic/.test(textOf(men.cells[2])) && /Not site-verified/.test(textOf(men.cells[2])), '2f the impact cell is the qualified rule text');
-  // no record's name appears as a heading anywhere else: the evidence block carries only what the row does not
-  ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8, '2g one supporting-evidence entry per record');
+  // the evidence is the fourth cell of the record's own row: one per record, no second list, no details block, no evidence card anywhere else
+  ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8 && evOf(html).every((e) => e.html.length > 0), '2g one supporting-evidence cell per record, in that record\'s own row');
+  ok(!/<details|<summary|da-rv-evrec|da-rv-evlist|da-rv-evtitle|Supporting evidence for each record/.test(html) && /Supporting Evidence/.test(html), '2g2 the separate expandable evidence section is gone: no details, no summary, no evidence cards or list, no duplicate evidence in the markup');
   const ev = evOf(html).find((e) => e.name === 'Menchaca Apartments').html;
   ok(!/Potential construction|Quality-of-Life|0\.2 mi/.test(textOf(ev)), '2h the evidence entry repeats neither the impact text nor the distance (they are in the row)', textOf(ev));
   ok(/Official record:<\/span> Issued · Sep 24, 2026/.test(ev) && !/HomeSignal lifecycle|Status in HomeSignal/.test(ev) && /Data: WSDOT/.test(ev), '2i it keeps the evidence the row does not: filing/issue date and the source attribution (the Approved bucket is not repeated: the stage "Approved / Coming" already says it; the agency\'s own word is in the Stage cell)');
@@ -158,7 +161,37 @@ try {
     ok(fns.length > 100 && !/record_date|submitted_at|source_family|registry|zip|county|brigham|utah/i.test(fns), '2i2k the decision uses only the record\'s own words: no date, source, county or place', fns.length);
   }
   const nums = rows.map((r) => (/Map (\d+)/.exec(r.cells[0]) || [])[1]).filter(Boolean);
-  ok(nums.join() === '1,2,3,4,5,6' && evOf(html).map((e) => (/Map (\d+)/.exec(e.html) || [])[1]).filter(Boolean).join() === '1,2,3,4,5,6', '2j the Map numbers in the table, the evidence and the map agree', nums);
+  ok(nums.join() === '1,2,3,4,5,6' && evOf(html).every((e) => !/Map \d+/.test(e.html)), '2j the Map numbers live in the Development cell (and match the map); the evidence cell does not repeat them', nums);
+  // ---- 2k. the evidence belongs to ITS record: read off the row, compared with the engine's own record, for every record ----
+  {
+    const byName = Object.fromEntries(W.report.projects.map((p) => [p.name, p]));
+    const wrong = rowsOf(html).filter((r) => {
+      const p = byName[r.name], c = r.cells[3], href = (/href="([^"]*)"/.exec(c) || [])[1];
+      const att = p.source && p.source.attribution;
+      return !p || href !== (p.source && p.source.url).replace(/&/g, '&amp;') || (att ? !c.includes('<p class="da-rv-attr">' + att.replace(/&/g, '&amp;')) : /da-rv-attr/.test(c)) || !c.includes('for ' + p.name.replace(/&/g, '&amp;') + ' (opens in a new tab)');
+    }).map((r) => r.name);
+    ok(wrong.length === 0, '2k2 in every row the Supporting Evidence link, attribution and link label are THAT record\'s own (engine url, attribution, name), never a neighbour\'s', wrong);
+    const pub = rowsOf(html).filter((r) => { const p = byName[r.name]; return p.publisher_event && p.publisher_event.date; });
+    ok(pub.length > 0 && pub.every((r) => { const p = byName[r.name]; return r.cells[3].includes(p.publisher_event.label); }), '2k3 a record\'s official event label is in its own evidence cell (' + pub.length + ' records carry one)');
+    // the two concepts stay two: an official-record line and a HomeSignal-detected line are separate lines, and a record with only a publisher date is never shown as a detected change
+    const onlyPub = rowsOf(html).filter((r) => { const p = byName[r.name]; return p.publisher_event && !(p.homesignal_detected_changes || []).length; });
+    ok(onlyPub.length > 0 && onlyPub.every((r) => /Official record:/.test(r.cells[3]) && !/HomeSignal detected/.test(r.cells[3])), '2k4 an official-record date never becomes a HomeSignal-detected change: records with a publisher event and no detected change show only "Official record"', onlyPub.length);
+    const det = rowsOf(html).filter((r) => (byName[r.name].homesignal_detected_changes || []).length);
+    ok(det.length > 0 && det.every((r) => /HomeSignal detected:/.test(r.cells[3])), '2k5 a record with a ledger-detected change shows it as its own "HomeSignal detected" line', det.length);
+    // internal-only lifecycle data stays on the internal page: the customer view's evidence cells never carry it, the review view carries it only in the evidence cell
+    ok(!/HomeSignal lifecycle|Ledger first read/.test(html) && rowsOf(viewLife(W)).every((r) => /HomeSignal lifecycle:/.test(r.cells[3]) && !/HomeSignal lifecycle/.test(r.cells.slice(0, 3).join('')) && !/Ledger first read/.test(r.cells.slice(0, 3).join(''))), '2k6 the internal lifecycle line is absent from the customer view and, on the internal page, appears only inside the Supporting Evidence cell');
+    // missing evidence is handled safely: nothing invented, the cell still exists, a record with no link has no link
+    const bare = clone(W);
+    const bp = bare.report.projects.find((p) => p.project_id === 'k-unk');
+    delete bp.publisher_event; delete bp.record_date; bp.homesignal_detected_changes = []; bp.source = {};
+    const hb2 = view(bare), rb = rowsOf(hb2).find((r) => r.name === bp.name);
+    ok(rb && rb.cells.length === 4 && /No supporting evidence supplied for this record\./.test(textOf(rb.cells[3])) && !/<a\b/.test(rb.cells[3]) && !/Official record|HomeSignal detected|da-rv-attr/.test(rb.cells[3]) && rowsOf(hb2).length === 8, '2k7 a record with no event, no change, no attribution and no source still has its four cells; the evidence cell says plainly that none was supplied and invents nothing');
+    // a saved report from before newer fields existed renders as it always did: no record_date, no verify, no render block
+    const old = clone(W);
+    old.render = undefined; old.report.projects.forEach((p) => { delete p.record_date; delete p.homesignal_observation; });
+    let ho; try { ho = view(old); } catch (e) { ho = ''; }
+    ok(rowsOf(ho).length === 8 && rowsOf(ho).every((r) => r.cells.length === 4 && /<a class="da-rv-link"/.test(r.cells[3])) && !/the view threw/.test(ho), '2k8 an older saved response (no record_date, no render block) renders four cells per row with every link, without migration');
+  }
   const mapNums = [...html.matchAll(/<svg class="da-rv-plot[\s\S]*?<\/svg>/g)].map((m) => [...m[0].matchAll(/>(\d+)<\/text>/g)].map((x) => x[1])).flat();
   ok(mapNums.length >= 6 && ['1', '2', '3', '4', '5', '6'].every((n) => mapNums.includes(n)), '2k the numbered markers on the map are the same numbers', mapNums);
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
@@ -356,7 +389,9 @@ try {
   const real = [...html.matchAll(/<a class="da-rv-link" href="([^"]*)" target="_blank" rel="noopener noreferrer">/g)];
   const nLinks = [...html.matchAll(/<a\b/g)].length;
   const inTable = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].reduce((a, t) => a + (t[0].match(/<a\b/g) || []).length, 0);
-  ok(real.length === nLinks && inTable > 0 && real.length === 8 + inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer (9 cards and 3 review items: 12, plus one per table row that has a link: ' + inTable + ')', [real.length, inTable]);
+  const linkCells = rowsOf(html).map((r) => r.cells.map((c) => (c.match(/<a\b/g) || []).length));
+  ok(real.length === nLinks && inTable === 8 && real.length === inTable && real.every((m) => /^https?:\/\//.test(m[1])), '6f every link on a normal report is http(s), opens in a new tab, with noopener noreferrer, and there is exactly one per record (8 records, 8 links, none outside the table)', [real.length, inTable]);
+  ok(linkCells.length === 8 && linkCells.every((c) => c.join() === '0,0,0,1'), '6f2 each record\'s one source link is in its FOURTH cell (Supporting Evidence) and in none of the other three', linkCells);
   ok(/Official source <span aria-hidden="true">→<\/span><span class="da-rv-sr"> for Menchaca Apartments \(opens in a new tab\)<\/span>/.test(html), '6g a link\'s accessible name carries the record it belongs to');
   const subj = '742 Evergreen Terrace, Springfield, OR 97477';
   const hs = V.html(W, { subject: subj });
@@ -477,9 +512,11 @@ try {
   ok(/\.da-rv-h2\{break-after:avoid/.test(P) || /\.da-rv-brieflab,\.da-rv-h2\{break-after:avoid/.test(P), '12c print: a heading is kept with what follows it');
   ok(/thead\{display:table-header-group\}/.test(P), '12d print: the table header repeats on each page');
   ok(/\.da-rv-actions[^{]*\{display:none/.test(P) && /da-rv-sec--filters/.test(P), '12e print: the buttons and the filters are not printed');
-  ok(/\.da-rv-detail::details-content\{content-visibility:visible;display:block\}/.test(P) && /\.da-rv-detail>\.da-rv-sum\{display:block;/.test(P) && !/\.da-rv-detail>\.da-rv-sum\{display:none/.test(P), '12e2 print: the collapsed evidence block is printed open (the whole report is printed) and its summary prints as the block\'s heading');
+  // paper: the evidence is a cell of its own row, so it prints with its record; there is no collapsed block left to open, and no rule that targets one
+  ok(!/da-rv-detail|da-rv-sum|da-rv-evrec|da-rv-evlist|da-rv-evtitle/.test(V.CSS) && !/da-rv-detail|da-rv-sum/.test(readFileSync(join(root, 'lib/da-report-view.js'), 'utf8').replace(/\/\/[^\n]*/g, '')), '12e2 print: no collapsed evidence block, summary or evidence-card rule survives in the stylesheet or the script: the evidence prints in the record\'s own row');
+  ok(/\.da-rv-table\{table-layout:fixed;font-size:11px\}\.da-rv-th--dev\{width:24%\}\.da-rv-th--stage\{width:17%\}\.da-rv-th--qol\{width:27%\}\.da-rv-th--evid\{width:32%\}/.test(P) && !/@container/.test(P), '12e2b print: the table keeps its four columns on paper, with widths set for the page (the on-screen stack is screen-only and cannot reach paper)');
   ok(/\.da-rv-plot--sm\{max-width:2\.4in\}\.da-rv-plot--lg\{max-width:3in\}/.test(P), '12e3 print: the map is large enough to read (2.4in, or 3in with many records), not the 1.8in thumbnail');
-  ok(/\.da-rv-evtitle\{font-size:11\.5px/.test(P) && /\.da-rv-histlist\{grid-template-columns:repeat\(2,/.test(P), '12e4 print: evidence cards and change history are compact, so a row of them fits the room left on a page');
+  ok(/\.da-rv-td--evid \.da-rv-line/.test(P) && /\.da-rv-histlist\{grid-template-columns:repeat\(2,/.test(P), '12e4 print: the evidence cell and change history are compact, so a record and its evidence fit the room left on a page');
   ok(/html,body\{background:#fff!important\}/.test(P), '12f print: the page background is white (no grey block on a short last page)');
   ok(/Headers and footers/.test(V.PDF_HINT), '12g the Download PDF hint tells the person which browser setting to switch off');
   // one renderer: every page that shows a report loads this file and the layout lives nowhere else

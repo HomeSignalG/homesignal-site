@@ -1,0 +1,78 @@
+name: dev-change-recovery-suite
+
+# HISTORICAL-RECOVERY PROTECTION (docs/dev-change-recovery.sql, rule_version 5). Runs the SHIPPED migration against a DISPOSABLE
+# Postgres whose ledger is built from the repo's own SQL of record (proved equal to the live bodies by md5 inside the run) AND the
+# real accepted-generation receipt (docs/dev-source-receipt.sql, owned by PR #1840): 114 REQUIRED check IDs (required_checks.txt -
+# a missing, duplicated, unexpected or failed ID fails the run), idempotence, three refusals, then every prohibited mutation (40) -
+# each MUST be killed by a check that ran and failed (a crashed suite is not a kill). Rule 5 classifies from DURABLE source
+# continuity (per ZIP x source: break_seq / gen_seq / scope version), so seven-day pruning cannot cause a silent re-baseline.
+# A final `gate` job fails unless the suite job concluded `success`, so a skipped job cannot read as green. Never addresses production.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-change-recovery.sql'
+      - 'docs/dev-change-ledger.sql'
+      - 'docs/dev-change-baseline.sql'
+      - 'docs/dev-change-reportable.sql'
+      - 'docs/dev-source-receipt.sql'
+      - 'test/lib/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/dev_change_recovery_pg/**'
+      - '.github/workflows/dev-change-recovery-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/dev-change-recovery.sql'
+      - 'docs/dev-source-receipt.sql'
+      - 'test/dev_change_recovery_pg/**'
+      - 'test/lib/**'
+
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dev_change_recovery_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped migration passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: dev_change_recovery_disposable
+        run: |
+          set -o pipefail
+          bash test/dev_change_recovery_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dcr.log
+          grep -q '^IDS OK — all 114 required check IDs' /tmp/dcr.log
+          grep -q '^MUTATIONS: 40 of 40 killed' /tmp/dcr.log
+          if grep -qE '^(SURVIVED|HARNESS)' /tmp/dcr.log; then echo 'a mutation survived or did not apply'; exit 1; fi
+
+  gate:
+    if: always()
+    needs: [recovery]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "recovery=${{ needs.recovery.result }}"
+          [ "${{ needs.recovery.result }}" = success ]

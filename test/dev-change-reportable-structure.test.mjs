@@ -107,7 +107,9 @@ const scanned = [...CODE_DIRS.flatMap((d) => walk(d)), ...rootFiles, ...sqlDocs]
 const mentions = scanned.filter((f) => /\.(sql|js|mjs|ts|html|py|sh|yml|json)$/.test(f) && /\bdev_change_event\b/.test(readFileSync(join(ROOT, f), 'utf8')));
 // docs/dev-change-copy-conflicts-apply.sql is the GENERATED production upgrade: the whole ledger file verbatim plus a guard and a
 // post-condition (test/dev-change-ledger-structure.test.mjs 9j pins that it is exactly that, so it can name the table only as the ledger does).
-const ALLOWED = ['docs/dev-change-baseline.sql', 'docs/dev-change-copy-conflicts-apply.sql', 'docs/dev-change-ledger.sql', 'docs/dev-change-reportable.sql'];
+const ALLOWED = ['docs/dev-change-baseline.sql', 'docs/dev-change-copy-conflicts-apply.sql', 'docs/dev-change-ledger.sql', 'docs/dev-change-reportable.sql',
+  // splices the single writer (dev_change_observe_zip) and re-states the reportable view; it adds no reader
+  'docs/dev-change-recovery.sql'];
 ok(scanned.length > 50 && mentions.includes('docs/dev-change-ledger.sql'),
   '7-control: the scan covers the code directories, the root files and every docs SQL, and it finds the ledger itself', scanned.length + ' files, ' + mentions.length + ' mention(s)');
 ok(mentions.every((f) => ALLOWED.includes(f)),

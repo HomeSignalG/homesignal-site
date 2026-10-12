@@ -7,7 +7,7 @@ create table public.development_reports (zip text primary key, sites jsonb not n
 create table public.dev_change_project (identity_key text primary key, registry_id text);
 create table public.dev_change_recovery (identity_key text primary key, zip text, outcome text, classified_at timestamptz);
 create table public.dev_change_event_reportable (identity_key text, event_type text, material boolean);
-create table public.dev_change_scope_ready (zip text, registry_id text, lapsed_at timestamptz);
+create table public.dev_change_scope_ready (zip text, registry_id text, lapsed_at timestamptz, baseline_gen_seq bigint);
 create or replace function public.app_source_key(el jsonb) returns text language sql immutable as
 $$ select nullif(btrim(el->>'source_id'), '') $$;
 create or replace function public.rs(p_zip text, p_stamped text[], p_unstamped text[] default '{}') returns void language sql as $$
@@ -23,7 +23,7 @@ begin
     insert into public.dev_change_recovery values (k, p_zip, 'coverage_recovered', '2026-10-11 05:00+00');
     if p_announced then insert into public.dev_change_event_reportable values (k, 'first_detected', true); end if;
   end loop;
-  if p_ready then insert into public.dev_change_scope_ready values (p_zip, 'rg', null); end if;
+  if p_ready then insert into public.dev_change_scope_ready values (p_zip, 'rg', null, 1); end if;
 end $$;
 -- 71001 good
 select public.rs('71001', array['a:1','a:2'], array['a:legacy']); select public.rl('71001', array['a:1','a:2']);
@@ -39,3 +39,6 @@ select public.rs('71005', array['e:1']);
 select public.rs('71006', array['f:1','f:2']); select public.rl('71006', array['f:1']);
 -- 71007 readiness was not established
 select public.rs('71007', array['g:1']); select public.rl('71007', array['g:1'], false);
+-- 71008 the ledger HELD a record from this source (a readiness row exists to count it) but NO baseline was ever established
+select public.rs('71008', array['h:1']); select public.rl('71008', array['h:1'], true);
+update public.dev_change_scope_ready set baseline_gen_seq = null where zip = '71008';

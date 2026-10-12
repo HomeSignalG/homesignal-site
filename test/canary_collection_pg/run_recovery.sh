@@ -17,6 +17,7 @@ t 'R04 a recovered key that was ANNOUNCED -> FAIL (backfill must stay silent)' "
 t 'R05 collection passed but the ledger recovered nothing -> FAIL (collection is not recovery)' "$(v 71005 "array['e:1']")" f
 t 'R06 the cache stamps a key the operator did not expect -> FAIL' "$(v 71006 "array['f:1']")" f
 t 'R07 readiness not established -> FAIL' "$(v 71007 "array['g:1']")" f
+t 'R10 a readiness row that only COUNTS held records (no baseline) is not READY -> FAIL' "$(v 71008 "array['h:1']")" f
 t 'R08 an EMPTY expected set -> FAIL (a zero proves nothing)' "$(v 71001 "array[]")" f
 t 'R09 an unknown ZIP -> FAIL, not NULL' "$(v 79999 "array['a:1']")" f
 echo "CANARY RECOVERY: $n checks, $bad failed"; [ "$bad" -eq 0 ]

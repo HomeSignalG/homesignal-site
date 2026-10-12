@@ -41,7 +41,7 @@ const C = code(SRC);
   ok(/innerHTML = html\(response, opts\)/.test(C) && (C.match(/innerHTML/g) || []).length === 1, '1e the only markup write is mount() setting innerHTML to its own html() output, once');
   const enh = (C.match(/function enhance\(el\) \{[\s\S]*?\n  \}\n/) || [''])[0];
   const attrWrites = [...C.matchAll(/(setAttribute|removeAttribute)\('([^']+)'/g)].map((m) => m[2]);
-  ok(enh.length > 200 && attrWrites.length === 9 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 9
+  ok(enh.length > 200 && attrWrites.length === 7 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 7
     && attrWrites.every((a, i) => enh.includes(a)), '1e2 the filters (enhance) change only two attributes, hidden and aria-pressed, and nothing else on the page', attrWrites);
   ok(!/url\(|@import/.test(C) && !/['"]https?:/.test(C), '1f the stylesheet and the markup fetch nothing, and no http URL is written into the module (only the pattern that validates one)');
 }
@@ -80,9 +80,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 5
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the operating card and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
@@ -199,7 +199,9 @@ const C = code(SRC);
     // 2026-10-10: the end-to-end proof that a serving-generation project reaches the report renders real rows through the view; its record names it
     // 2026-10-12: the Saved reports remove-from-my-list browser suite opens a real saved report through the view, using the same report world
     'test/saved-reports-archive.browser.test.mjs',
-    'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md']);
+    'test/national-report-generation-points.test.mjs', 'docs/development-activity-proposed-generation-points-2026-10-10.md',
+    // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
+    'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
