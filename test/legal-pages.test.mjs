@@ -19,9 +19,21 @@ for (const [f, title] of Object.entries(pages)) {
   ok(h.includes('hello@homesignal.net'), f + ' carries the contact address');
   ok(h.includes('<noscript>') && ['privacy.html', 'terms.html', 'refund-policy.html'].every((x) => h.includes('href="' + x + '"')), f + ' links the three policies without script');
   ok(!/Lemon\s*Squeezy|lemonsqueezy/i.test(h), f + ' does not name Lemon Squeezy');
-  ok(!/Paddle/i.test(h), f + ' does not announce Paddle before it is approved and live');
+  // Paddle merchant-of-record disclosure (2026-10-12): Terms and the Refund Policy name Paddle, conditionally. The Privacy Notice still does not.
+  if (f === 'privacy.html') ok(!/Paddle/i.test(h), f + ' does not name Paddle');
+  ok(!/\b(is|are) (now |currently |already )?(processing|processes)\b[^.]*Paddle|Paddle (is|has been) (now |currently )?(approved|active|live)|approved by Paddle/i.test(text(h)), f + ' does not claim Paddle is live or approved');
 }
 const terms = text(read('terms.html'));
+const rp = text(read('refund-policy.html')), rph = read('refund-policy.html');
+ok(/Where a purchase is processed through Paddle|When a purchase is processed through Paddle/.test(rp) && /merchant of record/i.test(rp), 'Refund Policy discloses Paddle as merchant of record, conditionally');
+ok(rph.includes('href="https://www.paddle.com/legal/refund-policy"') && rph.includes('href="https://www.paddle.com/legal/buyer-terms"') && rph.includes('href="https://paddle.net"'), 'Refund Policy links Paddle Refund Policy, Buyer Terms and paddle.net');
+ok(/\$79 per month/.test(rp) && /100 new Development Activity reports/.test(rp) && /renews and bills automatically/.test(rp), 'Refund Policy states the $79/month, 100-report recurring plan');
+ok(!/9\.99|ZIP development alerts/.test(rp), 'Refund Policy describes only the $79/month plan (no ZIP alerts product is offered)');
+ok(/Cancelling is not a refund/.test(rp) && /cannot approve or issue a refund for a Paddle transaction/.test(rp), 'Refund Policy keeps cancellation and refunds separate and does not claim HomeSignal can refund Paddle transactions');
+ok(!/money-back|guarantee/i.test(rp), 'Refund Policy promises no money-back guarantee');
+ok(/custom quote/i.test(rp) && /separate agreement/.test(rp) && /quality-of-life intelligence on development activity/.test(rp), 'Refund Policy describes the one product and refers enterprise customers to their agreement');
+ok(/Paddle is the merchant of record/.test(terms) && /Where a purchase is processed through Paddle/.test(terms), 'Terms disclose Paddle as merchant of record, conditionally');
+ok(!/Lemon\s*Squeezy/i.test(rp + terms), 'Refund Policy and Terms name no other processor');
 ok(!/personal, non-commercial/i.test(terms), 'Terms do not carry the personal, non-commercial clause');
 ok(/HomeSignal/.test(terms), 'Terms name HomeSignal');
 ok(/\$79 per month/.test(terms) && /100 new Development Activity reports/.test(terms), 'Terms state the $79/month, 100-report plan');
