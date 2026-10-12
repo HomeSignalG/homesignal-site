@@ -153,6 +153,11 @@ jobs:
           # "Failed to load resource" (its Leaflet fetch) on several runs.
           npm install --no-audit --no-fund playwright@1.56.0 leaflet@1.9.4
           npx playwright install --with-deps chromium
+      # The homepage example-report check (test/home-showcase-preview.test.mjs) builds the preview with Pillow.
+      - name: Install Pillow (homepage preview check)
+        run: |
+          python3 -m pip install --quiet pillow || python3 -m pip install --quiet --break-system-packages pillow
+          python3 -c "from PIL import Image, features; assert features.check('webp'), 'Pillow has no WebP support'; print('Pillow with WebP')"
       - name: Verify playwright is actually available to the suites
         run: node -e "import('playwright').then(()=>console.log('playwright resolves')).catch(e=>{console.error('playwright MISSING — browser assertions would silently skip');process.exit(1)})"
       # The FULL suite, not just the browser slice: this job is the one that proves
