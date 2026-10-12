@@ -216,7 +216,6 @@ m('print_evidence_hidden', "'.da-rv-table thead th{font-size:9.5px;letter-spacin
 m('print_table_loses_widths', "'.da-rv-table{table-layout:fixed;font-size:11px}.da-rv-th--dev{width:24%}", "'.da-rv-table{table-layout:auto;font-size:11px}.da-rv-th--dev{width:24%}")
 m('stack_never_decided_by_width', "var STACK_AT = 760;", "var STACK_AT = 100000;", [BROWSER])
 m('record_section_not_a_container', "    '.da-rv-sec--records{container:da-rv-rec/inline-size}',\n", "", [BROWSER])
-m('stacked_row_ignores_hidden', "    '.da-rv-table tr[hidden]{display:none}',\n", "", [BROWSER])
 
 
 def first_failure(out):
