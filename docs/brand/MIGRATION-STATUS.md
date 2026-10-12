@@ -8,7 +8,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 2 Dual-domain compatibility | DONE, deployed | site #1736 -> `11fd3d3`; ingest #653 -> `b074f81`; guard migration applied; see "Step 2 deployment record" |
 | 3 Jody staging site | DONE, merged | site #1740 -> `5d769e3`; `jody-staging` ran green on a runner; nothing deployed |
 | 4 SEO migration | tooling merged; real-snapshot parity PASSED (run 37971696362) | see Step 4 |
-| 5 Zero-cost redirect | built + proven by simulation only; real-HTTP provider test workflow written (`jody-redirect-verify`), needs a Netlify token | see Step 5 |
+| 5 Zero-cost redirect | **provider changed 2026-10-12: Netlify (access unavailable) -> Render Static Sites Free.** Render adapter built, OFFLINE PASS (44 checks, suite 351 files green). Real-HTTP test BLOCKED: needs a Render account (founder step 2). Netlify attempt: `jody-redirect-verify` run 38278525831 failed at the deploy step (token missing) | see Step 5 and "Step 5 addendum" |
 | 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
 | 7 Cutover | NOT READY: gates G1/G2/G3/G7/G8 open (see Launch readiness); needs founder GO LIVE | `docs/brand/CUTOVER-CHECKLIST.md` |
 | 8 Email + Bluesky | Resend domain jodytracks.com VERIFIED (2026-10-10 18:41Z); nothing sent, no outreach, Bluesky untouched | see "Resend verified" below |
@@ -73,6 +73,20 @@ Rule D / Rule F are untouched: the overlay never reads or changes the plane, and
 **Alternatives if Netlify Free is refused** (all zero-cost, none chosen silently): Cloudflare free plan redirect rule (needs the domain's nameservers moved - bigger DNS change); a registrar-level 301 forward if the registrar offers one free (cannot serve the DID file, so unsuitable alone). GitHub Pages cannot send a real 301.
 
 **Hard constraint recorded:** do not change DNS for homesignal.net (the audit below shows its nameservers are Google-hosted, not Shopify; the registrar is Tucows) until the founder's GO LIVE; until then GitHub Pages keeps answering.
+
+## Step 5 addendum - redirect provider replaced (2026-10-12)
+Preferred: **Render Static Sites (Free)**; fallback: GitLab Pages. **Verdict: BLOCKED** (not rejected) on one live test. Full criteria table, labels and audit: `docs/brand/CUTOVER-CHECKLIST.md` section 3a.
+
+| Item | Label |
+|---|---|
+| Render: 301, splat path preservation, rule not applied where a file exists, A/CNAME at a third-party DNS host | DOCUMENTATION VERIFIED (via search excerpts; render.com not fetchable from the sandbox) |
+| Render: query-string preservation, `.well-known` dot-directory published, HTTPS apex/www, commercial use, free limits and charges | BLOCKED (docs silent, conflicting or not read) |
+| GitLab Pages: 301, splat, files win, free custom domain, TXT verification | DOCUMENTATION VERIFIED; query preservation not stated (same gap) |
+| Builder `--provider render`, committed `redirect-service/render/`, verifier Render interpreter, 19 cases, loop check, `--require-https`, 10 mutations + 6 failing live variants | OFFLINE PASS |
+| Any real request to Render | BLOCKED (no account; none made) |
+| Netlify | SUPERSEDED. Last attempt: `jody-redirect-verify` run 38278525831, failed at the deploy step (secret missing, inferred). |
+
+G2 now reads "real-HTTP cases pass on Render, DID 200 with original bytes" and stays open. Nothing points `homesignal.net` at any new host. Production DNS, the Jody cutover, payments and GO LIVE are untouched.
 
 ## Step 6 - DNS and registration audit (2026-10-09, `jody-dns-audit` run 37978348576, read-only, from a GitHub runner)
 

@@ -1,0 +1,13 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1"
+  ],
+  "id": "did:web:homesignal.net",
+  "service": [
+    {
+      "id": "#bsky_fg",
+      "type": "BskyFeedGenerator",
+      "serviceEndpoint": "https://qwnnmljucajnexpxdgxr.functions.supabase.co"
+    }
+  ]
+}

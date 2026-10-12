@@ -51,6 +51,7 @@ const did = readFileSync(join(D, '.well-known/did.json'));
 const good = (status = 301, didBody = did) => (req, res) => {
   if (req.url === '/.well-known/did.json') { res.writeHead(200); res.end(didBody); return; }
   if (req.url === '/robots.txt') { res.writeHead(200); res.end(readFileSync(join(D, 'robots.txt'))); return; }
+  if (req.url === '/google59e1ae3ef6b75e3a.html') { res.writeHead(200); res.end(readFileSync(join(D, 'google59e1ae3ef6b75e3a.html'))); return; }
   res.writeHead(status, { Location: 'https://jodytracks.com' + req.url }); res.end();
 };
 // ASYNC spawn: the stand-in server lives in THIS process, so a blocking spawnSync would starve it (and make every probe fail).
@@ -63,13 +64,73 @@ for (const [name, h, want] of [
   ['a correct service', good(), true],
   ['a service answering 302', good(302), false],
   ['a service serving the wrong DID bytes', good(301, Buffer.from('{}')), false],
-  ['a service that drops the query string', (req, res) => { if (req.url === '/.well-known/did.json' || req.url === '/robots.txt') return good()(req, res); res.writeHead(301, { Location: 'https://jodytracks.com' + req.url.split('?')[0] }); res.end(); }, false],
+  ['a service that drops the query string', (req, res) => { if (req.url === '/.well-known/did.json' || req.url === '/robots.txt' || req.url === '/google59e1ae3ef6b75e3a.html') return good()(req, res); res.writeHead(301, { Location: 'https://jodytracks.com' + req.url.split('?')[0] }); res.end(); }, false],
   ['a service that redirects the DID document too', (req, res) => { res.writeHead(301, { Location: 'https://jodytracks.com' + req.url }); res.end(); }, false],
 ]) {
   const { s, url } = await serve(h);
   const r = await probe(url);
   s.close();
   check(`4 live probe: ${name} ${want ? 'passes' : 'is refused'}`, (r.status === 0) === want, r.stdout.slice(0, 300));
+}
+
+
+// 5. Render adapter (the Netlify account is unavailable): same builder, same cases, same live probe - provider-specific rules only
+const R = join(base, 'render');
+const rb = py(['scripts/build_redirect_site.py', '--out', R, '--provider', 'render']);
+check('5a the Render folder builds', rb.status === 0, rb.stderr);
+const rfiles = readdirSync(R, { recursive: true }).filter((f) => !f.endsWith('.well-known') && !f.endsWith('public')).sort();
+check('5b it holds exactly render.yaml + public/{did.json, google token, robots.txt} and no _redirects/netlify.toml/index.html', JSON.stringify(rfiles) === JSON.stringify(['public/.well-known/did.json', 'public/google59e1ae3ef6b75e3a.html', 'public/robots.txt', 'render.yaml']), rfiles.join());
+check('5c did.json and the Google file are byte-identical to the repo files', readFileSync(join(R, 'public/.well-known/did.json')).equals(readFileSync('.well-known/did.json')) && readFileSync(join(R, 'public/google59e1ae3ef6b75e3a.html')).equals(readFileSync('google59e1ae3ef6b75e3a.html')), 'differs');
+const ry = readFileSync(join(R, 'render.yaml'), 'utf8');
+check('5d ONE permanent redirect route /* -> the contract origin, free static site, blueprint kept OUTSIDE the publish dir', /type: redirect\n\s+source: \/\*\n\s+destination: https:\/\/jodytracks\.com\/\*\n/.test(ry) && (ry.match(/- type: /g) || []).length === 2 && /plan: free/.test(ry) && /staticPublishPath: public/.test(ry), ry);
+check('5e the COMMITTED redirect-service/render equals a fresh build (nobody hand-edits it)', py(['scripts/build_redirect_site.py', '--out', 'redirect-service/render', '--provider', 'render', '--check']).status === 0, 'drift');
+const rs = py(['scripts/verify_redirect_service.py', '--simulate', R]);
+check('5f the Render rules answer all cases (>= 19: community/76227, map?zip=76227, shared-report + unsubscribe queries, encoded/duplicate params, DID, Google token, robots)', rs.status === 0 && JSON.parse(rs.stdout).cases >= 19, rs.stdout);
+function rmut(name, fn) {
+  const M = join(base, 'rm-' + name); cpSync(R, M, { recursive: true }); fn(M);
+  const s2 = py(['scripts/verify_redirect_service.py', '--simulate', M]);
+  const c2 = py(['scripts/build_redirect_site.py', '--out', M, '--provider', 'render', '--check']);
+  check(`5g render mutation "${name}" is caught`, s2.status !== 0 || c2.status !== 0, 'passed both');
+}
+const ed = (M, f, fn) => writeFileSync(join(M, f), fn(readFileSync(join(M, f), 'utf8')));
+rmut('wrong destination host', (M) => ed(M, 'render.yaml', (t) => t.replace('jodytracks.com', 'jodytracks.net')));
+rmut('destination loses the splat', (M) => ed(M, 'render.yaml', (t) => t.replace('/*\n', '/\n').replace('com/\n', 'com/\n')));
+rmut('route is a rewrite, not a redirect', (M) => ed(M, 'render.yaml', (t) => t.replace('type: redirect', 'type: rewrite')));
+rmut('route narrowed to /community/*', (M) => ed(M, 'render.yaml', (t) => t.replace('source: /*', 'source: /community/*')));
+rmut('an index.html is published (/ would answer 200)', (M) => writeFileSync(join(M, 'public/index.html'), '<html></html>'));
+rmut('render.yaml leaks into the publish dir', (M) => writeFileSync(join(M, 'public/render.yaml'), ry));
+rmut('did.json edited', (M) => ed(M, 'public/.well-known/did.json', (t) => t.replace('homesignal.net', 'jodytracks.com')));
+rmut('did.json missing', (M) => rmSync(join(M, 'public/.well-known/did.json')));
+rmut('robots.txt gains a sitemap line', (M) => writeFileSync(join(M, 'public/robots.txt'), 'User-agent: *\nAllow: /\nSitemap: https://homesignal.net/sitemap.xml\n'));
+rmut('a stray static page is published', (M) => writeFileSync(join(M, 'public/about.html'), 'x'));
+
+// the live probe against a stand-in that implements Render's DOCUMENTED precedence (file wins, else the rule), plus failing variants
+const rdid = readFileSync(join(R, 'public/.well-known/did.json'));
+const rgoogle = readFileSync(join(R, 'public/google59e1ae3ef6b75e3a.html'));
+const renderLike = (loc = (u) => 'https://jodytracks.com' + u, status = 301) => (req, res) => {
+  const path = req.url.split('?')[0];
+  if (path === '/.well-known/did.json') { res.writeHead(200); res.end(rdid); return; }
+  if (path === '/robots.txt') { res.writeHead(200); res.end(readFileSync(join(R, 'public/robots.txt'))); return; }
+  if (path === '/google59e1ae3ef6b75e3a.html') { res.writeHead(200); res.end(rgoogle); return; }
+  res.writeHead(status, { Location: loc(req.url) }); res.end();
+};
+const rprobe = (url, extra = []) => new Promise((r) => {
+  const p = spawn('python3', ['scripts/verify_redirect_service.py', '--base', url, '--files', join(R, 'public'), ...extra]);
+  let out = ''; p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (out += d));
+  p.on('close', (code) => r({ status: code, stdout: out }));
+});
+for (const [name, h, want, extra] of [
+  ['a Render-like service (file wins, else 301 with the query kept)', renderLike(), true, []],
+  ['a service that strips the query string (the unproven Render behaviour)', renderLike((u) => 'https://jodytracks.com' + u.split('?')[0]), false, []],
+  ['a service that re-encodes the query', renderLike((u) => 'https://jodytracks.com' + u.replace('%2F', '/')), false, []],
+  ['a 302 service', renderLike(undefined, 302), false, []],
+  ['a service that redirects to its own host (loop)', (req, res) => { const p = req.url.split('?')[0]; if (['/.well-known/did.json', '/robots.txt', '/google59e1ae3ef6b75e3a.html'].includes(p)) return renderLike()(req, res); res.writeHead(301, { Location: 'http://' + req.headers.host + req.url }); res.end(); }, false, []],
+  ['a correct service probed over plain http with --require-https', renderLike(), false, ['--require-https']],
+]) {
+  const { s, url } = await serve(h);
+  const r = await rprobe(url, extra);
+  s.close();
+  check(`5h live probe: ${name} ${want ? 'passes' : 'is refused'}`, (r.status === 0) === want, r.stdout.slice(0, 300));
 }
 
 rmSync(base, { recursive: true, force: true });
