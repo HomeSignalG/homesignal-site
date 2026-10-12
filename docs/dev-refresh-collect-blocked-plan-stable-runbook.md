@@ -23,7 +23,9 @@ script does not depend on it: DDL on a busy database does not get its lock insta
 
 ## 2. Apply (needs separate authorization)
 ```
+set -o pipefail      # without it, tee's exit status (0) hides a failed psql
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f docs/dev-refresh-collect-blocked-plan-stable.sql 2>&1 | tee apply-evidence.log
+echo "apply exit status: ${PIPESTATUS[0]}"     # must be 0; anything else = nothing changed, read the log
 ```
 The file opens one transaction with `lock_timeout 3s`, `statement_timeout 30s`, `idle_in_transaction_session_timeout 60s`; verifies the
 ORIGINAL fingerprint, signature and security properties; recomputes the PATCHED fingerprint from the planned replacement **before** executing;
@@ -35,7 +37,9 @@ own advisory lock is unrelated). Re-running on the patched body is a no-op only 
 
 ## 3. Reversal (separate file, same discipline)
 ```
+set -o pipefail
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f docs/dev-refresh-collect-blocked-plan-stable-reverse.sql 2>&1 | tee reverse-evidence.log
+echo "reverse exit status: ${PIPESTATUS[0]}"
 ```
 Requires the exact PATCHED fingerprint; at the ORIGINAL it is a no-op; **any other body is refused and left untouched** (an intervening change
 is never overwritten). Restores the ORIGINAL fingerprint; owner/ACL/security preserved.
