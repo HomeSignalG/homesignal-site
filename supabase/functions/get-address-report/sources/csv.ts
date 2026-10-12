@@ -31,7 +31,8 @@
 // Types and values are imported separately: Node's type stripping (used by the offline
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
-import { pointInBox, validBounds, type ZipBounds } from "./scope-box.ts";
+import { pointInBox, validBounds, widensLegacy, scopeBox, type ZipBounds } from "./scope-box.ts";
+import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
@@ -121,6 +122,8 @@ export interface CsvRunReport {
   /** Widened-scope accounting (sources/scope-members.ts); present only when box candidates existed.
    *  Polygon exclusions are `outside_excluded` there — correct, never a drop and never a quarantine. */
   scope_membership?: ScopeMetrics;
+  /** The completion receipt for this ZIP x source (sources/scope-receipt.ts). Spatial-mode files only; absent when the fetch failed. */
+  scope_receipt?: ScopeReceipt;
 }
 
 export interface CsvDeps {
@@ -253,6 +256,15 @@ async function runEntry(
     }
     legacyCount = legacyRows.length;
     zipRows = [...legacyRows, ...widenedRows];
+    // THE COMPLETION RECEIPT. `scope_widened` above is only set when a widened-only row was KEPT, so a successful expanded read that
+    // found no ring records looked like a legacy read; the receipt states the scope that RAN, not what it found.
+    const widens = validBounds(bounds) && widensLegacy(scopeBox({ lat: cLat, lng: cLng }, radius, bounds), { lat: cLat, lng: cLng }, radius);
+    report.scope_receipt = buildScopeReceipt({
+      requested: !!deps.zipMembers && validBounds(bounds), widens, widenedRan: widens && !report.scope_fallback,
+      fallback: report.scope_fallback, truncatedAt: report.truncated_at_max_rows,
+      metrics: report.scope_membership ?? { unresolved_excluded: 0, rpc_failures: 0, capacity_truncated: false },
+      version: receiptVersion({ lat: cLat, lng: cLng }, radius, bounds, entry as unknown as Record<string, unknown>),
+    });
   }
   report.fetched = zipRows.length;
 
@@ -314,6 +326,8 @@ async function runEntry(
   report.decided_by_status = [...decidedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.unmapped_statuses = [...unmappedCount].map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
   report.case_insensitive_matches = caseFoldList(caseFold);
+  // The emit cap is decided in the loop above, after the receipt was first built: a capped emit is never a complete read.
+  if (report.scope_receipt && report.truncated_at_max_rows != null) report.scope_receipt = { ...report.scope_receipt, complete: false };
   return { records, report };
 }
 
