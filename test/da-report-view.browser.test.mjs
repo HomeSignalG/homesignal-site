@@ -368,6 +368,12 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     await page.emulateMedia({ media: 'print' });
     const bg = await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.documentElement).backgroundColor]);
     ok(bg[0] === 'rgb(255, 255, 255)', '12e print: the page background is white, so no grey block fills a short last page', bg);
+    // the same page in print media, measured without a PDF tool (CI has no poppler): every record's Supporting Evidence cell is laid out beside its row, with its link
+    const pe = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const c = r.querySelector('td.da-rv-td--evid'), a = c.querySelector('.da-rv-link'), cr = c.getBoundingClientRect(), rr = r.getBoundingClientRect();
+      return { shown: getComputedStyle(c).display !== 'none' && cr.width > 80 && cr.height > 10, link: !!a && a.getBoundingClientRect().height > 5 && getComputedStyle(a).textDecorationLine === 'underline', sameRow: Math.abs(cr.top - rr.top) < rr.height && cr.left > r.querySelector('td.da-rv-td--qol').getBoundingClientRect().left }; }));
+    ok(pe.length === 8 && pe.every((x) => x.shown && x.link && x.sameRow), '12e1 in print media every record\'s Supporting Evidence cell is shown beside its own row with its underlined source link (no PDF tool needed)', pe);
+    const pc = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table thead th')].map((x) => x.getBoundingClientRect().width > 40).length);
+    ok(pc === 4, '12e1b in print media the table header still has its four columns', pc);
     await page.emulateMedia({ media: null });
     let havePdfText = true;
     try { execFileSync('pdftotext', ['-v'], { stdio: 'ignore' }); execFileSync('pdfinfo', ['-v'], { stdio: 'ignore' }); } catch { havePdfText = false; }
