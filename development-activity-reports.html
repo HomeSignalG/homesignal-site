@@ -328,6 +328,44 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #saved-list:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
 .sv-row{display:flex;gap:10px;align-items:stretch}
 .sv-row button{flex:1;min-width:0;min-height:36px;padding:6px 10px;font-size:13px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Remove from my list (docs/saved-reports-archive.sql): a quiet three-dot menu on each row, a Manage mode for several, and a View archived list.
+   The list scrolls (max-height), so the ONE menu is drawn position:fixed from the pressed button, never inside the scrolling box where it would be clipped. */
+#saved-list{grid-template-columns:minmax(0,1fr)} /* a long address shortens inside its row; it never widens the row past the card and pushes the row menu out of view */
+.sv-head{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:32px}
+.sv-head .sec-h{margin:0}
+.sv-link{font:inherit;font-size:13.5px;font-weight:600;color:var(--accent);background:none;border:none;padding:6px 8px;min-height:36px;cursor:pointer;border-radius:6px}
+.sv-link:hover{background:var(--panel2)}
+.sv-link:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.sv-link:disabled{opacity:.6;cursor:default}
+.sv-viewrow{display:flex;justify-content:flex-start;margin-top:-4px}
+#saved-list .sv-kebab{flex:none;width:40px;min-width:40px;padding:0;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;font-weight:700;color:var(--muted);text-align:center;overflow:visible;text-overflow:clip}
+#saved-list .sv-kebab:hover{background:var(--line);color:var(--ink)}
+#saved-list .sv-restore{flex:none;width:auto;white-space:nowrap;padding:6px 12px;color:var(--accent);font-weight:600;border-color:var(--accent);background:var(--panel)}
+#saved-list .sv-row.sv-busy{opacity:.55}
+.sv-mpick{flex:none;display:none;align-items:center;justify-content:center;width:40px;min-height:36px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.sv-mpick input{width:18px;height:18px;margin:0}
+.sv-mpick input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+#saved.mng-on .sv-mpick{display:flex}
+#saved.mng-on .sv-kebab{display:none}
+.sv-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.sv-bulk[hidden],.sv-confirm[hidden],.sv-toast[hidden],.sv-menu[hidden]{display:none}
+.sv-bulk label{display:flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;min-height:36px}
+.sv-bulk input{width:18px;height:18px;margin:0}
+.sv-bulk .sv-count{font-size:13.5px;color:var(--muted);flex:1;min-width:6ch}
+.sv-bulk .go{padding:6px 12px;min-height:36px;font-size:13.5px}
+.sv-confirm{display:grid;gap:8px;background:var(--panel);border:1px solid var(--red);border-radius:8px;padding:10px 12px}
+.sv-confirm p{margin:0;font-size:14px}
+.sv-confirm .row{display:flex;flex-wrap:wrap;gap:8px}
+.sv-confirm .go{padding:8px 14px;min-height:40px;font-size:13.5px}
+.sv-confirm .go.danger{background:var(--red)}
+.sv-toast{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--ink);color:#fff;border-radius:8px;padding:6px 6px 6px 12px;font-size:14px}
+.sv-toast button{font:inherit;font-size:14px;font-weight:700;color:#fff;background:transparent;border:1px solid #fff;border-radius:6px;padding:6px 12px;min-height:36px;cursor:pointer}
+.sv-toast button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.sv-menu{position:fixed;z-index:60;min-width:220px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(22,33,28,.18);padding:4px}
+.sv-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:14px;color:var(--ink);background:none;border:none;border-radius:6px;padding:10px 12px;min-height:44px;cursor:pointer}
+.sv-menu button:hover,.sv-menu button:focus-visible{background:var(--panel2);outline:none}
+.sv-menu button:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
+@media(pointer:coarse){#saved-list .sv-kebab{width:44px;min-width:44px;min-height:44px}.sv-mpick{width:44px;min-height:44px}#saved-list .sv-restore{min-height:44px}}
 /* comparing is a mode: a saved report is a plain link until the agent chooses Compare reports */
 #saved:not(.cmp-on) .sv-pick{display:none}
 .sv-modes{margin-top:8px}
@@ -477,13 +515,29 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       </div>
 
     <section class="card" id="saved" aria-labelledby="saved-title" hidden>
-      <h2 class="sec-h" id="saved-title" title="Reopening a saved report does not use a report.">Saved reports</h2>
+      <div class="sv-head">
+        <h2 class="sec-h" id="saved-title" title="Reopening a saved report does not use a report.">Saved reports</h2>
+        <button type="button" class="sv-link" id="saved-manage" aria-pressed="false" hidden>Manage</button>
+      </div>
       <div class="sv-tools" id="saved-tools" hidden>
         <label class="sv-search">Find a saved report<input type="search" id="saved-search" maxlength="80" placeholder="Address, client or report number" autocomplete="off"></label>
         <div class="row sv-modes" id="compare-modes" hidden><button type="button" class="go ghost" id="compare-mode" aria-pressed="false">Compare reports</button></div>
       </div>
+      <div class="sv-bulk" id="saved-bulk" role="group" aria-label="Choose reports to remove" hidden>
+        <label><input type="checkbox" id="saved-all"> Select all shown</label>
+        <span class="sv-count" id="saved-count" aria-live="polite">0 selected</span>
+        <button type="button" class="go" id="saved-remove-sel" disabled>Remove selected</button>
+        <button type="button" class="go ghost" id="saved-cancel">Cancel</button>
+      </div>
+      <div class="sv-confirm" id="saved-confirm" role="group" aria-labelledby="saved-confirm-text" hidden>
+        <p id="saved-confirm-text"></p>
+        <div class="row"><button type="button" class="go danger" id="saved-confirm-go">Remove</button><button type="button" class="go ghost" id="saved-confirm-no">Keep them</button></div>
+      </div>
       <ul id="saved-list" tabindex="0" role="group" aria-label="Saved reports, most recent first as the list returns them"></ul>
       <div class="row"><button type="button" class="go ghost" id="saved-more" hidden></button></div>
+      <div class="sv-viewrow"><button type="button" class="sv-link" id="saved-archived-toggle" aria-pressed="false" hidden>View archived</button></div>
+      <div class="sv-toast" id="saved-toast" role="status" aria-live="polite" hidden><span id="saved-toast-text"></span><button type="button" id="saved-undo" hidden>Undo</button></div>
+      <div class="sv-menu" id="saved-menu" role="menu" aria-label="Report actions" hidden><button type="button" role="menuitem" id="saved-menu-remove">Remove from Saved Reports</button></div>
       <p class="hint" id="saved-nomatch" hidden>No saved report matches that search.</p>
       <p id="saved-status" role="status" aria-live="polite"></p>
       <div class="cmp" id="compare" aria-labelledby="compare-title" role="group" hidden>
@@ -1080,10 +1134,18 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   }
   // ---- saved reports (build step 6): the brokerage's stored reports, opened as stored ------------------------------------------
   var SAVED_RECENT = 6, savedAll = false;
+  // remove from my list (docs/saved-reports-archive.sql): which list is on screen, Manage mode, the one request in flight, the open row menu, the last removal (for Undo)
+  var savedView = 'active', savedManage = false, archiveBusy = false, menuFor = null, menuBtn = null, menuReport = null, menuAnchor = null, toastTimer = null, confirmIds = null, undoIds = null;
+  var MAX_PER_CALL = 100; // the report function takes at most this many ids in one request (a bigger selection is sent in turns)
   function savedSay(text, isError){ var s=$('saved-status'); s.textContent=text||''; s.className=isError?'err':''; }
   /** Hide or show the card. Hiding also forgets the list, so one person's reports are never left on the page for the next. */
   function showSaved(on){
-    if (!on) { savedAll = false; $('saved-more').hidden = true; savedFresh = false; $('saved-list').textContent = ''; $('saved-search').value = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; savedSay('', false); $('saved').hidden = true; hideCompare(); return; }
+    if (!on) {
+      savedAll = false; savedView = 'active'; archiveBusy = false; undoIds = null; confirmIds = null; closeMenu(false); hideToast(); hideConfirm(); setManage(false);
+      $('saved-more').hidden = true; savedFresh = false; $('saved-list').textContent = ''; $('saved-search').value = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true;
+      $('saved-manage').hidden = true; $('saved-archived-toggle').hidden = true; $('saved-title').textContent = 'Saved reports';
+      savedSay('', false); $('saved').hidden = true; hideCompare(); return;
+    }
     $('saved').hidden = false;
     if (!savedFresh) refreshSaved();
   }
@@ -1093,24 +1155,25 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (httpStatus === 403) return 'This account cannot open saved reports right now.';
     return 'The saved reports could not be read just now. Try again in a minute.';
   }
-  async function refreshSaved(){
+  async function refreshSaved(keepMessage){
     if (!session || !session.user) return;
-    var forUser = session.user.id;
+    var forUser = session.user.id, view = savedView, archivedView = view === 'archived';
     savedFresh = true; // one read at a time; a failure below lets the next call try again
-    var r = await post(REPORT_FN, { action: 'list' });
-    if (!session || !session.user || session.user.id !== forUser) return; // the person changed while the answer was on its way
+    // the normal list is asked for EXACTLY as it always was, so the function that is live today still answers it while this page is the newer of the two
+    var r = await post(REPORT_FN, archivedView ? { action: 'list', archived: true } : { action: 'list' });
+    if (!session || !session.user || session.user.id !== forUser || savedView !== view) return; // the person or the view changed while the answer was on its way
     var body = r.body || {};
-    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; $('saved-list').textContent = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; savedSay(savedMessage(r.status), true); paintCompare(null); return; }
+    if (r.status !== 200 || body.status !== 'OK' || !Array.isArray(body.reports)) { savedFresh = false; $('saved-list').textContent = ''; $('saved-tools').hidden = true; $('saved-nomatch').hidden = true; $('saved-manage').hidden = true; $('saved-archived-toggle').hidden = true; setManage(false); savedSay(typeof keepMessage === 'string' ? keepMessage : savedMessage(r.status), true); paintCompare(null); return; }
     var list = $('saved-list'), keep = chosenIds();
     list.textContent = '';
-    savedSay(body.reports.length ? '' : 'No reports saved yet. A report is saved when it uses one of your brokerage’s reports.', false);
+    $('saved-title').textContent = archivedView ? 'Archived reports' : 'Saved reports';
     var offered = [];
     body.reports.forEach(function(rep){
       if (!rep || typeof rep.report_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(rep.report_id)) return;
       offered.push(rep);
       var text = savedRowText(rep);
       var li = document.createElement('li'), b = document.createElement('button');
-      li.className = 'sv-row';
+      li.className = 'sv-row'; li.setAttribute('data-id', rep.report_id);
       // the comparison checkbox (build step 10) sits on the same row as the report it chooses; ticking it never opens anything
       var pick = null;
       if (COMPARE_AT_LAUNCH) {
@@ -1121,19 +1184,55 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         cb.addEventListener('change', function(){ $('compare-result').textContent = ''; compareSay('', false); syncCompare(); });
         pick.appendChild(cb);
       }
-      b.type = 'button';
+      b.type = 'button'; b.className = 'sv-open';
       b.textContent = text; b.title = text; // one line in the rail; the whole line on hover
       b.addEventListener('click', function(){ openSaved(rep.report_id, rep.number); });
       if (pick) li.appendChild(pick);
-      li.appendChild(b); list.appendChild(li);
+      if (!archivedView) {
+        // Manage mode: a checkbox per row (drawn only while managing); it never opens the report
+        var mp = document.createElement('label'), mc = document.createElement('input');
+        mp.className = 'sv-mpick'; mc.type = 'checkbox'; mc.value = rep.report_id; mc.setAttribute('aria-label', 'Select report ' + rep.number + ' to remove');
+        mc.addEventListener('change', function(){ hideConfirm(); updateBulk(); });
+        mp.appendChild(mc); li.appendChild(mp);
+      }
+      li.appendChild(b);
+      if (archivedView) {
+        var rb = document.createElement('button');
+        rb.type = 'button'; rb.className = 'sv-restore'; rb.textContent = 'Restore'; rb.setAttribute('aria-label', 'Restore report ' + rep.number + ' to Saved Reports');
+        rb.addEventListener('click', function(){ changeList([rep.report_id], false, 'restore'); });
+        li.appendChild(rb);
+      } else {
+        var kb = document.createElement('button');
+        kb.type = 'button'; kb.className = 'sv-kebab'; kb.textContent = '⋮'; kb.setAttribute('aria-label', 'Actions for report ' + rep.number);
+        kb.setAttribute('aria-haspopup', 'menu'); kb.setAttribute('aria-expanded', 'false');
+        kb.addEventListener('click', function(){ toggleMenu(kb, rep); });
+        kb.addEventListener('keydown', function(e){ if (e.key === 'ArrowDown') { e.preventDefault(); if (menuFor !== rep.report_id) toggleMenu(kb, rep); } });
+        li.appendChild(kb);
+      }
+      list.appendChild(li);
     });
     $('saved-tools').hidden = offered.length === 0;
+    $('saved-manage').hidden = archivedView || offered.length === 0;
+    if ($('saved-manage').hidden) setManage(false);
+    var tg = $('saved-archived-toggle'); tg.hidden = false; tg.textContent = archivedView ? '← Back to Saved reports' : 'View archived'; tg.setAttribute('aria-pressed', archivedView ? 'true' : 'false');
+    if (offered.length) { if (!keepMessage) savedSay('', false); }
+    else if (keepMessage) { /* the words about what just failed stay on screen */ }
+    else if (archivedView) savedSay('No archived reports.', false);
+    else emptyActiveMessage(forUser);
     filterSaved();
-    paintCompare(offered);
+    paintCompare(archivedView ? [] : offered);
+  }
+  /** The active list is empty: a person who has not made a report is told how one is saved; a person whose reports are all archived is told where they are. */
+  async function emptyActiveMessage(forUser){
+    savedSay('No reports saved yet. A report is saved when it uses one of your brokerage’s reports.', false);
+    var r = await post(REPORT_FN, { action: 'list', archived: true });
+    if (!session || !session.user || session.user.id !== forUser || savedView !== 'active' || $('saved-list').children.length) return;
+    var b = r.body || {};
+    if (r.status === 200 && b.status === 'OK' && Array.isArray(b.reports) && b.reports.length) savedSay('Every saved report is archived. Choose View archived to restore one.', false);
   }
   /** One saved report, in words: the same line the list has always shown. The search reads this text and nothing else. */
   function savedRowText(rep){
-    return 'Report ' + rep.number + ' \u00b7 ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' \u00b7 ' + dateWords(rep.generated_at) : '');
+    return 'Report ' + rep.number + ' · ' + (typeof rep.address === 'string' && rep.address ? rep.address : 'address no longer kept') + (dateWords(rep.generated_at) ? ' · ' + dateWords(rep.generated_at) : '');
   }
   /** Show the rows that match what was typed (all of them when nothing is). It only hides rows: a ticked row stays ticked and still counts. */
   function filterSaved(){
@@ -1142,16 +1241,122 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       var hit = !q || (li.textContent || '').toLowerCase().indexOf(q) >= 0;
       if (hit) hits++;
       li.hidden = !hit || (capped && hits > SAVED_RECENT);
+      // a row that is no longer shown is no longer selected: Remove selected acts on what the person can see, never on rows they cannot
+      if (li.hidden) { var mc = li.querySelector('.sv-mpick input'); if (mc) mc.checked = false; }
     });
     $('saved-nomatch').hidden = !(q && rows.length && !hits);
     // the rail shows the most recent few; "View all" opens the rest (a search always looks through every report)
     var more = $('saved-more'); more.hidden = !!q || rows.length <= SAVED_RECENT;
     more.textContent = savedAll ? 'Show recent reports only' : 'View all saved reports (' + rows.length + ')';
+    hideConfirm(); updateBulk();
+  }
+  // ---- remove from my list: one report from a row's menu, several in Manage mode, and the archived list ------------------------------
+  function toggleMenu(btn, rep){
+    if (archiveBusy) return;
+    if (menuFor === rep.report_id) { closeMenu(true); return; }
+    closeMenu(false);
+    menuFor = rep.report_id; menuBtn = btn; menuReport = rep; btn.setAttribute('aria-expanded', 'true');
+    var m = $('saved-menu'); m.hidden = false;
+    var r = btn.getBoundingClientRect(); menuAnchor = { top: r.top, left: r.left };
+    var w = m.offsetWidth || 220, h = m.offsetHeight || 52;
+    var left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)), top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4); // no room below: open upward
+    m.style.left = left + 'px'; m.style.top = top + 'px';
+    $('saved-menu-remove').focus();
+  }
+  function closeMenu(refocus){
+    var m = $('saved-menu'); if (m) m.hidden = true;
+    if (menuBtn) { menuBtn.setAttribute('aria-expanded', 'false'); if (refocus && document.body.contains(menuBtn)) menuBtn.focus(); }
+    menuFor = null; menuBtn = null; menuReport = null; menuAnchor = null;
+  }
+  /** The menu follows its button: it closes when the button has moved (the list or the page scrolled, the window changed size), not when focus merely lands on the menu. */
+  function closeMenuIfMoved(){
+    if (menuFor === null || !menuBtn) return;
+    var r = menuBtn.getBoundingClientRect();
+    if (Math.abs(r.top - menuAnchor.top) > 1 || Math.abs(r.left - menuAnchor.left) > 1) closeMenu(false);
+  }
+  function hideToast(){ if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; } $('saved-toast').hidden = true; $('saved-undo').hidden = true; }
+  /** A confirmation shown only AFTER the server has answered. `undo` offers to put the same reports back. */
+  function showToast(text, undo){
+    if (toastTimer) clearTimeout(toastTimer);
+    $('saved-toast-text').textContent = text; $('saved-undo').hidden = !undo; $('saved-toast').hidden = false;
+    toastTimer = setTimeout(function(){ hideToast(); undoIds = null; }, 12000);
+  }
+  function hideConfirm(){ confirmIds = null; var c = $('saved-confirm'); if (c) c.hidden = true; }
+  function manageIds(){
+    return Array.prototype.filter.call($('saved-list').querySelectorAll('.sv-mpick input'), function(c){ return c.checked && !c.closest('li').hidden; }).map(function(c){ return c.value; });
+  }
+  function updateBulk(){
+    var boxes = $('saved-list').querySelectorAll('.sv-mpick input'), shown = 0;
+    Array.prototype.forEach.call(boxes, function(c){ if (!c.closest('li').hidden) shown++; });
+    var n = manageIds().length, all = $('saved-all');
+    $('saved-count').textContent = n + ' selected';
+    all.disabled = shown === 0 || archiveBusy; all.checked = shown > 0 && n === shown; all.indeterminate = n > 0 && n < shown;
+    $('saved-remove-sel').disabled = n === 0 || archiveBusy;
+    $('saved-confirm-go').disabled = archiveBusy;
+  }
+  function setManage(on){
+    on = !!on && savedView === 'active';
+    var was = savedManage; savedManage = on;
+    $('saved').classList.toggle('mng-on', on); $('saved-bulk').hidden = !on;
+    var mb = $('saved-manage'); mb.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (!on) { Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-mpick input'), function(c){ c.checked = false; }); hideConfirm(); }
+    else closeMenu(false);
+    updateBulk();
+    if (on && !was) $('saved-all').focus();
+  }
+  /** Take reports off the caller's own list (archive) or put them back (restore). The page changes only after the server says it is done. */
+  async function changeList(ids, archive, how){
+    if (archiveBusy || !session || !session.user || !ids.length) return false;
+    var forUser = session.user.id, done = 0, failed = null, i, chunk, r;
+    archiveBusy = true; closeMenu(false); updateBulk(); savedSay('', false);
+    Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-row'), function(li){ if (ids.indexOf(li.getAttribute('data-id')) >= 0) li.classList.add('sv-busy'); });
+    for (i = 0; i < ids.length; i += MAX_PER_CALL) {
+      chunk = ids.slice(i, i + MAX_PER_CALL);
+      r = await post(REPORT_FN, { action: archive ? 'archive' : 'restore', report_ids: chunk });
+      if (!session || !session.user || session.user.id !== forUser) { archiveBusy = false; return false; } // another person is signed in now: touch nothing
+      if (r.status === 200 && r.body && r.body.status === 'OK') {
+        done += chunk.length;
+        Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-row'), function(li){ if (chunk.indexOf(li.getAttribute('data-id')) >= 0) li.remove(); });
+      } else { failed = r; break; }
+    }
+    archiveBusy = false;
+    Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-row.sv-busy'), function(li){ li.classList.remove('sv-busy'); });
+    var many = ids.length > 1, what = many ? done + ' reports' : 'report';
+    if (failed) {
+      if (failed.status === 401) { session = null; openAuth(); savedSay('Sign in first.', true); return false; }
+      var msg = failed.status === 404
+        ? 'Some of those reports are no longer available to you. The list has been refreshed.'
+        : failed.status === 403 ? 'This account cannot change saved reports right now. Nothing was changed.'
+        : (done ? 'Changed ' + done + ' of ' + ids.length + ' reports. The rest could not be changed just now. Try again in a minute.'
+                : 'That could not be done just now. Nothing was changed. Try again in a minute.');
+      savedSay(msg, true);
+      // read the list again only when it may have changed (some were done, or the server said a report is gone); the words stay on screen
+      if (done || failed.status === 404 || failed.status === 403) { savedFresh = false; refreshSaved(msg); }
+      return false;
+    }
+    if (archive) { undoIds = ids.slice(); showToast(many ? 'Removed ' + what + ' from Saved Reports.' : 'Removed from Saved Reports.', true); }
+    else { undoIds = null; showToast(many ? 'Restored ' + what + ' to Saved Reports.' : 'Restored to Saved Reports.', false); }
+    if (how === 'bulk') setManage(false);
+    if (!$('saved-list').children.length) { savedFresh = false; refreshSaved(); } else filterSaved();
+    if (how !== 'undo') $('saved-list').focus();
+    return true;
+  }
+  /** Undo puts the last removal back, then reads the list so the reports return in their own order. */
+  async function undoRemoval(){
+    var ids = undoIds; if (!ids || archiveBusy) return;
+    if (await changeList(ids, false, 'undo')) { undoIds = null; savedFresh = false; await refreshSaved(); }
+  }
+  function toggleArchivedView(){
+    if (archiveBusy) return;
+    savedView = savedView === 'archived' ? 'active' : 'archived';
+    setManage(false); closeMenu(false); hideToast(); undoIds = null; savedAll = false;
+    $('saved-list').textContent = ''; savedFresh = false; savedSay('', false); refreshSaved();
   }
   // ---- comparing saved reports (build step 10) --------------------------------------------------------------------------------
   function compareSay(text, isError){ var s=$('compare-status'); s.textContent=text||''; s.className=isError?'err':''; }
   function chosenIds(){
-    return Array.prototype.filter.call($('saved-list').querySelectorAll('input'), function(c){ return c.checked; }).map(function(c){ return c.value; });
+    return Array.prototype.filter.call($('saved-list').querySelectorAll('.sv-pick input'), function(c){ return c.checked; }).map(function(c){ return c.value; });
   }
   /** Hide the card and forget everything on it, so one person's reports and comparison are never left on the page for the next. */
   function hideCompare(){
@@ -1162,7 +1367,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   /** Keep the button and the count in step with the boxes: 2 to 5 may be chosen, and once 5 are the rest wait. */
   function syncCompare(){
     var n = chosenIds().length, C = window.HS && window.HS.daReportCompare, max = C ? C.MAX : 5, min = C ? C.MIN : 2;
-    Array.prototype.forEach.call($('saved-list').querySelectorAll('input'), function(c){ c.disabled = !c.checked && n >= max; });
+    Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-pick input'), function(c){ c.disabled = !c.checked && n >= max; });
     $('compare-go').disabled = comparing || n < min || n > max;
     $('compare-count').textContent = compareRows.length >= min ? (n === 0 ? 'Choose ' + min + ' to ' + max + ' reports.' : n + (n === 1 ? ' report' : ' reports') + ' chosen.') : '';
   }
@@ -1182,7 +1387,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var box = $('saved'), btn = $('compare-mode');
     if (!COMPARE_AT_LAUNCH) on = false;
     if (!on) {
-      Array.prototype.forEach.call($('saved-list').querySelectorAll('input'), function(c){ c.checked = false; c.disabled = false; });
+      Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-pick input'), function(c){ c.checked = false; c.disabled = false; });
       $('compare-result').textContent = ''; compareSay('', false);
     }
     box.classList.toggle('cmp-on', !!on);
@@ -1194,7 +1399,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   /** The report on screen joins the choice: its own "Compare property" button. */
   function chooseForCompare(reportId){
     setCompareMode(true);
-    var boxes = $('saved-list').querySelectorAll('input'), first = null;
+    var boxes = $('saved-list').querySelectorAll('.sv-pick input'), first = null;
     Array.prototype.forEach.call(boxes, function(c){ if (!first) first = c; if (c.value === reportId && !c.checked && !c.disabled) { c.checked = true; $('compare-result').textContent = ''; compareSay('', false); } });
     syncCompare();
     $('saved').scrollIntoView();
@@ -1786,6 +1991,36 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     $('acct-btn').addEventListener('click', function(){ var a = $('account'); a.open = true; a.scrollIntoView({ block: 'start' }); a.querySelector('summary').focus({ preventScroll: true }); });
     $('compare-mode').addEventListener('click', function(){ setCompareMode(!$('saved').classList.contains('cmp-on')); });
     $('saved-more').addEventListener('click', function(){ savedAll = !savedAll; filterSaved(); });
+    // remove from my list: Manage mode, the confirmation, the row menu, Undo and the archived list
+    $('saved-manage').addEventListener('click', function(){ setManage(!savedManage); if (!savedManage) $('saved-manage').focus(); });
+    $('saved-cancel').addEventListener('click', function(){ setManage(false); $('saved-manage').focus(); });
+    $('saved-all').addEventListener('change', function(){
+      var on = $('saved-all').checked;
+      Array.prototype.forEach.call($('saved-list').querySelectorAll('.sv-mpick input'), function(c){ c.checked = on && !c.closest('li').hidden; });
+      hideConfirm(); updateBulk();
+    });
+    $('saved-remove-sel').addEventListener('click', function(){
+      var ids = manageIds(); if (!ids.length || archiveBusy) return;
+      confirmIds = ids;
+      $('saved-confirm-text').textContent = 'Remove ' + ids.length + (ids.length === 1 ? ' report' : ' reports') + ' from Saved Reports? You can restore ' + (ids.length === 1 ? 'it' : 'them')
+        + ' from View archived. Nothing is refunded, and client links and property watches keep working.';
+      $('saved-confirm-go').textContent = 'Remove ' + ids.length + (ids.length === 1 ? ' report' : ' reports');
+      $('saved-confirm').hidden = false; $('saved-confirm-no').focus();
+    });
+    $('saved-confirm-no').addEventListener('click', function(){ hideConfirm(); $('saved-remove-sel').focus(); });
+    $('saved-confirm-go').addEventListener('click', function(){ var ids = confirmIds; hideConfirm(); if (ids && ids.length) changeList(ids, true, 'bulk'); });
+    $('saved-menu-remove').addEventListener('click', function(){ var rep = menuReport; closeMenu(false); if (rep) changeList([rep.report_id], true, 'single'); });
+    $('saved-undo').addEventListener('click', undoRemoval);
+    $('saved-archived-toggle').addEventListener('click', toggleArchivedView);
+    document.addEventListener('click', function(e){ if (menuFor !== null && !(e.target.closest && (e.target.closest('#saved-menu') || e.target.closest('.sv-kebab')))) closeMenu(false); });
+    document.addEventListener('keydown', function(e){
+      if (menuFor === null) return;
+      if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); }
+      else if (e.key === 'Tab') closeMenu(false);
+    });
+    $('saved-list').addEventListener('scroll', closeMenuIfMoved);
+    window.addEventListener('scroll', closeMenuIfMoved, true);
+    window.addEventListener('resize', closeMenuIfMoved);
     client.auth.getSession().then(function(res){ onSession(res && res.data ? res.data.session : null); });
     client.auth.onAuthStateChange(function(evt, s){ onSession(s); });
   });

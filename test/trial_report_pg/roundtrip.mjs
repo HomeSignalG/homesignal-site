@@ -45,6 +45,9 @@ const RPC = {
     { n: a.p_brokerage_name, s: a.p_seat_limit === null ? '' : String(a.p_seat_limit), e: a.p_expires_at === null ? '' : a.p_expires_at }],
   // saved reports (build step 6): two read-only functions
   evaluation_reports_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_reports_of(:'u'::uuid) t", { u: a.p_user_id }],
+  // remove from my list (docs/saved-reports-archive.sql): the handler's list reads through the first; archive and restore are the second
+  saved_reports_listed: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.saved_reports_listed(:'u'::uuid, :'a'::boolean) t", { u: a.p_user_id, a: String(a.p_archived) }],
+  saved_reports_archive_set: (a) => ["select public.saved_reports_archive_set(:'u'::uuid, :'ids'::uuid[], :'a'::boolean)", { u: a.p_user_id, ids: '{' + a.p_report_ids.join(',') + '}', a: String(a.p_archived) }],
   evaluation_report_open: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.evaluation_report_open(:'u'::uuid, :'r'::uuid) t", { u: a.p_user_id, r: a.p_report_id }],
   // the header (build step 7): one read-only function
   report_header_of: (a) => ["select coalesce(json_agg(row_to_json(t)), '[]') from public.report_header_of(:'u'::uuid) t", { u: a.p_user_id }],
@@ -406,6 +409,94 @@ r = await ask(CLEARED, MEMBER, { address: HOME, idempotency_key: key(60) });
 ok(r.status === 403 && r.json.error === 'evaluation_complete' && !seen.slice(beforeMake).some((x) => /brokerage_report_issue|evaluation_report_issue|report_snapshot/.test(x)) && count('evaluation_credit') === 10,
   '7r a complete trial still cannot make a report (403 evaluation_complete), and nothing was issued', r.json);
 
+// ---- 7x. REMOVE FROM MY LIST (docs/saved-reports-archive.sql): the real handler, data layer and SQL ---------------------------------------------------
+// Every request below builds a fresh handler and data layer (`ask`), so nothing but the database carries a person's list from one call to the next: a refresh, and a
+// sign-in on another device, are the same thing here. MEMBER (owner) and LATE (agent) share the first brokerage's ten reports.
+{
+  const arch = (userId, action, ids) => savedAsk(userId, { action, report_ids: ids });
+  const numbersOf = (res) => (res.json.reports || []).map((x) => x.number).join(',');
+  const ledgerFp = () => one("select md5((select coalesce(string_agg(c::text, ',' order by c.evaluation_id, c.ordinal), '') from public.evaluation_credit c) || (select coalesce(string_agg(p::text, ',' order by p.number, p.report_id), '') from public.brokerage_paid_credit p) || (select coalesce(string_agg(report_id::text || content_hash, ',' order by report_id), '') from public.report_snapshot))");
+  // a third member, who will lose their place later; they join now so the ledger and event figures below are taken after it
+  const DROPPED = 'e9999999-9999-4999-8999-999999999991';
+  one("insert into auth.users (id, email) values (:'d'::uuid, 'dropped@example.test')", { d: DROPPED });
+  const joined = psql("select * from public.evaluation_invite_redeem((select m.token from public.evaluation_invite_mint(:'e'::uuid, 'agent') m), :'d'::uuid)", { e: evalId, d: DROPPED });
+  ok(joined.ok, '7x-0 a third member joins the first brokerage (set-up for the removed-member checks)', joined.err);
+  const L0 = await savedAsk(MEMBER, { action: 'list' });
+  ok(L0.status === 200 && numbersOf(L0) === '10,9,8,7,6,5,4,3,2,1' && L0.json.archived === false && L0.json.trial.credits_used === 10 && L0.json.trial.credits_remaining === 0,
+    '7x-a the starting point: ten reports on the list, none removed, all ten free reports used', [L0.status, numbersOf(L0), L0.json.archived]);
+  const fp0 = ledgerFp(), snap0 = snapState();
+  const R = (nn) => L0.json.reports.find((x) => x.number === nn).report_id;
+  // a share link and a property watch on reports that are about to leave a list
+  one("select * from public.evaluation_report_share_create(:'u'::uuid, :'r'::uuid, repeat('c', 64))", { u: MEMBER, r: R(3) });
+  const watchOn = one("select count(*) from public.evaluation_property_watch_start(:'u'::uuid, :'r'::uuid)", { u: MEMBER, r: R(5) });
+  ok(watchOn === '1' && one("select count(*) from public.report_share_open(repeat('c', 64))") === '1', '7x-b a client link on report 3 and a property watch on report 5 exist, and work', watchOn);
+
+  let a = await arch(MEMBER, 'archive', [R(3)]);
+  ok(a.status === 200 && a.json.status === 'OK' && a.json.action === 'archive' && a.json.requested === 1 && a.json.changed === 1 && a.json.trial.credits_used === 10 && a.json.trial.credits_remaining === 0
+     && JSON.stringify(Object.keys(a.json).sort()) === '["action","changed","plan","requested","status","trial"]',
+    '7x-c removing one report from the list: one row changed, and the free-report figures in the answer are still 10 used, 0 left', a.json);
+  const L1 = await savedAsk(MEMBER, { action: 'list' }), A1 = await savedAsk(MEMBER, { action: 'list', archived: true });
+  ok(numbersOf(L1) === '10,9,8,7,6,5,4,2,1' && L1.json.archived === false && numbersOf(A1) === '3' && A1.json.archived === true && A1.json.reports[0].report_id === R(3) && typeof A1.json.reports[0].address === 'string' && A1.json.reports[0].address.length > 8,
+    '7x-d a fresh request (another device, another browser) lists nine reports, and the archived list holds report 3 with its number and address', [numbersOf(L1), numbersOf(A1)]);
+  const LL = await savedAsk(LATE, { action: 'list' }), LA = await savedAsk(LATE, { action: 'list', archived: true });
+  ok(numbersOf(LL) === '10,9,8,7,6,5,4,3,2,1' && numbersOf(LA) === '', '7x-e a colleague in the same brokerage still has all ten on their list and nothing archived: the lists are separate');
+  a = await arch(MEMBER, 'archive', [R(3)]);
+  ok(a.status === 200 && a.json.changed === 0 && numbersOf(await savedAsk(MEMBER, { action: 'list' })) === '10,9,8,7,6,5,4,2,1', '7x-f removing it AGAIN (a repeated click, a retry) changes nothing and is not an error', a.json);
+  a = await arch(MEMBER, 'restore', [R(3)]);
+  ok(a.status === 200 && a.json.changed === 1 && numbersOf(await savedAsk(MEMBER, { action: 'list' })) === '10,9,8,7,6,5,4,3,2,1' && numbersOf(await savedAsk(MEMBER, { action: 'list', archived: true })) === '',
+    '7x-g restoring it puts report 3 back with its original number, and the archived list is empty again', a.json);
+  a = await arch(MEMBER, 'restore', [R(3)]);
+  ok(a.status === 200 && a.json.changed === 0, '7x-h restoring again is a no-op');
+
+  // several at once: exactly the ones named
+  a = await arch(MEMBER, 'archive', [R(1), R(2), R(5)]);
+  const L2 = await savedAsk(MEMBER, { action: 'list' }), A2 = await savedAsk(MEMBER, { action: 'list', archived: true });
+  ok(a.status === 200 && a.json.requested === 3 && a.json.changed === 3 && numbersOf(L2) === '10,9,8,7,6,4,3' && numbersOf(A2) === '5,2,1',
+    '7x-i removing {1, 2, 5} in one request changes exactly those three: seven remain and the archived list is 5, 2, 1', [numbersOf(L2), numbersOf(A2)]);
+  a = await arch(MEMBER, 'archive', [R(4), R(1)]);
+  ok(a.json.requested === 2 && a.json.changed === 1 && numbersOf(await savedAsk(MEMBER, { action: 'list' })) === '10,9,8,7,6,3', '7x-j a set that is partly removed already changes only the rest (1 of 2)', a.json);
+
+  // an archived report still opens, exactly as stored; shares and watches are untouched
+  const reopenedAr = await savedAsk(MEMBER, { action: 'open', report_id: R(5) });
+  ok(reopenedAr.status === 200 && reopenedAr.json.reopened === true && reopenedAr.json.number === 5 && reopenedAr.json.charged === false && JSON.stringify(reopenedAr.json.report) === JSON.stringify(JSON.parse(one("select body from public.report_snapshot where report_id = :'r'::uuid", { r: R(5) }))),
+    '7x-k an ARCHIVED report still opens: its stored text, field for field, its original number, never charged', [reopenedAr.status, reopenedAr.json.number]);
+  await arch(MEMBER, 'archive', [R(3)]);
+  ok(one("select count(*) from public.report_share_open(repeat('c', 64))") === '1' && one("select count(*) from public.evaluation_property_watches_of(:'u'::uuid) w where w.report_id = :'r'::uuid", { u: MEMBER, r: R(5) }) === '1',
+    '7x-l the client link on report 3 (now removed from the list) still opens for the client, and the property watch on report 5 (removed) is still running');
+  await arch(MEMBER, 'restore', [R(3)]);
+
+  // a member who is removed from the brokerage can neither remove nor restore
+  const mine = await savedAsk(MEMBER, { action: 'list', archived: true });
+  a = await arch(DROPPED, 'archive', [R(6)]);
+  ok(a.status === 200 && a.json.changed === 1 && numbersOf(await savedAsk(DROPPED, { action: 'list', archived: true })) === '6', '7x-m a member of the brokerage removes a report from their own list (control for what follows)', a.json);
+  one("update public.brokerage_member set status = 'deactivated' where user_id = :'d'::uuid", { d: DROPPED });
+  const dr = [await arch(DROPPED, 'archive', [R(7)]), await arch(DROPPED, 'restore', [R(6)]), await savedAsk(DROPPED, { action: 'list' })];
+  ok(dr.every((x) => x.status === 403) && one("select count(*) from public.saved_report_archive where user_id = :'u'::uuid", { u: DROPPED }) === '1',
+    '7x-n once the member is removed they can neither remove nor restore, nor even list (403), and their one earlier row is untouched', dr.map((x) => x.status));
+  ok(numbersOf(await savedAsk(MEMBER, { action: 'list', archived: true })) === numbersOf(mine), '7x-o and that member\'s removals never touched the owner\'s list', numbersOf(mine));
+
+  // refusals
+  a = await arch(MEMBER, 'archive', [BCODE]);
+  ok(a.status === 404 && a.json.error === 'not_found', '7x-p an unknown id is a 404: nothing is changed', a.json);
+  a = await arch(MEMBER, 'archive', [R(7), BCODE]);
+  ok(a.status === 404 && numbersOf(await savedAsk(MEMBER, { action: 'list' })) === '10,9,8,7,6,3' && numbersOf(await savedAsk(MEMBER, { action: 'list', archived: true })) === numbersOf(mine),
+    '7x-q a set holding one of their own reports and one that is not theirs is refused whole: report 7 stays on the list', a.json);
+  a = await arch(STRANGER, 'archive', [R(6)]);
+  ok(a.status === 403 && one("select count(*) from public.saved_report_archive where user_id = :'u'::uuid", { u: STRANGER }) === '0', '7x-r a signed-in person with no brokerage is refused (403): no row for them', a.json);
+  a = await savedAsk(MEMBER, { action: 'archive', report_ids: [R(8)], user_id: LATE });
+  ok(a.status === 400 && /unknown field/.test(a.json.detail) && one("select count(*) from public.saved_report_archive where user_id = :'u'::uuid", { u: LATE }) === '0', '7x-s a request that names another user is refused: nobody can change a colleague\'s list', a.json);
+  const rapid = [await arch(MEMBER, 'archive', [R(9)]), await arch(MEMBER, 'archive', [R(9)]), await arch(MEMBER, 'archive', [R(9)])];
+  ok(rapid.map((x) => x.json.changed).join() === '1,0,0' && one("select count(*) from public.saved_report_archive where user_id = :'u'::uuid and report_id = :'r'::uuid", { u: MEMBER, r: R(9) }) === '1', '7x-t three rapid identical requests leave exactly one row: 1, then 0, then 0 changed', rapid.map((x) => x.json.changed));
+
+  // leave the first brokerage's lists as they were
+  await arch(MEMBER, 'restore', [R(1), R(2), R(5), R(4), R(9)]);
+  ok(numbersOf(await savedAsk(MEMBER, { action: 'list' })) === '10,9,8,7,6,5,4,3,2,1' && numbersOf(await savedAsk(MEMBER, { action: 'list', archived: true })) === '', '7x-u restoring everything leaves the list as it started', null);
+  // the money and the ledger
+  ok(ledgerFp() === fp0 && snapState() === snap0, '7x-v after all of that, every credit row, every snapshot (body and hash) and every ledger byte is exactly what it was: nothing refunded, renumbered or rewritten', [fp0, ledgerFp()]);
+  const U = await savedAsk(MEMBER, { action: 'list' });
+  ok(U.json.trial.credits_used === 10 && U.json.trial.credits_remaining === 0 && U.json.trial.status === 'complete', '7x-w the trial still reads 10 of 10 used and complete', U.json.trial);
+}
+
 // a revoked evaluation: the gate refuses, and the database itself returns nothing
 one("select public.evaluation_revoke(:'e'::uuid)", { e: evalId });
 const revokedList = await savedAsk(MEMBER, { action: 'list' });
@@ -424,6 +515,25 @@ ok(r.status === 200 && otherReport !== ''
   '7v while its trial is active and unexpired the other brokerage lists and opens its one report', r.json);
 
 ok(JSON.stringify(r.json.header) === '{"brokerage":"Other Brokerage Realty","agent":null}', '7v2 the other brokerage\'s report carries ITS OWN brokerage name, never the first one\'s', r.json.header);
+// ---- 7y. remove from my list, across brokerages (the other brokerage's member is active; the first brokerage was revoked in 7s) -------------------
+{
+  const arch = (userId, action, ids) => savedAsk(userId, { action, report_ids: ids });
+  const numbersOf = (res) => (res.json.reports || []).map((x) => x.number).join(',');
+  const firstBrokerageRows = () => one("select count(*) from public.saved_report_archive where report_id in (select report_id from public.evaluation_credit where evaluation_id = :'e'::uuid)", { e: evalId });
+  const before = firstBrokerageRows();
+  let a = await arch(NEWBIE, 'archive', [firstId]);
+  ok(a.status === 404 && a.json.error === 'not_found' && firstBrokerageRows() === before, '7y-a a member of the OTHER brokerage cannot remove a report that is not theirs: 404, and nothing is written for the first brokerage\'s report', a.json);
+  a = await arch(NEWBIE, 'archive', [otherReport, firstId]);
+  ok(a.status === 404 && numbersOf(await savedAsk(NEWBIE, { action: 'list' })) === '1', '7y-b a set holding their own report and a foreign one is refused whole: their report stays on the list', a.json);
+  a = await arch(NEWBIE, 'archive', [otherReport]);
+  ok(a.status === 200 && a.json.changed === 1 && numbersOf(await savedAsk(NEWBIE, { action: 'list' })) === '' && numbersOf(await savedAsk(NEWBIE, { action: 'list', archived: true })) === '1',
+    '7y-c they can remove their own report: the list is empty and the archived list holds it', a.json);
+  a = await arch(NEWBIE, 'restore', [otherReport]);
+  ok(a.status === 200 && a.json.changed === 1 && numbersOf(await savedAsk(NEWBIE, { action: 'list' })) === '1', '7y-d and restore it', a.json);
+  a = await arch(MEMBER, 'archive', [otherReport]);
+  ok(a.status === 403, '7y-e a member of the REVOKED brokerage cannot remove anything (403): the gate refuses before the archive is asked', a.json);
+}
+
 one("update public.evaluation e set expires_at = e.created_at + interval '1 second' from public.brokerage_account a where a.id = e.brokerage_id and a.name = 'Other Brokerage Realty' and e.status = 'active'");
 ok(one("select count(*) from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Other Brokerage Realty' and e.status = 'active' and e.expires_at < now()") === '1'
    && one("select count(*) from public.evaluation_reports_of(:'u'::uuid)", { u: NEWBIE }) === '0'

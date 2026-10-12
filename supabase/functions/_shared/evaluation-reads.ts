@@ -23,6 +23,12 @@ export class SeatLimitReached extends Error {}
 export class TrialRejected extends Error {}
 /** The person may not invite: they belong to no trial, are not an active OWNER of it, or the trial has ended (EV003, NOT_ENTITLED). */
 export class NotEntitled extends Error {}
+/** A report to archive or restore is not one the caller can see now (unknown, another brokerage's, or the caller has lost standing): the three are the same answer. */
+export class SavedReportNotFound extends Error {}
+/** The set to archive or restore is unusable (empty, over the bound, or not ids). The database changed nothing. */
+export class ArchiveInvalid extends Error {}
+/** The most reports one archive or restore call may name: the database's bound, and the edge function's 4 KB request limit allows about this many ids. */
+export const ARCHIVE_MAX_IDS = 100;
 /** The database refused an individual signup: no confirmed email, an unknown user, or an unusable name (EV001, SIGNUP_REFUSED). Nothing was created. */
 export class SignupRefused extends Error {}
 
@@ -190,14 +196,34 @@ export function makeEvaluationReads(rpc: ServiceRpc) {
     },
 
     /**
-     * The brokerage's stored reports, newest first (build step 6): public.evaluation_reports_of, which reads the caller's own brokerage's
-     * ledger through the one membership resolver. A person with no standing gets an empty list. At most the evaluation's 10 reports exist.
+     * The caller's stored reports, newest first (build step 6, and the per-person list): public.saved_reports_listed, which reads the caller's
+     * own brokerage's reports through public.evaluation_reports_of (the one ownership reader) and keeps only the ones THIS person has not
+     * removed from their own list, or, with `archived`, only the ones they have. A person with no standing gets an empty list.
      */
-    async savedReports(userId: string): Promise<SavedReport[]> {
-      const { data, error } = await rpc('evaluation_reports_of', { p_user_id: userId });
-      if (error) throw new DataUnavailable('evaluation_reports_of');
+    async savedReports(userId: string, archived = false): Promise<SavedReport[]> {
+      const { data, error } = await rpc('saved_reports_listed', { p_user_id: userId, p_archived: archived });
+      if (error) throw new DataUnavailable('saved_reports_listed');
       if (!Array.isArray(data) || data.length > 1000) throw new DataUnavailable('shape');
       return data.map(savedRow);
+    },
+
+    /**
+     * Remove reports from the caller's own list (archived = true) or put them back (false): public.saved_reports_archive_set. All or nothing:
+     * SavedReportNotFound when any id is not one the caller can see now, ArchiveInvalid for an unusable set. Returns how many rows THIS call
+     * changed (0 when it was already so). It writes the caller's own list state and nothing else: no ledger, snapshot, share or watch.
+     */
+    async archiveReports(userId: string, reportIds: string[], archived: boolean): Promise<number> {
+      if (!Array.isArray(reportIds) || reportIds.length < 1 || reportIds.length > ARCHIVE_MAX_IDS || !reportIds.every((x) => typeof x === 'string' && UUID.test(x))) {
+        throw new ArchiveInvalid('set');
+      }
+      const { data, error } = await rpc('saved_reports_archive_set', { p_user_id: userId, p_report_ids: reportIds.map((x) => x.toLowerCase()), p_archived: archived });
+      if (error) {
+        if (error.message === 'NOT_FOUND') throw new SavedReportNotFound('refused');
+        if (error.message === 'ARCHIVE_INVALID') throw new ArchiveInvalid('refused');
+        throw new DataUnavailable('saved_reports_archive_set');
+      }
+      if (typeof data !== 'number' || !Number.isInteger(data) || data < 0 || data > reportIds.length) throw new DataUnavailable('shape');
+      return data;
     },
 
     /**

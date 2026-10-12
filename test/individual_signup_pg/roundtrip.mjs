@@ -34,6 +34,7 @@ const RPC = {
   brokerage_report_issue: (a) => [J + "public.brokerage_report_issue(:'u'::uuid, :'k'::uuid, :'b', :'h', :'v', :'i'::jsonb, nullif(:'p', '')::jsonb) t",
     { u: a.p_user_id, k: a.p_idempotency_key, b: a.p_body, h: a.p_content_hash, v: a.p_report_version, i: JSON.stringify(a.p_engine_inputs), p: a.p_private === null ? '' : JSON.stringify(a.p_private) }],
   report_private_context_read: (a) => [J + "public.report_private_context_read(:'c'::uuid) t", { c: a.p_context }],
+  saved_reports_listed: (a) => [J + "public.saved_reports_listed(:'u'::uuid, :'a'::boolean) t", { u: a.p_user_id, a: String(a.p_archived) }],
   evaluation_reports_of: (a) => [J + "public.evaluation_reports_of(:'u'::uuid) t", { u: a.p_user_id }],
   report_header_of: (a) => [J + "public.report_header_of(:'u'::uuid) t", { u: a.p_user_id }],
   brokerage_membership_of: (a) => [J + "public.brokerage_membership_of(:'u'::uuid) t", { u: a.p_user_id }],

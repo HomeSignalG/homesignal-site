@@ -60,6 +60,7 @@ const RPC = {
   // PostgREST passes a JSON null as SQL null; psql variables cannot carry one, so '' stands for null here and nowhere else
   evaluation_create: (a) => [asJson("public.evaluation_create(:'n', nullif(:'s', '')::integer, nullif(:'e', '')::timestamptz)"),
     { n: a.p_brokerage_name, s: a.p_seat_limit === null ? '' : String(a.p_seat_limit), e: a.p_expires_at === null ? '' : a.p_expires_at }],
+  saved_reports_listed: (a) => [asJson("public.saved_reports_listed(:'u'::uuid, :'a'::boolean)"), { u: a.p_user_id, a: String(a.p_archived) }],
   evaluation_reports_of: (a) => [asJson("public.evaluation_reports_of(:'u'::uuid)"), { u: a.p_user_id }],
   evaluation_report_open: (a) => [asJson("public.evaluation_report_open(:'u'::uuid, :'r'::uuid)"), { u: a.p_user_id, r: a.p_report_id }],
   report_header_of: (a) => [asJson("public.report_header_of(:'u'::uuid)"), { u: a.p_user_id }],

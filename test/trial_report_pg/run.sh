@@ -30,6 +30,9 @@ P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the repo
 P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply a second time"; exit 1; }
 P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the billing layer does not apply"; exit 1; }
 P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the billing layer does not apply a second time"; exit 1; }
+# remove-from-my-list (docs/saved-reports-archive.sql): the real handler's list now reads through it (applied twice, as the others are)
+P -f "$root/docs/saved-reports-archive.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports archive does not apply"; exit 1; }
+P -f "$root/docs/saved-reports-archive.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports archive does not apply a second time"; exit 1; }
 # the report rate limit: the real handler now claims one request from it before any work is done, so this suite must have it (applied twice, as the others are)
 P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply"; exit 1; }
 P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply a second time"; exit 1; }
