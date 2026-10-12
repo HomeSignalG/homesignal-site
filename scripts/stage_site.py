@@ -127,7 +127,7 @@ TREES = {
     'lib': ('.js', '.json'),
     'partials': ('.html',),
     # .webp: the homepage's approved Development Activity report preview
-    # (assets/home-development-activity-report-preview.webp, founder-approved in #1494).
+    # (assets/home-report-example-*.webp, the homepage's real example-report preview).
     'assets': ('.js', '.css', '.png', '.svg', '.webp', '.woff2'),
     'seed': ('.js',),
 }

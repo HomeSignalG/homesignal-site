@@ -21,7 +21,7 @@
 <meta name="twitter:description" content="See what's being built and proposed around your home — mapped from public records — and follow the notices, meetings, and topics that matter. Free, one email a day, every item links to its official record.">
 <meta name="twitter:image" content="https://homesignal.net/og-default.png">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; frame-src 'self'; child-src 'self'; form-action 'self'">
-<link rel="stylesheet" href="app.css?v=cf77cadd">
+<link rel="stylesheet" href="app.css?v=ba77bc72">
 <script>
   // A link from a buyer's shared report arrives as /#address=...: hide the document at once so no homepage paints while the
   // page script (at the end of the body) moves on. That script un-hides it when the fragment is not a usable address.
@@ -31,8 +31,8 @@
 <body data-nav="explore">
 <!-- THE HOMEPAGE (founder, Revised Index Design — Final Claude-Ready, 2026-09-30). index.html is
      Explore for everyone: nothing here redirects, follows, saves or subscribes. The two visuals:
-       1. the Development Activity report preview, the approved static asset
-          assets/home-development-activity-report-preview.webp (merged in #1494), and
+       1. the Development Activity report preview: a real report (3999 Touraine Dr, Frisco, TX 75034) rendered by
+          the report view module, built by scripts/build-home-showcase-preview.mjs into assets/home-report-example-*.webp, and
        2. the development map, which is NOT an image: it is Map 1 itself, iframed in its embed
           mode (homesignalmap.html?embed=1). The sample uses Map 1's layout-only preview mode
           (&preview=1) so STATUS / PROJECT TYPE / REGULATORY RECORDS and the map key all show
@@ -68,12 +68,20 @@
         <p class="home-index__eyebrow">For real estate professionals</p>
         <h2 class="home-index__enterprise-heading" id="homeEnterpriseHeading">Development Activity reports for agents &amp; brokerages.</h2>
         <p class="home-index__enterprise-body">Know what’s changing around a property before your client does.</p>
+        <ul class="home-index__enterprise-points">
+          <li>Nearby development within 0.5 mile, proposed and permitted shown separately.</li>
+          <li>Potential quality-of-life considerations for every project, marked as not site-verified.</li>
+          <li>Each record links to its official source, so you can walk a buyer through it.</li>
+        </ul>
         <a class="home-index__enterprise-cta" id="homeEnterpriseCta" href="development-activity.html">Explore Agent Reports →</a>
       </div>
-      <img src="assets/home-development-activity-report-preview.webp"
-           class="home-index__report-preview"
-           alt="Sample HomeSignal Development Activity report pages"
-           width="1448" height="1086" decoding="async">
+      <picture class="home-index__report-picture">
+        <source media="(max-width: 560px)" srcset="assets/home-report-example-mobile.webp?v=20261012" width="688" height="2974">
+        <img src="assets/home-report-example-desktop.webp?v=20261012"
+             class="home-index__report-preview"
+             alt="Example property report for 3999 Touraine Dr, Frisco, TX 75034, as of Oct 12, 2026: 9 official records within 0.5 miles, 8 permitted or under construction and 1 proposed. Four are shown, each with its stage and a potential quality-of-life consideration that is not site-verified: a road widening, a single-family home, a commercial building and a school."
+             width="1400" height="1900" decoding="async" loading="lazy">
+      </picture>
     </section>
 
     <section class="home-index__results" id="homeExploreResults" aria-labelledby="homeResultsHeading">

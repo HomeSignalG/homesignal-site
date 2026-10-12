@@ -696,6 +696,9 @@ body[data-explore="activity"] .hs-navsub a[data-sub="activity"]{font-weight:600;
 .home-index__enterprise-body{font-size:17px;line-height:1.5;color:var(--ink-2);margin:0 0 10px}
 .home-index__enterprise-cta{display:inline-flex;align-items:center;min-height:44px;font-size:14.5px;font-weight:600;text-decoration:none}
 .home-index__enterprise-cta:hover{text-decoration:underline}
+.home-index__enterprise-points{margin:0 0 12px;padding:0 0 0 18px;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.home-index__enterprise-points li{margin:0 0 6px}
+.home-index__report-picture{display:block;min-width:0;justify-self:end;width:100%;max-width:760px}
 .home-index__report-preview{display:block;width:100%;height:auto;justify-self:end;object-fit:contain;border-radius:10px;box-shadow:0 18px 48px rgba(16,32,24,.16)}
 /* the sample / results section */
 .home-index__results{padding:38px 0 28px;scroll-margin-top:88px}
@@ -744,6 +747,7 @@ a.home-index__record-name:hover{color:var(--green)}
   .home-index{padding:0 24px}
   .home-index__report{grid-template-columns:minmax(0,1fr);row-gap:32px;padding:40px 32px}
   .home-index__report-preview{justify-self:center}
+  .home-index__report-picture{justify-self:center}
   .home-index__title{font-size:44px}
   .home-index__results-grid{grid-template-columns:minmax(0,1fr)}
   .home-index__map-frame{height:700px}
