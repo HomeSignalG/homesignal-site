@@ -105,7 +105,7 @@ const PAGE_SRC = read(PAGE);
   ok(/hidden>\s*<h2 id="compare-title"/.test(PAGE_SRC.replace(/\s+/g, ' ').replace(/ >/g, '>')) || /id="compare" aria-labelledby="compare-title"(?: role="group")? hidden>/.test(PAGE_SRC), '5i the comparison block is hidden until there is a signed-in member with a saved-report list');
   const showSaved = (PC.match(/function showSaved\(on\)\s*\{[\s\S]*?\n  \}/) || [''])[0];
   ok(/hideCompare\(\)/.test(showSaved), '5j leaving the saved list (sign-out, another person) clears the comparison with it, so one person\'s reports are never left for the next');
-  ok(/paintCompare\(null\)/.test(PC) && /paintCompare\(offered\)/.test(PC), '5k a saved list that cannot be read says so on the card, and a read one fills it');
+  ok(/paintCompare\(null\)/.test(PC) && /paintCompare\(archivedView \? \[\] : offered\)/.test(PC), '5k a saved list that cannot be read says so on the card, and a read one fills it');
   ok((PC.match(/'share', 'watch', 'pdf', 'compare'/g) || []).length === 2, '5l the report\'s own "Compare property" button is live exactly where Share and Watch are: on a report that was saved');
   ok(/act === 'compare' && !\$\('saved'\)\.hidden\) chooseForCompare\(shareFor\)/.test(PC), '5m that button (now in the workspace rail) adds the report on screen to the choice, starts comparing and moves to the list; it compares nothing by itself');
   ok(/c\.disabled = !c\.checked && n >= max;/.test(PC) && /\$\('compare-go'\)\.disabled = comparing \|\| n < min \|\| n > max;/.test(PC), '5n at most five can be ticked and the button needs two to five');

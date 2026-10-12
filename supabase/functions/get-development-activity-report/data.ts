@@ -91,6 +91,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
 
     // saved reports (build step 6): the brokerage's stored reports, read through the one membership resolver
     savedReports: evaluation.savedReports,
+    archiveReports: evaluation.archiveReports,
     openSavedReport: evaluation.openSavedReport,
 
     // the header a member's reports carry (build step 7): the brokerage's name and the person's own, read when a report is shown, never stored

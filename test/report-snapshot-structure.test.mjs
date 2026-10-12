@@ -110,12 +110,22 @@ const watchSrc = codeOf(WATCH_SQL);
 // points at ONE stored report), the replay read that returns a retried key's stored report, and the invariant that counts a paid credit with no stored report.
 // Every write of a report is the snapshot writer, which billing_paid_issue calls (3c).
 const BILLING_SQL = 'docs/brokerage-billing.sql';
+// 2026-10-12: docs/saved-reports-archive.sql names the table twice and never reads or writes it: its precondition, and the per-person archive row's foreign key (an archive
+// row points at ONE stored report and can never cascade into it). Pinned exactly by 3g.
+const ARCHIVE_SQL = 'docs/saved-reports-archive.sql';
 const billingSrc = codeOf(BILLING_SQL);
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL)
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL || f === ARCHIVE_SQL)
    && namesTable.includes(BILLING_SQL) && (billingSrc.match(/\breport_snapshot\b/g) || []).length === 4 && (billingSrc.match(/references public\.report_snapshot \(report_id\)/g) || []).length === 1 && (billingSrc.match(/from public\.report_snapshot s\b/g) || []).length === 2
    && /to_regclass\('public\.report_snapshot'\)/.test(billingSrc) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(billingSrc) && !/grant[^;]*report_snapshot\b(?!_issue)/i.test(billingSrc)
    && (watchSrc.match(/\breport_snapshot\b/g) || []).length === 5 && /references public\.report_snapshot \(report_id\)/.test(watchSrc) && (watchSrc.match(/(?:from|join) public\.report_snapshot s\b/g) || []).length === 3 && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(watchSrc) && !/grant[^;]*report_snapshot/i.test(watchSrc),
   '3: no client, page, script, function or other SQL names the table itself in code — every consumer goes through the writer or a later, reviewed reader (the readers are the Follow / Changes Since Report data layer, the report function\'s replay read and the saved-reports read-only functions; the references are the share-link foreign key, 3d, and the evaluation ledger\'s foreign key plus one replay read; and, from build step 8, the share-delivery client read, 3f; and from build step 9 three read-only joins in the property-watch SQL, and from build step 11 four references in the billing SQL: its precondition, one foreign key and two read-only checks)', namesTable.join(','));
+{
+  const t = codeOf(ARCHIVE_SQL);   // strings kept: the precondition names the table inside to_regclass('public.report_snapshot')
+  const uses = [...t.matchAll(/\breport_snapshot\b[^;,\n]*/g)].map((m) => m[0].trim());
+  ok(namesTable.includes(ARCHIVE_SQL) && uses.length === 2 && /references public\.report_snapshot \(report_id\)(?! on delete)/.test(t)
+    && !/\b(select|insert|update|delete|truncate|grant|alter|drop)\b[^;]*\breport_snapshot\b/i.test(t.replace(/references public\.report_snapshot \(report_id\)/g, '')) ,
+    '3g: the remove-from-my-list SQL names the table exactly twice (its precondition, and the foreign key that can never cascade into a snapshot) and never reads, writes or grants it (control: it does name it)', uses);
+}
 {
   const t = readFileSync(join(ROOT, REPORT_DATA), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
