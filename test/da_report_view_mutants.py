@@ -203,8 +203,19 @@ m('print_page_number_dropped', "@bottom-right{content:\"Page \" counter(page) \"
 m('print_row_split_allowed', ".da-rv-sec--map,.da-rv-table tr{break-inside:avoid;page-break-inside:avoid}", ".da-rv-sec--map{break-inside:avoid;page-break-inside:avoid}")
 m('print_header_not_repeated', "'.da-rv-table thead{display:table-header-group}',", "'.da-rv-table thead{display:table-row-group}',")
 m('raw_url_printed_again', "link + '</p>'", "link + '<span class=\"da-rv-url\">' + esc(safeHref(isObj(p.source) ? p.source.url : '')) + '</span></p>'")
-m('print_evidence_collapsed', ".da-rv-detail::details-content{content-visibility:visible;display:block}',", "',")
-m('print_evidence_heading_hidden', "'.da-rv-detail>.da-rv-sum{display:block;list-style:none;", "'.da-rv-detail>.da-rv-sum{display:none;list-style:none;")
+# ---- the fourth column (2026-10-12): evidence is a cell of its own row, on screen and on paper ----
+m('evidence_cell_empty', "evidenceCell(it, showLifecycle) + '</div></td>';", "'</div></td>';")
+m('evidence_from_neighbouring_row', "evidenceCell(it, showLifecycle) + '</div></td>';", "evidenceCell(items[(items.indexOf(it) + 1) % items.length], showLifecycle) + '</div></td>';")
+m('evidence_source_link_dropped', "      + (link ? '<p class=\"da-rv-src\">' + link + '</p>' : '');\n    return lines ||", "      + '';\n    return lines ||")
+m('source_link_duplicated_in_development', "+ (where ? '<span class=\"da-rv-sub\">' + esc(where) + '</span>' : '') + '</th>';", "+ (where ? '<span class=\"da-rv-sub\">' + esc(where) + '</span>' : '') + sourceLink(p) + '</th>';")
+m('evidence_column_dropped', ", ['evid', 'Supporting Evidence']];", "];")
+m('missing_evidence_invented', "return lines || '<p class=\"da-rv-quiet da-rv-noev\">' + NO_EVIDENCE + '</p>';", "return lines || line('Official record', 'Verified');")
+m('evidence_cell_not_in_row_filter', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + evid + '</tr>'", "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + '</tr>' + evid")
+m('evidence_attribution_dropped', "+ (att ? '<p class=\"da-rv-attr\">' + esc(att) + '</p>' : '')\n      + (link ?", "+ (link ?")
+m('print_evidence_hidden', "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}',", "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}.da-rv-td--evid{display:none}',", [BROWSER])
+m('print_table_loses_widths', "'.da-rv-table{table-layout:fixed;font-size:11px}.da-rv-th--dev{width:24%}", "'.da-rv-table{table-layout:auto;font-size:11px}.da-rv-th--dev{width:24%}")
+m('stack_never_decided_by_width', "var STACK_AT = 760;", "var STACK_AT = 100000;", [BROWSER])
+m('record_section_not_a_container', "    '.da-rv-sec--records{container:da-rv-rec/inline-size}',\n", "", [BROWSER])
 
 
 def first_failure(out):
