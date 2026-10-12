@@ -97,9 +97,9 @@ for z in ZIPS:
     d = rows(f"""
     select k.source_key, k.marker_seq, k.lat, k.lng, k.marker_rule, k.family, k.dim,
       (select m.geom_family from geo.n5_serving_membership m where m.zcta5::text=k.zcta5::text and m.source_key=k.source_key limit 1) geom_family,
-      ST_Covers(b.g, ST_SetSRID(ST_Point(k.lng,k.lat),4326)) inside,
-      ST_Covers(b.g, ST_SetSRID(ST_Point(k.lat,k.lng),4326)) swapped_inside,
-      ST_Distance(ST_Centroid(b.g)::geography, ST_SetSRID(ST_Point(k.lng,k.lat),4326)::geography) d_centroid_m,
+      geo.zip_point_membership_in(b.g, k.lat, k.lng) = 'member' inside,
+      geo.zip_point_membership_in(b.g, k.lng, k.lat) = 'member' swapped_inside,
+      ST_Distance(ST_Transform(ST_Centroid(b.g),4326)::geography, ST_SetSRID(ST_Point(k.lng,k.lat),4326)::geography) d_centroid_m,
       p.registry_id, p.status, p.submitted_at::date filed, left(p.name,70) name
     from geo.n5_serving_marker k
     cross join lateral (select geo.zip_membership_boundary('{z}') g) b
@@ -119,7 +119,11 @@ for z in ZIPS:
     iss["lnglat_reversed"] = sum(1 for r in d if r["inside"] is False and r["swapped_inside"])
     iss["at_centroid"] = sum(1 for r in d if r["d_centroid_m"] is not None and r["d_centroid_m"] < CENTROID_M)
     iss["duplicate_marker_rows"] = dup
-    iss["non_point_geometry"] = sum(1 for r in d if (r["geom_family"] or "point") not in ("point", "POINT", None))
+    fam = {}
+    for r in d:
+        fam[str(r["geom_family"])] = fam.get(str(r["geom_family"]), 0) + 1
+    BY[z]["geom_families"] = fam
+    iss["non_point_geometry"] = sum(n for k, n in fam.items() if k.lower() not in ("point", "pt", "none"))
     iss["no_app_projects_row"] = sum(1 for r in d if r["registry_id"] is None)
     print(f"[db] {z}: markers={len(d)} members={BY[z]['members']} issues={iss}", file=sys.stderr)
 
@@ -137,7 +141,17 @@ for reg in REGS:
     meta = http_json(e["service_url"], {"f": "json"})
     info["geometryType"] = meta.get("geometryType")
     info["meta_error"] = meta.get("_fetch_error")
-    if datecol:
+    fld = {f["name"]: f.get("type") for f in meta.get("fields", [])}
+    if datecol and fld.get(datecol) == "esriFieldTypeString":
+        mx = ""
+        j = http_json(url, {"f": "json", "where": where, "outFields": datecol, "returnGeometry": "false", "resultRecordCount": 5000})
+        for ft in j.get("features", []):
+            v = str(ft["attributes"].get(datecol) or "")
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})", v)
+            iso = f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}" if m else v[:10]
+            mx = max(mx, iso)
+        info["newest_source_record"] = mx or None
+    elif datecol:
         st = http_json(url, {"f": "json", "where": where, "outStatistics": json.dumps(
             [{"statisticType": "max", "onStatisticField": datecol, "outStatisticFieldName": "m"}])})
         try:
@@ -174,10 +188,15 @@ for reg, ids in want.items():
         continue
     got = 0
     for ch in chunks(sorted(ids), 150):
-        lit = ",".join(i if re.fullmatch(r"-?\d+", i) else "'" + i.replace("'", "''") + "'" for i in ch)
-        j = http_json(e["service_url"] + "/query", {
-            "f": "json", "where": f"{idcol} IN ({lit})", "outFields": idcol,
-            "returnGeometry": "true", "outSR": "4326"})
+        def lits(quote):
+            return ",".join(i if (not quote and re.fullmatch(r"-?\d+", i)) else "'" + i.replace("'", "''") + "'" for i in ch)
+        j = None
+        for quote in (False, True):  # a string-typed id column rejects bare numerics (HTTP 400)
+            j = http_json(e["service_url"] + "/query", {
+                "f": "json", "where": f"{idcol} IN ({lits(quote)})", "outFields": idcol,
+                "returnGeometry": "true", "outSR": "4326"})
+            if "_fetch_error" not in j:
+                break
         if "_fetch_error" in j:
             PUB[reg]["compare"] = "UNVERIFIED: fetch error " + j["_fetch_error"]
             break
@@ -227,7 +246,7 @@ for z in ZIPS:
 
 # eligibility / missing IDs: point layers, publisher point inside ZIP polygon vs serving membership
 ELIG = {}  # zip -> {reg: (eligible, missing_list)}
-DUPIDS = {}  # reg -> ids carried by more than one official feature
+DUPIDS = {}  # reg -> eligible ids carried by more than one official feature
 for reg, e in ARC.items():
     if reg not in want and reg not in ("denton-county-dev-permits", "frisco-active-building-permits",
                                          "fort-worth-development-permits"):
@@ -246,11 +265,17 @@ for reg, e in ARC.items():
         PUB[reg]["eligibility"] = "UNVERIFIED: coordinates are geocoded by the engine, publisher has no point"
         continue
     where = e.get("extra_where") or "1=1"
-    allrows, off, trunc = [], 0, False
+    stcol = e["column_map"].get("status_raw")
+    stmap = {}
+    for bucket, vals in (e.get("status_to_bucket") or {}).items():
+        for v in vals or []:
+            stmap[str(v).strip().lower()] = bucket
+    allrows, off, trunc, st_excluded = [], 0, False, 0
     idcount = {}
+    ofields = idcol + ("," + stcol if stcol and stcol != idcol else "")
     while True:
         j = http_json(e["service_url"] + "/query", {
-            "f": "json", "where": where, "outFields": idcol, "returnGeometry": "true", "outSR": "4326",
+            "f": "json", "where": where, "outFields": ofields, "returnGeometry": "true", "outSR": "4326",
             "resultOffset": off, "resultRecordCount": 2000, "orderByFields": idcol})
         if "_fetch_error" in j:
             PUB[reg]["eligibility"] = "UNVERIFIED: fetch error " + j["_fetch_error"]
@@ -258,9 +283,15 @@ for reg, e in ARC.items():
             break
         fs = j.get("features", [])
         for f in fs:
+            if not (f.get("geometry") and "x" in f["geometry"]):
+                continue
+            if stmap:  # same rule as the engine: unmapped/blank/excluded status is not an eligible record
+                b = stmap.get(str(f["attributes"].get(stcol) or "").strip().lower())
+                if b is None or b == "exclude":
+                    st_excluded += 1
+                    continue
+            allrows.append((str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"]))
             idcount[str(f["attributes"][idcol])] = idcount.get(str(f["attributes"][idcol]), 0) + 1
-        allrows += [(str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"])
-                    for f in fs if f.get("geometry") and "x" in f["geometry"]]
         if not j.get("exceededTransferLimit") and len(fs) < 2000:
             break
         off += len(fs)
@@ -272,13 +303,14 @@ for reg, e in ARC.items():
     PUB[reg]["eligibility"] = "ok" if not trunc else "TRUNCATED"
     DUPIDS[reg] = {i for i, n in idcount.items() if n > 1}
     PUB[reg]["source_rows_with_point"] = len(allrows)
+    PUB[reg]["excluded_by_status"] = st_excluded
     inzip = {}
     for ch in chunks(allrows, 1500):
         vals = ",".join(f"('{i.replace(chr(39), chr(39)*2)}',{x},{y})" for i, x, y in ch)
         res = rows(f"""select v.id, b.zip from (values {vals}) v(id,x,y)
           join lateral (select z.zip from unnest(array[{zl}]) z(zip)
             where geo.zip_membership_boundary(z.zip) is not null
-              and ST_Covers(geo.zip_membership_boundary(z.zip), ST_SetSRID(ST_Point(v.x,v.y),4326))) b on true""")   # every valid ZIP, no LIMIT 1
+              and geo.zip_point_membership_in(geo.zip_membership_boundary(z.zip), v.y, v.x) = 'member') b on true""")   # every valid ZIP, no LIMIT 1
         for r in res:
             inzip.setdefault(r["zip"], set()).add(r["id"])
     for z in ZIPS:
@@ -300,13 +332,15 @@ def page_ok(z):
 
 def facts(z):
     d = BY[z]
-    incomplete = [reg for reg in PUB
-                  if reg in ARC and str(PUB.get(reg, {}).get("eligibility", "ok")) != "ok"
-                  and any(r["registry_id"] == reg for r in d["dots"])] if d["has_boundary"] else []
+    cut = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 365 * 86400))   # REPORTED as a fact only; never a verdict input
+    d["current_non_txdot_dots"] = len([r for r in d["dots"] if r["registry_id"] not in (None, "txdot-projects-info-all")
+                                       and r["filed"] and str(r["filed"]) >= cut])
+    incomplete = ([reg for reg in PUB if reg in ARC and str(PUB[reg].get("eligibility", "ok")) != "ok"
+                   and any(r["registry_id"] == reg for r in d["dots"])] if d["has_boundary"] else [])
     elig_reg = ELIG.get(z, {})
     missing = sum(len(v[1]) for v in elig_reg.values())
     amb = 0
-    for reg, (el, miss) in elig_reg.items():
+    for reg in elig_reg:
         amb += len(DUPIDS.get(reg, set()) & {m.group(2) for r in d["dots"] for m in [key_re.match(r["source_key"] or "")] if m and m.group(1) == reg})
     return {"has_boundary": d["has_boundary"], "issues": d["issues"], "members_without_marker": d.get("members_without_marker"),
             "compare": d.get("publisher_compare"), "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
@@ -329,8 +363,8 @@ for z in ZIPS:
     v, why = verdict(z)
     pc = d["publisher_compare"]
     missn = sum(len(x[1]) for x in ELIG.get(z, {}).values())
-    out["zips"][z] = {k: d[k] for k in ("in_registry", "has_boundary", "members", "markers", "geo_status",
-                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches")}
+    out["zips"][z] = {k: d.get(k) for k in ("in_registry", "has_boundary", "members", "markers", "geo_status",
+                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches", "geom_families", "current_non_txdot_dots")}
     out["zips"][z]["eligible_missing"] = {r: {"eligible": a, "missing": m[:200], "missing_n": len(m)} for r, (a, m) in ELIG.get(z, {}).items()}
     out["zips"][z]["verdict"] = [v, why]
     out["zips"][z]["freshness_newest_record_by_source"] = freshness(z)
