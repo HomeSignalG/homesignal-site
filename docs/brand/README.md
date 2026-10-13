@@ -1,7 +1,6 @@
 # Brand / domain contract (Jody migration, Step 1)
 
-**Status: INERT.** HomeSignal is the only active identity. Nothing shipped, served, deployed,
-emailed, posted or signed reads this contract.
+**Status: INERT.** HomeSignal is the only active identity. Step 2+ plumbing reads this contract's current identity and returns exactly the HomeSignal values (byte-identical, pinned by tests); Step 16 adds the activation machinery, also inert while the contract is v1. Activation is a v2 contract (the swap), accepted by the validator but not committed.
 
 ## What exists
 | file | role |
@@ -13,6 +12,11 @@ emailed, posted or signed reads this contract.
 | `scripts/gen-brand-origins.mjs` | Step 2: generates `supabase/functions/_shared/brand-origins.generated.ts` (the backend browser-origin allowlist) from the contract. Never hand-edit the output. |
 | `test/brand-origins.test.mjs` | Step 2: generated file == contract, both origins echoed, lookalikes refused, authorization independent of origin. |
 | `docs/brand/MIGRATION-STATUS.md` | The one migration status document. |
+| `docs/brand/CUTOVER-CHECKLIST.md` | Founder actions, GO LIVE sequence, gates, competing-CTO audits. |
+| `docs/brand/indexnow-jody-hold.json` | Step 16: IndexNow is HELD whenever the contract publishes the site as a non-HomeSignal identity (`hold: true`, fails closed). Not read while HomeSignal is current. |
+| `docs/brand/search-console/` | Step 16: empty slot for the Jody host's Google verification file; a file that would not verify is refused at build. |
+| `scripts/brand_host.py`, `scripts/brand_stage.py` | The contract's origin/identity, and the overlay `pages.yml` applies (a no-op while HomeSignal is current). |
+| `test/cutover-activation.test.mjs`, `test/cutover-rehearsal.test.mjs` | Prove the machinery is inert today and that flipping the contract in a throwaway copy yields the proven Jody tree. |
 
 Operational secrets, provider settings and deployment controls are deliberately NOT fields.
 

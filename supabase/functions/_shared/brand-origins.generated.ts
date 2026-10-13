@@ -9,3 +9,9 @@ export const BROWSER_ORIGINS: readonly string[] = [
   'https://www.homesignal.net',
   'https://jodytracks.com',
 ];
+// What the site PUBLISHES as (the contract's current identity). The links and sender the backend EMITS are built from these, so
+// moving the brand is the contract change and one redeploy, never an edit to five files. While the contract is v1 these are
+// exactly the strings that used to be written out in those files (pinned by test/brand-origins.test.mjs section 6).
+export const PUBLIC_ORIGIN = 'https://homesignal.net';
+export const PUBLIC_HOST = 'homesignal.net';
+export const PUBLIC_NAME = 'HomeSignal';

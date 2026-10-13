@@ -39,7 +39,7 @@ rejects('1b missing required top-level field', () => validateContract(mut((c) =>
 rejects('1c missing required identity field', () => validateContract(mut((c) => { delete c.identities.jody.origin; })), /jody: missing required field: origin/);
 rejects('1d unknown field rejected', () => validateContract(mut((c) => { c.activate = true; })), /unknown field: activate/);
 rejects('1e unknown identity field rejected', () => validateContract(mut((c) => { c.identities.jody.enabled = true; })), /unknown field/);
-rejects('1f unsupported contract_version', () => validateContract(mut((c) => { c.contract_version = 2; })), /unsupported contract_version/);
+rejects('1f unsupported contract_version', () => validateContract(mut((c) => { c.contract_version = 3; })), /unsupported contract_version/);
 rejects('1g unsupported schema_version', () => validateContract(mut((c) => { c.schema_version = 99; })), /unsupported schema_version/);
 rejects('1h wrong contract name', () => validateContract(mut((c) => { c.contract = 'other'; })), /contract name/);
 for (const [label, origin] of [
@@ -71,6 +71,21 @@ check('2e committed contract: HomeSignal active at https://homesignal.net, Jody 
 const onlyHomesignalActive = Object.values(good.identities).filter((i) => i.state === 'active').length === 1;
 check('2f exactly one identity is active', onlyHomesignalActive, 'active count != 1');
 
+// ---- 2g. contract v2 = the activation swap; accepted by the validator, NOT committed ---------------------------------------
+const v2 = () => mut((c) => {
+  c.contract_version = 2; c.current_identity = 'jody'; c.future_identity = 'homesignal';
+  c.identities.jody.state = 'active'; c.identities.homesignal.state = 'inactive';
+});
+check('2g the v2 activation swap validates', (() => { try { validateContract(v2()); return true; } catch { return false; } })(), 'rejected');
+rejects('2h the SAME swap on a v1 file is still rejected (a field flip is not an activation)', () => validateContract(mut((c) => {
+  c.current_identity = 'jody'; c.future_identity = 'homesignal'; c.identities.jody.state = 'active'; c.identities.homesignal.state = 'inactive';
+})), /v1:/);
+rejects('2i v2 refuses HomeSignal still active beside Jody', () => { const c = v2(); c.identities.homesignal.state = 'active'; return validateContract(c); }, /v2: homesignal must be inactive/);
+rejects('2j v2 refuses a wrong Jody origin', () => { const c = v2(); c.identities.jody.origin = 'https://jodytracks.net'; return validateContract(c); }, /v2: jody origin/);
+rejects('2k v2 refuses moving the legacy origin (it carries the immutable DID)', () => { const c = v2(); c.identities.homesignal.origin = 'https://example.com'; return validateContract(c); }, /v2: homesignal origin/);
+rejects('2l v2 refuses a Jody that is not current', () => { const c = v2(); c.current_identity = 'homesignal'; c.future_identity = 'jody'; return validateContract(c); }, /v2: current_identity must be jody/);
+check('2m the COMMITTED contract is still v1 and HomeSignal-current (this PR does not activate Jody)', good.contract_version === 1 && good.current_identity === 'homesignal', JSON.stringify(good));
+
 // ---- 3. hash and cross-repository pin -----------------------------------------------------
 const reverseKeys = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? Object.fromEntries(Object.keys(v).reverse().map((k) => [k, reverseKeys(v[k])])) : v;
 const pinned = readFileSync('docs/brand/brand-contract.v1.sha256', 'utf8').trim();
@@ -87,7 +102,7 @@ rejects('3f hash mismatch rejected', () => checkPin(mut((c) => { c.identities.jo
 rejects('3g cross-repository version mismatch rejected', () => checkPin(good, { ...pin, contract_version: 2 }), /version mismatch/);
 rejects('3h malformed pin rejected', () => checkPin(good, { contract_version: 1, sha256: 'abc' }), /malformed/);
 rejects('3i pin cannot launder an invalid contract', () => checkPin(mut((c) => { c.identities.jody.state = 'active'; }), pin), /must be inactive/);
-check('3j supported versions list is exactly [1]', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS) === '[1]', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS));
+check('3j supported versions list is exactly [1, 2] (2 = the activation swap, accepted here but NOT committed)', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS) === '[1,2]', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS));
 
 // ---- 4. the public artifact: contract and Jody never ship ---------------------------------
 const out = mkdtempSync(join(tmpdir(), 'brand-artifact-'));
