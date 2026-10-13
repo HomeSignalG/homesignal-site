@@ -80,8 +80,25 @@ if (built) {
   const pAB = parity(A, B);
   check('3a the proven overlay tree still has full SEO parity with the HomeSignal tree (control: the instrument can pass)', pAB.r.status === 0 && pAB.j.ok === true, JSON.stringify(pAB.j.problems));
   const pAC = parity(A, C);
-  check('3b the ACTIVATED tree has SEO parity with it too, except the fingerprint hashes (the one named, explained difference); no other problem',
-    JSON.stringify(pAC.j.problems) === JSON.stringify(['page-state fingerprints differ beyond the host']), JSON.stringify(pAC.j.problems));
+  check('3b the ACTIVATED tree has full SEO parity with the HomeSignal tree INCLUDING the fingerprints: every stored fingerprint is PROVEN to differ only because the page names another host (a\'s page mapped to the Jody host and re-fingerprinted equals b\'s)',
+    pAC.r.status === 0 && pAC.j.ok === true && JSON.stringify(pAC.j.problems) === '[]' && pAC.j.stats.page_state_hashes_host_derived === pAC.j.stats.page_state_pages && pAC.j.stats.page_state_pages >= 5, JSON.stringify(pAC.j));
+  // The proof must be able to FAIL: change one generated page in the HomeSignal copy in a way a crawler would see, and the activated tree's fingerprint
+  // no longer follows from it. Without these the "host-derived" claim is an assertion, not a check.
+  const firstZip = Object.keys(jb.pages).find((k) => /^\/community\/\d{5}\/$/.test(k));
+  const mutated = (name, edit) => {
+    const D = join(base, 'mut-' + name); cpSync(A, D, { recursive: true });
+    const f = join(D, firstZip.slice(1), 'index.html'); const t = readFileSync(f, 'utf8'); const u = edit(t);
+    if (u === t) throw new Error('mutation ' + name + ' did not change the page');
+    writeFileSync(f, u); return parity(D, C);
+  };
+  const mText = mutated('text', (t) => t.replace(/<h1([^>]*)>/, '<h1$1>CHANGED ').replace(/<title>/, '<title>CHANGED '));
+  check('3b2 a page whose crawler-visible text changed is NOT excused as a host difference (the proof names it)', mText.j.problems.some((x) => x.includes('differ beyond the host') && x.includes(firstZip)), JSON.stringify(mText.j.problems).slice(0, 300));
+  const mRobots = mutated('robots', (t) => t.replace(/(<meta[^>]+name="robots"[^>]+content=")[^"]*"/, '$1noindex, follow"'));
+  check('3b3 a page whose robots directive changed is NOT excused as a host difference', mRobots.j.problems.length > 0 && mRobots.j.ok === false, JSON.stringify(mRobots.j.problems).slice(0, 300));
+  const mCanon = mutated('canonical', (t) => t.replace(/(<link[^>]+rel="canonical"[^>]+href="[^"]*\/community\/)(\d{5})/, '$1$2'.replace('$2', '00000')));
+  check('3b4 a page whose canonical PATH changed is NOT excused as a host difference', mCanon.j.problems.length > 0 && mCanon.j.ok === false, JSON.stringify(mCanon.j.problems).slice(0, 300));
+  const D2 = join(base, 'mut-ctl'); cpSync(A, D2, { recursive: true });
+  check('3b5 control: an UNCHANGED copy of the HomeSignal tree passes the same proof (so 3b2-3b4 fail because of the change, not the instrument)', parity(D2, C).j.ok === true, 'control failed');
   const rep = pAC.j;
   check('3c …on a real denominator (generated documents, indexable pages, sitemap URLs), with equal indexable sets', rep.stats && rep.stats.html_pages > 30 && rep.stats.indexable_a > 5 && rep.stats.indexable_a === rep.stats.indexable_b && rep.stats.sitemap_urls_a > 10, JSON.stringify(rep.stats));
   const jA = JSON.parse(readFileSync(join(A, 'sitemaps/page-state.json'), 'utf8'));

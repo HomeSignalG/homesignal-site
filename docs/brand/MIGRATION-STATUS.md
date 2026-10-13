@@ -234,3 +234,95 @@ Paddle remains the selected processor and is **not live**: no Paddle integration
 30. Redeploy the edge functions (origin list, link and sender constants); add `https://jodytracks.com` to Supabase Auth; re-run `jody-redirect-verify` against `https://homesignal.net` (G2 final) and the DID byte check; `hold: false`
 **E. After launch**
 31. Search Console verify + Change of Address, Bing Site Move; release the IndexNow hold only by a reviewed `hold: false`; 180 days of monitoring
+
+## Step 16 final hardening: independent competing-CTO audit (2026-10-13)
+
+Scope: site PR #1895 and ingest PR #663, both DRAFT, on the existing branches. Nothing merged, deployed, repointed or activated. G1 and G3 are not reopened.
+Evidence labels: **LOCAL** (run in the build sandbox), **CI** (GitHub Actions on the PR head), **PREVIEW** (live HTTP against the Render preview), **PRODUCTION** (read-only reads of production state), **GO-LIVE-ONLY** (cannot be run before GO LIVE).
+
+### A. Rule D dependency (EXTERNAL, not Jody's; not worked around)
+- The `pages` build on `main` has failed on every scheduled run in every run listed from run 988 (2026-10-13 06:45Z) on at the step "Fetch the published Rule D plane": `fetched Rule D plane is stale (61.5h > 36h)`. PR #1895's `build` job fails at the same step (run 38452509854), before any file this PR touches.
+- The producer (`refresh-development-seo-plane.yml`, homesignal-ingest) failed on its latest scheduled run (38352774380) with `RPC app_development_projects_for_zips ... 57014 statement timeout`. Owner: the Denton / Rule D recovery session (diagnostic PR homesignal-ingest#662, draft). **Jody does not modify the producer, the 36-hour threshold, the plane, Denton records or the gate, and opens no duplicate recovery PR.**
+- Consequence for Jody: a GO LIVE build cannot pass until a fresh plane is published, because the cutover build goes through the same `pages` workflow. A red `build` job is an EXTERNAL BLOCKED result, never a PASS.
+- **Evidence needed before Jody proceeds:** (1) a scheduled or dispatched producer run that publishes (`generated_at` younger than 36 h, the three objects with equal `generated_at`); (2) the normal `pages` build on `main` green on that fresh artifact; (3) then the full-national SEO parity re-run (section G) on that snapshot. Until then the PR's other finished checks (all green; `deploy` and `indexnow` are skipped because they need `build`) are the evidence, labelled as such.
+
+### B. Confirmed defects fixed on the existing draft branches
+| # | Severity | Defect | Evidence | Fix | Retest |
+|---|---|---|---|---|---|
+| D1 | HIGH | The watch e-mail sender follows the brand (`Jody <noreply@jodytracks.com>`) but carried no Reply-To; a domain verified at the mail provider says nothing about a person reading replies, so an agent's reply to a Jody watch e-mail would go to a mailbox that does not exist | `watch-email.ts` `WATCH_FROM`; `email-send.ts` sent five fields only | `REPLY_TO_BY_IDENTITY` in `scripts/gen-brand-origins.mjs` (homesignal `null`, jody `contact@jodytracks.com`, the mailbox that exists), generated `PUBLIC_REPLY_TO`, `reply_to` forwarded only when set | LOCAL `test/step16-outbound-email.test.mjs` 12 PASS: v1 body has EXACTLY the five fields it always had; v2 renders the Jody mailbox; handler wiring pinned with a control |
+| D2 | HIGH (SEO proof) | The "two expected fingerprint differences" were asserted only as "the hashes differ", which would also hide a real content change | `cutover-rehearsal` 2b2/3b; `seo_parity.py` reported the difference as a named problem | `seo_parity.host_derived_fingerprint_problems`: per page, tree A's written page with its build day restored and its origin mapped to Jody's must re-fingerprint (with the ONE `page_semantics.fingerprint`) to B's stored hash; a control re-fingerprints A unmapped first; a page failing either is named | LOCAL rehearsal 3b: 7 of 7 proven; control 7 of 7; 3b2 text change, 3b3 robots change, 3b4 canonical-path change each NOT excused; 3b5 unchanged copy passes |
+| D3 | MED (docs) | The activation order put the Pages domain flip BEFORE the homesignal.net repoint, which leaves homesignal.net (and the permanent Bluesky DID document) answering 404 from the flip until the Shopify repoint, a gap of certificate-wait length | Pages serves any host other than its one custom domain with 404 | New dependency-ordered plan (CUTOVER-CHECKLIST "4b"): Render serves homesignal.net FIRST | documented; the gap that remains is characterized in "Rollback and downtime" |
+| D4 | LOW (docs) | PR #1895 body and CUTOVER-CHECKLIST gave 30/27/31 for suites that run 31/26/30 | recounted | corrected in both | PR body updated |
+
+### C. Findings not fixable inside this scope (recorded, owner named)
+- **Four deployed edge functions are behind `main`** (table in section D). Owner: founder authorizes the deploy set; engineering deploys at GO LIVE.
+- **Render free plan, commercial use: NOT VERIFIED.** The sandbox cannot reach render.com. Render's docs, as returned by search, advise against free instances for production; no commercial-use ban was found in them, and the Terms of Service text could not be read. Owner: founder (read the Terms) or choose a paid plan.
+- **Render bandwidth exhaustion with no payment method SUSPENDS all Free services for the rest of the month** (docs.render.com/free, via search excerpt). That would take the redirects and the DID document offline. No hard cap can be set. Owner: founder decision plus the monitor in section F.
+- **Remaining hardcoded `homesignal.net` customer-facing links in homesignal-ingest outside this PR's scope** (all still work through the 301): `outreach/social_sender.py` `LINK_URL`, `outreach/log_youtube_comment.py` example, `scripts/generate-social-drafts.js` default link and `scripts/screenshot-alert.js` `PAGE_URL` (legacy Box Elder drip). Outreach is gated off; these must be derived before OUTREACH READINESS is claimed.
+- **No Paddle code exists.** Billing code (`lemon-billing.ts`, `development-activity-billing-webhook`, `manage-billing`) is Lemon Squeezy only. `manage-billing` fails closed (`not_set_up`) when the processor is unconfigured, which keeps the "$79/month" link from charging anyone. See section H.
+
+### D. Deployed edge functions vs `main` (PRODUCTION read 2026-10-13; the source of each was compared against git)
+All 30 database functions these four call exist in production (control: 1,087 public functions), so none depends on an unapplied migration. In every case the function-specific files (`index.ts`, `handler.ts`, `data.ts`) are unchanged since deploy; only shared modules drifted, and `main` equals the commit at which `get-development-activity-report` v25 (deployed 2026-10-12 15:51Z, one minute after #1851 merged) was built, so the same shared drift is already live in that sibling.
+| Function | Deployed | Required Jody change | Other undeployed changes that ship (shared modules, vs the nearest `main` commit before deploy) | Tests | Rollback | Verdict |
+|---|---|---|---|---|---|---|
+| follow-development-report | v13, 2026-10-01 | `admin-gate` CORS now from `brand-origins.generated` (+ jodytracks.com) | `admin-gate` (78 lines), `national-report` (234), `changes-since-report` (54), `report-snapshot` (130), `report-rights.json` (245), `service-rest` (25), `project-type.generated` (11) | `follow-*`, `national-report`, `report-snapshot` suites | capture `get_edge_function` source (hash `ezbr_sha256 95ddabb1...`) before deploy | DEPLOY AT GO LIVE after founder reviews the list; not "one line" |
+| manage-property-watch | v8, 2026-10-03 | same | `admin-gate` (15), `evaluation-reads` (127), `national-report` (68), `report-snapshot` (34), `service-rest` | watch, evaluation-reads | `ezbr fc245948...` | same |
+| run-property-watch | v9, 2026-10-04 | same, plus step-8 redeploy for sender, Reply-To and link | as above | watch-email, run-property-watch | `ezbr a5d18d46...` | same |
+| manage-shared-report | v8, 2026-10-03 | same, plus step-8 redeploy for `SHARE_PAGE` | `admin-gate`, `evaluation-reads` (127), `share-reads` (8), `service-rest` | share-link-functions | `ezbr a9e0cbc7...` | same |
+- **Do not deploy by hand-patching one line**: the deploy path bundles the whole import closure, and a hand-built bundle would bypass the repo's tests. The smallest safe resolution is the founder authorizing the set above (all of it is merged, tested and already live in the sibling function) and engineering deploying through `deploy-edge-functions.yml`, which checks out the dispatched ref.
+- **Rollback is NOT rehearsed.** The deployed source is retrievable (`get_edge_function` returns every file, hash-checkable against `ezbr_sha256`); redeploying it requires either a branch at the matching `main` commit dispatched through the same workflow, or the MCP deploy (about 30 KB payload ceiling, which these bundles exceed). Create and test that branch BEFORE the deploy.
+- **Link-emitting functions needing the SECOND redeploy after the contract is v2** (their link and sender constants follow the contract only then): manage-shared-report, development-activity-trial, get-development-activity-report, manage-billing, development-activity-billing-webhook, run-property-watch.
+
+### E. Outbound e-mail audit
+| Sender | Where configured | Jody state | Verdict |
+|---|---|---|---|
+| Watch e-mail | `watch-email.ts` `WATCH_FROM` from the contract | `Jody <noreply@jodytracks.com>` + Reply-To `contact@jodytracks.com` (D1) | OK once step 8 redeploys; domain verified (G3); mailbox `contact@` exists (Infomaniak) |
+| Digest | `digest.py` `RESEND_FROM` env, secret `RESEND_FROM` in `digest.yml`, default `HomeSignal <notices@homesignal.net>` | the GitHub secret is not read from here; **it stays a HomeSignal sender until the founder changes the secret** | GO LIVE item: set deliberately, decide the display name; the digest copy names HomeSignal (identity-bound, unchanged) |
+| Confirmation e-mail | `confirm-alerts` `RESEND_FROM` env, default `HomeSignal <notices@homesignal.net>` | same | same |
+| Ops mail (`notify-signup`, `notify-health`) | `noreply@homesignal.net` to `hello@homesignal.net` (Proton) | unchanged | keep: depends on homesignal.net MX only, which the cutover does not touch |
+- `UNSUBSCRIBE_PUBLIC_URL`: no override in any workflow; the default derives from the pin. One-click List-Unsubscribe POSTs go to the Supabase function URL, not to a domain we redirect.
+- Not verified (needs a send, forbidden here): Resend acceptance of a Jody sender through the API, DMARC alignment on a real message, bounce handling. DNS-level authentication was verified by G3.
+- Notifications generated before activation keep their homesignal.net links and keep working through the 301.
+
+### F. Render reliability and a no-cost monitor (DESIGN ONLY; not activated)
+- Facts: Hobby static sites are free; 5 GB/month bandwidth shared by the workspace; without a payment method, going over suspends all free services until the next month; no hard cap; commercial-use eligibility not confirmed.
+- Independent of Render AND of GitHub Actions (Actions budget exhaustion has already stopped every workflow once, 2026-08-18): a check inside the existing pg_cron health monitor (`pipeline_health_tick`), reading with pg_net. It probes (1) `https://homesignal.net/` and `https://www.homesignal.net/`: status 301 and `Location` begins `https://jodytracks.com/`; (2) `https://homesignal.net/.well-known/did.json`: status 200 and the body hash equals the recorded constant; (3) the TLS handshake succeeding (pg_net failing on a certificate is the signal). Alert: the existing notify-health mail path to `hello@homesignal.net`, which depends only on the homesignal.net MX records.
+- A second, weaker probe stays the existing `jody-redirect-verify` mode `probe` (Actions) for the full 19 cases; it would be dispatched, not scheduled, unless the founder approves.
+- NOT assumed: Render exposes no bandwidth API that this design uses; the weekly founder check of the Render Metrics page stays manual. **NOT VERIFIED:** whether pg_net follows or reports redirects as needed (it must report the 301 itself); prototype it read-only before building.
+- Recurrence is a new scheduled job: founder approval required.
+
+### G. National SEO and data integrity
+- Fixture rehearsal (7 generated pages) proves the mechanism, not the nation. The previous full-snapshot parity (run 37971696362, 35,284 HTML pages, 26,701 indexable on each identity, 56,807 matching sitemap URLs) was taken under the OVERLAY model; the activated model is proven equal to it on the fixture (byte-identical but the two fingerprint files), and the fingerprint difference is now proven host-derived (D2).
+- NOT run, GO-LIVE-ONLY or Rule-D-blocked: a full-national parity on a fresh plane, with the new host proof, which also exercises project pages (whose as_of is held neutral in the fingerprint; the proof tries the build-day and neutral restorations and reports any page it cannot prove, rather than skipping it).
+- Indexing safeguards unchanged: IndexNow stays held for any non-HomeSignal identity; Rule D / Rule F decisions are read from the document itself.
+
+### H. Commercial readiness (four separate gates)
+| Gate | Status | Evidence |
+|---|---|---|
+| Technical website readiness | NOT READY | blocked by the Rule D build failure (external) and the unproven homesignal.net apex/www/HTTPS/DID tests that need DNS |
+| Free-evaluation readiness | CODE PRESENT, NOT ACCEPTED | live free limit 10 read from production earlier; trial functions use shared modules that are behind in four deployed functions (section D) |
+| Paid-subscription readiness | NOT READY | no Paddle integration exists in code; Lemon Squeezy only; `manage-billing` returns `not_set_up` when unconfigured; Paddle Sandbox approval is not live approval; Lemon Squeezy and the $9.99 alerts product stay inactive |
+| Outreach readiness | NOT READY | outreach links not derived (section C); outreach is gated off |
+
+### I. The 31-step checklist: blocker owner of every open item (numbering unchanged; nothing newly crossed out)
+Steps 14 to 16 remain struck through in the list above as DRAFT IMPLEMENTATION; this audit did not promote them to launch-ready. Step 15 and 16's offline equivalents pass; their production equivalents are listed here, not crossed out.
+| Step | Blocker owner |
+|---|---|
+| 17 auto-renew | Founder action |
+| 18 counsel clearance (G7) | Legal/commercial approval |
+| 19 Render Terms / plan | Founder action (the sandbox cannot read render.com) |
+| 20 approve or decline the monitor | Founder action |
+| 21 TTLs | Founder action (read and lower); engineering supplies the exact records |
+| 22 Search Console method | Founder action |
+| 23 deploy-set authorization and a tested fallback host | Founder action (authorize, choose a provider); Jody engineering (rehearse rollback, verify standby) |
+| 24-30 GO LIVE sequence | Jody engineering executes after G8; **blocked by the Rule D recovery session** for the `pages` build, and by 17-23 |
+| 31 post-launch | Founder (consoles); Jody engineering (monitoring) |
+| Fresh Rule D plane and a green `main` build | Rule D / Denton recovery session (EXTERNAL) |
+| Full-national SEO parity with the host proof | Jody engineering, after the fresh plane |
+| Paddle integration, checkout acceptance | Jody engineering to build, founder/Paddle for live approval (separate project) |
+| Outreach link derivation | Jody engineering (before OUTREACH READINESS) |
+
+### J. Verdicts (separate from GO LIVE)
+- **Site PR #1895: PASS as inert draft machinery, with the Rule D `build` job EXTERNAL BLOCKED.** Not ready to merge until the producer recovers and the normal build is green on a fresh artifact.
+- **Ingest PR #663: PASS** (all finished checks green on `ad39802`). Merge only at GO LIVE step A4, never before jodytracks.com serves HTTPS 200; coordinate `digest.py` with the delivery session.
+- **GO LIVE: BLOCKED** (Rule D, section 4b exposures not accepted, Render commercial use unconfirmed, edge-function set unauthorized, no tested fallback, G7, G8).

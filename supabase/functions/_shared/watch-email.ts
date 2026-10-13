@@ -14,10 +14,12 @@
 // EVERY PUBLISHER STRING IS UNTRUSTED TEXT. A project's name or stage comes from a government feed; in HTML it is escaped, in either part it is
 // cut to a bounded length with control characters and line breaks removed, and a link is printed only if it is an https URL.
 import type { EmailSelection, WatchChange, WatchEntry } from './property-watch.ts';
-import { PUBLIC_HOST, PUBLIC_NAME, PUBLIC_ORIGIN } from './brand-origins.generated.ts';
+import { PUBLIC_HOST, PUBLIC_NAME, PUBLIC_ORIGIN, PUBLIC_REPLY_TO } from './brand-origins.generated.ts';
 
 /** The one From address. noreply@: nobody reads replies, and the email says where to go instead. */
 export const WATCH_FROM = PUBLIC_NAME + ' <noreply@' + PUBLIC_HOST + '>';
+/** Where a reply goes: a mailbox a person reads, or null for no Reply-To (HomeSignal's has always been none). Derived from the brand contract, never typed here. */
+export const WATCH_REPLY_TO: string | null = PUBLIC_REPLY_TO;
 /** Where the agent opens the report. The page is signed-in; no token and no private value rides in this address. */
 export const WATCH_OPEN_URL = PUBLIC_ORIGIN + '/development-activity-reports.html';
 

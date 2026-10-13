@@ -15,3 +15,5 @@ export const BROWSER_ORIGINS: readonly string[] = [
 export const PUBLIC_ORIGIN = 'https://homesignal.net';
 export const PUBLIC_HOST = 'homesignal.net';
 export const PUBLIC_NAME = 'HomeSignal';
+// Where a reply to a no-reply sender goes (null = the sender carries no Reply-To, as HomeSignal's never has). See REPLY_TO_BY_IDENTITY in the generator.
+export const PUBLIC_REPLY_TO: string | null = null;

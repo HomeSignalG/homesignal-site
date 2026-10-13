@@ -160,6 +160,49 @@ Recommendation: option 1, then add `?zip=` and `utm_*` order to the post-GO-LIVE
 
 The recorded pre-change values of homesignal.net DNS (2026-10-09): A `185.199.108.153`, `www` CNAME `homesignalg.github.io`, MX Proton, TXT SPF Proton + `protonmail-verification`, DKIM `resend._domainkey`, `send` MX/TXT for Resend. Steps 7 changes only the web records (A/CNAME); **MX, TXT, DKIM and `send` records stay exactly as they are.**
 
+## 4b. Dependency-ordered activation plan, v2 (Step 16 final hardening, 2026-10-13). This REPLACES the order in section 4 when GO LIVE is authorized; section 4 is kept as the record.
+
+**Why the order changed.** Section 4 flips the Pages custom domain (its step 5) and only later repoints homesignal.net (its step 7). GitHub Pages answers a host that is not its one custom domain with 404, so from the flip until the repoint propagates, `https://homesignal.net/.well-known/did.json` (the permanent Bluesky identity) and every old customer link would fail, for the length of the jodytracks.com certificate wait. The plan below makes Render the owner of homesignal.net BEFORE the Pages domain moves, so the DID document never has a time when nothing serves it with a valid certificate that we control the order of.
+
+**Rejected fallback (final):** "repoint homesignal.net back to GitHub Pages". Once Pages' custom domain is jodytracks.com, Pages cannot serve or redirect homesignal.net at all. The only Pages-based undo is a FULL reversal (put the Pages custom domain back to homesignal.net, which takes jodytracks.com offline) and it is valid only while homesignal.net still points at Pages.
+
+**States.** S0 now: site v1, pin v1, homesignal.net on Pages, jodytracks.com serves nothing. S5 end: contract v2, Pages = jodytracks.com, homesignal.net on Render, pin v2, functions redeployed.
+
+### Stageable in advance (no resident-visible effect; each has an undo)
+| # | Action | Owner | Effect while staged | Undo |
+|---|---|---|---|---|
+| P1 | Read the TTLs of the homesignal.net web records in Shopify (NOT MEASURED; the audit prints none) and lower them to the minimum offered, at least one OLD TTL before step A1 | founder | none | raise them |
+| P2 | Record the current homesignal.net web values (A `185.199.108.153`, `www` CNAME `homesignalg.github.io`) in a place you can read during an outage | founder + engineering | none | n/a |
+| P3 | Infomaniak: jodytracks.com web records to GitHub Pages (values read at that moment). Pages answers a host it does not own with 404, so this serves nothing yet | founder | none | delete the records |
+| P4 | Supabase Auth allow-list: ADD `https://jodytracks.com` (additive; keep homesignal.net) | founder or authorized API | none | remove it |
+| P5 | Edge-function deploy #1 of the four stale functions (the set in MIGRATION-STATUS D), after the founder authorizes the set. Before deploying, capture each deployed source with `get_edge_function` and check it against `ezbr_sha256` | founder authorizes, engineering deploys | the four accept Jody's origin; their links and sender are unchanged (the contract is still v1) | redeploy the captured source (rehearse the redeploy path first) |
+| P6 | Render: add `homesignal.net` and `www.homesignal.net` as custom domains (pending; DNS untouched) and read the values Render shows | founder + engineering | none | remove the domains |
+| P7 | Prepare the contract-v2 PR and the ingest pin-bump PR as drafts. Verify the `pages` build on a FRESH Rule D plane (Rule D recovery first) and a full-national SEO parity with the host proof | engineering | none | n/a |
+| P8 | Stand up the emergency fallback host (section "Fallback") and verify it with `jody-redirect-verify` mode `probe` | founder chooses, engineering verifies | none | delete |
+| P9 | Founder reads Render's Terms and sets the plan; founder approves or declines the monitor (MIGRATION-STATUS F) | founder | none | n/a |
+
+### Activation (only after G1-G8 are green, the Rule D plane is fresh, and the founder says GO LIVE)
+| # | Action | STOP if | Verify | Undo |
+|---|---|---|---|---|
+| A0 | Bluesky `hold: true` | the PR is red | `data/brand-publish-hold.json` on main says true | `false` |
+| A1 | Shopify "Edit DNS records" only: apex A and `www` CNAME to the Render values from P6; remove the AAAA if any. MX, TXT, DKIM and `send` records are NOT touched | Render shows the domain unverified after TTL + 10 min; or the apex edit is refused | `jody-redirect-verify` probe on `https://homesignal.net` and `https://www.homesignal.net`: 301 with path and sorted query kept, DID 200 with the exact bytes, valid certificate; run from a runner AND from two public resolvers | restore the values recorded in P2 (valid while Pages still has homesignal.net as its domain, which is true until A3) |
+| A2 | Merge the contract-v2 PR; `pages` builds (it will fail on a stale Rule D plane: STOP, that is the external block, not a reason to bypass the gate) and deploys the JODY tree. The Jody tree is deployed to Pages, but no custom host reaches it yet (homesignal.net now points at Render; jodytracks.com is not Pages' custom domain), so nothing resident-visible changes | the build is red, or the deployed artifact's `robots.txt`/sitemaps do not name jodytracks.com, or `/.well-known/did.json` is missing from the artifact | `jody-seo-parity` on the built artifact (the `_site` tree of that run), its canonical host, `did.json` bytes and sitemap host; nothing is browsable until A3 | revert the PR; `pages` rebuilds the HomeSignal tree |
+| A3 | GitHub Settings > Pages: custom domain `jodytracks.com`; enforce HTTPS when offered | A1 not verified | poll `https://jodytracks.com/` (certificate, 200, Jody canonical) and `https://jodytracks.com/robots.txt` from a runner | custom domain back to `homesignal.net` AND (because A1 moved DNS) first repoint homesignal.net to Pages: full reversal, takes jodytracks.com offline |
+| A4 | Merge the ingest pin-bump PR (digest, confirmation e-mail and Bluesky generators now emit jodytracks.com links) | A3 not verified. **Never merge this before jodytracks.com serves HTTPS 200**: e-mails would carry links to a host that is not up | the pin check on the ingest PR; one digest dry run shows `https://jodytracks.com` links | revert the pin PR |
+| A5 | Edge-function deploy #2 (the link-emitting functions listed in MIGRATION-STATUS D), set the `RESEND_FROM` secrets deliberately (GitHub secret for the digest, Supabase secret for confirm-alerts) | A4 not verified | `get_edge_function` shows the new constants; a dry-run watch e-mail names jodytracks.com and Reply-To `contact@jodytracks.com`; no real customer e-mail is sent | redeploy the captured source from P5 |
+| A6 | `hold: false` (Bluesky) | any A1-A5 verification open | a draft post links to jodytracks.com | `true` |
+| A7 | Search Console (verify, Change of Address), Bing Site Move; IndexNow released only by a reviewed `hold: false` after the Jody host has its own baseline | n/a | consoles | n/a |
+
+**Why no partial state breaks customer links or auth.** Each intermediate state: (A1 done) old links redirect to a host that is not up yet, so old-link visitors see the jodytracks.com error for the minutes until A3's certificate, BUT the DID document is served with 200 throughout; (A2 done, A3 not) the Jody artifact is deployed but unreachable by any custom host: nothing visible changes; (A3 done, A4 not) e-mails still carry homesignal.net links, which 301 to the live host; (A4 done, A5 not) new e-mails carry jodytracks.com links and in-app links still name homesignal.net, both resolve; sign-in is a 6-digit code per origin, so a resident who started on one host finishes on the same host; the Supabase allow-list already contains both (P4). The ONLY forbidden state is A4 before A3, which the STOP condition prevents. Two independent GitHub merges are not atomic, and this plan does not rely on it: each step is verified before the next.
+
+**Residual exposure that cannot be removed without a second website pipeline (founder must accept in writing before GO LIVE):**
+1. After A1, from the repoint until the jodytracks.com certificate is issued (typically minutes, GitHub documents up to an hour), old homesignal.net links redirect to a jodytracks.com address without a valid certificate. The DID document is not affected.
+2. During A1's DNS propagation, resolvers with an old cache reach Pages and resolvers with a new answer reach Render. Both answer the DID document with 200 until A3. After A3, a resolver still on a stale Pages answer for homesignal.net gets 404 until its TTL expires: bound by the lowered TTL (P1).
+3. The Render certificate for homesignal.net is issued after the DNS points at Render: a window of minutes with a certificate warning on homesignal.net, including for the DID document. Not measurable before the real cutover.
+4. A suspended Render workspace (bandwidth) takes homesignal.net offline until the next month or a paid plan.
+
+**Fallback (Render fails after A1).** None of these has been tested; the plan requires one tested BEFORE GO LIVE. Options, none paid: (a) a standby redirect-only service on a SECOND free provider holding the generated redirect folder (the verifier is provider-agnostic: `jody-redirect-verify` mode `probe` takes any base URL); (b) a second Render workspace (shares the provider risk, not the account risk). Repointing is one DNS edit (P2 values recorded for the original). Founder choice; engineering verifies the chosen standby with the 19 cases against its preview URL.
+
 ## 5. Payments: Paddle, not Lemon Squeezy (corrected)
 
 The intended provider is **Paddle**. Both domains are approved for checkout and Apple Pay in **Paddle Sandbox**. The Lemon Squeezy code in this repo is the earlier implementation; it is **not activated and must not be**, and no other processor is substituted.
