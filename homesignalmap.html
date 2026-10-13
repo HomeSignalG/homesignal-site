@@ -2703,7 +2703,12 @@ HS.onReady(function(){
     // the one predicate (HS.isActiveUndecided). Both loaders drop the report's own
     // counts.proposed_active before render(), because that number describes the report's
     // radius set, not what is on screen; a caller that passes one on is still honoured.
-    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(prop) : prop.length;
+    // PROJECTS, NOT NOTICES (founder decision A, 2026-10-13): the tile says "projects", so it counts
+    // only the Proposed records that are projects with a source-published point. Area-scope items
+    // (hearing and agenda notices) stay in the Proposed rail under "Hearings and notices in this
+    // area" but are not projects and are not counted here.
+    var propPoints = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; });
+    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(propPoints) : propPoints.length;
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
       : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
          : propActive);
