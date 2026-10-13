@@ -8,7 +8,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 2 Dual-domain compatibility | DONE, deployed | site #1736 -> `11fd3d3`; ingest #653 -> `b074f81`; guard migration applied; see "Step 2 deployment record" |
 | 3 Jody staging site | DONE, merged | site #1740 -> `5d769e3`; `jody-staging` ran green on a runner; nothing deployed |
 | 4 SEO migration | tooling merged; real-snapshot parity PASSED (run 37971696362) | see Step 4 |
-| 5 Zero-cost redirect | **provider changed 2026-10-12: Netlify (access unavailable) -> Render Static Sites Free.** Render adapter built, OFFLINE PASS (44 checks, suite 351 files green). Real-HTTP test BLOCKED: needs a Render account (founder step 2). Netlify attempt: `jody-redirect-verify` run 38278525831 failed at the deploy step (token missing) | see Step 5 and "Step 5 addendum" |
+| 5 Zero-cost redirect | **Render Static Sites Free: LIVE HTTP PASS on the preview address (19/19, run 38443897406, `--query-order sorted` founder-approved 2026-10-13).** Netlify superseded. homesignal.net NOT pointed at it; apex/www, certificate and the GO LIVE re-run are still ahead | see Step 5 and "Step 5 addendum" |
 | 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
 | 7 Cutover | NOT READY: gates G1/G2/G3/G7/G8 open (see Launch readiness); needs founder GO LIVE | `docs/brand/CUTOVER-CHECKLIST.md` |
 | 8 Email + Bluesky | Resend domain jodytracks.com VERIFIED (2026-10-10 18:41Z); nothing sent, no outreach, Bluesky untouched | see "Resend verified" below |
@@ -86,7 +86,7 @@ Preferred: **Render Static Sites (Free)**; fallback: GitLab Pages. **Verdict: BL
 | Any real request to Render | BLOCKED (no account; none made) |
 | Netlify | SUPERSEDED. Last attempt: `jody-redirect-verify` run 38278525831, failed at the deploy step (secret missing, inferred). |
 
-G2 now reads "real-HTTP cases pass on Render, DID 200 with original bytes" and stays open. Nothing points `homesignal.net` at any new host. Production DNS, the Jody cutover, payments and GO LIVE are untouched.
+G2 now reads "real-HTTP cases pass on Render, DID 200 with original bytes". **2026-10-13: PASS on the preview (run 38443897406, 19/19, sorted query order, DID byte-identical 200). Stays open for homesignal.net until the GO LIVE step 8 re-run.** Nothing points `homesignal.net` at any new host. Production DNS, the Jody cutover, payments and GO LIVE are untouched.
 
 ## Step 6 - DNS and registration audit (2026-10-09, `jody-dns-audit` run 37978348576, read-only, from a GitHub runner)
 
