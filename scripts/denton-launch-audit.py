@@ -117,7 +117,10 @@ for z in ZIPS:
     iss = BY[z]["issues"]
     iss["outside_polygon"] = sum(1 for r in d if r["inside"] is False)
     iss["lnglat_reversed"] = sum(1 for r in d if r["inside"] is False and r["swapped_inside"])
-    iss["at_centroid"] = sum(1 for r in d if r["d_centroid_m"] is not None and r["d_centroid_m"] < CENTROID_M)
+    # a marker on a LINE/polygon project can lie anywhere along it, including on the ZIP centroid by coincidence (76262's TxDOT marker is within
+    # 5 m of its official line): the centroid-shortcut test applies to point-geometry records only.
+    iss["at_centroid"] = sum(1 for r in d if r["d_centroid_m"] is not None and r["d_centroid_m"] < CENTROID_M
+                             and not any(w in str(r["geom_family"] or "").upper() for w in ("LINE", "POLYGON")))
     iss["duplicate_marker_rows"] = dup
     fam = {}
     for r in d:
