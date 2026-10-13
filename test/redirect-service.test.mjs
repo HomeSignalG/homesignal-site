@@ -119,13 +119,21 @@ const rprobe = (url, extra = []) => new Promise((r) => {
   let out = ''; p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (out += d));
   p.on('close', (code) => r({ status: code, stdout: out }));
 });
+// What Render MEASURABLY does (run 38405046317, 2026-10-13): every byte kept, query keys stably sorted. Founder-approved 2026-10-13.
+const sortQ = (u) => { const [b, q] = [u.split('?')[0], u.includes('?') ? u.slice(u.indexOf('?') + 1) : '']; return q ? b + '?' + q.split('&').map((p, i) => [p, i]).sort((x, y) => (x[0].split('=')[0] < y[0].split('=')[0] ? -1 : x[0].split('=')[0] > y[0].split('=')[0] ? 1 : x[1] - y[1])).map((x) => x[0]).join('&') : b; };
+const SORTED = ['--query-order', 'sorted'];
+const renderSorted = (u) => 'https://jodytracks.com' + sortQ(u);
 for (const [name, h, want, extra] of [
-  ['a Render-like service (file wins, else 301 with the query kept)', renderLike(), true, []],
-  ['a service that strips the query string (the unproven Render behaviour)', renderLike((u) => 'https://jodytracks.com' + u.split('?')[0]), false, []],
-  ['a service that re-encodes the query', renderLike((u) => 'https://jodytracks.com' + u.replace('%2F', '/')), false, []],
-  ['a 302 service', renderLike(undefined, 302), false, []],
-  ['a service that redirects to its own host (loop)', (req, res) => { const p = req.url.split('?')[0]; if (['/.well-known/did.json', '/robots.txt', '/google59e1ae3ef6b75e3a.html'].includes(p)) return renderLike()(req, res); res.writeHead(301, { Location: 'http://' + req.headers.host + req.url }); res.end(); }, false, []],
-  ['a correct service probed over plain http with --require-https', renderLike(), false, ['--require-https']],
+  ['a Render-like service (file wins, else 301, keys sorted) under --query-order sorted', renderLike(renderSorted), true, SORTED],
+  ['the SAME Render-like service under the strict default (documents the measured difference)', renderLike(renderSorted), false, []],
+  ['a service that strips the query string', renderLike((u) => 'https://jodytracks.com' + u.split('?')[0]), false, SORTED],
+  ['a service that re-encodes a value (%2F -> /)', renderLike((u) => renderSorted(u).replace('%2F', '/')), false, SORTED],
+  ['a service that drops one parameter', renderLike((u) => renderSorted(u).replace('&utm_source=bluesky', '').replace('utm_source=bluesky&', '')), false, SORTED],
+  ['a service that swaps the order of a duplicate key (d=1&d=2 -> d=2&d=1)', renderLike((u) => renderSorted(u).replace('d=1&d=2', 'd=2&d=1')), false, SORTED],
+  ['a service that changes a value (case)', renderLike((u) => renderSorted(u).replace('abc123', 'ABC123')), false, SORTED],
+  ['a 302 service', renderLike(renderSorted, 302), false, SORTED],
+  ['a service that redirects to its own host (loop)', (req, res) => { const p = req.url.split('?')[0]; if (['/.well-known/did.json', '/robots.txt', '/google59e1ae3ef6b75e3a.html'].includes(p)) return renderLike()(req, res); res.writeHead(301, { Location: 'http://' + req.headers.host + req.url }); res.end(); }, false, SORTED],
+  ['a correct service probed over plain http with --require-https', renderLike(renderSorted), false, [...SORTED, '--require-https']],
 ]) {
   const { s, url } = await serve(h);
   const r = await rprobe(url, extra);
