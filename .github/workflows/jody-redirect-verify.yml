@@ -21,6 +21,11 @@ on:
       base_url:
         description: Only for mode=probe - the URL to probe (https://...)
         default: ''
+      query_order:
+        description: exact (default; Netlify must keep the query byte for byte) or sorted (Render re-sorts keys; every value byte kept; founder-approved 2026-10-13)
+        default: exact
+        type: choice
+        options: [exact, sorted]
       keep_site:
         description: Keep the throw-away Netlify site afterwards
         default: false
@@ -97,11 +102,12 @@ jobs:
       - name: Probe the live deployment with real HTTP (no redirect following)
         env:
           TARGET: ${{ inputs.mode == 'probe' && inputs.base_url || steps.deploy.outputs.url }}
+          QUERY_ORDER: ${{ inputs.query_order }}
         run: |
           [ -n "$TARGET" ] || { echo "no target URL"; exit 1; }
           case "$TARGET" in https://*) ;; *) echo "target must be https://"; exit 1;; esac
           echo "probing $TARGET"
-          python3 scripts/verify_redirect_service.py --base "$TARGET" --files _redirect
+          python3 scripts/verify_redirect_service.py --base "$TARGET" --files _redirect --require-https --query-order "${QUERY_ORDER:-exact}"
       - name: Delete the throw-away site
         if: ${{ always() && inputs.mode == 'deploy-and-probe' && steps.deploy.outputs.site_id != '' && !inputs.keep_site }}
         env:

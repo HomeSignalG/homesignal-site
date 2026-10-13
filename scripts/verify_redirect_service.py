@@ -9,6 +9,7 @@
   --base URL       probe a LIVE deployment (a *.netlify.app / *.onrender.com preview before DNS, homesignal.net after) with
                    real HTTP and no redirect-following: it must answer the same way the simulator says it should.
   --require-https  with --base: refuse a non-https base (the real test must prove TLS).
+  --query-order sorted  with --base: accept Render's measured key sorting (see sorted_query); default `exact` is unchanged.
 
 Cases come from one list (paths a crawler or a resident really uses). Exit 0 only when every case holds.
 Stdlib only.
@@ -48,6 +49,18 @@ CASES = [
     ("/google59e1ae3ef6b75e3a.html", "file", "google59e1ae3ef6b75e3a.html"),
     ("/robots.txt", "file", "robots.txt"),
 ]
+
+
+def sorted_query(url: str) -> str:
+    """Founder-approved 2026-10-13 (Render re-sorts query keys, measured live): the SAME pairs, STABLE-sorted by key, every
+    byte of every key=value pair untouched (so duplicate keys keep their relative order, `%2F` is not decoded, an empty
+    value stays `e=`). This is a defined transformation, not a loosening: a dropped, re-encoded, merged or re-valued
+    parameter still differs and is refused."""
+    base, sep, q = url.partition("?")
+    if not sep or not q:
+        return url
+    pairs = q.split("&")
+    return base + "?" + "&".join(sorted(pairs, key=lambda p: p.split("=", 1)[0]))
 
 
 def parse_rules(text: str) -> list[tuple[str, str, int, bool]]:
@@ -98,7 +111,8 @@ def decide_render(source: str, dest: str, pub: Path, path_q: str):
         return ("file", rel)
     if not (source.endswith("/*") and u.path.startswith(source[:-1])):
         return ("none", "")
-    return ("redirect", dest.replace("*", u.path[len(source) - 1:]) + (("?" + u.query) if u.query else ""))
+    # Measured on the real host 2026-10-13 (run 38405046317): Render keeps every byte but sorts the query keys.
+    return ("redirect", sorted_query(dest.replace("*", u.path[len(source) - 1:]) + (("?" + u.query) if u.query else "")))
 
 
 def simulate_render(d: Path) -> list[str]:
@@ -117,6 +131,8 @@ def simulate_render(d: Path) -> list[str]:
         bad.append(f"publish dir holds {published}, expected exactly {sorted(allowed)}")
     for req, kind, want in CASES:
         got = decide_render(source, dest, pub, req)
+        if kind == "redirect":
+            want = sorted_query(want)
         if got != (kind, want):
             bad.append(f"{req}: expected {(kind, want)}, rules say {got}")
     return bad
@@ -149,7 +165,7 @@ class _NoFollow(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def probe(base: str, d: Path | None, require_https: bool = False) -> list[str]:
+def probe(base: str, d: Path | None, require_https: bool = False, query_order: str = "exact") -> list[str]:
     bad = []
     if require_https and not base.startswith("https://"):
         return [f"base {base} is not https; the real test must prove TLS"]
@@ -162,8 +178,9 @@ def probe(base: str, d: Path | None, require_https: bool = False) -> list[str]:
         except urllib.error.HTTPError as e:
             status, loc, body = e.code, e.headers.get("Location"), b""
         if kind == "redirect":
-            if status != 301 or loc != want:
-                bad.append(f"{req}: got {status} -> {loc}, want 301 -> {want}")
+            want_n = sorted_query(want) if query_order == "sorted" else want
+            if status != 301 or loc != want_n:
+                bad.append(f"{req}: got {status} -> {loc}, want 301 -> {want_n}")
             elif urlsplit(loc).netloc.lower() == host:
                 bad.append(f"{req}: redirects to its own host ({loc}) - a loop")
         else:
@@ -180,6 +197,9 @@ def main(argv=None) -> int:
     ap.add_argument("--base")
     ap.add_argument("--files", help="the folder whose files are served (the publish dir), to compare served bytes (with --base)")
     ap.add_argument("--require-https", action="store_true")
+    ap.add_argument("--query-order", choices=("exact", "sorted"), default="exact",
+                    help="exact (default): the Location must carry the original query string byte for byte. sorted: the original "
+                         "pairs stable-sorted by key, values untouched (what Render measurably does; founder-approved 2026-10-13)")
     a = ap.parse_args(argv)
     if not (a.simulate or a.base):
         ap.error("give --simulate DIR and/or --base URL")
@@ -187,7 +207,7 @@ def main(argv=None) -> int:
     if a.simulate:
         bad += [f"[rules] {b}" for b in simulate(Path(a.simulate))]
     if a.base:
-        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None, a.require_https)]
+        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None, a.require_https, a.query_order)]
     print(json.dumps({"ok": not bad, "cases": len(CASES), "problems": bad}, indent=2))
     return 0 if not bad else 1
 
