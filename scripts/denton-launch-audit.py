@@ -27,10 +27,6 @@ import subprocess
 if subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denton_verdict_selftest.py")]).returncode:
     sys.exit("acceptance-logic self-test failed: refusing to audit with logic that can mis-grade")
 from denton_verdict import verdict as accept
-# Per-ZIP attestation that the admitted authoritative sources are the complete set for that ZIP (checklist step 9). Absent => nobody has attested.
-ATTEST_FILE = "docs/denton-source-coverage.json"
-ATTESTED = set(json.load(open(ATTEST_FILE)).get("attested_zips", [])) if os.path.exists(ATTEST_FILE) else set()
-PAGES_FILE = os.environ.get("DENTON_PAGES_JSON")   # optional: output of the pages task, to feed page_test_ok
 CENTROID_M = 25.0      # a marker this close to the ZIP centroid is suspicious
 POINT_TOL_M = 30.0     # marker vs publisher point
 
@@ -326,31 +322,51 @@ for reg, e in ARC.items():
     print(f"[pub] {reg}: {len(allrows)} point rows", file=sys.stderr)
 
 # ---------------------------------------------------------------- report
-PAGES = json.load(open(PAGES_FILE)) if PAGES_FILE and os.path.exists(PAGES_FILE) else {}
-def page_ok(z):
-    r = PAGES.get(z)
-    if not r:
-        return None
-    return all((r.get(v) or {}).get("zip_page", {}).get("status") == 200 and not (r.get(v) or {}).get("errors") for v in ("desktop", "mobile"))
+def covering_registries():
+    """Registered sources that claim Denton County (or all of Texas). Their reconciliation must have RUN, whether or not they display a dot."""
+    def covers(e):
+        return any(isinstance(c, dict) and c.get("state") == "TX" and c.get("county") in (None, "Denton") for c in (e.get("coverage") or []))
+    arc = {e["registry_id"] for e in REGISTRY["arcgis"] if covers(e)}
+    other = sorted(e["registry_id"] for k in ("socrata", "ckan", "csv", "carto", "opendatasoft")
+                   for e in (REGISTRY.get(k) or []) if isinstance(e, dict) and covers(e))
+    return arc, other
+COVER_ARC, UNAUDITED_FAMILIES = covering_registries()   # non-ArcGIS families have no reconciliation here: reported, never assumed empty
 
 def facts(z):
+    """Facts for the acceptance logic. Checks the browser / attestation / classification / evidence evidence are added by denton-launch-accept.py."""
     d = BY[z]
     cut = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 365 * 86400))   # REPORTED as a fact only; never a verdict input
     d["current_non_txdot_dots"] = len([r for r in d["dots"] if r["registry_id"] not in (None, "txdot-projects-info-all")
                                        and r["filed"] and str(r["filed"]) >= cut])
-    incomplete = ([reg for reg in PUB if reg in ARC and str(PUB[reg].get("eligibility", "ok")) != "ok"
-                   and any(r["registry_id"] == reg for r in d["dots"])] if d["has_boundary"] else [])
+    shown = {r["registry_id"] for r in d["dots"] if r["registry_id"]}
+    incomplete = []
+    if d["has_boundary"]:
+        for reg in sorted((shown | COVER_ARC) & set(ARC)):
+            if reg not in PUB or str(PUB[reg].get("eligibility", "NOT RUN")) != "ok":
+                incomplete.append(reg)
     elig_reg = ELIG.get(z, {})
     missing = sum(len(v[1]) for v in elig_reg.values())
     amb = 0
     for reg in elig_reg:
         amb += len(DUPIDS.get(reg, set()) & {m.group(2) for r in d["dots"] for m in [key_re.match(r["source_key"] or "")] if m and m.group(1) == reg})
-    return {"has_boundary": d["has_boundary"], "issues": d["issues"], "members_without_marker": d.get("members_without_marker"),
-            "compare": d.get("publisher_compare"), "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
-            "source_coverage_attested": z in ATTESTED, "page_test_ok": page_ok(z)}
+    cmp_ = d.get("publisher_compare")
+    iss = d.get("issues") or {}
+    nonpoint_dots = sum(1 for r in d["dots"] if any(w in str(r.get("geom_family") or "").upper() for w in ("LINE", "POLYGON")))
+    geom_known = all(r.get("geom_family") for r in d["dots"])
+    checks = {
+        "polygon_membership": "complete" if d["has_boundary"] and all(isinstance(iss.get(k), int) for k in ("outside_polygon", "lnglat_reversed", "duplicate_marker_rows", "at_centroid")) else "not_run",
+        "unique_identity": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] else "incomplete",
+        "publisher_geometry": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] and not cmp_["nonpoint_unverified"] else "incomplete",
+        "eligibility_reconciliation": "complete" if not incomplete and not UNAUDITED_FAMILIES else "incomplete",
+        # applicable only to line/polygon dots; vacuously complete ONLY when every dot's geometry family is known and none is a line/polygon
+        "nonpoint_geometry": "complete" if (geom_known and nonpoint_dots == 0) else "not_run",
+    }
+    return {"has_boundary": d["has_boundary"], "issues": iss, "members_without_marker": d.get("members_without_marker"),
+            "compare": cmp_, "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
+            "unaudited_source_families": list(UNAUDITED_FAMILIES), "checks": checks}
 
 def verdict(z):
-    v, why = accept(facts(z))
+    v, why, warn = accept(facts(z))
     return v, "; ".join(why) or "all checks complete"
 
 def freshness(z):
@@ -371,10 +387,13 @@ for z in ZIPS:
     out["zips"][z]["eligible_missing"] = {r: {"eligible": a, "missing": m[:200], "missing_n": len(m)} for r, (a, m) in ELIG.get(z, {}).items()}
     out["zips"][z]["verdict"] = [v, why]
     out["zips"][z]["freshness_newest_record_by_source"] = freshness(z)
+    out["zips"][z]["facts"] = facts(z)
     i = d["issues"]
     md.append(f"| {z} | {'yes' if d['has_boundary'] else 'NO'} | {d['members']} | {len(d['dots'])} | {i['outside_polygon']} | {i['at_centroid']} | {i['lnglat_reversed']} | {i['duplicate_marker_rows']} | "
               f"{pc['match']}/{pc['mismatch']}/{pc['not_arcgis_unverified']+pc['nonpoint_unverified']+pc['publisher_not_found']} | {missn} | {v} | {why} |")
 text = "\n".join(md)
+if os.environ.get("OUT_AUDIT"):
+    open(os.environ["OUT_AUDIT"], "w").write(json.dumps(out, default=str))
 print("----- BEGIN DENTON AUDIT JSON -----")
 print(json.dumps(out, default=str))
 print("----- END DENTON AUDIT JSON -----")
