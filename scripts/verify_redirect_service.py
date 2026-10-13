@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Verify a redirect service for the old host (Jody migration, Step 5).
 
-  --simulate DIR   evaluate the generated `_redirects` in DIR with a small Netlify-subset interpreter (first match wins,
-                   `200!` serves the file, `301!` redirects, `:splat`). Proves OUR RULES; it cannot prove the host.
-  --base URL       probe a LIVE deployment (a *.netlify.app preview before DNS, homesignal.net after) with real HTTP and
-                   no redirect-following: it must answer the same way the simulator says it should.
+  --simulate DIR   evaluate the generated rules in DIR. Netlify folder: `_redirects` with a small Netlify-subset interpreter
+                   (first match wins, `200!` serves the file, `301!` redirects, `:splat`). Render folder (has render.yaml):
+                   the Blueprint route, with Render's documented precedence (a rule applies ONLY when no file exists at
+                   the path). Proves OUR RULES; it cannot prove the host - in particular it ASSUMES the host keeps the
+                   query string, which only the live probe can show.
+  --base URL       probe a LIVE deployment (a *.netlify.app / *.onrender.com preview before DNS, homesignal.net after) with
+                   real HTTP and no redirect-following: it must answer the same way the simulator says it should.
+  --require-https  with --base: refuse a non-https base (the real test must prove TLS).
 
 Cases come from one list (paths a crawler or a resident really uses). Exit 0 only when every case holds.
 Stdlib only.
@@ -27,6 +31,11 @@ CASES = [
     ("/", "redirect", f"{ORIGIN}/"),
     ("/index.html", "redirect", f"{ORIGIN}/index.html"),
     ("/community/84302/", "redirect", f"{ORIGIN}/community/84302/"),
+    ("/community/76227/", "redirect", f"{ORIGIN}/community/76227/"),
+    ("/homesignalmap.html?zip=76227", "redirect", f"{ORIGIN}/homesignalmap.html?zip=76227"),
+    ("/shared-report.html?r=abc123&utm_medium=email", "redirect", f"{ORIGIN}/shared-report.html?r=abc123&utm_medium=email"),
+    ("/unsubscribe.html?t=a1b2c3d4e5&z=76227", "redirect", f"{ORIGIN}/unsubscribe.html?t=a1b2c3d4e5&z=76227"),
+    ("/search.html?q=a%2Fb&v=%E2%9C%93&e=&d=1&d=2", "redirect", f"{ORIGIN}/search.html?q=a%2Fb&v=%E2%9C%93&e=&d=1&d=2"),
     ("/community/84302", "redirect", f"{ORIGIN}/community/84302"),
     ("/homesignalmap.html?zip=84302&utm_source=bluesky", "redirect", f"{ORIGIN}/homesignalmap.html?zip=84302&utm_source=bluesky"),
     ("/unsubscribe.html?t=abc", "redirect", f"{ORIGIN}/unsubscribe.html?t=abc"),
@@ -36,6 +45,7 @@ CASES = [
     ("/og-default.png", "redirect", f"{ORIGIN}/og-default.png"),
     ("/some/unknown/path", "redirect", f"{ORIGIN}/some/unknown/path"),
     ("/.well-known/did.json", "file", ".well-known/did.json"),
+    ("/google59e1ae3ef6b75e3a.html", "file", "google59e1ae3ef6b75e3a.html"),
     ("/robots.txt", "file", "robots.txt"),
 ]
 
@@ -71,7 +81,50 @@ def decide(rules, path_q: str):
     return ("none", "")
 
 
+def parse_render(text: str) -> tuple[str, str, str]:
+    """(source, destination, publish path) from the generated Blueprint. Fails on anything but ONE redirect route."""
+    routes = re.findall(r"- type: (\w+)\n\s+source: (\S+)\n\s+destination: (\S+)", text)
+    pub = re.search(r"staticPublishPath: (\S+)", text)
+    if len(routes) != 1 or routes[0][0] != "redirect" or not pub:
+        raise ValueError(f"render.yaml must hold exactly one redirect route and a publish path: {routes} {pub}")
+    return routes[0][1], routes[0][2], pub.group(1)
+
+
+def decide_render(source: str, dest: str, pub: Path, path_q: str):
+    u = urlsplit(path_q)
+    rel = u.path.lstrip("/")
+    f = pub / rel
+    if rel and f.is_file():           # Render: a rule is NOT applied when a resource exists at the path
+        return ("file", rel)
+    if not (source.endswith("/*") and u.path.startswith(source[:-1])):
+        return ("none", "")
+    return ("redirect", dest.replace("*", u.path[len(source) - 1:]) + (("?" + u.query) if u.query else ""))
+
+
+def simulate_render(d: Path) -> list[str]:
+    bad = []
+    source, dest, pubname = parse_render((d / "render.yaml").read_text())
+    pub = d / pubname
+    if source != "/*" or not dest.endswith("/*"):
+        bad.append(f"the route must be the permanent catch-all /* -> <origin>/*, got {source} -> {dest}")
+    if dest != ORIGIN + "/*":
+        bad.append(f"destination {dest} is not {ORIGIN}/*")
+    if (pub / "index.html").exists():
+        bad.append("an index.html in the publish dir would answer / with 200 instead of redirecting")
+    published = sorted(p.relative_to(pub).as_posix() for p in pub.rglob("*") if p.is_file())
+    allowed = {".well-known/did.json", "robots.txt"} | {n for n in (p.name for p in pub.iterdir()) if re.fullmatch(r"google[0-9a-f]+\.html", n)}
+    if set(published) != allowed:
+        bad.append(f"publish dir holds {published}, expected exactly {sorted(allowed)}")
+    for req, kind, want in CASES:
+        got = decide_render(source, dest, pub, req)
+        if got != (kind, want):
+            bad.append(f"{req}: expected {(kind, want)}, rules say {got}")
+    return bad
+
+
 def simulate(d: Path) -> list[str]:
+    if (d / "render.yaml").is_file():
+        return simulate_render(d)
     bad = []
     rules = parse_rules((d / "_redirects").read_text())
     if not rules or rules[-1][0] != "/*" or rules[-1][2] != 301:
@@ -96,8 +149,11 @@ class _NoFollow(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def probe(base: str, d: Path | None) -> list[str]:
+def probe(base: str, d: Path | None, require_https: bool = False) -> list[str]:
     bad = []
+    if require_https and not base.startswith("https://"):
+        return [f"base {base} is not https; the real test must prove TLS"]
+    host = urlsplit(base).netloc.lower()
     op = urllib.request.build_opener(_NoFollow)
     for req, kind, want in CASES:
         try:
@@ -108,6 +164,8 @@ def probe(base: str, d: Path | None) -> list[str]:
         if kind == "redirect":
             if status != 301 or loc != want:
                 bad.append(f"{req}: got {status} -> {loc}, want 301 -> {want}")
+            elif urlsplit(loc).netloc.lower() == host:
+                bad.append(f"{req}: redirects to its own host ({loc}) - a loop")
         else:
             if status != 200:
                 bad.append(f"{req}: got {status}, want 200")
@@ -120,7 +178,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--simulate")
     ap.add_argument("--base")
-    ap.add_argument("--files", help="the built folder, to compare served bytes (with --base)")
+    ap.add_argument("--files", help="the folder whose files are served (the publish dir), to compare served bytes (with --base)")
+    ap.add_argument("--require-https", action="store_true")
     a = ap.parse_args(argv)
     if not (a.simulate or a.base):
         ap.error("give --simulate DIR and/or --base URL")
@@ -128,7 +187,7 @@ def main(argv=None) -> int:
     if a.simulate:
         bad += [f"[rules] {b}" for b in simulate(Path(a.simulate))]
     if a.base:
-        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None)]
+        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None, a.require_https)]
     print(json.dumps({"ok": not bad, "cases": len(CASES), "problems": bad}, indent=2))
     return 0 if not bad else 1
 

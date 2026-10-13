@@ -9,7 +9,7 @@ Nothing here has been done on the founder's behalf, and nothing is cleared legal
 | # | You do this | Time | Why only you | What happens automatically afterwards |
 |---|---|---|---|---|
 | 1 | In the **Shopify DNS console for homesignal.net**, add one harmless TXT record (name `_jody-dnstest`, value `ok`) and tell me when it is saved | 1 min | Only your Shopify login can edit the zone. This is the one test that proves the console you edit really is authoritative. | I read it from every authoritative nameserver (`jody-dns-authority`, probe mode) and report FOUND / ABSENT. You then delete the record. |
-| 2 | Create a **Netlify Free** account (no card; stop if asked for one), create a **personal access token**, add it to `homesignal-site` as the Actions secret `NETLIFY_AUTH_TOKEN` | 5 min | Account and secret are yours. | `jody-redirect-verify` deploys the redirect folder to a throw-away site, runs the 13 real-HTTP cases including the DID document, and deletes the site. No drag-and-drop, no addresses to send me. |
+| 2 | ~~Netlify Free account + `NETLIFY_AUTH_TOKEN`~~ **SUPERSEDED 2026-10-12: Netlify access is unavailable; replaced by the Render path in section 3a.** Create a **Render** account (Free; **stop if it asks for a card**), then: New > Static Site > connect `HomeSignalG/homesignal-site`, **Branch** `render-redirect-preview` (a generated, redirect-files-only orphan branch), **Root Directory** left EMPTY, **Build Command** `echo no build`, **Publish Directory** `public`, **Auto-Deploy: No**, plan Free. Then Redirects/Rewrites tab: add ONE rule, Type **Redirect**, Source `/*`, Destination `https://jodytracks.com/*`. Send me the `https://<name>.onrender.com` address. | 10 min | Account and repo connection are yours. | I run `jody-redirect-verify` mode `probe` against that address (no secret needed): 19 real-HTTP cases incl. paths, queries, DID bytes, Google token, robots, HTTPS, loop check. Nothing points homesignal.net at it yet. |
 | 3 | Turn on **auto-renew** at both registrars: Infomaniak (jodytracks.com, expires 2027-10-08) and the homesignal.net registrar (expires 2027-05-26) | 2 min | Registrar logins. A lapse of homesignal.net would break the redirect and the permanent Bluesky identity `did:web:homesignal.net`. | Nothing; expiry is re-read by `jody-dns-audit`. |
 | 4 | At **Infomaniak DNS for jodytracks.com**, add the **4 Resend records in section 2 below** (copy-paste), (the two Infomaniak addresses **info@jodytracks.com** and **contact@jodytracks.com** already exist; **contact@** is for real-estate-agent outreach and free-report invitations; no further mailbox is needed) | 10 min | Infomaniak login. | `resend-domain-records` (action `verify`) and `jody-dns-authority` confirm all four records and Resend's status. Nothing sends until Resend reports the domain verified. |
 | 5 | Counsel: a **trademark / name clearance** opinion for "Jody" / "JodyTracks", and a read of the Jody `privacy.html` and `terms.html`; decide the legal-entity text | your schedule | Cannot be done by engineering or represented as done. Blocks GO LIVE only. | I apply any copy changes counsel asks for. |
@@ -69,7 +69,9 @@ send.forge.rmta.net
 
 Re-read before adding (the values come from Resend and I will re-print them if anything differs): run `resend-domain-records` (ingest) with `action=list`.
 
-## 3. Hosting decision (corrected 2026-10-09)
+## 3. Hosting decision (corrected 2026-10-09; redirect provider REPLACED 2026-10-12, see 3a)
+
+> **2026-10-12:** wherever this section says Netlify, read **Render Static Site (Free)** per section 3a. The revenue-site decision (GitHub Pages, no second pipeline) is unchanged and is the part that matters.
 
 **The revenue site stays on GitHub Pages, and nothing revenue-bearing runs on Netlify.** Netlify carries only the redirect for homesignal.net and the immutable DID document.
 
@@ -78,6 +80,45 @@ Re-read before adding (the values come from Resend and I will re-print them if a
 - **The price of this choice, stated:** the certificate for jodytracks.com can only be issued after DNS points at Pages, so GO LIVE has a **waiting window of up to about an hour** (step 6 in section 4) during which homesignal.net and jodytracks.com can both be unavailable or show a certificate warning. The Bluesky publish hold covers it. This window is documented, not hidden; the rollback is in section 4.
 - **Netlify credit exhaustion is a real, structural risk** (a free plan has a monthly allowance; when it is spent the site can be paused). Netlify's pricing page cannot be reached from the build sandbox, so I do not quote its numbers. What bounds the damage: Netlify serves only tiny 301s and the DID file; a pause would break redirects for old links and make the feed generator's DID unresolvable until the next cycle, but **does not take the revenue site down**. Mitigations: the real-HTTP verifier doubles as a monitor (`jody-redirect-verify` mode `probe` against `https://homesignal.net`); a **daily scheduled run needs your approval at GO LIVE** because it is a new scheduled job; and the emergency fallback is to repoint homesignal.net back to GitHub Pages' addresses (Pages serves the DID file; it cannot 301).
 
+## 3a. Redirect provider: Netlify REPLACED by Render Static Sites (2026-10-12)
+
+**Why:** Netlify account access is unavailable. Nothing else about the plan moves: jodytracks.com stays on the existing GitHub Pages pipeline; homesignal.net stays at its registrar with Shopify-edited DNS; Proton MX, SPF, DKIM and DMARC are untouched; no new paid hosting.
+**Preferred provider: Render Static Sites (Free). Verdict: BLOCKED, not rejected** - five critical requirements cannot be settled from documentation and need ONE live test that only a Render account can run (founder step 2). GitLab Pages is the documented fallback, evaluated below only because Render has unverifiable items.
+
+Labels: **DOCUMENTATION VERIFIED** = stated in the provider's official documentation (read through search excerpts; `render.com` itself could not be fetched from the build sandbox, so quote-level verification of the pages is still owed) / **OFFLINE PASS** = our tests, no provider / **LIVE HTTP PASS** = real HTTP against the provider (none yet) / **BLOCKED** = cannot be established without the live test or a founder look.
+
+| # | Requirement (Render Free) | Result | Evidence / what is missing |
+|---|---|---|---|
+| 1 | Permanent 301 | DOCUMENTATION VERIFIED + **LIVE HTTP PASS** | 10 redirect cases returned 301 on the Render preview, including the **root `/`** (the documented root restriction did not apply), `jody-redirect-verify` run 38329014182, 2026-10-13. |
+| 2 | Exact path preservation | DOCUMENTATION VERIFIED + **LIVE HTTP PASS** | `/`, `/index.html`, `/community/84302/` (with and without slash), sitemaps, `.png`, an unknown path all landed on the identical path at `https://jodytracks.com`. `/community/76227/` is in the 19-case verifier (PR #1880), not yet run live. |
+| 3 | Arbitrary query-string preservation | **LIVE HTTP FAIL (strict)** | Render **re-orders query keys**: `/homesignalmap.html?zip=84302&utm_source=bluesky` -> `https://jodytracks.com/homesignalmap.html?utm_source=bluesky&zip=84302` (run 38329014182). Set and values equal on that sample, order not. NOT yet probed: percent-encoding (`%2F`, unicode), empty values, duplicate keys, the shared-report and unsubscribe shapes (cases exist only in the PR #1880 verifier, which cannot run from a branch). The strict check was NOT loosened. |
+| 4 | Existing files answer 200 (did.json, Google token, robots) | DOCUMENTATION VERIFIED (rule) / **LIVE HTTP PASS for did.json (200, bytes equal to the repo file) and robots.txt (200)** on the Render preview, PRE-RULE baseline, `jody-redirect-verify` run 38328698969 (2026-10-13). Google token **not yet probed** (the verifier on `main` has no case for it); the redirect rule is not yet entered, so the 11 redirect cases correctly returned 404 | Docs: a rule is not applied where a resource exists at the path, so no `200!` rule is needed. Whether the `.well-known` dot-directory is published is not in the docs - live probe only. |
+| 5 | HTTPS on apex and www | **LIVE HTTP PASS for the onrender.com address** (TLS verified by the probe); apex/www on homesignal.net untested (not added, DNS untouched) | Not in the excerpts read. Render documents automatic www/apex companion redirects, so `www` may take two hops (www -> apex -> Jody); acceptable only if both are 301. Live. |
+| 6 | Custom domains with Shopify-edited A/CNAME, no transfer | DOCUMENTATION VERIFIED | Apex: ALIAS/ANAME if offered, else A `216.24.57.1` (read the current value in the Render dashboard - do not trust this file); `www`: CNAME to the service's onrender.com name; remove AAAA (Render has no IPv6). Whether Shopify's DNS console accepts an apex A edit is still gate G1. |
+| 7 | Commercial-use eligibility | **BLOCKED** (not stated in the pages read; founder to read Render's terms) | Not found in the excerpts. Founder must read Render's terms/pricing page. |
+| 8 | Free limits, suspension, surprise charges | DOCUMENTATION VERIFIED (via search excerpts of render.com pricing/docs, 2026-10-13) | Hobby (free): static sites free; **5 GB/month outbound bandwidth**, extra **$0.15/GB** billed only if a payment method is linked; **with no payment method Render spins down the workspace's services until the next month** (a suspension would take the redirects AND the DID offline); **2 custom domains included** (apex + www fits), $0.25/month each beyond; 500 pipeline minutes. Open: whether Render asked for a card at signup (not reported); whether the dashboard shows these limits for this workspace. |
+| 9 | Scalability, monitoring | OFFLINE PASS (monitoring tool) | `jody-redirect-verify` mode `probe` is the monitor (no secret). A daily schedule is a new scheduled job and needs founder approval. A redirect response is a few hundred bytes; the founder's own bandwidth figure after launch decides if 5 GB is enough (estimate, not measured: on the order of 10 million redirects). |
+
+**GitLab Pages (evaluated because Render has BLOCKED items; not selected):** DOCUMENTATION VERIFIED: `_redirects` supports 301 (default), splats, and existing files take priority; "Force (shadowing)" is unsupported but not needed; **query-parameter matching is unsupported (preservation not stated - same gap as Render)**; custom domains on Free; apex A record plus a `_gitlab-pages-verification-code` TXT record that must stay in place; Let's Encrypt can take up to an hour; remove AAAA and check CAA. Costs vs Render: needs a CI pipeline (a second deployment mechanism), one more DNS record to add to homesignal.net, and a possible account-verification step on Free that was NOT checked. It does not remove any BLOCKED item, so it is a fallback only if Render's live test fails.
+
+**Our side (OFFLINE PASS, `test/redirect-service.test.mjs`, 44 checks, full offline suite 351 files green):** `scripts/build_redirect_site.py --provider render` writes `redirect-service/render/` (committed; a test fails if it drifts): `render.yaml` (one `redirect` route `/*` -> `https://jodytracks.com/*`, free static site, no build) OUTSIDE the publish directory, and `public/` holding only the byte-identical `.well-known/did.json`, the Google token and a permissive `robots.txt`. `scripts/verify_redirect_service.py` gained a Render rules interpreter with Render's documented precedence, 6 new cases (community/76227, map `?zip=76227`, shared-report and unsubscribe queries, encoded/duplicate params, Google token), a loop check and `--require-https`. 10 folder mutations and 6 live-probe failure variants (query stripped, query re-encoded, 302, loop, http, DID redirected) are each refused. Netlify output is unchanged byte for byte.
+
+**LIVE HTTP: PARTIAL, one FAIL.** Dashboard rule CONFIRMED from a screenshot (Source `/*`, Destination `https://jodytracks.com/*`, Action Redirect, 'Updated rules successfully.', 2026-10-12 7:47 PM CDT). Run 38329014182: 12 of 13 cases pass; the failing one is query-key re-ordering (row 3).  Preview service deployed 2026-10-12 19:43 CDT from branch `0-render-redirect-preview` commit `c1eebb2` (deploy succeeded). Pre-rule baseline above. Still BLOCKED: redirect rule not yet entered/shown, so root `/`, 301 status, path and query preservation, and the Google token are unproven. The 19-case verifier lives on PR #1880, and the workflow only runs from `main`. Run: `jody-redirect-verify`, mode `probe`, `base_url` = the onrender.com address. Pass criteria are exactly cases 3, 4, 5 and 8 above plus the 19 cases.
+
+### Competing-CTO audit (what would make this architecture wrong)
+
+| Risk | Finding | Control |
+|---|---|---|
+| Query strings dropped | Would break every unsubscribe, shared-report and map link in old emails and posts. A hard fail. | Live probe refuses it; if Render fails, fall to GitLab, do not ship. |
+| DID fails | `did:web:homesignal.net` is immutable; a 404 on `.well-known/did.json` breaks the Bluesky feed generator. Dot-directory publishing is undocumented for Render. | Live probe compares served bytes to the repo file; homesignal.net is NOT repointed until it passes. |
+| SEO loss | A temporary or chained redirect, or `www` taking two hops, weakens Search Console Change of Address. | 301-only assertion; `www` probed separately; Change of Address only after both pass. |
+| Surprise cost | Custom-domain fee and bandwidth overage are billed to a card if one is on file; two domains (apex and www) may each count. | If Render demands a card or charges for the domains, this is BLOCKED against "no new paid hosting"; do not add a card to proceed. |
+| Provider pause | A free-tier suspension would stop old links and the DID, not the revenue site. | Monitor via the probe; rollback below; GitLab is a pre-evaluated alternate. |
+| DNS mistakes | Shopify's Connect / Verify / Set-as-primary actions can rewrite records. A stray AAAA breaks Render. | Edit only the apex A and `www` CNAME in "Edit DNS records"; MX, TXT, DKIM, `send` records untouched. |
+| Accidental redeploy | The service builds from the public repo. | Dedicated orphan branch `render-redirect-preview` holding only `public/` + `render.yaml` + README (no site code, no Root Directory ambiguity: Render's docs do not say whether Publish Directory is relative to Root Directory, so the branch root IS the service root); Auto-Deploy: No; the folder never changes except by a reviewed, test-gated commit. A push under `redirect-service/` also re-runs the Pages build (harmless, identical artifact). |
+| Rollback gap | After the Pages custom domain moves to jodytracks.com, restoring homesignal.net's old A/CNAME points it at a Pages site that no longer answers for that host. | Rollback of the OLD host is "repoint to Render" or revert the Pages custom domain first; recorded old values stay in section 4. Test the rollback order before GO LIVE. |
+| Architecture that stays rejected | A meta-refresh or JS redirect on GitHub Pages (not a 301), a registrar forward (cannot serve the DID file), moving nameservers (a bigger DNS change). | Unchanged from MIGRATION-STATUS Step 5. |
+
 ## 4. GO LIVE sequence (executed only after your explicit approval; each gate is checked by engineering)
 
 **Gates, all must be green before step 1 (engineering reports each with its run link):**
@@ -85,7 +126,7 @@ Re-read before adding (the values come from Resend and I will re-print them if a
 | Gate | Check | Status |
 |---|---|---|
 | G1 | `jody-dns-authority` probe record found on every authoritative nameserver of homesignal.net | needs founder step 1 |
-| G2 | `jody-redirect-verify` real-HTTP cases pass on Netlify, **including `/.well-known/did.json` answering 200 with the original bytes** | needs founder step 2 |
+| G2 | `jody-redirect-verify` real-HTTP cases pass on the redirect provider (**Render**, was Netlify), **including `/.well-known/did.json` answering 200 with the original bytes** | BLOCKED: needs founder step 2 (Render account) |
 | G3 | Resend reports jodytracks.com `verified` (all four records) | needs founder step 4 |
 | G4 | `jody-seo-parity` on a fresh snapshot: `ok: true` | passed once on 2026-10-09; re-run on the day |
 | G5 | The contract-flip PR builds clean as a draft (not merged) | prepared at GO LIVE time |
@@ -98,13 +139,13 @@ Re-read before adding (the values come from Resend and I will re-print them if a
 | # | Action | Who | Undo |
 |---|---|---|---|
 | 1 | `hold: true` (Bluesky) | engineering PR | set `false` |
-| 2 | Add `homesignal.net` as a custom domain on the persistent Netlify redirect site; print the DNS values to use | engineering | remove it |
+| 2 | Add `homesignal.net` and `www.homesignal.net` as custom domains on the persistent **Render** redirect service; read the exact DNS values Render shows for them at that moment (documented shape: apex A, `www` CNAME to the service's onrender.com name; no AAAA) | founder (dashboard) + engineering (reads values back) | remove the custom domains |
 | 3 | Deploy the five site edge functions that still carry the old origin list | engineering | redeploy previous |
 | 4 | jodytracks.com web records at Infomaniak | founder | delete the records |
 | 5 | Pages custom domain -> `jodytracks.com`; merge the contract-flip PR | founder + engineering | set the domain back, revert the PR |
 | 6 | Wait for the jodytracks.com certificate; engineering polls TLS + content from a runner | engineering | n/a |
-| 7 | **Only once step 6 is green:** repoint homesignal.net at Netlify in the Shopify console. Use only "Edit DNS records"; do not use any Shopify "Connect", "Verify", "Set as primary" or "Remove" domain action, which can rewrite the records to Shopify storefront addresses | founder | restore the previous A/CNAME values (recorded before the change) |
-| 8 | Wait for the homesignal.net certificate on Netlify; run `jody-redirect-verify` mode `probe` on `https://homesignal.net` (13 cases + DID 200) and the live parity checks | engineering | n/a |
+| 7 | **Only once step 6 is green:** repoint homesignal.net at Render in the Shopify console. Use only "Edit DNS records"; do not use any Shopify "Connect", "Verify", "Set as primary" or "Remove" domain action, which can rewrite the records to Shopify storefront addresses | founder | restore the previous A/CNAME values (recorded before the change) |
+| 8 | Wait for the homesignal.net certificate on Render; run `jody-redirect-verify` mode `probe` on `https://homesignal.net` (13 cases + DID 200) and the live parity checks | engineering | n/a |
 | 9 | `hold: false` | engineering | set `true` |
 
 The recorded pre-change values of homesignal.net DNS (2026-10-09): A `185.199.108.153`, `www` CNAME `homesignalg.github.io`, MX Proton, TXT SPF Proton + `protonmail-verification`, DKIM `resend._domainkey`, `send` MX/TXT for Resend. Steps 7 changes only the web records (A/CNAME); **MX, TXT, DKIM and `send` records stay exactly as they are.**
@@ -124,8 +165,8 @@ Gates, separate from Jody: (1) Paddle Sandbox build against captured payloads; (
 ## 7. Engineering does this (never asked of the founder)
 
 Done: brand contract and pin; dual-origin backends and the database guard; Jody staging build and SEO parity (35,284 pages, identical indexable sets); redirect-service folder and offline simulator; Bluesky publish hold; DNS and registration audits; the origin-from-contract plumbing (live, byte-identical output); the Resend domain created with its records read back; the Paddle audit.
-Ready and waiting on a founder input above: authoritative-DNS probe (step 1), real-HTTP Netlify verification (step 2), Resend verification (step 4).
-At GO LIVE: the contract-flip PR, verification files, the five edge-function deploys, the Netlify custom domain, certificate polling, the redirect probe, parity checks, the hold, and 180 days of monitoring (Search Console coverage, redirect probe, sitemap parity, Bluesky and email delivery).
+Ready and waiting on a founder input above: authoritative-DNS probe (step 1), real-HTTP redirect-provider verification (step 2, now Render), Resend verification (step 4).
+At GO LIVE: the contract-flip PR, verification files, the five edge-function deploys, the Render custom domains, certificate polling, the redirect probe, parity checks, the hold, and 180 days of monitoring (Search Console coverage, redirect probe, sitemap parity, Bluesky and email delivery).
 
 ## 8. Not cleared, and not represented as cleared
 
