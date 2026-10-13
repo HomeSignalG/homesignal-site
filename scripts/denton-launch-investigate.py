@@ -96,6 +96,7 @@ out["txdot_projects_with_markers"] = len(ids); out["txdot_projects_found_at_publ
 def wkt(parts):
     return "MULTILINESTRING(" + ",".join("(" + ",".join(f"{x} {y}" for x, y in p) + ")" for part in parts for p in part if len(p) > 1) + ")"
 worst, off_line, no_int = [], 0, 0
+detail_off, detail_far = [], []
 for z in ZIPS:
     mz = [m for m in mk if m["zip"] == z]
     for i in range(0, len(mz), 60):
@@ -106,13 +107,29 @@ for z in ZIPS:
                 vals.append(f"('{m['source_key']}',{m['marker_seq']},{m['lng']},{m['lat']},'{wkt(lines[pid])}')")
         if not vals: continue
         res = sql(f"""select v.sk, v.seq, ST_Distance(ST_GeogFromText('SRID=4326;'||v.w), ST_SetSRID(ST_Point(v.x,v.y),4326)::geography) d_m,
-            ST_Intersects(geo.zip_membership_boundary('{z}'), ST_SetSRID(ST_GeomFromText(v.w),4269)) line_hits_zip
+            ST_Intersects(geo.zip_membership_boundary('{z}'), ST_SetSRID(ST_GeomFromText(v.w),4269)) line_hits_zip,
+            ST_Distance(ST_GeogFromText('SRID=4326;'||v.w), ST_Transform(geo.zip_membership_boundary('{z}'),4326)::geography) line_to_zip_m,
+            geo.zip_point_membership_in(geo.zip_membership_boundary('{z}'), v.y, v.x) = 'member' marker_in_zip,
+            ST_Length(ST_GeogFromText('SRID=4326;'||v.w)) line_len_m, ST_NumGeometries(ST_GeomFromText(v.w)) line_parts
             from (values {",".join(vals)}) v(sk,seq,x,y,w)""")
         for r in res:
             if r["d_m"] > 5: off_line += 1; worst.append((z, r["sk"].split(":")[-1], r["seq"], round(r["d_m"], 1)))
-            if not r["line_hits_zip"]: no_int += 1
+            if not r["line_hits_zip"]:
+                no_int += 1
+                detail_off.append({"zip": z, "project": r["sk"].split(":")[-1], "seq": r["seq"], "line_to_zip_m": round(r["line_to_zip_m"], 1),
+                                   "marker_in_zip": r["marker_in_zip"], "line_len_m": round(r["line_len_m"]), "line_parts": r["line_parts"]})
+            if r["d_m"] > 5:
+                detail_far.append({"zip": z, "project": r["sk"].split(":")[-1], "seq": r["seq"], "marker_to_line_m": round(r["d_m"], 1),
+                                   "line_len_m": round(r["line_len_m"]), "line_parts": r["line_parts"], "marker_in_zip": r["marker_in_zip"]})
 out["txdot_markers_more_than_5m_from_their_line"] = off_line
 out["txdot_markers_whose_line_misses_the_zip_polygon"] = no_int
+out["txdot_line_misses_zip_detail"] = detail_off
+out["txdot_marker_far_from_line_detail"] = detail_far
+# several markers on one project vs several projects: per-ZIP distribution of markers per project
+from collections import Counter
+per = Counter((m["zip"], m["source_key"]) for m in mk)
+out["txdot_markers_per_project_distribution"] = dict(sorted(Counter(per.values()).items()))
+out["txdot_projects_with_more_than_one_marker_in_a_zip"] = sum(1 for v in per.values() if v > 1)
 out["txdot_worst"] = sorted(worst, key=lambda t: -t[3])[:15]
 
 # ---- 3. the 76262 centroid marker
