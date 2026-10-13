@@ -401,7 +401,12 @@ const RECORDING = ['recordRun', 'recordFailure', 'endWatch'];
      && order.indexOf('seenOf') < order.indexOf('recipientOf') && order.indexOf('recipientOf') < order.indexOf('send') && order.indexOf('send') < order.indexOf('recordRun'),
     '4a the order is: standing, the point, the area, the ledger, what was already told, the address, the EMAIL, and only then the record', order.join(' > '));
   const send = callOf(log, 'send'), rec = callOf(log, 'recordRun');
-  ok(order.filter((x) => x === 'send').length === 1 && send[1].to === AGENT_EMAIL && send[1].from === 'HomeSignal <noreply@homesignal.net>', '4b exactly one email, to the agent\'s address, from the one From address');
+  // The From address and Reply-To are the brand's, pinned as EXACT literals for each identity (never read back from the code under test):
+  // HomeSignal (v1) has always sent from HomeSignal <noreply@homesignal.net> with no Reply-To; Jody (v2) sends from Jody <noreply@jodytracks.com> with Reply-To info@jodytracks.com.
+  const BRG = await import('../supabase/functions/_shared/brand-origins.generated.ts');
+  const EXPECT = { 'homesignal.net': { from: 'HomeSignal <noreply@homesignal.net>', reply_to: undefined }, 'jodytracks.com': { from: 'Jody <noreply@jodytracks.com>', reply_to: 'info@jodytracks.com' } }[BRG.PUBLIC_HOST];
+  ok(EXPECT !== undefined && order.filter((x) => x === 'send').length === 1 && send[1].to === AGENT_EMAIL && send[1].from === EXPECT.from && send[1].reply_to === EXPECT.reply_to && ('reply_to' in send[1]) === (EXPECT.reply_to !== undefined),
+    '4b exactly one email, to the agent\'s address, from the one From address and (Jody only) the one Reply-To');
   ok(/^watch-[0-9a-f]{64}$/.test(send[2]), '4c carrying an idempotency key', send[2]);
   ok(rec[1] === WATCH && rec[2] === 'NOTIFIED' && rec[3].length === 2 && same(rec[3].map((x) => x.project_id).sort(), ['k1', 'k3']), '4d what is recorded is the watch, NOTIFIED, and the two changes the email told');
   const flat = send[1].text;
@@ -692,6 +697,26 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
   logs.length = 0;
   const r2 = await quietly(() => run(known.d, {}));
   ok(r2.status === 502 && r2.json.error === 'data_unavailable' && logs.length === 1 && JSON.parse(logs[0]).reason === 'property_watch_claim', '6l and a database fault answers 502 data_unavailable and logs its own fixed reason', { status: r2.status, logs });
+}
+
+// ---- 7. Reply-To, end to end (Jody Step 16 hardening): the REAL handler hands the message to the REAL sender, and the request that reaches the mail provider
+// carries the brand's Reply-To. Whatever identity the generated brand module says, the same chain is checked: HomeSignal sends NO reply_to key; Jody
+// (info@jodytracks.com, customer support) sends exactly that. test/step16-outbound-email.test.mjs runs this whole file against a Jody-generated copy.
+{
+  const BR = await import('../supabase/functions/_shared/brand-origins.generated.ts');
+  const WE = await import('../supabase/functions/_shared/watch-email.ts');
+  const sent = [];
+  const { f } = stub([
+    [/api\.resend\.com\/emails$/, (init) => { sent.push(JSON.parse(init.body)); return json({ id: 'msg_rt' }); }],
+  ]);
+  const real = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
+  const { d, log } = rdeps({ send: real.send });
+  const r = await quietly(() => run(d, {}));
+  const want = BR.PUBLIC_REPLY_TO;
+  ok(r.status === 200 && r.json.notified === 1 && sent.length === 1, '7a one watch email reached the mail provider through the real handler and the real sender', { status: r.status, sent: sent.length });
+  ok(sent[0].from === WE.WATCH_FROM && (want === null ? !('reply_to' in sent[0]) : sent[0].reply_to === want),
+    '7b the provider request carries the brand\'s Reply-To (' + (want === null ? 'none: the key is absent' : want) + ') and the brand\'s sender', sent[0] && { from: sent[0].from, reply_to: sent[0].reply_to });
+  ok(want === null || (want === 'info@jodytracks.com' && BR.PUBLIC_HOST === 'jodytracks.com'), '7c the only non-null Reply-To is Jody\'s customer-support mailbox, on Jody\'s own domain', want);
 }
 
 console.log('\n' + (n - bad) + ' of ' + n + ' passed');

@@ -22,10 +22,10 @@ export const OUT_FILE = 'supabase/functions/_shared/brand-origins.generated.ts';
 /**
  * Where a reply to a no-reply sender should go, per identity. A sending domain being VERIFIED at the mail provider says nothing about a person
  * reading replies; a customer who answers `noreply@jodytracks.com` otherwise writes to nobody. HomeSignal's value is null: its watch email has never
- * carried a Reply-To and stays byte-identical. Jody's is the mailbox that exists (contact@jodytracks.com, Infomaniak) and is read by a person.
+ * carried a Reply-To and stays byte-identical. Jody's is info@jodytracks.com (Infomaniak), the customer-support mailbox read by a person; contact@jodytracks.com is for agent outreach and is NOT a reply destination.
  * Changing a mailbox is a reviewed edit HERE, in the one place the brand's outbound identity is derived.
  */
-export const REPLY_TO_BY_IDENTITY = { homesignal: null, jody: 'contact@jodytracks.com' };
+export const REPLY_TO_BY_IDENTITY = { homesignal: null, jody: 'info@jodytracks.com' };
 
 /** The pre-contract allowlist also carried the www host of HomeSignal. Kept explicitly, never inferred. */
 export const LEGACY_EXTRA_ORIGINS = ['https://www.homesignal.net'];
