@@ -72,7 +72,10 @@ check('3e shipped host allowlists name the Jody host AND keep the legacy one (an
   check('3e3 …and still refuses lookalikes, other schemes, userinfo and ports (not an open relay)', !ok('https://jodytracks.com.evil.io/') && !ok('https://evil.io/?x=homesignal.net') && !ok('http://jodytracks.com/') && !ok('https://u:p@jodytracks.com/') && !ok('https://jodytracks.com:444/') && !ok('https://notjodytracks.com/') && !ok('https://homesignal.net.evil.io/'), 'accepted');
 }
 check('3f the file names stay (homesignalmap.html is still linked)', all.some(([, t]) => t.includes('homesignalmap.html')) && jfiles.includes('homesignalmap.html'), 'renamed');
-check('3g e-mail addresses stay on the existing domain until Step 6', all.some(([, t]) => /@homesignal\.net/.test(t)) && !all.some(([, t]) => /@jodytracks\.com/.test(t)), 'email');
+// F2 (Step 16 audit): the ONLY @jodytracks.com mailbox in the Jody tree is the customer-support one (info@), and only on the
+// contact + legal pages; every other address stays on the existing domain until Step 6.
+const jMail = all.flatMap(([f, t]) => (t.match(/[A-Za-z0-9._%+\-]+@jodytracks\.com/g) || []).map((m) => [f, m]));
+check('3g e-mail addresses stay on the existing domain until Step 6, except the support mailbox on its pages', all.some(([, t]) => /@homesignal\.net/.test(t)) && jMail.every(([f, m]) => m === 'info@jodytracks.com' && ['contact.html', 'privacy.html', 'terms.html', 'refund-policy.html'].includes(f)), JSON.stringify(jMail.slice(0, 5)));
 check('3h the immutable DID is untouched wherever it appears', !all.some(([, t]) => /did:web:jodytracks/.test(t)), 'did');
 check('3i the Supabase project reference is untouched', all.some(([, t]) => t.includes('qwnnmljucajnexpxdgxr')), 'supabase');
 
