@@ -23,7 +23,11 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
 // Computed in the production database on 2026-10-04 over the same 240-id array (md5(string_agg(registry_id, ',' order by registry_id collate "C"))).
 // A new registry source changes this. That is the point: clearing it is a decision, so this line is edited in the change that records it.
-const FINGERPRINT_2026_10_04 = '32af7ab5a9f963a562e9af19eab246bf';
+// Founder approval 2026-10-14 (genuine, relayed by the coordinator) cleared exactly seven City of Denton Planning/Projects sources
+// (denton-city-projects-*): 240 -> 247 ids. Prior value 32af7ab5a9f963a562e9af19eab246bf (240 ids, 2026-10-04).
+// Recomputed read-only in the production database (db-sql run 38598272960, scratch branch never merged) over a VALUES list GENERATED from the registry: n=247, md5 009d7cd0... (same algorithm as the 240-id value).
+const FINGERPRINT_2026_10_04 = '009d7cd035eeab4fcf1df21b08f8bf3a';
+const EXPECTED_IDS = 247;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();
@@ -39,7 +43,7 @@ ok(read(RULING_PATH) === withBlock(read(RULING_PATH), gen.block), '1b the ruling
 
 // ---- 2. the list IS the registry ---------------------------------------------------------------------------------------------------------------
 const listed = shipped.cleared.map((e) => e.registry_id);
-ok(ids.length === 240, '2a (control) the jurisdiction registry was read: ' + ids.length + ' sources', ids.length);
+ok(ids.length === EXPECTED_IDS,'2a (control) the jurisdiction registry was read: ' + ids.length + ' sources', ids.length);
 ok(listed.length === ids.length && JSON.stringify([...listed].sort()) === JSON.stringify(ids), '2b the list is the registry exactly: nothing missing, nothing extra, no repeats',
   { listed: listed.length, registry: ids.length, missing: ids.filter((i) => !listed.includes(i)).slice(0, 5), extra: listed.filter((i) => !ids.includes(i)).slice(0, 5) });
 ok(fingerprint(ids) === FINGERPRINT_2026_10_04 && fingerprint([...listed].sort()) === FINGERPRINT_2026_10_04,

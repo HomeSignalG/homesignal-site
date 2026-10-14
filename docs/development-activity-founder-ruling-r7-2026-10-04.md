@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`240` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `32af7ab5a9f963a562e9af19eab246bf`.
+`247` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `009d7cd035eeab4fcf1df21b08f8bf3a`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -122,6 +122,13 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `dallas-specific-use-permits`
 - `dekalb-county-building-permits`
 - `delaware-county-pa-subdivisions-land-developments`
+- `denton-city-projects-annexation`
+- `denton-city-projects-decided`
+- `denton-city-projects-planned-development`
+- `denton-city-projects-site-plan`
+- `denton-city-projects-specific-use`
+- `denton-city-projects-subdivision`
+- `denton-city-projects-zoning`
 - `denton-county-dev-permits`
 - `denver-commercial-construction-permits`
 - `denver-residential-construction-permits`
