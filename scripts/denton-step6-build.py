@@ -31,11 +31,12 @@ def jurisdictions(z):
         if p["kind"] == "city":
             by.setdefault(nrm(p["name"]), {})[p["src"]] = p["share"]
     for k, v in by.items():
-        pri = v.get("denton_county_gis", v.get("census_tigerweb"))
+        pri = max(v.values())   # county layer covers only Denton County; Census adds the part in other counties
         j = {"name": disp(k), "type": "incorporated city", "area_share": pri,
              "boundary_source": "denton_county_gis" if "denton_county_gis" in v else "census_tigerweb (outside Denton County layer)"}
         if len(v) == 2 and abs(v["denton_county_gis"] - v["census_tigerweb"]) > 0.02:
-            j["note"] = f"county layer {v['denton_county_gis']} vs Census {v['census_tigerweb']} (annexation vintage difference)"
+            j["note"] = f"county layer {v['denton_county_gis']} (Denton County part) vs Census {v['census_tigerweb']} (whole city); larger used"
+            j["boundary_source"] = "max(denton_county_gis, census_tigerweb)"
         out.append(j)
     etj = {}
     for p in r["parts"]:
@@ -45,7 +46,7 @@ def jurisdictions(z):
         if "/" in name or name.lower().startswith("undetermined") or "undetermined" in name.lower():
             label, jt = f"Undetermined/overlapping ETJ ({name})", "ETJ-undetermined"
         elif typ == "DIV 2":
-            label, jt = f"{disp(name)} ETJ (county 'DIV 2' polygon)", "ETJ"
+            label, jt = f"{disp(name)} 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)", "ETJ-DIV2"
         else:
             label, jt = f"{disp(name)} ETJ", "ETJ"
         e = etj.setdefault(label, {"name": label, "type": jt, "area_share": 0.0, "boundary_source": "denton_county_gis ETJ_GC", "city": disp(name) if jt == "ETJ" else None})
@@ -95,10 +96,18 @@ def status(srcs):
     return best
 
 
+def auth_share(js, auth):
+    if not auth:
+        return None
+    if auth == "Denton County":
+        return round(sum(j["area_share"] for j in js if j["type"] in ("unincorporated county", "ETJ", "ETJ-undetermined", "ETJ-DIV2")), 5)
+    return round(sum(j["area_share"] for j in js if j["type"] == "incorporated city" and nrm(j["name"]) == nrm(auth)), 5)
+
+
 def authority(js):
     cities = [j for j in js if j["type"] == "incorporated city" and j["area_share"] >= 0.005]
     etjs = [j for j in js if j["type"] == "ETJ" and j["area_share"] >= 0.005]
-    und = [j for j in js if j["type"] == "ETJ-undetermined" and j["area_share"] >= 0.005]
+    und = [j for j in js if j["type"] in ("ETJ-undetermined", "ETJ-DIV2") and j["area_share"] >= 0.005]
     unc = next((j for j in js if j["type"] == "unincorporated county"), None)
     return {
         "building_permits_and_zoning": [{"authority": f"City of {c['name']}", "where": "within city limits", "area_share": c["area_share"]} for c in cities],
@@ -126,7 +135,11 @@ for z in raw["zips"]:
     conn = []
     for x in recs:
         s = SRC.get(x["registry_id"])
-        conn.append({"registry_id": x["registry_id"], "authority": s["authority"] if s else "UNMAPPED", "stored_records": x["n_all"], "records_last_365d": x["n_365d"], "newest_record_date": x["newest"], "local_permit_authority_source": bool(s and s["authority"])})
+        conn.append({"registry_id": x["registry_id"], "authority": s["authority"] if s else "UNMAPPED", "stored_records": x["n_all"], "records_last_365d": x["n_365d"], "newest_record_date": x["newest"], "local_permit_authority_source": bool(s and s["authority"]),
+                     "authority_area_share_in_zip": auth_share(js, s["authority"]) if s else None,
+                     "coverage_basis": ("not a local permit authority" if not (s and s["authority"]) else
+                                        "legitimate (authority covers >=5% of ZIP area)" if auth_share(js, s["authority"]) >= 0.05 else
+                                        "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)")})
     newest_all = max((c["newest_record_date"] for c in conn), default=None)
     newest_local = max((c["newest_record_date"] for c in conn if c["local_permit_authority_source"]), default=None)
     gaps = [{"jurisdiction": j["name"], "type": j["type"], "area_share": j["area_share"], "status": j["source_status"]} for j in js if j["source_status"] != "CURRENT" and (j["area_share"] or 0) >= 0.05]
@@ -165,11 +178,18 @@ L += ["", "No other registry source covers any Denton-County jurisdiction (check
 for z, d in zips.items():
     if d["jurisdictions"] == "UNKNOWN":
         L.append(f"| {z} | UNKNOWN | | | UNKNOWN |"); continue
-    js = "; ".join(f"{j['name']}{' (ETJ)' if j['type'] == 'ETJ' else ''} {pct(j['area_share'])}" for j in d["jurisdictions"] if j["area_share"] >= 0.02)
+    js = "; ".join(f"{j['name']}{pct(j['area_share'])}" for j in d["jurisdictions"] if j["area_share"] >= 0.02)
     cs = "; ".join(f"`{c['registry_id'].replace('-projects-info-all','').replace('-active-building-permits','').replace('-development-permits','')}` {c['stored_records']}/{c['records_last_365d']}/{c['newest_record_date']}" for c in d["connected_sources"]) or "none stored"
     g = d["gap"]
     gs = ", ".join(f"{x['jurisdiction']} {pct(x['area_share'])} ({x['status'].lower()})" for x in g["jurisdictions_without_current_source_ge_5pct"]) or "none >=5%"
     L.append(f"| {z} | {js} | {cs} | {d['newest_local_permit_record_date'] or 'none'} | {pct(g['area_share_without_current_source'])} of area has no current source: {gs} |")
+L += ["", "## Source × ZIP: does the source legitimately cover that ZIP's area?", "", "| source | ZIP | authority's share of ZIP area | stored / last 365d / newest | basis |", "|---|---|---|---|---|"]
+for rid in [r for r in SRC if SRC[r]["authority"]]:
+    for z, d in zips.items():
+        if d["jurisdictions"] == "UNKNOWN": continue
+        for c in d["connected_sources"]:
+            if c["registry_id"] == rid:
+                L.append(f"| `{rid}` | {z} | {pct(c['authority_area_share_in_zip'])} | {c['stored_records']}/{c['records_last_365d']}/{c['newest_record_date']} | {c['coverage_basis']} |")
 # per-jurisdiction table
 cj = collections.defaultdict(list)
 for z, d in zips.items():
