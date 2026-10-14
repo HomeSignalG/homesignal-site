@@ -183,12 +183,12 @@ def inspect():
     for s in ["City_Limit", "ETJ_GC", "PoliticalBoundaries_GC", "CityETJPermits_GC", "CitiesGrey", "Special_DistrictsGC"]:
         m = get(f"{base}{s}/MapServer?f=json")
         e = {"desc": (m.get("serviceDescription") or "")[:200], "err": m.get("_err"), "layers": {}}
-        for l in m.get("layers", []):
+        for l in (m.get("layers") or []):
             lj = get(f"{base}{s}/MapServer/{l['id']}?f=json")
             cnt = get(f"{base}{s}/MapServer/{l['id']}/query", {"f": "json", "where": "1=1", "returnCountOnly": "true"})
             smp = get(f"{base}{s}/MapServer/{l['id']}/query", {"f": "json", "where": "1=1", "outFields": "*", "returnGeometry": "false", "resultRecordCount": "60"})
-            e["layers"][l["id"]] = {"name": l["name"], "type": lj.get("geometryType"), "fields": [f["name"] for f in lj.get("fields", [])],
-                                    "count": cnt.get("count"), "sample": [x["attributes"] for x in smp.get("features", [])][:60], "err": lj.get("_err")}
+            e["layers"][l["id"]] = {"name": l["name"], "type": lj.get("geometryType"), "fields": [f["name"] for f in (lj.get("fields") or [])],
+                                    "count": cnt.get("count"), "sample": [x["attributes"] for x in (smp.get("features") or [])][:60], "err": lj.get("_err")}
         out[s] = e
     emit("STEP6 INSPECT", out)
 
