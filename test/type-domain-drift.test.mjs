@@ -141,23 +141,23 @@ const UNCHANGED = [
 
 // ── D. the real registry ─────────────────────────────────────────────────────────────────
 {
-  ok(WHITELISTED.length === 12,
-    `D1 the include_types fleet is the expected 12 entries (${WHITELISTED.length})`,
+  ok(WHITELISTED.length === 14,
+    `D1 the include_types fleet is the expected 14 entries (${WHITELISTED.length})`,
     WHITELISTED.map((e) => e.registry_id).join(', '));
   const applies = WHITELISTED.filter(typeDriftApplies);
   ok(applies.length === WHITELISTED.length,
-    'D2 every whitelisted entry resolves a single type column, so all 12 are checkable',
+    'D2 every whitelisted entry resolves a single type column, so all 14 are checkable',
     WHITELISTED.filter((e) => !typeDriftApplies(e)).map((e) => e.registry_id).join(', '));
 
   const seeded = WHITELISTED.filter(hasBaseline);
-  ok(seeded.length === 10,
-    `D3 10 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
+  ok(seeded.length === 12,
+    `D3 12 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
   const pending = WHITELISTED.filter((e) => !hasBaseline(e)).map((e) => e.registry_id).sort();
   ok(JSON.stringify(pending) === JSON.stringify(['portland-building-permits', 'san-diego-approved-permits']),
     'D4 …and exactly the two that could not be enumerated are BASELINE NOT ESTABLISHED',
     JSON.stringify(pending));
   const total = seeded.reduce((s, e) => s + e.observed_types_unreviewed.length, 0);
-  ok(total === 115, `D5 115 values are recorded observed-not-fetched (${total})`);
+  ok(total === 123, `D5 123 values are recorded observed-not-fetched (${total})`);
 
   // A baseline value that is ALSO whitelisted would be a contradiction: fetched and unfetched.
   // VERBATIM on the baseline side, trimmed on the config side — the connector's own asymmetry.

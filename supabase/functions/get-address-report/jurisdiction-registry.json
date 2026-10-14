@@ -5268,6 +5268,15 @@
         "SITEPLANS",
         "ANNEXATIONS"
       ],
+      "observed_types_unreviewed": [
+        "CIVIL ENGINEERING PLANS",
+        "TREE PRESERVATION PLAN",
+        "PRE APPLICATION",
+        "VAR_SUB",
+        "ZBA",
+        "HISTORIC LANDMARK",
+        "CLOMR"
+      ],
       "_receipts": "2026-10-14 Denton Step 6. City of Denton Planning/Projects MapServer layer 15 \"Approved/Closed Recently (decided applications)\". The City of Denton Development Services GIS server (maps.cityofdenton.com/server) is the backing service of the city's own Active Projects / Development Projects web maps (AGO items d0480d15098a4b49837a5bab66338b41 and dd40833bb0c3444f95a1b12fe84b9644, owner *@cityofdenton.com_dentontxgis, modified 2025-12-10). The sibling service Planning/DevelopmentProjects/MapServer is NOT used: its Site Plans, Plats and Approved/Denied (Past 90 Days) layers are frozen at 2023-06. out_fields never fetches applicant or contact columns (Applicant_Name, Project_Manager, Contact_*). The layer has no per-record URL, so record_url is the city's Active Projects Map (dataset precision). The city's own pages (cityofdenton.com/241 and /1072) answer HTTP 403 to automated clients, so the backing layer was found through the public ArcGIS Online web-map JSON, not by evading that block. Geometry is parcel polygons; the connector derives the shoelace centroid (MapServer ignores returnCentroid). Project_LandUse is empty on 180/180 decided rows and 30/31 subdivision rows and Project_Type is an application type, not a use, so use_type is the constant Development. Probe runs (read-only, dispatched from claude/step6-sources): 38592730673 (layer inventory, field/ID/date census, geometry bbox), 38594777168 (verbatim Status / Project_Type / Project_LandUse vocabularies), and a fixture-capture run for the offline test."
     },
     {
@@ -5381,6 +5390,9 @@
         "ZONING"
       ],
       "recency_days": 1095,
+      "observed_types_unreviewed": [
+        "SPECIALSIGNDISTRICT"
+      ],
       "_receipts": "2026-10-14 Denton Step 6. City of Denton Planning/Projects MapServer layer 12 \"Zoning (rezonings under review)\". The City of Denton Development Services GIS server (maps.cityofdenton.com/server) is the backing service of the city's own Active Projects / Development Projects web maps (AGO items d0480d15098a4b49837a5bab66338b41 and dd40833bb0c3444f95a1b12fe84b9644, owner *@cityofdenton.com_dentontxgis, modified 2025-12-10). The sibling service Planning/DevelopmentProjects/MapServer is NOT used: its Site Plans, Plats and Approved/Denied (Past 90 Days) layers are frozen at 2023-06. out_fields never fetches applicant or contact columns (Applicant_Name, Project_Manager, Contact_*). The layer has no per-record URL, so record_url is the city's Active Projects Map (dataset precision). The city's own pages (cityofdenton.com/241 and /1072) answer HTTP 403 to automated clients, so the backing layer was found through the public ArcGIS Online web-map JSON, not by evading that block. Geometry is parcel polygons; the connector derives the shoelace centroid (MapServer ignores returnCentroid). Project_LandUse is empty on 180/180 decided rows and 30/31 subdivision rows and Project_Type is an application type, not a use, so use_type is the constant Development. Probe runs (read-only, dispatched from claude/step6-sources): 38592730673 (layer inventory, field/ID/date census, geometry bbox), 38594777168 (verbatim Status / Project_Type / Project_LandUse vocabularies), and a fixture-capture run for the offline test."
     },
     {
