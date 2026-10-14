@@ -393,7 +393,21 @@ async function denton() {
   console.log('----- BEGIN DENTON PROBE JSON -----'); console.log(JSON.stringify(out)); console.log('----- END DENTON PROBE JSON -----');
 }
 
+async function denton2() {
+  const gb = async (lu, f) => { const g = await jget(`${lu}/query?${new URLSearchParams({ f: 'json', where: '1=1', groupByFieldsForStatistics: f, outStatistics: JSON.stringify([{ statisticType: 'count', onStatisticField: 'OBJECTID', outStatisticFieldName: 'n' }]), orderByFields: 'n DESC', resultRecordCount: '300' })}`); return ((g.json && g.json.features) || []).map((x) => `${JSON.stringify(x.attributes[f])}=${x.attributes.n}`).join(' | '); };
+  for (const id of [15, 9, 13, 5, 8, 12, 0, 1]) {
+    if (timeUp()) break; const lu = `${DEN_MS}/${id}`;
+    console.log(`V2-LAYER ${id}`);
+    for (const f of ['Status', 'Project_Type', 'Project_LandUse', 'SimpleStatus', 'Current_Zoning']) console.log(`  V2 ${id} ${f}: ${(await gb(lu, f)).slice(0, 2200)}`);
+    const nu = await jget(`${lu}/query?${new URLSearchParams({ f: 'json', where: 'Number_Of_Units IS NOT NULL', returnCountOnly: 'true' })}`); console.log(`  V2 ${id} units_nonnull=${nu.json && nu.json.count}`);
+  }
+  const s5 = await jget(`${DEN_MS}/15/query?${new URLSearchParams({ f: 'json', where: "Status_Date >= DATE '2026-09-01'", outFields: 'Project_ID,Project_Name,Project_Type,Status,Submittal_Date,Status_Date,Completion_Date,Project_Description,Address,Project_LandUse,Number_Of_Units,Number_Of_Lots,Property_ID', returnGeometry: 'false', resultRecordCount: '6', orderByFields: 'Status_Date DESC' })}`);
+  for (const f of (s5.json && s5.json.features) || []) { const a = { ...f.attributes }; for (const k of ['Submittal_Date', 'Status_Date', 'Completion_Date']) if (a[k]) a[k] = iso(new Date(a[k])); console.log('  V2 SAMPLE15 ' + JSON.stringify(a).slice(0, 700)); }
+  console.log('----- BEGIN DENTON PROBE JSON -----'); console.log('{}'); console.log('----- END DENTON PROBE JSON -----');
+}
+
 async function main() {
+  if (process.env.PROBE_MODE === 'denton2') return denton2();
   if (process.env.PROBE_MODE === 'denton') return denton();
   if (process.env.PROBE_MODE === 'focus') return focus();
   for (const [k, u] of PORTALS) { if (timeUp()) break; await probePortal(k, u); }
