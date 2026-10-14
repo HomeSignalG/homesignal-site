@@ -222,9 +222,9 @@ console.log('\n8. THE COPY COMES FROM THE ONE OWNER, and Map 1 is byte-for-byte 
   ok(HS.zipAuthNote({ status: 'not_measured' }, '84011', []) === HS.zipNoMappedAreaFact('84011'),
     '8f2 a no-boundary ZIP gets the founder no-mapped-area sentence, once (no second invitation)');
   ok(HS.zipAuthNote({ status: 'boundary_complete', projects: [], markers: [] }, '84011', [])
-      === 'No qualifying development records across ZIP 84011. This is a measurement of the '
-        + 'whole ZIP, not an empty search.',
-    '8g ... and its measured-zero sentence is untouched');
+      === 'No development records fall inside the Census boundary for ZIP 84011. Enter a '
+        + 'street address to see development around that address.',
+    '8g ... and its measured-zero sentence is the founder-approved option-B text (2026-10-14)');
 }
 
 console.log('\n9. THE PRODUCER IS UNTOUCHED — no consumer substitutes its own geography');

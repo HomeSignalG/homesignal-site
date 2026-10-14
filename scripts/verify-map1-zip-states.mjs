@@ -270,6 +270,8 @@ for (const c of CASES.filter((c) => c.zip)) {
       // nothing enforced it.
       addressCta:  /\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(txt + '\n' + ph),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
+      // Founder option B, 2026-10-14 (test/zip-measured-zero-copy.test.mjs): the measured-zero sentence.
+      insideBoundary: /No development records fall inside the Census boundary for ZIP \d{5}\. Enter a street address to see development around that address\./.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
   });
@@ -324,7 +326,7 @@ for (const c of CASES.filter((c) => c.zip)) {
   }
   if (c.kind === 'measured_zero') {
     ok(!m.notMeasured && !m.noMappedArea, `${c.zip}: a MEASURED zero never claims to be unmeasured or unmapped`);
-    ok(m.wholeZip, `${c.zip}: it asserts a real whole-ZIP measurement`);
+    ok(m.insideBoundary, `${c.zip}: it states the measured zero in the founder's wording`);
     ok(m.dev === 0, `${c.zip}: and shows nothing, because there is nothing`, `dev=${m.dev}`);
   }
   console.log('');
