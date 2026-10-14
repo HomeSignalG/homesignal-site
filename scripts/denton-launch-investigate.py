@@ -217,8 +217,17 @@ for m in allmk:
         out["z75033_not_found"].append({"zip": m["zip"], "key": m["source_key"], "reg": reg, "marker": [m["lat"], m["lng"]], "single_requery": single})
 nk = sorted({x["key"] for x in out["z75033_not_found"]})
 if nk:
-    out["z75033_not_found_app_projects"] = sql("select source_key, registry_id, status, submitted_at::date filed, left(name,80) name, left(address,80) addr, source_id from public.app_projects where source_key in (" + ",".join("'" + k.replace("'", "''") + "'" for k in nk) + ") order by source_key limit 40")
+    out["z75033_not_found_app_projects"] = sql("select source_key, registry_id, status, submitted_at::date filed, left(name,80) name, left(address,80) addr from public.app_projects where source_key in (" + ",".join("'" + k.replace("'", "''") + "'" for k in nk) + ") order by source_key limit 40")
 
+print("----- BEGIN DENTON INVESTIGATE PART4 -----")
+print(json.dumps({k: v for k, v in out.items() if k.startswith(("z75033", "lookup_by"))}, default=str))
+print("----- END DENTON INVESTIGATE PART4 -----")
+_sql_orig = sql
+def sql(q):          # section 5 is diagnostic: a failed statement is reported in the output, it must not discard what was already measured
+    try:
+        return _sql_orig(q)
+    except Exception as ex:
+        return [{"sql_error": str(ex)[:400]}]
 # ---- 5. ZIP 76207 / TxDOT 008113084: is the 16.7 m offset a misplacement, a CRS artifact or a stale/simplified stored line?
 TXK = "arcgis:txdot-projects-info-all:008113084"
 out["z76207_markers"] = sql(f"select zcta5::text zip, source_key, marker_seq, lat, lng, marker_rule, family, dim from geo.n5_serving_marker where source_key = '{TXK}'")
@@ -237,7 +246,7 @@ for label, sr in (("outSR_4326", "4326"), ("outSR_4269", "4269"), ("native", Non
 out["z76207_publisher"] = {k: {kk: vv for kk, vv in v.items() if kk != "paths"} for k, v in pubs.items()}
 def mls(paths, srid):
     return "SRID=%s;MULTILINESTRING(" % srid + ",".join("(" + ",".join(f"{x} {y}" for x, y in pp) + ")" for p in paths for pp in p if len(pp) > 1) + ")"
-mk76207 = [m for m in out["z76207_markers"] if m["zip"] == "76207"]
+mk76207 = [m for m in out["z76207_markers"] if m.get("zip") == "76207"]
 def dist_sql(w):
     return ("select v.seq, ST_Distance(ST_Transform(ST_GeomFromEWKT('" + w + "'),4326)::geography, ST_SetSRID(ST_Point(v.x,v.y),4326)::geography) d_m from (values " +
             ",".join(f"({m['marker_seq']},{m['lng']},{m['lat']})" for m in mk76207) + ") v(seq,x,y)")
