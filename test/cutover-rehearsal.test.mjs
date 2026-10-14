@@ -122,7 +122,9 @@ if (built) {
   check('5a under the activated contract IndexNow is HELD (nothing is announced to a search engine until a reviewed hold=false)', hold !== 'NONE' && /hold/.test(hold), hold);
   check('5b the immutable Bluesky DID document is shipped unchanged (did:web:homesignal.net)', existsSync(join(C, '.well-known/did.json')) && readFileSync(join(C, '.well-known/did.json')).compare(readFileSync(join(A, '.well-known/did.json'))) === 0, 'did');
   check('5c the old domain\'s Google verification file is not on the Jody host', !existsSync(join(C, 'google59e1ae3ef6b75e3a.html')), 'present');
-  check('5d e-mail addresses are untouched (no @jodytracks.com mailbox is invented)', walk(C).every((p) => !/\.(html|js|txt|json|xml)$/.test(p) || !/@jodytracks\.com/.test(readFileSync(p, 'utf8'))), '@jodytracks.com appears');
+  // F2: the one deliberate mailbox is the customer-support info@ on the contact + legal pages; nothing else is invented.
+  const SUPPORT = /(^|\/)(contact|privacy|terms|refund-policy)\.html$/;
+  check('5d e-mail addresses are untouched (no @jodytracks.com mailbox is invented, except info@ on the support/legal pages)', walk(C).every((p) => !/\.(html|js|txt|json|xml)$/.test(p) || (readFileSync(p, 'utf8').match(/[A-Za-z0-9._%+\-]+@jodytracks\.com/g) || []).every((m) => SUPPORT.test(p) && m === 'info@jodytracks.com')), '@jodytracks.com appears');
   check('5e a Jody LAUNCH tree carries no staging marks (no sitewide noindex, no Disallow-all, sitemaps present)', !/noindex, nofollow/.test(home) && existsSync(join(C, 'sitemap.xml')), 'staging');
 }
 

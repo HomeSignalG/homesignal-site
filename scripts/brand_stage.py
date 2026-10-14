@@ -57,6 +57,12 @@ ALLOWLIST_RE = re.compile(r"ALLOWED_HOSTS = \['homesignal\.net', 'www\.homesigna
 WORDMARK_RE = re.compile(r"Home<span([^>]*)>Signal</span>")
 NAME_NET_RE = re.compile(r"HomeSignal\.net(?![\w\-])")
 NAME_RE = re.compile(r"HomeSignal(?![\w\-])")
+# Customer-support mailbox shown on the contact and legal pages. HomeSignal's hello@ is a Proton mailbox that survives the move but
+# is the wrong brand on a Jody page (Step 16 audit F2). Scoped to exactly these files: other mailboxes (noreply@, ops) are not
+# customer-facing support and stay in ALLOWED_LEFTOVER. Must equal gen-brand-origins.mjs REPLY_TO_BY_IDENTITY (pinned by a test).
+SUPPORT_PAGES = {"contact.html", "privacy.html", "terms.html", "refund-policy.html"}
+SUPPORT_MAILBOX = {"jody": "info@jodytracks.com"}
+SUPPORT_RE = re.compile(r"hello@homesignal\.net")
 
 # What may remain after rewriting a jody tree (everything else is a defect).
 ALLOWED_LEFTOVER = [
@@ -169,7 +175,7 @@ def run(root: Path, identity: str, staging: bool, contract: dict, verification_d
     if ident is None:
         sys.exit(f"ERROR: unknown identity {identity!r}")
     report = {"identity": identity, "staging": staging, "files": 0, "changed": 0,
-              "counts": {"allowlist": 0, "wordmark": 0, "esc": 0, "origin": 0, "host": 0, "name_net": 0, "name": 0, "tagline": 0, "noindex": 0},
+              "counts": {"allowlist": 0, "wordmark": 0, "esc": 0, "origin": 0, "host": 0, "name_net": 0, "name": 0, "tagline": 0, "noindex": 0, "support": 0},
               "leftovers": {}, "verification_files": 0}
     if staging and identity == contract["current_identity"]:
         sys.exit("ERROR: --staging is only meaningful for a non-current identity")
@@ -196,6 +202,9 @@ def run(root: Path, identity: str, staging: bool, contract: dict, verification_d
         after, n = rewrite_text(before, origin, host)
         for k, v in n.items():
             report["counts"][k] += v
+        if rel in SUPPORT_PAGES and identity in SUPPORT_MAILBOX:
+            after, k = SUPPORT_RE.subn(SUPPORT_MAILBOX[identity], after)
+            report["counts"]["support"] += k
         after, t = apply_tagline(rel, after)
         report["counts"]["tagline"] += t
         if p.suffix == ".html":
