@@ -139,20 +139,21 @@ def compute():
         parts = [p for p in parts if not p[4].endswith("EMPTY")]
         q1 = chr(39)
         vals = ",".join(f"('{k_}','{s_}','{n.replace(q1, q1 * 2)}','{t.replace(q1, q1 * 2)}','{o}','{h}')" for k_, s_, n, t, o, h in parts) or "('none','','','','MULTIPOLYGON EMPTY','MULTIPOLYGON EMPTY')"
-        q = f"""with z as (select geo.zip_membership_boundary('{z}') g), srid as (select ST_SRID(g) s from z),
+        V = lambda x: f"ST_CollectionExtract(ST_MakeValid(ST_Buffer(ST_MakeValid({x}),0)),3)"
+        EMPTY = "ST_GeomFromText('POLYGON EMPTY',(select s from srid))"
+        q = f"""with z0 as (select geo.zip_membership_boundary('{z}') g), srid as (select ST_SRID(g) s from z0),
+        z as (select {V('g')} g from z0),
         raw(kind,src,name,typ,o,h) as (values {vals}),
-        p as (select kind,src,name,typ, ST_MakeValid(ST_Difference(ST_SetSRID(ST_GeomFromText(o),(select s from srid)),
-              ST_SetSRID(ST_GeomFromText(h),(select s from srid)))) g from raw where kind<>'none'),
-        cu as (select ST_Union(g) g from p where kind='city'),
-        eu as (select ST_Union(g) g from p where kind='etj'),
-        ku as (select ST_Union(g) g from p where kind='county'),
-        eo as (select case when (select g from cu) is null then (select g from eu) else ST_Difference((select g from eu),(select g from cu)) end g),
-        zin as (select case when (select g from ku) is null then null else ST_Intersection(z.g,(select g from ku)) end g from z),
+        p as (select kind,src,name,typ, {V("ST_Difference(" + V("ST_SetSRID(ST_GeomFromText(o),(select s from srid))") + "," + V("ST_SetSRID(ST_GeomFromText(h),(select s from srid))") + ")")} g from raw where kind<>'none'),
+        cu as (select {V('ST_Union(g)')} g from p where kind='city'),
+        eu as (select {V('ST_Union(g)')} g from p where kind='etj'),
+        ku as (select {V('ST_Union(g)')} g from p where kind='county'),
+        eo as (select case when (select g from cu) is null then (select g from eu) else {V("ST_Difference((select g from eu),(select g from cu))")} end g),
+        zin as (select case when (select g from ku) is null then null else {V("ST_Intersection(z.g,(select g from ku))")} end g from z),
         unc as (select case when (select g from zin) is null then null else
-                 ST_Difference(ST_Difference((select g from zin), coalesce((select g from cu),ST_GeomFromText('POLYGON EMPTY',(select s from srid)))),
-                               coalesce((select g from eo),ST_GeomFromText('POLYGON EMPTY',(select s from srid)))) end g)
+                 {V("ST_Difference(" + V("ST_Difference((select g from zin), coalesce((select g from cu)," + EMPTY + "))") + ", coalesce((select g from eo)," + EMPTY + "))")} end g)
         select 'city' k, p.src, p.name, p.typ, ST_Area(ST_Intersection(z.g,p.g)::geography)/ST_Area(z.g::geography) a from p,z where p.kind='city' and ST_Intersects(z.g,p.g)
-        union all select 'etj', p.src, p.name, p.typ, ST_Area(ST_Intersection(z.g,case when (select g from cu) is null then p.g else ST_Difference(p.g,(select g from cu)) end)::geography)/ST_Area(z.g::geography)
+        union all select 'etj', p.src, p.name, p.typ, ST_Area(ST_Intersection(z.g,case when (select g from cu) is null then p.g else {V("ST_Difference(p.g,(select g from cu))")} end)::geography)/ST_Area(z.g::geography)
               from p,z where p.kind='etj' and ST_Intersects(z.g,p.g)
         union all select 'city_union','','','', coalesce(ST_Area(ST_Intersection(z.g,(select g from cu))::geography)/ST_Area(z.g::geography),0) from z
         union all select 'etj_union','','','', coalesce(ST_Area(ST_Intersection(z.g,(select g from eo))::geography)/ST_Area(z.g::geography),0) from z
