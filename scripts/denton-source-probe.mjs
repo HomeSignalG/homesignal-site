@@ -346,7 +346,55 @@ async function focus() {
   console.log('----- BEGIN DENTON PROBE JSON -----'); console.log(JSON.stringify(out)); console.log('----- END DENTON PROBE JSON -----');
 }
 
+// ---------- DENTON MODE: City of Denton Planning/Projects MapServer in depth + hosted permit/project views ----------
+const DEN_MS = 'https://maps.cityofdenton.com/server/rest/services/Planning/Projects/MapServer';
+async function denton() {
+  const svc = await jget(DEN_MS + '?f=json');
+  console.log(`DEN-SVC HTTP ${svc.status} layers=${((svc.json && svc.json.layers) || []).map((l) => l.id + ':' + l.name + (l.subLayerIds ? '[group]' : '')).join(' | ')} desc=${JSON.stringify(((svc.json && svc.json.serviceDescription) || '').slice(0, 300))} copyright=${JSON.stringify((svc.json && svc.json.copyrightText) || '')} caps=${svc.json && svc.json.capabilities} fmt=${svc.json && svc.json.supportedExtensions}`);
+  out.den_layers = ((svc.json && svc.json.layers) || []).map((l) => `${l.id}:${l.name}`);
+  const P = (v) => (v == null ? null : iso(new Date(v)));
+  for (const l of ((svc.json && svc.json.layers) || [])) {
+    if (timeUp()) break;
+    const lu = `${DEN_MS}/${l.id}`;
+    const meta = await jget(lu + '?f=json'); const j = meta.json || {};
+    if (!j.fields || l.subLayerIds) { console.log(`DEN-LAYER ${l.id} "${l.name}" ${l.subLayerIds ? 'GROUP' : 'no fields'}`); continue; }
+    const q = (p) => jget(`${lu}/query?${new URLSearchParams({ f: 'json', ...p })}`);
+    const n = (await q({ where: '1=1', returnCountOnly: 'true' })).json;
+    const c = async (w) => { const r = (await q({ where: w, returnCountOnly: 'true' })).json; return r && r.count != null ? r.count : 'ERR'; };
+    const row = { id: l.id, name: l.name, total: n && n.count, sub_2025: await c("Submittal_Date >= DATE '2025-01-01'"), sub_2026: await c("Submittal_Date >= DATE '2026-01-01'"), stat_2025: await c("Status_Date >= DATE '2025-01-01'"), stat_2026: await c("Status_Date >= DATE '2026-01-01'"), visible_vals: null };
+    const vis = await q({ where: '1=1', groupByFieldsForStatistics: 'Visible', outStatistics: JSON.stringify([{ statisticType: 'count', onStatisticField: 'OBJECTID', outStatisticFieldName: 'n' }]) });
+    row.visible_vals = ((vis.json && vis.json.features) || []).map((f) => `${JSON.stringify(f.attributes.Visible)}=${f.attributes.n}`).join(' ');
+    const dd = await q({ where: '1=1', outStatistics: JSON.stringify([{ statisticType: 'count_distinct', onStatisticField: 'Project_ID', outStatisticFieldName: 'dp' }, { statisticType: 'count', onStatisticField: 'Project_ID', outStatisticFieldName: 'np' }, { statisticType: 'max', onStatisticField: 'Date_Added', outStatisticFieldName: 'da' }]) });
+    row.id_stats = dd.json && dd.json.features && dd.json.features[0] && dd.json.features[0].attributes; if (row.id_stats && row.id_stats.da) row.id_stats.da = P(row.id_stats.da);
+    const s3 = await q({ where: '1=1', outFields: 'Project_ID,Project_Name,Project_Type,Status,Submittal_Date,Status_Date,Address,SimpleStatus,SimpleType,Visible,Property_ID', returnGeometry: 'true', outSR: '4326', orderByFields: 'Status_Date DESC', resultRecordCount: '3' });
+    row.newest = ((s3.json && s3.json.features) || []).map((f) => { const a = f.attributes; const ring = f.geometry && f.geometry.rings && f.geometry.rings[0]; const cen = ring ? [ring.reduce((s, p) => s + p[0], 0) / ring.length, ring.reduce((s, p) => s + p[1], 0) / ring.length].map((x) => +x.toFixed(5)) : null; return { id: a.Project_ID, name: a.Project_Name, type: a.Project_Type, status: a.Status, sub: P(a.Submittal_Date), statusDate: P(a.Status_Date), addr: a.Address, simple: a.SimpleStatus + '/' + a.SimpleType, visible: a.Visible, ring_centroid: cen }; });
+    // geometry bounds + null-address share over all rows
+    const all = await q({ where: '1=1', outFields: 'Project_ID,Address,Status,Project_Type', returnGeometry: 'true', outSR: '4326', resultRecordCount: '2000' });
+    const fs = (all.json && all.json.features) || []; let minx = 9, maxx = -999, miny = 99, maxy = -99, ng = 0;
+    for (const f of fs) { const r = f.geometry && f.geometry.rings; if (!r) { ng++; continue; } for (const ring of r) for (const [x, y] of ring) { minx = Math.min(minx, x); maxx = Math.max(maxx, x); miny = Math.min(miny, y); maxy = Math.max(maxy, y); } }
+    row.geom = { rows: fs.length, no_geometry: ng, bbox: [minx, miny, maxx, maxy].map((v) => +v.toFixed(4)), no_address: fs.filter((f) => !f.attributes.Address || !String(f.attributes.Address).trim()).length, dup_project_ids_in_layer: fs.length - new Set(fs.map((f) => f.attributes.Project_ID)).size };
+    out['den_layer_' + l.id] = row; console.log('DEN-LAYER ' + JSON.stringify(row));
+  }
+  // cross-layer duplicate Project_IDs (same project in several stage layers?)
+  const idsByLayer = {};
+  for (const l of ((svc.json && svc.json.layers) || [])) { if (l.subLayerIds) continue; const r = await jget(`${DEN_MS}/${l.id}/query?${new URLSearchParams({ f: 'json', where: '1=1', outFields: 'Project_ID', returnGeometry: 'false', resultRecordCount: '2000' })}`); idsByLayer[l.id] = ((r.json && r.json.features) || []).map((f) => f.attributes.Project_ID); }
+  const seen = new Map(); for (const [lid, ids] of Object.entries(idsByLayer)) for (const id of new Set(ids)) { if (!seen.has(id)) seen.set(id, []); seen.get(id).push(lid); }
+  const multi = [...seen.entries()].filter(([, v]) => v.length > 1);
+  console.log(`DEN-XLAYER distinct Project_IDs=${seen.size} appearing in >1 layer=${multi.length} sample=${JSON.stringify(multi.slice(0, 12))}`);
+  console.log('=== DEN hosted candidates ===');
+  const HB = 'https://services.arcgis.com/9dTWrhPzuDPnUVXr/arcgis/rest/services';
+  for (const nm of ['Planning_Projects_view', 'All_Projects', 'ProjectPlanning', 'Active_Development_Public_View', 'RecentDevelopment', 'MajorProjectsunderdevelopment', 'New_Permits', 'All_Permits', 'Residential_Permits_New_view', 'Commerical_Permits_view']) {
+    if (timeUp()) break;
+    const m = await jget(`${HB}/${nm}/FeatureServer?f=json`);
+    console.log(`HOSTED ${nm} HTTP ${m.status} ${m.json && m.json.error ? JSON.stringify(m.json.error).slice(0, 120) : (m.json && m.json.layers || []).map((l) => l.id + ':' + l.name).join(' | ')}`);
+    for (const l of ((m.json && m.json.layers) || []).slice(0, 2)) { await probeLayer(`${HB}/${nm}/FeatureServer/${l.id}`, nm, 'City of Denton (dentontxgis)'); await vocab(`${HB}/${nm}/FeatureServer/${l.id}`); }
+  }
+  console.log(`DONE requests=${nreq} elapsed_s=${Math.round((Date.now() - T0) / 1000)}`);
+  console.log('----- BEGIN DENTON PROBE JSON -----'); console.log(JSON.stringify(out)); console.log('----- END DENTON PROBE JSON -----');
+}
+
 async function main() {
+  if (process.env.PROBE_MODE === 'denton') return denton();
   if (process.env.PROBE_MODE === 'focus') return focus();
   for (const [k, u] of PORTALS) { if (timeUp()) break; await probePortal(k, u); }
   console.log('=== ARCGIS REST DIRECTORIES ===');
