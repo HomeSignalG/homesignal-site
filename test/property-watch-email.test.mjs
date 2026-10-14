@@ -20,17 +20,17 @@ const compose = (changes, o = {}) => W.composeWatchEmail({ selection: P.selectFo
 // ---- 1. what it says --------------------------------------------------------------------------------------------------------------------------------------------
 {
   const e = compose([change('k1')]);
-  ok(e.subject === 'HomeSignal: 1 official development change near a property you are watching', '1a the subject counts the changes (singular)', e.subject);
+  ok(e.subject === 'Jody: 1 official development change near a property you are watching', '1a the subject counts the changes (singular)', e.subject);
   const two = compose([change('k1'), change('k3', { name: 'Fremont Bike Lane Extension', entries: [entry({ event_type: 'first_detected', changes: [], publisher_event: { kind: 'filed', date: '2026-09-12' } })] })]);
-  ok(two.subject === 'HomeSignal: 2 official development changes near a property you are watching', '1b and the plural', two.subject);
-  ok(e.text.includes('The property is the one in Report 3, made Sep 29, 2026. Open that report in HomeSignal to see which property it is.'), '1c the property is named only as the one in the report, by number and date');
+  ok(two.subject === 'Jody: 2 official development changes near a property you are watching', '1b and the plural', two.subject);
+  ok(e.text.includes('The property is the one in Report 3, made Sep 29, 2026. Open that report in Jody to see which property it is.'), '1c the property is named only as the one in the report, by number and date');
   ok(e.text.includes('Ravenna Bridge Retrofit · Roads & infrastructure') && e.text.includes('Official status changed (found Oct 1, 2026)') && e.text.includes('Stage: Approved → Complete') && e.text.includes('The source records it as: Completed 2026-10-01'),
     '1d each change is the project, its kind, what changed in the publisher\'s words (from → to) and what the source records');
   ok(e.text.includes('Official source: https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0') && e.text.includes('Data: WSDOT'), '1e with the official link and the attribution');
   ok(two.text.includes('New official record (found Oct 1, 2026)') && two.text.includes('Filed 2026-09-12'), '1f a project first seen is "New official record", with the publisher\'s filing event');
-  ok(compose([change('k1', { entries: [entry({ event_type: 'first_detected', changes: [], publisher_event: null })] })]).text.includes('A record near the property that HomeSignal had not seen before.'), '1g a new record that carries no field changes still says what it is');
-  ok(e.text.includes('Open the report: https://homesignal.net/development-activity-reports.html') && e.html.includes('href="https://homesignal.net/development-activity-reports.html"') && e.text.includes('choose Stop watching'), '1h one link to open the report - signed-in, no token - and one line on how to stop');
-  ok(e.text.includes('it is not a legal opinion'), '1i and the standing disclaimer: HomeSignal shows what the source states and when it found it');
+  ok(compose([change('k1', { entries: [entry({ event_type: 'first_detected', changes: [], publisher_event: null })] })]).text.includes('A record near the property that Jody had not seen before.'), '1g a new record that carries no field changes still says what it is');
+  ok(e.text.includes('Open the report: https://jodytracks.com/development-activity-reports.html') && e.html.includes('href="https://jodytracks.com/development-activity-reports.html"') && e.text.includes('choose Stop watching'), '1h one link to open the report - signed-in, no token - and one line on how to stop');
+  ok(e.text.includes('it is not a legal opinion'), '1i and the standing disclaimer: Jody shows what the source states and when it found it');
   ok(compose([change('k1')], { reportNumber: null }).text.includes('The property is the one in Your saved report, made Sep 29, 2026.'), '1j a report with no number is "Your saved report"');
   const nodate = compose([change('k1')], { reportDate: 'nonsense' });
   ok(nodate.text.includes('Report 3.') && !nodate.text.includes('made'), '1k and a date that cannot be read is left out, not guessed');
@@ -49,7 +49,7 @@ const compose = (changes, o = {}) => W.composeWatchEmail({ selection: P.selectFo
   ok(!/\b\d+(\.\d+)?\s*(mi|miles?|km|feet|ft|metres?|meters?)\b/i.test(e.text) && !/\b(north|south|east|west|northeast|northwest|southeast|southwest)\b/i.test(e.text.replace(/Official source.*|Data: .*/g, '')),
     '2c no distance and no direction from the property: either would let a reader work out where it is');
   const hrefs = [...e.html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
-  ok(hrefs.every((h) => h === 'https://homesignal.net/development-activity-reports.html' || h.startsWith('https://data.wsdot.wa.gov/')), '2d every link in the HTML is the report page or an official source', hrefs);
+  ok(hrefs.every((h) => h === 'https://jodytracks.com/development-activity-reports.html' || h.startsWith('https://data.wsdot.wa.gov/')), '2d every link in the HTML is the report page or an official source', hrefs);
 }
 
 // ---- 3. publisher text is untrusted ------------------------------------------------------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ const compose = (changes, o = {}) => W.composeWatchEmail({ selection: P.selectFo
   const e = compose(many);
   const named = many.filter((c) => e.text.includes(c.name));
   ok(named.length === 10 && !e.text.includes('Project 10') && !e.text.includes('Project 13'), '4a fourteen projects: ten are listed in detail and the other four are not', named.length);
-  ok(e.subject === 'HomeSignal: 14 official development changes near a property you are watching', '4b but the subject counts all fourteen: the agent is told the true total', e.subject);
+  ok(e.subject === 'Jody: 14 official development changes near a property you are watching', '4b but the subject counts all fourteen: the agent is told the true total', e.subject);
   ok(e.text.includes('4 more changes will be in your next email.') && e.html.includes('4 more changes will be in your next email.'), '4c and the email says four more will follow, in both parts');
   const five = compose([change('k1', { entries: Array.from({ length: 8 }, (_, i) => entry({ detected_at: '2026-10-01T0' + i + ':00:00Z' })) })]);
   ok(five.text.includes('3 more changes will be in your next email.') && five.text.split('\n').filter((x) => x.includes('Official status changed')).length === 5, '4d a project with eight entries lists five and leaves three');

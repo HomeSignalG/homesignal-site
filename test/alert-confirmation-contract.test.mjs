@@ -56,10 +56,10 @@ const gen = read('scripts/gen_zip_pages.py');
 ok(gen.includes('canon = f"{BASE}/community/{z}/"'),
    'the canonical ZIP page is still /community/<zip>/ — the email CTA points here');
 // The origin now comes from the brand contract (Jody migration step 7 plumbing): BASE = ps.BASE = brand_host.origin().
-// While homesignal is the current identity it must still be https://homesignal.net; the email CTA is built from it.
+// Since the v2 swap the current identity is Jody, so it is https://jodytracks.com; the email CTA is built from it.
 const brandContract = JSON.parse(read('docs/brand/brand-contract.v1.json'));
-ok(gen.includes('BASE = ps.BASE') && brandContract.identities[brandContract.current_identity].origin === 'https://homesignal.net',
-   'the canonical origin is still https://homesignal.net (read from the brand contract)');
+ok(gen.includes('BASE = ps.BASE') && brandContract.identities[brandContract.current_identity].origin === 'https://jodytracks.com',
+   'the canonical origin is https://jodytracks.com (read from the brand contract; Jody is current since the v2 swap)');
 
 // The email must NOT link the legacy query URL: the generated page canonicalises away
 // from it, and this repo deliberately stopped linking it internally for that reason.

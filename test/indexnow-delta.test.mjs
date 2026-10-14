@@ -40,7 +40,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://homesignal.net/</loc>
+    <loc>https://jodytracks.com/</loc>
   </url>
 </urlset>
 `;
@@ -109,7 +109,7 @@ function gen(docs, { baseline = null, now = '2026-09-28T00:00:00', extra = [] } 
 }
 const touched = (d) => [...d.added, ...d.changed, ...d.indexability_changed, ...d.removed].sort();
 const lastmodOf = (sm, path) => {
-  const m = sm.match(new RegExp(`<loc>https://homesignal\\.net${path.replace(/[/]/g, '\\/')}</loc>\\s*(?:<lastmod>([^<]*)</lastmod>)?`));
+  const m = sm.match(new RegExp(`<loc>https://jodytracks\\.com${path.replace(/[/]/g, '\\/')}</loc>\\s*(?:<lastmod>([^<]*)</lastmod>)?`));
   return m ? (m[1] || null) : undefined;
 };
 
@@ -119,7 +119,7 @@ const sD = gen(inputs());
 ok(sD.status === 0, `H0 the seed build succeeds (${(sD.r.stderr || '').trim().slice(-200)})`);
 ok(sD.delta.seed === true && sD.delta.submit.length === 0,
    'H  first run seeds the state and submits ZERO URLs (no historical bulk submission)');
-ok(Object.keys(sD.state.pages).length >= 8 && sD.state.semantic_version === 1 && sD.state.host === 'https://homesignal.net',
+ok(Object.keys(sD.state.pages).length >= 8 && sD.state.semantic_version === 1 && sD.state.host === 'https://jodytracks.com',
    `H2 the seed state tracks every generated page (${Object.keys(sD.state.pages).length})`);
 const fams = new Set(Object.keys(sD.state.pages).map((p) => p.split('/')[1]));
 ok(['community', 'city', 'project', 'guides'].every((f) => fams.has(f)),
@@ -309,7 +309,7 @@ ok(projLm === undefined || projLm === null || /^\d{4}-\d{2}-\d{2}$/.test(projLm)
 // The projection itself: what is, and is not, a semantic change
 const proj = JSON.parse(execFileSync('python3', ['-c', `
 import sys, json; sys.path.insert(0, ${JSON.stringify(SCRIPTS)}); import page_semantics as ps
-def page(title='T', desc='D', robots='index, follow', canon='https://homesignal.net/community/84302/', body='<main>Hello</main>',
+def page(title='T', desc='D', robots='index, follow', canon='https://jodytracks.com/community/84302/', body='<main>Hello</main>',
          ld='{"a":1}', js='/shell.js?v=aaaa', css='/app.css?v=1111', csp="default-src 'self'", day='@@HS-BUILD-DAY@@'):
     return ('<!DOCTYPE html><html><head><meta charset="UTF-8"><base href="/">'
       '<meta name="viewport" content="width=device-width">'
@@ -325,7 +325,7 @@ for name, k in [('script_version', dict(js='/shell.js?v=bbbb')), ('css_version',
                 ('csp', dict(csp="default-src 'none'"))]:
     r['same_' + name] = f(**k) == base
 for name, k in [('title', dict(title='T2')), ('description', dict(desc='D2')), ('robots', dict(robots='noindex, follow')),
-                ('canonical', dict(canon='https://homesignal.net/community/84303/')), ('body', dict(body='<main>Hello!</main>')),
+                ('canonical', dict(canon='https://jodytracks.com/community/84303/')), ('body', dict(body='<main>Hello!</main>')),
                 ('jsonld', dict(ld='{"a":2}'))]:
     r['diff_' + name] = f(**k) != base
 # content that merely EQUALS the build day is content: it must not be masked

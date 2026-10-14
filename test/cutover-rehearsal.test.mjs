@@ -28,9 +28,15 @@ const committed = readFileSync('docs/brand/brand-contract.v1.json', 'utf8');
 const base = mkdtempSync(join(tmpdir(), 'rehearsal-'));
 
 // ---- tree A: HomeSignal (the live brand), tree B: HomeSignal build + overlay (the proven Jody launch tree) ----------------------------
+// The committed contract is now the v2 swap (Jody current), so the HomeSignal build is made in a throwaway copy of the repo whose contract is
+// the FROZEN v1 (HomeSignal current): that is exactly the build that was live before the cutover and the one the overlay was proven against.
+const SKIP0 = new Set(['.git', 'node_modules', 'test', '_site']);
+const RH = join(base, 'repo-homesignal');
+cpSync('.', RH, { recursive: true, filter: (src) => !SKIP0.has(src.replace(/^\.\/?/, '').split('/')[0]) || src === '.' });
+writeFileSync(join(RH, 'docs/brand/brand-contract.v1.json'), readFileSync('test/fixtures/brand-contract.v1.frozen.json', 'utf8'));
 const A = join(base, 'a');
-execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', A], { stdio: 'pipe' });
-execFileSync('python3', ['scripts/gen_zip_pages.py', '--fixture', FIXTURE, '--out', A, '--now', NOW], { stdio: 'pipe' });
+execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', A], { stdio: 'pipe', cwd: RH });
+execFileSync('python3', ['scripts/gen_zip_pages.py', '--fixture', FIXTURE, '--out', A, '--now', NOW], { stdio: 'pipe', cwd: RH });
 const B = join(base, 'b'); cpSync(A, B, { recursive: true });
 check('0a overlay of the HomeSignal build into the Jody launch tree succeeds', spawnSync('python3', ['scripts/brand_stage.py', '--dir', B, '--identity', 'jody'], { encoding: 'utf8' }).status === 0, 'failed');
 
@@ -38,10 +44,10 @@ check('0a overlay of the HomeSignal build into the Jody launch tree succeeds', s
 const R = join(base, 'repo');
 const SKIP = new Set(['.git', 'node_modules', 'test', '_site']);
 cpSync('.', R, { recursive: true, filter: (src) => !SKIP.has(src.replace(/^\.\/?/, '').split('/')[0]) || src === '.' });
+// The committed contract IS the v2 swap now; the throwaway copy carries it unchanged.
 const v2 = JSON.parse(committed);
-v2.contract_version = 2; v2.current_identity = 'jody'; v2.future_identity = 'homesignal';
-v2.identities.jody.state = 'active'; v2.identities.homesignal.state = 'inactive';
-writeFileSync(join(R, 'docs/brand/brand-contract.v1.json'), JSON.stringify(v2, null, 2) + '\n');
+check('0b the committed contract is the v2 swap this rehearsal activates', v2.contract_version === 2 && v2.current_identity === 'jody' && v2.identities.jody.state === 'active', JSON.stringify(v2));
+writeFileSync(join(R, 'docs/brand/brand-contract.v1.json'), committed);
 
 const inR = (args) => spawnSync('python3', args, { cwd: R, encoding: 'utf8' });
 const ident = inR(['scripts/brand_host.py', '--identity']).stdout.trim();
@@ -129,7 +135,7 @@ if (built) {
 }
 
 // ---- the repo itself was not touched ----------------------------------------------------------------------------------------------------
-check('6a the committed contract is unchanged by this rehearsal and still HomeSignal-current v1', readFileSync('docs/brand/brand-contract.v1.json', 'utf8') === committed && JSON.parse(committed).current_identity === 'homesignal' && JSON.parse(committed).contract_version === 1, 'changed');
+check('6a the committed contract is unchanged by this rehearsal and is the Jody-current v2', readFileSync('docs/brand/brand-contract.v1.json', 'utf8') === committed && JSON.parse(committed).current_identity === 'jody' && JSON.parse(committed).contract_version === 2, 'changed');
 check('6b the Jody IndexNow hold file is still hold=true', JSON.parse(readFileSync('docs/brand/indexnow-jody-hold.json', 'utf8')).hold === true, 'released');
 
 rmSync(base, { recursive: true, force: true });

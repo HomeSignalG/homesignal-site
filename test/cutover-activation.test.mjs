@@ -43,9 +43,9 @@ const stage = (d, ...a) => py(['scripts/brand_stage.py', '--dir', d, ...a]);
   const r = stage(a, '--identity', 'homesignal');
   check('A1 --identity homesignal is a byte-for-byte no-op', r.status === 0 && JSON.stringify(snapshot(a)) === JSON.stringify(before), r.stderr);
   const cur = py(['scripts/brand_host.py', '--identity']).stdout.trim();
-  check('A2 the build step\'s own argument (`brand_host.py --identity`) is homesignal for the committed contract', cur === 'homesignal', cur);
+  check('A2 the build step\'s own argument (`brand_host.py --identity`) is jody for the committed (v2) contract', cur === 'jody', cur);
   const b = tree('a-pipeline', FILES); const bb = snapshot(b);
-  check('A3 …so the exact command the workflow runs changes nothing today', stage(b, '--identity', cur).status === 0 && JSON.stringify(snapshot(b)) === JSON.stringify(bb), 'changed');
+  check('A3 …so the exact command the workflow runs rewrites the HomeSignal-branded source tree to the Jody origin', stage(b, '--identity', cur).status === 0 && JSON.stringify(snapshot(b)) !== JSON.stringify(bb) && readFileSync(join(b, 'index.html'), 'utf8').includes('https://jodytracks.com/'), 'unchanged');
 
   // activation: the contract says Jody is current; the SOURCE tree is still HomeSignal-branded; the step must still rewrite it
   const j = tree('a-jody-current', FILES);
@@ -65,7 +65,7 @@ const stage = (d, ...a) => py(['scripts/brand_stage.py', '--dir', d, ...a]);
   const slot = join(base, 'slot'); mkdirSync(slot);
   const NAME = 'google0123456789abcdef.html';
   writeFileSync(join(slot, NAME), `google-site-verification: ${NAME}\n`);
-  const run = (id, extra = [], dir = slot) => py(['-c', `import sys; sys.path.insert(0,'scripts'); import brand_stage as b, json, pathlib; c=b.load_contract(); r=b.run(pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]=='1', c, pathlib.Path(sys.argv[4])); print(json.dumps(r['verification_files']))`, ...extra]);
+  const run = (id, extra = [], dir = slot) => py(['-c', `import sys; sys.path.insert(0,'scripts'); import brand_stage as b, json, pathlib; c=b.load_contract(pathlib.Path('test/fixtures/brand-contract.v1.frozen.json')); r=b.run(pathlib.Path(sys.argv[1]), sys.argv[2], sys.argv[3]=='1', c, pathlib.Path(sys.argv[4])); print(json.dumps(r['verification_files']))`, ...extra]);
   // helper: invoke run() directly so the slot directory is injectable
   const launch = (identity, staging = '0', dir = slot) => { const d = tree(`b-${identity}-${staging}-${Math.random()}`, FILES); const r = run(null, [d, identity, staging, dir]); return { r, d }; };
   const l = launch('jody');

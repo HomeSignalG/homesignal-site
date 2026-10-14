@@ -251,6 +251,9 @@ const server = createServer(async (req, res) => {
   // raised ERR_HTTP_HEADERS_SENT and killed the whole test process - a crash that only fires when such a request races the run.
   let body;
   try { body = await readFile(p); } catch { res.writeHead(404).end('not found'); return; }
+  // The deployed page is the SOURCE page after the brand overlay, which widens its escaped HomeSignal origin pattern to accept both hosts
+  // (brand_stage.py ESC_ORIGIN_RE). Apply exactly that one rule here, because the invite link the server builds now names the Jody origin.
+  if (extname(p) === '.html') body = Buffer.from(String(body).split('https:\\/\\/homesignal\\.net').join('https:\\/\\/(?:homesignal\\.net|jodytracks\\.com)'));
   res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -275,7 +278,8 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
     // Compare is hidden at launch (COMPARE_AT_LAUNCH = false in the page). The comparison tests below keep proving the engine and its UI by serving the page with the
     // switch ON (open() with compare: true, the default); the launch section (N) opens it exactly as shipped (compare: false).
     if (compare && url.split('?')[0].endsWith(PAGE)) {
-      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;');
+      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;')
+        .split('https:\\/\\/homesignal\\.net').join('https:\\/\\/(?:homesignal\\.net|jodytracks\\.com)'); // the brand overlay's origin rule, as above
       if (!html.includes('COMPARE_AT_LAUNCH = true;')) throw new Error('the launch switch is not in the page');
       return route.fulfill({ status: 200, contentType: 'text/html', body: html });
     }
@@ -352,7 +356,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the link exactly as the trial function hands it to the admin who created the trial (build step 5d): its path is this page and its
   // fragment is what this page reads, so a change to either half of the invite link fails here
   const link = new URL(E.inviteLink(TOKEN));
-  ok(link.origin === 'https://homesignal.net' && link.pathname === PAGE, '1-0 the invite link the server makes points at this page', link.href);
+  ok(link.origin === 'https://jodytracks.com' && link.pathname === PAGE, '1-0 the invite link the server makes points at this page', link.href);
   const { ctx, page, errors, trials, foreign } = await open({ w, signedIn: false, hash: link.hash });
   ok((await page.evaluate(() => location.hash)) === '' && !(await page.evaluate(() => location.href)).includes('hse1_'), '1a the invite token is removed from the address bar on load');
   ok(/join your brokerage/.test(await text(page, '#trial-count')) && trials.length === 0, '1b signed out, the page asks the person to sign in to join, and calls nothing');
@@ -913,7 +917,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 // The real manage-shared-report handler (and the real link form) behind a fake ledger. What is proved here is the PAGE: when it offers sharing,
 // that it shows the link once and keeps it nowhere, that it withdraws a link, and that what it sends carries nothing the client must not
 // see. Who may share, for how long and whether a link works are the database's, proved by test/report_share_delivery_pg.
-const LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
+const LINK = /^https:\/\/jodytracks\.com\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
 const shareHidden = (page) => page.$eval('#share', (e) => e.hidden);
 // The card's own "Make a client link" button is gone (founder, 2026-10-11): the report's Share with Client action is the one entry point. This makes a link the way an agent does,
 // and closes the popup so the next step can reach the page. The old button always made a NEW link, so a link already on screen is cleared first (the action reuses it).

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 let failures = 0;
 const check = (n, ok, why) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${ok ? '' : ` — ${why}`}`); if (!ok) failures++; };
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : [p]; });
-const brand = (dir, ...a) => spawnSync('python3', ['scripts/brand_stage.py', '--dir', dir, ...a], { encoding: 'utf8' });
+const brand = (dir, ...a) => spawnSync('python3', ['scripts/brand_stage.py', '--dir', dir, '--contract', 'test/fixtures/brand-contract.v1.frozen.json', ...a], { encoding: 'utf8' });
 
 const base = mkdtempSync(join(tmpdir(), 'brand-stage-'));
 const st = join(base, 'st');

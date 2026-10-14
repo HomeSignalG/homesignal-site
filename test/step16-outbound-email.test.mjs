@@ -15,13 +15,14 @@ const check = (n, ok, why) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${ok ? 
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const contract = JSON.parse(readFileSync(CONTRACT_FILE, 'utf8'));
+// The committed contract IS the v2 swap now (Jody current). The HomeSignal-era behaviour is checked against the FROZEN v1 contract.
 const v2 = JSON.parse(JSON.stringify(contract));
-v2.contract_version = 2; v2.current_identity = 'jody'; v2.future_identity = 'homesignal';
-v2.identities.jody.state = 'active'; v2.identities.homesignal.state = 'inactive';
+const v1 = JSON.parse(readFileSync('test/fixtures/brand-contract.v1.frozen.json', 'utf8'));
+const r1 = render(v1);
 
 // 1. under the committed v1 contract nothing changes: no Reply-To, the same sender
-check('1a v1: the generated reply-to is null (HomeSignal has never sent a Reply-To)', gen.PUBLIC_REPLY_TO === null && watch.WATCH_REPLY_TO === null, String(gen.PUBLIC_REPLY_TO));
-check('1b v1: the sender is exactly what it has always been', watch.WATCH_FROM === 'HomeSignal <noreply@homesignal.net>', watch.WATCH_FROM);
+check('1a v1 (frozen): the generated reply-to is null (HomeSignal has never sent a Reply-To)', r1.includes("export const PUBLIC_REPLY_TO: string | null = null;"), r1.split('\n').filter((l) => l.includes('PUBLIC_REPLY_TO')).join(' | '));
+check('1b v1 (frozen): the sender identity is HomeSignal; the COMMITTED module is the Jody one (reply-to info@, sender Jody)', r1.includes("PUBLIC_NAME = 'HomeSignal'") && gen.PUBLIC_REPLY_TO === 'info@jodytracks.com' && watch.WATCH_REPLY_TO === 'info@jodytracks.com' && watch.WATCH_FROM === 'Jody <noreply@jodytracks.com>', watch.WATCH_FROM);
 const bodyOf = async (m) => { let sent; await sendEmail(async (_u, init) => { sent = JSON.parse(init.body); return new Response('{}', { status: 200 }); }, 'k', m, 'idem'); return sent; };
 const base = { from: watch.WATCH_FROM, to: 'agent@example.com', subject: 's', text: 't', html: '<p>h</p>' };
 const plain = await bodyOf(base);
@@ -53,8 +54,13 @@ check('4c the e-mail adapter forwards reply_to only when set', /\.\.\.\(m\.reply
 // 5. END TO END under BOTH identities: the REAL handler -> the REAL sender -> the request the mail provider receives (test/property-watch-functions.test.mjs
 //    section 7). v1 is the committed tree; v2 is a throwaway copy of the edge functions whose brand module was generated from the Jody contract.
 const run = (root) => spawnSync('node', [join(root, 'test/property-watch-functions.test.mjs')], { cwd: root, encoding: 'utf8' });
-const v1run = run(process.cwd());
-check('5a v1 (committed): the whole watch suite passes, including 7a-7c (no reply_to key; HomeSignal sender)', v1run.status === 0 && /7b the provider request carries the brand's Reply-To \(none: the key is absent\)/.test(v1run.stdout), (v1run.stdout + v1run.stderr).slice(-400));
+const tmp1 = mkdtempSync(join(tmpdir(), 'v1-watch-'));
+mkdirSync(join(tmp1, 'test'));
+cpSync('supabase/functions', join(tmp1, 'supabase/functions'), { recursive: true });
+cpSync('test/property-watch-functions.test.mjs', join(tmp1, 'test/property-watch-functions.test.mjs'));
+writeFileSync(join(tmp1, 'supabase/functions/_shared/brand-origins.generated.ts'), r1);
+const v1run = run(tmp1);
+check('5a v1 (frozen-contract copy): the whole watch suite passes, including 7a-7c (no reply_to key; HomeSignal sender)', v1run.status === 0 && /7b the provider request carries the brand's Reply-To \(none: the key is absent\)/.test(v1run.stdout), (v1run.stdout + v1run.stderr).slice(-400));
 const tmp = mkdtempSync(join(tmpdir(), 'v2-watch-'));
 mkdirSync(join(tmp, 'test'));
 cpSync('supabase/functions', join(tmp, 'supabase/functions'), { recursive: true });

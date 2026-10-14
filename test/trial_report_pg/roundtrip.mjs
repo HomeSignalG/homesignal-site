@@ -103,7 +103,7 @@ ok(t.status === 403 && t.json.error === 'forbidden' && tally() === '0 0 0' && !s
   '0-a a signed-in person who is not an admin cannot create a trial: nothing is written, and the database function is never called', t.json);
 t = await trialAsk(ADMIN, { action: 'create', brokerage_name: '  Round Trip Realty ' }, true);
 ok(t.status === 200 && t.json.brokerage_name === 'Round Trip Realty' && t.json.seat_limit === null && t.json.trial_ends_at === null
-   && /^https:\/\/homesignal\.net\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link),
+   && /^https:\/\/jodytracks\.com\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link),
   '0-b an admin creates a trial: the answer is the owner invite link', t.json);
 const token = new URL(t.json.invite_link).hash.slice('#invite='.length);
 const evalId = one("select e.evaluation_id from public.evaluation e join public.brokerage_account a on a.id = e.brokerage_id where a.name = 'Round Trip Realty'");
@@ -151,7 +151,7 @@ t = await trialAsk(MEMBER, { action: 'status' });
 ok(t.status === 200 && t.json.role === 'owner' && t.json.access === 'trial', '0j the owner\'s status says owner, from the membership resolver', t.json);
 const invitesBefore = Number(one('select count(*) from public.evaluation_invite'));
 t = await trialAsk(MEMBER, { action: 'invite' });
-ok(t.status === 200 && /^https:\/\/homesignal\.net\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link)
+ok(t.status === 200 && /^https:\/\/jodytracks\.com\/development-activity-reports\.html#invite=hse1_[0-9a-f]{64}$/.test(t.json.invite_link)
    && JSON.stringify(Object.keys(t.json).sort()) === '["invite_expires_at","invite_link","status"]' && !JSON.stringify(t.json).includes(evalId),
   '0k the owner makes an agent invite: the answer is the link and its expiry, and no id', t.json);
 const agentLink = t.json.invite_link;
