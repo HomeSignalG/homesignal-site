@@ -133,8 +133,8 @@ ok(!/not measured yet/i.test(noteNM), 'D5 ...and never that it is "not measured 
 const notePending = HS.zipAuthNote(UNKNOWN, '01004', []);
 ok(/not measured yet/i.test(notePending) && /will not estimate/i.test(notePending),
   'D5b a ZIP still waiting on a build keeps "not measured yet" and the no-circle promise', notePending);
-ok(/No qualifying development/i.test(noteMZ) && /whole ZIP/i.test(noteMZ),
-  'D6 the measured-zero ZIP claims a real whole-ZIP measurement', noteMZ);
+ok(/No development records fall inside the Census boundary for ZIP 01009/.test(noteMZ),
+  'D6 the measured-zero ZIP states a measured zero inside the Census boundary', noteMZ);
 ok(/2 projects across the whole of ZIP 78617/.test(HS.zipAuthNote(COMPLETE, '78617', sites)),
   'D7 a measured ZIP counts projects across the WHOLE ZIP', HS.zipAuthNote(COMPLETE, '78617', sites));
 

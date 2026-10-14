@@ -224,6 +224,9 @@ for (const c of CASES.filter((c) => c.zip)) {
       // WHICH WORDING THE DEPLOYED PAGE SHIPS. This job runs on the push that changes the
       // wording, against production, before that change is deployed — so it must judge the
       // contract the live page actually carries, never the one in this checkout.
+      // Does the DEPLOYED page's own code carry the 2026-10-14 measured-zero sentence? Asked of the page, not assumed.
+      shipsMeasuredZeroCopy: !!(window.HS && typeof window.HS.zipAuthNote === 'function'
+        && /fall inside the Census boundary/.test(window.HS.zipAuthNote({ status: 'boundary_complete', projects: [], markers: [] }, '00000', []))),
       shipsNoAreaCopy: !!(window.HS && typeof window.HS.zipNoMappedAreaFact === 'function'),
       couldNotRead: /could not be read/i.test(txt),
       // THE PAGE HAS TWO DIFFERENT FAILURE SENTENCES AND THIS GATE ONLY KNEW ONE.
@@ -270,6 +273,8 @@ for (const c of CASES.filter((c) => c.zip)) {
       // nothing enforced it.
       addressCta:  /\b(enter|type|search|choose|select|pick)\b[^.\n]{0,24}\baddress\b/i.test(txt + '\n' + ph),
       wholeZip:    /whole of ZIP|whole ZIP/i.test(txt),
+      // Founder option B, 2026-10-14 (test/zip-measured-zero-copy.test.mjs): the measured-zero sentence.
+      insideBoundary: /No development records fall inside the Census boundary for ZIP \d{5}\. Enter a street address to see development around that address\./.test(txt),
       noCircle:    /will not estimate it from a circle/i.test(txt),
     };
   });
@@ -324,7 +329,13 @@ for (const c of CASES.filter((c) => c.zip)) {
   }
   if (c.kind === 'measured_zero') {
     ok(!m.notMeasured && !m.noMappedArea, `${c.zip}: a MEASURED zero never claims to be unmeasured or unmapped`);
-    ok(m.wholeZip, `${c.zip}: it asserts a real whole-ZIP measurement`);
+    if (m.shipsMeasuredZeroCopy) {
+      ok(m.insideBoundary, `${c.zip}: it states the measured zero in the founder's wording`);
+    } else {
+      // The deployed page predates the 2026-10-14 sentence: judged on its old one until the deploy lands.
+      console.log(`   note: ${c.zip}: the deployed page predates the measured-zero wording; judged on the old sentence`);
+      ok(m.wholeZip, `${c.zip}: (pre-deploy) it asserts a real whole-ZIP measurement`);
+    }
     ok(m.dev === 0, `${c.zip}: and shows nothing, because there is nothing`, `dev=${m.dev}`);
   }
   console.log('');
