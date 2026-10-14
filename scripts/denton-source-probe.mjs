@@ -175,7 +175,79 @@ async function probeService(svc, orgName) {
   }
 }
 
+// ---------- FOCUS MODE (founder directive 2026-10-14): City of Denton pages -> backing ArcGIS, Frisco health, pointers ----------
+const HEX = /\b[0-9a-f]{32}\b/g;
+async function mineRefs(label, text, base, depth, seenIds, found) {
+  const urls = new Set((text.match(/https?:\/\/[^"'\s<>\\)]+\/(?:Feature|Map)Server(?:\/\d+)?/gi) || []));
+  for (const u of urls) found.layers.add(u);
+  const frames = [...text.matchAll(/<iframe[^>]+src=["']([^"']+)["']/gi)].map((m) => { try { return new URL(m[1], base).href; } catch { return null; } }).filter(Boolean);
+  const arc = (text.match(/https?:\/\/[^"'\s<>\\)]*(?:arcgis\.com|maps\.cityofdenton|gis\.cityofdenton|cityofdenton\.com\/(?:maps|gis))[^"'\s<>\\)]*/gi) || []);
+  console.log(`MINE ${label}: featureServer/MapServer urls=${[...urls].join(' ') || '-'} | iframes=${frames.join(' ') || '-'} | arcgis/map links=${[...new Set(arc)].slice(0, 12).join(' ') || '-'}`);
+  for (const f of [...frames, ...arc]) { for (const m of f.matchAll(/(?:webmap|appid|id|layers)=([0-9a-f]{32})/gi)) found.ids.add(m[1]); }
+  for (const id of (text.match(HEX) || [])) if (/arcgis|webmap|appid/i.test(text.slice(Math.max(0, text.indexOf(id) - 120), text.indexOf(id) + 40))) found.ids.add(id);
+  if (depth < 1) for (const f of frames.filter((x) => !/youtube|vimeo|facebook|google\.com\/maps/i.test(x)).slice(0, 4)) { const r = await get(f); console.log(`  IFRAME ${f} -> HTTP ${r.status} ${r.bytes}B`); if (r.status === 200) await mineRefs('iframe ' + f, r.text, f, depth + 1, seenIds, found); }
+}
+async function walkItem(id, depth, found, seenIds) {
+  if (seenIds.has(id) || depth > 3 || timeUp()) return; seenIds.add(id);
+  const it = await jget(`https://www.arcgis.com/sharing/rest/content/items/${id}?f=json`);
+  if (!it.json || it.json.error) { console.log(`ITEM ${id} -> ${it.status} ${it.json && it.json.error ? JSON.stringify(it.json.error).slice(0, 100) : ''}`); return; }
+  const j = it.json; console.log(`ITEM ${id} type=${j.type} title=${JSON.stringify(j.title)} owner=${j.owner} org=${j.orgId} modified=${j.modified ? iso(new Date(j.modified)) : '?'} url=${j.url || '-'}`);
+  found.items.push({ id, type: j.type, title: j.title, owner: j.owner, orgId: j.orgId, modified: j.modified ? iso(new Date(j.modified)) : null, url: j.url });
+  if (j.url && /(Feature|Map)Server/i.test(j.url)) found.layers.add(j.url);
+  const d = await jget(`https://www.arcgis.com/sharing/rest/content/items/${id}/data?f=json`);
+  if (d.json && !d.json.error) {
+    const t = JSON.stringify(d.json);
+    for (const l of (d.json.operationalLayers || [])) { console.log(`  OPLAYER "${l.title}" ${l.layerType} ${l.url || '(itemId ' + l.itemId + ')'}`); if (l.url) found.layers.add(l.url); if (l.itemId) await walkItem(l.itemId, depth + 1, found, seenIds); }
+    for (const u of (t.match(/https?:\/\/[^"'\s\\]+\/(?:Feature|Map)Server(?:\/\d+)?/gi) || [])) found.layers.add(u);
+    if (j.type !== 'Web Map') for (const h of new Set(t.match(HEX) || [])) if (h !== id) await walkItem(h, depth + 1, found, seenIds);
+  }
+}
+async function friscoHealth() {
+  const base = 'https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer/1';
+  await probeLayer(base, 'frisco-active-building-permits (wired)', 'City of Frisco');
+  const r = await jget(`${base}/query?${new URLSearchParams({ f: 'json', where: '1=1', outFields: 'Issued_Date,Permit_No,Type,Status,Address,Hyperlink', returnGeometry: 'false', resultRecordCount: '2000' })}`);
+  const rows = ((r.json && r.json.features) || []).map((f) => f.attributes);
+  const P = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? new Date(Date.UTC(+m[3], +m[1] - 1, +m[2])) : null; };
+  const dated = rows.map((a) => ({ ...a, d: P(a.Issued_Date) })).filter((a) => a.d).sort((a, b) => b.d - a.d);
+  const cnt = (y) => dated.filter((a) => a.d.getUTCFullYear() === y).length;
+  const res = { rows: rows.length, exceededTransferLimit: !!(r.json && r.json.exceededTransferLimit), parsed_dates: dated.length, newest: dated[0] && iso(dated[0].d), oldest: dated.length && iso(dated[dated.length - 1].d), n2025: cnt(2025), n2026: cnt(2026), last365: dated.filter((a) => a.d >= D365).length, last90: dated.filter((a) => a.d >= new Date(NOW - 90 * 864e5)).length, statuses: [...new Set(rows.map((a) => a.Status))], types: Object.fromEntries([...new Set(rows.map((a) => a.Type))].map((t) => [t, rows.filter((a) => a.Type === t).length])), with_hyperlink: rows.filter((a) => a.Hyperlink).length, distinct_permit_no: new Set(rows.map((a) => a.Permit_No)).size, newest5: dated.slice(0, 5).map((a) => [iso(a.d), a.Permit_No, a.Type, a.Address, a.Hyperlink]) };
+  out.frisco = res; console.log('FRISCO ' + JSON.stringify(res));
+}
+async function focus() {
+  const found = { layers: new Set(), ids: new Set(), items: [] }; const seenIds = new Set();
+  console.log('=== FOCUS 1: City of Denton pages ===');
+  for (const u of ['https://www.cityofdenton.com/241/Development-Project-Information', 'https://www.cityofdenton.com/1072/Development-Activity']) {
+    const r = await get(u); console.log(`PAGE ${u} -> HTTP ${r.status} ${r.bytes}B ${r.error || ''}`);
+    if (r.status !== 200) continue;
+    console.log(`  text=${JSON.stringify(strip(r.text).slice(0, 700))}`);
+    const links = [...r.text.matchAll(/<a[^>]+href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map((m) => [m[1], strip(m[2]).trim().slice(0, 70)]).filter(([h, t]) => /map|gis|arcgis|project|activity|permit|dashboard|data|report|download|csv|tracker|zoning|plat/i.test(h + t)).slice(0, 30);
+    console.log(`  links=${JSON.stringify(links)}`);
+    await mineRefs(u, r.text, u, 0, seenIds, found);
+    for (const [h] of links) { if (/arcgis\.com|storymaps|experience|\/maps?\b|gis\./i.test(h)) { try { const a = new URL(h, u).href; const rr = await get(a); console.log(`  LINK ${a} -> HTTP ${rr.status} ${rr.bytes}B`); if (rr.status === 200) await mineRefs('link ' + a, rr.text, a, 1, seenIds, found); for (const m of a.matchAll(/[0-9a-f]{32}/g)) found.ids.add(m[0]); } catch {} } }
+  }
+  for (const id of [...found.ids]) await walkItem(id, 0, found, seenIds);
+  console.log(`CANDIDATE LAYERS: ${[...found.layers].join(' ') || 'none'}`);
+  for (const u of found.layers) {
+    if (timeUp()) break;
+    const m = u.match(/^(.*\/(?:Feature|Map)Server)(\/\d+)?$/i); if (!m) continue;
+    if (m[2]) await probeLayer(u, 'city-of-denton candidate', 'City of Denton'); else await probeService({ base: m[1].replace(/\/[^/]+\/(?:Feature|Map)Server$/i, ''), name: m[1].replace(/^.*\/rest\/services\//i, '').replace(/\/(?:Feature|Map)Server$/i, ''), type: /FeatureServer/i.test(m[1]) ? 'FeatureServer' : 'MapServer' }, 'City of Denton');
+  }
+  out.denton_candidates = [...found.layers]; out.denton_items = found.items;
+  console.log('=== FOCUS 2: Frisco health ==='); await friscoHealth();
+  console.log('=== FOCUS 3: Denton County Civic Access (publisher + documented export/API only) ===');
+  await probePortal('1_denton_county_civic_access', PORTALS[0][1]);
+  for (const u of ['https://dentoncountytx-energovweb.tylerhost.net/apps/SelfService/robots.txt', 'https://www.dentoncounty.gov/', ]) { const r = await get(u); console.log(`CIVIC ${u} -> HTTP ${r.status} ${r.bytes}B ${JSON.stringify(strip(r.text).slice(0, 300))}`); }
+  console.log('=== FOCUS 4: pointers (discovery/cross-check only) ===');
+  for (const u of ['https://denton.myopentexas.org/development', 'https://physical-layer.com/permits/texas/denton-county']) {
+    const r = await get(u); console.log(`POINTER ${u} -> HTTP ${r.status} ${r.bytes}B final=${r.finalUrl} ${r.error || ''}`);
+    if (r.status === 200) { console.log(`  text=${JSON.stringify(strip(r.text).slice(0, 900))}`); const ext = [...r.text.matchAll(/href=["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]).filter((h) => /denton|\.gov|\.us\/|arcgis|energov|etrakit|tylerhost|aspgov|opengov|civic/i.test(h)).slice(0, 20); console.log(`  outbound=${JSON.stringify([...new Set(ext)])}`); }
+  }
+  console.log(`DONE requests=${nreq} elapsed_s=${Math.round((Date.now() - T0) / 1000)}`);
+  console.log('----- BEGIN DENTON PROBE JSON -----'); console.log(JSON.stringify(out)); console.log('----- END DENTON PROBE JSON -----');
+}
+
 async function main() {
+  if (process.env.PROBE_MODE === 'focus') return focus();
   for (const [k, u] of PORTALS) { if (timeUp()) break; await probePortal(k, u); }
   console.log('=== ARCGIS REST DIRECTORIES ===');
   const seen = new Set();
