@@ -137,6 +137,131 @@ out["z76262_centroid"] = sql("""select k.source_key, k.marker_seq, k.marker_rule
   from geo.n5_serving_marker k cross join lateral (select geo.zip_membership_boundary('76262') g) b
   left join lateral (select registry_id,name,address,type,submitted_at from public.app_projects a where a.source_key=k.source_key order by a.id limit 1) p on true
   where k.zcta5::text='76262' and ST_Distance(ST_Transform(ST_Centroid(b.g),4326)::geography, ST_SetSRID(ST_Point(k.lng,k.lat),4326)::geography) < 25""")
+# ---- 4. ZIP 75033: which dots does the audit's identity lookup fail to find at the publisher, and why? (WSC-1)
+# Replays the audit's lookup EXACTLY (all 32 audit ZIPs' ids per registry, sorted, chunks of 150, unquoted-then-quoted, one request per chunk,
+# no paging) and then asks again the way n5_shard does (small chunks + exceededTransferLimit paging) and one id at a time.
+AUDIT_ZIPS = ("75007 75010 75022 75027 75028 75029 75033 75036 75056 75057 75065 75067 75068 75077 76201 76202 76203 76204 76205 76206 76207 76208 76209 76210 "
+              "76226 76227 76247 76249 76258 76259 76262 76266").split()
+zl = ",".join(f"'{z}'" for z in AUDIT_ZIPS)
+allmk = sql(f"select k.zcta5::text zip, k.source_key, k.marker_seq, k.lat, k.lng, k.marker_rule from geo.n5_serving_marker k where k.zcta5::text in ({zl})")
+key_re = re.compile(r"^arcgis:([^:]+):(.+)$")
+want = {}
+for m in allmk:
+    mm = key_re.match(m["source_key"] or "")
+    if mm and mm.group(1) in REG: want.setdefault(mm.group(1), set()).add(mm.group(2))
+def lits(ch, quote):
+    return ",".join(i if (not quote and re.fullmatch(r"-?\d+", i)) else "'" + i.replace("'", "''") + "'" for i in ch)
+def audit_lookup(reg, ids):
+    e = REG[reg]; idcol = e["column_map"].get("case_number"); found = {}; det = []
+    ids = sorted(ids)
+    for i in range(0, len(ids), 150):
+        ch = ids[i:i + 150]; j = None; used = None
+        for quote in (False, True):
+            j = q(e["service_url"] + "/query", {"f": "json", "where": f"{idcol} IN ({lits(ch, quote)})", "outFields": idcol, "returnGeometry": "true", "outSR": "4326"})
+            used = quote
+            if "_err" not in j: break
+        fs = j.get("features", []) if "_err" not in j else []
+        for f in fs:
+            found[str(f["attributes"].get(idcol))] = found.get(str(f["attributes"].get(idcol)), 0) + 1
+        det.append({"chunk": i // 150, "asked": len(ch), "features_returned": len(fs), "exceededTransferLimit": bool(j.get("exceededTransferLimit")),
+                    "quoted": used, "err": j.get("_err"), "distinct_ids_returned": len({str(f['attributes'].get(idcol)) for f in fs}),
+                    "response_chars": len(json.dumps(j))})
+    return found, det
+def paged_lookup(reg, ids, chunk=25):
+    e = REG[reg]; idcol = e["column_map"].get("case_number"); found = {}
+    ids = sorted(ids)
+    for i in range(0, len(ids), chunk):
+        ch = ids[i:i + chunk]
+        for quote in (False, True):
+            off = 0; ok = True; got = []
+            while True:
+                j = q(e["service_url"] + "/query", {"f": "json", "where": f"{idcol} IN ({lits(ch, quote)})", "outFields": idcol, "returnGeometry": "false",
+                                                     "resultOffset": off, "resultRecordCount": 1000, "orderByFields": idcol})
+                if "_err" in j: ok = False; break
+                got += j.get("features", [])
+                if not j.get("exceededTransferLimit"): break
+                off += len(j.get("features", []))
+            if ok: break
+        for f in got:
+            found[str(f["attributes"].get(idcol))] = found.get(str(f["attributes"].get(idcol)), 0) + 1
+    return found
+out["z75033_dots"] = [{"key": m["source_key"], "seq": m["marker_seq"], "lat": m["lat"], "lng": m["lng"], "rule": m["marker_rule"]} for m in allmk if m["zip"] == "75033"]
+nf = {}
+out["lookup_by_registry"] = {}
+for reg, ids in want.items():
+    meta = q(REG[reg]["service_url"], {"f": "json"})
+    fld = {f["name"]: f.get("type") for f in meta.get("fields", [])}
+    idcol = REG[reg]["column_map"].get("case_number")
+    found, det = audit_lookup(reg, ids)
+    miss = sorted(set(ids) - set(found))
+    out["lookup_by_registry"][reg] = {"ids_asked": len(ids), "ids_found_by_audit_method": len(found), "not_found": len(miss), "idcol": idcol, "idcol_type": fld.get(idcol),
+        "maxRecordCount": meta.get("maxRecordCount"), "geometryType": meta.get("geometryType"), "chunks": det[:40]}
+    nf[reg] = miss
+    if miss:
+        pf = paged_lookup(reg, miss)
+        out["lookup_by_registry"][reg]["not_found_ids_sample"] = miss[:20]
+        out["lookup_by_registry"][reg]["recovered_by_small_chunk_paging"] = len([i for i in miss if i in pf])
+out["z75033_not_found"] = []
+for m in allmk:
+    mm = key_re.match(m["source_key"] or "")
+    if mm and mm.group(1) in REG and mm.group(2) in set(nf.get(mm.group(1), [])):
+        reg, ident = mm.group(1), mm.group(2); idcol = REG[reg]["column_map"].get("case_number")
+        single = {}
+        for label, where in (("bare", f"{idcol} = {ident}" if re.fullmatch(r"-?\d+", ident) else None), ("quoted", f"{idcol} = '{ident}'"),
+                             ("like", f"{idcol} LIKE '%{ident}%'"), ("trim_upper", f"UPPER(TRIM({idcol})) = '{ident.upper()}'")):
+            if where is None: continue
+            j = q(REG[reg]["service_url"] + "/query", {"f": "json", "where": where, "outFields": "*", "returnGeometry": "true", "outSR": "4326"})
+            fs = j.get("features", []) if "_err" not in j else []
+            single[label] = {"n": len(fs), "err": j.get("_err"), "ids": sorted({str(f['attributes'].get(idcol)) for f in fs})[:5],
+                             "geomkeys": sorted({k for f in fs for k in (f.get('geometry') or {}).keys()})}
+        out["z75033_not_found"].append({"zip": m["zip"], "key": m["source_key"], "reg": reg, "marker": [m["lat"], m["lng"]], "single_requery": single})
+nk = sorted({x["key"] for x in out["z75033_not_found"]})
+if nk:
+    out["z75033_not_found_app_projects"] = sql("select source_key, registry_id, status, submitted_at::date filed, left(name,80) name, left(address,80) addr, source_id from public.app_projects where source_key in (" + ",".join("'" + k.replace("'", "''") + "'" for k in nk) + ") order by source_key limit 40")
+
+# ---- 5. ZIP 76207 / TxDOT 008113084: is the 16.7 m offset a misplacement, a CRS artifact or a stale/simplified stored line?
+TXK = "arcgis:txdot-projects-info-all:008113084"
+out["z76207_markers"] = sql(f"select zcta5::text zip, source_key, marker_seq, lat, lng, marker_rule, family, dim from geo.n5_serving_marker where source_key = '{TXK}'")
+out["z76207_membership"] = sql(f"select zcta5::text zip, lat, lng, point_rule, clip_dim, feature_count, geom_family from geo.n5_serving_membership where source_key = '{TXK}'")
+out["z76207_n5_geom"] = sql(f"""select to_jsonb(gg) - 'geom' meta, ST_SRID(gg.geom) srid, GeometryType(gg.geom) gtype, ST_NPoints(gg.geom) npts, ST_NumGeometries(gg.geom) ngeom,
+    ST_Length(gg.geom::geography) len_m, md5(ST_AsText(gg.geom)) wkt_md5 from geo.n5_geom gg where gg.source_key = '{TXK}'""")
+pubs = {}
+for label, sr in (("outSR_4326", "4326"), ("outSR_4269", "4269"), ("native", None)):
+    prm = {"f": "json", "where": "CONTROL_SECT_JOB = '008113084'", "outFields": "CONTROL_SECT_JOB,OBJECTID", "returnGeometry": "true"}
+    if sr: prm["outSR"] = sr
+    j = q(tx["service_url"] + "/query", prm)
+    fs = j.get("features", []) if "_err" not in j else []
+    paths = [(f.get("geometry") or {}).get("paths") or [] for f in fs]
+    pubs[label] = {"n_features": len(fs), "spatialReference": j.get("spatialReference"), "oids": [f["attributes"].get("OBJECTID") for f in fs],
+                   "n_paths": sum(len(p) for p in paths), "n_vertices": sum(len(pp) for p in paths for pp in p), "err": j.get("_err"), "paths": paths}
+out["z76207_publisher"] = {k: {kk: vv for kk, vv in v.items() if kk != "paths"} for k, v in pubs.items()}
+def mls(paths, srid):
+    return "SRID=%s;MULTILINESTRING(" % srid + ",".join("(" + ",".join(f"{x} {y}" for x, y in pp) + ")" for p in paths for pp in p if len(pp) > 1) + ")"
+mk76207 = [m for m in out["z76207_markers"] if m["zip"] == "76207"]
+def dist_sql(w):
+    return ("select v.seq, ST_Distance(ST_Transform(ST_GeomFromEWKT('" + w + "'),4326)::geography, ST_SetSRID(ST_Point(v.x,v.y),4326)::geography) d_m from (values " +
+            ",".join(f"({m['marker_seq']},{m['lng']},{m['lat']})" for m in mk76207) + ") v(seq,x,y)")
+for label, srid in (("outSR_4326", 4326), ("outSR_4269", 4269)):
+    if pubs[label]["paths"] and mk76207:
+        out["z76207_dist_" + label] = sql(dist_sql(mls(pubs[label]["paths"], srid)))
+nat = pubs["native"]
+wk = (nat.get("spatialReference") or {}).get("latestWkid") or (nat.get("spatialReference") or {}).get("wkid")
+if nat["paths"] and wk and mk76207:
+    out["z76207_dist_native_wkid_%s" % wk] = sql(dist_sql(mls(nat["paths"], wk)))
+out["z76207_stored_vs_marker_and_rederived"] = sql(f"""
+with b as (select geo.zip_membership_boundary('76207') g),
+ raw as (select gg.geom from geo.n5_geom gg where gg.source_key = '{TXK}' and gg.outcome = 1 and gg.geom is not null),
+ clip as (select ST_Intersection(ST_MakeValid(ST_Union(raw.geom)), b.g) c, ST_Union(raw.geom) u from raw cross join b),
+ comp as (select d.geom gm, ST_Length(d.geom::geography) len_m, ST_NPoints(d.geom) npts from clip, ST_Dump(ST_LineMerge(ST_CollectionExtract(clip.c, 2))) d),
+ mk as (select marker_seq seq, lat, lng from geo.n5_serving_marker where source_key = '{TXK}' and zcta5::text = '76207')
+select mk.seq, mk.lat, mk.lng,
+  (select ST_Distance(clip.u::geography, ST_SetSRID(ST_Point(mk.lng, mk.lat), 4269)::geography) from clip) d_to_stored_n5_geom_m,
+  (select ST_Distance(clip.c::geography, ST_SetSRID(ST_Point(mk.lng, mk.lat), 4269)::geography) from clip) d_to_clip_m,
+  (select count(*) from comp) n_components, (select sum(len_m) from comp) comp_len_m, (select sum(npts) from comp) comp_npts,
+  (select ST_Y(ST_LineInterpolatePoint(gm, 0.5)) from comp order by len_m desc limit 1) rederived_lat_half,
+  (select ST_X(ST_LineInterpolatePoint(gm, 0.5)) from comp order by len_m desc limit 1) rederived_lng_half
+from mk""")
+
 print("----- BEGIN DENTON INVESTIGATE JSON -----")
 print(json.dumps(out, default=str))
 print("----- END DENTON INVESTIGATE JSON -----")
