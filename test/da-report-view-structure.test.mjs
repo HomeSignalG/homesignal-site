@@ -160,7 +160,7 @@ const C = code(SRC);
     '5c the view\'s two stage labels equal the landing page\'s (so a label change must be made in both places on purpose)');
   ok(C.includes("permitted: 'Permitted / Under Construction'") && labels[2] === 'Permitted / Under Construction' && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
     '5d the third landing label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
-  ok(C.includes("var EYEBROW = 'HOMESIGNAL DEVELOPMENT ACTIVITY';"), '5e the eyebrow is the ruled one (R6)');
+  ok(C.includes("var EYEBROW = 'JODY Development Activity';"), '5e the eyebrow is the Jody name (founder 2026-10-14, audit F4; supersedes R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
 }
 
