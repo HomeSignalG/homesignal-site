@@ -622,7 +622,7 @@
      "newest_record_date": "2026-10-07",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.97476,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -808,7 +808,7 @@
      "newest_record_date": "2023-05-04",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.31117,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "frisco-active-building-permits",
@@ -818,7 +818,7 @@
      "newest_record_date": "2026-09-15",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.43979,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -997,7 +997,7 @@
      "newest_record_date": "2021-11-02",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.17105,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -1278,7 +1278,7 @@
      "newest_record_date": "2021-05-28",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.35666,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -1646,7 +1646,7 @@
      "newest_record_date": "2023-05-19",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.31031,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "frisco-active-building-permits",
@@ -2220,7 +2220,7 @@
      "newest_record_date": "2023-03-23",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.17242,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2418,7 +2418,7 @@
      "newest_record_date": "2023-05-17",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.41047,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2649,7 +2649,7 @@
      "newest_record_date": "2023-04-05",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.14012,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2962,7 +2962,7 @@
      "newest_record_date": "2023-05-15",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.33456,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3365,7 +3365,7 @@
      "newest_record_date": "2023-05-24",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.65128,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3676,7 +3676,7 @@
      "newest_record_date": "2023-06-06",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.62988,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3696,7 +3696,7 @@
      "newest_record_date": "2026-07-13",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.06084,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     }
    ],
    "newest_record_date": "2026-07-13",
@@ -3883,7 +3883,7 @@
      "newest_record_date": "2023-05-04",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.88058,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4088,7 +4088,7 @@
      "newest_record_date": "2023-05-10",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.72443,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4300,7 +4300,7 @@
      "newest_record_date": "2023-05-31",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.83302,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4627,7 +4627,7 @@
      "newest_record_date": "2023-05-01",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.15019,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4647,7 +4647,7 @@
      "newest_record_date": "2026-08-17",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.11132,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     }
    ],
    "newest_record_date": "2026-08-17",
@@ -4847,7 +4847,7 @@
      "newest_record_date": "2023-05-02",
      "local_permit_authority_source": true,
      "authority_area_share_in_zip": 0.84877,
-     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
+     "coverage_basis": "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)"
     },
     {
      "registry_id": "txdot-projects-info-all",
