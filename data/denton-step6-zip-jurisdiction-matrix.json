@@ -41,9 +41,9 @@
     {
      "name": "Carrollton",
      "type": "incorporated city",
-     "area_share": 0.89467,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.89467 vs Census 0.98948 (annexation vintage difference)",
+     "area_share": 0.98948,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.89467 (Denton County part) vs Census 0.98948 (whole city); larger used",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
@@ -91,7 +91,7 @@
      {
       "authority": "City of Carrollton",
       "where": "within city limits",
-      "area_share": 0.89467
+      "area_share": 0.98948
      },
      {
       "authority": "City of Dallas",
@@ -103,7 +103,7 @@
      {
       "authority": "City of Carrollton",
       "where": "within city limits",
-      "area_share": 0.89467
+      "area_share": 0.98948
      },
      {
       "authority": "City of Dallas",
@@ -125,7 +125,9 @@
      "stored_records": 10,
      "records_last_365d": 1,
      "newest_record_date": "2026-06-24",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     },
     {
      "registry_id": "dallas-specific-use-permits",
@@ -133,7 +135,9 @@
      "stored_records": 1,
      "records_last_365d": 0,
      "newest_record_date": "2009-03-27",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.01054,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     }
    ],
    "newest_record_date": "2026-06-24",
@@ -143,11 +147,11 @@
      {
       "jurisdiction": "Carrollton",
       "type": "incorporated city",
-      "area_share": 0.89467,
+      "area_share": 0.98948,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9064,
+    "area_share_without_current_source": 1.0012,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -160,7 +164,7 @@
     {
      "name": "Carrollton",
      "type": "incorporated city",
-     "area_share": 0.94952,
+     "area_share": 0.95088,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -204,7 +208,7 @@
      {
       "authority": "City of Carrollton",
       "where": "within city limits",
-      "area_share": 0.94952
+      "area_share": 0.95088
      },
      {
       "authority": "City of Hebron",
@@ -221,7 +225,7 @@
      {
       "authority": "City of Carrollton",
       "where": "within city limits",
-      "area_share": 0.94952
+      "area_share": 0.95088
      },
      {
       "authority": "City of Hebron",
@@ -248,7 +252,9 @@
      "stored_records": 1,
      "records_last_365d": 0,
      "newest_record_date": "2018-01-09",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -256,7 +262,9 @@
      "stored_records": 1,
      "records_last_365d": 0,
      "newest_record_date": "2022-12-15",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2022-12-15",
@@ -266,11 +274,11 @@
      {
       "jurisdiction": "Carrollton",
       "type": "incorporated city",
-      "area_share": 0.94952,
+      "area_share": 0.95088,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9995,
+    "area_share_without_current_source": 1.0009,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -283,9 +291,9 @@
     {
      "name": "Flower Mound",
      "type": "incorporated city",
-     "area_share": 0.89285,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.89285 vs Census 0.91827 (annexation vintage difference)",
+     "area_share": 0.91827,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.89285 (Denton County part) vs Census 0.91827 (whole city); larger used",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
@@ -344,7 +352,7 @@
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.89285
+      "area_share": 0.91827
      },
      {
       "authority": "City of Grapevine",
@@ -366,7 +374,7 @@
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.89285
+      "area_share": 0.91827
      },
      {
       "authority": "City of Grapevine",
@@ -403,7 +411,9 @@
      "stored_records": 2,
      "records_last_365d": 0,
      "newest_record_date": "2021-06-30",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.00711,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -411,7 +421,9 @@
      "stored_records": 2,
      "records_last_365d": 0,
      "newest_record_date": "2025-02-27",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-02-27",
@@ -421,11 +433,11 @@
      {
       "jurisdiction": "Flower Mound",
       "type": "incorporated city",
-      "area_share": 0.89285,
+      "area_share": 0.91827,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9744,
+    "area_share_without_current_source": 0.9998,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -438,9 +450,9 @@
     {
      "name": "Flower Mound",
      "type": "incorporated city",
-     "area_share": 0.9714,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.9714 vs Census 0.9958 (annexation vintage difference)",
+     "area_share": 0.9958,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.9714 (Denton County part) vs Census 0.9958 (whole city); larger used",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
@@ -479,14 +491,14 @@
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.9714
+      "area_share": 0.9958
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.9714
+      "area_share": 0.9958
      }
     ],
     "etj_building_permit_note": null,
@@ -503,7 +515,9 @@
      "stored_records": 4,
      "records_last_365d": 0,
      "newest_record_date": "2025-03-27",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-03-27",
@@ -513,11 +527,11 @@
      {
       "jurisdiction": "Flower Mound",
       "type": "incorporated city",
-      "area_share": 0.9714,
+      "area_share": 0.9958,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.977,
+    "area_share_without_current_source": 1.0014,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -530,9 +544,9 @@
     {
      "name": "Frisco",
      "type": "incorporated city",
-     "area_share": 0.5243,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.5243 vs Census 0.97476 (annexation vintage difference)",
+     "area_share": 0.97476,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.5243 (Denton County part) vs Census 0.97476 (whole city); larger used",
      "registered_sources": [
       {
        "registry_id": "frisco-active-building-permits",
@@ -548,7 +562,7 @@
     {
      "name": "Little Elm",
      "type": "incorporated city",
-     "area_share": 0.01859,
+     "area_share": 0.01862,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -572,24 +586,24 @@
      {
       "authority": "City of Frisco",
       "where": "within city limits",
-      "area_share": 0.5243
+      "area_share": 0.97476
      },
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.01859
+      "area_share": 0.01862
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Frisco",
       "where": "within city limits",
-      "area_share": 0.5243
+      "area_share": 0.97476
      },
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.01859
+      "area_share": 0.01862
      }
     ],
     "etj_building_permit_note": null,
@@ -606,7 +620,9 @@
      "stored_records": 154,
      "records_last_365d": 124,
      "newest_record_date": "2026-10-07",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.97476,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -614,7 +630,9 @@
      "stored_records": 20,
      "records_last_365d": 2,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-10-07",
@@ -634,7 +652,7 @@
     {
      "name": "Frisco",
      "type": "incorporated city",
-     "area_share": 0.43978,
+     "area_share": 0.43979,
      "boundary_source": "denton_county_gis",
      "registered_sources": [
       {
@@ -684,7 +702,7 @@
     {
      "name": "Little Elm",
      "type": "incorporated city",
-     "area_share": 0.07169,
+     "area_share": 0.07195,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -700,7 +718,7 @@
     {
      "name": "Hackberry",
      "type": "incorporated city",
-     "area_share": 0.02605,
+     "area_share": 0.02651,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -719,7 +737,7 @@
      {
       "authority": "City of Frisco",
       "where": "within city limits",
-      "area_share": 0.43978
+      "area_share": 0.43979
      },
      {
       "authority": "City of The Colony",
@@ -729,19 +747,19 @@
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.07169
+      "area_share": 0.07195
      },
      {
       "authority": "City of Hackberry",
       "where": "within city limits",
-      "area_share": 0.02605
+      "area_share": 0.02651
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Frisco",
       "where": "within city limits",
-      "area_share": 0.43978
+      "area_share": 0.43979
      },
      {
       "authority": "City of The Colony",
@@ -751,12 +769,12 @@
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.07169
+      "area_share": 0.07195
      },
      {
       "authority": "City of Hackberry",
       "where": "within city limits",
-      "area_share": 0.02605
+      "area_share": 0.02651
      },
      {
       "authority": "City of Hackberry",
@@ -788,7 +806,9 @@
      "stored_records": 1828,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-04",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.31117,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "frisco-active-building-permits",
@@ -796,7 +816,9 @@
      "stored_records": 7,
      "records_last_365d": 7,
      "newest_record_date": "2026-09-15",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.43979,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -804,7 +826,9 @@
      "stored_records": 4,
      "records_last_365d": 0,
      "newest_record_date": "2024-03-28",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-09-15",
@@ -832,11 +856,11 @@
      {
       "jurisdiction": "Little Elm",
       "type": "incorporated city",
-      "area_share": 0.07169,
+      "area_share": 0.07195,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.5585,
+    "area_share_without_current_source": 0.5592,
     "current_local_source_records_365d": 7
    },
    "county_outline": "ok",
@@ -857,7 +881,7 @@
     {
      "name": "Lewisville",
      "type": "incorporated city",
-     "area_share": 0.36591,
+     "area_share": 0.36685,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -927,7 +951,7 @@
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.36591
+      "area_share": 0.36685
      }
     ],
     "plat_subdivision": [
@@ -939,7 +963,7 @@
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.36591
+      "area_share": 0.36685
      },
      {
       "authority": "City of The Colony",
@@ -971,7 +995,9 @@
      "stored_records": 1594,
      "records_last_365d": 0,
      "newest_record_date": "2021-11-02",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.17105,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -979,7 +1005,9 @@
      "stored_records": 5,
      "records_last_365d": 1,
      "newest_record_date": "2026-05-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-05-21",
@@ -995,7 +1023,7 @@
      {
       "jurisdiction": "Lewisville",
       "type": "incorporated city",
-      "area_share": 0.36591,
+      "area_share": 0.36685,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -1005,7 +1033,7 @@
       "status": "STALE"
      }
     ],
-    "area_share_without_current_source": 0.999,
+    "area_share_without_current_source": 1.0,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -1018,7 +1046,7 @@
     {
      "name": "Lewisville",
      "type": "incorporated city",
-     "area_share": 0.985,
+     "area_share": 0.98623,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1050,7 +1078,7 @@
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.985
+      "area_share": 0.98623
      },
      {
       "authority": "City of Carrollton",
@@ -1062,7 +1090,7 @@
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.985
+      "area_share": 0.98623
      },
      {
       "authority": "City of Carrollton",
@@ -1084,7 +1112,9 @@
      "stored_records": 6,
      "records_last_365d": 1,
      "newest_record_date": "2026-05-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-05-21",
@@ -1094,11 +1124,11 @@
      {
       "jurisdiction": "Lewisville",
       "type": "incorporated city",
-      "area_share": 0.985,
+      "area_share": 0.98623,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 1.0,
+    "area_share_without_current_source": 1.0012,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -1128,7 +1158,7 @@
     {
      "name": "Hickory Creek",
      "type": "incorporated city",
-     "area_share": 0.2791,
+     "area_share": 0.28126,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1144,7 +1174,7 @@
     {
      "name": "Lake Dallas",
      "type": "incorporated city",
-     "area_share": 0.16338,
+     "area_share": 0.16398,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1187,7 +1217,7 @@
      {
       "authority": "City of Hickory Creek",
       "where": "within city limits",
-      "area_share": 0.2791
+      "area_share": 0.28126
      },
      {
       "authority": "City of Lewisville",
@@ -1197,14 +1227,14 @@
      {
       "authority": "City of Lake Dallas",
       "where": "within city limits",
-      "area_share": 0.16338
+      "area_share": 0.16398
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Hickory Creek",
       "where": "within city limits",
-      "area_share": 0.2791
+      "area_share": 0.28126
      },
      {
       "authority": "City of Lewisville",
@@ -1214,7 +1244,7 @@
      {
       "authority": "City of Lake Dallas",
       "where": "within city limits",
-      "area_share": 0.16338
+      "area_share": 0.16398
      },
      {
       "authority": "City of Hickory Creek",
@@ -1246,7 +1276,9 @@
      "stored_records": 182,
      "records_last_365d": 0,
      "newest_record_date": "2021-05-28",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.35666,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -1254,7 +1286,9 @@
      "stored_records": 7,
      "records_last_365d": 0,
      "newest_record_date": "2024-01-17",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2024-01-17",
@@ -1270,7 +1304,7 @@
      {
       "jurisdiction": "Hickory Creek",
       "type": "incorporated city",
-      "area_share": 0.2791,
+      "area_share": 0.28126,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -1282,11 +1316,11 @@
      {
       "jurisdiction": "Lake Dallas",
       "type": "incorporated city",
-      "area_share": 0.16338,
+      "area_share": 0.16398,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9973,
+    "area_share_without_current_source": 1.0001,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -1299,7 +1333,7 @@
     {
      "name": "Lewisville",
      "type": "incorporated city",
-     "area_share": 0.92601,
+     "area_share": 0.938,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1321,6 +1355,14 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
+     "name": "Grapevine",
+     "type": "incorporated city",
+     "area_share": 0.01478,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
      "name": "Lewisville ETJ",
      "type": "ETJ",
      "area_share": 0.01173,
@@ -1329,17 +1371,9 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Grapevine",
-     "type": "incorporated city",
-     "area_share": 0.00331,
-     "boundary_source": "denton_county_gis",
-     "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
-    },
-    {
      "name": "Flower Mound",
      "type": "incorporated city",
-     "area_share": 0.00093,
+     "area_share": 0.00124,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1363,7 +1397,7 @@
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.92601
+      "area_share": 0.938
      },
      {
       "authority": "City of Carrollton",
@@ -1374,13 +1408,18 @@
       "authority": "City of Coppell",
       "where": "within city limits",
       "area_share": 0.01529
+     },
+     {
+      "authority": "City of Grapevine",
+      "where": "within city limits",
+      "area_share": 0.01478
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Lewisville",
       "where": "within city limits",
-      "area_share": 0.92601
+      "area_share": 0.938
      },
      {
       "authority": "City of Carrollton",
@@ -1391,6 +1430,11 @@
       "authority": "City of Coppell",
       "where": "within city limits",
       "area_share": 0.01529
+     },
+     {
+      "authority": "City of Grapevine",
+      "where": "within city limits",
+      "area_share": 0.01478
      },
      {
       "authority": "City of Lewisville",
@@ -1412,7 +1456,9 @@
      "stored_records": 19,
      "records_last_365d": 2,
      "newest_record_date": "2026-05-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-05-21",
@@ -1422,11 +1468,11 @@
      {
       "jurisdiction": "Lewisville",
       "type": "incorporated city",
-      "area_share": 0.92601,
+      "area_share": 0.938,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9769,
+    "area_share_without_current_source": 1.0007,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -1439,7 +1485,7 @@
     {
      "name": "Little Elm",
      "type": "incorporated city",
-     "area_share": 0.48306,
+     "area_share": 0.48332,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1447,7 +1493,7 @@
     {
      "name": "Oak Point",
      "type": "incorporated city",
-     "area_share": 0.16168,
+     "area_share": 0.16242,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1524,12 +1570,12 @@
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.48306
+      "area_share": 0.48332
      },
      {
       "authority": "City of Oak Point",
       "where": "within city limits",
-      "area_share": 0.16168
+      "area_share": 0.16242
      },
      {
       "authority": "City of Lakewood Village",
@@ -1546,12 +1592,12 @@
      {
       "authority": "City of Little Elm",
       "where": "within city limits",
-      "area_share": 0.48306
+      "area_share": 0.48332
      },
      {
       "authority": "City of Oak Point",
       "where": "within city limits",
-      "area_share": 0.16168
+      "area_share": 0.16242
      },
      {
       "authority": "City of Lakewood Village",
@@ -1598,7 +1644,9 @@
      "stored_records": 4213,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-19",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.31031,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "frisco-active-building-permits",
@@ -1606,7 +1654,9 @@
      "stored_records": 10,
      "records_last_365d": 9,
      "newest_record_date": "2026-09-21",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.0154,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -1614,7 +1664,9 @@
      "stored_records": 10,
      "records_last_365d": 1,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-09-21",
@@ -1624,13 +1676,13 @@
      {
       "jurisdiction": "Little Elm",
       "type": "incorporated city",
-      "area_share": 0.48306,
+      "area_share": 0.48332,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
       "jurisdiction": "Oak Point",
       "type": "incorporated city",
-      "area_share": 0.16168,
+      "area_share": 0.16242,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -1652,7 +1704,7 @@
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9813,
+    "area_share_without_current_source": 0.9823,
     "current_local_source_records_365d": 9
    },
    "county_outline": "ok",
@@ -1665,7 +1717,7 @@
     {
      "name": "Highland Village",
      "type": "incorporated city",
-     "area_share": 0.38579,
+     "area_share": 0.38624,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1681,7 +1733,7 @@
     {
      "name": "Copper Canyon",
      "type": "incorporated city",
-     "area_share": 0.15595,
+     "area_share": 0.15636,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1689,7 +1741,7 @@
     {
      "name": "Double Oak",
      "type": "incorporated city",
-     "area_share": 0.13993,
+     "area_share": 0.14019,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -1733,7 +1785,7 @@
      {
       "authority": "City of Highland Village",
       "where": "within city limits",
-      "area_share": 0.38579
+      "area_share": 0.38624
      },
      {
       "authority": "City of Lewisville",
@@ -1743,12 +1795,12 @@
      {
       "authority": "City of Copper Canyon",
       "where": "within city limits",
-      "area_share": 0.15595
+      "area_share": 0.15636
      },
      {
       "authority": "City of Double Oak",
       "where": "within city limits",
-      "area_share": 0.13993
+      "area_share": 0.14019
      },
      {
       "authority": "City of Flower Mound",
@@ -1760,7 +1812,7 @@
      {
       "authority": "City of Highland Village",
       "where": "within city limits",
-      "area_share": 0.38579
+      "area_share": 0.38624
      },
      {
       "authority": "City of Lewisville",
@@ -1770,12 +1822,12 @@
      {
       "authority": "City of Copper Canyon",
       "where": "within city limits",
-      "area_share": 0.15595
+      "area_share": 0.15636
      },
      {
       "authority": "City of Double Oak",
       "where": "within city limits",
-      "area_share": 0.13993
+      "area_share": 0.14019
      },
      {
       "authority": "City of Flower Mound",
@@ -1802,7 +1854,9 @@
      "stored_records": 11,
      "records_last_365d": 0,
      "newest_record_date": "2025-03-27",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     },
     {
      "registry_id": "denton-county-dev-permits",
@@ -1810,7 +1864,9 @@
      "stored_records": 3,
      "records_last_365d": 0,
      "newest_record_date": "2020-09-09",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.01279,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     }
    ],
    "newest_record_date": "2025-03-27",
@@ -1820,7 +1876,7 @@
      {
       "jurisdiction": "Highland Village",
       "type": "incorporated city",
-      "area_share": 0.38579,
+      "area_share": 0.38624,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -1832,17 +1888,17 @@
      {
       "jurisdiction": "Copper Canyon",
       "type": "incorporated city",
-      "area_share": 0.15595,
+      "area_share": 0.15636,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
       "jurisdiction": "Double Oak",
       "type": "incorporated city",
-      "area_share": 0.13993,
+      "area_share": 0.14019,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9998,
+    "area_share_without_current_source": 1.0009,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -1903,7 +1959,9 @@
      "stored_records": 11,
      "records_last_365d": 1,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-11-13",
@@ -2048,7 +2106,9 @@
      "stored_records": 19,
      "records_last_365d": 0,
      "newest_record_date": "2025-08-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     },
     {
      "registry_id": "denton-county-dev-permits",
@@ -2056,7 +2116,9 @@
      "stored_records": 1,
      "records_last_365d": 0,
      "newest_record_date": "2015-09-30",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0,
+     "coverage_basis": "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)"
     }
    ],
    "newest_record_date": "2025-08-21",
@@ -2097,12 +2159,12 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.00086,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Unincorporated Denton County",
@@ -2156,7 +2218,9 @@
      "stored_records": 285,
      "records_last_365d": 0,
      "newest_record_date": "2023-03-23",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.17242,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2164,7 +2228,9 @@
      "stored_records": 49,
      "records_last_365d": 5,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-11-13",
@@ -2211,17 +2277,17 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.10448,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Shady Shores",
      "type": "incorporated city",
-     "area_share": 0.09109,
+     "area_share": 0.09227,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -2286,7 +2352,7 @@
      {
       "authority": "City of Shady Shores",
       "where": "within city limits",
-      "area_share": 0.09109
+      "area_share": 0.09227
      },
      {
       "authority": "City of Corinth",
@@ -2303,7 +2369,7 @@
      {
       "authority": "City of Shady Shores",
       "where": "within city limits",
-      "area_share": 0.09109
+      "area_share": 0.09227
      },
      {
       "authority": "City of Corinth",
@@ -2316,11 +2382,6 @@
       "area_share": 0.21695
      },
      {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.10448
-     },
-     {
       "authority": "City of Shady Shores",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.01257
@@ -2329,6 +2390,11 @@
       "authority": "City of Oak Point",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.00798
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.10448
      },
      {
       "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
@@ -2350,7 +2416,9 @@
      "stored_records": 222,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-17",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.41047,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2358,7 +2426,9 @@
      "stored_records": 9,
      "records_last_365d": 1,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-11-13",
@@ -2378,15 +2448,15 @@
       "status": "NO_SOURCE_REGISTERED"
      },
      {
-      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
-      "type": "ETJ",
+      "jurisdiction": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "type": "ETJ-DIV2",
       "area_share": 0.10448,
-      "status": "NO_SOURCE_REGISTERED"
+      "status": "UNKNOWN_AUTHORITY"
      },
      {
       "jurisdiction": "Shady Shores",
       "type": "incorporated city",
-      "area_share": 0.09109,
+      "area_share": 0.09227,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -2396,7 +2466,7 @@
       "status": "STALE"
      }
     ],
-    "area_share_without_current_source": 0.9967,
+    "area_share_without_current_source": 0.9979,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -2457,7 +2527,9 @@
      "stored_records": 6,
      "records_last_365d": 1,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-11-13",
@@ -2492,7 +2564,7 @@
     {
      "name": "Corinth",
      "type": "incorporated city",
-     "area_share": 0.38891,
+     "area_share": 0.38916,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -2541,7 +2613,7 @@
      {
       "authority": "City of Corinth",
       "where": "within city limits",
-      "area_share": 0.38891
+      "area_share": 0.38916
      }
     ],
     "plat_subdivision": [
@@ -2553,7 +2625,7 @@
      {
       "authority": "City of Corinth",
       "where": "within city limits",
-      "area_share": 0.38891
+      "area_share": 0.38916
      },
      {
       "authority": "City of Denton",
@@ -2575,7 +2647,9 @@
      "stored_records": 53,
      "records_last_365d": 0,
      "newest_record_date": "2023-04-05",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.14012,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2583,7 +2657,9 @@
      "stored_records": 22,
      "records_last_365d": 0,
      "newest_record_date": "2025-08-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-08-21",
@@ -2599,7 +2675,7 @@
      {
       "jurisdiction": "Corinth",
       "type": "incorporated city",
-      "area_share": 0.38891,
+      "area_share": 0.38916,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -2609,7 +2685,7 @@
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9993,
+    "area_share_without_current_source": 0.9996,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -2654,7 +2730,7 @@
     {
      "name": "Flower Mound",
      "type": "incorporated city",
-     "area_share": 0.07644,
+     "area_share": 0.07668,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -2678,18 +2754,18 @@
     {
      "name": "Copper Canyon",
      "type": "incorporated city",
-     "area_share": 0.04299,
+     "area_share": 0.04305,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.04239,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Northlake ETJ",
@@ -2718,7 +2794,7 @@
     {
      "name": "Highland Village",
      "type": "incorporated city",
-     "area_share": 0.00882,
+     "area_share": 0.00886,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -2785,7 +2861,7 @@
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.07644
+      "area_share": 0.07668
      },
      {
       "authority": "City of Northlake",
@@ -2795,12 +2871,12 @@
      {
       "authority": "City of Copper Canyon",
       "where": "within city limits",
-      "area_share": 0.04299
+      "area_share": 0.04305
      },
      {
       "authority": "City of Highland Village",
       "where": "within city limits",
-      "area_share": 0.00882
+      "area_share": 0.00886
      }
     ],
     "plat_subdivision": [
@@ -2822,7 +2898,7 @@
      {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.07644
+      "area_share": 0.07668
      },
      {
       "authority": "City of Northlake",
@@ -2832,12 +2908,12 @@
      {
       "authority": "City of Copper Canyon",
       "where": "within city limits",
-      "area_share": 0.04299
+      "area_share": 0.04305
      },
      {
       "authority": "City of Highland Village",
       "where": "within city limits",
-      "area_share": 0.00882
+      "area_share": 0.00886
      },
      {
       "authority": "City of Denton",
@@ -2848,11 +2924,6 @@
       "authority": "City of Argyle",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.04606
-     },
-     {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.04239
      },
      {
       "authority": "City of Northlake",
@@ -2868,6 +2939,11 @@
       "authority": "City of Bartonville",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.02281
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.04239
      }
     ],
     "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
@@ -2884,7 +2960,9 @@
      "stored_records": 2327,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-15",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.33456,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -2892,7 +2970,9 @@
      "stored_records": 36,
      "records_last_365d": 1,
      "newest_record_date": "2026-05-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-05-21",
@@ -2926,7 +3006,7 @@
      {
       "jurisdiction": "Flower Mound",
       "type": "incorporated city",
-      "area_share": 0.07644,
+      "area_share": 0.07668,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -2936,7 +3016,7 @@
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 1.0013,
+    "area_share_without_current_source": 1.0017,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -3028,17 +3108,17 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.02901,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Celina",
      "type": "incorporated city",
-     "area_share": 0.02892,
+     "area_share": 0.02899,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -3078,7 +3158,7 @@
     {
      "name": "Prosper",
      "type": "incorporated city",
-     "area_share": 0.01033,
+     "area_share": 0.01038,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -3154,7 +3234,7 @@
      {
       "authority": "City of Celina",
       "where": "within city limits",
-      "area_share": 0.02892
+      "area_share": 0.02899
      },
      {
       "authority": "City of Krugerville",
@@ -3164,7 +3244,7 @@
      {
       "authority": "City of Prosper",
       "where": "within city limits",
-      "area_share": 0.01033
+      "area_share": 0.01038
      }
     ],
     "plat_subdivision": [
@@ -3196,7 +3276,7 @@
      {
       "authority": "City of Celina",
       "where": "within city limits",
-      "area_share": 0.02892
+      "area_share": 0.02899
      },
      {
       "authority": "City of Krugerville",
@@ -3206,7 +3286,7 @@
      {
       "authority": "City of Prosper",
       "where": "within city limits",
-      "area_share": 0.01033
+      "area_share": 0.01038
      },
      {
       "authority": "City of Aubrey",
@@ -3222,11 +3302,6 @@
       "authority": "City of Cross Roads",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.05066
-     },
-     {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.02901
      },
      {
       "authority": "City of Krugerville",
@@ -3252,6 +3327,11 @@
       "authority": "City of Providence Village",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.00641
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.02901
      },
      {
       "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
@@ -3283,7 +3363,9 @@
      "stored_records": 5682,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-24",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.65128,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3291,7 +3373,9 @@
      "stored_records": 38,
      "records_last_365d": 4,
      "newest_record_date": "2026-01-29",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2026-01-29",
@@ -3335,7 +3419,7 @@
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9978,
+    "area_share_without_current_source": 0.998,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -3397,7 +3481,7 @@
     {
      "name": "Justin",
      "type": "incorporated city",
-     "area_share": 0.09562,
+     "area_share": 0.09632,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -3428,6 +3512,15 @@
      "source_status": "CURRENT"
     },
     {
+     "name": "New Fairview",
+     "type": "incorporated city",
+     "area_share": 0.05339,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.03158 (Denton County part) vs Census 0.05339 (whole city); larger used",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
      "name": "Unincorporated Denton County",
      "type": "unincorporated county",
      "area_share": 0.04596,
@@ -3445,15 +3538,6 @@
      "source_status": "STALE"
     },
     {
-     "name": "New Fairview",
-     "type": "incorporated city",
-     "area_share": 0.03158,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.03158 vs Census 0.05339 (annexation vintage difference)",
-     "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
-    },
-    {
      "name": "DISH ETJ",
      "type": "ETJ",
      "area_share": 0.02306,
@@ -3464,7 +3548,7 @@
     {
      "name": "DISH",
      "type": "incorporated city",
-     "area_share": 0.02035,
+     "area_share": 0.02077,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -3496,7 +3580,7 @@
      {
       "authority": "City of Justin",
       "where": "within city limits",
-      "area_share": 0.09562
+      "area_share": 0.09632
      },
      {
       "authority": "City of Fort Worth",
@@ -3506,12 +3590,12 @@
      {
       "authority": "City of New Fairview",
       "where": "within city limits",
-      "area_share": 0.03158
+      "area_share": 0.05339
      },
      {
       "authority": "City of DISH",
       "where": "within city limits",
-      "area_share": 0.02035
+      "area_share": 0.02077
      }
     ],
     "plat_subdivision": [
@@ -3523,7 +3607,7 @@
      {
       "authority": "City of Justin",
       "where": "within city limits",
-      "area_share": 0.09562
+      "area_share": 0.09632
      },
      {
       "authority": "City of Fort Worth",
@@ -3533,12 +3617,12 @@
      {
       "authority": "City of New Fairview",
       "where": "within city limits",
-      "area_share": 0.03158
+      "area_share": 0.05339
      },
      {
       "authority": "City of DISH",
       "where": "within city limits",
-      "area_share": 0.02035
+      "area_share": 0.02077
      },
      {
       "authority": "City of Ponder",
@@ -3590,7 +3674,9 @@
      "stored_records": 395,
      "records_last_365d": 0,
      "newest_record_date": "2023-06-06",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.62988,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3598,7 +3684,9 @@
      "stored_records": 19,
      "records_last_365d": 1,
      "newest_record_date": "2025-10-30",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     },
     {
      "registry_id": "fort-worth-development-permits",
@@ -3606,7 +3694,9 @@
      "stored_records": 10,
      "records_last_365d": 10,
      "newest_record_date": "2026-07-13",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.06084,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     }
    ],
    "newest_record_date": "2026-07-13",
@@ -3640,7 +3730,7 @@
      {
       "jurisdiction": "Justin",
       "type": "incorporated city",
-      "area_share": 0.09562,
+      "area_share": 0.09632,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -3648,9 +3738,15 @@
       "type": "ETJ",
       "area_share": 0.0715,
       "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "New Fairview",
+      "type": "incorporated city",
+      "area_share": 0.05339,
+      "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.7967,
+    "area_share_without_current_source": 0.8196,
     "current_local_source_records_365d": 10
    },
    "county_outline": "ok",
@@ -3678,12 +3774,12 @@
      "source_status": "STALE"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.33599,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Denton ETJ",
@@ -3704,7 +3800,7 @@
     {
      "name": "Krum",
      "type": "incorporated city",
-     "area_share": 0.04387,
+     "area_share": 0.04388,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -3731,7 +3827,7 @@
      {
       "authority": "City of Krum",
       "where": "within city limits",
-      "area_share": 0.04387
+      "area_share": 0.04388
      },
      {
       "authority": "City of Denton",
@@ -3743,17 +3839,12 @@
      {
       "authority": "City of Krum",
       "where": "within city limits",
-      "area_share": 0.04387
+      "area_share": 0.04388
      },
      {
       "authority": "City of Denton",
       "where": "within city limits",
       "area_share": 0.0302
-     },
-     {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.33599
      },
      {
       "authority": "City of Denton",
@@ -3764,6 +3855,11 @@
       "authority": "City of Krum",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.03417
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.33599
      },
      {
       "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
@@ -3785,7 +3881,9 @@
      "stored_records": 284,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-04",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.88058,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3793,7 +3891,9 @@
      "stored_records": 15,
      "records_last_365d": 2,
      "newest_record_date": "2025-10-30",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-10-30",
@@ -3807,10 +3907,10 @@
       "status": "STALE"
      },
      {
-      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
-      "type": "ETJ",
+      "jurisdiction": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "type": "ETJ-DIV2",
       "area_share": 0.33599,
-      "status": "NO_SOURCE_REGISTERED"
+      "status": "UNKNOWN_AUTHORITY"
      },
      {
       "jurisdiction": "Denton ETJ",
@@ -3866,8 +3966,8 @@
      "name": "Pilot Point",
      "type": "incorporated city",
      "area_share": 0.09602,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.09602 vs Census 0.07269 (annexation vintage difference)",
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.09602 (Denton County part) vs Census 0.07269 (whole city); larger used",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
@@ -3880,12 +3980,12 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.05387,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Undetermined/overlapping ETJ (Denton DIV 2/Pilot Point)",
@@ -3957,8 +4057,8 @@
       "area_share": 0.05918
      },
      {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
       "area_share": 0.05387
      },
      {
@@ -3986,7 +4086,9 @@
      "stored_records": 288,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-10",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.72443,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -3994,7 +4096,9 @@
      "stored_records": 26,
      "records_last_365d": 0,
      "newest_record_date": "2025-02-27",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-02-27",
@@ -4032,10 +4136,10 @@
       "status": "NO_SOURCE_REGISTERED"
      },
      {
-      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
-      "type": "ETJ",
+      "jurisdiction": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "type": "ETJ-DIV2",
       "area_share": 0.05387,
-      "status": "NO_SOURCE_REGISTERED"
+      "status": "UNKNOWN_AUTHORITY"
      }
     ],
     "area_share_without_current_source": 0.9956,
@@ -4049,12 +4153,12 @@
    "zip_km2": 134.14,
    "jurisdictions": [
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.28492,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Unincorporated Denton County",
@@ -4092,7 +4196,7 @@
     {
      "name": "Denton",
      "type": "incorporated city",
-     "area_share": 0.06399,
+     "area_share": 0.06402,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -4100,7 +4204,7 @@
     {
      "name": "Ponder",
      "type": "incorporated city",
-     "area_share": 0.06152,
+     "area_share": 0.06161,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -4135,29 +4239,24 @@
      {
       "authority": "City of Denton",
       "where": "within city limits",
-      "area_share": 0.06399
+      "area_share": 0.06402
      },
      {
       "authority": "City of Ponder",
       "where": "within city limits",
-      "area_share": 0.06152
+      "area_share": 0.06161
      }
     ],
     "plat_subdivision": [
      {
       "authority": "City of Denton",
       "where": "within city limits",
-      "area_share": 0.06399
+      "area_share": 0.06402
      },
      {
       "authority": "City of Ponder",
       "where": "within city limits",
-      "area_share": 0.06152
-     },
-     {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.28492
+      "area_share": 0.06161
      },
      {
       "authority": "City of Ponder",
@@ -4173,6 +4272,11 @@
       "authority": "City of DISH",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.00931
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.28492
      },
      {
       "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
@@ -4194,7 +4298,9 @@
      "stored_records": 386,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-31",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.83302,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4202,7 +4308,9 @@
      "stored_records": 12,
      "records_last_365d": 2,
      "newest_record_date": "2025-11-13",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-11-13",
@@ -4210,10 +4318,10 @@
    "gap": {
     "jurisdictions_without_current_source_ge_5pct": [
      {
-      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
-      "type": "ETJ",
+      "jurisdiction": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "type": "ETJ-DIV2",
       "area_share": 0.28492,
-      "status": "NO_SOURCE_REGISTERED"
+      "status": "UNKNOWN_AUTHORITY"
      },
      {
       "jurisdiction": "Unincorporated Denton County",
@@ -4236,17 +4344,17 @@
      {
       "jurisdiction": "Denton",
       "type": "incorporated city",
-      "area_share": 0.06399,
+      "area_share": 0.06402,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
       "jurisdiction": "Ponder",
       "type": "incorporated city",
-      "area_share": 0.06152,
+      "area_share": 0.06161,
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9994,
+    "area_share_without_current_source": 0.9996,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
@@ -4259,7 +4367,7 @@
     {
      "name": "Northlake",
      "type": "incorporated city",
-     "area_share": 0.15815,
+     "area_share": 0.15817,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -4273,35 +4381,20 @@
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
-     "name": "Flower Mound",
+     "name": "Westlake",
      "type": "incorporated city",
-     "area_share": 0.09735,
-     "boundary_source": "denton_county_gis",
-     "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
-    },
-    {
-     "name": "Trophy Club",
-     "type": "incorporated city",
-     "area_share": 0.08525,
-     "boundary_source": "denton_county_gis",
-     "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
-    },
-    {
-     "name": "Keller",
-     "type": "incorporated city",
-     "area_share": 0.08039,
-     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "area_share": 0.13391,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.02008 (Denton County part) vs Census 0.13391 (whole city); larger used",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
     },
     {
      "name": "Fort Worth",
      "type": "incorporated city",
-     "area_share": 0.07246,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.07246 vs Census 0.11132 (annexation vintage difference)",
+     "area_share": 0.11132,
+     "boundary_source": "max(denton_county_gis, census_tigerweb)",
+     "note": "county layer 0.07246 (Denton County part) vs Census 0.11132 (whole city); larger used",
      "registered_sources": [
       {
        "registry_id": "fort-worth-development-permits",
@@ -4313,6 +4406,30 @@
       }
      ],
      "source_status": "CURRENT"
+    },
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.0974,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Trophy Club",
+     "type": "incorporated city",
+     "area_share": 0.08886,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Keller",
+     "type": "incorporated city",
+     "area_share": 0.08039,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
     },
     {
      "name": "Unincorporated Denton County",
@@ -4356,15 +4473,6 @@
      "source_status": "UNKNOWN_AUTHORITY"
     },
     {
-     "name": "Westlake",
-     "type": "incorporated city",
-     "area_share": 0.02008,
-     "boundary_source": "denton_county_gis",
-     "note": "county layer 0.02008 vs Census 0.13391 (annexation vintage difference)",
-     "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
-    },
-    {
      "name": "Fort Worth ETJ",
      "type": "ETJ",
      "area_share": 0.01647,
@@ -4403,7 +4511,7 @@
      {
       "authority": "City of Northlake",
       "where": "within city limits",
-      "area_share": 0.15815
+      "area_share": 0.15817
      },
      {
       "authority": "City of Roanoke",
@@ -4411,29 +4519,29 @@
       "area_share": 0.14593
      },
      {
+      "authority": "City of Westlake",
+      "where": "within city limits",
+      "area_share": 0.13391
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.11132
+     },
+     {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.09735
+      "area_share": 0.0974
      },
      {
       "authority": "City of Trophy Club",
       "where": "within city limits",
-      "area_share": 0.08525
+      "area_share": 0.08886
      },
      {
       "authority": "City of Keller",
       "where": "within city limits",
       "area_share": 0.08039
-     },
-     {
-      "authority": "City of Fort Worth",
-      "where": "within city limits",
-      "area_share": 0.07246
-     },
-     {
-      "authority": "City of Westlake",
-      "where": "within city limits",
-      "area_share": 0.02008
      },
      {
       "authority": "City of Southlake",
@@ -4445,7 +4553,7 @@
      {
       "authority": "City of Northlake",
       "where": "within city limits",
-      "area_share": 0.15815
+      "area_share": 0.15817
      },
      {
       "authority": "City of Roanoke",
@@ -4453,29 +4561,29 @@
       "area_share": 0.14593
      },
      {
+      "authority": "City of Westlake",
+      "where": "within city limits",
+      "area_share": 0.13391
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.11132
+     },
+     {
       "authority": "City of Flower Mound",
       "where": "within city limits",
-      "area_share": 0.09735
+      "area_share": 0.0974
      },
      {
       "authority": "City of Trophy Club",
       "where": "within city limits",
-      "area_share": 0.08525
+      "area_share": 0.08886
      },
      {
       "authority": "City of Keller",
       "where": "within city limits",
       "area_share": 0.08039
-     },
-     {
-      "authority": "City of Fort Worth",
-      "where": "within city limits",
-      "area_share": 0.07246
-     },
-     {
-      "authority": "City of Westlake",
-      "where": "within city limits",
-      "area_share": 0.02008
      },
      {
       "authority": "City of Southlake",
@@ -4517,7 +4625,9 @@
      "stored_records": 42,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-01",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.15019,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4525,7 +4635,9 @@
      "stored_records": 37,
      "records_last_365d": 1,
      "newest_record_date": "2026-05-21",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     },
     {
      "registry_id": "fort-worth-development-permits",
@@ -4533,7 +4645,9 @@
      "stored_records": 19,
      "records_last_365d": 19,
      "newest_record_date": "2026-08-17",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.11132,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     }
    ],
    "newest_record_date": "2026-08-17",
@@ -4543,7 +4657,7 @@
      {
       "jurisdiction": "Northlake",
       "type": "incorporated city",
-      "area_share": 0.15815,
+      "area_share": 0.15817,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -4553,15 +4667,21 @@
       "status": "NO_SOURCE_REGISTERED"
      },
      {
+      "jurisdiction": "Westlake",
+      "type": "incorporated city",
+      "area_share": 0.13391,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
       "jurisdiction": "Flower Mound",
       "type": "incorporated city",
-      "area_share": 0.09735,
+      "area_share": 0.0974,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
       "jurisdiction": "Trophy Club",
       "type": "incorporated city",
-      "area_share": 0.08525,
+      "area_share": 0.08886,
       "status": "NO_SOURCE_REGISTERED"
      },
      {
@@ -4577,7 +4697,7 @@
       "status": "STALE"
      }
     ],
-    "area_share_without_current_source": 0.7535,
+    "area_share_without_current_source": 0.871,
     "current_local_source_records_365d": 19
    },
    "county_outline": "ok",
@@ -4605,12 +4725,12 @@
      "source_status": "STALE"
     },
     {
-     "name": "Denton ETJ (county 'DIV 2' polygon)",
-     "type": "ETJ",
+     "name": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+     "type": "ETJ-DIV2",
      "area_share": 0.23633,
      "boundary_source": "denton_county_gis ETJ_GC",
      "registered_sources": [],
-     "source_status": "NO_SOURCE_REGISTERED"
+     "source_status": "UNKNOWN_AUTHORITY"
     },
     {
      "name": "Sanger ETJ",
@@ -4639,7 +4759,7 @@
     {
      "name": "Denton",
      "type": "incorporated city",
-     "area_share": 0.02968,
+     "area_share": 0.02995,
      "boundary_source": "denton_county_gis",
      "registered_sources": [],
      "source_status": "NO_SOURCE_REGISTERED"
@@ -4671,7 +4791,7 @@
      {
       "authority": "City of Denton",
       "where": "within city limits",
-      "area_share": 0.02968
+      "area_share": 0.02995
      }
     ],
     "plat_subdivision": [
@@ -4683,12 +4803,7 @@
      {
       "authority": "City of Denton",
       "where": "within city limits",
-      "area_share": 0.02968
-     },
-     {
-      "authority": "City of Denton",
-      "where": "ETJ (statutory general rule; confirm)",
-      "area_share": 0.23633
+      "area_share": 0.02995
      },
      {
       "authority": "City of Sanger",
@@ -4699,6 +4814,11 @@
       "authority": "City of Denton",
       "where": "ETJ (statutory general rule; confirm)",
       "area_share": 0.07095
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "area_share": 0.23633
      },
      {
       "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
@@ -4725,7 +4845,9 @@
      "stored_records": 474,
      "records_last_365d": 0,
      "newest_record_date": "2023-05-02",
-     "local_permit_authority_source": true
+     "local_permit_authority_source": true,
+     "authority_area_share_in_zip": 0.84877,
+     "coverage_basis": "legitimate (authority covers >=5% of ZIP area)"
     },
     {
      "registry_id": "txdot-projects-info-all",
@@ -4733,7 +4855,9 @@
      "stored_records": 20,
      "records_last_365d": 1,
      "newest_record_date": "2025-10-30",
-     "local_permit_authority_source": false
+     "local_permit_authority_source": false,
+     "authority_area_share_in_zip": null,
+     "coverage_basis": "not a local permit authority"
     }
    ],
    "newest_record_date": "2025-10-30",
@@ -4747,10 +4871,10 @@
       "status": "STALE"
      },
      {
-      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
-      "type": "ETJ",
+      "jurisdiction": "Denton 'DIV 2' polygon in county ETJ layer (meaning of DIV 2 unverified)",
+      "type": "ETJ-DIV2",
       "area_share": 0.23633,
-      "status": "NO_SOURCE_REGISTERED"
+      "status": "UNKNOWN_AUTHORITY"
      },
      {
       "jurisdiction": "Sanger ETJ",
@@ -4771,7 +4895,7 @@
       "status": "NO_SOURCE_REGISTERED"
      }
     ],
-    "area_share_without_current_source": 0.9991,
+    "area_share_without_current_source": 0.9993,
     "current_local_source_records_365d": 0
    },
    "county_outline": "ok",
