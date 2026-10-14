@@ -21,6 +21,9 @@ import { createServer } from 'node:http';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { chromium } from 'playwright';
+import { execFileSync } from 'node:child_process';
+// The origin the generated documents canonicalise to is the contract's CURRENT identity (brand_host.py), never a literal.
+const SITE_ORIGIN = execFileSync('python3', ['scripts/brand_host.py', '--origin'], { encoding: 'utf8' }).trim().replace(/\/$/, '');
 import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, classifyMembers, chooseControls,
          publishedControls } from './lib/zip-page-controls.mjs';
 
@@ -106,7 +109,7 @@ const main = async () => {
         ok(r.status === 200, `[${z}] initial response is HTTP 200`);
         ok(h.includes(`content="${wantIdx ? 'index, follow' : 'noindex, follow'}"`),
            `[${z}] initial HTML carries ${wantIdx ? 'index, follow' : 'noindex, follow'}`);
-        ok(grab(h, /<link rel="canonical" href="([^"]+)"/) === `https://homesignal.net/community/${z}/`,
+        ok(grab(h, /<link rel="canonical" href="([^"]+)"/) === `${SITE_ORIGIN}/community/${z}/`,
            `[${z}] canonical is the ZIP path`);
         ok((grab(h, /<title>([^<]+)<\/title>/) || '').includes(z) ||
            (grab(h, /<h1>([^<]+)<\/h1>/) || '').includes(z), `[${z}] title/H1 carry the ZIP identity`);
