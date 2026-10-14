@@ -155,7 +155,7 @@ for (const [z, mode] of [[SPEC, 'specialized_zip'], [PEND, 'verification_pending
   ok(!r.mapFrame && !r.leaflet && !r.strip, `${z} → no map, no iframe, no stat tiles`, { frame: r.mapFrame, leaflet: r.leaflet, strip: r.strip });
   ok(!NO_ZIPWIDE.test(r.bodyText), `${z} → no ZIP-wide project count and no empty-search sentence`, r.bodyText.match(NO_ZIPWIDE));
   ok(!/decommission|retired|inactive|undeliverable|invalid/i.test(r.bodyText), `${z} → never calls the ZIP retired, inactive, invalid or decommissioned`);
-  ok(r.canonical === `https://homesignal.net/community/${z}/`, `${z} → keeps its own canonical`, r.canonical);
+  ok(r.canonical === `https://jodytracks.com/community/${z}/`, `${z} → keeps its own canonical`, r.canonical);
   ok(r.errors.length === 0, `${z} → no page error`, r.errors);
 }
 

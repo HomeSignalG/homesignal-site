@@ -77,7 +77,11 @@ const server = createServer(async (req, res) => {
   const url = req.url.split('?')[0];
   const p = normalize(join(root, decodeURIComponent(url)));
   if (!p.startsWith(root)) { res.writeHead(403).end(); return; }
-  try { res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(await readFile(p)); }
+  try { let body = await readFile(p);
+    // The deployed page is the SOURCE page after the brand overlay, which widens its escaped HomeSignal origin pattern to accept both hosts
+    // (brand_stage.py ESC_ORIGIN_RE). Apply exactly that one rule here, because the invite link the server builds now names the Jody origin.
+    if (extname(p) === '.html') body = Buffer.from(String(body).split('https:\\/\\/homesignal\\.net').join('https:\\/\\/(?:homesignal\\.net|jodytracks\\.com)'));
+    res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body); }
   catch { res.writeHead(404).end('not found'); }
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
