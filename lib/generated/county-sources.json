@@ -2,7 +2,7 @@
   "_generated": "AUTO-GENERATED — do not edit. Source: supabase/functions/get-address-report/jurisdiction-registry.json",
   "_regenerate": "node scripts/gen-county-sources.mjs",
   "_contract": "label is the entry jurisdiction verbatim, truncated at the first em-dash. scope is read from the entry, never guessed. The ONLY derived subject-matter fact is `commercial`: the entry maps a value to Commercial (or use_type_const is Commercial) AND its commercial_work_evidence is not unresolved. Nothing else is inferred from an id, family or name.",
-  "registry_entries": 240,
+  "registry_entries": 247,
   "statewide": {
     "AK": [
       {
@@ -1909,6 +1909,48 @@
       }
     ],
     "TX|Denton": [
+      {
+        "id": "denton-city-projects-annexation",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-decided",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-planned-development",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-site-plan",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-specific-use",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-subdivision",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
+      {
+        "id": "denton-city-projects-zoning",
+        "label": "City of Denton",
+        "scope": "city",
+        "commercial": false
+      },
       {
         "id": "denton-county-dev-permits",
         "label": "Denton County",
