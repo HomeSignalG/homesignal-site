@@ -30,7 +30,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fai
 const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://homesignal.net/</loc>
+    <loc>https://jodytracks.com/</loc>
   </url>
 </urlset>
 `;
@@ -124,12 +124,12 @@ ok(man.project_pages.length === nProjects, `the manifest lists all ${nProjects} 
 ok(JSON.stringify(man.project_pages) === JSON.stringify(Object.keys(docs.projectsDoc.projects)
   .map((k) => expectedPath('town-permits', docs.projectsDoc.projects[k].case, k)).sort()),
    'every page is at the documented URL');
-const smProj = [...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+const smProj = [...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/project\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
 ok(JSON.stringify(smProj) === JSON.stringify(man.project_pages), 'the sitemap advertises exactly the project pages');
 ok(man.sitemap_project_urls === nProjects, 'the manifest reconciles the sitemap count');
 const pg1 = read(out, p1);
 ok(/<meta name="robots" content="index, follow">/.test(pg1), 'a project page is indexable');
-ok(pg1.includes(`<link rel="canonical" href="https://homesignal.net${p1}">`), 'and self-canonical');
+ok(pg1.includes(`<link rel="canonical" href="https://jodytracks.com${p1}">`), 'and self-canonical');
 const onDisk = readdirSync(join(out, 'project', 'town-permits'));
 ok(onDisk.length === nProjects, 'nothing else is written under /project/');
 
@@ -207,7 +207,7 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   ok(list.includes(`<a href="${po}">Nobody Links Here</a>`) && list.includes(`<a href="${p1}">`),
      "the ZIP's project list links every project page on that ZIP, kept or featured");
   ok(/<meta name="robots" content="noindex, follow">/.test(list) &&
-     list.includes('<link rel="canonical" href="https://homesignal.net/community/01002/projects/">'),
+     list.includes('<link rel="canonical" href="https://jodytracks.com/community/01002/projects/">'),
      'the list is followed but not indexed');
   const smk = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
   ok(!smk.includes('/projects/') && smk.includes(po), 'the list is in no sitemap; the kept page is');
@@ -268,19 +268,19 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const items = crumbs ? crumbs.itemListElement : [];
   ok(crumbs && crumbs['@type'] === 'BreadcrumbList' && items.length === 4 &&
      items.map((x) => x.position).join() === '1,2,3,4' &&
-     items[0].item === 'https://homesignal.net/' && items[1].item === 'https://homesignal.net/city/ma/amherst/' &&
-     items[2].item === 'https://homesignal.net/community/01002/' &&
-     items[3].item === `https://homesignal.net${expectedPath('phoenix-building-permits', 'T971680', KK)}` &&
+     items[0].item === 'https://jodytracks.com/' && items[1].item === 'https://jodytracks.com/city/ma/amherst/' &&
+     items[2].item === 'https://jodytracks.com/community/01002/' &&
+     items[3].item === `https://jodytracks.com${expectedPath('phoenix-building-permits', 'T971680', KK)}` &&
      items[3].name.includes('</script>'),
      'breadcrumbs: Home › City › ZIP › Project, with the name as data');
-  const lm = (xml, path) => (xml.match(new RegExp(`<loc>https://homesignal\\.net${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</loc>\\n    <lastmod>([^<]+)</lastmod>`)) || [])[1];
+  const lm = (xml, path) => (xml.match(new RegExp(`<loc>https://jodytracks\\.com${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</loc>\\n    <lastmod>([^<]+)</lastmod>`)) || [])[1];
   const sm2 = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
   const fam2 = readFileSync(join(b.out, 'sitemaps', 'project.xml'), 'utf8');
   ok(lm(sm2, p1) === '2026-09-20' && lm(fam2, p1) === '2026-09-20',
      'the sitemaps give a project the day its facts last changed');
   ok(lm(sm2, pathOf('https://permits.example.gov/r/2')) === '2026-09-28',
      'a record without changed_on falls back to the plane day');
-  ok(!/<loc>https:\/\/homesignal\.net\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
+  ok(!/<loc>https:\/\/jodytracks\.com\/community\/[^<]+<\/loc>\n    <lastmod>/.test(sm2),
      'ZIP pages carry no lastmod (no honest per-page change date exists for them yet)');
   const list = read(b.out, '/community/01002/projects/');
   ok(list.includes('(no longer tracked)') && list.includes('<span class="addr">27 W Lewis Ave</span>'),
@@ -408,11 +408,11 @@ print("LOADED")`;
   const gw = read(out, W);
   const gc = read(out, C);
   ok(JSON.stringify(man.guide_pages) === JSON.stringify([C, W].sort()), 'the manifest lists exactly the two guides');
-  const smG = [...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/guides\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
+  const smG = [...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/guides\/[^<]+)<\/loc>/g)].map((m) => m[1]).sort();
   ok(JSON.stringify(smG) === JSON.stringify([C, W].sort()) && man.sitemap_guide_urls === 2,
      'the sitemap advertises exactly the two guides');
   for (const [p, g] of [[W, gw], [C, gc]]) {
-    ok(/<meta name="robots" content="index, follow">/.test(g) && g.includes(`<link rel="canonical" href="https://homesignal.net${p}">`),
+    ok(/<meta name="robots" content="index, follow">/.test(g) && g.includes(`<link rel="canonical" href="https://jodytracks.com${p}">`),
        `${p} is indexable and self-canonical`);
     ok(g.includes('<form class="zsec" action="/homesignalmap.html" method="get" role="search">') &&
        /<input id="[a-zA-Z]+" name="zip"/.test(g), `${p} has a ZIP lookup that works with no script`);
@@ -443,7 +443,7 @@ print("LOADED")`;
   for (const n of ['zip-alerts', 'zip-development', 'city', 'project', 'guide']) {
     const f = join(out, 'sitemaps', `${n}.xml`);
     ok(existsSync(f), `sitemaps/${n}.xml is written`);
-    fam[n] = [...readFileSync(f, 'utf8').matchAll(/<loc>https:\/\/homesignal\.net([^<]+)<\/loc>/g)].map((m) => m[1]);
+    fam[n] = [...readFileSync(f, 'utf8').matchAll(/<loc>https:\/\/jodytracks\.com([^<]+)<\/loc>/g)].map((m) => m[1]);
     ok(fam[n].length === man.family_sitemaps[n], `${n}: the manifest records its count (${fam[n].length})`);
   }
   ok(JSON.stringify([...fam.project].sort()) === JSON.stringify(man.project_pages), 'the project family is exactly the project pages');
@@ -451,10 +451,11 @@ print("LOADED")`;
   ok(JSON.stringify([...fam.guide].sort()) === JSON.stringify(man.guide_pages), 'the guide family is exactly the guides');
   ok(fam['zip-development'].includes('/community/01002/') && !fam['zip-alerts'].includes('/community/01002/'),
      'a Rule-D-only ZIP is in the development family and not the alerts family');
-  const mainGen = new Set([...sm.matchAll(/<loc>https:\/\/homesignal\.net(\/(?:community|city|project|guides)\/[^<]+)<\/loc>/g)].map((m) => m[1]));
+  const mainGen = new Set([...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/(?:community|city|project|guides)\/[^<]+)<\/loc>/g)].map((m) => m[1]));
   const union = new Set(Object.values(fam).flat());
   ok(union.size === mainGen.size && [...union].every((u) => mainGen.has(u)),
      `together the families cover exactly sitemap.xml's generated URLs (${union.size})`);
+  // robots.txt is a SOURCE file (HomeSignal-branded); the brand overlay (brand_stage.py) rewrites it to the Jody host at build time (cutover-rehearsal 3a/A7).
   const robots = readFileSync(join(root, 'robots.txt'), 'utf8');
   ok(['zip-alerts', 'zip-development', 'city', 'project', 'guide']
     .every((n) => robots.includes(`Sitemap: https://homesignal.net/sitemaps/${n}.xml`)) &&

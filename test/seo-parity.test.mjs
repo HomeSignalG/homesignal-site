@@ -11,9 +11,16 @@ const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return
 const parity = (a, b) => spawnSync('python3', ['scripts/seo_parity.py', '--a', a, '--b', b], { encoding: 'utf8' });
 
 const base = mkdtempSync(join(tmpdir(), 'seo-parity-'));
+// Tree A is the HomeSignal build. The committed contract is now the v2 swap (Jody current), so A is built in a throwaway copy of the repo
+// carrying the FROZEN v1 contract (HomeSignal current): the build that was live before the cutover.
+const RH = join(base, 'repo-homesignal');
+const SKIP0 = new Set(['.git', 'node_modules', 'test', '_site']);
+cpSync('.', RH, { recursive: true, filter: (src) => !SKIP0.has(src.replace(/^\.\/?/, '').split('/')[0]) || src === '.' });
+writeFileSync(join(RH, 'docs/brand/brand-contract.v1.json'), readFileSync('test/fixtures/brand-contract.v1.frozen.json', 'utf8'));
+const FIX = join(process.cwd(), 'test/fixtures/zip-pages.json');
 const A = join(base, 'a');
-execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', A], { stdio: 'pipe' });
-execFileSync('python3', ['scripts/gen_zip_pages.py', '--fixture', 'test/fixtures/zip-pages.json', '--out', A, '--now', '2026-09-04T00:00:00'], { stdio: 'pipe' });
+execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', A], { stdio: 'pipe', cwd: RH });
+execFileSync('python3', ['scripts/gen_zip_pages.py', '--fixture', FIX, '--out', A, '--now', '2026-09-04T00:00:00'], { stdio: 'pipe', cwd: RH });
 const B = join(base, 'b'); cpSync(A, B, { recursive: true });
 const ov = spawnSync('python3', ['scripts/brand_stage.py', '--dir', B, '--identity', 'jody'], { encoding: 'utf8' });
 check('0a the launch overlay (no --staging) succeeds with no leftovers', ov.status === 0, ov.stderr);

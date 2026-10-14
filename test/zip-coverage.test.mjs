@@ -184,7 +184,7 @@ for (const z of MOD) {
   const title = c.page_title.replace('{zip}', z), desc = c.meta_description.replace('{zip}', z);
   ok(h.includes(`<title>${title}</title>`), `5e ${z} title: ${title}`);
   ok(h.includes(`<meta name="description" content="${desc}">`), `5f ${z} meta description is the approved one`);
-  ok(h.includes(`<link rel="canonical" href="https://homesignal.net/community/${z}/">`), `5g ${z} keeps its own canonical URL`);
+  ok(h.includes(`<link rel="canonical" href="https://jodytracks.com/community/${z}/">`), `5g ${z} keeps its own canonical URL`);
   ok(h.includes(`data-zip-coverage="${mode}"`) && text(h).includes(c.title.replace('{zip}', z)), `5h ${z} shows the ${mode} panel`);
   if (mode === 'specialized_zip') ok(new RegExp(`<h2>HomeSignal coverage for ZIP ${z}</h2>`).test(h) && !/active in HomeSignal/i.test(h), `5h2 ${z} heading is "HomeSignal coverage for ZIP ${z}", never "active in HomeSignal"`);
   ok(!/USPS|Postal Service|confirmed|verified active|is active|active ZIP/i.test(text(/<section class="zcov"[\s\S]*?<\/section>/.exec(h)[0]).replace(/is being verified|verifying its current postal/gi, '')),

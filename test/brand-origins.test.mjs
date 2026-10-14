@@ -24,7 +24,7 @@ let threw = false; try { render({ ...contract, contract_version: 9 }); } catch {
 check('1e an invalid contract cannot be rendered', threw, 'rendered');
 
 // 2. the allowlist the gate really uses
-const want = ['https://homesignal.net', 'https://www.homesignal.net', 'https://jodytracks.com'];
+const want = ['https://jodytracks.com', 'https://www.homesignal.net', 'https://homesignal.net'];  // v2: the current identity first, then the legacy (redirect-only) hosts
 check('2a ALLOWED_ORIGINS is exactly the three expected origins, in order', gate.ALLOWED_ORIGINS.join() === want.join(), gate.ALLOWED_ORIGINS.join());
 check('2b every pre-existing origin is preserved (additive only)', ['https://homesignal.net', 'https://www.homesignal.net'].every((o) => gate.ALLOWED_ORIGINS.includes(o)), 'lost one');
 check('2c the legacy www host is explicit, not inferred', JSON.stringify(LEGACY_EXTRA_ORIGINS) === '["https://www.homesignal.net"]', 'legacy');
@@ -68,11 +68,11 @@ const evalM = await import('../supabase/functions/_shared/evaluation-reads.ts');
 const billM = await import('../supabase/functions/_shared/billing-reads.ts');
 const watchM = await import('../supabase/functions/_shared/watch-email.ts');
 const HERE = JSON.parse(readFileSync('docs/brand/brand-contract.v1.json', 'utf8')).current_identity;
-check('6a the committed contract is HomeSignal-current, so the emitted values are the HomeSignal ones', HERE === 'homesignal' && genM.PUBLIC_ORIGIN === 'https://homesignal.net' && genM.PUBLIC_HOST === 'homesignal.net' && genM.PUBLIC_NAME === 'HomeSignal', JSON.stringify([HERE, genM.PUBLIC_ORIGIN]));
-check('6b SHARE_PAGE is byte-identical to the pre-contract literal', shareM.SHARE_PAGE === 'https://homesignal.net/shared-report.html', shareM.SHARE_PAGE);
-check('6c INVITE_PAGE is byte-identical', evalM.INVITE_PAGE === 'https://homesignal.net/development-activity-reports.html', evalM.INVITE_PAGE);
-check('6d BILLING_PAGE is byte-identical', billM.BILLING_PAGE === 'https://homesignal.net/development-activity-reports.html#billing', billM.BILLING_PAGE);
-check('6e WATCH_FROM and WATCH_OPEN_URL are byte-identical', watchM.WATCH_FROM === 'HomeSignal <noreply@homesignal.net>' && watchM.WATCH_OPEN_URL === 'https://homesignal.net/development-activity-reports.html', watchM.WATCH_FROM);
+check('6a the committed contract is Jody-current (v2), so the emitted values are the Jody ones', HERE === 'jody' && genM.PUBLIC_ORIGIN === 'https://jodytracks.com' && genM.PUBLIC_HOST === 'jodytracks.com' && genM.PUBLIC_NAME === 'Jody', JSON.stringify([HERE, genM.PUBLIC_ORIGIN]));
+check('6b SHARE_PAGE is the Jody origin plus the unchanged path', shareM.SHARE_PAGE === 'https://jodytracks.com/shared-report.html', shareM.SHARE_PAGE);
+check('6c INVITE_PAGE is the Jody origin plus the unchanged path', evalM.INVITE_PAGE === 'https://jodytracks.com/development-activity-reports.html', evalM.INVITE_PAGE);
+check('6d BILLING_PAGE is the Jody origin plus the unchanged path', billM.BILLING_PAGE === 'https://jodytracks.com/development-activity-reports.html#billing', billM.BILLING_PAGE);
+check('6e WATCH_FROM and WATCH_OPEN_URL use the Jody identity', watchM.WATCH_FROM === 'Jody <noreply@jodytracks.com>' && watchM.WATCH_OPEN_URL === 'https://jodytracks.com/development-activity-reports.html', watchM.WATCH_FROM);
 for (const f of ['share-reads', 'evaluation-reads', 'billing-reads', 'watch-email']) {
   const src = readFileSync(`supabase/functions/_shared/${f}.ts`, 'utf8').replace(/\/\/.*$/gm, '');
   check(`6f ${f}.ts writes no literal homesignal.net/jodytracks.com origin (they come from the contract)`, !/https?:\/\/(www\.)?(homesignal\.net|jodytracks\.com)/.test(src) && !/@homesignal\.net/.test(src), 'literal');

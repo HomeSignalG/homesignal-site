@@ -28,7 +28,7 @@ const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fai
 const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://homesignal.net/</loc>
+    <loc>https://jodytracks.com/</loc>
   </url>
 </urlset>
 `;
@@ -59,13 +59,13 @@ const sm = readFileSync(join(out, 'sitemap.xml'), 'utf8');
 ok(existsSync(cityFile), 'the qualified city has a page at /city/ma/amherst/');
 ok(!existsSync(join(out, 'city', 'ma', 'belchertown')), 'a one-ZIP town gets no city page');
 ok(/<meta name="robots" content="index, follow">/.test(city), 'the city page is indexable');
-ok(city.includes('<link rel="canonical" href="https://homesignal.net/city/ma/amherst/">'),
+ok(city.includes('<link rel="canonical" href="https://jodytracks.com/city/ma/amherst/">'),
    'the city page is self-canonical');
 ok(/<title>Development in Amherst, MA — 7 projects on record \| HomeSignal<\/title>/.test(city),
    'the title names the city, state and project count');
 ok(JSON.stringify(man.city_pages) === JSON.stringify(['/city/ma/amherst/']),
    'the manifest records exactly the city pages written');
-ok(sm.includes('<loc>https://homesignal.net/city/ma/amherst/</loc>'), 'the sitemap advertises the city page');
+ok(sm.includes('<loc>https://jodytracks.com/city/ma/amherst/</loc>'), 'the sitemap advertises the city page');
 ok((sm.match(/\/city\//g) || []).length === 1, 'the sitemap advertises no other city URL');
 
 // ---- 2. Type / lifecycle mix through the one authority ---------------------------------
