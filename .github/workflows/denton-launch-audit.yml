@@ -92,6 +92,8 @@ jobs:
     if: ${{ startsWith(github.event.inputs.task, 'step6-') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write   # only to commit the generated matrix files to the dispatching branch
     steps:
       - uses: actions/checkout@v4
       - name: Step 6 jurisdiction matrix (read only)
@@ -99,6 +101,15 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           STEP: ${{ github.event.inputs.task == 'step6-compute' && 'compute' || (github.event.inputs.task == 'step6-inspect' && 'inspect' || 'discover') }}
         run: python3 scripts/denton-step6-matrix.py
+      - name: Build and commit matrix files (compute only)
+        if: ${{ github.event.inputs.task == 'step6-compute' && startsWith(github.ref_name, 'claude/step6-') }}
+        run: |
+          python3 scripts/denton-step6-build.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/denton-step6-zip-jurisdiction-matrix.json docs/denton-step6-zip-jurisdiction-matrix-2026-10-14.md
+          git commit -m "Denton Step 6: generated ZIP jurisdiction matrix" || echo "no change"
+          git push origin HEAD:${{ github.ref_name }}
   accept:
     # Final acceptance: needs BOTH halves to have completed. A skipped or failed half means this job does not run, so it can never grade from nothing.
     needs: [data, pages]

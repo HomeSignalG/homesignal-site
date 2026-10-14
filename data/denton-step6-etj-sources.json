@@ -1,0 +1,6 @@
+{
+  "_note": "Denton County GIS (first-party) layers found by step6-discover/inspect 2026-10-14. City_Limit/0: 45 cities (edited through 2026). ETJ_GC/1: 40 ETJ polygons, CITY field names the city (or 'A/B' where two cities' ETJs are undetermined/overlapping), TYPE 'ETJ' or 'DIV 2'. Both layers are limited to Denton County; Census TIGERweb incorporated places fill in the parts of cities outside the county layer. ETJ outside Denton County is UNKNOWN.",
+  "city_limits": {"url": "https://gis.dentoncounty.gov/arcgis/rest/services/City_Limit/MapServer/0", "name_field": "CITY"},
+  "etj": [{"url": "https://gis.dentoncounty.gov/arcgis/rest/services/ETJ_GC/MapServer/1", "name_field": "CITY", "type_field": "TYPE"}],
+  "county": {"url": "https://gis.dentoncounty.gov/arcgis/rest/services/Hosted/CountyOutline/FeatureServer/0"}
+}
