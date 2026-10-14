@@ -1,0 +1,4781 @@
+{
+ "meta": {
+  "generated": "2026-10-14",
+  "method": "ZIP polygon = geo.zip_membership_boundary (canonical); city limits = Denton County GIS City_Limit/0 (+ Census TIGERweb incorporated places for parts outside the county layer); ETJ = Denton County GIS ETJ_GC/1; area shares are geodesic ST_Area ratios; no radius logic. SRID 4269/4326 differences (~1 m) ignored.",
+  "limitations": [
+   "ETJ outside Denton County is UNKNOWN (county layer does not cover it); ZIPs extending into Dallas/Collin/Tarrant/Cooke counties show that share as city or 'outside county'.",
+   "Census place boundaries lag annexations; the county layer's last-edit dates are 2025-2026.",
+   "Stored-record attribution is ZIP-level (serving membership), not jurisdiction-level: a stored record is not geolocated to a city here.",
+   "Texas permit-authority text is a statutory generalization, not verified per jurisdiction.",
+   "PO Box ZIPs 75027, 75029, 76202, 76204, 76206 are out of scope (no geographic area)."
+  ],
+  "sources_registered": {
+   "frisco-active-building-permits": {
+    "authority": "Frisco",
+    "scope": "City of Frisco active building permits (all ISSUED). Registry coverage declares Collin+Denton because Frisco straddles the county line."
+   },
+   "denton-county-dev-permits": {
+    "authority": "Denton County",
+    "scope": "Denton County DEV_Permits (county-issued development permits). FROZEN: layer-wide newest 2023-06-09 (docs/denton-data-integrity-launch-gate-2026-10-10.md s1)."
+   },
+   "fort-worth-development-permits": {
+    "authority": "Fort Worth",
+    "scope": "City of Fort Worth development permits."
+   },
+   "dallas-specific-use-permits": {
+    "authority": "Dallas",
+    "scope": "City of Dallas specific-use (zoning) permits only."
+   },
+   "txdot-projects-info-all": {
+    "authority": null,
+    "scope": "TxDOT statewide road projects: state highway work, NOT a local land-development permit authority; shown for completeness, ignored for gap."
+   }
+  },
+  "disclaimer": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+ },
+ "zips": [
+  {
+   "zip": "75007",
+   "zip_km2": 31.15,
+   "jurisdictions": [
+    {
+     "name": "Carrollton",
+     "type": "incorporated city",
+     "area_share": 0.89467,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.89467 vs Census 0.98948 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Dallas",
+     "type": "incorporated city",
+     "area_share": 0.01054,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [
+      {
+       "registry_id": "dallas-specific-use-permits",
+       "stored_in_zip": {
+        "n_all": 1,
+        "n_365d": 0,
+        "newest": "2009-03-27"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Hebron",
+     "type": "incorporated city",
+     "area_share": 0.00115,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.89467
+     },
+     {
+      "authority": "City of Dallas",
+      "where": "within city limits",
+      "area_share": 0.01054
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.89467
+     },
+     {
+      "authority": "City of Dallas",
+      "where": "within city limits",
+      "area_share": 0.01054
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 10,
+     "records_last_365d": 1,
+     "newest_record_date": "2026-06-24",
+     "local_permit_authority_source": false
+    },
+    {
+     "registry_id": "dallas-specific-use-permits",
+     "authority": "Dallas",
+     "stored_records": 1,
+     "records_last_365d": 0,
+     "newest_record_date": "2009-03-27",
+     "local_permit_authority_source": true
+    }
+   ],
+   "newest_record_date": "2026-06-24",
+   "newest_local_permit_record_date": "2009-03-27",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Carrollton",
+      "type": "incorporated city",
+      "area_share": 0.89467,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9064,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.90606
+  },
+  {
+   "zip": "75010",
+   "zip_km2": 17.77,
+   "jurisdictions": [
+    {
+     "name": "Carrollton",
+     "type": "incorporated city",
+     "area_share": 0.94952,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Hebron",
+     "type": "incorporated city",
+     "area_share": 0.02735,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.02262,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 1,
+        "n_365d": 0,
+        "newest": "2018-01-09"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.94952
+     },
+     {
+      "authority": "City of Hebron",
+      "where": "within city limits",
+      "area_share": 0.02735
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.02262
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.94952
+     },
+     {
+      "authority": "City of Hebron",
+      "where": "within city limits",
+      "area_share": 0.02735
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.02262
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 1,
+     "records_last_365d": 0,
+     "newest_record_date": "2018-01-09",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 1,
+     "records_last_365d": 0,
+     "newest_record_date": "2022-12-15",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2022-12-15",
+   "newest_local_permit_record_date": "2018-01-09",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Carrollton",
+      "type": "incorporated city",
+      "area_share": 0.94952,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9995,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "75022",
+   "zip_km2": 57.63,
+   "jurisdictions": [
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.89285,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.89285 vs Census 0.91827 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Grapevine",
+     "type": "incorporated city",
+     "area_share": 0.0272,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.02052,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Bartonville",
+     "type": "incorporated city",
+     "area_share": 0.01788,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Double Oak",
+     "type": "incorporated city",
+     "area_share": 0.00882,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.00711,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 2,
+        "n_365d": 0,
+        "newest": "2021-06-30"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.89285
+     },
+     {
+      "authority": "City of Grapevine",
+      "where": "within city limits",
+      "area_share": 0.0272
+     },
+     {
+      "authority": "City of Bartonville",
+      "where": "within city limits",
+      "area_share": 0.01788
+     },
+     {
+      "authority": "City of Double Oak",
+      "where": "within city limits",
+      "area_share": 0.00882
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.89285
+     },
+     {
+      "authority": "City of Grapevine",
+      "where": "within city limits",
+      "area_share": 0.0272
+     },
+     {
+      "authority": "City of Bartonville",
+      "where": "within city limits",
+      "area_share": 0.01788
+     },
+     {
+      "authority": "City of Double Oak",
+      "where": "within city limits",
+      "area_share": 0.00882
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.00711
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0.00711,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 2,
+     "records_last_365d": 0,
+     "newest_record_date": "2021-06-30",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 2,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-02-27",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-02-27",
+   "newest_local_permit_record_date": "2021-06-30",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Flower Mound",
+      "type": "incorporated city",
+      "area_share": 0.89285,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9744,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.9268
+  },
+  {
+   "zip": "75028",
+   "zip_km2": 40.5,
+   "jurisdictions": [
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.9714,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.9714 vs Census 0.9958 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Double Oak",
+     "type": "incorporated city",
+     "area_share": 0.00467,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.00091,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.9714
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.9714
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 4,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-03-27",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-03-27",
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Flower Mound",
+      "type": "incorporated city",
+      "area_share": 0.9714,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.977,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.97704
+  },
+  {
+   "zip": "75033",
+   "zip_km2": 57.31,
+   "jurisdictions": [
+    {
+     "name": "Frisco",
+     "type": "incorporated city",
+     "area_share": 0.5243,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.5243 vs Census 0.97476 (annexation vintage difference)",
+     "registered_sources": [
+      {
+       "registry_id": "frisco-active-building-permits",
+       "stored_in_zip": {
+        "n_all": 154,
+        "n_365d": 124,
+        "newest": "2026-10-07"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Little Elm",
+     "type": "incorporated city",
+     "area_share": 0.01859,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.5243
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.01859
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.5243
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.01859
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "frisco-active-building-permits",
+     "authority": "Frisco",
+     "stored_records": 154,
+     "records_last_365d": 124,
+     "newest_record_date": "2026-10-07",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 20,
+     "records_last_365d": 2,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-10-07",
+   "newest_local_permit_record_date": "2026-10-07",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [],
+    "area_share_without_current_source": 0.0186,
+    "current_local_source_records_365d": 124
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.54557
+  },
+  {
+   "zip": "75036",
+   "zip_km2": 36.82,
+   "jurisdictions": [
+    {
+     "name": "Frisco",
+     "type": "incorporated city",
+     "area_share": 0.43978,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [
+      {
+       "registry_id": "frisco-active-building-permits",
+       "stored_in_zip": {
+        "n_all": 7,
+        "n_365d": 7,
+        "newest": "2026-09-15"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.18791,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 1828,
+        "n_365d": 0,
+        "newest": "2023-05-04"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "The Colony",
+     "type": "incorporated city",
+     "area_share": 0.1496,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Hackberry ETJ",
+     "type": "ETJ",
+     "area_share": 0.08568,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Little Elm",
+     "type": "incorporated city",
+     "area_share": 0.07169,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "The Colony ETJ",
+     "type": "ETJ",
+     "area_share": 0.03567,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Hackberry",
+     "type": "incorporated city",
+     "area_share": 0.02605,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Undetermined/overlapping ETJ (Frisco/Hackberry)",
+     "type": "ETJ-undetermined",
+     "area_share": 0.00191,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.43978
+     },
+     {
+      "authority": "City of The Colony",
+      "where": "within city limits",
+      "area_share": 0.1496
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.07169
+     },
+     {
+      "authority": "City of Hackberry",
+      "where": "within city limits",
+      "area_share": 0.02605
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.43978
+     },
+     {
+      "authority": "City of The Colony",
+      "where": "within city limits",
+      "area_share": 0.1496
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.07169
+     },
+     {
+      "authority": "City of Hackberry",
+      "where": "within city limits",
+      "area_share": 0.02605
+     },
+     {
+      "authority": "City of Hackberry",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.08568
+     },
+     {
+      "authority": "City of The Colony",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.03567
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.18791
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.18791,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 1828,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-04",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "frisco-active-building-permits",
+     "authority": "Frisco",
+     "stored_records": 7,
+     "records_last_365d": 7,
+     "newest_record_date": "2026-09-15",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 4,
+     "records_last_365d": 0,
+     "newest_record_date": "2024-03-28",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-09-15",
+   "newest_local_permit_record_date": "2026-09-15",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.18791,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "The Colony",
+      "type": "incorporated city",
+      "area_share": 0.1496,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Hackberry ETJ",
+      "type": "ETJ",
+      "area_share": 0.08568,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Little Elm",
+      "type": "incorporated city",
+      "area_share": 0.07169,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.5585,
+    "current_local_source_records_365d": 7
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "75056",
+   "zip_km2": 77.38,
+   "jurisdictions": [
+    {
+     "name": "The Colony",
+     "type": "incorporated city",
+     "area_share": 0.45484,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.36591,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.13325,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 1594,
+        "n_365d": 0,
+        "newest": "2021-11-02"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "The Colony ETJ",
+     "type": "ETJ",
+     "area_share": 0.03232,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville ETJ",
+     "type": "ETJ",
+     "area_share": 0.00548,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Frisco",
+     "type": "incorporated city",
+     "area_share": 0.00363,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [
+      {
+       "registry_id": "frisco-active-building-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    },
+    {
+     "name": "Carrollton",
+     "type": "incorporated city",
+     "area_share": 0.00359,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of The Colony",
+      "where": "within city limits",
+      "area_share": 0.45484
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.36591
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of The Colony",
+      "where": "within city limits",
+      "area_share": 0.45484
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.36591
+     },
+     {
+      "authority": "City of The Colony",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.03232
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.00548
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.13325
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.13325,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 1594,
+     "records_last_365d": 0,
+     "newest_record_date": "2021-11-02",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 5,
+     "records_last_365d": 1,
+     "newest_record_date": "2026-05-21",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-05-21",
+   "newest_local_permit_record_date": "2021-11-02",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "The Colony",
+      "type": "incorporated city",
+      "area_share": 0.45484,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Lewisville",
+      "type": "incorporated city",
+      "area_share": 0.36591,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.13325,
+      "status": "STALE"
+     }
+    ],
+    "area_share_without_current_source": 0.999,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1.0
+  },
+  {
+   "zip": "75057",
+   "zip_km2": 40.75,
+   "jurisdictions": [
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.985,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Carrollton",
+     "type": "incorporated city",
+     "area_share": 0.01495,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.985
+     },
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.01495
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.985
+     },
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.01495
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 6,
+     "records_last_365d": 1,
+     "newest_record_date": "2026-05-21",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-05-21",
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Lewisville",
+      "type": "incorporated city",
+      "area_share": 0.985,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1.0,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "75065",
+   "zip_km2": 41.63,
+   "jurisdictions": [
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.29973,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 182,
+        "n_365d": 0,
+        "newest": "2021-05-28"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Hickory Creek",
+     "type": "incorporated city",
+     "area_share": 0.2791,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.19668,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lake Dallas",
+     "type": "incorporated city",
+     "area_share": 0.16338,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Hickory Creek ETJ",
+     "type": "ETJ",
+     "area_share": 0.04647,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lake Dallas ETJ",
+     "type": "ETJ",
+     "area_share": 0.00651,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.00395,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Highland Village",
+     "type": "incorporated city",
+     "area_share": 0.00153,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Hickory Creek",
+      "where": "within city limits",
+      "area_share": 0.2791
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.19668
+     },
+     {
+      "authority": "City of Lake Dallas",
+      "where": "within city limits",
+      "area_share": 0.16338
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Hickory Creek",
+      "where": "within city limits",
+      "area_share": 0.2791
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.19668
+     },
+     {
+      "authority": "City of Lake Dallas",
+      "where": "within city limits",
+      "area_share": 0.16338
+     },
+     {
+      "authority": "City of Hickory Creek",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.04647
+     },
+     {
+      "authority": "City of Lake Dallas",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.00651
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.29973
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.29973,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 182,
+     "records_last_365d": 0,
+     "newest_record_date": "2021-05-28",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 7,
+     "records_last_365d": 0,
+     "newest_record_date": "2024-01-17",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2024-01-17",
+   "newest_local_permit_record_date": "2021-05-28",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.29973,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Hickory Creek",
+      "type": "incorporated city",
+      "area_share": 0.2791,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Lewisville",
+      "type": "incorporated city",
+      "area_share": 0.19668,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Lake Dallas",
+      "type": "incorporated city",
+      "area_share": 0.16338,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9973,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "75067",
+   "zip_km2": 35.12,
+   "jurisdictions": [
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.92601,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Carrollton",
+     "type": "incorporated city",
+     "area_share": 0.01962,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Coppell",
+     "type": "incorporated city",
+     "area_share": 0.01529,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville ETJ",
+     "type": "ETJ",
+     "area_share": 0.01173,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Grapevine",
+     "type": "incorporated city",
+     "area_share": 0.00331,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.00093,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.92601
+     },
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.01962
+     },
+     {
+      "authority": "City of Coppell",
+      "where": "within city limits",
+      "area_share": 0.01529
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.92601
+     },
+     {
+      "authority": "City of Carrollton",
+      "where": "within city limits",
+      "area_share": 0.01962
+     },
+     {
+      "authority": "City of Coppell",
+      "where": "within city limits",
+      "area_share": 0.01529
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01173
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 19,
+     "records_last_365d": 2,
+     "newest_record_date": "2026-05-21",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-05-21",
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Lewisville",
+      "type": "incorporated city",
+      "area_share": 0.92601,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9769,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.9623
+  },
+  {
+   "zip": "75068",
+   "zip_km2": 92.49,
+   "jurisdictions": [
+    {
+     "name": "Little Elm",
+     "type": "incorporated city",
+     "area_share": 0.48306,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Oak Point",
+     "type": "incorporated city",
+     "area_share": 0.16168,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Oak Point ETJ",
+     "type": "ETJ",
+     "area_share": 0.10981,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Little Elm ETJ",
+     "type": "ETJ",
+     "area_share": 0.10488,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lakewood Village ETJ",
+     "type": "ETJ",
+     "area_share": 0.06309,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.03253,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 4213,
+        "n_365d": 0,
+        "newest": "2023-05-19"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Lakewood Village",
+     "type": "incorporated city",
+     "area_share": 0.02623,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Frisco",
+     "type": "incorporated city",
+     "area_share": 0.0154,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [
+      {
+       "registry_id": "frisco-active-building-permits",
+       "stored_in_zip": {
+        "n_all": 10,
+        "n_365d": 9,
+        "newest": "2026-09-21"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.48306
+     },
+     {
+      "authority": "City of Oak Point",
+      "where": "within city limits",
+      "area_share": 0.16168
+     },
+     {
+      "authority": "City of Lakewood Village",
+      "where": "within city limits",
+      "area_share": 0.02623
+     },
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.0154
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.48306
+     },
+     {
+      "authority": "City of Oak Point",
+      "where": "within city limits",
+      "area_share": 0.16168
+     },
+     {
+      "authority": "City of Lakewood Village",
+      "where": "within city limits",
+      "area_share": 0.02623
+     },
+     {
+      "authority": "City of Frisco",
+      "where": "within city limits",
+      "area_share": 0.0154
+     },
+     {
+      "authority": "City of Oak Point",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.10981
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.10488
+     },
+     {
+      "authority": "City of Lakewood Village",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.06309
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.03253
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.03253,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 4213,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-19",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "frisco-active-building-permits",
+     "authority": "Frisco",
+     "stored_records": 10,
+     "records_last_365d": 9,
+     "newest_record_date": "2026-09-21",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 10,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-09-21",
+   "newest_local_permit_record_date": "2026-09-21",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Little Elm",
+      "type": "incorporated city",
+      "area_share": 0.48306,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Oak Point",
+      "type": "incorporated city",
+      "area_share": 0.16168,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Oak Point ETJ",
+      "type": "ETJ",
+      "area_share": 0.10981,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Little Elm ETJ",
+      "type": "ETJ",
+      "area_share": 0.10488,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Lakewood Village ETJ",
+      "type": "ETJ",
+      "area_share": 0.06309,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9813,
+    "current_local_source_records_365d": 9
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "75077",
+   "zip_km2": 40.01,
+   "jurisdictions": [
+    {
+     "name": "Highland Village",
+     "type": "incorporated city",
+     "area_share": 0.38579,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Lewisville",
+     "type": "incorporated city",
+     "area_share": 0.29039,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Copper Canyon",
+     "type": "incorporated city",
+     "area_share": 0.15595,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Double Oak",
+     "type": "incorporated city",
+     "area_share": 0.13993,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.01493,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.00842,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 3,
+        "n_365d": 0,
+        "newest": "2020-09-09"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Copper Canyon ETJ",
+     "type": "ETJ",
+     "area_share": 0.00437,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Highland Village",
+      "where": "within city limits",
+      "area_share": 0.38579
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.29039
+     },
+     {
+      "authority": "City of Copper Canyon",
+      "where": "within city limits",
+      "area_share": 0.15595
+     },
+     {
+      "authority": "City of Double Oak",
+      "where": "within city limits",
+      "area_share": 0.13993
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.01493
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Highland Village",
+      "where": "within city limits",
+      "area_share": 0.38579
+     },
+     {
+      "authority": "City of Lewisville",
+      "where": "within city limits",
+      "area_share": 0.29039
+     },
+     {
+      "authority": "City of Copper Canyon",
+      "where": "within city limits",
+      "area_share": 0.15595
+     },
+     {
+      "authority": "City of Double Oak",
+      "where": "within city limits",
+      "area_share": 0.13993
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.01493
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.00842
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0.00842,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 11,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-03-27",
+     "local_permit_authority_source": false
+    },
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 3,
+     "records_last_365d": 0,
+     "newest_record_date": "2020-09-09",
+     "local_permit_authority_source": true
+    }
+   ],
+   "newest_record_date": "2025-03-27",
+   "newest_local_permit_record_date": "2020-09-09",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Highland Village",
+      "type": "incorporated city",
+      "area_share": 0.38579,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Lewisville",
+      "type": "incorporated city",
+      "area_share": 0.29039,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Copper Canyon",
+      "type": "incorporated city",
+      "area_share": 0.15595,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Double Oak",
+      "type": "incorporated city",
+      "area_share": 0.13993,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9998,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76201",
+   "zip_km2": 14.23,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 1,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 11,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-11-13",
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 1,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76203",
+   "zip_km2": 0.02,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 1,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [],
+   "newest_record_date": null,
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 1,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76205",
+   "zip_km2": 21.62,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 1.0,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 1,
+        "n_365d": 0,
+        "newest": "2015-09-30"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1.0
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1.0
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 19,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-08-21",
+     "local_permit_authority_source": false
+    },
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 1,
+     "records_last_365d": 0,
+     "newest_record_date": "2015-09-30",
+     "local_permit_authority_source": true
+    }
+   ],
+   "newest_record_date": "2025-08-21",
+   "newest_local_permit_record_date": "2015-09-30",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 1.0,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1.0,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76207",
+   "zip_km2": 105.19,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.82584,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.17156,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.00086,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 285,
+        "n_365d": 0,
+        "newest": "2023-03-23"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.82584
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.82584
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.17156
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 285,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-03-23",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 49,
+     "records_last_365d": 5,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-11-13",
+   "newest_local_permit_record_date": "2023-03-23",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.82584,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.17156,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9983,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76208",
+   "zip_km2": 88.07,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.45145,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.21695,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.10448,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Shady Shores",
+     "type": "incorporated city",
+     "area_share": 0.09109,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.06769,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 222,
+        "n_365d": 0,
+        "newest": "2023-05-17"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Corinth",
+     "type": "incorporated city",
+     "area_share": 0.04371,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Shady Shores ETJ",
+     "type": "ETJ",
+     "area_share": 0.01257,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Oak Point ETJ",
+     "type": "ETJ",
+     "area_share": 0.00798,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Cross Roads ETJ",
+     "type": "ETJ",
+     "area_share": 0.0008,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.45145
+     },
+     {
+      "authority": "City of Shady Shores",
+      "where": "within city limits",
+      "area_share": 0.09109
+     },
+     {
+      "authority": "City of Corinth",
+      "where": "within city limits",
+      "area_share": 0.04371
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.45145
+     },
+     {
+      "authority": "City of Shady Shores",
+      "where": "within city limits",
+      "area_share": 0.09109
+     },
+     {
+      "authority": "City of Corinth",
+      "where": "within city limits",
+      "area_share": 0.04371
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.21695
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.10448
+     },
+     {
+      "authority": "City of Shady Shores",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01257
+     },
+     {
+      "authority": "City of Oak Point",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.00798
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.06769
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.06769,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 222,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-17",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 9,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-11-13",
+   "newest_local_permit_record_date": "2023-05-17",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.45145,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.21695,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
+      "type": "ETJ",
+      "area_share": 0.10448,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Shady Shores",
+      "type": "incorporated city",
+      "area_share": 0.09109,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.06769,
+      "status": "STALE"
+     }
+    ],
+    "area_share_without_current_source": 0.9967,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76209",
+   "zip_km2": 17.23,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 1,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": null
+      }
+     ],
+     "source_status": "REGISTERED_NO_RECORDS_IN_ZIP"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 1
+     }
+    ],
+    "etj_building_permit_note": null,
+    "unincorporated": {
+     "area_share": 0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 6,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-11-13",
+   "newest_local_permit_record_date": null,
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 1,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76210",
+   "zip_km2": 42.32,
+   "jurisdictions": [
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.47032,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Corinth",
+     "type": "incorporated city",
+     "area_share": 0.38891,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.13763,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Hickory Creek ETJ",
+     "type": "ETJ",
+     "area_share": 0.00249,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.0,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 53,
+        "n_365d": 0,
+        "newest": "2023-04-05"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.47032
+     },
+     {
+      "authority": "City of Corinth",
+      "where": "within city limits",
+      "area_share": 0.38891
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.47032
+     },
+     {
+      "authority": "City of Corinth",
+      "where": "within city limits",
+      "area_share": 0.38891
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.13763
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.0,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 53,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-04-05",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 22,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-08-21",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-08-21",
+   "newest_local_permit_record_date": "2023-04-05",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.47032,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Corinth",
+      "type": "incorporated city",
+      "area_share": 0.38891,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.13763,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9993,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76226",
+   "zip_km2": 130.6,
+   "jurisdictions": [
+    {
+     "name": "Argyle",
+     "type": "incorporated city",
+     "area_share": 0.22944,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.13874,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Bartonville",
+     "type": "incorporated city",
+     "area_share": 0.1274,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.10526,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.07644,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Northlake",
+     "type": "incorporated city",
+     "area_share": 0.07037,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Argyle ETJ",
+     "type": "ETJ",
+     "area_share": 0.04606,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Copper Canyon",
+     "type": "incorporated city",
+     "area_share": 0.04299,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.04239,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Northlake ETJ",
+     "type": "ETJ",
+     "area_share": 0.04049,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Copper Canyon ETJ",
+     "type": "ETJ",
+     "area_share": 0.03476,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Bartonville ETJ",
+     "type": "ETJ",
+     "area_share": 0.02281,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Highland Village",
+     "type": "incorporated city",
+     "area_share": 0.00882,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.00466,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 2327,
+        "n_365d": 0,
+        "newest": "2023-05-15"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Hickory Creek ETJ",
+     "type": "ETJ",
+     "area_share": 0.00465,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Corral",
+     "type": "incorporated city",
+     "area_share": 0.00311,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Corral",
+     "type": "incorporated city",
+     "area_share": 0.00294,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Argyle",
+      "where": "within city limits",
+      "area_share": 0.22944
+     },
+     {
+      "authority": "City of Bartonville",
+      "where": "within city limits",
+      "area_share": 0.1274
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.10526
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.07644
+     },
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.07037
+     },
+     {
+      "authority": "City of Copper Canyon",
+      "where": "within city limits",
+      "area_share": 0.04299
+     },
+     {
+      "authority": "City of Highland Village",
+      "where": "within city limits",
+      "area_share": 0.00882
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Argyle",
+      "where": "within city limits",
+      "area_share": 0.22944
+     },
+     {
+      "authority": "City of Bartonville",
+      "where": "within city limits",
+      "area_share": 0.1274
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.10526
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.07644
+     },
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.07037
+     },
+     {
+      "authority": "City of Copper Canyon",
+      "where": "within city limits",
+      "area_share": 0.04299
+     },
+     {
+      "authority": "City of Highland Village",
+      "where": "within city limits",
+      "area_share": 0.00882
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.13874
+     },
+     {
+      "authority": "City of Argyle",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.04606
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.04239
+     },
+     {
+      "authority": "City of Northlake",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.04049
+     },
+     {
+      "authority": "City of Copper Canyon",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.03476
+     },
+     {
+      "authority": "City of Bartonville",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.02281
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.00466,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 2327,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-15",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 36,
+     "records_last_365d": 1,
+     "newest_record_date": "2026-05-21",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-05-21",
+   "newest_local_permit_record_date": "2023-05-15",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Argyle",
+      "type": "incorporated city",
+      "area_share": 0.22944,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.13874,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Bartonville",
+      "type": "incorporated city",
+      "area_share": 0.1274,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.10526,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Flower Mound",
+      "type": "incorporated city",
+      "area_share": 0.07644,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Northlake",
+      "type": "incorporated city",
+      "area_share": 0.07037,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 1.0013,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76227",
+   "zip_km2": 214.15,
+   "jurisdictions": [
+    {
+     "name": "Aubrey ETJ",
+     "type": "ETJ",
+     "area_share": 0.27288,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.16576,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Cross Roads",
+     "type": "incorporated city",
+     "area_share": 0.08144,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.08107,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.05445,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 5682,
+        "n_365d": 0,
+        "newest": "2023-05-24"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Cross Roads ETJ",
+     "type": "ETJ",
+     "area_share": 0.05066,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Little Elm",
+     "type": "incorporated city",
+     "area_share": 0.048,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Aubrey",
+     "type": "incorporated city",
+     "area_share": 0.04379,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Providence Village",
+     "type": "incorporated city",
+     "area_share": 0.03387,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.02901,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Celina",
+     "type": "incorporated city",
+     "area_share": 0.02892,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Krugerville ETJ",
+     "type": "ETJ",
+     "area_share": 0.02343,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Krugerville",
+     "type": "incorporated city",
+     "area_share": 0.01914,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Oak Point ETJ",
+     "type": "ETJ",
+     "area_share": 0.01414,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Celina ETJ",
+     "type": "ETJ",
+     "area_share": 0.01237,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Prosper",
+     "type": "incorporated city",
+     "area_share": 0.01033,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Little Elm ETJ",
+     "type": "ETJ",
+     "area_share": 0.01011,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Providence Village ETJ",
+     "type": "ETJ",
+     "area_share": 0.00641,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Undetermined/overlapping ETJ (Denton DIV 2/Cross Roads)",
+     "type": "ETJ-undetermined",
+     "area_share": 0.00588,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Undetermined/overlapping ETJ (Aubrey/Cross Roads)",
+     "type": "ETJ-undetermined",
+     "area_share": 0.00532,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Prosper ETJ",
+     "type": "ETJ",
+     "area_share": 0.00086,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Cross Roads",
+      "where": "within city limits",
+      "area_share": 0.08144
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.08107
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.048
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "within city limits",
+      "area_share": 0.04379
+     },
+     {
+      "authority": "City of Providence Village",
+      "where": "within city limits",
+      "area_share": 0.03387
+     },
+     {
+      "authority": "City of Celina",
+      "where": "within city limits",
+      "area_share": 0.02892
+     },
+     {
+      "authority": "City of Krugerville",
+      "where": "within city limits",
+      "area_share": 0.01914
+     },
+     {
+      "authority": "City of Prosper",
+      "where": "within city limits",
+      "area_share": 0.01033
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Cross Roads",
+      "where": "within city limits",
+      "area_share": 0.08144
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.08107
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "within city limits",
+      "area_share": 0.048
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "within city limits",
+      "area_share": 0.04379
+     },
+     {
+      "authority": "City of Providence Village",
+      "where": "within city limits",
+      "area_share": 0.03387
+     },
+     {
+      "authority": "City of Celina",
+      "where": "within city limits",
+      "area_share": 0.02892
+     },
+     {
+      "authority": "City of Krugerville",
+      "where": "within city limits",
+      "area_share": 0.01914
+     },
+     {
+      "authority": "City of Prosper",
+      "where": "within city limits",
+      "area_share": 0.01033
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.27288
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.16576
+     },
+     {
+      "authority": "City of Cross Roads",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.05066
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.02901
+     },
+     {
+      "authority": "City of Krugerville",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.02343
+     },
+     {
+      "authority": "City of Oak Point",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01414
+     },
+     {
+      "authority": "City of Celina",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01237
+     },
+     {
+      "authority": "City of Little Elm",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01011
+     },
+     {
+      "authority": "City of Providence Village",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.00641
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Undetermined/overlapping ETJ (Denton DIV 2/Cross Roads)",
+      "area_share": 0.00588
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Undetermined/overlapping ETJ (Aubrey/Cross Roads)",
+      "area_share": 0.00532
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.05445
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.05445,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 5682,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-24",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 38,
+     "records_last_365d": 4,
+     "newest_record_date": "2026-01-29",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2026-01-29",
+   "newest_local_permit_record_date": "2023-05-24",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Aubrey ETJ",
+      "type": "ETJ",
+      "area_share": 0.27288,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.16576,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Cross Roads",
+      "type": "incorporated city",
+      "area_share": 0.08144,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.08107,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.05445,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Cross Roads ETJ",
+      "type": "ETJ",
+      "area_share": 0.05066,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9978,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 1
+  },
+  {
+   "zip": "76247",
+   "zip_km2": 193.41,
+   "jurisdictions": [
+    {
+     "name": "Ponder ETJ",
+     "type": "ETJ",
+     "area_share": 0.13616,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Justin ETJ",
+     "type": "ETJ",
+     "area_share": 0.12651,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Northlake",
+     "type": "incorporated city",
+     "area_share": 0.12386,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Fort Worth ETJ",
+     "type": "ETJ",
+     "area_share": 0.11676,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [
+      {
+       "registry_id": "fort-worth-development-permits",
+       "stored_in_zip": {
+        "n_all": 10,
+        "n_365d": 10,
+        "newest": "2026-07-13"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Northlake ETJ",
+     "type": "ETJ",
+     "area_share": 0.10846,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Justin",
+     "type": "incorporated city",
+     "area_share": 0.09562,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "New Fairview ETJ",
+     "type": "ETJ",
+     "area_share": 0.0715,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Fort Worth",
+     "type": "incorporated city",
+     "area_share": 0.06084,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [
+      {
+       "registry_id": "fort-worth-development-permits",
+       "stored_in_zip": {
+        "n_all": 10,
+        "n_365d": 10,
+        "newest": "2026-07-13"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.04596,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 395,
+        "n_365d": 0,
+        "newest": "2023-06-06"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "New Fairview",
+     "type": "incorporated city",
+     "area_share": 0.03158,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.03158 vs Census 0.05339 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "DISH ETJ",
+     "type": "ETJ",
+     "area_share": 0.02306,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "DISH",
+     "type": "incorporated city",
+     "area_share": 0.02035,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.01217,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Corral ETJ",
+     "type": "ETJ",
+     "area_share": 0.00147,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.12386
+     },
+     {
+      "authority": "City of Justin",
+      "where": "within city limits",
+      "area_share": 0.09562
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.06084
+     },
+     {
+      "authority": "City of New Fairview",
+      "where": "within city limits",
+      "area_share": 0.03158
+     },
+     {
+      "authority": "City of DISH",
+      "where": "within city limits",
+      "area_share": 0.02035
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.12386
+     },
+     {
+      "authority": "City of Justin",
+      "where": "within city limits",
+      "area_share": 0.09562
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.06084
+     },
+     {
+      "authority": "City of New Fairview",
+      "where": "within city limits",
+      "area_share": 0.03158
+     },
+     {
+      "authority": "City of DISH",
+      "where": "within city limits",
+      "area_share": 0.02035
+     },
+     {
+      "authority": "City of Ponder",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.13616
+     },
+     {
+      "authority": "City of Justin",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.12651
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.11676
+     },
+     {
+      "authority": "City of Northlake",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.10846
+     },
+     {
+      "authority": "City of New Fairview",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.0715
+     },
+     {
+      "authority": "City of DISH",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.02306
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.04596
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.04596,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 395,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-06-06",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 19,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-10-30",
+     "local_permit_authority_source": false
+    },
+    {
+     "registry_id": "fort-worth-development-permits",
+     "authority": "Fort Worth",
+     "stored_records": 10,
+     "records_last_365d": 10,
+     "newest_record_date": "2026-07-13",
+     "local_permit_authority_source": true
+    }
+   ],
+   "newest_record_date": "2026-07-13",
+   "newest_local_permit_record_date": "2026-07-13",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Ponder ETJ",
+      "type": "ETJ",
+      "area_share": 0.13616,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Justin ETJ",
+      "type": "ETJ",
+      "area_share": 0.12651,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Northlake",
+      "type": "incorporated city",
+      "area_share": 0.12386,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Northlake ETJ",
+      "type": "ETJ",
+      "area_share": 0.10846,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Justin",
+      "type": "incorporated city",
+      "area_share": 0.09562,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "New Fairview ETJ",
+      "type": "ETJ",
+      "area_share": 0.0715,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.7967,
+    "current_local_source_records_365d": 10
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.96586
+  },
+  {
+   "zip": "76249",
+   "zip_km2": 185.77,
+   "jurisdictions": [
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.42317,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 284,
+        "n_365d": 0,
+        "newest": "2023-05-04"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.33599,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.08725,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.04488,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Krum",
+     "type": "incorporated city",
+     "area_share": 0.04387,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Krum ETJ",
+     "type": "ETJ",
+     "area_share": 0.03417,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.0302,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Krum",
+      "where": "within city limits",
+      "area_share": 0.04387
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.0302
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Krum",
+      "where": "within city limits",
+      "area_share": 0.04387
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.0302
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.33599
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.08725
+     },
+     {
+      "authority": "City of Krum",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.03417
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.42317
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.42317,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 284,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-04",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 15,
+     "records_last_365d": 2,
+     "newest_record_date": "2025-10-30",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-10-30",
+   "newest_local_permit_record_date": "2023-05-04",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.42317,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
+      "type": "ETJ",
+      "area_share": 0.33599,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.08725,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9995,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.95513
+  },
+  {
+   "zip": "76258",
+   "zip_km2": 236.68,
+   "jurisdictions": [
+    {
+     "name": "Pilot Point ETJ",
+     "type": "ETJ",
+     "area_share": 0.40821,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.1897,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 288,
+        "n_365d": 0,
+        "newest": "2023-05-10"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.16218,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Pilot Point",
+     "type": "incorporated city",
+     "area_share": 0.09602,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.09602 vs Census 0.07269 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Aubrey ETJ",
+     "type": "ETJ",
+     "area_share": 0.05918,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.05387,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Undetermined/overlapping ETJ (Denton DIV 2/Pilot Point)",
+     "type": "ETJ-undetermined",
+     "area_share": 0.01347,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Aubrey",
+     "type": "incorporated city",
+     "area_share": 0.00744,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Celina",
+     "type": "incorporated city",
+     "area_share": 0.00553,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Pilot Point",
+      "where": "within city limits",
+      "area_share": 0.09602
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "within city limits",
+      "area_share": 0.00744
+     },
+     {
+      "authority": "City of Celina",
+      "where": "within city limits",
+      "area_share": 0.00553
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Pilot Point",
+      "where": "within city limits",
+      "area_share": 0.09602
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "within city limits",
+      "area_share": 0.00744
+     },
+     {
+      "authority": "City of Celina",
+      "where": "within city limits",
+      "area_share": 0.00553
+     },
+     {
+      "authority": "City of Pilot Point",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.40821
+     },
+     {
+      "authority": "City of Aubrey",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.05918
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.05387
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Undetermined/overlapping ETJ (Denton DIV 2/Pilot Point)",
+      "area_share": 0.01347
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.1897
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.1897,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 288,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-10",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 26,
+     "records_last_365d": 0,
+     "newest_record_date": "2025-02-27",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-02-27",
+   "newest_local_permit_record_date": "2023-05-10",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Pilot Point ETJ",
+      "type": "ETJ",
+      "area_share": 0.40821,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.1897,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Outside Denton County, not in a mapped city/ETJ",
+      "type": "outside-county-unmapped",
+      "area_share": 0.16218,
+      "status": "UNKNOWN_AUTHORITY"
+     },
+     {
+      "jurisdiction": "Pilot Point",
+      "type": "incorporated city",
+      "area_share": 0.09602,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Aubrey ETJ",
+      "type": "ETJ",
+      "area_share": 0.05918,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
+      "type": "ETJ",
+      "area_share": 0.05387,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9956,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.83501
+  },
+  {
+   "zip": "76259",
+   "zip_km2": 134.14,
+   "jurisdictions": [
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.28492,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.22433,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 386,
+        "n_365d": 0,
+        "newest": "2023-05-31"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Ponder ETJ",
+     "type": "ETJ",
+     "area_share": 0.17152,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.14,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.06399,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Ponder",
+     "type": "incorporated city",
+     "area_share": 0.06152,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.04091,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "DISH ETJ",
+     "type": "ETJ",
+     "area_share": 0.00931,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Northlake ETJ",
+     "type": "ETJ",
+     "area_share": 0.00294,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.06399
+     },
+     {
+      "authority": "City of Ponder",
+      "where": "within city limits",
+      "area_share": 0.06152
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.06399
+     },
+     {
+      "authority": "City of Ponder",
+      "where": "within city limits",
+      "area_share": 0.06152
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.28492
+     },
+     {
+      "authority": "City of Ponder",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.17152
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.14
+     },
+     {
+      "authority": "City of DISH",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.00931
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.22433
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.22433,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 386,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-31",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 12,
+     "records_last_365d": 2,
+     "newest_record_date": "2025-11-13",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-11-13",
+   "newest_local_permit_record_date": "2023-05-31",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
+      "type": "ETJ",
+      "area_share": 0.28492,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.22433,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Ponder ETJ",
+      "type": "ETJ",
+      "area_share": 0.17152,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.14,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton",
+      "type": "incorporated city",
+      "area_share": 0.06399,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Ponder",
+      "type": "incorporated city",
+      "area_share": 0.06152,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9994,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.95908
+  },
+  {
+   "zip": "76262",
+   "zip_km2": 118.49,
+   "jurisdictions": [
+    {
+     "name": "Northlake",
+     "type": "incorporated city",
+     "area_share": 0.15815,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Roanoke",
+     "type": "incorporated city",
+     "area_share": 0.14593,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Flower Mound",
+     "type": "incorporated city",
+     "area_share": 0.09735,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Trophy Club",
+     "type": "incorporated city",
+     "area_share": 0.08525,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Keller",
+     "type": "incorporated city",
+     "area_share": 0.08039,
+     "boundary_source": "census_tigerweb (outside Denton County layer)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Fort Worth",
+     "type": "incorporated city",
+     "area_share": 0.07246,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.07246 vs Census 0.11132 (annexation vintage difference)",
+     "registered_sources": [
+      {
+       "registry_id": "fort-worth-development-permits",
+       "stored_in_zip": {
+        "n_all": 19,
+        "n_365d": 19,
+        "newest": "2026-08-17"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.05738,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 42,
+        "n_365d": 0,
+        "newest": "2023-05-01"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Northlake ETJ",
+     "type": "ETJ",
+     "area_share": 0.04163,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Trophy Club ETJ",
+     "type": "ETJ",
+     "area_share": 0.0329,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.02672,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Westlake",
+     "type": "incorporated city",
+     "area_share": 0.02008,
+     "boundary_source": "denton_county_gis",
+     "note": "county layer 0.02008 vs Census 0.13391 (annexation vintage difference)",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Fort Worth ETJ",
+     "type": "ETJ",
+     "area_share": 0.01647,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [
+      {
+       "registry_id": "fort-worth-development-permits",
+       "stored_in_zip": {
+        "n_all": 19,
+        "n_365d": 19,
+        "newest": "2026-08-17"
+       }
+      }
+     ],
+     "source_status": "CURRENT"
+    },
+    {
+     "name": "Southlake",
+     "type": "incorporated city",
+     "area_share": 0.00591,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Roanoke ETJ",
+     "type": "ETJ",
+     "area_share": 0.00181,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.15815
+     },
+     {
+      "authority": "City of Roanoke",
+      "where": "within city limits",
+      "area_share": 0.14593
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.09735
+     },
+     {
+      "authority": "City of Trophy Club",
+      "where": "within city limits",
+      "area_share": 0.08525
+     },
+     {
+      "authority": "City of Keller",
+      "where": "within city limits",
+      "area_share": 0.08039
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.07246
+     },
+     {
+      "authority": "City of Westlake",
+      "where": "within city limits",
+      "area_share": 0.02008
+     },
+     {
+      "authority": "City of Southlake",
+      "where": "within city limits",
+      "area_share": 0.00591
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Northlake",
+      "where": "within city limits",
+      "area_share": 0.15815
+     },
+     {
+      "authority": "City of Roanoke",
+      "where": "within city limits",
+      "area_share": 0.14593
+     },
+     {
+      "authority": "City of Flower Mound",
+      "where": "within city limits",
+      "area_share": 0.09735
+     },
+     {
+      "authority": "City of Trophy Club",
+      "where": "within city limits",
+      "area_share": 0.08525
+     },
+     {
+      "authority": "City of Keller",
+      "where": "within city limits",
+      "area_share": 0.08039
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "within city limits",
+      "area_share": 0.07246
+     },
+     {
+      "authority": "City of Westlake",
+      "where": "within city limits",
+      "area_share": 0.02008
+     },
+     {
+      "authority": "City of Southlake",
+      "where": "within city limits",
+      "area_share": 0.00591
+     },
+     {
+      "authority": "City of Northlake",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.04163
+     },
+     {
+      "authority": "City of Trophy Club",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.0329
+     },
+     {
+      "authority": "City of Fort Worth",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.01647
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.05738
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.05738,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 42,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-01",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 37,
+     "records_last_365d": 1,
+     "newest_record_date": "2026-05-21",
+     "local_permit_authority_source": false
+    },
+    {
+     "registry_id": "fort-worth-development-permits",
+     "authority": "Fort Worth",
+     "stored_records": 19,
+     "records_last_365d": 19,
+     "newest_record_date": "2026-08-17",
+     "local_permit_authority_source": true
+    }
+   ],
+   "newest_record_date": "2026-08-17",
+   "newest_local_permit_record_date": "2026-08-17",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Northlake",
+      "type": "incorporated city",
+      "area_share": 0.15815,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Roanoke",
+      "type": "incorporated city",
+      "area_share": 0.14593,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Flower Mound",
+      "type": "incorporated city",
+      "area_share": 0.09735,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Trophy Club",
+      "type": "incorporated city",
+      "area_share": 0.08525,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Keller",
+      "type": "incorporated city",
+      "area_share": 0.08039,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.05738,
+      "status": "STALE"
+     }
+    ],
+    "area_share_without_current_source": 0.7535,
+    "current_local_source_records_365d": 19
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.73717
+  },
+  {
+   "zip": "76266",
+   "zip_km2": 343.82,
+   "jurisdictions": [
+    {
+     "name": "Unincorporated Denton County",
+     "type": "unincorporated county",
+     "area_share": 0.37143,
+     "boundary_source": "derived: ZIP \u2229 county outline \u2212 city limits \u2212 ETJ",
+     "registered_sources": [
+      {
+       "registry_id": "denton-county-dev-permits",
+       "stored_in_zip": {
+        "n_all": 474,
+        "n_365d": 0,
+        "newest": "2023-05-02"
+       }
+      }
+     ],
+     "source_status": "STALE"
+    },
+    {
+     "name": "Denton ETJ (county 'DIV 2' polygon)",
+     "type": "ETJ",
+     "area_share": 0.23633,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Sanger ETJ",
+     "type": "ETJ",
+     "area_share": 0.15185,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Sanger",
+     "type": "incorporated city",
+     "area_share": 0.09351,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton ETJ",
+     "type": "ETJ",
+     "area_share": 0.07095,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Denton",
+     "type": "incorporated city",
+     "area_share": 0.02968,
+     "boundary_source": "denton_county_gis",
+     "registered_sources": [],
+     "source_status": "NO_SOURCE_REGISTERED"
+    },
+    {
+     "name": "Outside Denton County, not in a mapped city/ETJ",
+     "type": "outside-county-unmapped",
+     "area_share": 0.02712,
+     "boundary_source": "derived residual; authority UNKNOWN",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    },
+    {
+     "name": "Undetermined/overlapping ETJ (Denton DIV2/Sanger ETJ)",
+     "type": "ETJ-undetermined",
+     "area_share": 0.01821,
+     "boundary_source": "denton_county_gis ETJ_GC",
+     "registered_sources": [],
+     "source_status": "UNKNOWN_AUTHORITY"
+    }
+   ],
+   "permit_authority": {
+    "building_permits_and_zoning": [
+     {
+      "authority": "City of Sanger",
+      "where": "within city limits",
+      "area_share": 0.09351
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.02968
+     }
+    ],
+    "plat_subdivision": [
+     {
+      "authority": "City of Sanger",
+      "where": "within city limits",
+      "area_share": 0.09351
+     },
+     {
+      "authority": "City of Denton",
+      "where": "within city limits",
+      "area_share": 0.02968
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.23633
+     },
+     {
+      "authority": "City of Sanger",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.15185
+     },
+     {
+      "authority": "City of Denton",
+      "where": "ETJ (statutory general rule; confirm)",
+      "area_share": 0.07095
+     },
+     {
+      "authority": "UNDETERMINED (overlapping/unassigned ETJ per county GIS)",
+      "where": "Undetermined/overlapping ETJ (Denton DIV2/Sanger ETJ)",
+      "area_share": 0.01821
+     },
+     {
+      "authority": "Denton County (limited; plat approval outside city limits/ETJ)",
+      "where": "unincorporated",
+      "area_share": 0.37143
+     }
+    ],
+    "etj_building_permit_note": "No municipal building-permit or zoning authority is asserted inside an ETJ (general TX rule); verify per city.",
+    "unincorporated": {
+     "area_share": 0.37143,
+     "note": "No county zoning or general building-permit program asserted; county GIS publishes DEV_Permits, OSSF, 911-address and floodplain-permit layers, scope unverified."
+    },
+    "basis": "General Texas framework, NOT verified against any city's ordinances, interlocal agreements or the county's rules: municipalities regulate (zoning, building permits) inside their limits; a city's subdivision/plat authority also reaches its ETJ (Local Gov't Code ch. 212); counties have no zoning power and only limited authority (plat approval in unincorporated areas under ch. 232, plus floodplain / on-site sewage / 911 addressing programs). Which office actually issues a given permit in a given spot must be confirmed with that jurisdiction."
+   },
+   "connected_sources": [
+    {
+     "registry_id": "denton-county-dev-permits",
+     "authority": "Denton County",
+     "stored_records": 474,
+     "records_last_365d": 0,
+     "newest_record_date": "2023-05-02",
+     "local_permit_authority_source": true
+    },
+    {
+     "registry_id": "txdot-projects-info-all",
+     "authority": null,
+     "stored_records": 20,
+     "records_last_365d": 1,
+     "newest_record_date": "2025-10-30",
+     "local_permit_authority_source": false
+    }
+   ],
+   "newest_record_date": "2025-10-30",
+   "newest_local_permit_record_date": "2023-05-02",
+   "gap": {
+    "jurisdictions_without_current_source_ge_5pct": [
+     {
+      "jurisdiction": "Unincorporated Denton County",
+      "type": "unincorporated county",
+      "area_share": 0.37143,
+      "status": "STALE"
+     },
+     {
+      "jurisdiction": "Denton ETJ (county 'DIV 2' polygon)",
+      "type": "ETJ",
+      "area_share": 0.23633,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Sanger ETJ",
+      "type": "ETJ",
+      "area_share": 0.15185,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Sanger",
+      "type": "incorporated city",
+      "area_share": 0.09351,
+      "status": "NO_SOURCE_REGISTERED"
+     },
+     {
+      "jurisdiction": "Denton ETJ",
+      "type": "ETJ",
+      "area_share": 0.07095,
+      "status": "NO_SOURCE_REGISTERED"
+     }
+    ],
+    "area_share_without_current_source": 0.9991,
+    "current_local_source_records_365d": 0
+   },
+   "county_outline": "ok",
+   "in_denton_county_share": 0.97288
+  }
+ ]
+}
