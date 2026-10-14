@@ -314,7 +314,7 @@ ok(/--allow-missing-dev-plane is fixture-only/.test(gen),
      'Pages fetches the published Rule D plane before gen_zip_pages');
   ok(/email-assets\/seo\/development-seo-plane\.json/.test(pages),
      'Pages fetch URL is the public Storage current object');
-  ok(/age > 36/.test(pages) && /could not fetch the published Rule D plane/.test(pages),
+  ok(/age > limit/.test(pages) && /limit = 36\.0/.test(pages) && /could not fetch the published Rule D plane/.test(pages),
      'Pages hard-fails a missing or stale (>36h) fetch');
   ok(/cron: '40 6 \* \* \*'/.test(pages),
      'Pages schedule remains 06:40 UTC');
