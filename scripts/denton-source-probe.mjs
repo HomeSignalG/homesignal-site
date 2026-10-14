@@ -214,7 +214,7 @@ async function friscoHealth() {
   out.frisco = res; console.log('FRISCO ' + JSON.stringify(res));
 }
 // City of Denton's own AGO org (Development Services GIS) -- found via public web search (discovery only), verified here.
-const DENTON_AGO = 'https://services9.arcgis.com/EYTIgi02HN6AuvRN/ArcGIS/rest/services';
+const DENTON_AGO = 'https://services8.arcgis.com/OQPRCxZXJewOd2xW/ArcGIS/rest/services'; // candidate from web-search pointer; EYTIgi02HN6AuvRN was verified to be City of Pilot Point, NOT Denton
 async function vocab(layerUrl) {
   const m = await jget(layerUrl + '?f=json'); if (!m.json || !m.json.fields) return;
   console.log(`FIELDS ${layerUrl}: ${m.json.fields.map((f) => f.name + ':' + f.type.replace('esriFieldType', '')).join(', ')}`);
@@ -228,8 +228,8 @@ async function vocab(layerUrl) {
   for (const x of (s.json && s.json.features || [])) console.log(`  SAMPLE ${JSON.stringify(x.attributes).slice(0, 900)} geom=${JSON.stringify(x.geometry).slice(0, 120)}`);
 }
 async function focusDenton() {
-  console.log('=== FOCUS 1b: City of Denton AGO org EYTIgi02HN6AuvRN ===');
-  const org = await jget('https://www.arcgis.com/sharing/rest/portals/EYTIgi02HN6AuvRN?f=json');
+  console.log('=== FOCUS 1b: candidate AGO org OQPRCxZXJewOd2xW ===');
+  const org = await jget('https://www.arcgis.com/sharing/rest/portals/OQPRCxZXJewOd2xW?f=json');
   console.log(`ORG HTTP ${org.status} name=${org.json && org.json.name} url=${org.json && org.json.urlKey} ${org.json && org.json.error ? JSON.stringify(org.json.error) : ''}`);
   const L = await listServices(DENTON_AGO);
   console.log(`DENTON-AGO ${L.err ? 'ERR ' + L.err : L.services.length + ' services'}: ${L.services.map((s) => s.name + '/' + s.type).join(', ')}`);
@@ -241,6 +241,22 @@ async function focusDenton() {
     console.log(`SVC ${base} layers=${((m.json && m.json.layers) || []).map((l) => l.id + ':' + l.name).join(', ')} desc=${JSON.stringify(((m.json && m.json.serviceDescription) || '').slice(0, 200))}`);
     for (const l of ((m.json && m.json.layers) || [])) { await probeLayer(`${base}/${l.id}`, `${s.name}/${l.name}`, 'City of Denton (dentontxgis)'); await vocab(`${base}/${l.id}`); }
   }
+  const ps = await jget('https://dentontxgis.maps.arcgis.com/sharing/rest/portals/self?f=json');
+  console.log(`DENTONTXGIS portals/self HTTP ${ps.status} id=${ps.json && ps.json.id} name=${ps.json && ps.json.name} ${ps.json && ps.json.error ? JSON.stringify(ps.json.error).slice(0, 150) : ''}`);
+  if (ps.json && ps.json.id) {
+    const sr = await jget(`https://www.arcgis.com/sharing/rest/search?${new URLSearchParams({ f: 'json', num: '100', q: `orgid:${ps.json.id} AND (type:"Feature Service" OR type:"Map Service")`, sortField: 'modified', sortOrder: 'desc' })}`);
+    for (const it of (sr.json && sr.json.results) || []) console.log(`DENTONTXGIS-ITEM "${it.title}" type=${it.type} modified=${iso(new Date(it.modified))} url=${it.url}`);
+    out.dentontxgis_items = ((sr.json && sr.json.results) || []).map((it) => ({ title: it.title, url: it.url, modified: iso(new Date(it.modified)) }));
+    const seenU = new Set();
+    for (const it of ((sr.json && sr.json.results) || []).filter((x) => x.url && /project|develop|permit|plat|zon|case|activity|plan/i.test(x.title)).slice(0, 8)) {
+      if (seenU.has(it.url) || timeUp()) continue; seenU.add(it.url);
+      const mm = it.url.match(/^(.*)\/(FeatureServer|MapServer)(\/\d+)?$/); if (!mm) continue;
+      const m2 = await jget(mm[1] + '/' + mm[2] + '?f=json');
+      for (const l of ((m2.json && m2.json.layers) || [])) { await probeLayer(`${mm[1]}/${mm[2]}/${l.id}`, it.title + '/' + l.name, 'dentontxgis'); await vocab(`${mm[1]}/${mm[2]}/${l.id}`); }
+    }
+  }
+  console.log('=== FOCUS 1c: skipped ===');
+  return;
   console.log('=== FOCUS 1c: Denton County PlanningandZoning_GC "Present" layer ===');
   const cu = 'https://gis.dentoncounty.gov/arcgis/rest/services/PlanningandZoning_GC/MapServer/0';
   for (const p of [{ where: 'DateReceiv IS NOT NULL', outFields: 'PermitID,DateReceiv,PermitStat,PermitType', orderByFields: 'DateReceiv DESC', resultRecordCount: '5', returnGeometry: 'false' }, { where: "DateReceiv >= DATE '2024-01-01'", returnCountOnly: 'true' }]) {
