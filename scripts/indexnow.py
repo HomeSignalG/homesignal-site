@@ -105,7 +105,7 @@ def canonical_url(path):
 
 
 def check_url(url):
-    m = re.fullmatch(r"https://homesignal\.net(/[^?#\s]*)", url)
+    m = re.fullmatch(r"https://" + re.escape(HOST) + r"(/[^?#\s]*)", url)
     if not m or ps.family_of(m.group(1)) is None:
         raise IndexNowError(f"refusing to submit a non-canonical URL: {url!r}")
     return url

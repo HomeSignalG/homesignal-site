@@ -18,7 +18,7 @@ check('1a committed generated file equals a fresh render of the contract', commi
 check('1b embedded hash equals the contract hash', gen.BRAND_CONTRACT_SHA256 === contractHash(contract) && gen.BRAND_CONTRACT_SHA256 === readFileSync('docs/brand/brand-contract.v1.sha256', 'utf8').trim(), gen.BRAND_CONTRACT_SHA256);
 let out = ''; try { execFileSync('node', ['scripts/gen-brand-origins.mjs', '--check'], { stdio: 'pipe' }); out = 'ok'; } catch (e) { out = 'FAILED'; }
 check('1c generator --check passes on the committed tree', out === 'ok', out);
-const tampered = JSON.parse(JSON.stringify(contract)); tampered.identities.jody.origin = 'https://jodytracks.net';
+const tampered = JSON.parse(JSON.stringify(contract)); tampered.identities.jody.display_name = 'JodyTampered'; // v2 pins the Jody origin, so tamper a field it still allows; the rendered hash must change
 check('1d a changed contract renders a DIFFERENT file (the check can fail)', render(tampered) !== committed, 'insensitive');
 let threw = false; try { render({ ...contract, contract_version: 9 }); } catch { threw = true; }
 check('1e an invalid contract cannot be rendered', threw, 'rendered');

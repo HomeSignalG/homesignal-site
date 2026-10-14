@@ -8,16 +8,18 @@ import { tmpdir } from 'node:os';
 let failures = 0;
 const check = (n, ok, why) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${ok ? '' : ` — ${why}`}`); if (!ok) failures++; };
 const py = (code) => spawnSync('python3', ['-c', `import sys; sys.path.insert(0,'scripts'); ${code}`], { encoding: 'utf8' });
-const contract = JSON.parse(readFileSync('docs/brand/brand-contract.v1.json', 'utf8'));
+// Negative controls mutate the FROZEN v1 (HomeSignal-current) contract; the committed one is the v2 swap (Jody current, 2026-10-14).
+const contract = JSON.parse(readFileSync('test/fixtures/brand-contract.v1.frozen.json', 'utf8'));
+const committed = JSON.parse(readFileSync('docs/brand/brand-contract.v1.json', 'utf8'));
 const tmp = mkdtempSync(join(tmpdir(), 'brand-host-'));
 const write = (name, obj) => { const p = join(tmp, name); writeFileSync(p, JSON.stringify(obj)); return p; };
 
-// 1. today's behaviour is unchanged
-check('1a the shipped contract is still homesignal-current (this PR must not activate Jody)', contract.current_identity === 'homesignal' && contract.identities.jody.state === 'inactive', JSON.stringify(contract.current_identity));
+// 1. the committed contract publishes as Jody
+check('1a the shipped contract is jody-current (the activation swap)', committed.current_identity === 'jody' && committed.identities.jody.state === 'active' && committed.identities.homesignal.state === 'inactive', JSON.stringify(committed.current_identity));
 const r = py('import brand_host as b; print(b.origin()); print(b.host())');
-check('1b origin/host equal the strings that were hard-coded before', r.status === 0 && r.stdout === 'https://homesignal.net\nhomesignal.net\n', r.stdout + r.stderr);
+check('1b origin/host are the Jody origin', r.status === 0 && r.stdout === 'https://jodytracks.com\njodytracks.com\n', r.stdout + r.stderr);
 const m = py('import page_semantics as p, gen_zip_pages as g, gen_sitemap as s, indexnow as i; print(p.BASE, g.BASE, s.BASE, i.HOST)');
-check('1c all four consumers resolve to the same unchanged origin', m.status === 0 && m.stdout.trim() === 'https://homesignal.net https://homesignal.net https://homesignal.net homesignal.net', m.stdout + m.stderr);
+check('1c all four consumers resolve to the same Jody origin', m.status === 0 && m.stdout.trim() === 'https://jodytracks.com https://jodytracks.com https://jodytracks.com jodytracks.com', m.stdout + m.stderr);
 
 // 2. a contract that makes Jody current moves the answer (the future cutover is a contract change only)
 const jodyActive = JSON.parse(JSON.stringify(contract)); jodyActive.current_identity = 'jody'; jodyActive.identities.jody.state = 'active'; jodyActive.identities.homesignal.state = 'inactive';
