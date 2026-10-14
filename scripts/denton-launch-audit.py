@@ -22,6 +22,11 @@ assert len(ZIPS) == 32 and len(set(ZIPS)) == 32
 REGISTRY = json.load(open("supabase/functions/get-address-report/jurisdiction-registry.json"))
 ARC = {e["registry_id"]: e for e in REGISTRY["arcgis"]}
 UA = "Mozilla/5.0 (HomeSignal launch audit; read-only)"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import subprocess
+if subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denton_verdict_selftest.py")]).returncode:
+    sys.exit("acceptance-logic self-test failed: refusing to audit with logic that can mis-grade")
+from denton_verdict import verdict as accept
 CENTROID_M = 25.0      # a marker this close to the ZIP centroid is suspicious
 POINT_TOL_M = 30.0     # marker vs publisher point
 
@@ -88,9 +93,9 @@ for z in ZIPS:
     d = rows(f"""
     select k.source_key, k.marker_seq, k.lat, k.lng, k.marker_rule, k.family, k.dim,
       (select m.geom_family from geo.n5_serving_membership m where m.zcta5::text=k.zcta5::text and m.source_key=k.source_key limit 1) geom_family,
-      ST_Covers(b.g, ST_SetSRID(ST_Point(k.lng,k.lat),4326)) inside,
-      ST_Covers(b.g, ST_SetSRID(ST_Point(k.lat,k.lng),4326)) swapped_inside,
-      ST_Distance(ST_Centroid(b.g)::geography, ST_SetSRID(ST_Point(k.lng,k.lat),4326)::geography) d_centroid_m,
+      geo.zip_point_membership_in(b.g, k.lat, k.lng) = 'member' inside,
+      geo.zip_point_membership_in(b.g, k.lng, k.lat) = 'member' swapped_inside,
+      ST_Distance(ST_Transform(ST_Centroid(b.g),4326)::geography, ST_SetSRID(ST_Point(k.lng,k.lat),4326)::geography) d_centroid_m,
       p.registry_id, p.status, p.submitted_at::date filed, left(p.name,70) name
     from geo.n5_serving_marker k
     cross join lateral (select geo.zip_membership_boundary('{z}') g) b
@@ -108,9 +113,16 @@ for z in ZIPS:
     iss = BY[z]["issues"]
     iss["outside_polygon"] = sum(1 for r in d if r["inside"] is False)
     iss["lnglat_reversed"] = sum(1 for r in d if r["inside"] is False and r["swapped_inside"])
-    iss["at_centroid"] = sum(1 for r in d if r["d_centroid_m"] is not None and r["d_centroid_m"] < CENTROID_M)
+    # a marker on a LINE/polygon project can lie anywhere along it, including on the ZIP centroid by coincidence (76262's TxDOT marker is within
+    # 5 m of its official line): the centroid-shortcut test applies to point-geometry records only.
+    iss["at_centroid"] = sum(1 for r in d if r["d_centroid_m"] is not None and r["d_centroid_m"] < CENTROID_M
+                             and not any(w in str(r["geom_family"] or "").upper() for w in ("LINE", "POLYGON")))
     iss["duplicate_marker_rows"] = dup
-    iss["non_point_geometry"] = sum(1 for r in d if (r["geom_family"] or "point") not in ("point", "POINT", None))
+    fam = {}
+    for r in d:
+        fam[str(r["geom_family"])] = fam.get(str(r["geom_family"]), 0) + 1
+    BY[z]["geom_families"] = fam
+    iss["non_point_geometry"] = sum(n for k, n in fam.items() if k.lower() not in ("point", "pt", "none"))
     iss["no_app_projects_row"] = sum(1 for r in d if r["registry_id"] is None)
     print(f"[db] {z}: markers={len(d)} members={BY[z]['members']} issues={iss}", file=sys.stderr)
 
@@ -128,7 +140,17 @@ for reg in REGS:
     meta = http_json(e["service_url"], {"f": "json"})
     info["geometryType"] = meta.get("geometryType")
     info["meta_error"] = meta.get("_fetch_error")
-    if datecol:
+    fld = {f["name"]: f.get("type") for f in meta.get("fields", [])}
+    if datecol and fld.get(datecol) == "esriFieldTypeString":
+        mx = ""
+        j = http_json(url, {"f": "json", "where": where, "outFields": datecol, "returnGeometry": "false", "resultRecordCount": 5000})
+        for ft in j.get("features", []):
+            v = str(ft["attributes"].get(datecol) or "")
+            m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})", v)
+            iso = f"{m.group(3)}-{int(m.group(1)):02d}-{int(m.group(2)):02d}" if m else v[:10]
+            mx = max(mx, iso)
+        info["newest_source_record"] = mx or None
+    elif datecol:
         st = http_json(url, {"f": "json", "where": where, "outStatistics": json.dumps(
             [{"statisticType": "max", "onStatisticField": datecol, "outStatisticFieldName": "m"}])})
         try:
@@ -156,7 +178,8 @@ def chunks(seq, n):
         yield seq[i:i + n]
 
 
-PUBPT = {}  # (reg,id) -> (x,y) or None
+NPG = {}    # (reg,id) -> publisher line/polygon parts, for the line/polygon geometry check
+PUBPT = {}  # (reg,id) -> (x,y) | "NONPOINT" | "AMBIGUOUS" (several official features share the id)
 for reg, ids in want.items():
     e = ARC[reg]
     idcol = e["column_map"].get("case_number")
@@ -165,17 +188,33 @@ for reg, ids in want.items():
         continue
     got = 0
     for ch in chunks(sorted(ids), 150):
-        lit = ",".join(i if re.fullmatch(r"-?\d+", i) else "'" + i.replace("'", "''") + "'" for i in ch)
-        j = http_json(e["service_url"] + "/query", {
-            "f": "json", "where": f"{idcol} IN ({lit})", "outFields": idcol,
-            "returnGeometry": "true", "outSR": "4326"})
+        def lits(quote):
+            return ",".join(i if (not quote and re.fullmatch(r"-?\d+", i)) else "'" + i.replace("'", "''") + "'" for i in ch)
+        j = None
+        for quote in (False, True):  # a string-typed id column rejects bare numerics (HTTP 400)
+            j = http_json(e["service_url"] + "/query", {
+                "f": "json", "where": f"{idcol} IN ({lits(quote)})", "outFields": idcol,
+                "returnGeometry": "true", "outSR": "4326"})
+            if "_fetch_error" not in j:
+                break
         if "_fetch_error" in j:
             PUB[reg]["compare"] = "UNVERIFIED: fetch error " + j["_fetch_error"]
             break
         for ft in j.get("features", []):
             g, a = ft.get("geometry") or {}, ft["attributes"]
             k = (reg, str(a.get(idcol)))
-            PUBPT[k] = (g["x"], g["y"]) if "x" in g and "y" in g else "NONPOINT"
+            new = (g["x"], g["y"]) if "x" in g and "y" in g else "NONPOINT"
+            if new == "NONPOINT":
+                # a line/polygon project may legitimately be several features (parts); they are ONE project, so keep every part
+                # (the marker rule is defined on the merged geometry) instead of calling the id ambiguous
+                parts = g.get("paths") or g.get("rings") or []
+                NPG.setdefault(k, {"kind": "paths" if g.get("paths") else "rings", "parts": []})["parts"].append(parts)
+                if PUBPT.get(k) not in (None, "NONPOINT"):
+                    PUBPT[k] = "AMBIGUOUS"
+                else:
+                    PUBPT[k] = "NONPOINT"
+            else:
+                PUBPT[k] = "AMBIGUOUS" if k in PUBPT else new
             got += 1
     PUB[reg].setdefault("compare", "ok")
     PUB[reg]["ids_requested"], PUB[reg]["ids_returned"] = len(ids), got
@@ -188,7 +227,8 @@ def hav(x1, y1, x2, y2):
     return 2 * R * math.asin(math.sqrt(a))
 
 for z in ZIPS:
-    cmp_ = {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0}
+    cmp_ = {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0,
+            "ambiguous_identity": 0, "comparison_unavailable": 0}
     bad = []
     for r in BY[z]["dots"]:
         m = key_re.match(r["source_key"] or "")
@@ -196,7 +236,11 @@ for z in ZIPS:
             cmp_["not_arcgis_unverified"] += 1
             continue
         pt = PUBPT.get((m.group(1), m.group(2)))
-        if pt is None:
+        if str(PUB.get(m.group(1), {}).get("compare", "")).startswith("UNVERIFIED"):
+            cmp_["comparison_unavailable"] += 1          # a failed comparison is never "not found" and never a match
+        elif pt == "AMBIGUOUS":
+            cmp_["ambiguous_identity"] += 1
+        elif pt is None:
             cmp_["publisher_not_found"] += 1
         elif pt == "NONPOINT":
             cmp_["nonpoint_unverified"] += 1
@@ -210,8 +254,46 @@ for z in ZIPS:
     BY[z]["publisher_compare"] = cmp_
     BY[z]["publisher_mismatches"] = bad[:20]
 
+# line/polygon dots: the dot must lie ON the publisher's own geometry (measured distance, SRID-safe, geography metres).
+# Membership of the dot in the ZIP polygon is the polygon_membership check; this proves the dot is where the publisher's line is.
+NONPOINT_TOL_M = 5.0
+def _wkt(info):
+    if info["kind"] == "paths":
+        return "MULTILINESTRING(" + ",".join("(" + ",".join(f"{x} {y}" for x, y in p) + ")" for part in info["parts"] for p in part if len(p) > 1) + ")"
+    return "MULTIPOLYGON(" + ",".join("((" + ",".join(f"{x} {y}" for x, y in r) + "))" for part in info["parts"] for r in part if len(r) > 3) + ")"
+def _usable(w):
+    return w not in ("MULTILINESTRING()", "MULTIPOLYGON()")
+for z in ZIPS:
+    cmp_ = BY[z]["publisher_compare"]
+    cmp_["nonpoint_off_geometry"] = 0
+    cmp_["nonpoint_verified"] = 0
+    off, vals = [], []
+    for r in BY[z]["dots"]:
+        m = key_re.match(r["source_key"] or "")
+        if not m or m.group(1) not in ARC:
+            continue
+        k = (m.group(1), m.group(2))
+        if PUBPT.get(k) == "NONPOINT" and k in NPG and _usable(_wkt(NPG[k])):
+            vals.append((r["source_key"], r.get("marker_seq"), r["lng"], r["lat"], _wkt(NPG[k])))
+    for i in range(0, len(vals), 40):
+        part = vals[i:i + 40]
+        lit = ",".join(f"('{sk}',{sq if sq is not None else 'null'},{x},{y},'{w}')" for sk, sq, x, y, w in part)
+        res = rows(f"""select v.sk, v.seq, ST_Distance(ST_GeogFromText('SRID=4326;'||v.w), ST_SetSRID(ST_Point(v.x,v.y),4326)::geography) d_m
+                       from (values {lit}) v(sk,seq,x,y,w)""")
+        for rr in res:
+            if rr["d_m"] is None:
+                continue                      # no distance computed: stays unverified, never counted as on-geometry
+            cmp_["nonpoint_verified"] += 1
+            if rr["d_m"] > NONPOINT_TOL_M:
+                cmp_["nonpoint_off_geometry"] += 1
+                off.append({"source_key": rr["sk"], "marker_seq": rr["seq"], "dist_m": round(rr["d_m"], 1)})
+    # only dots whose distance to the publisher's own geometry was actually computed leave the "unverified" count
+    cmp_["nonpoint_unverified"] = max(0, cmp_["nonpoint_unverified"] - cmp_["nonpoint_verified"])
+    BY[z]["nonpoint_off_detail"] = off[:20]
+
 # eligibility / missing IDs: point layers, publisher point inside ZIP polygon vs serving membership
 ELIG = {}  # zip -> {reg: (eligible, missing_list)}
+DUPIDS = {}  # reg -> eligible ids carried by more than one official feature
 for reg, e in ARC.items():
     if reg not in want and reg not in ("denton-county-dev-permits", "frisco-active-building-permits",
                                          "fort-worth-development-permits"):
@@ -230,18 +312,33 @@ for reg, e in ARC.items():
         PUB[reg]["eligibility"] = "UNVERIFIED: coordinates are geocoded by the engine, publisher has no point"
         continue
     where = e.get("extra_where") or "1=1"
-    allrows, off, trunc = [], 0, False
+    stcol = e["column_map"].get("status_raw")
+    stmap = {}
+    for bucket, vals in (e.get("status_to_bucket") or {}).items():
+        for v in vals or []:
+            stmap[str(v).strip().lower()] = bucket
+    allrows, off, trunc, st_excluded = [], 0, False, 0
+    idcount = {}
+    ofields = idcol + ("," + stcol if stcol and stcol != idcol else "")
     while True:
         j = http_json(e["service_url"] + "/query", {
-            "f": "json", "where": where, "outFields": idcol, "returnGeometry": "true", "outSR": "4326",
+            "f": "json", "where": where, "outFields": ofields, "returnGeometry": "true", "outSR": "4326",
             "resultOffset": off, "resultRecordCount": 2000, "orderByFields": idcol})
         if "_fetch_error" in j:
             PUB[reg]["eligibility"] = "UNVERIFIED: fetch error " + j["_fetch_error"]
             allrows = None
             break
         fs = j.get("features", [])
-        allrows += [(str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"])
-                    for f in fs if f.get("geometry") and "x" in f["geometry"]]
+        for f in fs:
+            if not (f.get("geometry") and "x" in f["geometry"]):
+                continue
+            if stmap:  # same rule as the engine: unmapped/blank/excluded status is not an eligible record
+                b = stmap.get(str(f["attributes"].get(stcol) or "").strip().lower())
+                if b is None or b == "exclude":
+                    st_excluded += 1
+                    continue
+            allrows.append((str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"]))
+            idcount[str(f["attributes"][idcol])] = idcount.get(str(f["attributes"][idcol]), 0) + 1
         if not j.get("exceededTransferLimit") and len(fs) < 2000:
             break
         off += len(fs)
@@ -251,14 +348,16 @@ for reg, e in ARC.items():
     if allrows is None:
         continue
     PUB[reg]["eligibility"] = "ok" if not trunc else "TRUNCATED"
+    DUPIDS[reg] = {i for i, n in idcount.items() if n > 1}
     PUB[reg]["source_rows_with_point"] = len(allrows)
+    PUB[reg]["excluded_by_status"] = st_excluded
     inzip = {}
     for ch in chunks(allrows, 1500):
         vals = ",".join(f"('{i.replace(chr(39), chr(39)*2)}',{x},{y})" for i, x, y in ch)
         res = rows(f"""select v.id, b.zip from (values {vals}) v(id,x,y)
           join lateral (select z.zip from unnest(array[{zl}]) z(zip)
             where geo.zip_membership_boundary(z.zip) is not null
-              and ST_Covers(geo.zip_membership_boundary(z.zip), ST_SetSRID(ST_Point(v.x,v.y),4326)) limit 1) b on true""")
+              and geo.zip_point_membership_in(geo.zip_membership_boundary(z.zip), v.y, v.x) = 'member') b on true""")   # every valid ZIP, no LIMIT 1
         for r in res:
             inzip.setdefault(r["zip"], set()).add(r["id"])
     for z in ZIPS:
@@ -271,32 +370,57 @@ for reg, e in ARC.items():
     print(f"[pub] {reg}: {len(allrows)} point rows", file=sys.stderr)
 
 # ---------------------------------------------------------------- report
-def verdict(z):
+def covering_registries():
+    """Registered sources that claim Denton County (or all of Texas). Their reconciliation must have RUN, whether or not they display a dot."""
+    def covers(e):
+        return any(isinstance(c, dict) and c.get("state") == "TX" and c.get("county") in (None, "Denton") for c in (e.get("coverage") or []))
+    arc = {e["registry_id"] for e in REGISTRY["arcgis"] if covers(e)}
+    other = sorted(e["registry_id"] for k in ("socrata", "ckan", "csv", "carto", "opendatasoft")
+                   for e in (REGISTRY.get(k) or []) if isinstance(e, dict) and covers(e))
+    return arc, other
+COVER_ARC, UNAUDITED_FAMILIES = covering_registries()   # non-ArcGIS families have no reconciliation here: reported, never assumed empty
+
+def facts(z):
+    """Facts for the acceptance logic. Checks the browser / attestation / classification / evidence evidence are added by denton-launch-accept.py."""
     d = BY[z]
-    if not d["has_boundary"]:
-        return "UNKNOWN", "no canonical boundary: classify (non-ZCTA vs gap); no map dots possible"
-    why = []
-    i = d["issues"]
-    if i["outside_polygon"]:
-        why.append(f"{i['outside_polygon']} dots outside polygon")
-    if i["at_centroid"]:
-        why.append(f"{i['at_centroid']} dots at centroid")
-    if i["duplicate_marker_rows"]:
-        why.append("duplicate markers")
-    if d.get("members_without_marker"):
-        why.append(f"{d['members_without_marker']} members without marker")
-    miss = sum(len(v[1]) for v in ELIG.get(z, {}).values())
-    if miss:
-        why.append(f"{miss} eligible source IDs missing")
-    unver = d["publisher_compare"]["not_arcgis_unverified"] + d["publisher_compare"]["nonpoint_unverified"]
-    if unver:
-        why.append(f"{unver} dots not verifiable against publisher geometry here")
-    regs = {r["registry_id"] for r in d["dots"]}
-    fresh = [PUB[r].get("newest_source_record") for r in regs if r in PUB and r != "txdot-projects-info-all"]
-    cur = [f for f in fresh if f and f >= time.strftime("%Y-%m-%d", time.gmtime(time.time() - 365 * 86400))]
-    if not cur:
-        why.append("no municipal/county source with a record in the last 365 days")
-    return ("FAIL" if why else "UNKNOWN"), "; ".join(why) or "page/report tests pending"
+    cut = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 365 * 86400))   # REPORTED as a fact only; never a verdict input
+    d["current_non_txdot_dots"] = len([r for r in d["dots"] if r["registry_id"] not in (None, "txdot-projects-info-all")
+                                       and r["filed"] and str(r["filed"]) >= cut])
+    shown = {r["registry_id"] for r in d["dots"] if r["registry_id"]}
+    incomplete = []
+    if d["has_boundary"]:
+        for reg in sorted((shown | COVER_ARC) & set(ARC)):
+            if reg not in PUB or str(PUB[reg].get("eligibility", "NOT RUN")) != "ok":
+                incomplete.append(reg)
+    elig_reg = ELIG.get(z, {})
+    missing = sum(len(v[1]) for v in elig_reg.values())
+    amb = 0
+    for reg in elig_reg:
+        amb += len(DUPIDS.get(reg, set()) & {m.group(2) for r in d["dots"] for m in [key_re.match(r["source_key"] or "")] if m and m.group(1) == reg})
+    cmp_ = d.get("publisher_compare")
+    iss = d.get("issues") or {}
+    nonpoint_dots = sum(1 for r in d["dots"] if any(w in str(r.get("geom_family") or "").upper() for w in ("LINE", "POLYGON")))
+    geom_known = all(r.get("geom_family") for r in d["dots"])
+    checks = {
+        "polygon_membership": "complete" if d["has_boundary"] and all(isinstance(iss.get(k), int) for k in ("outside_polygon", "lnglat_reversed", "duplicate_marker_rows", "at_centroid")) else "not_run",
+        "unique_identity": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] else "incomplete",
+        "publisher_geometry": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] and not cmp_["nonpoint_unverified"] else "incomplete",
+        "eligibility_reconciliation": "complete" if not incomplete and not UNAUDITED_FAMILIES else "incomplete",
+        # applicable only to line/polygon dots; vacuously complete ONLY when every dot's geometry family is known and none is a line/polygon
+        "nonpoint_geometry": ("complete" if (geom_known and (nonpoint_dots == 0 or (cmp_ and cmp_.get("nonpoint_unverified") == 0 and cmp_.get("nonpoint_verified") == nonpoint_dots))) else ("incomplete" if geom_known else "not_run")),
+    }
+    return {"has_boundary": d["has_boundary"], "issues": iss, "members_without_marker": d.get("members_without_marker"),
+            "compare": cmp_, "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
+            "unaudited_source_families": list(UNAUDITED_FAMILIES), "checks": checks}
+
+def verdict(z):
+    v, why, warn = accept(facts(z))
+    return v, "; ".join(why) or "all checks complete"
+
+def freshness(z):
+    """Reported as a FACT, never a verdict input: newest record each admitted source has published."""
+    regs = {r["registry_id"] for r in BY[z]["dots"]}
+    return {r: PUB[r].get("newest_source_record") for r in sorted(regs) if r in PUB}
 
 out = {"generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "publishers": PUB, "zips": {}}
 md = ["| ZIP | Boundary | Members | Dots | Out-of-polygon | At centroid | Reversed | Dup | Pub match/mismatch/unverified | Eligible IDs missing | Verdict | Blocker |",
@@ -306,14 +430,18 @@ for z in ZIPS:
     v, why = verdict(z)
     pc = d["publisher_compare"]
     missn = sum(len(x[1]) for x in ELIG.get(z, {}).values())
-    out["zips"][z] = {k: d[k] for k in ("in_registry", "has_boundary", "members", "markers", "geo_status",
-                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches")}
+    out["zips"][z] = {k: d.get(k) for k in ("in_registry", "has_boundary", "members", "markers", "geo_status",
+                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches", "geom_families", "current_non_txdot_dots")}
     out["zips"][z]["eligible_missing"] = {r: {"eligible": a, "missing": m[:200], "missing_n": len(m)} for r, (a, m) in ELIG.get(z, {}).items()}
     out["zips"][z]["verdict"] = [v, why]
+    out["zips"][z]["freshness_newest_record_by_source"] = freshness(z)
+    out["zips"][z]["facts"] = facts(z)
     i = d["issues"]
     md.append(f"| {z} | {'yes' if d['has_boundary'] else 'NO'} | {d['members']} | {len(d['dots'])} | {i['outside_polygon']} | {i['at_centroid']} | {i['lnglat_reversed']} | {i['duplicate_marker_rows']} | "
               f"{pc['match']}/{pc['mismatch']}/{pc['not_arcgis_unverified']+pc['nonpoint_unverified']+pc['publisher_not_found']} | {missn} | {v} | {why} |")
 text = "\n".join(md)
+if os.environ.get("OUT_AUDIT"):
+    open(os.environ["OUT_AUDIT"], "w").write(json.dumps(out, default=str))
 print("----- BEGIN DENTON AUDIT JSON -----")
 print(json.dumps(out, default=str))
 print("----- END DENTON AUDIT JSON -----")
