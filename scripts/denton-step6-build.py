@@ -138,7 +138,7 @@ for z in raw["zips"]:
         conn.append({"registry_id": x["registry_id"], "authority": s["authority"] if s else "UNMAPPED", "stored_records": x["n_all"], "records_last_365d": x["n_365d"], "newest_record_date": x["newest"], "local_permit_authority_source": bool(s and s["authority"]),
                      "authority_area_share_in_zip": auth_share(js, s["authority"]) if s else None,
                      "coverage_basis": ("not a local permit authority" if not (s and s["authority"]) else
-                                        "legitimate (authority covers >=5% of ZIP area)" if auth_share(js, s["authority"]) >= 0.05 else
+                                        "legitimate (authority area share >=5%; for the county = unincorporated + ETJ + undetermined area, a generous reading)" if auth_share(js, s["authority"]) >= 0.05 else
                                         "disc-scoping spill only (authority covers <5% of ZIP area; stored rows are inside the registry's 3-mile disc, not the authority's limits)")})
     newest_all = max((c["newest_record_date"] for c in conn), default=None)
     newest_local = max((c["newest_record_date"] for c in conn if c["local_permit_authority_source"]), default=None)
@@ -178,7 +178,7 @@ L += ["", "No other registry source covers any Denton-County jurisdiction (check
 for z, d in zips.items():
     if d["jurisdictions"] == "UNKNOWN":
         L.append(f"| {z} | UNKNOWN | | | UNKNOWN |"); continue
-    js = "; ".join(f"{j['name']}{pct(j['area_share'])}" for j in d["jurisdictions"] if j["area_share"] >= 0.02)
+    js = "; ".join(f"{j['name']} {pct(j['area_share'])}" for j in d["jurisdictions"] if j["area_share"] >= 0.02)
     cs = "; ".join(f"`{c['registry_id'].replace('-projects-info-all','').replace('-active-building-permits','').replace('-development-permits','')}` {c['stored_records']}/{c['records_last_365d']}/{c['newest_record_date']}" for c in d["connected_sources"]) or "none stored"
     g = d["gap"]
     gs = ", ".join(f"{x['jurisdiction']} {pct(x['area_share'])} ({x['status'].lower()})" for x in g["jurisdictions_without_current_source_ge_5pct"]) or "none >=5%"
