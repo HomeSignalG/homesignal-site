@@ -187,19 +187,43 @@ for reg, ids in want.items():
         PUB[reg]["compare"] = "UNVERIFIED: registry has no case_number column"
         continue
     got = 0
-    for ch in chunks(sorted(ids), 150):
+    # chunk size follows the publisher's own record cap (n5_shard does the same): a big chunk against a layer whose features are many long parts
+    # overruns the cap, the server answers exceededTransferLimit and omits the rest -> a false "publisher_not_found".
+    mrc = http_json(e["service_url"], {"f": "json"}).get("maxRecordCount")
+    try:
+        step = max(10, min(150, int(mrc) // 8)) if mrc else 25
+    except (TypeError, ValueError):
+        step = 25
+    for ch in chunks(sorted(ids), step):
         def lits(quote):
             return ",".join(i if (not quote and re.fullmatch(r"-?\d+", i)) else "'" + i.replace("'", "''") + "'" for i in ch)
-        j = None
+        feats_ch, j = [], None
         for quote in (False, True):  # a string-typed id column rejects bare numerics (HTTP 400)
-            j = http_json(e["service_url"] + "/query", {
-                "f": "json", "where": f"{idcol} IN ({lits(quote)})", "outFields": idcol,
-                "returnGeometry": "true", "outSR": "4326"})
+            feats_ch, off_ = [], 0
+            while True:
+                j = http_json(e["service_url"] + "/query", {
+                    "f": "json", "where": f"{idcol} IN ({lits(quote)})", "outFields": idcol,
+                    "returnGeometry": "true", "outSR": "4326", "resultOffset": off_, "resultRecordCount": 500, "orderByFields": idcol})
+                if "_fetch_error" in j and off_ == 0:    # a layer without pagination support: ask once, unpaged, and refuse a truncated answer
+                    j = http_json(e["service_url"] + "/query", {
+                        "f": "json", "where": f"{idcol} IN ({lits(quote)})", "outFields": idcol, "returnGeometry": "true", "outSR": "4326"})
+                    if "_fetch_error" not in j and j.get("exceededTransferLimit"):
+                        j = {"_fetch_error": "truncated response (exceededTransferLimit) and the layer does not page"}
+                if "_fetch_error" in j:
+                    break
+                feats_ch += j.get("features", [])
+                if not j.get("exceededTransferLimit"):
+                    break                      # a page that says it is not the last one is paged, never read as the whole answer
+                off_ += len(j.get("features", []))
+                if off_ > 20000:
+                    j = {"_fetch_error": "paging did not terminate"}
+                    break
             if "_fetch_error" not in j:
                 break
         if "_fetch_error" in j:
             PUB[reg]["compare"] = "UNVERIFIED: fetch error " + j["_fetch_error"]
             break
+        j = {"features": feats_ch}
         for ft in j.get("features", []):
             g, a = ft.get("geometry") or {}, ft["attributes"]
             k = (reg, str(a.get(idcol)))
@@ -301,15 +325,9 @@ for reg, e in ARC.items():
     if reg not in PUB:
         PUB[reg] = {"registry_id": reg, "service_url": e["service_url"],
                     "geometryType": http_json(e["service_url"], {"f": "json"}).get("geometryType")}
-    if PUB[reg].get("geometryType") != "esriGeometryPoint":
-        PUB[reg]["eligibility"] = "UNVERIFIED: layer geometry is not point (line/polygon intersection not tested here)"
-        continue
     idcol = e["column_map"].get("case_number")
     if not idcol:
         PUB[reg]["eligibility"] = "UNVERIFIED: no case_number column in registry"
-        continue
-    if e.get("geocode_assemble"):
-        PUB[reg]["eligibility"] = "UNVERIFIED: coordinates are geocoded by the engine, publisher has no point"
         continue
     where = e.get("extra_where") or "1=1"
     stcol = e["column_map"].get("status_raw")
@@ -317,6 +335,137 @@ for reg, e in ARC.items():
     for bucket, vals in (e.get("status_to_bucket") or {}).items():
         for v in vals or []:
             stmap[str(v).strip().lower()] = bucket
+    gtype = PUB[reg].get("geometryType")
+    if e.get("geocode_assemble"):
+        # The engine places these records by geocoding the ADDRESS; the publisher has no coordinate to put in a polygon, so the
+        # polygon-membership test cannot be run against the publisher. State the measured reason (and the one thing that CAN be
+        # measured, the publisher's own ZIP column when it has one) instead of leaving the registry silently "incomplete".
+        zc = e["column_map"].get("zip")
+        info = {"geometryType": gtype, "layer_has_geometry": gtype is not None, "registry_coordinates": [e["column_map"].get("lat"), e["column_map"].get("lng")],
+                "publisher_zip_column": zc}
+        if zc:
+            rows_, off_, ok_ = {}, 0, True
+            zin = ",".join(f"'{z}'" for z in ZIPS)
+            while True:
+                j = http_json(e["service_url"] + "/query", {"f": "json", "where": f"({where}) AND {zc} IN ({zin})",
+                                                            "outFields": ",".join(x for x in (idcol, zc, stcol) if x), "returnGeometry": "false",
+                                                            "resultOffset": off_, "resultRecordCount": 1000, "orderByFields": idcol})
+                if "_fetch_error" in j:
+                    ok_ = False
+                    info["zip_column_error"] = j["_fetch_error"]
+                    break
+                fs_ = j.get("features", [])
+                for f in fs_:
+                    a_ = f["attributes"]
+                    b_ = stmap.get(str(a_.get(stcol) or "").strip().lower()) if stmap else "x"
+                    if b_ is None or b_ == "exclude":
+                        continue
+                    rows_.setdefault(str(a_.get(zc))[:5], set()).add(str(a_.get(idcol)))
+                if not j.get("exceededTransferLimit"):
+                    break
+                off_ += len(fs_)
+                if off_ > 200000:
+                    ok_ = False
+                    info["zip_column_error"] = "truncated"
+                    break
+            if ok_:
+                per = {}
+                for z in ZIPS:
+                    srv = {r["source_key"].split(":", 2)[2] for r in rows(f"select source_key from geo.n5_serving_membership where zcta5::text='{z}' and source_key like 'arcgis:{reg}:%'")}
+                    el = rows_.get(z, set())
+                    per[z] = {"publisher_rows_stating_this_zip": len(el), "of_them_served_here": len(el & srv), "served_here_total": len(srv)}
+                info["by_audit_zip"] = {z: v for z, v in per.items() if v["publisher_rows_stating_this_zip"] or v["served_here_total"]}
+        PUB[reg]["eligibility_measurement"] = info
+        PUB[reg]["eligibility"] = ("UNRECONCILABLE: coordinates are geocoded by the engine from the address (registry lat/lng=__lat/__lng); layer geometryType=%s, so the publisher "
+                                   "has no point to test against the ZIP polygon%s" % (gtype, "; its own ZIP column (%s) is reported in eligibility_measurement but is not a membership test" % zc if zc else ""))
+        continue
+    if gtype in ("esriGeometryPolyline", "esriGeometryPolygon"):
+        # Serving membership of a line/polygon project = its geometry INTERSECTS the ZIP boundary (docs/n5-generation-publish.sql,
+        # step (1): ST_Intersects(c.geom, b.geom)); markers are derived afterwards (LINE_MERGED_COMPONENT_INTERVAL_1000M). So the eligible set
+        # for a ZIP is: publisher features passing the registry's own extra_where + status rule whose geometry intersects the ZIP polygon.
+        ext = rows(f"select min(ST_XMin(g)) x0, min(ST_YMin(g)) y0, max(ST_XMax(g)) x1, max(ST_YMax(g)) y1 from "
+                   f"(select ST_Transform(geo.zip_membership_boundary(z.zip),4326) g from unnest(array[{zl}]) z(zip) where geo.zip_membership_boundary(z.zip) is not null) t")
+        x0, y0, x1, y1 = [float(ext[0][k]) for k in ("x0", "y0", "x1", "y1")]
+        feats, off, trunc, st_excluded, err = {}, 0, False, 0, None
+        ofields = idcol + ("," + stcol if stcol and stcol != idcol else "")
+        while True:
+            j = http_json(e["service_url"] + "/query", {
+                "f": "json", "where": where, "outFields": ofields, "returnGeometry": "true", "outSR": "4326",
+                "geometry": json.dumps({"xmin": x0, "ymin": y0, "xmax": x1, "ymax": y1, "spatialReference": {"wkid": 4326}}),
+                "geometryType": "esriGeometryEnvelope", "inSR": "4326", "spatialRel": "esriSpatialRelIntersects",
+                "resultOffset": off, "resultRecordCount": 500, "orderByFields": idcol})
+            if "_fetch_error" in j:
+                err = j["_fetch_error"]
+                break
+            fs = j.get("features", [])
+            for f in fs:
+                g = f.get("geometry") or {}
+                parts = g.get("paths") or g.get("rings") or []
+                if not parts:
+                    continue
+                if stmap:
+                    b = stmap.get(str(f["attributes"].get(stcol) or "").strip().lower())
+                    if b is None or b == "exclude":
+                        st_excluded += 1
+                        continue
+                feats.setdefault(str(f["attributes"][idcol]), {"kind": "paths" if g.get("paths") else "rings", "parts": []})["parts"].append(parts)
+            if not j.get("exceededTransferLimit") and len(fs) < 500:
+                break
+            off += len(fs)
+            if off > 200000:
+                trunc = True
+                break
+        if err:
+            PUB[reg]["eligibility"] = "UNVERIFIED: fetch error " + err
+            continue
+        PUB[reg]["eligibility"] = "ok" if not trunc else "TRUNCATED"
+        PUB[reg]["eligibility_method"] = "nonpoint: ST_Intersects(publisher geometry, ZIP boundary), same predicate as serving membership"
+        PUB[reg]["source_projects_in_audit_bbox"] = len(feats)
+        PUB[reg]["excluded_by_status"] = st_excluded
+        DUPIDS[reg] = set()      # several features under one id are parts of ONE line/polygon project, not an identity clash
+        inzip = {}
+        ids_ = sorted(feats)
+        for ch in chunks(ids_, 25):
+            vals = ",".join("('" + i.replace("'", "''") + "','" + _wkt(feats[i]) + "')" for i in ch if _usable(_wkt(feats[i])))
+            if not vals:
+                continue
+            res = rows(f"""select v.id, b.zip from (values {vals}) v(id,w)
+              join lateral (select z.zip from unnest(array[{zl}]) z(zip)
+                where geo.zip_membership_boundary(z.zip) is not null
+                  and ST_Intersects(geo.zip_membership_boundary(z.zip), ST_SetSRID(ST_GeomFromText(v.w),4269))) b on true""")
+            for r in res:
+                inzip.setdefault(r["zip"], set()).add(r["id"])
+        causes = {}
+        for z in ZIPS:
+            mem = rows(f"select source_key from geo.n5_serving_membership where zcta5::text='{z}' and source_key like 'arcgis:{reg}:%'")
+            have = {r["source_key"].split(":", 2)[2] for r in mem}
+            have |= {m.group(2) for r in BY[z]["dots"] for m in [key_re.match(r["source_key"] or "")] if m and m.group(1) == reg}
+            el = inzip.get(z, set())
+            ELIG.setdefault(z, {})[reg] = (len(el), sorted(el - have))
+            for i in sorted(el - have):
+                causes.setdefault(i, []).append(z)
+        # WHY an eligible project is not served (informational; the verdict input is the missing count itself)
+        if causes:
+            kl = ",".join("'arcgis:%s:%s'" % (reg, i.replace("'", "''")) for i in sorted(causes))
+            cr = rows(f"""select k.sk,
+                 exists (select 1 from public.app_projects a where a.source_key = k.sk) in_app_projects,
+                 exists (select 1 from geo.n5_geom g where g.source_key = k.sk and g.outcome = 1 and g.geom is not null) has_candidate_geom,
+                 (select string_agg(distinct g.outcome::text, ',') from geo.n5_geom g where g.source_key = k.sk) geom_outcomes,
+                 (select count(*) from geo.n5_serving_membership m where m.source_key = k.sk) memberships_anywhere
+               from unnest(array[{kl}]) k(sk)""")
+            tally = {}
+            for r in cr:
+                key = ("not_in_app_projects" if not r["in_app_projects"] else
+                       "no_candidate_geometry(outcomes=%s)" % r["geom_outcomes"] if not r["has_candidate_geom"] else
+                       "candidate_geometry_but_no_membership_in_this_zip")
+                tally[key] = tally.get(key, 0) + 1
+            PUB[reg]["missing_causes"] = tally
+            PUB[reg]["missing_examples"] = [{"id": i, "zips": zs} for i, zs in list(causes.items())[:15]]
+        print(f"[pub] {reg}: {len(feats)} nonpoint projects (bbox) reconciled", file=sys.stderr)
+        continue
+    if gtype != "esriGeometryPoint":
+        PUB[reg]["eligibility"] = "UNVERIFIED: layer geometryType=%s is not point/polyline/polygon" % gtype
+        continue
     allrows, off, trunc, st_excluded = [], 0, False, 0
     idcount = {}
     ofields = idcol + ("," + stcol if stcol and stcol != idcol else "")
@@ -387,10 +536,15 @@ def facts(z):
     d["current_non_txdot_dots"] = len([r for r in d["dots"] if r["registry_id"] not in (None, "txdot-projects-info-all")
                                        and r["filed"] and str(r["filed"]) >= cut])
     shown = {r["registry_id"] for r in d["dots"] if r["registry_id"]}
-    incomplete = []
+    incomplete, unrec = [], []
     if d["has_boundary"]:
         for reg in sorted((shown | COVER_ARC) & set(ARC)):
-            if reg not in PUB or str(PUB[reg].get("eligibility", "NOT RUN")) != "ok":
+            st_ = str(PUB.get(reg, {}).get("eligibility", "NOT RUN")) if reg in PUB else "NOT RUN"
+            if st_ == "ok":
+                continue
+            if st_.startswith("UNRECONCILABLE: "):
+                unrec.append(f"{reg}: {st_[len('UNRECONCILABLE: '):]}")     # measured reason: nothing in the publisher can be tested against the polygon
+            else:
                 incomplete.append(reg)
     elig_reg = ELIG.get(z, {})
     missing = sum(len(v[1]) for v in elig_reg.values())
@@ -405,12 +559,12 @@ def facts(z):
         "polygon_membership": "complete" if d["has_boundary"] and all(isinstance(iss.get(k), int) for k in ("outside_polygon", "lnglat_reversed", "duplicate_marker_rows", "at_centroid")) else "not_run",
         "unique_identity": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] else "incomplete",
         "publisher_geometry": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] and not cmp_["nonpoint_unverified"] else "incomplete",
-        "eligibility_reconciliation": "complete" if not incomplete and not UNAUDITED_FAMILIES else "incomplete",
+        "eligibility_reconciliation": "complete" if not incomplete and not unrec and not UNAUDITED_FAMILIES else "incomplete",
         # applicable only to line/polygon dots; vacuously complete ONLY when every dot's geometry family is known and none is a line/polygon
         "nonpoint_geometry": ("complete" if (geom_known and (nonpoint_dots == 0 or (cmp_ and cmp_.get("nonpoint_unverified") == 0 and cmp_.get("nonpoint_verified") == nonpoint_dots))) else ("incomplete" if geom_known else "not_run")),
     }
     return {"has_boundary": d["has_boundary"], "issues": iss, "members_without_marker": d.get("members_without_marker"),
-            "compare": cmp_, "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},
+            "compare": cmp_, "eligibility": {"missing": missing, "incomplete": incomplete, "unreconcilable": unrec, "ambiguous_ids": amb},
             "unaudited_source_families": list(UNAUDITED_FAMILIES), "checks": checks}
 
 def verdict(z):

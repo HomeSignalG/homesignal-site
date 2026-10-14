@@ -74,6 +74,9 @@ def verdict(f):
     inc = (elig or {}).get("incomplete") if isinstance(elig, dict) else None
     if not isinstance(inc, list): unk.append("eligibility.incomplete list not reported")
     elif inc: unk.append("eligible-record reconciliation incomplete for: " + ", ".join(sorted(map(str, inc))))
+    unrec = (elig or {}).get("unreconcilable") if isinstance(elig, dict) else None
+    if not isinstance(unrec, list): unk.append("eligibility.unreconcilable list not reported")
+    elif unrec: unk.append("eligible-record reconciliation not testable (measured reason): " + " | ".join(sorted(map(str, unrec))))
     n, ok = _count(elig, "ambiguous_ids")
     if not ok: unk.append("counter eligibility.ambiguous_ids not measured")
     elif n: unk.append(f"{n} eligible ids are not unique at the publisher")
