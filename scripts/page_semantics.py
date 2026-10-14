@@ -170,7 +170,7 @@ class BaselineError(Exception):
     pass
 
 
-def load_baseline(text):
+def load_baseline(text, host=None):
     """Parse and VALIDATE a previously published state document. Returns the dict, or raises
     BaselineError. A document that does not validate is never silently treated as 'no baseline':
     that would turn a corrupt file into a first-run reseed and swallow a real delta."""
@@ -180,8 +180,9 @@ def load_baseline(text):
         raise BaselineError(f"baseline is not JSON: {e}")
     if not isinstance(doc, dict) or doc.get("schema") != SCHEMA:
         raise BaselineError("baseline is not a homesignal-page-state document")
-    if doc.get("host") != BASE:
-        raise BaselineError(f"baseline host is {doc.get('host')!r}, not {BASE!r}")
+    want = host or BASE
+    if doc.get("host") != want:
+        raise BaselineError(f"baseline host is {doc.get('host')!r}, not {want!r}")
     if not isinstance(doc.get("semantic_version"), int):
         raise BaselineError("baseline has no integer semantic_version")
     pages = doc.get("pages")
@@ -340,16 +341,9 @@ def _cmd_decide(a):
     return 0
 
 
-def fetch_baseline(out, *, get=None, sleep=time.sleep, tries=4, url=None):
-    """Capture the PREVIOUS LIVE state before anything is built or deployed.
-
-    The `?cb=` query defeats the CDN: GitHub Pages serves with a ten-minute max-age, so a build
-    that starts minutes after a deploy could otherwise read the state from TWO deploys ago and
-    announce pages that were already announced. 404 means 'there is no baseline' (first
-    publication, seed). Any other failure is retried and then FAILS the build: a flaky read must
-    not be mistaken for a first run, because a first run notifies nothing.
-    Returns 'ok' | 'absent'."""
-    url = url or f"{BASE}/sitemaps/page-state.json"
+def _read_state(url, *, get, sleep, tries):
+    """GET one page-state URL with the ?cb= cache-buster. Returns (status, body_text, last_error): status 200/404 are answers;
+    anything else (or None for a network error) is retried and then returned as an unreadable result."""
     last = ""
     for n in range(tries):
         cb = f"{url}?cb={int(time.time())}{n}"
@@ -364,18 +358,75 @@ def fetch_baseline(out, *, get=None, sleep=time.sleep, tries=4, url=None):
             status, body = e.code, b""
         except Exception as e:                       # network error: retry
             status, body, last = None, b"", str(e)
-        if status == 404:
-            if os.path.exists(out):
-                os.remove(out)
-            return "absent"
-        if status == 200:
-            text = body.decode("utf-8")
-            load_baseline(text)                        # validate before trusting it
-            open(out, "w", encoding="utf-8").write(text)
-            return "ok"
+        if status in (200, 404):
+            return status, body.decode("utf-8") if status == 200 else "", last
         last = last or f"HTTP {status}"
         if n < tries - 1:
             sleep(min(2 ** (n + 1), 30))
+    return None, "", last
+
+
+def _foreign_state(text, origins):
+    """If `text` is a valid page-state document published by ANOTHER known identity, return that origin, else None."""
+    for o in origins:
+        try:
+            load_baseline(text, host=o)
+            return o
+        except BaselineError:
+            continue
+    return None
+
+
+def fetch_baseline(out, *, get=None, sleep=time.sleep, tries=4, url=None, known_origins=None):
+    """Capture the PREVIOUS LIVE state before anything is built or deployed.
+
+    The `?cb=` query defeats the CDN: GitHub Pages serves with a ten-minute max-age, so a build
+    that starts minutes after a deploy could otherwise read the state from TWO deploys ago and
+    announce pages that were already announced. 404 means 'there is no baseline' (first
+    publication, seed). Any other failure is retried and then FAILS the build: a flaky read must
+    not be mistaken for a first run, because a first run notifies nothing.
+
+    BRAND MIGRATION (F1). When the contract's identity changes the host changes with it, so the previous live state lives on the
+    OLD origin and every URL differs: a per-page delta is meaningless and the correct result is a seed ('absent'). It is
+    recognised ONLY by positive evidence, never by a failed read alone:
+      (a) the new origin answers 200 with a VALID state document published by another known identity (old tree still served), or
+      (b) the new origin is unreadable AND a known other origin answers 200 with a valid document published by itself.
+    A document that is not valid, a host nobody knows, or both origins unreadable still FAIL. After cutover the old origin
+    301s to the new one, so (b) cannot be satisfied by a flaky new-origin read: the redirect yields a document of the new host.
+    Returns 'ok' | 'absent'."""
+    url = url or f"{BASE}/sitemaps/page-state.json"
+    if known_origins is None:
+        known_origins = brand_host.other_origins() if url == f"{BASE}/sitemaps/page-state.json" else []
+    status, text, last = _read_state(url, get=get, sleep=sleep, tries=tries)
+    if status == 404:
+        if os.path.exists(out):
+            os.remove(out)
+        return "absent"
+    if status == 200:
+        try:
+            load_baseline(text)                        # validate before trusting it
+        except BaselineError:
+            o = _foreign_state(text, known_origins)
+            if o is None:
+                raise
+            print(f"NOTE: brand migration: the live state at {BASE} was published by {o}; seeding (no per-page delta across a host change)",
+                  file=sys.stderr)
+            if os.path.exists(out):
+                os.remove(out)
+            return "absent"
+        open(out, "w", encoding="utf-8").write(text)
+        return "ok"
+    for o in known_origins:                              # new origin unreadable: look for positive evidence on the old one
+        s2, t2, _ = _read_state(f"{o}/sitemaps/page-state.json", get=get, sleep=sleep, tries=tries)
+        if s2 == 200:
+            try:
+                load_baseline(t2, host=o)
+            except BaselineError:
+                continue
+            print(f"NOTE: brand migration: {BASE} is not serving yet and {o} publishes a valid state; seeding", file=sys.stderr)
+            if os.path.exists(out):
+                os.remove(out)
+            return "absent"
     raise SystemExit(f"ERROR: could not read the live page state ({last}); refusing to treat an unreadable "
                      f"baseline as a first run")
 
