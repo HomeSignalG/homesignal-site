@@ -42,7 +42,7 @@ html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
 <script src="lib/templates.js?v=6b61281a"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=0973955c"></script>
+<script src="shell.js?v=78757d3e"></script>
 <script>
 (function(){
   'use strict';
@@ -77,7 +77,7 @@ html.hs-follow,html.hs-follow body{background:#fff;margin:0;min-height:0}
     var ok = HS.startFollowEmbed(address, {
       onSaved: function(info){
         var hm = document.getElementById('homeModal'); if (hm) hm.classList.remove('show');
-        tell({ type: 'following', existed: !!(info && info.existed) });
+        tell({ type: 'following', existed: !!(info && info.existed), zip: (info && /^\d{5}$/.test(String(info.zip))) ? String(info.zip) : '' });
       }
     });
     if (!ok) { tell({ type: 'unavailable' }); return; }

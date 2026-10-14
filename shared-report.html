@@ -98,10 +98,11 @@ noscript p{margin:16px;font-weight:600}
   <aside id="invite" class="invite" hidden aria-label="About HomeSignal">
     <h2>Follow quality-of-life intelligence for this property.</h2>
     <p>HomeSignal helps you discover proposed development, construction, infrastructure projects, and other changes around the places you care about.</p>
-    <p id="followNote" hidden>Get notified when HomeSignal finds new development or meaningful project changes near this property.</p>
+    <p id="followNote" hidden>Following saves this property to your HomeSignal account. Email alerts are a separate choice: after you follow, pick your alert topics and HomeSignal will email you about new development and meaningful project changes in this area.</p>
     <a class="go follow" id="follow2" href="#" hidden>Follow this property</a>
     <div id="followBottom"></div>
     <a href="https://homesignal.net/" rel="noopener noreferrer">Explore HomeSignal &rarr;</a>
+    <p id="followAlerts" hidden><a id="followAlertsLink" href="#" target="_blank" rel="noopener noreferrer">Choose your alert topics &rarr;</a> Nothing is emailed until you do.</p>
   </aside>
 </main>
 <section id="followPanel" class="follow-panel" hidden aria-label="Follow this property">
@@ -192,7 +193,7 @@ noscript p{margin:16px;font-weight:600}
     panel.hidden = false;
     try { followFrame.focus(); } catch (e) {}
   }
-  function followDone(){
+  function followDone(zip){
     followState = 'following';
     ['follow', 'follow2'].forEach(function(id){
       var a = $(id); if (!a) return;
@@ -201,13 +202,17 @@ noscript p{margin:16px;font-weight:600}
     });
     followClose();
     $('followStatus').textContent = 'Following this property.';
+    if (/^\d{5}$/.test(zip || '')) {
+      $('followAlertsLink').href = 'https://homesignal.net/alerts.html?zip=' + zip;
+      $('followAlerts').hidden = false;
+    }
   }
   window.addEventListener('message', function(e){
     var d = e.data;
     // only our own frame, on our own origin, speaking our own small vocabulary
     if (e.origin !== location.origin || !followFrame || e.source !== followFrame.contentWindow || !d || d.hsFollow !== true) return;
     if (d.type === 'height' && typeof d.h === 'number') followFrame.style.height = Math.max(110, Math.min(520, Math.ceil(d.h))) + 'px';
-    else if (d.type === 'following') followDone();
+    else if (d.type === 'following') followDone(typeof d.zip === 'string' ? d.zip : '');
     else if (d.type === 'unavailable') $('followFallback').hidden = false;
   });
 
