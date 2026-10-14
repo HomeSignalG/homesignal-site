@@ -177,4 +177,20 @@ def compute():
     emit("STEP6 META", {k: v for k, v in res.items() if k != "zips"})
 
 
-discover() if STEP == "discover" else compute()
+def inspect():
+    base = "https://gis.dentoncounty.gov/arcgis/rest/services/"
+    out = {}
+    for s in ["City_Limit", "ETJ_GC", "PoliticalBoundaries_GC", "CityETJPermits_GC", "CitiesGrey", "Special_DistrictsGC"]:
+        m = get(f"{base}{s}/MapServer?f=json")
+        e = {"desc": (m.get("serviceDescription") or "")[:200], "err": m.get("_err"), "layers": {}}
+        for l in m.get("layers", []):
+            lj = get(f"{base}{s}/MapServer/{l['id']}?f=json")
+            cnt = get(f"{base}{s}/MapServer/{l['id']}/query", {"f": "json", "where": "1=1", "returnCountOnly": "true"})
+            smp = get(f"{base}{s}/MapServer/{l['id']}/query", {"f": "json", "where": "1=1", "outFields": "*", "returnGeometry": "false", "resultRecordCount": "60"})
+            e["layers"][l["id"]] = {"name": l["name"], "type": lj.get("geometryType"), "fields": [f["name"] for f in lj.get("fields", [])],
+                                    "count": cnt.get("count"), "sample": [x["attributes"] for x in smp.get("features", [])][:60], "err": lj.get("_err")}
+        out[s] = e
+    emit("STEP6 INSPECT", out)
+
+
+{"discover": discover, "inspect": inspect}.get(STEP, compute)()

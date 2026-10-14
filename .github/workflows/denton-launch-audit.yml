@@ -97,7 +97,7 @@ jobs:
       - name: Step 6 jurisdiction matrix (read only)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          STEP: ${{ github.event.inputs.task == 'step6-compute' && 'compute' || 'discover' }}
+          STEP: ${{ github.event.inputs.task == 'step6-compute' && 'compute' || (github.event.inputs.task == 'step6-inspect' && 'inspect' || 'discover') }}
         run: python3 scripts/denton-step6-matrix.py
   accept:
     # Final acceptance: needs BOTH halves to have completed. A skipped or failed half means this job does not run, so it can never grade from nothing.
