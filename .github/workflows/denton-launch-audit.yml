@@ -27,6 +27,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"      # the audit reads the connector's own predicate (scripts/denton-connector-where.mjs); needs type stripping
       - name: Database + publisher audit (read only)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

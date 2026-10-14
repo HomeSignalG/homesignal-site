@@ -333,6 +333,15 @@ for z in ZIPS:
 # eligibility / missing IDs: point layers, publisher point inside ZIP polygon vs serving membership
 ELIG = {}  # zip -> {reg: (eligible, missing_list)}
 DUPIDS = {}  # reg -> eligible ids carried by more than one official feature
+def connector_where(regs):
+    try:
+        r = subprocess.run(["node", os.path.join(os.path.dirname(os.path.abspath(__file__)), "denton-connector-where.mjs"), *regs],
+                           capture_output=True, text=True, timeout=180)
+        d = json.loads(r.stdout.strip().splitlines()[-1])
+        return None if r.returncode or "_error" in d else d
+    except Exception:  # noqa
+        return None
+CONNECTOR_WHERE = connector_where(sorted(ARC))
 for reg, e in ARC.items():
     if reg not in want and reg not in ("denton-county-dev-permits", "frisco-active-building-permits",
                                          "fort-worth-development-permits"):
@@ -344,14 +353,22 @@ for reg, e in ARC.items():
     if not idcol:
         PUB[reg]["eligibility"] = "UNVERIFIED: no case_number column in registry"
         continue
-    where = e.get("extra_where") or "1=1"
+    # The publisher predicate is the connector's OWN (extra_where AND include_types AND recency window), obtained from the shipped code by
+    # scripts/denton-connector-where.mjs; never re-typed here. If it cannot be obtained, the registry is UNVERIFIED (never "nothing eligible").
+    if CONNECTOR_WHERE is None or not isinstance(CONNECTOR_WHERE.get(reg), dict) or "where" not in CONNECTOR_WHERE[reg]:
+        PUB[reg]["eligibility"] = "UNVERIFIED: connector predicate unavailable (node helper failed)"
+        continue
+    where = CONNECTOR_WHERE[reg]["where"]
+    PUB[reg]["eligibility_where"] = where
     stcol = e["column_map"].get("status_raw")
     stmap = {}
     for bucket, vals in (e.get("status_to_bucket") or {}).items():
         for v in vals or []:
             stmap[str(v).strip().lower()] = bucket
     gtype = PUB[reg].get("geometryType")
-    if e.get("geocode_assemble"):
+    # A geocode_assemble layer whose publisher DOES serve points (Frisco, Fort Worth: dots match the publisher point) takes the point path below;
+    # the engine-geocoded remainder (rows with no publisher point) is detected there and reported, not assumed absent.
+    if e.get("geocode_assemble") and gtype != "esriGeometryPoint":
         # The engine places these records by geocoding the ADDRESS; the publisher has no coordinate to put in a polygon, so the
         # polygon-membership test cannot be run against the publisher. State the measured reason (and the one thing that CAN be
         # measured, the publisher's own ZIP column when it has one) instead of leaving the registry silently "incomplete".
@@ -481,7 +498,7 @@ for reg, e in ARC.items():
     if gtype != "esriGeometryPoint":
         PUB[reg]["eligibility"] = "UNVERIFIED: layer geometryType=%s is not point/polyline/polygon" % gtype
         continue
-    allrows, off, trunc, st_excluded = [], 0, False, 0
+    allrows, off, trunc, st_excluded, no_point = [], 0, False, 0, 0
     idcount = {}
     ofields = idcol + ("," + stcol if stcol and stcol != idcol else "")
     while True:
@@ -494,13 +511,14 @@ for reg, e in ARC.items():
             break
         fs = j.get("features", [])
         for f in fs:
-            if not (f.get("geometry") and "x" in f["geometry"]):
-                continue
             if stmap:  # same rule as the engine: unmapped/blank/excluded status is not an eligible record
                 b = stmap.get(str(f["attributes"].get(stcol) or "").strip().lower())
                 if b is None or b == "exclude":
                     st_excluded += 1
                     continue
+            if not (f.get("geometry") and "x" in f["geometry"]):
+                no_point += 1          # eligible by predicate and status, but the publisher gives it no point
+                continue
             allrows.append((str(f["attributes"][idcol]), f["geometry"]["x"], f["geometry"]["y"]))
             idcount[str(f["attributes"][idcol])] = idcount.get(str(f["attributes"][idcol]), 0) + 1
         if not j.get("exceededTransferLimit") and len(fs) < 2000:
@@ -512,6 +530,11 @@ for reg, e in ARC.items():
     if allrows is None:
         continue
     PUB[reg]["eligibility"] = "ok" if not trunc else "TRUNCATED"
+    PUB[reg]["eligible_rows_without_publisher_point"] = no_point
+    if no_point and not trunc and e.get("geocode_assemble"):
+        # the engine places these by geocoding the address, so they cannot be put in a polygon from the publisher: say so, never call them absent
+        PUB[reg]["eligibility"] = ("UNRECONCILABLE: %d eligible publisher rows carry no point (the engine geocodes them from the address); "
+                                   "the %d rows with a publisher point were reconciled" % (no_point, len(allrows)))
     DUPIDS[reg] = {i for i, n in idcount.items() if n > 1}
     PUB[reg]["source_rows_with_point"] = len(allrows)
     PUB[reg]["excluded_by_status"] = st_excluded
