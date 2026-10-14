@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   data:
-    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'pages' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' }}
+    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'pages' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' && github.event.inputs.task != 'sources-denton3' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: denton-audit, path: out/audit.json, retention-days: 7 }
   pages:
-    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' }}
+    if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' && github.event.inputs.task != 'sources-denton3' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -100,7 +100,7 @@ jobs:
           node-version: "22"
       - name: Probe Denton sources (read only)
         env:
-          PROBE_MODE: ${{ github.event.inputs.task == 'sources-focus' && 'focus' || github.event.inputs.task == 'sources-denton' && 'denton' || github.event.inputs.task == 'sources-denton2' && 'denton2' || 'broad' }}
+          PROBE_MODE: ${{ github.event.inputs.task == 'sources-focus' && 'focus' || github.event.inputs.task == 'sources-denton' && 'denton' || github.event.inputs.task == 'sources-denton2' && 'denton2' || github.event.inputs.task == 'sources-denton3' && 'denton3' || 'broad' }}
         run: node scripts/denton-source-probe.mjs
   accept:
     # Final acceptance: needs BOTH halves to have completed. A skipped or failed half means this job does not run, so it can never grade from nothing.

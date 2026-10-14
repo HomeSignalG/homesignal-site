@@ -406,7 +406,20 @@ async function denton2() {
   console.log('----- BEGIN DENTON PROBE JSON -----'); console.log('{}'); console.log('----- END DENTON PROBE JSON -----');
 }
 
+async function denton3() {
+  // Raw query responses in the exact shape the connector requests, for the offline fixture (real captured features).
+  const cols = 'OBJECTID,Project_ID,Project_Name,Project_Type,Status,Submittal_Date,Status_Date,Address';
+  const want = { 15: "Project_Type IN ('FINAL PLAT','ZONING COMPLIANCE PLAN','MINOR REPLAT','ZONING','SPECIFICUSE') AND Status_Date >= DATE '2026-09-01'", 9: '1=1', 13: '1=1', 5: '1=1', 8: '1=1', 12: '1=1', 0: '1=1' };
+  const cap = {};
+  for (const [id, where] of Object.entries(want)) {
+    const r = await jget(`${DEN_MS}/${id}/query?${new URLSearchParams({ f: 'json', where, outFields: cols, returnGeometry: 'true', outSR: '4326', orderByFields: 'Status_Date DESC', resultRecordCount: id === '15' ? '8' : '3' })}`);
+    cap[id] = r.json; console.log(`CAPTURE layer ${id} HTTP ${r.status} features=${r.json && r.json.features && r.json.features.length}`);
+  }
+  console.log('----- BEGIN DENTON FIXTURE -----'); console.log(JSON.stringify(cap)); console.log('----- END DENTON FIXTURE -----');
+}
+
 async function main() {
+  if (process.env.PROBE_MODE === 'denton3') return denton3();
   if (process.env.PROBE_MODE === 'denton2') return denton2();
   if (process.env.PROBE_MODE === 'denton') return denton();
   if (process.env.PROBE_MODE === 'focus') return focus();
