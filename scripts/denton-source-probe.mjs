@@ -213,7 +213,44 @@ async function friscoHealth() {
   const res = { rows: rows.length, exceededTransferLimit: !!(r.json && r.json.exceededTransferLimit), parsed_dates: dated.length, newest: dated[0] && iso(dated[0].d), oldest: dated.length && iso(dated[dated.length - 1].d), n2025: cnt(2025), n2026: cnt(2026), last365: dated.filter((a) => a.d >= D365).length, last90: dated.filter((a) => a.d >= new Date(NOW - 90 * 864e5)).length, statuses: [...new Set(rows.map((a) => a.Status))], types: Object.fromEntries([...new Set(rows.map((a) => a.Type))].map((t) => [t, rows.filter((a) => a.Type === t).length])), with_hyperlink: rows.filter((a) => a.Hyperlink).length, distinct_permit_no: new Set(rows.map((a) => a.Permit_No)).size, newest5: dated.slice(0, 5).map((a) => [iso(a.d), a.Permit_No, a.Type, a.Address, a.Hyperlink]) };
   out.frisco = res; console.log('FRISCO ' + JSON.stringify(res));
 }
+// City of Denton's own AGO org (Development Services GIS) -- found via public web search (discovery only), verified here.
+const DENTON_AGO = 'https://services9.arcgis.com/EYTIgi02HN6AuvRN/ArcGIS/rest/services';
+async function vocab(layerUrl) {
+  const m = await jget(layerUrl + '?f=json'); if (!m.json || !m.json.fields) return;
+  console.log(`FIELDS ${layerUrl}: ${m.json.fields.map((f) => f.name + ':' + f.type.replace('esriFieldType', '')).join(', ')}`);
+  console.log(`  geom=${m.json.geometryType} oid=${m.json.objectIdField} maxRecordCount=${m.json.maxRecordCount} lastEdit=${m.json.editingInfo && m.json.editingInfo.lastEditDate ? iso(new Date(m.json.editingInfo.lastEditDate)) : '?'} desc=${JSON.stringify((m.json.description || '').slice(0, 300))} copyright=${JSON.stringify(m.json.copyrightText || '')}`);
+  for (const f of m.json.fields.filter((f) => f.type === 'esriFieldTypeString' && /status|type|categor|stage|phase|class|kind|desc|review|zone|proc|name$/i.test(f.name) && !/addr|owner|applicant|email|phone|contact|agent|manager|staff/i.test(f.name)).slice(0, 8)) {
+    const g = await jget(`${layerUrl}/query?${new URLSearchParams({ f: 'json', where: '1=1', groupByFieldsForStatistics: f.name, outStatistics: JSON.stringify([{ statisticType: 'count', onStatisticField: f.name, outStatisticFieldName: 'n' }]), orderByFields: 'n DESC', resultRecordCount: '60' })}`);
+    const rows = (g.json && g.json.features || []).map((x) => `${JSON.stringify(x.attributes[f.name])}=${x.attributes.n}`);
+    console.log(`  VOCAB ${f.name} (${rows.length}${rows.length >= 60 ? '+' : ''}): ${rows.join(' | ').slice(0, 1800)}`);
+  }
+  const s = await jget(`${layerUrl}/query?${new URLSearchParams({ f: 'json', where: '1=1', outFields: '*', returnGeometry: 'true', outSR: '4326', resultRecordCount: '3', orderByFields: m.json.objectIdField ? m.json.objectIdField + ' DESC' : '' })}`);
+  for (const x of (s.json && s.json.features || [])) console.log(`  SAMPLE ${JSON.stringify(x.attributes).slice(0, 900)} geom=${JSON.stringify(x.geometry).slice(0, 120)}`);
+}
+async function focusDenton() {
+  console.log('=== FOCUS 1b: City of Denton AGO org EYTIgi02HN6AuvRN ===');
+  const org = await jget('https://www.arcgis.com/sharing/rest/portals/EYTIgi02HN6AuvRN?f=json');
+  console.log(`ORG HTTP ${org.status} name=${org.json && org.json.name} url=${org.json && org.json.urlKey} ${org.json && org.json.error ? JSON.stringify(org.json.error) : ''}`);
+  const L = await listServices(DENTON_AGO);
+  console.log(`DENTON-AGO ${L.err ? 'ERR ' + L.err : L.services.length + ' services'}: ${L.services.map((s) => s.name + '/' + s.type).join(', ')}`);
+  out.denton_ago_services = L.services.map((s) => `${s.name}/${s.type}`);
+  for (const s of L.services) {
+    if (timeUp()) break; if (s.type !== 'FeatureServer' && s.type !== 'MapServer') continue;
+    if (!/project|develop|permit|plat|zon|plan|case|annex|site|subdiv|rezon|activity|inspect/i.test(s.name)) continue;
+    const base = `${s.base}/${s.name}/${s.type}`; const m = await jget(base + '?f=json');
+    console.log(`SVC ${base} layers=${((m.json && m.json.layers) || []).map((l) => l.id + ':' + l.name).join(', ')} desc=${JSON.stringify(((m.json && m.json.serviceDescription) || '').slice(0, 200))}`);
+    for (const l of ((m.json && m.json.layers) || [])) { await probeLayer(`${base}/${l.id}`, `${s.name}/${l.name}`, 'City of Denton (dentontxgis)'); await vocab(`${base}/${l.id}`); }
+  }
+  console.log('=== FOCUS 1c: Denton County PlanningandZoning_GC "Present" layer ===');
+  const cu = 'https://gis.dentoncounty.gov/arcgis/rest/services/PlanningandZoning_GC/MapServer/0';
+  for (const p of [{ where: 'DateReceiv IS NOT NULL', outFields: 'PermitID,DateReceiv,PermitStat,PermitType', orderByFields: 'DateReceiv DESC', resultRecordCount: '5', returnGeometry: 'false' }, { where: "DateReceiv >= DATE '2024-01-01'", returnCountOnly: 'true' }]) {
+    const r = await jget(`${cu}/query?${new URLSearchParams({ f: 'json', ...p })}`); console.log(`COUNTY-PRESENT ${JSON.stringify(p).slice(0, 80)} -> HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 700)}`);
+  }
+  const ff = 'https://maps.friscotexas.gov/gis/rest/services/Public/External_Planning_and_Zoning/MapServer';
+  for (const id of [4, 5, 2, 9, 10]) await vocab(`${ff}/${id}`);
+}
 async function focus() {
+  await focusDenton();
   const found = { layers: new Set(), ids: new Set(), items: [] }; const seenIds = new Set();
   console.log('=== FOCUS 1: City of Denton pages ===');
   for (const u of ['https://www.cityofdenton.com/241/Development-Project-Information', 'https://www.cityofdenton.com/1072/Development-Activity']) {
