@@ -178,6 +178,7 @@ def chunks(seq, n):
         yield seq[i:i + n]
 
 
+NPG = {}    # (reg,id) -> publisher line/polygon parts, for the line/polygon geometry check
 PUBPT = {}  # (reg,id) -> (x,y) | "NONPOINT" | "AMBIGUOUS" (several official features share the id)
 for reg, ids in want.items():
     e = ARC[reg]
@@ -203,7 +204,17 @@ for reg, ids in want.items():
             g, a = ft.get("geometry") or {}, ft["attributes"]
             k = (reg, str(a.get(idcol)))
             new = (g["x"], g["y"]) if "x" in g and "y" in g else "NONPOINT"
-            PUBPT[k] = "AMBIGUOUS" if k in PUBPT else new
+            if new == "NONPOINT":
+                # a line/polygon project may legitimately be several features (parts); they are ONE project, so keep every part
+                # (the marker rule is defined on the merged geometry) instead of calling the id ambiguous
+                parts = g.get("paths") or g.get("rings") or []
+                NPG.setdefault(k, {"kind": "paths" if g.get("paths") else "rings", "parts": []})["parts"].append(parts)
+                if PUBPT.get(k) not in (None, "NONPOINT"):
+                    PUBPT[k] = "AMBIGUOUS"
+                else:
+                    PUBPT[k] = "NONPOINT"
+            else:
+                PUBPT[k] = "AMBIGUOUS" if k in PUBPT else new
             got += 1
     PUB[reg].setdefault("compare", "ok")
     PUB[reg]["ids_requested"], PUB[reg]["ids_returned"] = len(ids), got
@@ -242,6 +253,43 @@ for z in ZIPS:
                 bad.append({"source_key": r["source_key"], "dist_m": round(dm, 1)})
     BY[z]["publisher_compare"] = cmp_
     BY[z]["publisher_mismatches"] = bad[:20]
+
+# line/polygon dots: the dot must lie ON the publisher's own geometry (measured distance, SRID-safe, geography metres).
+# Membership of the dot in the ZIP polygon is the polygon_membership check; this proves the dot is where the publisher's line is.
+NONPOINT_TOL_M = 5.0
+def _wkt(info):
+    if info["kind"] == "paths":
+        return "MULTILINESTRING(" + ",".join("(" + ",".join(f"{x} {y}" for x, y in p) + ")" for part in info["parts"] for p in part if len(p) > 1) + ")"
+    return "MULTIPOLYGON(" + ",".join("((" + ",".join(f"{x} {y}" for x, y in r) + "))" for part in info["parts"] for r in part if len(r) > 3) + ")"
+def _usable(w):
+    return w not in ("MULTILINESTRING()", "MULTIPOLYGON()")
+for z in ZIPS:
+    cmp_ = BY[z]["publisher_compare"]
+    cmp_["nonpoint_off_geometry"] = 0
+    cmp_["nonpoint_verified"] = 0
+    off, vals = [], []
+    for r in BY[z]["dots"]:
+        m = key_re.match(r["source_key"] or "")
+        if not m or m.group(1) not in ARC:
+            continue
+        k = (m.group(1), m.group(2))
+        if PUBPT.get(k) == "NONPOINT" and k in NPG and _usable(_wkt(NPG[k])):
+            vals.append((r["source_key"], r.get("marker_seq"), r["lng"], r["lat"], _wkt(NPG[k])))
+    for i in range(0, len(vals), 40):
+        part = vals[i:i + 40]
+        lit = ",".join(f"('{sk}',{sq if sq is not None else 'null'},{x},{y},'{w}')" for sk, sq, x, y, w in part)
+        res = rows(f"""select v.sk, v.seq, ST_Distance(ST_GeogFromText('SRID=4326;'||v.w), ST_SetSRID(ST_Point(v.x,v.y),4326)::geography) d_m
+                       from (values {lit}) v(sk,seq,x,y,w)""")
+        for rr in res:
+            if rr["d_m"] is None:
+                continue                      # no distance computed: stays unverified, never counted as on-geometry
+            cmp_["nonpoint_verified"] += 1
+            if rr["d_m"] > NONPOINT_TOL_M:
+                cmp_["nonpoint_off_geometry"] += 1
+                off.append({"source_key": rr["sk"], "marker_seq": rr["seq"], "dist_m": round(rr["d_m"], 1)})
+    # only dots whose distance to the publisher's own geometry was actually computed leave the "unverified" count
+    cmp_["nonpoint_unverified"] = max(0, cmp_["nonpoint_unverified"] - cmp_["nonpoint_verified"])
+    BY[z]["nonpoint_off_detail"] = off[:20]
 
 # eligibility / missing IDs: point layers, publisher point inside ZIP polygon vs serving membership
 ELIG = {}  # zip -> {reg: (eligible, missing_list)}
@@ -359,7 +407,7 @@ def facts(z):
         "publisher_geometry": "complete" if cmp_ and not cmp_["not_arcgis_unverified"] and not cmp_["comparison_unavailable"] and not cmp_["nonpoint_unverified"] else "incomplete",
         "eligibility_reconciliation": "complete" if not incomplete and not UNAUDITED_FAMILIES else "incomplete",
         # applicable only to line/polygon dots; vacuously complete ONLY when every dot's geometry family is known and none is a line/polygon
-        "nonpoint_geometry": "complete" if (geom_known and nonpoint_dots == 0) else "not_run",
+        "nonpoint_geometry": ("complete" if (geom_known and (nonpoint_dots == 0 or (cmp_ and cmp_.get("nonpoint_unverified") == 0 and cmp_.get("nonpoint_verified") == nonpoint_dots))) else ("incomplete" if geom_known else "not_run")),
     }
     return {"has_boundary": d["has_boundary"], "issues": iss, "members_without_marker": d.get("members_without_marker"),
             "compare": cmp_, "eligibility": {"missing": missing, "incomplete": incomplete, "ambiguous_ids": amb},

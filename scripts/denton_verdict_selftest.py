@@ -5,7 +5,7 @@ from denton_verdict import verdict, po_box_verdict, REQUIRED_CHECKS
 CLEAN = {"has_boundary": True,
          "issues": {"outside_polygon": 0, "lnglat_reversed": 0, "duplicate_marker_rows": 0, "at_centroid": 0},
          "members_without_marker": 0,
-         "compare": {"match": 5, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0,
+         "compare": {"match": 5, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "nonpoint_off_geometry": 0, "not_arcgis_unverified": 0,
                      "ambiguous_identity": 0, "comparison_unavailable": 0},
          "eligibility": {"missing": 0, "incomplete": [], "ambiguous_ids": 0},
          "unaudited_source_families": [],
@@ -34,7 +34,7 @@ for c in REQUIRED_CHECKS:
 G.append(("checks block missing entirely is UNKNOWN", {k: v for k, v in CLEAN.items() if k != "checks"}, "UNKNOWN"))
 # falsely clean counters: absent / null / bool / string / negative are NOT zero
 for path in (("issues", "outside_polygon"), ("issues", "lnglat_reversed"), ("issues", "duplicate_marker_rows"), ("members_without_marker",),
-             ("compare", "mismatch"), ("compare", "publisher_not_found"), ("compare", "nonpoint_unverified"), ("compare", "not_arcgis_unverified"),
+             ("compare", "mismatch"), ("compare", "publisher_not_found"), ("compare", "nonpoint_unverified"), ("compare", "nonpoint_off_geometry"), ("compare", "not_arcgis_unverified"),
              ("compare", "ambiguous_identity"), ("compare", "comparison_unavailable"), ("eligibility", "missing"), ("eligibility", "ambiguous_ids")):
     G.append((f"counter {'.'.join(path)} absent is UNKNOWN", drop(path), "UNKNOWN"))
     for bad in (None, False, "0", -1, 0.0):
@@ -48,7 +48,7 @@ G += [
     ("compare block empty is UNKNOWN", mod(compare={}) if False else {**copy.deepcopy(CLEAN), "compare": {}}, "UNKNOWN"),
     ("eligibility block missing is UNKNOWN", {k: v for k, v in CLEAN.items() if k != "eligibility"}, "UNKNOWN"),
     ("zero records but nothing evidenced is UNKNOWN", {"has_boundary": True, "issues": {"outside_polygon": 0, "lnglat_reversed": 0, "duplicate_marker_rows": 0, "at_centroid": 0},
-        "members_without_marker": 0, "compare": {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0, "ambiguous_identity": 0, "comparison_unavailable": 0},
+        "members_without_marker": 0, "compare": {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "nonpoint_off_geometry": 0, "not_arcgis_unverified": 0, "ambiguous_identity": 0, "comparison_unavailable": 0},
         "eligibility": {"missing": 0, "incomplete": [], "ambiguous_ids": 0}, "unaudited_source_families": [], "checks": {}}, "UNKNOWN"),
     ("unavailable publisher (comparison failed) is UNKNOWN", mod(compare={"comparison_unavailable": 3}), "UNKNOWN"),
     ("one ambiguous PermitID is UNKNOWN", mod(compare={"ambiguous_identity": 1}), "UNKNOWN"),
@@ -64,6 +64,7 @@ G += [
     ("duplicate marker FAILS", mod(issues={"duplicate_marker_rows": 1}), "FAIL"),
     ("member without marker FAILS", mod(members_without_marker=1), "FAIL"),
     ("publisher mismatch FAILS", mod(compare={"mismatch": 1}), "FAIL"),
+    ("line dot off the publisher's own line FAILS", mod(compare={"nonpoint_off_geometry": 1}), "FAIL"),
     ("publisher record not found FAILS", mod(compare={"publisher_not_found": 1}), "FAIL"),
     ("missing eligible record FAILS", mod(eligibility={"missing": 1}), "FAIL"),
     ("a FAIL stays FAIL when checks are also incomplete", mod(eligibility={"missing": 4}, check={"browser_behavior": "not_run"}), "FAIL"),

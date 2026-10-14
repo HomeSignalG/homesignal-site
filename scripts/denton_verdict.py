@@ -48,6 +48,7 @@ def verdict(f):
     elif n: fail.append(f"{n} serving members without a marker")
     cmp_ = f.get("compare")
     for key, label in (("mismatch", "dots differ from the publisher's own coordinates"),
+                       ("nonpoint_off_geometry", "line/polygon dots not on the publisher's own geometry"),
                        ("publisher_not_found", "dots whose source record the publisher does not return")):
         n, ok = _count(cmp_, key)
         if not ok: unk.append(f"counter compare.{key} not measured")
