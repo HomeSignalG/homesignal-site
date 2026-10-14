@@ -1,0 +1,15 @@
+
+  select case
+    when nullif(btrim(el->>'source_id'),'') is not null then
+      case
+        when nullif(btrim(el->>'case_number'),'') is not null
+             and btrim(el->>'source_id') like '%:'||btrim(el->>'case_number') then 'source_id:case_number'
+        when btrim(el->>'source_id') ~ ':[0-9]+$'                             then 'source_id:row_id'
+        when nullif(btrim(el->>'title'),'') is not null
+             and btrim(el->>'source_id') like '%:'||btrim(el->>'title')       then 'source_id:title(MUTABLE)'
+        else 'source_id:other'
+      end
+    when nullif(btrim(el->>'project_no'),'')  is not null then 'tdlr:project_no'
+    when nullif(btrim(el->>'registry_id'),'') is not null then 'epa_frs:registry_id'
+    else 'none'
+  end
