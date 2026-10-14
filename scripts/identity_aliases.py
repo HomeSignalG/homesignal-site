@@ -57,6 +57,18 @@ def fingerprint(pairs):
     return f"n:{n}:{total}"
 
 
+def finite_coord(v):
+    """A coordinate as a finite float, else None. ArcGIS answers an empty point as NaN (a JSON literal or the string "NaN"); that is
+    'no geometry', never a number: it must not be written to the alias file (NaN is not JSON) nor compared as a position."""
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
 def haversine_m(x1, y1, x2, y2):
     p1, p2 = math.radians(y1), math.radians(y2)
     a = math.sin((p2 - p1) / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(math.radians(x2 - x1) / 2) ** 2
@@ -78,9 +90,10 @@ def true_duplicate(a, b, oid_field, ignore_fields=(), tol_m=DUPLICATE_M):
     """Both features carry a point, are within tol_m, and have identical comparable attributes.
     A missing point, or ANY difference, means NOT a duplicate (a wrongly-merged pair is the defect this exists to prevent;
     a wrongly-split pair costs one extra identical-looking record)."""
-    if a.get("x") is None or a.get("y") is None or b.get("x") is None or b.get("y") is None:
+    ax, ay, bx, by = (finite_coord(a.get("x")), finite_coord(a.get("y")), finite_coord(b.get("x")), finite_coord(b.get("y")))
+    if ax is None or ay is None or bx is None or by is None:
         return False
-    if haversine_m(float(a["x"]), float(a["y"]), float(b["x"]), float(b["y"])) > tol_m:
+    if haversine_m(ax, ay, bx, by) > tol_m:
         return False
     return _comparable_attrs(a.get("attrs"), oid_field, ignore_fields) == _comparable_attrs(b.get("attrs"), oid_field, ignore_fields)
 
@@ -160,9 +173,10 @@ def build_alias_file(features, registry_id, id_field, oid_field, scan_date, serv
             continue
         for f in sorted(members[i], key=lambda t: int(norm_oid(t["attrs"].get(oid_field)))):
             oid = norm_oid(f["attrs"].get(oid_field))
+            fx, fy = finite_coord(f.get("x")), finite_coord(f.get("y"))
+            has = fx is not None and fy is not None          # half a point is no point
             evidence.append({"id": i, "oid": oid, "identity": ids[oid],
-                             "x": None if f.get("x") is None else round(float(f["x"]), 6),
-                             "y": None if f.get("y") is None else round(float(f["y"]), 6)})
+                             "x": round(fx, 6) if has else None, "y": round(fy, 6) if has else None})
     return {
         "version": VERSION,
         "registry_id": registry_id,
@@ -217,6 +231,8 @@ def validate_alias_file(obj):
                 p.append(f"evidence row malformed: {r!r}")
                 continue
             oid, ident = str(r["oid"]), r["identity"]
+            if any(r[k] is not None and finite_coord(r[k]) is None for k in ("x", "y")) or (r["x"] is None) != (r["y"] is None):
+                p.append(f"evidence row for OBJECTID {oid} has a non-finite or half-missing coordinate (missing geometry must be null/null)")
             if (ident != r["id"]) != (oid in al) or (oid in al and al[oid] != ident):
                 p.append(f"evidence for OBJECTID {oid} disagrees with aliases")
         if {str(r.get("oid")) for r in ev if isinstance(r, dict)} < set(al):
@@ -246,7 +262,8 @@ def diff_alias_files(committed, fresh):
             moved.append(f"OBJECTID {oid} is no longer a member of a reused id")
         elif q["id"] != r["id"]:
             moved.append(f"OBJECTID {oid} changed id {r['id']!r} -> {q['id']!r}")
-        elif (r["x"] is None) != (q["x"] is None) or (r["x"] is not None and haversine_m(r["x"], r["y"], q["x"], q["y"]) > DUPLICATE_M):
+        elif (finite_coord(r["x"]) is None) != (finite_coord(q["x"]) is None) or (
+                finite_coord(r["x"]) is not None and haversine_m(finite_coord(r["x"]), finite_coord(r["y"]), finite_coord(q["x"]), finite_coord(q["y"])) > DUPLICATE_M):
             moved.append(f"OBJECTID {oid} of id {r['id']!r} now sits elsewhere (renumbering/re-geocoding: its legacy-or-alias key would change owner)")
     if moved:
         bad.append(f"{len(moved)} reused-id feature(s) moved: " + "; ".join(moved[:3]))
@@ -260,9 +277,14 @@ def diff_alias_files(committed, fresh):
     return bad
 
 
+def _no_constant(name):
+    raise ValueError(f"non-JSON constant {name} in an alias file")
+
+
 def load_alias_file(path):
+    """STRICT parse: NaN / Infinity are not JSON (the edge bundler and every other JSON consumer reject them)."""
     with open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+        return json.load(fh, parse_constant=_no_constant)
 
 
 def source_identity(base, oid, alias_file):

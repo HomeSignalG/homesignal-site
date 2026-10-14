@@ -69,7 +69,7 @@ def scan_layer(service_url, oid_field, id_field, fetch=http_json):
             raise SystemExit("STOP: a page came back without a features array; refusing a partial scan")
         for f in fs:
             g = f.get("geometry") or {}
-            feats.append({"attrs": f.get("attributes") or {}, "x": g.get("x"), "y": g.get("y")})
+            feats.append({"attrs": f.get("attributes") or {}, "x": ia.finite_coord(g.get("x")), "y": ia.finite_coord(g.get("y"))})
         off += len(fs)
         if not fs or (j.get("exceededTransferLimit") is False) or (j.get("exceededTransferLimit") is not True and len(fs) < PAGE):
             break
@@ -91,7 +91,7 @@ def build(entry, feats, scan_date):
 
 
 def dump(obj):
-    return json.dumps(obj, indent=1, sort_keys=False) + "\n"
+    return json.dumps(obj, indent=1, sort_keys=False, allow_nan=False) + "\n"   # raises on NaN/Infinity: the file must be strict JSON
 
 
 def main(argv=None):
