@@ -1,0 +1,267 @@
+{
+ "_note": "Shared by test/identity-alias-parity.test.mjs (TypeScript applyIdentityAlias) and scripts/test_identity_aliases.py (Python source_identity). `file` is built from denton-shaped-scan.json by scripts/identity_aliases.py; the Python test fails if it drifts.",
+ "file": {
+  "version": 1,
+  "registry_id": "denton-county-dev-permits",
+  "id_field": "PermitID",
+  "oid_field": "OBJECTID",
+  "aliases": {
+   "12": "19990001#12",
+   "21": "19990002#21",
+   "31": "19990003#31",
+   "41": "19990004#41",
+   "42": "19990004#41",
+   "311": "20062250#311",
+   "4001": "20062248#4001"
+  },
+  "evidence": [
+   {
+    "id": "19990001",
+    "oid": "10",
+    "identity": "19990001",
+    "x": -97.3,
+    "y": 33.1
+   },
+   {
+    "id": "19990001",
+    "oid": "11",
+    "identity": "19990001",
+    "x": -97.30002,
+    "y": 33.10002
+   },
+   {
+    "id": "19990001",
+    "oid": "12",
+    "identity": "19990001#12",
+    "x": -97.3,
+    "y": 33.1
+   },
+   {
+    "id": "19990002",
+    "oid": "20",
+    "identity": "19990002",
+    "x": -97.4,
+    "y": 33.4
+   },
+   {
+    "id": "19990002",
+    "oid": "21",
+    "identity": "19990002#21",
+    "x": -97.4,
+    "y": 33.4
+   },
+   {
+    "id": "19990003",
+    "oid": "30",
+    "identity": "19990003",
+    "x": -97.5,
+    "y": 33.5
+   },
+   {
+    "id": "19990003",
+    "oid": "31",
+    "identity": "19990003#31",
+    "x": -96.5,
+    "y": 33.5
+   },
+   {
+    "id": "19990004",
+    "oid": "40",
+    "identity": "19990004",
+    "x": -97.6,
+    "y": 33.6
+   },
+   {
+    "id": "19990004",
+    "oid": "41",
+    "identity": "19990004#41",
+    "x": -97.0,
+    "y": 33.0
+   },
+   {
+    "id": "19990004",
+    "oid": "42",
+    "identity": "19990004#41",
+    "x": -97.00001,
+    "y": 33.0
+   },
+   {
+    "id": "20062248",
+    "oid": "101",
+    "identity": "20062248",
+    "x": -97.1,
+    "y": 33.2
+   },
+   {
+    "id": "20062248",
+    "oid": "4001",
+    "identity": "20062248#4001",
+    "x": -97.0,
+    "y": 33.25
+   },
+   {
+    "id": "20062250",
+    "oid": "310",
+    "identity": "20062250",
+    "x": null,
+    "y": null
+   },
+   {
+    "id": "20062250",
+    "oid": "311",
+    "identity": "20062250#311",
+    "x": null,
+    "y": null
+   },
+   {
+    "id": "20110001",
+    "oid": "55",
+    "identity": "20110001",
+    "x": -97.2,
+    "y": 33.3
+   },
+   {
+    "id": "20110001",
+    "oid": "56",
+    "identity": "20110001",
+    "x": -97.20003,
+    "y": 33.30003
+   }
+  ],
+  "scan": {
+   "scan_date": "2026-10-14",
+   "service_url": "synthetic",
+   "rule": "lowest-oid-keeps-legacy; distinct-records-get-id#oid; true-duplicates-share-identity",
+   "duplicate_tolerance_m": 30.0,
+   "ignored_fields": [],
+   "features": 20,
+   "blank_id": 2,
+   "distinct_ids": 9,
+   "reused_ids": 7,
+   "reused_ids_all_true_duplicates": 1,
+   "reused_ids_with_distinct_records": 6,
+   "aliased_features": 7,
+   "duplicate_features_collapsed": 3,
+   "distinct_record_features": 6,
+   "layer_fingerprint": "n:18:50286680443",
+   "alias_fingerprint": "n:7:17657561135"
+  }
+ },
+ "cases": [
+  {
+   "name": "non-primary distinct feature gets the alias",
+   "row": {
+    "OBJECTID": 4001,
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248#4001"
+  },
+  {
+   "name": "the lowest-OBJECTID feature keeps the legacy identity",
+   "row": {
+    "OBJECTID": 101,
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248"
+  },
+  {
+   "name": "a true duplicate of the primary keeps the legacy identity (not in the file)",
+   "row": {
+    "OBJECTID": 56,
+    "PermitID": "20110001"
+   },
+   "base": "20110001",
+   "expected": "20110001"
+  },
+  {
+   "name": "a true duplicate of a non-primary record shares THAT record's alias",
+   "row": {
+    "OBJECTID": 42,
+    "PermitID": "19990004"
+   },
+   "base": "19990004",
+   "expected": "19990004#41"
+  },
+  {
+   "name": "a different record at the same place gets its own alias",
+   "row": {
+    "OBJECTID": 12,
+    "PermitID": "19990001"
+   },
+   "base": "19990001",
+   "expected": "19990001#12"
+  },
+  {
+   "name": "OBJECTID given as a string still matches",
+   "row": {
+    "OBJECTID": "4001",
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248#4001"
+  },
+  {
+   "name": "OBJECTID with surrounding space still matches",
+   "row": {
+    "OBJECTID": " 4001 ",
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248#4001"
+  },
+  {
+   "name": "a stale alias never attaches to a re-keyed id (publisher changed this OBJECTID's PermitID)",
+   "row": {
+    "OBJECTID": 4001,
+    "PermitID": "20999999"
+   },
+   "base": "20999999",
+   "expected": "20999999"
+  },
+  {
+   "name": "an OBJECTID the file does not list keeps its identity",
+   "row": {
+    "OBJECTID": 999999,
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248"
+  },
+  {
+   "name": "a row without its OBJECTID keeps its identity (out_fields dropped it)",
+   "row": {
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248"
+  },
+  {
+   "name": "a blank OBJECTID keeps its identity",
+   "row": {
+    "OBJECTID": "  ",
+    "PermitID": "20062248"
+   },
+   "base": "20062248",
+   "expected": "20062248"
+  },
+  {
+   "name": "a null base stays null",
+   "row": {
+    "OBJECTID": 4001
+   },
+   "base": null,
+   "expected": null
+  },
+  {
+   "name": "a unique id is never touched",
+   "row": {
+    "OBJECTID": 200,
+    "PermitID": "Z-3"
+   },
+   "base": "Z-3",
+   "expected": "Z-3"
+  }
+ ]
+}

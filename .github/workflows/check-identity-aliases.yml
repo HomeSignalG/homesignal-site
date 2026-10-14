@@ -1,0 +1,101 @@
+name: check-identity-aliases
+
+# COMPOUND RECORD IDENTITY (sources/identity-aliases.ts <-> scripts/identity_aliases.py; docs/denton-workstream-b-2026-10-14.md).
+#
+# offline  - on PRs/pushes touching the rule: registry <-> alias files <-> engine loader <-> n5_shard parity (check_identity_aliases.py),
+#            the unit suites, and the prohibited-weakening mutants (each MUST make a suite fail).
+# live     - DAILY and on dispatch: re-reads the PUBLISHER layer (public GET only, no secret, no database) for every committed alias file
+#            and fails when the reuse set or an OBJECTID's location moved (renumbering, new reuse, re-keying). With no committed file it
+#            prints that and passes: there is nothing yet to be stale.
+# generate - dispatch only: scans the layer and PRINTS the alias file between markers (artifacts are unreadable from the sandbox; the log is
+#            the channel). Nothing is committed or applied by this workflow.
+#
+# Runs on a runner because the development sandbox has no egress to publisher hosts. Holds NO Supabase credential.
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/get-address-report/sources/identity-aliases.ts'
+      - 'supabase/functions/get-address-report/sources/arcgis.ts'
+      - 'supabase/functions/get-address-report/identity-aliases/**'
+      - 'supabase/functions/get-address-report/jurisdiction-registry.json'
+      - 'supabase/functions/get-address-report/index.ts'
+      - 'scripts/identity_aliases.py'
+      - 'scripts/gen_identity_aliases.py'
+      - 'scripts/check_identity_aliases.py'
+      - 'scripts/test_identity_aliases.py'
+      - 'scripts/n5_shard.py'
+      - 'test/identity-alias*'
+      - 'test/fixtures/identity-aliases/**'
+      - '.github/workflows/check-identity-aliases.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/get-address-report/identity-aliases/**'
+      - 'scripts/identity_aliases.py'
+      - 'scripts/n5_shard.py'
+  schedule:
+    - cron: '37 6 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'live = compare committed files with the publisher; generate = print a fresh alias file'
+        type: choice
+        options: [live, generate]
+        default: live
+      registry_id:
+        description: 'registry_id for generate mode'
+        default: denton-county-dev-permits
+
+jobs:
+  offline:
+    if: github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.mode == 'live')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Registry, alias files, engine loader and n5_shard agree
+        run: python3 -I scripts/check_identity_aliases.py
+      - name: Legacy keys unchanged (14 fixtures, 12 registry entries)
+        run: node test/identity-alias-legacy-keys.test.mjs
+      - name: Rule, connector, fail-closed, Python twin
+        run: node test/identity-alias-parity.test.mjs
+      - name: Python rule, generator, fingerprints, shard fetch routing, checker
+        run: python3 -I scripts/test_identity_aliases.py
+      - name: Every prohibited weakening is killed
+        run: python3 test/identity-alias_mutants.py
+
+  live:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Committed alias files equal the live layers' reuse sets
+        run: |
+          set -u
+          shopt -s nullglob
+          files=(supabase/functions/get-address-report/identity-aliases/*.json)
+          echo "committed alias files: ${#files[@]}"
+          if [ "${#files[@]}" -eq 0 ]; then echo "none committed yet - nothing can be stale"; exit 0; fi
+          rc=0
+          for f in "${files[@]}"; do
+            id="$(basename "$f" .json)"
+            echo "== $id"
+            python3 -I scripts/gen_identity_aliases.py --registry-id "$id" --check-live || rc=1
+          done
+          exit $rc
+
+  generate:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'generate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan the layer and print the alias file (read-only; commit it through a reviewed PR)
+        env:
+          REGISTRY_ID: ${{ inputs.registry_id }}
+        run: python3 -I scripts/gen_identity_aliases.py --registry-id "$REGISTRY_ID" --scan --stdout
