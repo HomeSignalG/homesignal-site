@@ -295,6 +295,75 @@ ok(any("mutually exclusive" in e for e in chk_errs(ident_fields=True)), "checker
 ok(any("n5_shard" in e for e in chk_errs(shard_ok=False)), "checker: n5_shard not routed through the shared rule -> FAIL")
 for variant in (False, "import_only", "pass_only"):
     ok(any("engine index.ts" in e for e in chk_errs(engine_ok=variant)), f"checker: engine wiring {variant!r} (not both imported AND handed to arcgisForZip) -> FAIL")
+# ── missing geometry must be null, never NaN (the first Denton file carried NaN: not JSON, broke the edge module) ────────────────
+import gen_identity_aliases as gen  # noqa: E402
+
+NAN = float("nan")
+nan_scan = [
+    {"attrs": {IDF: "2010", OIDF: 1}, "x": NAN, "y": NAN},                 # the shape ArcGIS gives an empty point
+    {"attrs": {IDF: "2010", OIDF: 2}, "x": "NaN", "y": "NaN"},             # ... or the string
+    {"attrs": {IDF: "2010", OIDF: 3}, "x": float("inf"), "y": 1.0},
+    {"attrs": {IDF: "2010", OIDF: 4}, "x": -97.1, "y": None},              # half a point
+    {"attrs": {IDF: "9", OIDF: 5}, "x": -97.1, "y": 33.2},
+    {"attrs": {IDF: "9", OIDF: 6}, "x": -97.1, "y": 33.2},                 # same attrs, same place: a true duplicate
+]
+nf = build(nan_scan)
+txt = gen.dump(nf)                                                          # allow_nan=False: raises if any NaN survived
+strict = json.loads(txt, parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+ev = {r["oid"]: r for r in strict["evidence"]}
+ok(all(ev[o]["x"] is None and ev[o]["y"] is None for o in ("1", "2", "3", "4")), "missing / non-finite / half geometry is written as null/null", ev)
+ok(ia.finite_coord(NAN) is None and ia.finite_coord("NaN") is None and ia.finite_coord(float("-inf")) is None and ia.finite_coord(True) is None
+   and ia.finite_coord("-97.5") == -97.5 and ia.finite_coord(0) == 0.0, "finite_coord: NaN/inf/bool -> None, numbers and numeric strings kept")
+ok(set(nf["aliases"]) == {"2", "3", "4"} and "6" not in nf["aliases"],
+   "NaN geometry is never 'identical': three distinct records alias, the real duplicate (5,6) still folds", nf["aliases"])
+ok(ia.true_duplicate({"attrs": {IDF: "a", OIDF: 1}, "x": NAN, "y": NAN}, {"attrs": {IDF: "a", OIDF: 2}, "x": NAN, "y": NAN}, OIDF) is False,
+   "two NaN points are not a true duplicate")
+try:
+    json.dumps({"x": NAN}, allow_nan=False)
+    raised = False
+except ValueError:
+    raised = True
+ok(raised, "control: strict dumping a NaN raises (what gen.dump now relies on)")
+try:
+    gen.dump({"evidence": [{"x": NAN}]})
+    dump_raises = False
+except ValueError:
+    dump_raises = True
+ok(dump_raises, "gen.dump REFUSES a NaN instead of writing it")
+ok(not [p for p in ia.validate_alias_file(strict)], "the null-geometry file validates", ia.validate_alias_file(strict))
+bad = copy.deepcopy(strict)
+bad["evidence"][0]["x"] = NAN
+ok(any("non-finite" in p for p in ia.validate_alias_file(bad)), "validate_alias_file rejects a NaN evidence coordinate")
+bad2 = copy.deepcopy(strict)
+bad2["evidence"][0]["y"] = None
+bad2["evidence"][0]["x"] = 1.5
+ok(any("half-missing" in p for p in ia.validate_alias_file(bad2)), "validate_alias_file rejects a half-missing coordinate")
+_tmp = tempfile.mkdtemp()
+try:
+    _p = os.path.join(_tmp, "x.json")
+    open(_p, "w").write(json.dumps(strict).replace('"x": null', '"x": NaN', 1) if '"x": null' in json.dumps(strict) else "{\"x\": NaN}")
+    try:
+        ia.load_alias_file(_p)
+        loads = True
+    except ValueError:
+        loads = False
+    ok(not loads, "load_alias_file is a STRICT parser: a file containing NaN is refused")
+finally:
+    shutil.rmtree(_tmp)
+# every committed alias file parses as strict JSON (what the edge bundler requires)
+_adir = os.path.join(ROOT, "supabase/functions/get-address-report/identity-aliases")
+_files = sorted(f for f in os.listdir(_adir) if f.endswith(".json"))
+def _strict(path):
+    try:
+        json.loads(open(path, encoding="utf-8").read(), parse_constant=lambda c: (_ for _ in ()).throw(ValueError(c)))
+        return True
+    except ValueError:
+        return False
+
+
+_bad = [f for f in _files if not _strict(os.path.join(_adir, f))]
+ok(not _bad, f"every committed alias file ({len(_files)}) is strict JSON (no NaN/Infinity)", _bad)
+
 real = chk.check(ROOT)
 ok(real == [], "checker: THE REAL TREE passes", real)
 
