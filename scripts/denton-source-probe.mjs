@@ -227,7 +227,33 @@ async function vocab(layerUrl) {
   const s = await jget(`${layerUrl}/query?${new URLSearchParams({ f: 'json', where: '1=1', outFields: '*', returnGeometry: 'true', outSR: '4326', resultRecordCount: '3', orderByFields: m.json.objectIdField ? m.json.objectIdField + ' DESC' : '' })}`);
   for (const x of (s.json && s.json.features || [])) console.log(`  SAMPLE ${JSON.stringify(x.attributes).slice(0, 900)} geom=${JSON.stringify(x.geometry).slice(0, 120)}`);
 }
+async function findDentonOrg() {
+  console.log('=== FOCUS 1d: locate the CITY OF DENTON ArcGIS org (verify org name, never assume) ===');
+  const orgs = new Map();
+  const note = async (orgId, via) => { if (!orgId || orgs.has(orgId)) return; const p = await jget(`https://www.arcgis.com/sharing/rest/portals/${orgId}?f=json`); const name = p.json && p.json.name; const url = p.json && p.json.urlKey; orgs.set(orgId, { name, urlKey: url }); console.log(`ORG ${orgId} name=${JSON.stringify(name)} urlKey=${url} via=${via} ${name ? '' : 'HTTP ' + p.status + ' ' + JSON.stringify(p.json && p.json.error || '').slice(0, 80)}`); };
+  for (const q of ['denton', 'dentontxgis', 'City of Denton']) {
+    const u = await jget(`https://www.arcgis.com/sharing/rest/community/users?${new URLSearchParams({ f: 'json', num: '50', q })}`);
+    for (const x of (u.json && u.json.results) || []) console.log(`USER q=${q} username=${x.username} fullName=${JSON.stringify(x.fullName)} orgId=${x.orgId}`);
+    const g = await jget(`https://www.arcgis.com/sharing/rest/community/groups?${new URLSearchParams({ f: 'json', num: '50', q })}`);
+    for (const x of (g.json && g.json.results) || []) console.log(`GROUP q=${q} title=${JSON.stringify(x.title)} owner=${x.owner} orgId=${x.orgId}`);
+  }
+  for (const q of ['Active Projects Denton', 'Denton development projects review', 'City of Denton site plans plats rezoning', 'Denton Development Services']) {
+    const r = await jget(`https://www.arcgis.com/sharing/rest/search?${new URLSearchParams({ f: 'json', num: '50', q, sortField: 'modified', sortOrder: 'desc' })}`);
+    for (const it of (r.json && r.json.results) || []) {
+      const hay = `${it.title} ${it.owner} ${it.snippet} ${(it.tags || []).join(' ')}`.toLowerCase();
+      if (!/denton/.test(hay) && !/denton/.test(String(it.url))) continue;
+      await note(it.orgId, 'item ' + it.title);
+      console.log(`ITEM q=${JSON.stringify(q)} "${it.title}" type=${it.type} owner=${it.owner} org=${JSON.stringify((orgs.get(it.orgId) || {}).name)} modified=${iso(new Date(it.modified))} url=${it.url}`);
+    }
+  }
+  for (const [id, o] of orgs) if (/denton/i.test(o.name || '')) {
+    const sr = await jget(`https://www.arcgis.com/sharing/rest/search?${new URLSearchParams({ f: 'json', num: '100', q: `orgid:${id} AND (type:"Feature Service" OR type:"Map Service")`, sortField: 'modified', sortOrder: 'desc' })}`);
+    for (const it of (sr.json && sr.json.results) || []) console.log(`DENTON-ORG-ITEM ${id} "${it.title}" modified=${iso(new Date(it.modified))} url=${it.url}`);
+  }
+}
 async function focusDenton() {
+  await findDentonOrg();
+  return;
   console.log('=== FOCUS 1b: candidate AGO org OQPRCxZXJewOd2xW ===');
   const org = await jget('https://www.arcgis.com/sharing/rest/portals/OQPRCxZXJewOd2xW?f=json');
   console.log(`ORG HTTP ${org.status} name=${org.json && org.json.name} url=${org.json && org.json.urlKey} ${org.json && org.json.error ? JSON.stringify(org.json.error) : ''}`);
