@@ -56,3 +56,29 @@ poisons the whole statement. This cannot be settled without capturing a failing 
 `last_collected_response_id` ≥ that response id; `refreshed_at` > the fire instant; no `blocked_update` failure rows since the
 fire; materialised `app_projects` rows at/after the new `refreshed_at`; and then the recovered `source_key`s compared **by key**.
 HTTP 200, a green workflow, or unrelated successful ticks are not evidence.
+
+---
+
+## 2026-10-12 — CAUSE PROVEN (read-only production diagnostic; nothing in production changed)
+
+**The step (d) timeout is a planner flip in the `blocked` CTE, not a lock, a payload or a trigger.** Evidence, all SELECT-only on production:
+
+- `blocked` is `where exists (select 1 from development_reports d, lateral jsonb_array_elements(d.sites) e where d.zip = r.zip and e->>'source_registry_id' = f.registry_id)`.
+  Postgres flattens the EXISTS to a semi join and prices it from the response-set size. `EXPLAIN` (no execution) with literal id sets: 1, 8 and 12 ids →
+  Nested Loop Semi Join on `development_reports_pkey`; **16 ids → Hash Semi Join with a build side of every site of every one of 12,722 ZIPs** (estimate 1,272,200 rows, cost 72,212).
+- The hash side is built only when the outer side yields a row, i.e. only when one of the 16 responses carries a `fetch failed:` source.
+  Same SELECT, same 16 ids, same data: **default plan cancelled at a 45 s cap; `enable_hashjoin=off`/`enable_mergejoin=off`: 15 ms, 741 buffers.**
+- The 23:34Z episode's oldest-16 uncollected set (ids 39616–39635, fired together at 23:26:26Z) is the Maine DOT batch: every response carries
+  `maine-dot-public-projects` + `-lines` "fetch failed: rate-limited/5xx". The 20:34Z, 21:32Z and 19:30Z episodes each begin right after an identical batch (ids 38743–38760, 38998–39015, 38464–38481).
+- Ticks that processed 16 ids **without** a failed source (23:28–23:32Z, up to 2.1 MB payloads each) took ~1 s; single failed-source responses inside a ≤12-id set took ~1 s.
+- A failing tick rolls back its cursor, so the next tick selects the same 16 and fails the same way until the batch leaves the 20-minute window: 7–9 ticks. Responses that age out are the ones counted lost.
+
+NOT OBSERVED: a live `pg_stat_activity` / `pg_locks` capture of a failing tick (none occurred during the bounded observation). The cause above does not need one: the statement's plan and its cancelled isolated replay are the direct evidence. A lock wait is not required to explain any episode and none was observed.
+
+Fix (draft, not applied): `docs/dev-refresh-collect-blocked-plan-stable.sql` — `exists (...)` → `(select count(*) ...) > 0`; test: `test/dev_collect_plan_pg` / `dev-collect-plan-suite.yml`.
+
+### 2026-10-12 (later) - release-audit hardening of the fix (still NOT applied)
+Migration now fail-closed on md5(prosrc) ORIGINAL `2012877397532a1e8e160b5a7a4c8032` / PATCHED `12b3dcc680b322af7d2cd61734be9b4c`, with an exact reversal and a runbook
+(`docs/dev-refresh-collect-blocked-plan-stable-runbook.md`). COUNT(*) vs the best-case EXISTS, measured on a disposable PG (not production): identical buffers
+(it detoasts the same array either way; step (a)'s `scored` CTE already runs the same COUNT per failed source), at most ~1.3x time in the multi-probe worst
+case (e.g. 5 failed sources on a 40,000-site ZIP: 192 ms vs 196 ms; 16-response batch 243 vs 245 ms). No second form is proposed.
