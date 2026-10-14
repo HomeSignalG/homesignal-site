@@ -222,7 +222,10 @@ ok((gateSrc.match(/trialStanding\(/g) || []).length === 2 && /const standing = t
   '5b the report gate reads a trial through trialStanding and nothing else (its definition plus its one use)');
 
 // ---- 6. create (build step 5d): an admin creates a brokerage's trial and its owner invite -----------------------------------------------------------
-const LINK = 'https://homesignal.net/development-activity-reports.html#invite=' + TOKEN;
+import { readFileSync as __rf } from 'node:fs';
+const PUBLISHED = JSON.parse(__rf(new URL('../docs/brand/brand-contract.v1.json', import.meta.url), 'utf8')); // the contract's CURRENT identity: these links follow it
+const ORIGIN = PUBLISHED.identities[PUBLISHED.current_identity].origin;
+const LINK = ORIGIN + '/development-activity-reports.html#invite=' + TOKEN;
 const admin = (over = {}) => deps({ isAdmin: async () => true, ...over });
 r = await ask(deps(), { action: 'create', brokerage_name: 'Acme Realty' });
 ok(r.status === 403 && r.json.error === 'forbidden' && named('createTrial').length === 0, '6a a signed-in person who is not an admin cannot create a trial: 403, and the database is not asked', r.json);
@@ -299,7 +302,7 @@ for (const [label, route, status] of [
 }
 
 // the one form of the invite link, and the page that reads it
-ok(E.INVITE_PAGE === 'https://homesignal.net/development-activity-reports.html' && E.inviteLink(TOKEN) === LINK, '6u the invite link is the customer page with the token in the fragment');
+ok(E.INVITE_PAGE === ORIGIN + '/development-activity-reports.html' && E.inviteLink(TOKEN) === LINK, '6u the invite link is the customer page with the token in the fragment');
 let threw = false; try { E.inviteLink('hse1_nope'); } catch (e) { threw = e instanceof H.DataUnavailable; }
 ok(threw, '6v a token of the wrong shape is never made into a link');
 {

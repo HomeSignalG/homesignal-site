@@ -57,11 +57,25 @@ check('4c the unauthenticated control is actually refused', (await status('https
 const gateSrc = readFileSync('supabase/functions/_shared/admin-gate.ts', 'utf8');
 check('5a admin-gate.ts holds no literal origin list', !/https:\/\/(www\.)?(homesignal\.net|jodytracks\.com)/.test(gateSrc.replace(/\/\/.*$/gm, '')), 'literal');
 const consumers = execFileSync('git', ['grep', '--untracked', '-l', 'brand-origins.generated', '--', 'supabase', 'scripts', 'lib'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).sort();
-check('5b only admin-gate.ts and the generator reference the generated module', JSON.stringify(consumers) === JSON.stringify(['scripts/gen-brand-origins.mjs', 'supabase/functions/_shared/admin-gate.ts']), consumers.join());
+const WANT_CONSUMERS = ['scripts/gen-brand-origins.mjs', 'supabase/functions/_shared/admin-gate.ts', 'supabase/functions/_shared/billing-reads.ts', 'supabase/functions/_shared/evaluation-reads.ts', 'supabase/functions/_shared/share-reads.ts', 'supabase/functions/_shared/watch-email.ts'].sort();
+check('5b only the gate, the four link/sender modules and the generator reference the generated module', JSON.stringify(consumers) === JSON.stringify(WANT_CONSUMERS), consumers.join());
 
-// 6. outbound links and shipped bytes are untouched (supported, not activated)
-for (const [f, needle] of [['supabase/functions/_shared/billing-reads.ts', 'https://homesignal.net/development-activity-reports.html#billing'], ['supabase/functions/_shared/share-reads.ts', 'https://homesignal.net/shared-report.html'], ['supabase/functions/_shared/evaluation-reads.ts', 'https://homesignal.net/development-activity-reports.html'], ['supabase/functions/_shared/watch-email.ts', "'HomeSignal <noreply@homesignal.net>'"]]) {
-  check(`6a ${f} still emits the HomeSignal URL/sender`, readFileSync(f, 'utf8').includes(needle), 'changed');
+// 6. outbound links: built from the contract's CURRENT identity. While the contract is v1 every emitted string is exactly the one that
+// used to be written out in the source (so this deploys with no behaviour change); under the v2 swap they follow the contract.
+const genM = await import('../supabase/functions/_shared/brand-origins.generated.ts');
+const shareM = await import('../supabase/functions/_shared/share-reads.ts');
+const evalM = await import('../supabase/functions/_shared/evaluation-reads.ts');
+const billM = await import('../supabase/functions/_shared/billing-reads.ts');
+const watchM = await import('../supabase/functions/_shared/watch-email.ts');
+const HERE = JSON.parse(readFileSync('docs/brand/brand-contract.v1.json', 'utf8')).current_identity;
+check('6a the committed contract is HomeSignal-current, so the emitted values are the HomeSignal ones', HERE === 'homesignal' && genM.PUBLIC_ORIGIN === 'https://homesignal.net' && genM.PUBLIC_HOST === 'homesignal.net' && genM.PUBLIC_NAME === 'HomeSignal', JSON.stringify([HERE, genM.PUBLIC_ORIGIN]));
+check('6b SHARE_PAGE is byte-identical to the pre-contract literal', shareM.SHARE_PAGE === 'https://homesignal.net/shared-report.html', shareM.SHARE_PAGE);
+check('6c INVITE_PAGE is byte-identical', evalM.INVITE_PAGE === 'https://homesignal.net/development-activity-reports.html', evalM.INVITE_PAGE);
+check('6d BILLING_PAGE is byte-identical', billM.BILLING_PAGE === 'https://homesignal.net/development-activity-reports.html#billing', billM.BILLING_PAGE);
+check('6e WATCH_FROM and WATCH_OPEN_URL are byte-identical', watchM.WATCH_FROM === 'HomeSignal <noreply@homesignal.net>' && watchM.WATCH_OPEN_URL === 'https://homesignal.net/development-activity-reports.html', watchM.WATCH_FROM);
+for (const f of ['share-reads', 'evaluation-reads', 'billing-reads', 'watch-email']) {
+  const src = readFileSync(`supabase/functions/_shared/${f}.ts`, 'utf8').replace(/\/\/.*$/gm, '');
+  check(`6f ${f}.ts writes no literal homesignal.net/jodytracks.com origin (they come from the contract)`, !/https?:\/\/(www\.)?(homesignal\.net|jodytracks\.com)/.test(src) && !/@homesignal\.net/.test(src), 'literal');
 }
 
 if (failures) { console.error(`\n${failures} brand-origins check(s) FAILED`); process.exit(1); }

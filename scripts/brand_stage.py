@@ -32,6 +32,12 @@ from pathlib import Path
 
 CONTRACT = Path(__file__).resolve().parent.parent / "docs" / "brand" / "brand-contract.v1.json"
 TEXT_EXT = {".html", ".js", ".json", ".xml", ".txt", ".css", ".svg", ".webmanifest", ".md", ".csv"}
+# The identity the COMMITTED files are written in. Nothing in the source tree is ever rewritten; the overlay turns the staged
+# artifact into the identity the contract says the site publishes as. It is a no-op ONLY for this one, whatever the contract
+# says is current: after the (separately authorized) activation the contract's current identity is `jody`, the source is still
+# HomeSignal-branded, and the build must still rewrite it. Keying the no-op to the contract instead would make activation
+# silently publish a HomeSignal-branded tree on the Jody host.
+SOURCE_IDENTITY = "homesignal"
 TAGLINE = "Know what’s coming."
 TAGLINE_ASCII = "Know what's coming."
 
@@ -41,6 +47,12 @@ ORIGIN_RE = re.compile(r"https://(?:www\.)?homesignal\.net(?![\w\-])")
 # A link VALIDATOR written as a regex literal. The server still emits homesignal.net links until Step 8,
 # so the Jody build must accept BOTH origins (rewriting to the new one alone would reject every link).
 ESC_ORIGIN_RE = re.compile(r"https:\\/\\/homesignal\\\.net")
+# A shipped HOST allowlist written as a JS array (lib/share-text.js). The Jody build must accept BOTH hosts: a digest e-mail sent
+# before the move carries `u=https://homesignal.net/...`, and that link now opens on the Jody host. Rewriting the array to the new
+# host alone refuses every one of those links (found by the Step 16 audit; the Messages button showed an error). Both hosts are ours;
+# the legacy one only redirects. Not an open relay: the list stays a closed pair of our own hosts.
+_LEGACY = "\x00legacy-host\x00"      # placeholder: the later bare-host rule must not rewrite the entry we keep
+ALLOWLIST_RE = re.compile(r"ALLOWED_HOSTS = \['homesignal\.net', 'www\.homesignal\.net'\]")
 # The two-tone wordmark: Home<span ...>Signal</span>  ->  Jo<span ...>dy</span> (keeps the accent styling).
 WORDMARK_RE = re.compile(r"Home<span([^>]*)>Signal</span>")
 NAME_NET_RE = re.compile(r"HomeSignal\.net(?![\w\-])")
@@ -54,6 +66,7 @@ ALLOWED_LEFTOVER = [
     re.compile(r"homesignalmap[A-Za-z0-9_.\-]*"),            # file names / ids, identical paths
     re.compile(r"homesignal-page-state"),                    # the page-state schema marker (page_semantics.SCHEMA)
     re.compile(r"homesignal_[a-z_.]+"),                      # database identifiers
+    re.compile(r"'homesignal\.net', 'www\.homesignal\.net'\]"),   # the legacy half of the dual-host share allowlist (kept on purpose)
     re.compile(r"\(\?:homesignal\\\.net\|"),                       # the dual-origin validator this script writes
     re.compile(r"'@homesignal'|@homesignal'"),                    # iCalendar UID suffix (an identifier)
     re.compile(r"window\.HomeSignalVideoProducer(?:\.init)?"),   # JS global identifier
@@ -61,6 +74,31 @@ ALLOWED_LEFTOVER = [
     re.compile(r"HomeSignal-detected"),                            # a code comment
     re.compile(r"homesignalphase1_13\.html"),
 ]
+
+
+# Search Console ownership for the NEW host. Google issues a per-property file (googleXXXXXXXXXXXXXXXX.html whose whole content is
+# `google-site-verification: <its own name>`); only the founder can obtain it, so this repo never invents one. Files the founder
+# commits here ship on a Jody LAUNCH tree and nowhere else. An empty directory is the normal state until GO LIVE; the other method
+# (a DNS TXT record on jodytracks.com at Infomaniak) needs no file at all and verifies the whole domain.
+VERIFICATION_DIR = Path(__file__).resolve().parent.parent / "docs" / "brand" / "search-console"
+VERIFICATION_NAME = re.compile(r"google[0-9a-f]{16}\.html")
+
+
+def verification_files(directory: Path) -> list[tuple[str, str]]:
+    """The (name, content) of every Search Console file the founder committed; anything else in the slot is refused."""
+    out = []
+    if not directory.is_dir():
+        return out
+    for p in sorted(directory.iterdir()):
+        if p.name == ".gitkeep" or p.name == "README.md":
+            continue
+        if not p.is_file() or not VERIFICATION_NAME.fullmatch(p.name):
+            sys.exit(f"ERROR: {p.name!r} in the Search Console slot is not a Google HTML verification file name")
+        text = p.read_text(encoding="utf-8")
+        if text.strip() != f"google-site-verification: {p.name}":
+            sys.exit(f"ERROR: {p.name} does not contain exactly 'google-site-verification: {p.name}' (a file that does not verify is refused)")
+        out.append((p.name, text))
+    return out
 
 
 def load_contract(path: Path = CONTRACT) -> dict:
@@ -77,12 +115,15 @@ def _is_text(p: Path) -> bool:
 
 def rewrite_text(s: str, origin: str, host: str) -> tuple[str, dict]:
     n = {}
+    s, n["allowlist"] = ALLOWLIST_RE.subn(
+        lambda m: "ALLOWED_HOSTS = ['" + host + "', 'www." + host + "', '" + _LEGACY + "', 'www." + _LEGACY + "']", s)
     s, n["esc"] = ESC_ORIGIN_RE.subn(lambda m: r"https:\/\/(?:homesignal\.net|" + host.replace(".", r"\.") + ")", s)
     s, n["origin"] = ORIGIN_RE.subn(origin, s)
     s, n["host"] = HOST_RE.subn(lambda m: ("www." + host) if m.group(1) else host, s)
     s, n["wordmark"] = WORDMARK_RE.subn(r"Jo<span\1>dy</span>", s)
     s, n["name_net"] = NAME_NET_RE.subn(host, s)
     s, n["name"] = NAME_RE.subn("Jody", s)
+    s = s.replace(_LEGACY, "homesignal.net")     # restore the legacy host the allowlist kept on purpose, after every host rule ran
     return s, n
 
 
@@ -123,17 +164,19 @@ def leftovers(text: str) -> list[str]:
     return re.findall(r"[A-Za-z0-9_.@:/\-]*[Hh]ome[Ss]ignal[A-Za-z0-9_.@:/\-]*", masked)
 
 
-def run(root: Path, identity: str, staging: bool, contract: dict) -> dict:
+def run(root: Path, identity: str, staging: bool, contract: dict, verification_dir: Path = VERIFICATION_DIR) -> dict:
     ident = contract["identities"].get(identity)
     if ident is None:
         sys.exit(f"ERROR: unknown identity {identity!r}")
     report = {"identity": identity, "staging": staging, "files": 0, "changed": 0,
-              "counts": {"wordmark": 0, "esc": 0, "origin": 0, "host": 0, "name_net": 0, "name": 0, "tagline": 0, "noindex": 0},
-              "leftovers": {}}
-    if identity == contract["current_identity"]:
+              "counts": {"allowlist": 0, "wordmark": 0, "esc": 0, "origin": 0, "host": 0, "name_net": 0, "name": 0, "tagline": 0, "noindex": 0},
+              "leftovers": {}, "verification_files": 0}
+    if staging and identity == contract["current_identity"]:
+        sys.exit("ERROR: --staging is only meaningful for a non-current identity")
+    if identity == SOURCE_IDENTITY:
         if staging:
-            sys.exit("ERROR: --staging is only meaningful for a non-current identity")
-        return report                                   # verified no-op: the live brand is untouched
+            sys.exit("ERROR: --staging is only meaningful for a non-source identity")
+        return report                                   # verified no-op: the source tree is already written in this identity
     origin = ident["origin"].rstrip("/")
     host = origin.split("://", 1)[1]
     for p in sorted(root.rglob("*")):
@@ -167,6 +210,10 @@ def run(root: Path, identity: str, staging: bool, contract: dict) -> dict:
         left = leftovers(after)
         if left:
             report["leftovers"][rel] = sorted(set(left))[:10]
+    if not staging:
+        for name, text in verification_files(verification_dir):
+            (root / name).write_text(text, encoding="utf-8")
+            report["verification_files"] += 1
     return report
 
 
@@ -189,7 +236,7 @@ def main(argv=None) -> int:
     if rep["leftovers"]:
         print("ERROR: unclassified HomeSignal strings remain in the rewritten tree", file=sys.stderr)
         return 1
-    if rep["identity"] != contract["current_identity"] and (rep["counts"]["origin"] + rep["counts"]["host"]) == 0:
+    if rep["identity"] != SOURCE_IDENTITY and (rep["counts"]["origin"] + rep["counts"]["host"]) == 0:
         print("ERROR: no origin was rewritten - the overlay ran over nothing", file=sys.stderr)
         return 1
     return 0

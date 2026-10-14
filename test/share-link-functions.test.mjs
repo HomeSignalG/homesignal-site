@@ -14,6 +14,9 @@
 // test/report_share_delivery_pg proves the database half; test/report-share-delivery-structure.test.mjs pins the structure.
 // Run: node test/share-link-functions.test.mjs
 import { createHash } from 'node:crypto';
+import { readFileSync as __rf } from 'node:fs';
+const PUBLISHED = JSON.parse(__rf(new URL('../docs/brand/brand-contract.v1.json', import.meta.url), 'utf8')); // the contract's CURRENT identity: these links follow it
+const ORIGIN = PUBLISHED.identities[PUBLISHED.current_identity].origin;
 
 const R = await import('../supabase/functions/_shared/share-reads.ts');
 const S = await import('../supabase/functions/_shared/private-subject.ts');
@@ -48,7 +51,7 @@ const refused = (message) => ({ data: null, error: { message } });
 // ---- 1. the link and the secret --------------------------------------------------------------------------------------------------------------------
 {
   const t = 'A'.repeat(43);
-  ok(R.SHARE_PAGE === 'https://homesignal.net/shared-report.html' && R.shareLink(t) === 'https://homesignal.net/shared-report.html#share=' + t,
+  ok(R.SHARE_PAGE === ORIGIN + '/shared-report.html' && R.shareLink(t) === ORIGIN + '/shared-report.html#share=' + t,
     '1a the link has ONE form: the page, and the token in the URL FRAGMENT (which no server receives)');
   let threw = 0;
   for (const bad of ['', 'short', t + 'A', t.slice(1) + '+', 't'.repeat(42) + ' ', null, 5]) { try { R.shareLink(bad); } catch (e) { if (e instanceof Svc.DataUnavailable) threw++; } }

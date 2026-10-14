@@ -237,6 +237,16 @@ jobs:
             --baseline "$RUNNER_TEMP/baseline-page-state.json" \
             --delta-out "$RUNNER_TEMP/indexnow-delta.json" $EXTRA | tee -a "$RUNNER_TEMP/receipts.txt"
 
+      # Jody migration (Step 16). The staged artifact is rewritten into the identity docs/brand/brand-contract.v1.json says the
+      # site PUBLISHES as. While that is `homesignal` this is a verified no-op (brand_stage.py leaves a tree that is already in the
+      # source identity untouched), so today's bytes are unchanged. Activation is therefore the contract change alone: no second
+      # workflow, no second builder, no fork of this pipeline. The generator, sitemap and IndexNow hosts already come from the same
+      # contract through scripts/brand_host.py, so the document hosts and this rewrite cannot disagree.
+      - name: Apply the published brand identity (no-op while HomeSignal is current)
+        run: |
+          set -euo pipefail
+          python3 scripts/brand_stage.py --dir _site --identity "$(python3 scripts/brand_host.py --identity)" | tee -a "$RUNNER_TEMP/receipts.txt"
+
       # `deploy` precedes `indexnow`, so a failed notification leaves its pages live and inside the
       # NEXT baseline: they would never differ again. Pick them up from the earlier run's stored
       # delta, so a notification outage self-heals on the next build with no one asked to act.

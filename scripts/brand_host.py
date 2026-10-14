@@ -30,5 +30,16 @@ def host(contract_path: Path = CONTRACT) -> str:
     return urlsplit(origin(contract_path)).netloc
 
 
+def identity(contract_path: Path = CONTRACT) -> str:
+    """The key of the identity the site PUBLISHES as (`homesignal` today). origin() has already refused a non-active one."""
+    origin(contract_path)
+    return json.loads(Path(contract_path).read_text(encoding="utf-8"))["current_identity"]
+
+
 if __name__ == "__main__":
-    print(origin())
+    import sys
+    what = sys.argv[1] if len(sys.argv) > 1 else "--origin"
+    fns = {"--origin": origin, "--host": host, "--identity": identity}
+    if what not in fns:
+        raise SystemExit(f"usage: brand_host.py [--origin|--host|--identity] (got {what!r})")
+    print(fns[what]())
