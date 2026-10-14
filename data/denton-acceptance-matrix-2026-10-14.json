@@ -6394,5 +6394,36 @@
    "76204",
    "76206"
   ]
+ },
+ "go_no_go": {
+  "verdict": "NO-GO for full data currency; Step 6 BLOCKED / UNPROVEN",
+  "founder_option": "Option 3: natural refresh cadence (~50h); no timestamp changes; no manual dev_refresh_fire_targets",
+  "evidence_file": "docs/denton-acceptance-evidence.json NOT created; source_coverage/classification/evidence remain UNKNOWN",
+  "verdict_counts": {
+   "UNKNOWN": 14,
+   "PASS": 5,
+   "FAIL": 13
+  },
+  "geographic_zips_passing": 0,
+  "delivered_per_coordinator": {
+   "step1": "#1878 70e50d1b; ingest #665 0804406 run 38614877723 generated_at 2026-10-14T18:24:36Z; pages deploy 38617956566 @ eb33b7db; live pages audit 38619142539",
+   "step2": "source_key_basis splice; #1848 12b3dcc6; #1840; #1829 (NOT e.is_baseline); #1922 dc939b57; alias #1924 44e04245 (148 ids, 194 aliases); #1921 21e5ce1a; v271 18:04Z",
+   "baseline_guard": "#1926 eb33b7db; migration dev_change_source_baseline_denton_20261014; observe_zip md5 2f70e4c7->161d7fd2; until 2026-10-20T00:00Z; allowlist fp 40ee6c76",
+   "note": "ids supplied by the founder/coordinator, not independently re-verified, except baseline rows and live pages, which were measured"
+  },
+  "pr_1928": {
+   "state": "open, not merged, not draft",
+   "head": "07e6aee7",
+   "mergeable_state": "unstable",
+   "checked": "2026-10-14 ~19:35Z"
+  },
+  "open_actions": [
+   "natural refresh",
+   "re-run data audit and pages test after refresh",
+   "baseline guard verification checks",
+   "verify alias-key activation after refresh",
+   "founder: #1928, scope enablement and A9-A12, geometry cache policy, rights ruling",
+   "attestations only after real review"
+  ]
  }
 }

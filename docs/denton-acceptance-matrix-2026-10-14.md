@@ -3,12 +3,76 @@
 Prepared for the 2026-10-14 20:45Z (3:45 PM CT) GO/NO-GO. Branch `claude/denton-acceptance-matrix`, **not merged**. Machine-readable twin: `data/denton-acceptance-matrix-2026-10-14.json`.
 No production writes, merges, deploys, cron or notification changes were made. **UNKNOWN is not PASS.** A PASS exists only where every required check reports `complete`.
 
+## GO / NO-GO summary (for the 3:45 PM CT / 20:45Z review)
+
+**Verdict: NO-GO for full Denton data currency. Step 6 (all 32 ZIPs current and accepted) is BLOCKED and UNPROVEN.**
+Founder decision recorded: **Option 3, natural refresh cadence (about 50 h).** No timestamp changes, no manual `dev_refresh_fire_targets`. No `docs/denton-acceptance-evidence.json` was created and no attestation was fabricated; `source_coverage`, `classification` and `evidence` stay UNKNOWN.
+
+| item | state |
+|---|---|
+| Overall verdicts, 32 ZIPs | **PASS 5 / UNKNOWN 14 / FAIL 13** |
+| Geographic ZIPs (27) that PASS | **0** |
+| PASS (PO Box path only) | 75027, 75029, 76202, 76204, 76206 |
+| FAIL (13) | 75033, 75036, 75068, 76205, 76207, 76226, 76227, 76247, 76249, 76258, 76259, 76262, 76266 |
+| UNKNOWN (14) | 75007, 75010, 75022, 75028, 75056, 75057, 75065, 75067, 75077, 76201, 76203, 76208, 76209, 76210 |
+| Denton ZIPs that ingested City of Denton records | **0 of 32** (measured about 19:14Z; the coordinator re-checked at 19:14-19:27Z with the same result) |
+| `source_coverage` / `classification` / `evidence` | UNKNOWN on all 27 geographic ZIPs (never run / no attested reference) |
+| Step 1 (publish and verify live pages) | delivered (below) |
+| Step 2 (safeguards) | applied and verified (below) |
+| Step 6 (current data on all 32 ZIPs) | **BLOCKED until each ZIP refreshes; UNPROVEN** |
+
+Why NO-GO, in one paragraph: the pages are live, correct in behaviour and guarded, but the seven City of Denton sources registered at 18:04Z have delivered nothing, because the ZIPs have not reached the front of a 53-hour oldest-first refresh sweep. Even where records are stored (Frisco, Fort Worth), the audit finds eligible publisher records missing from serving, and the county layer is frozen at 2023-06-09. Nothing here proves the remaining ZIPs have current coverage.
+
+### What was delivered (record, with run ids and SHAs as supplied by the founder/coordinator; items marked [measured] were measured by this session)
+
+1. **Step 1 delivered.**
+   - #1878 merged `70e50d1b`.
+   - Rule D plane refreshed: ingest PR #665 merge `0804406`, run `38614877723`, `generated_at` 2026-10-14T18:24:36Z. The Boston re-key guard held (a separate, unresolved item, see Known open items).
+   - Pages deploy run `38617956566` at `eb33b7db`.
+   - Live pages audit run `38619142539` (32 ZIPs, desktop and mobile): markers equal point sites; the 5 PO Box ZIPs draw 0 markers and show the "not measured" notice. The marker-click link probe was **inconclusive**; notice sections were **not measured**. [measured: HTTP 200, 0 errors, 0 sites missing `record_url`.]
+2. **Step 2 safeguards applied and verified.**
+   - `source_key_basis` splice.
+   - #1848 collector `12b3dcc6…`.
+   - #1840.
+   - #1829 with the view filter `WHERE NOT e.is_baseline`.
+   - Identity code #1922 `dc939b57`; alias file #1924 `44e04245` (148 reused ids, 194 aliases).
+   - City of Denton sources #1921 `21e5ce1a`.
+   - `get-address-report` v271 deployed 18:04Z.
+3. **PR #1926 baseline guard** (merge `eb33b7db`): migration `dev_change_source_baseline_denton_20261014`; `observe_zip` md5 `2f70e4c7` to `161d7fd2`; window until 2026-10-20 00:00Z; 7-id allowlist fingerprint `40ee6c76…`; with a verification schedule. [measured: `dev_change_source_baseline` holds exactly 7 rows, all `denton-city-projects-*`, `baseline_until` 2026-10-20 00:00Z, `closed_at` null; 0 `dev_change_project` identities for them.]
+4. **Refresh status [measured].** 0 of 32 ZIPs hold city records (cached `sites` and `app_projects`). Queue positions and projected times are in the Task A table: first Denton ZIP (76247) is next, 76258 about 20:55Z, the last (75028) about 2026-10-16 22:30Z (about 50 h). **A queue jump is not available:** cron job 14 does not read `dev_refresh_targets` (1,437 stale target rows, none of them Denton), and timestamps must not be falsified. By the 20:45Z review at most 1-2 ZIPs will have refreshed.
+5. **76203 is a legitimate measured zero**, one of a class of 3,825 `boundary_complete` ZIPs with empty membership (n5-national-2026-10-14). The Option B copy ("No development records fall inside the Census boundary for ZIP [ZIP]. Enter a street address to see development around that address.") is in **PR #1928 (head `07e6aee7`): OPEN, NOT merged, not draft, mergeable state "unstable" as of this check; awaiting founder approval.** Until it merges, 76203 shows the existing wording. 76203 remains UNKNOWN here, not PASS, because source_coverage/classification/evidence are unrecorded.
+
+### Known FAIL / UNKNOWN (details per ZIP and category below)
+
+- **13 FAIL ZIPs**, all on `eligibility_reconciliation` (eligible publisher records inside the ZIP polygon absent from serving), mostly the frozen `denton-county-dev-permits`.
+- **Fort Worth:** 76247, 962 of 972 eligible records missing from serving, plus 1,091 eligible rows without a publisher point (not testable); 76262, 75 of 94 missing.
+- **Frisco:** 75033, 90 of 239 eligible missing; 75036, 40 of 47 missing.
+- **75033:** 5 dots whose Frisco id the publisher does not return (re-queried singly). **76207:** 1 polyline dot off the publisher's geometry (stale geometry).
+- **TxDOT (reported by the coordinator, not re-measured here):** 32 never-ingested records, plus a line/polygon scope gap. This audit does show TxDOT eligible-missing counts of 1-13 on 13 ZIPs.
+- **Notification exposure (coordinator analysis):** no `property_watch` rows exist today, so no resident can currently be notified from this data.
+- **Boston held pages:** unresolved, separate from Denton.
+- **No local authority source is current** for the 23 other geographic ZIPs; the City of Denton ZIPs await the first refresh.
+
+### Remaining actions and approvals
+
+1. Let the Denton ZIPs refresh naturally (about 50 h). Do not edit timestamps or fire targets by hand.
+2. After they refresh: re-run the **data audit** (`denton-launch-audit.py` task `data`) from a ref whose registry has `denton-city-projects-*` (main), and the **production pages test**. The candidate has changed since the 16:58Z audit.
+3. Run the baseline-guard verification checks on the schedule in #1926 (window closes 2026-10-20 00:00Z); confirm first city observations land as baseline and none is reportable.
+4. Verify permit-identity activation after refresh: it is live through the alias file (#1924), so check the `#`-suffixed alias keys appear and behave once county ZIPs refresh (0 stored today).
+5. Founder approvals still open: merge of #1928 (76203 copy); scope-enablement sequence and A9-A12; the geometry cache refresh policy (`docs/denton-geometry-cache-refresh-policy-2026-10-14.md`, design only); the rights ruling (`report-rights-r7`) that the city-source PR needed.
+6. Write per-ZIP attestations to `docs/denton-acceptance-evidence.json` **only after** real source-coverage and classification review exists. Not done and not to be faked.
+
+
+---
+
+The sections below are the measured detail behind the summary above.
+
 ## Headline
 
 - **Overall verdicts (32 ZIPs): PASS 5 / UNKNOWN 14 / FAIL 13.** The 5 PASS are the PO Box ZIPs (75027, 75029, 76202, 76204, 76206) on their separate non-geographic path. **0 of 27 geographic ZIPs pass.**
 - **Why no geographic ZIP can pass today:** `source_coverage` and `classification` were never run for any ZIP (no `docs/denton-acceptance-evidence.json` exists on any branch) and `evidence` has no recorded reference, so those three categories are UNKNOWN for all 27. That is a missing-evidence gap, not a measured defect.
 - **Measured defects (FAIL) on 13 geographic ZIPs:** eligible source records inside the ZIP polygon but absent from serving (`eligibility_reconciliation`), plus 1 publisher-not-found ZIP (75033) and 1 off-geometry polyline dot (76207). Most of the missing counts are `denton-county-dev-permits` records, a source frozen at 2023-06-09.
-- **Rolling refresh (Task A):** **0 of 32 Denton ZIPs have refreshed since v271 (18:04Z); 0 contain any `denton-city-projects-*` site; `app_projects` holds 0 rows for them.** The national sweep runs 240 ZIPs/hour and reaches the Denton ZIPs between now and about 2026-10-16 22:30Z. By 20:45Z at most 1-2 will have refreshed.
+- **Rolling refresh (Task A):** **0 of 32 Denton ZIPs have refreshed since v271 (18:04Z); 0 contain any `denton-city-projects-*` site; `app_projects` holds 0 rows for them.** The national sweep runs 240 ZIPs/hour; founder Option 3 accepts the natural cadence (about 50 h, last Denton ZIP about 2026-10-16 22:30Z). By 20:45Z at most 1-2 will have refreshed.
 - **Candidate changed:** the data audit (16:19-16:58Z) predates v271 and its registry did not include the seven city sources. See "Re-runs needed".
 
 ## Category counts (27 geographic ZIPs; PO Box ZIPs separate)
