@@ -2,8 +2,8 @@
 // Run: node test/identity-alias-parity.test.mjs
 //
 // REAL: sources/arcgis.ts (arcgisForZip, recordIdentity) and sources/identity-aliases.ts are IMPORTED and run; the registry entry
-// is the COMMITTED denton-county-dev-permits entry with the opt-in added in memory (the registry line is not added until the
-// generated file is reviewed - docs/denton-workstream-b-2026-10-14.md).
+// is the COMMITTED denton-county-dev-permits entry. Since 2026-10-14 the committed registry opts Denton in (the reviewed generated file
+// was committed with its index.ts import); the "no opt-in" controls below run on BASE, the same entry with the option removed in memory.
 // SYNTHETIC: the layer rows (test/fixtures/identity-aliases/denton-shaped-scan.json) - shaped like Denton's, not publisher data.
 // TWO IMPLEMENTATIONS, ONE TABLE: test/fixtures/identity-aliases/parity-cases.json is asserted here against the TypeScript rule
 // and by scripts/test_identity_aliases.py against the Python rule (spawned at the end, so a green run here means both).
@@ -21,14 +21,16 @@ const { arcgisForZip, recordIdentity } = await import(pathToFileURL(join(SRC, 'a
 const { aliasFileFor, applyIdentityAlias } = await import(pathToFileURL(join(SRC, 'identity-aliases.ts')).href);
 const REG = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8')).arcgis;
 const DENTON = REG.find((e) => e.registry_id === 'denton-county-dev-permits');
+const BASE = (() => { const b = { ...DENTON }; delete b.identity_aliases_file; return b; })();   // the entry WITHOUT the opt-in (controls)
 const PARITY = JSON.parse(readFileSync(join(root, 'test/fixtures/identity-aliases/parity-cases.json'), 'utf8'));
 const SCAN = JSON.parse(readFileSync(join(root, 'test/fixtures/identity-aliases/denton-shaped-scan.json'), 'utf8')).features;
 const FILE_NAME = 'denton-county-dev-permits.json';
-const OPT = { ...DENTON, identity_aliases_file: FILE_NAME };
+const OPT = { ...BASE, identity_aliases_file: FILE_NAME };
 const FILES = { [FILE_NAME]: PARITY.file };
 
 ok(!!DENTON && DENTON.column_map.case_number === 'PermitID' && !DENTON.identity_fields, 'the committed Denton entry identifies by PermitID, no identity_fields');
-ok(!('identity_aliases_file' in DENTON), 'the committed registry does NOT yet opt Denton in (activation waits for the reviewed generated file)');
+ok(DENTON.identity_aliases_file === FILE_NAME, 'the committed registry opts Denton in with the reviewed generated file (activated 2026-10-14)');
+ok(!('identity_aliases_file' in BASE), 'control: BASE (the entry without the opt-in) has no opt-in');
 
 // ── 1. the shared case table through the TypeScript rule ──────────────────────────────────────────────────────────────────────
 {
@@ -43,7 +45,7 @@ ok(!('identity_aliases_file' in DENTON), 'the committed registry does NOT yet op
 {
   const row = { OBJECTID: 4001, PermitID: '20062248' };
   const legacy = (v) => applyIdentityAlias(row, '20062248', v) === '20062248';
-  ok(aliasFileFor(DENTON, FILES) === null && legacy(null), 'no opt-in: no verdict, legacy identity');
+  ok(aliasFileFor(BASE, FILES) === null && legacy(null), 'no opt-in: no verdict, legacy identity');
   const notLoaded = aliasFileFor(OPT, {});
   ok(notLoaded && notLoaded.ok === false && /not loaded/.test(notLoaded.reason) && legacy(notLoaded), 'declared but not loaded: reported, legacy identity', notLoaded);
   const other = aliasFileFor(OPT, { [FILE_NAME]: { ...PARITY.file, registry_id: 'someone-else' } });
@@ -70,7 +72,7 @@ async function run(entry, files, features = SCAN) {
   const usable = SCAN.filter((f) => f.attrs.PermitID != null && String(f.attrs.PermitID).trim() !== '');
   const want = usable.map((f) => `arcgis:denton-county-dev-permits:${expectFor(f)}`);
 
-  const off = await run(DENTON, FILES);
+  const off = await run(BASE, FILES);
   ok(off.ids.length === usable.length, 'control: every usable fixture feature is emitted by the connector', [off.ids.length, usable.length]);
   ok(off.ids.every((id, i) => id === `arcgis:denton-county-dev-permits:${String(usable[i].attrs.PermitID).trim()}`),
     'WITHOUT the opt-in every record keeps the bare PermitID (today\'s behaviour, even with a file loaded)');

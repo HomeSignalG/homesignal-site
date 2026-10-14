@@ -10,9 +10,11 @@
 //   - a file's own fingerprints do not recompute from its contents.
 // A daily live check (check-identity-aliases.yml) re-reads the publisher and fails when the reuse set moved.
 //
-// NO FILE IS COMMITTED YET: the Denton file must be generated on a runner (this repo's sandbox has no egress to
-// gis.dentoncounty.gov) and reviewed before the registry line is added. See docs/denton-workstream-b-2026-10-14.md.
+// denton-county-dev-permits.json: generated 2026-10-14 on a runner (check-identity-aliases.yml, mode generate, run 38604499401)
+// from a full read of the layer: 56,500 features, 148 reused PermitIDs, 194 alias entries. See docs/denton-workstream-b-2026-10-14.md.
 import type { IdentityAliasFiles } from "../sources/identity-aliases.ts";
+import dentonCountyDevPermits from "./denton-county-dev-permits.json" with { type: "json" };
 
 export const IDENTITY_ALIAS_FILES: IdentityAliasFiles = {
+  "denton-county-dev-permits.json": dentonCountyDevPermits,
 };
