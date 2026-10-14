@@ -253,7 +253,7 @@ def hav(x1, y1, x2, y2):
 for z in ZIPS:
     cmp_ = {"match": 0, "mismatch": 0, "publisher_not_found": 0, "nonpoint_unverified": 0, "not_arcgis_unverified": 0,
             "ambiguous_identity": 0, "comparison_unavailable": 0}
-    bad = []
+    bad, nf_keys = [], []
     for r in BY[z]["dots"]:
         m = key_re.match(r["source_key"] or "")
         if not m or m.group(1) not in ARC:
@@ -266,6 +266,7 @@ for z in ZIPS:
             cmp_["ambiguous_identity"] += 1
         elif pt is None:
             cmp_["publisher_not_found"] += 1
+            nf_keys.append(r["source_key"])
         elif pt == "NONPOINT":
             cmp_["nonpoint_unverified"] += 1
         else:
@@ -277,6 +278,20 @@ for z in ZIPS:
                 bad.append({"source_key": r["source_key"], "dist_m": round(dm, 1)})
     BY[z]["publisher_compare"] = cmp_
     BY[z]["publisher_mismatches"] = bad[:20]
+    # every "not found" is asked again, one id at a time, by exact equality: an id the publisher DOES return would be an instrument fault
+    # (a truncated or mis-quoted batch), an id it does not return is a stored record the publisher no longer lists.
+    confirmed = {}
+    for k_ in nf_keys:
+        reg_, id_ = key_re.match(k_).groups()
+        idc_ = ARC[reg_]["column_map"].get("case_number")
+        n_ = None
+        for lit_ in ([id_] if re.fullmatch(r"-?\d+", id_) else []) + ["'" + id_.replace("'", "''") + "'"]:
+            j_ = http_json(ARC[reg_]["service_url"] + "/query", {"f": "json", "where": f"{idc_} = {lit_}", "outFields": idc_, "returnGeometry": "false"})
+            if "_fetch_error" not in j_:
+                n_ = len(j_.get("features", []))
+                break
+        confirmed[k_] = n_      # 0 = absent at the publisher, >0 = the batch lookup missed a record that exists, None = could not ask
+    BY[z]["publisher_not_found_requery"] = confirmed
 
 # line/polygon dots: the dot must lie ON the publisher's own geometry (measured distance, SRID-safe, geography metres).
 # Membership of the dot in the ZIP polygon is the polygon_membership check; this proves the dot is where the publisher's line is.
@@ -585,7 +600,7 @@ for z in ZIPS:
     pc = d["publisher_compare"]
     missn = sum(len(x[1]) for x in ELIG.get(z, {}).values())
     out["zips"][z] = {k: d.get(k) for k in ("in_registry", "has_boundary", "members", "markers", "geo_status",
-                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches", "geom_families", "current_non_txdot_dots")}
+                                          "members_without_marker", "issues", "publisher_compare", "publisher_mismatches", "publisher_not_found_requery", "geom_families", "current_non_txdot_dots")}
     out["zips"][z]["eligible_missing"] = {r: {"eligible": a, "missing": m[:200], "missing_n": len(m)} for r, (a, m) in ELIG.get(z, {}).items()}
     out["zips"][z]["verdict"] = [v, why]
     out["zips"][z]["freshness_newest_record_by_source"] = freshness(z)
