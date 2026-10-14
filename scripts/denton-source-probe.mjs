@@ -252,7 +252,28 @@ async function findDentonOrg() {
   }
 }
 async function focusDenton() {
-  await findDentonOrg();
+  // City of Denton's org (verified by group/item owners '*@cityofdenton.com_dentontxgis'); hosted services live on services.arcgis.com/9dTWrhPzuDPnUVXr
+  console.log('=== FOCUS 1e: walk City of Denton Active Projects web app item -> web map -> layers ===');
+  const found = { layers: new Set(), ids: new Set(), items: [] }; const seenIds = new Set();
+  await walkItem('10e6a853d14e4576a2c63b781b649841', 0, found, seenIds);
+  console.log(`DENTON-APP candidate layers: ${[...found.layers].join(' ') || 'none'}`);
+  const done = new Set();
+  for (const u of found.layers) {
+    if (timeUp()) break; const m = u.match(/^(.*\/rest\/services\/.+?\/(?:Feature|Map)Server)(\/\d+)?$/i); if (!m) { console.log(`  skip non-service url ${u}`); continue; }
+    const ls = m[2] ? [m[2].slice(1)] : ((await jget(m[1] + '?f=json')).json?.layers || []).map((l) => String(l.id));
+    for (const id of ls) { const lu = `${m[1]}/${id}`; if (done.has(lu)) continue; done.add(lu); await probeLayer(lu, 'denton active projects app layer', 'City of Denton (dentontxgis)'); await vocab(lu); }
+  }
+  console.log('=== FOCUS 1f: list City of Denton hosted services ===');
+  const LD = await listServices('https://services.arcgis.com/9dTWrhPzuDPnUVXr/ArcGIS/rest/services');
+  console.log(`DENTON-HOSTED ${LD.err ? 'ERR ' + LD.err : LD.services.length + ' services'}: ${LD.services.map((s) => s.name + '/' + s.type).join(', ')}`);
+  out.denton_hosted = LD.services.map((s) => `${s.name}/${s.type}`);
+  let n = 0;
+  for (const s of LD.services) {
+    if (timeUp() || n >= 10) break; if (!/FeatureServer/.test(s.type)) continue;
+    if (!/project|permit|plat|zon|case|plan|develop|site_?plan|annex|variance|subdiv|activity/i.test(s.name) || /survey123|template|storm|water|sewer|parcel_?view|hydrant/i.test(s.name)) continue;
+    n++; const base = `${s.base}/${s.name}/${s.type}`; const m = await jget(base + '?f=json');
+    for (const l of ((m.json && m.json.layers) || []).slice(0, 4)) { await probeLayer(`${base}/${l.id}`, s.name + '/' + l.name, 'City of Denton (dentontxgis)'); await vocab(`${base}/${l.id}`); }
+  }
   return;
   console.log('=== FOCUS 1b: candidate AGO org OQPRCxZXJewOd2xW ===');
   const org = await jget('https://www.arcgis.com/sharing/rest/portals/OQPRCxZXJewOd2xW?f=json');
