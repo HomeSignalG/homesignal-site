@@ -1,0 +1,265 @@
+{
+ "_note": "SYNTHETIC scan shaped like the Denton DEV_Permits layer (OBJECTID, PermitID, ...). Not publisher data; each reuse shape the rule must decide is present once.",
+ "features": [
+  {
+   "attrs": {
+    "OBJECTID": 101,
+    "PermitID": "20062248",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "10 OAK LN",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.1,
+   "y": 33.2
+  },
+  {
+   "attrs": {
+    "OBJECTID": 4001,
+    "PermitID": "20062248",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "900 FAR RD",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.0,
+   "y": 33.25
+  },
+  {
+   "attrs": {
+    "OBJECTID": 55,
+    "PermitID": "20110001",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "5 PINE",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.2,
+   "y": 33.3
+  },
+  {
+   "attrs": {
+    "OBJECTID": 56,
+    "PermitID": "20110001",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "5 PINE",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.20003,
+   "y": 33.30003
+  },
+  {
+   "attrs": {
+    "OBJECTID": 10,
+    "PermitID": "19990001",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.3,
+   "y": 33.1
+  },
+  {
+   "attrs": {
+    "OBJECTID": 11,
+    "PermitID": "19990001",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.30002,
+   "y": 33.10002
+  },
+  {
+   "attrs": {
+    "OBJECTID": 12,
+    "PermitID": "19990001",
+    "PermitType": "BARN",
+    "PermitStat": "Approved",
+    "PropertySi": "2 OTHER",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.3,
+   "y": 33.1
+  },
+  {
+   "attrs": {
+    "OBJECTID": 20,
+    "PermitID": "19990002",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.4,
+   "y": 33.4
+  },
+  {
+   "attrs": {
+    "OBJECTID": 21,
+    "PermitID": "19990002",
+    "PermitType": "HOUSE",
+    "PermitStat": "Pending",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.4,
+   "y": 33.4
+  },
+  {
+   "attrs": {
+    "OBJECTID": 30,
+    "PermitID": "19990003",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.5,
+   "y": 33.5
+  },
+  {
+   "attrs": {
+    "OBJECTID": 31,
+    "PermitID": "19990003",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -96.5,
+   "y": 33.5
+  },
+  {
+   "attrs": {
+    "OBJECTID": 40,
+    "PermitID": "19990004",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.6,
+   "y": 33.6
+  },
+  {
+   "attrs": {
+    "OBJECTID": 41,
+    "PermitID": "19990004",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "B",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.0,
+   "y": 33.0
+  },
+  {
+   "attrs": {
+    "OBJECTID": 42,
+    "PermitID": "19990004",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "B",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.00001,
+   "y": 33.0
+  },
+  {
+   "attrs": {
+    "OBJECTID": 200,
+    "PermitID": "Z-3",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.7,
+   "y": 33.7
+  },
+  {
+   "attrs": {
+    "OBJECTID": 201,
+    "PermitID": "20062249",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.71,
+   "y": 33.71
+  },
+  {
+   "attrs": {
+    "OBJECTID": 300,
+    "PermitID": null,
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.8,
+   "y": 33.8
+  },
+  {
+   "attrs": {
+    "OBJECTID": 301,
+    "PermitID": "  ",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": -97.81,
+   "y": 33.81
+  },
+  {
+   "attrs": {
+    "OBJECTID": 310,
+    "PermitID": "20062250",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": null,
+   "y": null
+  },
+  {
+   "attrs": {
+    "OBJECTID": 311,
+    "PermitID": "20062250",
+    "PermitType": "HOUSE",
+    "PermitStat": "Approved",
+    "PropertySi": "1 MAIN ST",
+    "DateReceiv": 1650000000000,
+    "Shape__Area": null
+   },
+   "x": null,
+   "y": null
+  }
+ ]
+}

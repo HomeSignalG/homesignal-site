@@ -41,6 +41,7 @@ import { fenceGeocode, noteFenceOutcome } from "./geo-fence.ts";
 import { applyCommercialWorkEvidence } from "./commercial-eligibility.ts";
 import type { CommercialWorkEvidence } from "./commercial-eligibility.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
+import { aliasFileFor, applyIdentityAlias, type AliasVerdict, type IdentityAliasFiles } from "./identity-aliases.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
 
@@ -67,6 +68,12 @@ export interface ArcgisRegistryEntry {
    *  INSTEAD of case_number. Use when the case-number column is not a record
    *  identifier. Fails closed: any missing/empty field falls back to case_number. */
   identity_fields?: string[];
+  /** OPT-IN, ADDITIVE, default-off. Names a GENERATED alias file (identity-aliases/<name>, loaded by the engine
+   *  through deps.identityAliases) for a layer whose identifier column is REUSED by unrelated features
+   *  (Denton PermitID: 149 reused values). The lowest-OBJECTID feature of a reused value keeps the legacy
+   *  source_id; every other distinct feature gets `<id>#<OBJECTID>`. Unlike identity_fields it never rekeys a
+   *  record that is not in the file. Fails closed to the legacy ladder (sources/identity-aliases.ts). */
+  identity_aliases_file?: string;
   record_url_precision?: "record" | "dataset";
   /** false → not run in ZIP-aggregate mode. Default true. */
   zip_mode?: boolean;
@@ -233,6 +240,8 @@ export interface ArcgisRunReport {
   scope_membership?: ScopeMetrics;
   /** The completion receipt for this ZIP x source (sources/scope-receipt.ts). Absent when the fetch failed. */
   scope_receipt?: ScopeReceipt;
+  /** Records that took an identity_aliases_file alias key (<id>#<OBJECTID>) this run. Absent for entries without the option. */
+  identity_alias_applied?: number;
 }
 
 /** Set by fetchRows when the max_rows cap BOUND the fetch — i.e. the source has MORE matching
@@ -262,6 +271,9 @@ export interface ArcgisDeps {
    *  used ONLY together with this: without it the scope stays the legacy one, so a box can never
    *  admit a neighbouring ZIP's records unfiltered. */
   zipMembers?: MembershipFn | null;
+  /** Generated alias files by name (identity-aliases/index.ts). Read only by entries declaring
+   *  identity_aliases_file; absent for every other entry. */
+  identityAliases?: IdentityAliasFiles | null;
   /** Stamp geofence_status on the cache row (inside_zip / zip_mismatch / too_far). */
   noteFence?: (input: string, status: "inside_zip" | "zip_mismatch" | "too_far") => void | Promise<void>;
 }
@@ -324,6 +336,14 @@ async function runEntry(
     blank_status: 0, geocode_failures: 0, no_record_url: 0, commercial_downgraded: 0, quarantined: [], truncated_at_max_rows: null,
   };
   const records: NormalizedRecord[] = [];
+
+  // identity_aliases_file: resolve the file ONCE per run. An unusable declaration is reported (never silent) and the
+  // legacy ladder is used - the pre-change key, so a missing file can degrade coverage of the fix but never mint a key.
+  const aliasVerdict = aliasFileFor(entry, deps.identityAliases);
+  if (aliasVerdict && !aliasVerdict.ok) {
+    report.quarantined.push({ reason: `identity alias file unavailable (${aliasVerdict.reason}); legacy source_id used`, sample: entry.registry_id });
+  }
+  if (aliasVerdict) report.identity_alias_applied = 0;
 
   // use_type_const AND type_map may be set TOGETHER (2026-08-03 founder ruling). They are not in
   // competition — they answer different questions, and the difference is load-bearing:
@@ -459,7 +479,7 @@ async function runEntry(
     // A DECISION bucket does NOT continue — the row is emitted with its decision
     // attached. Counted here so the run report can distinguish surfaced from dropped.
     if (bucket === "denied" || bucket === "withdrawn") { decidedCount.set(statusRaw, (decidedCount.get(statusRaw) ?? 0) + 1); }
-    const rec = await normalizeRow(row, entry, statusRaw, bucket, zip, deps, report, typeLookup, caseFold);
+    const rec = await normalizeRow(row, entry, statusRaw, bucket, zip, deps, report, typeLookup, caseFold, aliasVerdict);
     if (rec) records.push(rec);
   }
 
@@ -481,6 +501,7 @@ async function normalizeRow(
   report: ArcgisRunReport,
   typeLookup: NormalizedLookup<string> | null,
   caseFold: Map<string, CaseFoldMatch>,
+  aliasVerdict: AliasVerdict | null = null,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
   const title = String(readCol(row, cm.title) ?? "").trim();
@@ -571,7 +592,7 @@ async function normalizeRow(
   });
 
   const rec: NormalizedRecord = {
-    source_id: `arcgis:${entry.registry_id}:${identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title}`,
+    source_id: `arcgis:${entry.registry_id}:${recordIdentity(row, entry, caseNo, title, aliasVerdict, report)}`,
     source_class: "arcgis",
     source_registry_id: entry.registry_id,
     jurisdiction: entry.jurisdiction,
@@ -997,6 +1018,26 @@ function extractUrl(v: unknown): string {
   if (typeof v === "string") return v.trim();
   if (typeof v === "object" && v !== null && typeof (v as { url?: unknown }).url === "string") return String((v as { url: string }).url).trim();
   return "";
+}
+
+/**
+ * The record segment of source_id. The EXISTING ladder first (identity_fields -> case_number -> row id -> title),
+ * byte for byte as before; then, only for an entry that opted in with identity_aliases_file, the alias for a row
+ * whose OBJECTID the generated file lists (sources/identity-aliases.ts). Exported so the parity and mutation
+ * suites drive the shipped function, not a copy.
+ */
+export function recordIdentity(
+  row: Record<string, unknown>,
+  entry: Pick<ArcgisRegistryEntry, "identity_fields">,
+  caseNo: string | null,
+  title: string,
+  aliasVerdict: AliasVerdict | null,
+  report?: { identity_alias_applied?: number },
+): string {
+  const base = identityFromFields(row, entry.identity_fields) ?? caseNo ?? rowId(row) ?? title;
+  const aliased = applyIdentityAlias(row, base, aliasVerdict);
+  if (aliased !== base && report && report.identity_alias_applied !== undefined) report.identity_alias_applied++;
+  return aliased as string;
 }
 
 function fillTemplate(tpl: string, row: Record<string, unknown>, caseNo: string | null): string {

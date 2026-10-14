@@ -1,0 +1,77 @@
+{
+ "_note": "source_ids emitted by the connector on origin/main BEFORE identity_aliases_file existed. Data, not a recomputation.",
+ "cases": {
+  "fixtures/city-of-orange/active-planning-projects-sample.json|city-of-orange-active-planning-projects": [
+   "arcgis:city-of-orange-active-planning-projects:6",
+   "arcgis:city-of-orange-active-planning-projects:8",
+   "arcgis:city-of-orange-active-planning-projects:14"
+  ],
+  "fixtures/mdt-stip/lines-sample.json|mt-mdt-stip-lines": [
+   "arcgis:mt-mdt-stip-lines:9610",
+   "arcgis:mt-mdt-stip-lines:10352",
+   "arcgis:mt-mdt-stip-lines:10342"
+  ],
+  "fixtures/phoenix/planning-permit-layer1-sample.json|phoenix-building-permits": [
+   "arcgis:phoenix-building-permits:1500027",
+   "arcgis:phoenix-building-permits:1500048",
+   "arcgis:phoenix-building-permits:1500049"
+  ],
+  "fixtures/kytc-syp/louisville-current-plan.json|kytc-syp-highway-plan": [
+   "arcgis:kytc-syp-highway-plan:5-10016.00",
+   "arcgis:kytc-syp-highway-plan:5-10065.00",
+   "arcgis:kytc-syp-highway-plan:5-607.00",
+   "arcgis:kytc-syp-highway-plan:5-80311.00",
+   "arcgis:kytc-syp-highway-plan:6-80416.00"
+  ],
+  "fixtures/sd-stip/structures-sample.json|sd-stip-structures": [
+   "arcgis:sd-stip-structures:0A65",
+   "arcgis:sd-stip-structures:067J",
+   "arcgis:sd-stip-structures:08J1"
+  ],
+  "fixtures/sd-stip/construction-reconstruction-sample.json|sd-stip-construction-reconstruction": [
+   "arcgis:sd-stip-construction-reconstruction:04WQ",
+   "arcgis:sd-stip-construction-reconstruction:09R4",
+   "arcgis:sd-stip-construction-reconstruction:09X4"
+  ],
+  "fixtures/penndot/points-sample.json|penndot-transportation-projects": [
+   "arcgis:penndot-transportation-projects:124338",
+   "arcgis:penndot-transportation-projects:124323",
+   "arcgis:penndot-transportation-projects:124073"
+  ],
+  "fixtures/el-paso/new-residential-sample.json|el-paso-new-residential-permits": [
+   "arcgis:el-paso-new-residential-permits:BRNN24-00083",
+   "arcgis:el-paso-new-residential-permits:BRNN25-00162",
+   "arcgis:el-paso-new-residential-permits:BRNN25-00212"
+  ],
+  "fixtures/madison/planning-projects-sample.json|madison-planning-projects": [
+   "arcgis:madison-planning-projects:LNDUSE-2015-00037",
+   "arcgis:madison-planning-projects:LNDUSE-2019-00032",
+   "arcgis:madison-planning-projects:LNDUSE-2021-00012",
+   "arcgis:madison-planning-projects:LNDUSE-2025-00011",
+   "arcgis:madison-planning-projects:LNDCSM-2026-00014"
+  ],
+  "fixtures/ardot/points-sample.json|ar-ardot-job-status-points": [
+   "arcgis:ar-ardot-job-status-points:BB0401",
+   "arcgis:ar-ardot-job-status-points:090520",
+   "arcgis:ar-ardot-job-status-points:110509"
+  ],
+  "fixtures/ardot/points-overlap-sample.json|ar-ardot-job-status-points": [
+   "arcgis:ar-ardot-job-status-points:012289",
+   "arcgis:ar-ardot-job-status-points:012289"
+  ],
+  "fixtures/ardot/lines-sample.json|ar-ardot-job-status-lines": [
+   "arcgis:ar-ardot-job-status-lines:090250",
+   "arcgis:ar-ardot-job-status-lines:020660",
+   "arcgis:ar-ardot-job-status-lines:012361"
+  ],
+  "fixtures/ardot/lines-overlap-sample.json|ar-ardot-job-status-lines": [
+   "arcgis:ar-ardot-job-status-lines:012274",
+   "arcgis:ar-ardot-job-status-lines:012289"
+  ],
+  "fixtures/bismarck/building-permit-main-sample.json|bismarck-building-permits": [
+   "arcgis:bismarck-building-permits:BCOM2024-0010",
+   "arcgis:bismarck-building-permits:BCOM2024-0016",
+   "arcgis:bismarck-building-permits:BCOM2024-0019"
+  ]
+ }
+}

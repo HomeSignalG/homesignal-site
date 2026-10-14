@@ -27,6 +27,7 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import identity_aliases as ia  # noqa: E402  - the ONE Python home of the compound-identity rule (twin of sources/identity-aliases.ts)
 from n3_pilot import (  # noqa: E402  - one implementation, imported not re-derived
     sql, http, esri, lit, read_dbf, read_shp_polygons, rings_to_multipolygon_wkt,
     SQLPayloadTooLarge,
@@ -46,6 +47,7 @@ DISK_FLOOR_MB = float(os.environ.get("DISK_FLOOR_MB", "2048"))
 # Same basis as the N3/N4 receipts so the floor means the same thing across phases.
 DISK_TOTAL_MB = float(os.environ.get("DISK_TOTAL_MB", "11607"))
 REG_PATH = "supabase/functions/get-address-report/jurisdiction-registry.json"
+ALIAS_DIR = "supabase/functions/get-address-report/identity-aliases"
 
 # Carried-forward gates. These are decisions, not TODOs - see the N5 authorization.
 EXCLUDED_SOURCES = {
@@ -376,6 +378,32 @@ def recover_shard(z3, registry):
     return report
 
 
+def load_entry_aliases(entry, alias_dir=None):
+    """(alias_file | None, problem | None) for an entry that opts in with identity_aliases_file.
+
+    The connector (sources/arcgis.ts) and this fetcher MUST key a record identically, so both read the same generated file
+    through the same rule (scripts/identity_aliases.py <-> sources/identity-aliases.ts). An opted-in entry whose file cannot be
+    used is EXCLUDED here, never fetched under legacy keys: the stored keys may already be alias keys, and fetching them as
+    bare ids would find the wrong feature or none (reported as EXCLUDED, never as zero)."""
+    name = entry.get("identity_aliases_file")
+    if not name:
+        return None, None
+    path = os.path.join(alias_dir or ALIAS_DIR, name)
+    try:
+        obj = ia.load_alias_file(path)
+    except (OSError, ValueError) as ex:
+        return None, f"identity_aliases_file {name} unreadable: {ex}"
+    bad = ia.validate_alias_file(obj)
+    if bad:
+        return None, f"identity_aliases_file {name} unsound: {'; '.join(bad)[:200]}"
+    cn = (entry.get("column_map") or {}).get("case_number")
+    if obj.get("registry_id") != entry.get("registry_id") or obj.get("id_field") != cn:
+        return None, f"identity_aliases_file {name} does not belong to {entry.get('registry_id')}/{cn}"
+    if entry.get("identity_fields"):
+        return None, "identity_fields and identity_aliases_file are mutually exclusive"
+    return obj, None
+
+
 def fetch_features(rid, entry, keys, z3):
     """Fetch authoritative geometry for `keys` from the publisher layer."""
     url = entry["service_url"]
@@ -386,6 +414,14 @@ def fetch_features(rid, entry, keys, z3):
             return {"status": "EXCLUDED",
                     "reason": f"compound identity {ident} is not supported by this pass"}
         ident = ident[0]
+    alias_file, alias_problem = load_entry_aliases(entry)
+    if alias_problem:
+        return {"status": "EXCLUDED", "reason": alias_problem}
+    # An alias identity '<id>#<OBJECTID>' is answered by the BARE id's features, then routed by OBJECTID with the same rule the
+    # connector uses. Querying `ident IN ('<id>#<oid>')` would find nothing; stripping '#' blindly would break ids that really
+    # contain it - so only identities the file lists are translated.
+    alias_rev = ia.reverse_index(alias_file) if alias_file else {}
+    oid_field = alias_file["oid_field"] if alias_file else None
     b0, r0 = STATS["bytes_in"], STATS["requests"]
     meta, why = http(url, {"f": "json"})
     if meta is None or esri(meta):
@@ -405,7 +441,8 @@ def fetch_features(rid, entry, keys, z3):
                     "reason": f"source_key {k!r} is not platform:registry:ident; "
                               f"a 4-segment (socrata) key needs its own parser"}
         cases.setdefault(parts[2].strip(), k)
-    want = sorted(cases)
+    # the identities to ASK the publisher for: aliases map to their bare id (deduplicated; one id may serve several keys)
+    want = sorted({alias_rev[c][0] if c in alias_rev else c for c in cases})
     feats, unasked, errors = [], [], 0
     # BATCH SIZE COMES FROM THE PUBLISHER, NOT FROM A CONSTANT. It was a hardcoded 10,
     # which is ~4,700 sequential POSTs for a 47k-project shard (722 / little-rock-permits)
@@ -424,7 +461,8 @@ def fetch_features(rid, entry, keys, z3):
     while i < len(want):
         part = want[i:i + chunk]
         vals = ",".join(("'" + c.replace("'", "''") + "'") if quoted else c for c in part)
-        j, why2 = http(url + "/query", {"where": f"{ident} IN ({vals})", "outFields": ident,
+        j, why2 = http(url + "/query", {"where": f"{ident} IN ({vals})",
+                                        "outFields": f"{ident},{oid_field}" if oid_field else ident,
                                         "returnGeometry": "true", "outSR": str(CANON_SRID),
                                         "f": "json"}, method="POST")
         if j is None or esri(j):
@@ -456,8 +494,10 @@ def fetch_features(rid, entry, keys, z3):
             continue
         singles_failed = 0
         for ft in j.get("features") or []:
-            echo = str((ft.get("attributes") or {}).get(ident))
-            sk = cases.get(echo.strip())
+            attrs = ft.get("attributes") or {}
+            echo = str(attrs.get(ident))
+            routed = ia.source_identity(echo.strip(), attrs.get(oid_field), alias_file) if alias_file else echo.strip()
+            sk = cases.get(routed)
             if sk is None:
                 unasked.append(echo)
                 continue
