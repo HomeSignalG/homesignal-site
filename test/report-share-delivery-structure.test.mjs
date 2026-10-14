@@ -117,7 +117,7 @@ ok(namers(/(?<![a-z_])(report_share_resolve|report_share_create|report_share_rev
 ok(namers(/newShareToken|hashShareToken/).filter((f) => f !== 'supabase/functions/_shared/report-share.ts').join() === 'supabase/functions/_shared/share-reads.ts',
   '2c the token is minted and hashed by ONE module (besides the one that defines how)');
 ok(namers(/#share=|shared-report\.html/).join() === 'supabase/functions/_shared/share-reads.ts' && (S('supabase/functions/_shared/share-reads.ts').match(/shared-report\.html/g) || []).length === 1
-   && /export const SHARE_PAGE = 'https:\/\/homesignal\.net\/shared-report\.html';/.test(S('supabase/functions/_shared/share-reads.ts')) && /return SHARE_PAGE \+ '#share=' \+ token;/.test(S('supabase/functions/_shared/share-reads.ts')),
+   && /export const SHARE_PAGE = PUBLIC_ORIGIN \+ '\/shared-report\.html';/.test(S('supabase/functions/_shared/share-reads.ts')) && !/https?:\/\/(www\.)?(homesignal\.net|jodytracks\.com)/.test(S('supabase/functions/_shared/share-reads.ts').replace(/\/\/.*$/gm, '')) && /return SHARE_PAGE \+ '#share=' \+ token;/.test(S('supabase/functions/_shared/share-reads.ts')),
   '2d the link\'s form is written ONCE, with the token in the URL fragment (which no server receives)');
 {
   const reads = S('supabase/functions/_shared/share-reads.ts');

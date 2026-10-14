@@ -265,7 +265,7 @@ ok(sent.url === L.CHECKOUT_ENDPOINT && sent.init.method === 'POST' && sent.init.
    && sentBody.data.attributes.test_mode === undefined,
   '5f the request the processor was sent: its documented endpoint, the store and the $79 variant, a live (not test) checkout, authorised by the key');
 ok(custom.brokerage_id === brokerageId && await L.verifyBinding(BILLING.secret, custom.brokerage_id, custom.bind)
-   && sentBody.data.attributes.product_options.redirect_url === 'https://homesignal.net/development-activity-reports.html#billing',
+   && sentBody.data.attributes.product_options.redirect_url === 'https://jodytracks.com/development-activity-reports.html#billing',
   '5g the checkout names THIS brokerage with a signature only this server\'s secret makes, and its return address only brings the person back');
 ok(!JSON.stringify(sentBody).includes('owner@example.test') && !/@/.test(JSON.stringify(sentBody)), '5h the request carries no email address');
 ok(count('brokerage_subscription') === 0 && count('payment_event') === 0 && count('brokerage_paid_credit') === 0, '5i asking for a checkout changed nothing in the database: no subscription, no event, no credit');

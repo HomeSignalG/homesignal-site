@@ -4,7 +4,10 @@
 // so it can never reach the Pages artifact (scripts/stage_site.py is an allowlist).
 import { createHash } from 'node:crypto';
 
-export const SUPPORTED_CONTRACT_VERSIONS = [1];
+// v1: HomeSignal is the active identity (today). v2: Jody is the active identity and HomeSignal is the legacy, redirect-only host.
+// The repo's contract file is v1; v2 exists here so the activation is ONE reviewed data change that this validator already
+// accepts and the rehearsal (test/cutover-rehearsal.test.mjs) already proves, never a validator edit made on launch day.
+export const SUPPORTED_CONTRACT_VERSIONS = [1, 2];
 export const SUPPORTED_SCHEMA_VERSIONS = [1];
 export const CONTRACT_NAME = 'homesignal-brand-contract';
 
@@ -55,13 +58,23 @@ export function validateContract(c) {
   if (!(c.future_identity in c.identities)) fail('future_identity does not name a defined identity');
   if (c.current_identity === c.future_identity) fail('current_identity and future_identity must differ');
   if (c.identities[c.current_identity].origin === c.identities[c.future_identity].origin) fail('identities must have distinct origins');
-  // Contract v1 FREEZES activation: HomeSignal is the only active identity. Activating the future
-  // brand is a new contract_version plus a reviewed validator change — never a field flip.
-  if (c.current_identity !== 'homesignal') fail('v1: current_identity must be homesignal');
-  if (c.identities.homesignal.state !== 'active') fail('v1: homesignal must be active');
-  if (c.identities.homesignal.origin !== 'https://homesignal.net') fail('v1: homesignal origin must be https://homesignal.net');
-  if (c.future_identity !== 'jody') fail('v1: future_identity must be jody');
-  if (c.identities.jody.state !== 'inactive') fail('v1: the future identity must be inactive');
+  if (c.contract_version === 1) {
+    // Contract v1 FREEZES activation: HomeSignal is the only active identity. Activating the future
+    // brand is a new contract_version (2) - never a field flip on a v1 file.
+    if (c.current_identity !== 'homesignal') fail('v1: current_identity must be homesignal');
+    if (c.identities.homesignal.state !== 'active') fail('v1: homesignal must be active');
+    if (c.identities.homesignal.origin !== 'https://homesignal.net') fail('v1: homesignal origin must be https://homesignal.net');
+    if (c.future_identity !== 'jody') fail('v1: future_identity must be jody');
+    if (c.identities.jody.state !== 'inactive') fail('v1: the future identity must be inactive');
+  } else {
+    // Contract v2: the SWAP, nothing else. `future_identity` names the other identity, which is now the legacy host.
+    if (c.current_identity !== 'jody') fail('v2: current_identity must be jody');
+    if (c.identities.jody.state !== 'active') fail('v2: jody must be active');
+    if (c.identities.jody.origin !== 'https://jodytracks.com') fail('v2: jody origin must be https://jodytracks.com');
+    if (c.future_identity !== 'homesignal') fail('v2: future_identity must be homesignal (the legacy, redirect-only host)');
+    if (c.identities.homesignal.state !== 'inactive') fail('v2: homesignal must be inactive (it only redirects)');
+    if (c.identities.homesignal.origin !== 'https://homesignal.net') fail('v2: homesignal origin must be https://homesignal.net (it carries the immutable DID)');
+  }
   return c;
 }
 

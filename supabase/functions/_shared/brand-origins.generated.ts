@@ -3,9 +3,17 @@
 //
 // Browser origins the backend recognises (supported, NOT activated): the origin of every identity in the
 // brand contract, plus the legacy www host. Order: current identity, its legacy host(s), future identity.
-export const BRAND_CONTRACT_SHA256 = '5fb1a9c320f296297e1e43fd593f4ba2cd3757d2d9dc3c3b9128205e97cfaec3';
+export const BRAND_CONTRACT_SHA256 = 'dd54ca80e9f9e4df53d34c243bff440d58980054173e5f0851b7bc3fd8fff4c6';
 export const BROWSER_ORIGINS: readonly string[] = [
-  'https://homesignal.net',
-  'https://www.homesignal.net',
   'https://jodytracks.com',
+  'https://www.homesignal.net',
+  'https://homesignal.net',
 ];
+// What the site PUBLISHES as (the contract's current identity). The links and sender the backend EMITS are built from these, so
+// moving the brand is the contract change and one redeploy, never an edit to five files. While the contract is v1 these are
+// exactly the strings that used to be written out in those files (pinned by test/brand-origins.test.mjs section 6).
+export const PUBLIC_ORIGIN = 'https://jodytracks.com';
+export const PUBLIC_HOST = 'jodytracks.com';
+export const PUBLIC_NAME = 'Jody';
+// Where a reply to a no-reply sender goes (null = the sender carries no Reply-To, as HomeSignal's never has). See REPLY_TO_BY_IDENTITY in the generator.
+export const PUBLIC_REPLY_TO: string | null = 'info@jodytracks.com';

@@ -1,0 +1,81 @@
+// Jody Step 16 hardening: the watch e-mail's SENDER and REPLY handling follow the brand, and a reply never goes to a no-reply address nobody reads.
+// Found by the independent audit: WATCH_FROM is derived from the brand (`Jody <noreply@jodytracks.com>`), the domain being verified at the mail provider
+// says nothing about a person reading replies, and the sender had no Reply-To at all. Run: node test/step16-outbound-email.test.mjs
+import { readFileSync, mkdtempSync, mkdirSync, cpSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { render, CONTRACT_FILE, REPLY_TO_BY_IDENTITY } from '../scripts/gen-brand-origins.mjs';
+import { sendEmail } from '../supabase/functions/_shared/email-send.ts';
+import * as watch from '../supabase/functions/_shared/watch-email.ts';
+import * as gen from '../supabase/functions/_shared/brand-origins.generated.ts';
+
+let failures = 0;
+const check = (n, ok, why) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${ok ? '' : ` - ${why}`}`); if (!ok) failures++; };
+const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const contract = JSON.parse(readFileSync(CONTRACT_FILE, 'utf8'));
+// The committed contract IS the v2 swap now (Jody current). The HomeSignal-era behaviour is checked against the FROZEN v1 contract.
+const v2 = JSON.parse(JSON.stringify(contract));
+const v1 = JSON.parse(readFileSync('test/fixtures/brand-contract.v1.frozen.json', 'utf8'));
+const r1 = render(v1);
+
+// 1. under the committed v1 contract nothing changes: no Reply-To, the same sender
+check('1a v1 (frozen): the generated reply-to is null (HomeSignal has never sent a Reply-To)', r1.includes("export const PUBLIC_REPLY_TO: string | null = null;"), r1.split('\n').filter((l) => l.includes('PUBLIC_REPLY_TO')).join(' | '));
+check('1b v1 (frozen): the sender identity is HomeSignal; the COMMITTED module is the Jody one (reply-to info@, sender Jody)', r1.includes("PUBLIC_NAME = 'HomeSignal'") && gen.PUBLIC_REPLY_TO === 'info@jodytracks.com' && watch.WATCH_REPLY_TO === 'info@jodytracks.com' && watch.WATCH_FROM === 'Jody <noreply@jodytracks.com>', watch.WATCH_FROM);
+const bodyOf = async (m) => { let sent; await sendEmail(async (_u, init) => { sent = JSON.parse(init.body); return new Response('{}', { status: 200 }); }, 'k', m, 'idem'); return sent; };
+const base = { from: watch.WATCH_FROM, to: 'agent@example.com', subject: 's', text: 't', html: '<p>h</p>' };
+const plain = await bodyOf(base);
+check('1c a message with no reply_to is sent with EXACTLY the five fields it has always had', JSON.stringify(Object.keys(plain)) === JSON.stringify(['from', 'to', 'subject', 'text', 'html']), JSON.stringify(Object.keys(plain)));
+
+// 2. under v2 the sender is Jody's and replies reach a mailbox a person reads
+const r2 = render(v2);
+check('2a v2: the generated reply-to is the Jody customer-support mailbox (info@, never the outreach mailbox contact@)', r2.includes("export const PUBLIC_REPLY_TO: string | null = 'info@jodytracks.com';"), r2.split('\n').filter((l) => l.includes('PUBLIC_REPLY_TO')).join(' | '));
+check('2b v2: the sender is Jody\'s own verified domain', r2.includes("PUBLIC_NAME = 'Jody'") && r2.includes("PUBLIC_HOST = 'jodytracks.com'"), 'sender');
+const withReply = await bodyOf({ ...base, reply_to: 'info@jodytracks.com' });
+check('2c a message that carries reply_to sends it to the provider (Resend\'s field name)', withReply.reply_to === 'info@jodytracks.com', JSON.stringify(withReply));
+check('2d …and only then (the other five fields are unchanged)', JSON.stringify(Object.keys(withReply).filter((k) => k !== 'reply_to')) === JSON.stringify(Object.keys(plain)), 'fields');
+
+// 3. the decision cannot be forgotten for an identity: a brand with no recorded decision cannot be rendered
+check('3a every identity in the generator has a recorded reply-to decision', Object.keys(REPLY_TO_BY_IDENTITY).sort().join() === Object.keys(contract.identities).sort().join(), Object.keys(REPLY_TO_BY_IDENTITY).join());
+check('3b0 the outreach mailbox is NEVER a reply destination for any identity', !Object.values(REPLY_TO_BY_IDENTITY).includes('contact@jodytracks.com'), JSON.stringify(REPLY_TO_BY_IDENTITY));
+check('3b the Jody reply-to is a Jody-domain address (never a HomeSignal mailbox after the move)', REPLY_TO_BY_IDENTITY.jody.endsWith('@jodytracks.com') && REPLY_TO_BY_IDENTITY.homesignal === null, JSON.stringify(REPLY_TO_BY_IDENTITY));
+
+// 4. the sending function passes it (structural pin on the comment-stripped source, with a control that the pin can fail)
+const handler = strip(readFileSync('supabase/functions/run-property-watch/handler.ts', 'utf8'));
+const wired = /reply_to:\s*WATCH_REPLY_TO/.test(handler) && /WATCH_REPLY_TO\s*\?/.test(handler);
+check('4a the watch sender includes reply_to from the brand-derived constant, only when there is one', wired, 'handler does not pass WATCH_REPLY_TO');
+const unwired = handler.replace(/\.\.\.\(WATCH_REPLY_TO \? \{ reply_to: WATCH_REPLY_TO \} : \{\}\),\s*/, '');
+check('4b control: with that line removed the pin fails (it is not vacuous)', unwired !== handler && !(/reply_to:\s*WATCH_REPLY_TO/.test(unwired)), 'pin insensitive');
+const other = (readFileSync('supabase/functions/_shared/email-send.ts', 'utf8'));
+check('4c the e-mail adapter forwards reply_to only when set', /\.\.\.\(m\.reply_to \? \{ reply_to: m\.reply_to \} : \{\}\)/.test(other), 'adapter');
+
+
+// 5. END TO END under BOTH identities: the REAL handler -> the REAL sender -> the request the mail provider receives (test/property-watch-functions.test.mjs
+//    section 7). v1 is the committed tree; v2 is a throwaway copy of the edge functions whose brand module was generated from the Jody contract.
+const run = (root) => spawnSync('node', [join(root, 'test/property-watch-functions.test.mjs')], { cwd: root, encoding: 'utf8' });
+const tmp1 = mkdtempSync(join(tmpdir(), 'v1-watch-'));
+mkdirSync(join(tmp1, 'test'));
+cpSync('supabase/functions', join(tmp1, 'supabase/functions'), { recursive: true });
+cpSync('test/property-watch-functions.test.mjs', join(tmp1, 'test/property-watch-functions.test.mjs'));
+writeFileSync(join(tmp1, 'supabase/functions/_shared/brand-origins.generated.ts'), r1);
+const v1run = run(tmp1);
+check('5a v1 (frozen-contract copy): the whole watch suite passes, including 7a-7c (no reply_to key; HomeSignal sender)', v1run.status === 0 && /7b the provider request carries the brand's Reply-To \(none: the key is absent\)/.test(v1run.stdout), (v1run.stdout + v1run.stderr).slice(-400));
+const tmp = mkdtempSync(join(tmpdir(), 'v2-watch-'));
+mkdirSync(join(tmp, 'test'));
+cpSync('supabase/functions', join(tmp, 'supabase/functions'), { recursive: true });
+cpSync('test/property-watch-functions.test.mjs', join(tmp, 'test/property-watch-functions.test.mjs'));
+writeFileSync(join(tmp, 'supabase/functions/_shared/brand-origins.generated.ts'), r2);
+const v2run = run(tmp);
+check('5b v2 (Jody-generated copy): the whole watch suite passes and the provider request carries Reply-To info@jodytracks.com from sender Jody <noreply@jodytracks.com>',
+  v2run.status === 0 && /7b the provider request carries the brand's Reply-To \(info@jodytracks\.com\)/.test(v2run.stdout) && /7c the only non-null Reply-To/.test(v2run.stdout), (v2run.stdout + v2run.stderr).slice(-500));
+// mutation: if the handler stopped passing reply_to, the v2 chain must FAIL (so 5b is not vacuous)
+const hp = join(tmp, 'supabase/functions/run-property-watch/handler.ts');
+const hsrc = readFileSync(hp, 'utf8');
+const mut = hsrc.replace(/\.\.\.\(WATCH_REPLY_TO \? \{ reply_to: WATCH_REPLY_TO \} : \{\}\),\s*/, '');
+writeFileSync(hp, mut);
+const mrun = run(tmp);
+check('5c mutation: with the handler\'s reply_to removed the v2 chain FAILS at 7b', mut !== hsrc && mrun.status !== 0 && /FAIL — 7b/.test(mrun.stdout), (mrun.stdout + mrun.stderr).slice(-300));
+
+console.log(failures ? `\n${failures} failed` : '\nall passed');
+process.exit(failures ? 1 : 0);

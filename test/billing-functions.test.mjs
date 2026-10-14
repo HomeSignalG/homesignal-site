@@ -14,6 +14,9 @@
 // test/brokerage_billing_pg proves the database half; test/billing-structure.test.mjs pins the structure; test/lemon-billing.test.mjs proves the shapes.
 // Run: node test/billing-functions.test.mjs
 import { createHmac } from 'node:crypto';
+import { readFileSync as __rf } from 'node:fs';
+const PUBLISHED = JSON.parse(__rf(new URL('../docs/brand/brand-contract.v1.json', import.meta.url), 'utf8')); // the contract's CURRENT identity: these links follow it
+const ORIGIN = PUBLISHED.identities[PUBLISHED.current_identity].origin;
 
 const L = await import('../supabase/functions/_shared/lemon-billing.ts');
 const B = await import('../supabase/functions/_shared/billing-reads.ts');
@@ -397,7 +400,7 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
      && sbody.data.attributes.product_options.redirect_url === B.BILLING_PAGE,
     '4g the request is the processor\'s endpoint, with the API key in the header, the brokerage and ITS signature in the custom data, and the billing page as the return address');
   ok(!sent.init.body.includes(API_KEY) && !sent.init.body.includes(SECRET) && !JSON.stringify(sent.init.headers).includes(SERVICE), '4h the API key is never in the body, the signing secret is never sent, and the project\'s service key never goes to the processor');
-  ok(B.BILLING_PAGE === 'https://homesignal.net/development-activity-reports.html#billing', '4i the return address is the billing section of the agent\'s page');
+  ok(B.BILLING_PAGE === ORIGIN + '/development-activity-reports.html#billing', '4i the return address is the billing section of the agent\'s page');
   let f = 0;
   for (const routes of [[[/checkouts$/, () => json({ errors: [{ detail: 'x' }] }, 422)]], [[/checkouts$/, () => json({ data: { attributes: { url: 'https://evil.example/x' } } }, 201)]],
     [[/checkouts$/, () => new Response('not json', { status: 201 })]], [[/checkouts$/, () => { throw new Error('network down ' + API_KEY); }]]]) {

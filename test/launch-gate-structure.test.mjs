@@ -60,7 +60,7 @@ ok(!/process\.env|Deno\.env/.test(RT) && !/SUPABASE_[A-Z_]*KEY|LEMON_SQUEEZY_[A-
 const fixtures = [...RT.matchAll(/(apiKey|secret|serviceKey): '([^']+)'/g)].map((m) => m[2]);
 ok(fixtures.length >= 3 && fixtures.every((v) => /fixture|not-real/.test(v)), '2h every key and secret value in it is plainly marked as a fixture', fixtures.join(' | '));
 const hosts = new Set([...RT.matchAll(/https?:\/\/([a-z0-9.-]+)/g)].map((m) => m[1]));
-const allowedHosts = ['proj.supabase.co', 'x', 'homesignal.net', 'api.lemonsqueezy.com', 'fixture-store.lemonsqueezy.com', 'data.wsdot.wa.gov'];
+const allowedHosts = ['proj.supabase.co', 'x', 'jodytracks.com', 'api.lemonsqueezy.com', 'fixture-store.lemonsqueezy.com', 'data.wsdot.wa.gov'];
 ok([...hosts].every((h) => allowedHosts.includes(h)), '2i it names no host but the fixture project, the processor and its stand-in\'s own domain', [...hosts].join(','));
 ok(/u\.origin === 'https:\/\/api\.lemonsqueezy\.com'\) return lemonStandIn\(/.test(RT) && !/\bawait fetch\(|globalThis\.fetch|node:https?|node:net/.test(RT),
   '2j the payment processor is answered by a stand-in that records the request, and the round trip opens no connection of its own');

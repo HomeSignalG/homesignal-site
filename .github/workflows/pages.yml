@@ -61,6 +61,10 @@ on:
         description: 'ignore the live page state: publish this one as the new baseline, notify nothing'
         type: boolean
         default: false
+      plane_max_age_hours:
+        description: 'IDENTITY-ONLY CUTOVER ONLY: accept a Rule D plane up to this many hours old (1-336). Empty = the normal 36h guard. Never set by schedule or push.'
+        type: string
+        default: ''
   push:
     branches: [main]
     paths:
@@ -154,6 +158,8 @@ jobs:
       # true only for a freshness-triggered run (dispatch input, or the half-hourly tick).
       FRESHNESS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.freshness == true) || (github.event_name == 'schedule' && github.event.schedule != '40 6 * * *')) && 'true' || 'false' }}
       RESEED: ${{ (github.event_name == 'workflow_dispatch' && inputs.reseed == true) && 'true' || 'false' }}
+      # Empty on every trigger except a manual dispatch that names it: the normal 36h guard then applies unchanged.
+      PLANE_MAX_AGE_HOURS: ${{ github.event_name == 'workflow_dispatch' && inputs.plane_max_age_hours || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -197,8 +203,19 @@ jobs:
             exit 1
           fi
           python3 - <<'PY'
-          import json, sys
+          import json, os, sys
           from datetime import datetime, timezone
+          # 36h unless a manual identity-only dispatch names a longer window (hard ceiling 336h = 14 days).
+          limit = 36.0
+          o = os.environ.get("PLANE_MAX_AGE_HOURS", "").strip()
+          if o:
+              try:
+                  limit = float(o)
+              except ValueError:
+                  sys.exit(f"ERROR: plane_max_age_hours {o!r} is not a number")
+              if not (1 <= limit <= 336):
+                  sys.exit(f"ERROR: plane_max_age_hours {limit} is outside 1-336")
+              print(f"::warning::IDENTITY-ONLY BUILD: accepting a Rule D plane up to {limit:g}h old (normal guard is 36h)")
           p = json.load(open("data/development_seo_plane.json"))
           c = json.load(open("data/development_seo_cities.json"))
           pj = json.load(open("data/development_seo_projects.json"))
@@ -210,8 +227,8 @@ jobs:
           except ValueError:
               sys.exit("ERROR: fetched plane has no parseable generated_at")
           age = (datetime.now(timezone.utc) - ts).total_seconds() / 3600
-          if age > 36:
-              sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > 36h)")
+          if age > limit:
+              sys.exit(f"ERROR: fetched Rule D plane is stale ({age:.1f}h > {limit:g}h)")
           if not isinstance(c.get("cities"), dict):
               sys.exit("ERROR: fetched city data has no cities object — refusing to drop city pages")
           if c.get("generated_at") != raw:
@@ -233,9 +250,20 @@ jobs:
           set -euo pipefail
           EXTRA=""
           if [ "$RESEED" = "true" ]; then EXTRA="--reseed"; fi
+          if [ -n "$PLANE_MAX_AGE_HOURS" ]; then EXTRA="$EXTRA --plane-max-age-hours $PLANE_MAX_AGE_HOURS"; fi
           python3 scripts/gen_zip_pages.py --out _site \
             --baseline "$RUNNER_TEMP/baseline-page-state.json" \
             --delta-out "$RUNNER_TEMP/indexnow-delta.json" $EXTRA | tee -a "$RUNNER_TEMP/receipts.txt"
+
+      # Jody migration (Step 16). The staged artifact is rewritten into the identity docs/brand/brand-contract.v1.json says the
+      # site PUBLISHES as. While that is `homesignal` this is a verified no-op (brand_stage.py leaves a tree that is already in the
+      # source identity untouched), so today's bytes are unchanged. Activation is therefore the contract change alone: no second
+      # workflow, no second builder, no fork of this pipeline. The generator, sitemap and IndexNow hosts already come from the same
+      # contract through scripts/brand_host.py, so the document hosts and this rewrite cannot disagree.
+      - name: Apply the published brand identity (no-op while HomeSignal is current)
+        run: |
+          set -euo pipefail
+          python3 scripts/brand_stage.py --dir _site --identity "$(python3 scripts/brand_host.py --identity)" | tee -a "$RUNNER_TEMP/receipts.txt"
 
       # `deploy` precedes `indexnow`, so a failed notification leaves its pages live and inside the
       # NEXT baseline: they would never differ again. Pick them up from the earlier run's stored

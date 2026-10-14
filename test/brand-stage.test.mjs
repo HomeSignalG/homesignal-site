@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 let failures = 0;
 const check = (n, ok, why) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${n}${ok ? '' : ` — ${why}`}`); if (!ok) failures++; };
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = join(d, f); return statSync(p).isDirectory() ? walk(p) : [p]; });
-const brand = (dir, ...a) => spawnSync('python3', ['scripts/brand_stage.py', '--dir', dir, ...a], { encoding: 'utf8' });
+const brand = (dir, ...a) => spawnSync('python3', ['scripts/brand_stage.py', '--dir', dir, '--contract', 'test/fixtures/brand-contract.v1.frozen.json', ...a], { encoding: 'utf8' });
 
 const base = mkdtempSync(join(tmpdir(), 'brand-stage-'));
 const st = join(base, 'st');
@@ -61,9 +61,21 @@ check('3c the share-link validators accept BOTH origins', /homesignal\\\.net\|jo
 const re = /^https:\/\/(?:homesignal\.net|jodytracks\.com)\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
 const tok = 'A'.repeat(43);
 check('3d …and reject a lookalike host', re.test(`https://homesignal.net/shared-report.html#share=${tok}`) && re.test(`https://jodytracks.com/shared-report.html#share=${tok}`) && !re.test(`https://jodytracks.com.evil.io/shared-report.html#share=${tok}`), 'regex');
-check('3e shipped host allowlists name the Jody host', /ALLOWED_HOSTS = \['jodytracks\.com', 'www\.jodytracks\.com'\]/.test(readFileSync(join(j, 'lib/share-text.js'), 'utf8')), 'share-text');
+check('3e shipped host allowlists name the Jody host AND keep the legacy one (an e-mail sent before the move carries u=https://homesignal.net/...)',
+  /ALLOWED_HOSTS = \['jodytracks\.com', 'www\.jodytracks\.com', 'homesignal\.net', 'www\.homesignal\.net'\]/.test(readFileSync(join(j, 'lib/share-text.js'), 'utf8')), 'share-text');
+{
+  // run the REAL overlaid validator, not a regex about it
+  const { createRequire } = await import('node:module');
+  const st = createRequire(import.meta.url)(join(j, 'lib/share-text.js'));
+  const ok = (u) => st.model('?u=' + encodeURIComponent(u)).ok;
+  check('3e2 the Jody share-text page accepts a link from an old e-mail (homesignal.net) and from the new host', ok('https://homesignal.net/homesignalmap.html?zip=84302') && ok('https://jodytracks.com/community/84302/'), 'refused');
+  check('3e3 …and still refuses lookalikes, other schemes, userinfo and ports (not an open relay)', !ok('https://jodytracks.com.evil.io/') && !ok('https://evil.io/?x=homesignal.net') && !ok('http://jodytracks.com/') && !ok('https://u:p@jodytracks.com/') && !ok('https://jodytracks.com:444/') && !ok('https://notjodytracks.com/') && !ok('https://homesignal.net.evil.io/'), 'accepted');
+}
 check('3f the file names stay (homesignalmap.html is still linked)', all.some(([, t]) => t.includes('homesignalmap.html')) && jfiles.includes('homesignalmap.html'), 'renamed');
-check('3g e-mail addresses stay on the existing domain until Step 6', all.some(([, t]) => /@homesignal\.net/.test(t)) && !all.some(([, t]) => /@jodytracks\.com/.test(t)), 'email');
+// F2 (Step 16 audit): the ONLY @jodytracks.com mailbox in the Jody tree is the customer-support one (info@), and only on the
+// contact + legal pages; every other address stays on the existing domain until Step 6.
+const jMail = all.flatMap(([f, t]) => (t.match(/[A-Za-z0-9._%+\-]+@jodytracks\.com/g) || []).map((m) => [f, m]));
+check('3g e-mail addresses stay on the existing domain until Step 6, except the support mailbox on its pages', all.some(([, t]) => /@homesignal\.net/.test(t)) && jMail.every(([f, m]) => m === 'info@jodytracks.com' && ['contact.html', 'privacy.html', 'terms.html', 'refund-policy.html'].includes(f)), JSON.stringify(jMail.slice(0, 5)));
 check('3h the immutable DID is untouched wherever it appears', !all.some(([, t]) => /did:web:jodytracks/.test(t)), 'did');
 check('3i the Supabase project reference is untouched', all.some(([, t]) => t.includes('qwnnmljucajnexpxdgxr')), 'supabase');
 
@@ -79,7 +91,11 @@ check('4b a tree with nothing to rewrite fails (the overlay must prove it ran)',
 const srcIdx = readFileSync('index.html', 'utf8');
 check('5a source index.html still says HomeSignal on the live origin', srcIdx.includes('https://homesignal.net/') && !srcIdx.includes('jodytracks'), 'source changed');
 const pages = readFileSync('.github/workflows/pages.yml', 'utf8');
-check('5b pages.yml (the live deploy) does not call the overlay', !/brand_stage/.test(pages), 'wired into the live deploy');
+// Step 16 superseded the old pin ("the live deploy does not call the overlay"): it now calls it, exactly once, with the identity the
+// CONTRACT reports - a verified no-op while that is homesignal (A1-A3 in cutover-activation.test.mjs) - and never with a literal or --staging.
+const calls = pages.split('\n').filter((l) => !/^\s*#/.test(l) && /brand_stage\.py/.test(l));
+check('5b pages.yml calls the overlay exactly once, with the contract-reported identity, never a literal and never --staging',
+  calls.length === 1 && /--identity "\$\(python3 scripts\/brand_host\.py --identity\)"/.test(calls[0]) && !/--staging|--identity (jody|homesignal)\b/.test(calls[0]), JSON.stringify(calls));
 rmSync(base, { recursive: true, force: true });
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

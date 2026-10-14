@@ -17,7 +17,7 @@ const root = jodyRoot;
 const baseRoot = mkdtempSync(join(tmpdir(), 'hs-stage-'));
 execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', root], { stdio: 'pipe' });
 execFileSync('python3', ['scripts/stage_site.py', '--src', '.', '--out', baseRoot], { stdio: 'pipe' });
-execFileSync('python3', ['scripts/brand_stage.py', '--dir', root, '--identity', 'jody', '--staging'], { stdio: 'pipe' });
+execFileSync('python3', ['scripts/brand_stage.py', '--dir', root, '--identity', 'jody', '--staging', '--contract', 'test/fixtures/brand-contract.v1.frozen.json'], { stdio: 'pipe' });
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.txt': 'text/plain' };
 async function serve(dir) {
