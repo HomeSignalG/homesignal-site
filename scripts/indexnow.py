@@ -31,11 +31,38 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from pathlib import Path
 
+import brand_host
 import page_semantics as ps
 
 ENDPOINT = "https://api.indexnow.org/indexnow"
 HOST = ps.BASE.split("://", 1)[1]   # from the brand contract via page_semantics
+
+# ---------------------------------------------------------------- the Jody launch hold
+# While the site publishes as HomeSignal this is not consulted: nothing about today's notifications changes. The day the contract
+# publishes the site as another identity, IndexNow stays QUIET until a committed one-line change says otherwise (founder's Step 9
+# decision: no search-engine notification for jodytracks.com before it is live, verified and the Change of Address is done).
+# Fails CLOSED: a missing, unreadable, non-JSON or non-boolean file holds. A held run is a clean no-op, not an error: it must
+# not turn a good deploy red, and its pages are not re-announced later (the founder's resubmit workflow does that on purpose).
+LAUNCH_HOLD_FILE = Path(__file__).resolve().parent.parent / "docs" / "brand" / "indexnow-jody-hold.json"
+SOURCE_PUBLIC_IDENTITY = "homesignal"
+
+
+def launch_hold(identity=None, hold_file=LAUNCH_HOLD_FILE):
+    """Return a reason string when IndexNow must not submit, else None."""
+    if identity is None:
+        identity = brand_host.identity()
+    if identity == SOURCE_PUBLIC_IDENTITY:
+        return None
+    try:
+        hold = json.loads(Path(hold_file).read_text(encoding="utf-8")).get("hold")
+    except Exception:
+        return f"the {identity} launch hold file is unreadable: held (fails closed)"
+    if hold is False:
+        return None
+    return (f"the site publishes as {identity!r} and docs/brand/indexnow-jody-hold.json has hold={hold!r}: "
+            f"no search-engine notification until that file says hold=false")
 KEY_LOCATION = f"https://{HOST}/indexnow.txt"
 KEY_FILE = "indexnow.txt"
 MAX_URLS_PER_POST = 10_000
@@ -326,6 +353,10 @@ def notify(delta, key, *, allow_mass=False, post=default_post, get=default_get, 
            "indexability_changed": len(delta.get("indexability_changed") or []),
            "removed": len(delta.get("removed") or []), "submitted": 0, "batches": [],
            "seed": bool(delta.get("seed")), "outcome": "", "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    held = launch_hold()
+    if held:
+        rec["outcome"] = f"HELD (not an error): {held}"
+        return rec
     if delta.get("seed"):
         rec["outcome"] = f"seed: {delta.get('seed_reason')}"
         return rec

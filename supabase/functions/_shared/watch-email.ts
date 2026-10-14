@@ -14,11 +14,14 @@
 // EVERY PUBLISHER STRING IS UNTRUSTED TEXT. A project's name or stage comes from a government feed; in HTML it is escaped, in either part it is
 // cut to a bounded length with control characters and line breaks removed, and a link is printed only if it is an https URL.
 import type { EmailSelection, WatchChange, WatchEntry } from './property-watch.ts';
+import { PUBLIC_HOST, PUBLIC_NAME, PUBLIC_ORIGIN, PUBLIC_REPLY_TO } from './brand-origins.generated.ts';
 
 /** The one From address. noreply@: nobody reads replies, and the email says where to go instead. */
-export const WATCH_FROM = 'HomeSignal <noreply@homesignal.net>';
+export const WATCH_FROM = PUBLIC_NAME + ' <noreply@' + PUBLIC_HOST + '>';
+/** Where a reply goes: a mailbox a person reads, or null for no Reply-To (HomeSignal's has always been none). Derived from the brand contract, never typed here. */
+export const WATCH_REPLY_TO: string | null = PUBLIC_REPLY_TO;
 /** Where the agent opens the report. The page is signed-in; no token and no private value rides in this address. */
-export const WATCH_OPEN_URL = 'https://homesignal.net/development-activity-reports.html';
+export const WATCH_OPEN_URL = PUBLIC_ORIGIN + '/development-activity-reports.html';
 
 const VALUE_MAX = 160;
 
@@ -65,7 +68,7 @@ function entryLines(e: WatchEntry): string[] {
   const head = e.event_type === 'first_detected' ? 'New official record' : 'Official status changed';
   const lines = [head + (when ? ' (found ' + when + ')' : '')];
   for (const c of e.changes.slice(0, 6)) lines.push(fieldWord(c.field) + ': ' + shown(c.from) + ' → ' + shown(c.to));
-  if (e.event_type === 'first_detected' && e.changes.length === 0) lines.push('A record near the property that HomeSignal had not seen before.');
+  if (e.event_type === 'first_detected' && e.changes.length === 0) lines.push('A record near the property that ' + PUBLIC_NAME + ' had not seen before.');
   if (e.publisher_event && e.publisher_event.kind) {
     const k = KIND_WORDS[e.publisher_event.kind] ?? clean(e.publisher_event.kind);
     const d = e.publisher_event.date ? ' ' + clean(e.publisher_event.date) : '';
@@ -87,13 +90,13 @@ export type Email = { subject: string; text: string; html: string };
 export function composeWatchEmail(i: EmailInput): Email {
   const { listed, remaining } = i.selection;
   const total = listed.reduce((n, c) => n + c.entries.length, 0) + remaining.entries;
-  const subject = 'HomeSignal: ' + total + ' official development change' + (total === 1 ? '' : 's') + ' near a property you are watching';
+  const subject = PUBLIC_NAME + ': ' + total + ' official development change' + (total === 1 ? '' : 's') + ' near a property you are watching';
   const which = (i.reportNumber !== null ? 'Report ' + i.reportNumber : 'Your saved report') + (dayWords(i.reportDate) ? ', made ' + dayWords(i.reportDate) : '');
-  const intro = 'Development records near a property you are watching have changed. The property is the one in ' + which + '. Open that report in HomeSignal to see which property it is.';
-  const partialLine = 'One or more official sources near this property could not be fully read recently, so there may be changes HomeSignal has not seen yet.';
+  const intro = 'Development records near a property you are watching have changed. The property is the one in ' + which + '. Open that report in ' + PUBLIC_NAME + ' to see which property it is.';
+  const partialLine = 'One or more official sources near this property could not be fully read recently, so there may be changes ' + PUBLIC_NAME + ' has not seen yet.';
   const moreLine = remaining.entries > 0 ? remaining.entries + ' more change' + (remaining.entries === 1 ? '' : 's') + ' will be in your next email.' : '';
-  const stop = 'You get this because you chose to watch this property in HomeSignal. To stop, open the report in HomeSignal and choose Stop watching.';
-  const source = 'Each change comes from the official source named under it. HomeSignal shows what the source states and when HomeSignal found it; it is not a legal opinion.';
+  const stop = 'You get this because you chose to watch this property in ' + PUBLIC_NAME + '. To stop, open the report in ' + PUBLIC_NAME + ' and choose Stop watching.';
+  const source = 'Each change comes from the official source named under it. ' + PUBLIC_NAME + ' shows what the source states and when ' + PUBLIC_NAME + ' found it; it is not a legal opinion.';
 
   const textBlocks = listed.map((c) => projectText(c));
   const text = [

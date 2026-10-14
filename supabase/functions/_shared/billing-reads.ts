@@ -10,9 +10,10 @@
 import { DataUnavailable } from './service-rest.ts';
 import type { ServiceRpc } from './service-rest.ts';
 import type { LedgerEvent } from './lemon-billing.ts';
+import { PUBLIC_ORIGIN } from './brand-origins.generated.ts';
 
 /** Where the processor brings a person back to after a checkout. It only brings them back: the page re-reads the plan, and a success URL grants nothing. */
-export const BILLING_PAGE = 'https://homesignal.net/development-activity-reports.html#billing';
+export const BILLING_PAGE = PUBLIC_ORIGIN + '/development-activity-reports.html#billing';
 
 /** The ledger refused to bind the subscription: it already belongs to a different brokerage. */
 export class BindingConflict extends Error {}
