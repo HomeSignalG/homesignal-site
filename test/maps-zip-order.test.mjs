@@ -26,7 +26,7 @@ ok(/PRIMARY KEY \(founder_position\)/.test(SQLC) && /zip ~ '\^\[0-9\]\{5\}\$'/.t
 ok(/enable row level security/.test(SQLC) && /revoke all on public\.maps_zip_order from anon/.test(SQLC),
   'RLS on, anon revoked');
 ok(/'sdsutca@proton\.me'/.test(SQLC) && /raise exception 'not authorized'/.test(SQLC), 'founder-only gate');
-ok(/delete from public\.maps_zip_order;[\s\S]*with ordinality/i.test(SQLC), 'replace is one transactional clear + ordered insert');
+ok(/delete from public\.maps_zip_order where true;[\s\S]*with ordinality/i.test(SQLC), 'replace is one transactional clear + ordered insert');
 ok(/function public\.hs_set_maps_zip_order\(p_zips text\[\]\)/.test(SQLC), 'own setter RPC');
 ok(/function public\.hs_request_maps_generation\(\)/.test(SQLC)
   && /function public\.hs_maps_generation_status\(\)/.test(SQLC), 'own generate + status RPCs');
