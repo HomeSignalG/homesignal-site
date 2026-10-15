@@ -1,7 +1,7 @@
 -- ============================================================================
 -- INDIVIDUAL-AGENT SIGNUP  (Development Activity plan, Order L2 — 2026-10-09)
 -- SQL OF RECORD. PARKED: NOT APPLIED to production. Applying it needs the founder's separate go (new schema in production).
--- Founder model: an individual agent gets 10 free Development Activity reports, then $79/month for 100. Brokerages, teams and
+-- Founder model: an individual agent gets 100 free Development Activity reports, then $79/month for 100. Brokerages, teams and
 -- enterprise customers are custom-quoted. An individual registers and receives their own account AUTOMATICALLY, with no
 -- manual HomeSignal step. This file adds nothing parallel: an individual is the OWNER of a single-person account in the existing
 -- brokerage infrastructure, with the existing 10-report evaluation and the existing billing.

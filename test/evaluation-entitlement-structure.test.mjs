@@ -183,7 +183,7 @@ const watchCode = code(WATCH_SQL);
 const BILLING_SQL = 'docs/brokerage-billing.sql';
 const billingCode = code(BILLING_SQL);
 // docs/report-rate-limit.sql is a sixth SQL file that names this layer, ONLY to read the free-report number: its post-condition refuses to apply if
-// public.evaluation_report_limit() is not 10, so that file can never be the reason the founder's number moved. It writes no row of this layer (its one table is
+// public.evaluation_report_limit() is not 100, so that file can never be the reason the founder's number moved. It writes no row of this layer (its one table is
 // report_rate_window) and calls nothing else here. test/report_rate_limit_pg proves that; test/report-rate-limit-structure.test.mjs pins its structure.
 const RATE_SQL = 'docs/report-rate-limit.sql';
 const rateCode = code(RATE_SQL);
@@ -191,17 +191,20 @@ const rateCode = code(RATE_SQL);
 // and splices two readers; its ONE data write is flipping an evaluation that had already used 10 reports to complete (status + the completed event), never a ledger row.
 const LIMIT_MIGRATION = 'docs/free-report-limit-10.sql';
 const limitMigrationCode = code(LIMIT_MIGRATION);
+// docs/free-report-limit-100.sql (founder, 2026-10-15) moves the number 10 -> 100 and reopens evaluations that completed at the old limit (status only, guard trigger off for that one UPDATE); it never writes a ledger row.
+const LIMIT_MIGRATION_100 = 'docs/free-report-limit-100.sql';
+const limitMigration100Code = code(LIMIT_MIGRATION_100);
 // docs/da-owner-safeguards.sql (audit item D, 2026-10-08) is a seventh SQL file that names this layer: the owner's team list reads the invite table (open agent invites of
 // the asker's own brokerage) and joins the evaluation to find that brokerage; its preconditions check evaluation_invite_revoke exists (the owner's withdrawal IS that
-// function, called unchanged, with the owner as the actor) and its post-condition reads the free number (10). It writes no row of this layer: its writes are its own two
+// function, called unchanged, with the owner as the actor) and its post-condition reads the free number (100). It writes no row of this layer: its writes are its own two
 // tables and ending an agent's membership. test/da_owner_safeguards_pg proves that; test/da-owner-safeguards-structure.test.mjs pins its structure.
 const DA_SQL = 'docs/da-owner-safeguards.sql';
 const daCode = code(DA_SQL);
 const dmlTargets = (t) => { const x = t.replace(/'(?:[^']|'')*'/g, "''"); return [...x.matchAll(/\binsert\s+into\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\bupdate\s+(?:public\.)?(\w+)\s+\w*\s*set\b/gi), ...x.matchAll(/\bdelete\s+from\s+(?:public\.)?(\w+)/gi), ...x.matchAll(/\btruncate\s+(?:table\s+)?(?:public\.)?(\w+)/gi)].map((m) => m[1]).filter((t) => t !== 'on'); }; // 'on' is the trigger event of `before truncate on <table>`, not a table
-ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql'].sort())
+ok(JSON.stringify(namingOurs.sort()) === JSON.stringify([SQL_FILE, SAVED_SQL, DELIVERY_SQL, WATCH_SQL, BILLING_SQL, RATE_SQL, LIMIT_MIGRATION, LIMIT_MIGRATION_100, EVAL_READS, DA_SQL, 'docs/individual-agent-signup.sql'].sort())
    && dmlTargets(daCode).length >= 3 && dmlTargets(daCode).every((t) => /^(brokerage_member|share_view_window|billing_checkout_claim)$/.test(t)) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(?:public\.)?evaluation/i.test(daCode)
    && (daCode.match(/\bpublic\.evaluation_invite_revoke\(/g) || []).length === 2 && !/\bfrom public\.evaluation_invite_revoke|\bperform public\.evaluation_invite_revoke/.test(daCode) && /to_regprocedure\('public\.evaluation_invite_revoke\(uuid,uuid\)'\)/.test(daCode)
-   && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigrationCode)
+   && !/\b(insert\s+into|delete\s+from|truncate)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigrationCode) && !/\b(insert\s+into|delete\s+from|truncate|update)\s+(?:public\.)?evaluation_credit\b/i.test(limitMigration100Code)
    && [...new Set(rateCode.match(new RegExp(OURS.source, 'g')) || [])].join() === 'evaluation_report_limit' && dmlTargets(rateCode).length >= 1 && dmlTargets(rateCode).every((t) => t === 'report_rate_window')
    && dmlTargets(billingCode).length >= 2 && dmlTargets(billingCode).every((t) => /^brokerage_(subscription|paid_credit)$/.test(t))
    && !/\bexecute\b[^;]*\b(insert|update|delete)\b[^;]*\bevaluation(_credit)?\b/i.test(billingCode)
@@ -272,8 +275,8 @@ ok(DEFINERS.every((f) => /security definer set search_path = public, pg_temp/.te
   '5f: exactly eight functions are security definer — the eight a caller may run — and every function that touches a table pins its search_path; the trigger functions and the limit are not definers');
 
 // ── 6. the invariants, in the code ───────────────────────────────────────────────────────────────────────────────────────
-ok(/language sql immutable as \$\$ select 10 \$\$;/.test(SQL) && (SQL.match(/\b10\b/g) || []).length === 1,
-  '6: the number of free reports is defined ONCE (evaluation_report_limit() = 10); no other statement writes the number, so changing it is one edit and a second copy cannot drift');
+ok(/language sql immutable as \$\$ select 100 \$\$;/.test(SQL) && (SQL.match(/\b100\b/g) || []).length === 1,
+  '6: the number of free reports is defined ONCE (evaluation_report_limit() = 100); no other statement writes the number, so changing it is one edit and a second copy cannot drift');
 ok(/constraint evaluation_credit_pkey\s+primary key \(evaluation_id, ordinal\)/.test(BODY.evaluation_credit)
    && /constraint evaluation_credit_ordinal\s+check \(ordinal between 1 and public\.evaluation_report_limit\(\)\)/.test(BODY.evaluation_credit)
    && /constraint evaluation_credit_key_unique\s+unique \(evaluation_id, idempotency_key\)/.test(BODY.evaluation_credit)
