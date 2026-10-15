@@ -15,7 +15,12 @@ tomorrow, with the same directive, and nothing is lost, added, or pointed at the
   4. sitemaps: identical path sets and lastmods per file, hosts moved a -> b, no duplicate, no query-string url
   5. robots.txt: identical rules; Sitemap lines identical modulo host
   6. b contains no reference to a's origin (canonical, og:url, JSON-LD, sitemap, robots)
-  7. page-state baseline (sitemaps/page-state.json): identical per-page fingerprints, host moved a -> b
+  7. page-state baseline (sitemaps/page-state.json): identical per-page fingerprints, host moved a -> b. When b was GENERATED
+     under the Jody host (an activated build) its fingerprints legitimately differ, because a fingerprint hashes the page text
+     and that text names its own host. The difference is then PROVEN host-derived, page by page, never assumed: a's written
+     page is mapped to the Jody host and re-fingerprinted, and must equal b's stored fingerprint. A control runs first: a's page
+     re-fingerprinted UNMAPPED must reproduce a's own stored fingerprint, or that page cannot be proven and is reported. One
+     page that changed in any other way (text, robots, JSON-LD, a project record) fails the proof and is named.
 
 Exit 0 only when every check holds. Stdlib only.
 """
@@ -26,11 +31,57 @@ import json
 import re
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import page_semantics as _ps  # noqa: E402  (the ONE fingerprint definition; never re-implemented here)
 from urllib.parse import urlsplit
 
 A_HOST = "homesignal.net"
 B_HOST = "jodytracks.com"
 ALLOWED_ONLY_IN_A = re.compile(r"google[0-9a-f]+\.html")     # a site-verification token proves the OLD domain only
+
+
+def _page_file(root: Path, key: str) -> Path:
+    return root / (key.lstrip("/") + ("index.html" if key.endswith("/") else ""))
+
+
+def host_derived_fingerprint_problems(root_a: Path, da: dict, db: dict) -> tuple[list[str], int]:
+    """Prove, page by page, that b's fingerprints differ from a's ONLY because the page names another host.
+
+    Returns (problems, pages_proven). A page is proven when (control) a's own page, with the build day put back as the token the
+    renderer fingerprints, reproduces a's stored fingerprint, AND (proof) the same text with a's origin mapped to b's reproduces b's
+    stored fingerprint. A page failing the control is reported as unprovable, never skipped; a page failing the proof is reported as
+    changed. The pages must also agree on indexability."""
+    pa, pb = da.get("pages", {}), db.get("pages", {})
+    day = str(da.get("built_at", ""))[:10]
+    problems: list[str] = []
+    if sorted(pa) != sorted(pb):
+        return ["page-state page sets differ"], 0
+    if not day:
+        return ["page-state has no build day; the host proof cannot be run"], 0
+    proven = 0
+    for key in sorted(pa):
+        f = _page_file(root_a, key)
+        if not f.is_file():
+            problems.append(f"{key}: page file missing in tree a; cannot prove")
+            continue
+        text = f.read_text(encoding="utf-8")
+        ctl = None
+        for restore in (_ps.BUILD_DAY_TOKEN, _ps.NEUTRAL_AS_OF):
+            t = text.replace(day, restore)
+            if _ps.fingerprint(t) == pa[key]["h"]:
+                ctl = t
+                break
+        if ctl is None:
+            problems.append(f"{key}: control failed (tree a's own page does not reproduce its stored fingerprint); cannot prove")
+            continue
+        if pa[key].get("i") != pb[key].get("i"):
+            problems.append(f"{key}: indexability differs")
+            continue
+        if _ps.fingerprint(ctl.replace(f"https://{A_HOST}", f"https://{B_HOST}")) != pb[key]["h"]:
+            problems.append(f"{key}: fingerprint differs for a reason other than the host")
+            continue
+        proven += 1
+    return problems, proven
 
 
 def _walk(root: Path) -> dict[str, Path]:
@@ -164,7 +215,10 @@ def compare(a: Path, b: Path) -> dict:
             problems.append(f"page-state host: {da.get('host')} -> {db.get('host')}")
         strip = lambda d: {k: v for k, v in d.items() if k != "host"}
         if strip(da) != strip(db):
-            problems.append("page-state fingerprints differ beyond the host")
+            probs, proven = host_derived_fingerprint_problems(a, da, db)
+            stats["page_state_hashes_host_derived"] = proven
+            if probs:
+                problems.append("page-state fingerprints differ beyond the host: " + "; ".join(probs[:5]) + (f" (+{len(probs) - 5} more)" if len(probs) > 5 else ""))
         stats["page_state_pages"] = len(da.get("pages", da))
     return {"ok": not problems, "problems": problems, "stats": stats}
 

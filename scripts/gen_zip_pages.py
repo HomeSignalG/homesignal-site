@@ -54,6 +54,8 @@ RULE_D_MIN = 3                               # >= 3 publishable Development enti
 # silently treat Rule D as empty (that would noindex the 776 Development pages
 # while the job stayed green). Fixtures may opt out with --allow-missing-dev-plane.
 RULE_D_PLANE_MAX_AGE_HOURS = 36
+# A manual identity-only cutover dispatch may accept an older plane (pages.yml `plane_max_age_hours`); never longer than this.
+RULE_D_PLANE_MAX_AGE_CEILING_HOURS = 336
 SIB_CAP = 10                                 # sibling ZIP links per page (see link_siblings)
 WEATHER_AGENCY = "api.weather.gov"
 GN_CATEGORIES = ("Government & civic", "Planning & zoning")
@@ -277,7 +279,7 @@ def _merge_side_docs(path, side_docs, required):
 
 
 def load_dev_plane(path, *, required=True, now=None, cities_out=None, cities_path=None,
-                   projects_out=None, projects_path=None):
+                   projects_out=None, projects_path=None, max_age_hours=None):
     """Read the compact Development SEO plane.
 
     Production (required=True): a missing, unreadable, unstamped or stale plane
@@ -313,9 +315,12 @@ def load_dev_plane(path, *, required=True, now=None, cities_out=None, cities_pat
         if age is None:
             sys.exit("ERROR: Rule D plane has no parseable generated_at — "
                      "refusing to treat an undated snapshot as current")
-        if age > RULE_D_PLANE_MAX_AGE_HOURS:
+        limit = RULE_D_PLANE_MAX_AGE_HOURS if max_age_hours is None else max_age_hours
+        if not (0 < limit <= RULE_D_PLANE_MAX_AGE_CEILING_HOURS):
+            sys.exit(f"ERROR: plane max age {limit}h is outside (0, {RULE_D_PLANE_MAX_AGE_CEILING_HOURS}]")
+        if age > limit:
             sys.exit(f"ERROR: Rule D plane is stale ({age:.1f}h > "
-                     f"{RULE_D_PLANE_MAX_AGE_HOURS}h) — refusing to silently "
+                     f"{limit:g}h) — refusing to silently "
                      "drop Development indexability")
     if raw.get("ssr_authority") != "lib/project-type.js":
         sys.exit("ERROR: annotated plane is not from lib/project-type.js")
@@ -1809,10 +1814,15 @@ def main():
                     help="write the semantic delta (IndexNow notification set) here, outside the artifact")
     ap.add_argument("--build-id", default=os.environ.get("HS_BUILD_ID", ""))
     ap.add_argument("--commit", default=os.environ.get("GITHUB_SHA", ""))
+    ap.add_argument("--plane-max-age-hours", type=float, default=None,
+                    help="IDENTITY-ONLY CUTOVER: accept a Rule D plane up to this many hours old "
+                         f"(ceiling {RULE_D_PLANE_MAX_AGE_CEILING_HOURS}). Default: the 36h guard. Refused with --fixture.")
     ap.add_argument("--allow-missing-dev-plane", action="store_true",
                     help="fixture-only: a missing plane is {} (no Rule D). "
                          "Refused in production.")
     a = ap.parse_args()
+    if a.plane_max_age_hours is not None and a.fixture:
+        sys.exit("ERROR: --plane-max-age-hours is production-only (fixtures skip the freshness clock)")
     t0 = time.time()
     DEADLINE[0] = t0 + FETCH_BUDGET
     now_iso = a.now or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
@@ -1860,7 +1870,7 @@ def main():
     cities, projects = {}, {}
     d["_dev_plane"] = load_dev_plane(plane_path, required=plane_required, cities_out=cities,
                                      cities_path=cities_path, projects_out=projects,
-                                     projects_path=projects_path)
+                                     projects_path=projects_path, max_age_hours=a.plane_max_age_hours)
 
     ps.assert_token_absent(json.dumps(d, default=str) + json.dumps(cities, default=str)
                            + json.dumps(projects, default=str))

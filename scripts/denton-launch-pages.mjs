@@ -35,8 +35,20 @@ for (const z of ZIPS) {
         return {
           sites: s.length, development: dev.length, facility: s.length - dev.length,
           no_coords: dev.filter(x => x.lat == null || x.lng == null).length,
+          scopes_all: s.reduce((o, x) => { const k = (x && (x.relevance || 'none')) + '/' + (x && (x.scope || 'none')); o[k] = (o[k] || 0) + 1; return o; }, {}),
+          scopes: dev.reduce((o, x) => { o[x.scope || 'none'] = (o[x.scope || 'none'] || 0) + 1; return o; }, {}),
           no_record_url: dev.filter(x => !(x.record_url || x.url)).length,
           sample: dev.slice(0, 5).map(pick),
+          // every area-scope (jurisdiction-level) record, by source identity, so what a fix removes from the map is provable
+          area_sites: s.filter(x => x && x.scope === 'area').map(x => ({ rel: x.relevance || null, reg: x.source_registry_id || null, sid: x.source_id || x.case_number || null,
+            name: (x.name || x.label || x.title || '').slice(0, 90), url: x.record_url || x.url || null, type: x.type || null, status: x.status || null })),
+          point_sites: s.filter(x => x && x.scope === 'point').length,
+          counters: Object.fromEntries(['cFac', 'cDev', 'cOpen', 'cTot'].map(id => [id, (document.getElementById(id) || {}).textContent ?? null])),
+          lists: Object.fromEntries(['builtList', 'unknownList', 'apprList', 'propList'].map(id => {
+            const el = document.getElementById(id);
+            const rows = el ? [...el.children] : [];
+            return [id, { rows: rows.length, first: rows.slice(0, 3).map(r => (r.innerText || '').replace(/\s+/g, ' ').slice(0, 110)) }];
+          })),
           text_has_not_measured: /not measured yet|no mapped area|could not be read|couldn.t load/i.test(document.body.innerText || ''),
           leaflet_markers: document.querySelectorAll('.leaflet-marker-icon, .leaflet-interactive').length,
         };
@@ -56,6 +68,7 @@ for (const z of ZIPS) {
   console.error('[pages]', z, JSON.stringify(out[z].desktop.map || out[z].desktop.fatal).slice(0, 160));
 }
 await browser.close();
+if (process.env.OUT_PAGES) fs.writeFileSync(process.env.OUT_PAGES, JSON.stringify(out));
 console.log('----- BEGIN DENTON PAGES JSON -----');
 console.log(JSON.stringify(out));
 console.log('----- END DENTON PAGES JSON -----');

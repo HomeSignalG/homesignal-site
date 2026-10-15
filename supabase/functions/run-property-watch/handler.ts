@@ -27,7 +27,7 @@ import { readReportInputs } from '../_shared/report-run.ts';
 import { ReportUnreadable } from '../_shared/changes-since-report.ts';
 import { checkWatch, lookBackInstant, selectForEmail } from '../_shared/property-watch.ts';
 import type { SeenKey } from '../_shared/property-watch.ts';
-import { composeWatchEmail, WATCH_FROM } from '../_shared/watch-email.ts';
+import { composeWatchEmail, WATCH_FROM, WATCH_REPLY_TO } from '../_shared/watch-email.ts';
 import { EmailFailed, idempotencyKeyFor } from '../_shared/email-send.ts';
 import type { Message } from '../_shared/email-send.ts';
 import { corsFor, readBounded, reply, TOO_LARGE } from '../_shared/admin-gate.ts';
@@ -148,7 +148,7 @@ export async function processWatch(deps: Deps, w: Claimed): Promise<Outcome> {
     const to = await deps.recipientOf(w.user_id);
     if (!to) throw new NoRecipient('no address');
     const email = composeWatchEmail({ selection, partial: check.partial, reportNumber: opened.number, reportDate: opened.generated_at });
-    await deps.send({ from: WATCH_FROM, to, ...email }, await idempotencyKeyFor(w.watch_id, selection.told));
+    await deps.send({ from: WATCH_FROM, to, ...(WATCH_REPLY_TO ? { reply_to: WATCH_REPLY_TO } : {}), ...email }, await idempotencyKeyFor(w.watch_id, selection.told));
 
     stage = 'record';
     // Only now, after the provider accepted the email, is it recorded as told. A failure here leaves the changes untold, and the retry's

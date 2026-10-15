@@ -1,0 +1,4 @@
+{
+  "hold": false,
+  "note": "IndexNow is released for jodytracks.com (founder, 2026-10-15, after Search Console Change of Address was confirmed and the Jody host's own baseline matched: 0 URLs to notify). Consulted ONLY when the brand contract publishes the site as a non-HomeSignal identity. Fails closed: missing, unreadable or non-boolean means held; set hold=true in a reviewed commit to pause."
+}

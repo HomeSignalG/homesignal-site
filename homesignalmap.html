@@ -1442,7 +1442,10 @@ HS.onReady(function(){
   // a synthetic DISPLAY position instead: a deterministic golden-angle spread around the
   // page anchor (ZIP centroid / searched home), always inside the viewed radius. Placement
   // is presentation only — the popup says so; every fact on the dot comes from the record.
-  function mappable(s){ return s.scope==="point" || s.scope==="area"; }
+  // FOUNDER BAR (Denton launch, 2026-10-12): a dot means a precise project site. Jurisdiction-level (scope "area")
+  // records have no trustworthy coordinate, so they are NEVER drawn — they stay in the lists/counters above and
+  // below the map with their official links. placeAreaSites() is retained only so no other code path breaks.
+  function mappable(s){ return s.scope==="point"; }
   function placeAreaSites(sites, home){
     var area = sites.filter(function(s){ return s.scope==="area"; });
     var N = area.length;
@@ -2700,7 +2703,12 @@ HS.onReady(function(){
     // the one predicate (HS.isActiveUndecided). Both loaders drop the report's own
     // counts.proposed_active before render(), because that number describes the report's
     // radius set, not what is on screen; a caller that passes one on is still honoured.
-    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(prop) : prop.length;
+    // PROJECTS, NOT NOTICES (founder decision A, 2026-10-13): the tile says "projects", so it counts
+    // only the Proposed records that are projects with a source-published point. Area-scope items
+    // (hearing and agenda notices) stay in the Proposed rail under "Hearings and notices in this
+    // area" but are not projects and are not counted here.
+    var propPoints = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; });
+    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(propPoints) : propPoints.length;
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
       : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
          : propActive);
@@ -2816,7 +2824,7 @@ HS.onReady(function(){
     MAP_SITES = sites;                       // feed both 3D views the same (sourced) data
     // ZIP frame FIRST, from the records' own coordinates. A ZIP centroid is not a frame.
     ZIP_FRAME = ZIP_MODE && window.HS && HS.zipFrameFromSites ? HS.zipFrameFromSites(sites) : null;
-    placeAreaSites(sites, home);             // display positions for jurisdiction-level items
+    // (area-scope items are not given a display position: they are not drawn — see mappable())
     placeStackedPoints(sites, home);         // fan co-located precise points so none is hidden
     LAST_HOME = home;
     LAST_ADDR = ZIP_MODE ? ("ZIP " + ZIP_CODE) : (data.address || "This address");

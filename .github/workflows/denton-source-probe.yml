@@ -1,0 +1,27 @@
+name: denton-source-probe
+
+# DENTON STEP 6 — read-only verification of first-party permit / planning sources for Denton
+# County TX. Dispatch only (no schedule, no pull_request, no secrets). GET requests only, honest
+# User-Agent, robots.txt respected, no login / form / CAPTCHA handling. Results are in the job log.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: denton-source-probe
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: probe (read-only)
+        run: node scripts/denton-source-probe.mjs

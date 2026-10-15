@@ -26,9 +26,46 @@ def origin(contract_path: Path = CONTRACT) -> str:
     return o
 
 
+SOURCE_IDENTITY = "homesignal"   # the identity every COMMITTED, generated file is written as (scripts/brand_stage.py overlays the current one at build time)
+
+
+def source_origin(contract_path: Path = CONTRACT) -> str:
+    """The origin of the SOURCE identity (`homesignal`), whatever the contract's current identity is. Committed generated files
+    (sitemap.xml) are written with this one, never with origin(): after the Jody cutover origin() is Jody, and a Jody origin in
+    the committed source tree breaks the invariant that brand_stage.py is the ONLY place the public brand is applied. Unlike
+    origin() it does not require the identity to be active, because the source identity goes inactive at cutover."""
+    c = json.loads(Path(contract_path).read_text(encoding="utf-8"))
+    o = c["identities"][SOURCE_IDENTITY]["origin"].rstrip("/")
+    u = urlsplit(o)
+    if u.scheme != "https" or not u.netloc or u.path or u.query or u.fragment:
+        raise SystemExit(f"ERROR: brand contract source identity {SOURCE_IDENTITY!r} has no https origin: {o!r}")
+    return o
+
+
 def host(contract_path: Path = CONTRACT) -> str:
     return urlsplit(origin(contract_path)).netloc
 
 
+def other_origins(contract_path: Path = CONTRACT) -> list:
+    """Origins of every identity in the contract OTHER than the current one (sorted, https only). A brand migration changes the
+    host, so the previously published page state may legitimately live on one of these; callers use it to recognise a migration,
+    never to choose what to publish."""
+    c = json.loads(Path(contract_path).read_text(encoding="utf-8"))
+    cur = c["identities"][c["current_identity"]]["origin"].rstrip("/")
+    out = {i["origin"].rstrip("/") for i in c["identities"].values() if str(i.get("origin", "")).startswith("https://")}
+    return sorted(out - {cur})
+
+
+def identity(contract_path: Path = CONTRACT) -> str:
+    """The key of the identity the site PUBLISHES as (`homesignal` today). origin() has already refused a non-active one."""
+    origin(contract_path)
+    return json.loads(Path(contract_path).read_text(encoding="utf-8"))["current_identity"]
+
+
 if __name__ == "__main__":
-    print(origin())
+    import sys
+    what = sys.argv[1] if len(sys.argv) > 1 else "--origin"
+    fns = {"--origin": origin, "--host": host, "--identity": identity}
+    if what not in fns:
+        raise SystemExit(f"usage: brand_host.py [--origin|--host|--identity] (got {what!r})")
+    print(fns[what]())

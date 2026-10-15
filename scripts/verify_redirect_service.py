@@ -10,6 +10,10 @@
                    real HTTP and no redirect-following: it must answer the same way the simulator says it should.
   --require-https  with --base: refuse a non-https base (the real test must prove TLS).
   --query-order sorted  with --base: accept Render's measured key sorting (see sorted_query); default `exact` is unchanged.
+  --expect-apex-hop HOST  with --base: for probing the `www.` alias (founder-approved 2026-10-15: www -> apex -> jodytracks.com is
+                   acceptable). EVERY case, files included, must answer 301 -> https://HOST + the same path and query, byte for
+                   byte; the apex then redirects onward. It is the apex probe that proves the second hop, the DID document and
+                   robots.txt (the DID identity is the apex, never www). BASE must not itself be HOST.
 
 Cases come from one list (paths a crawler or a resident really uses). Exit 0 only when every case holds.
 Stdlib only.
@@ -165,10 +169,31 @@ class _NoFollow(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def probe(base: str, d: Path | None, require_https: bool = False, query_order: str = "exact") -> list[str]:
+def probe_apex_hop(base: str, apex: str) -> list[str]:
+    """The alias host: every case is a permanent redirect to the SAME path+query on the apex (no sorting, no rewriting)."""
+    host = urlsplit(base).netloc.lower()
+    if host == apex.lower():
+        return [f"base {base} is the apex itself; --expect-apex-hop is for the www alias"]
+    bad = []
+    op = urllib.request.build_opener(_NoFollow)
+    for req, _kind, _want in CASES:
+        try:
+            r = op.open(urllib.request.Request(base.rstrip("/") + req, headers={"User-Agent": "redirect-verify"}), timeout=20)
+            status, loc = r.status, r.headers.get("Location")
+        except urllib.error.HTTPError as e:
+            status, loc = e.code, e.headers.get("Location")
+        want = f"https://{apex}{req}"
+        if status != 301 or loc != want:
+            bad.append(f"{req}: got {status} -> {loc}, want 301 -> {want}")
+    return bad
+
+
+def probe(base: str, d: Path | None, require_https: bool = False, query_order: str = "exact", apex_hop: str | None = None) -> list[str]:
     bad = []
     if require_https and not base.startswith("https://"):
         return [f"base {base} is not https; the real test must prove TLS"]
+    if apex_hop:
+        return probe_apex_hop(base, apex_hop)
     host = urlsplit(base).netloc.lower()
     op = urllib.request.build_opener(_NoFollow)
     for req, kind, want in CASES:
@@ -200,6 +225,8 @@ def main(argv=None) -> int:
     ap.add_argument("--query-order", choices=("exact", "sorted"), default="exact",
                     help="exact (default): the Location must carry the original query string byte for byte. sorted: the original "
                          "pairs stable-sorted by key, values untouched (what Render measurably does; founder-approved 2026-10-13)")
+    ap.add_argument("--expect-apex-hop", metavar="HOST",
+                    help="probe the www alias: every case must be 301 -> https://HOST + the same path and query (see the module doc)")
     a = ap.parse_args(argv)
     if not (a.simulate or a.base):
         ap.error("give --simulate DIR and/or --base URL")
@@ -207,7 +234,7 @@ def main(argv=None) -> int:
     if a.simulate:
         bad += [f"[rules] {b}" for b in simulate(Path(a.simulate))]
     if a.base:
-        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None, a.require_https, a.query_order)]
+        bad += [f"[live] {b}" for b in probe(a.base, Path(a.files) if a.files else None, a.require_https, a.query_order, a.expect_apex_hop)]
     print(json.dumps({"ok": not bad, "cases": len(CASES), "problems": bad}, indent=2))
     return 0 if not bad else 1
 

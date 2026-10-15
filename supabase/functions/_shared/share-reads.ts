@@ -20,6 +20,7 @@ import { DataUnavailable } from './service-rest.ts';
 import type { ServiceRpc } from './service-rest.ts';
 import { hashShareToken, isWellFormedToken, newShareToken } from './report-share.ts';
 import { UUID } from './evaluation-reads.ts';
+import { PUBLIC_ORIGIN } from './brand-origins.generated.ts';
 
 /** The report is not one of the caller's own brokerage's, does not exist, or the brokerage has no standing to share it. All one answer. */
 export class ShareNotFound extends Error {}
@@ -30,7 +31,7 @@ export class ShareLimitReached extends Error {}
  * THE share link: the ONE place its form is written. The token rides in the URL FRAGMENT, so no server, log or referrer ever receives it.
  * The page that reads it is shared-report.html, which is noindex, disallowed in robots.txt, linked from nowhere and sends no referrer.
  */
-export const SHARE_PAGE = 'https://homesignal.net/shared-report.html';
+export const SHARE_PAGE = PUBLIC_ORIGIN + '/shared-report.html';
 export function shareLink(token: string): string {
   if (!isWellFormedToken(token)) throw new DataUnavailable('shape');
   return SHARE_PAGE + '#share=' + token;

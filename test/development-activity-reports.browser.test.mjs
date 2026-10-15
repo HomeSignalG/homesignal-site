@@ -251,6 +251,9 @@ const server = createServer(async (req, res) => {
   // raised ERR_HTTP_HEADERS_SENT and killed the whole test process - a crash that only fires when such a request races the run.
   let body;
   try { body = await readFile(p); } catch { res.writeHead(404).end('not found'); return; }
+  // The deployed page is the SOURCE page after the brand overlay, which widens its escaped HomeSignal origin pattern to accept both hosts
+  // (brand_stage.py ESC_ORIGIN_RE). Apply exactly that one rule here, because the invite link the server builds now names the Jody origin.
+  if (extname(p) === '.html') body = Buffer.from(String(body).split('https:\\/\\/homesignal\\.net').join('https:\\/\\/(?:homesignal\\.net|jodytracks\\.com)'));
   res.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }).end(body);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -275,7 +278,8 @@ async function open({ compare = true, w = world(), signedIn = true, hash = '', w
     // Compare is hidden at launch (COMPARE_AT_LAUNCH = false in the page). The comparison tests below keep proving the engine and its UI by serving the page with the
     // switch ON (open() with compare: true, the default); the launch section (N) opens it exactly as shipped (compare: false).
     if (compare && url.split('?')[0].endsWith(PAGE)) {
-      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;');
+      const html = (await readFile(join(root, PAGE.slice(1)), 'utf8')).replace('var COMPARE_AT_LAUNCH = false;', 'var COMPARE_AT_LAUNCH = true;')
+        .split('https:\\/\\/homesignal\\.net').join('https:\\/\\/(?:homesignal\\.net|jodytracks\\.com)'); // the brand overlay's origin rule, as above
       if (!html.includes('COMPARE_AT_LAUNCH = true;')) throw new Error('the launch switch is not in the page');
       return route.fulfill({ status: 200, contentType: 'text/html', body: html });
     }
@@ -352,7 +356,7 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   // the link exactly as the trial function hands it to the admin who created the trial (build step 5d): its path is this page and its
   // fragment is what this page reads, so a change to either half of the invite link fails here
   const link = new URL(E.inviteLink(TOKEN));
-  ok(link.origin === 'https://homesignal.net' && link.pathname === PAGE, '1-0 the invite link the server makes points at this page', link.href);
+  ok(link.origin === 'https://jodytracks.com' && link.pathname === PAGE, '1-0 the invite link the server makes points at this page', link.href);
   const { ctx, page, errors, trials, foreign } = await open({ w, signedIn: false, hash: link.hash });
   ok((await page.evaluate(() => location.hash)) === '' && !(await page.evaluate(() => location.href)).includes('hse1_'), '1a the invite token is removed from the address bar on load');
   ok(/join your brokerage/.test(await text(page, '#trial-count')) && trials.length === 0, '1b signed out, the page asks the person to sign in to join, and calls nothing');
@@ -913,7 +917,7 @@ const labelLine = (page) => page.$eval('#report .da-rv-label', (e) => e.textCont
 // The real manage-shared-report handler (and the real link form) behind a fake ledger. What is proved here is the PAGE: when it offers sharing,
 // that it shows the link once and keeps it nowhere, that it withdraws a link, and that what it sends carries nothing the client must not
 // see. Who may share, for how long and whether a link works are the database's, proved by test/report_share_delivery_pg.
-const LINK = /^https:\/\/homesignal\.net\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
+const LINK = /^https:\/\/jodytracks\.com\/shared-report\.html#share=[A-Za-z0-9_-]{43}$/;
 const shareHidden = (page) => page.$eval('#share', (e) => e.hidden);
 // The card's own "Make a client link" button is gone (founder, 2026-10-11): the report's Share with Client action is the one entry point. This makes a link the way an agent does,
 // and closes the popup so the next step can reach the page. The old button always made a NEW link, so a link already on screen is cleared first (the action reuses it).
@@ -1635,12 +1639,12 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page, errors, foreign, billingCalls, checkouts } = await open({ w });
   await waitBilling(page, /Free trial/);
   const t = await billingText(page);
-  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(t) && /10 free reports are separate from the plan/.test(t),
-    '12a an owner with no plan sees the Billing card: the free trial, and the $79/month offer in the landing page\'s own words (100 new reports each month, cancel anytime)', t);
+  ok(await billingShown(page) && /Billing/.test(t) && /Free trial/.test(t) && /Paid plans are coming\./.test(t) && /10 free reports are separate from the plan/.test(t),
+    '12a an owner with no plan sees the Billing card: the free trial, and the "Paid plans are coming" line (free-only, founder 2026-10-15)', t);
   ok(billingCalls.length === 1 && billingCalls[0].body.action === 'status' && billingCalls[0].auth === 'Bearer user-token' && JSON.stringify(billingCalls[0].body) === '{"action":"status"}',
     '12b the plan is read with ONE status call carrying the person\'s own token and nothing else', billingCalls.map((c) => c.body));
-  ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe for \$79\/month$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe for $79/month"');
-  ok(await page.$eval('#trial-cta', (e) => !e.closest('#trial').hidden && !e.parentElement.hidden && e.textContent === 'Subscribe — $79/month'), '12c3 the status tile itself carries "Subscribe — $79/month" while free reports remain');
+  ok(await page.$eval('#subscribe', (e) => !e.hidden && /^Subscribe$/.test(e.textContent.trim())), '12c the owner is offered "Subscribe" (no price; free-only copy)');
+  ok(await page.$eval('#trial-cta', (e) => !e.closest('#trial').hidden && !e.parentElement.hidden && e.textContent === 'Subscribe'), '12c3 the status tile itself carries "Subscribe" while free reports remain and checkout is available');
   ok(!(await page.content()).includes(BKID) && !(await page.evaluate(() => document.body.innerText)).includes(BKID), '12c2 the brokerage\'s id is nowhere on the page');
   await page.click('#subscribe');
   await page.waitForFunction(() => /checkout/i.test(document.title), null, { timeout: 8000 }).catch(() => {});
@@ -1663,11 +1667,11 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 
   o = await open({ w: world({ role: 'owner', configured: false }) });
   await waitBilling(o.page, /Free trial/);
-  ok(await o.page.$eval('#subscribe', (e) => !e.hidden && e.disabled && /^Subscribe for \$79\/month$/.test(e.textContent.trim())) && /Subscribing is not open yet\./.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
-    '12f with the processor not set up the owner SEES the Subscribe button, disabled, beside "Subscribing is not open yet" (and the free trial still works)');
-  await o.page.evaluate(() => document.getElementById('subscribe').click()); // a script presses the disabled button anyway
+  ok(await o.page.$eval('#subscribe', (e) => e.hidden) && await o.page.$eval('#trial-cta', (e) => e.parentElement.hidden) && /Paid plans are coming\./.test(await billingText(o.page)) && !/Subscribing is not open yet/.test(await billingText(o.page)) && (await text(o.page, '#trial-count')).length > 0,
+    '12f with the processor not set up (free-only, founder 2026-10-15) there is NO Subscribe button anywhere, the card says paid plans are coming, and the free trial still works');
+  await o.page.evaluate(() => document.getElementById('subscribe').click()); // a script presses the hidden button anyway
   await settled(o.page);
-  ok(o.checkouts.length === 0 && o.billingCalls.length === 1, '12f2 pressing it asks for nothing: no checkout is requested while the processor is not set up');
+  ok(o.checkouts.length === 0 && o.billingCalls.length === 1, '12f2 pressing the hidden button asks for nothing: no checkout is requested while the processor is not set up');
   await o.ctx.close();
 
   const w = world({ role: 'owner' });
@@ -1706,13 +1710,13 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     '12i a brokerage whose free reports are used and whose plan is paid is told how many of the month\'s reports are left and when the month ends', [await text(page, '#trial-count'), await text(page, '#trial-sub')]);
   const t = await billingText(page);
   ok(await page.$eval('#trial-cta', (e) => !e.parentElement.hidden && e.textContent === 'Manage plan'), '12j2 once subscribed the tile CTA is "Manage plan"');
-  ok(/\$79\/month plan: 3 of 100 reports used this month/.test(t) && /kept as they were/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, and no second checkout');
+  ok(/Paid plan: 3 of 100 reports used this month/.test(t) && /kept as they were/.test(t) && await page.$eval('#subscribe', (e) => e.hidden), '12j the Billing card shows the plan, the month\'s figures, and no second checkout');
   ok(await page.$eval('#go', (e) => !e.disabled), '12k "Make report" is open: the free trial is complete but the plan is paid');
   await make(page);
   ok(reports.length === 1 && V4.test(reports[0].body.idempotency_key), '12k2 a report made on the paid plan carries a random key, like every member report', reports.map((r) => r.body));
   ok(w.paidUsed === 4 && w.used === 10 && /^4 of 100 reports used$/.test(await text(page, '#trial-count')) && /used 1 of your brokerage’s 100 reports this month/.test(await text(page, '#creditnote')),
     '12l the report used one of the MONTH\'s (4 used, 96 left), the 10 free ones are untouched, and the page says which it used', [w.paidUsed, w.used, await text(page, '#trial-count'), await text(page, '#creditnote')]);
-  ok(/\$79\/month plan: 4 of 100 reports used this month/.test(await billingText(page)), '12l2 the Billing card follows the report, from the database\'s own answer');
+  ok(/Paid plan: 4 of 100 reports used this month/.test(await billingText(page)), '12l2 the Billing card follows the report, from the database\'s own answer');
   // a retry of a finished paid report
   ok(foreign.length === 0 && errors.length === 0, '12m nothing else was fetched and the page raised no error', [foreign, errors]);
   await ctx.close();
@@ -1738,7 +1742,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     const w = world({ role: 'owner', used: 10, plan: state });
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
-    ok(await page.$eval('#trial-cta', (e, st) => !e.parentElement.hidden && e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe — $79/month'), state), '12p2 a ' + state + ' plan on a used-up trial: the tile still carries the right commercial action');
+    ok(await page.$eval('#trial-cta', (e, [st, shown]) => (!e.parentElement.hidden) === shown && (!shown || e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe')), [state, state !== 'unknown' && state !== 'trialing']), '12p2 a ' + state + ' plan on a used-up trial: the tile carries "Manage plan" (past due), "Subscribe" where a new subscription is possible, and NOTHING while the status is unclear (free-only, founder 2026-10-15)');
     ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
@@ -1746,7 +1750,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const w = world({ role: 'owner', used: 10, plan: 'canceled' });
   const { ctx, page } = await open({ w });
   await waitBilling(page, /ended/);
-  ok(await page.$eval('#subscribe', (e) => /^Subscribe again for \$79\/month$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again for $79/month"');
+  ok(await page.$eval('#subscribe', (e) => /^Subscribe again$/.test(e.textContent.trim())), '12q a brokerage whose subscription ended is offered "Subscribe again"');
   await ctx.close();
 }
 {
@@ -1763,23 +1767,23 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // the provider has confirmed a payment: the page learns it only by asking
   w.plan = 'paid'; w.paidUsed = 0; w.used = 10;
   await page.click('#billing-refresh');
-  await waitBilling(page, /\$79\/month plan/);
-  ok(/\$79\/month plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^0 of 100 reports used$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
+  await waitBilling(page, /Paid plan:/);
+  ok(/Paid plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^0 of 100 reports used$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
     '12u2 once the database says the plan is paid, "Check again" shows it, and "Make report" opens: the page changed nothing until it was told');
   // the plan can no longer be read: the card says so and forgets the plan it showed (never the old figures)
   w.billingFails = true;
   await page.click('#billing-refresh');
   await waitBilling(page, /could not be read/);
-  ok(/Your plan could not be read just now/.test(await billingText(page)) && !/\$79\/month plan: /.test(await page.$eval('#billing-plan', (e) => e.textContent)) && await page.$eval('#subscribe', (e) => e.hidden),
+  ok(/Your plan could not be read just now/.test(await billingText(page)) && !/Paid plan: /.test(await page.$eval('#billing-plan', (e) => e.textContent)) && await page.$eval('#subscribe', (e) => e.hidden),
     '12u3 when the plan can no longer be read the card says so and forgets the plan it showed (never the old figures, never "paid")');
   w.billingFails = false;
   await page.click('#billing-refresh');
-  await waitBilling(page, /\$79\/month plan/);
+  await waitBilling(page, /Paid plan:/);
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
   await page.evaluate(() => { window.__sb.session = null; });
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
   await page.waitForFunction(() => document.getElementById('billing').hidden, null, { timeout: 8000 }).catch(() => {});
-  ok(await page.$eval('#billing', (e) => e.hidden) && (await billingText(page)).includes('Billing') && !/\$79\/month plan|3 of 100|0 of 100/.test(await page.$eval('#billing-plan', (e) => e.textContent)),
+  ok(await page.$eval('#billing', (e) => e.hidden) && (await billingText(page)).includes('Billing') && !/Paid plan|3 of 100|0 of 100/.test(await page.$eval('#billing-plan', (e) => e.textContent)),
     '12v signing out hides the Billing card and forgets the plan, so it is never left for the next person');
   await ctx.close();
 }
@@ -1787,7 +1791,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12v2. a different person signing in on the same tab: the first person's plan is gone in the same moment
   const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 3 });
   const { ctx, page } = await open({ w });
-  await waitBilling(page, /\$79\/month plan/);
+  await waitBilling(page, /Paid plan:/);
   const swap = await page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
@@ -1862,7 +1866,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   const { ctx, page } = await open({ w });
   await page.waitForFunction(() => !document.getElementById('signup').hidden, null, { timeout: 8000 }).catch(() => {});
   ok(await page.$eval('#signup', (e) => !e.hidden) && /not part of a trial/.test(await text(page, '#trial-count')), '14a signed in with no account: the signup card shows');
-  ok(/10 free Development Activity reports, then \$79\/month for 100 reports/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
+  ok(/10 free Development Activity reports\. Paid plans are coming/.test(await text(page, '#signup')) && await page.$eval('#signup-quote', (a) => a.getAttribute('href') === 'contact.html'),
     '14b it states the offer in the founder\'s words and links brokerages to the contact page');
   await page.click('#signup-go');
   ok(w.signedUp.length === 0 && /Type your name/.test(await text(page, '#signup-status')), '14c an empty name is stopped on the page: nothing is sent');
@@ -2263,7 +2267,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   ok(t.create < t.actions && t.actions < t.report && t.report < t.saved && t.saved < t.account, 'L6a at 390px the order is Create, this report\'s tools, the report, Saved reports, Account', t);
   ok(await noSideways(page), 'L6b at 390px nothing scrolls sideways');
   { const u = await page.evaluate(() => ({ trialInHeader: document.querySelector('header.sitebar').contains(document.getElementById('trial')), tr: document.getElementById('trial').getBoundingClientRect().height, ctaVisible: document.getElementById('trial-cta').getClientRects().length > 0, count: document.getElementById('trial-count').textContent, cta: document.getElementById('trial-cta').textContent, addr: document.getElementById('addr').getBoundingClientRect(), label: document.getElementById('label').getBoundingClientRect(), go: document.getElementById('go').getBoundingClientRect() }));
-    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe — $79/month', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
+    ok(u.trialInHeader && u.ctaVisible && u.tr < 80 && /of 10 free reports used/.test(u.count) && u.cta === 'Subscribe', 'L6c at 390px usage and Subscribe stay visible and compact in the site bar', u);
     ok(u.addr.bottom <= u.label.top + 1 && u.label.bottom <= u.go.top + 1 && Math.abs(u.addr.width - u.go.width) < 4, 'L6d at 390px the form stacks: address, client label, then a full-width Generate report', u); }
   await ctx.close();
 }
@@ -2283,8 +2287,9 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 
 // ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
 for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
-  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true, compare: false });
+  const { ctx, page, errors } = await open({ w: world({ role: 'owner' }), width: w, height: h, signedIn: true, compare: false });   // an owner: free-only copy shows the plan action only where checkout is available
   await waitCount(page, /free reports left/);
+  await waitBilling(page, /Free trial/);
   await make(page, A1);
   await waitBoxes(page, 1);
   if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }

@@ -445,7 +445,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 <main class="wrap">
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
-    <p class="sub">For individual real estate agents: 10 free Development Activity reports, then $79/month for 100 reports. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
+    <p class="sub">For individual real estate agents: 10 free Development Activity reports. Paid plans are coming. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
     <form id="sf" novalidate>
       <label>Your name, shown at the top of your reports<input type="text" id="signup-name" maxlength="120" autocomplete="name" placeholder="Pat Agent"></label>
       <button type="submit" class="go" id="signup-go">Create my account</button>
@@ -574,7 +574,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
         <p class="plan" id="billing-plan"></p>
         <p class="sub" id="billing-sub"></p>
         <div class="row">
-          <button type="button" class="go" id="subscribe" hidden>Subscribe for $79/month</button>
+          <button type="button" class="go" id="subscribe" hidden>Subscribe</button>
           <button type="button" class="go ghost" id="billing-refresh">Check again</button>
         </div>
         <p class="hint" id="billing-hint" hidden>Back from payment? Press Check again.</p>
@@ -634,8 +634,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </div>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/da-report-view.js?v=1304916f"></script>
-<script src="lib/da-report-compare.js?v=a3609f97"></script>
+<script src="lib/da-report-view.js?v=226679f8"></script>
+<script src="lib/da-report-compare.js?v=a165ca6d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -803,7 +803,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (n > 0) {
         count.className = 'count';
         count.textContent = typeof plan.credits_used === 'number' && typeof plan.credit_limit === 'number' ? plan.credits_used + ' of ' + plan.credit_limit + ' reports used' : (n === 1 ? '1 report left this month' : n + ' reports left this month');
-        sub.textContent = (mine() ? 'Your $79/month plan includes 100 new reports each month' : "Your brokerage's $79/month plan includes 100 new reports each month, shared by everyone on it") + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
+        sub.textContent = (mine() ? 'Your plan includes 100 new reports each month' : "Your brokerage's plan includes 100 new reports each month, shared by everyone on it") + (end ? '; this month ends ' + end : '') + '. A report with no development data for its area (“No data ingested”) does not use one.';
       } else {
         count.className = 'count out';
         count.textContent = typeof plan.credit_limit === 'number' ? plan.credit_limit + ' of ' + plan.credit_limit + ' reports used' : 'All 100 reports for this month are used';
@@ -826,9 +826,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     ctaSay('', false);
     if (a !== 'trial' && a !== 'complete') { wrap.hidden = true; return; }
     var manage = !!plan && (plan.state === 'paid' || plan.state === 'past_due');
-    btn.textContent = manage ? 'Manage plan' : 'Subscribe — $79/month';
+    btn.textContent = manage ? 'Manage plan' : 'Subscribe';
     btn.dataset.mode = manage ? 'manage' : 'subscribe';
-    wrap.hidden = false;
+    wrap.hidden = !(manage || checkoutState === 'available');   // free-only until a payment processor is connected: no Subscribe prompt while subscribing is closed
   }
   async function trialCtaPressed(){
     if ($('trial-cta').dataset.mode === 'manage') { $('account').open = true; $('billing').hidden = false; $('billing').scrollIntoView(); return; }
@@ -859,12 +859,12 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       return;
     }
     var owner = plan.role === 'owner';
-    var offer = mine() ? ' $79/month gives you 100 new reports each month. Cancel anytime.' : ' $79/month gives your brokerage 100 new reports each month. Cancel anytime.';
+    var offer = ' Paid plans are coming.';
     var who = owner ? '' : " Only your brokerage's owner can subscribe.";
-    var closed = owner && checkoutState === 'not_set_up' ? ' Subscribing is not open yet.' : '';
+    var closed = '';
     if (plan.state === 'paid') {
       var end = monthEndWords();
-      p.textContent = '$79/month plan: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
+      p.textContent = 'Paid plan: ' + plan.credits_used + ' of ' + plan.credit_limit + ' reports used this month';
       sub.textContent = (end ? 'This month ends ' + end + '. ' : '') + "The plan's reports are separate from your brokerage's " + freeWords() + ", which are kept as they were.";
       return;
     }
@@ -883,8 +883,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     }
     // The owner always SEES the button where a new subscription would be possible. Before the payment provider is set up it is shown disabled
     // (checkout 'not_set_up'): it cannot be pressed, and subscribe() refuses anything but 'available' regardless. Every other reader sees none.
-    var shown = owner && (checkoutState === 'available' || checkoutState === 'not_set_up');
-    if (shown) { buy.textContent = plan.state === 'canceled' ? 'Subscribe again for $79/month' : 'Subscribe for $79/month'; buy.disabled = checkoutState !== 'available'; buy.hidden = false; }
+    var shown = owner && checkoutState === 'available';
+    if (shown) { buy.textContent = plan.state === 'canceled' ? 'Subscribe again' : 'Subscribe'; buy.disabled = checkoutState !== 'available'; buy.hidden = false; }
     $('billing-hint').hidden = false;
   }
   /** Ask the billing function for the plan. A failure leaves no plan (never "paid"), and the card says it could not be read. */

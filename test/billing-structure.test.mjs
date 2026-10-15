@@ -190,7 +190,7 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
 {
   const page = read('development-activity-reports.html');
   const js = stripJs(page.slice(page.indexOf('<script>\n// ====')));
-  ok(page.length > 30000 && /id="billing"/.test(page) && /id="subscribe"/.test(page) && /Subscribe for \$79\/month/.test(page), '4-control: the page carries the Billing card and its button');
+  ok(page.length > 30000 && /id="billing"/.test(page) && /id="subscribe"/.test(page) && /id="subscribe"[^>]*hidden>Subscribe<\/button>/.test(page), '4-control: the page carries the Billing card and its button');
   ok(count(js, /location\.assign\(/g) === 1 && js.indexOf('checkoutOk(b.url)') > 0 && js.indexOf('checkoutOk(b.url)') < js.indexOf('location.assign(b.url)'),
     '4a the browser is sent anywhere by ONE call, after the address passed the page\'s own check');
   ok(/h === 'lemonsqueezy\.com' \|\| \/\\\.lemonsqueezy\\\.com\$\/\.test\(h\)/.test(js) && /u\.protocol === 'https:' && !u\.username && !u\.password/.test(js),
@@ -200,11 +200,10 @@ ok([BR, LB, ...Object.values(MB), ...Object.values(WB)].every((t) => t.length > 
   ok(!/credits_remaining\s*[-+]\s*1|credits_used\s*\+\s*1|plan\.credits_(used|remaining)\s*(\+\+|--|[-+]=)/.test(js),
     '4d the page never works out a count: every figure it shows is the one the database gave');
   const landing = read('development-activity.html');
-  ok(!/manage-billing|lemonsqueezy|checkout/i.test(stripJs(landing.replace(/<!--[\s\S]*?-->/g, ''))) && /<a class="mbtn da-join" href="development-activity-reports\.html#billing" id="daJoin" data-cta="join">Join for \$79\/month<\/a>/.test(landing),
-    '4e the landing page still makes NO checkout and calls no billing function or processor; its Join for $79/month (founder, 2026-10-06) is a plain link to the Reports page Billing card, where the owner presses Subscribe');
-  const landingPrice = /\$79\/month/.test(landing) && /100 new Development Activity reports each month/.test(landing) && /Cancel anytime\./.test(landing);
-  ok(landingPrice && /\$79\/month gives your brokerage 100 new reports each month\. Cancel anytime\./.test(page),
-    '4f the page\'s offer says the same thing as the landing page: $79/month, 100 new reports each month, cancel anytime');
+  ok(!/manage-billing|lemonsqueezy|checkout/i.test(stripJs(landing.replace(/<!--[\s\S]*?-->/g, ''))) && !/da-join|data-cta="join"/.test(landing),
+    '4e the landing page makes NO checkout, calls no billing function or processor, and (free-only, founder 2026-10-15) carries no Join link');
+  ok(!/\$\d/.test(landing.replace(/<!--[\s\S]*?-->/g, '')) && /Paid plans are coming\./.test(page),
+    '4f free-only (founder, 2026-10-15): the landing page shows no price and the Reports page offer says only that paid plans are coming');
 }
 
 // ---- 5. the wiring and the written record ------------------------------------------------------------------------------------------------------

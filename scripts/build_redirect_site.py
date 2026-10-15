@@ -33,7 +33,7 @@ TOML = '[build]\n  publish = "."\n'
 
 def target_origin() -> str:
     c = json.loads(CONTRACT.read_text(encoding="utf-8"))
-    return c["identities"][c["future_identity"]]["origin"].rstrip("/")
+    return c["identities"]["jody"]["origin"].rstrip("/")  # the Jody origin in BOTH contract versions (v2 makes future_identity homesignal)
 
 
 def keep_files() -> list[str]:

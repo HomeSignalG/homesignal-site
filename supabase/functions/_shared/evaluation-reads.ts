@@ -12,6 +12,7 @@
 import { DataUnavailable } from './service-rest.ts';
 import type { ServiceRpc } from './service-rest.ts';
 import type { TrialState } from './admin-gate.ts';
+import { PUBLIC_ORIGIN } from './brand-origins.generated.ts';
 
 /** The invite cannot be used: unknown, malformed, expired, revoked, already used by someone else, or its trial has ended. */
 export class InviteUnusable extends Error {}
@@ -39,7 +40,7 @@ export const INVITE_TOKEN = /^hse1_[0-9a-f]{64}$/;
  * THE invite link: the ONE place its form is written (build step 5d). The token rides in the URL FRAGMENT, which a browser never sends
  * to any server; the customer page (development-activity-reports.html) reads it from there and removes it from the address bar.
  */
-export const INVITE_PAGE = 'https://homesignal.net/development-activity-reports.html';
+export const INVITE_PAGE = PUBLIC_ORIGIN + '/development-activity-reports.html';
 export function inviteLink(token: string): string {
   if (!INVITE_TOKEN.test(token)) throw new DataUnavailable('shape');
   return INVITE_PAGE + '#invite=' + token;

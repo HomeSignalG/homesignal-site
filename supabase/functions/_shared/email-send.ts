@@ -14,7 +14,7 @@ export class EmailFailed extends Error {}
 
 export const RESEND_URL = 'https://api.resend.com/emails';
 
-export type Message = { from: string; to: string; subject: string; text: string; html: string };
+export type Message = { from: string; to: string; subject: string; text: string; html: string; reply_to?: string };
 
 const ADDRESS = /^[^\s@<>()",;:\\]+@[^\s@<>()",;:\\]+\.[^\s@<>()",;:\\]+$/;
 export const isMailable = (v: unknown): v is string => typeof v === 'string' && v.length <= 254 && ADDRESS.test(v);
@@ -39,7 +39,8 @@ export async function sendEmail(fetchFn: FetchFn, apiKey: string, m: Message, id
     r = await fetchFn(RESEND_URL, {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-      body: JSON.stringify({ from: m.from, to: [m.to], subject: m.subject, text: m.text, html: m.html }),
+      // reply_to is sent ONLY when the message carries one, so a message without it is byte-for-byte what it has always been
+      body: JSON.stringify({ from: m.from, to: [m.to], subject: m.subject, text: m.text, html: m.html, ...(m.reply_to ? { reply_to: m.reply_to } : {}) }),
     });
   } catch { throw new EmailFailed('network'); }
   if (!r.ok) throw new EmailFailed('http ' + r.status);

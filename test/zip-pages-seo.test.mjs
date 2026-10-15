@@ -22,22 +22,22 @@ const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fai
 const STAGED_SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://homesignal.net/</loc>
+    <loc>https://jodytracks.com/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://homesignal.net/community.html?zip=01001</loc>
+    <loc>https://jodytracks.com/community.html?zip=01001</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://homesignal.net/community.html?zip=01002</loc>
+    <loc>https://jodytracks.com/community.html?zip=01002</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://homesignal.net/homesignalmap.html?zip=01002</loc>
+    <loc>https://jodytracks.com/homesignalmap.html?zip=01002</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
@@ -94,7 +94,7 @@ ok(wxOnly.includes('Wind advisory'), '...while weather is still DISPLAYED (and s
 ok(devFail.includes('<meta name="robots" content="index, follow"'),
    'Alerts PASS + development FAIL is indexable — page-purpose separation');
 ok(!a.includes('RETRACTED'), 'an actively retracted Local News item is excluded');
-ok(a.includes('rel="canonical" href="https://homesignal.net/community/01001/"'), 'canonical is the ZIP path');
+ok(a.includes('rel="canonical" href="https://jodytracks.com/community/01001/"'), 'canonical is the ZIP path');
 ok(a.includes('<h1>01001 · Agawam (01001), MA</h1>'), 'ZIP-specific H1 in the initial HTML');
 ok(a.includes('<title>Agawam (01001), MA'), 'ZIP-specific title in the initial HTML');
 ok(/<meta name="description" content="[^"]{40,}"/.test(a), 'ZIP-specific meta description');
@@ -201,7 +201,7 @@ ok(!/homesignalmap\.html\?zip=/.test(sm),
    'the noindex development URLs are dropped from the artifact sitemap');
 ok(man.sitemap_dev_urls_removed === 1,
    'the manifest records how many development URLs were dropped (fixture stages 1)');
-ok(sm.includes('<loc>https://homesignal.net/</loc>'), 'static URLs survive the rewrite');
+ok(sm.includes('<loc>https://jodytracks.com/</loc>'), 'static URLs survive the rewrite');
 
 // ---- 8b. SHARING + STRUCTURED DATA ------------------------------------------------------
 // Added 2026-09-19. The homepage carried Open Graph and these documents did not, so every
@@ -215,9 +215,9 @@ for (const [tag, want] of [
 }
 ok(/<meta property="og:title" content="Agawam \(01001\), MA/.test(ogPage),
    'og:title carries the ZIP-specific title');
-ok(ogPage.includes('<meta property="og:url" content="https://homesignal.net/community/01001/">'),
+ok(ogPage.includes('<meta property="og:url" content="https://jodytracks.com/community/01001/">'),
    'og:url is this document\'s own canonical URL');
-ok(ogPage.includes('<meta property="og:image" content="https://homesignal.net/og-default.png">'),
+ok(ogPage.includes('<meta property="og:image" content="https://jodytracks.com/og-default.png">'),
    'og:image is ABSOLUTE — social crawlers do not resolve relative URLs or read <base>');
 ok(ogPage.includes('<meta name="twitter:card" content="summary_large_image">'),
    'twitter:card is declared');
@@ -314,7 +314,7 @@ ok(/--allow-missing-dev-plane is fixture-only/.test(gen),
      'Pages fetches the published Rule D plane before gen_zip_pages');
   ok(/email-assets\/seo\/development-seo-plane\.json/.test(pages),
      'Pages fetch URL is the public Storage current object');
-  ok(/age > 36/.test(pages) && /could not fetch the published Rule D plane/.test(pages),
+  ok(/age > limit/.test(pages) && /limit = 36\.0/.test(pages) && /could not fetch the published Rule D plane/.test(pages),
      'Pages hard-fails a missing or stale (>36h) fetch');
   ok(/cron: '40 6 \* \* \*'/.test(pages),
      'Pages schedule remains 06:40 UTC');

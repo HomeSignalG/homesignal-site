@@ -91,6 +91,7 @@ import { applyYields, buildYieldsMap } from "./sources/yields.ts";
 const YIELDS_MAP = buildYieldsMap(jurisdictionRegistry as Record<string, unknown>);
 const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
 import { arcgisForZip, type ArcgisRegistryEntry } from "./sources/arcgis.ts";
+import { IDENTITY_ALIAS_FILES } from "./identity-aliases/index.ts";
 import { ckanForZip, type CkanCommunityRow, type CkanRegistryEntry } from "./sources/ckan.ts";
 import { csvForZip, type CsvCommunityRow, type CsvRegistryEntry } from "./sources/csv.ts";
 import { cartoForZip, type CartoCommunityRow, type CartoRegistryEntry } from "./sources/carto.ts";
@@ -736,6 +737,7 @@ async function handleRequest(req: Request): Promise<Response> {
       zipCentroid: { lat: clat, lng: clng },
       zipBounds: scope.bounds,
       zipMembers: scope.bounds ? zipMembers : null,
+      identityAliases: IDENTITY_ALIAS_FILES,
       noteFence,
     });
     // TASK 1 (CKAN twin) — same generic, coverage-gated connector for CKAN datastore portals

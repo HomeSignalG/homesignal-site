@@ -1,6 +1,6 @@
 // IndexNow transport and policy (scripts/indexnow.py). No network: every POST and GET is a fake.
 //
-//   K/L/M  only canonical https://homesignal.net page URLs are ever submitted
+//   K/L/M  only canonical https://jodytracks.com page URLs are ever submitted
 //   N      never more than 10,000 URLs in one POST
 //   O      duplicate changed inputs collapse to one URL
 //   S      200 and 202 are accepted
@@ -11,7 +11,7 @@
 //   X      no INDEXNOW_KEY: the build is unaffected and IndexNow skips safely
 //   +      the key file, the artifact hygiene check, and the mass-change hold
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,7 +22,7 @@ let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) { pass++; console.log('PASS —', m); } else { fail++; console.error('FAIL —', m); } };
 
 const KEY = 'a1b2c3d4-e5f6-4789-abcd-0123456789ab';   // a fake, valid-format test key
-const PRE = `import sys, json; sys.path.insert(0, ${JSON.stringify(SCRIPTS)}); import indexnow as ix, page_semantics as ps\n`;
+const PRE = `import sys, json; sys.path.insert(0, ${JSON.stringify(SCRIPTS)}); import indexnow as ix, page_semantics as ps\nix.launch_hold = lambda *a, **k: None  # mechanics only; the real hold is pinned by test/cutover-activation.test.mjs\n`;
 function py(code, env = {}) {
   const r = spawnSync('python3', ['-c', PRE + code], { encoding: 'utf8', env: { ...process.env, ...env } });
   return { status: r.status, out: r.stdout, err: r.stderr, all: r.stdout + r.stderr };
@@ -41,11 +41,11 @@ for label, path in [
         ix.canonical_url(path); res[label] = 'ACCEPTED'
     except ix.IndexNowError:
         res[label] = 'refused'
-for label, url in [('http', 'http://homesignal.net/community/84302/'), ('www', 'https://www.homesignal.net/community/84302/'),
+for label, url in [('http', 'http://jodytracks.com/community/84302/'), ('www', 'https://www.jodytracks.com/community/84302/'),
                    ('supabase', 'https://qwnnmljucajnexpxdgxr.supabase.co/community/84302/'),
                    ('github_pages', 'https://homesignalg.github.io/homesignal-site/community/84302/'),
-                   ('map_url', 'https://homesignal.net/homesignalmap.html?zip=84302'),
-                   ('legacy_url', 'https://homesignal.net/community.html?zip=84302')]:
+                   ('map_url', 'https://jodytracks.com/homesignalmap.html?zip=84302'),
+                   ('legacy_url', 'https://jodytracks.com/community.html?zip=84302')]:
     try:
         ix.check_url(url); res[label] = 'ACCEPTED'
     except ix.IndexNowError:
@@ -55,14 +55,14 @@ ok(bad.v && Object.values(bad.v).every((x) => x === 'refused'),
    `K/L  query-string map URLs, legacy community.html?zip=, other hosts, previews, tracking: all refused ${bad.v ? JSON.stringify(Object.entries(bad.v).filter(([, x]) => x !== 'refused')) : bad.all}`);
 const good = J(`
 paths = ['/community/84302/', '/city/ut/brigham-city/', '/project/arcgis-x/case-1-1a2b3c4d/', '/guides/what-is-being-built-near-me/']
-us = ix.url_list(paths); print(json.dumps({'urls': us, 'host_ok': all(u.startswith('https://homesignal.net/') for u in us)}))`);
-ok(good.v && good.v.urls.length === 4 && good.v.host_ok, 'M  every canonical family is accepted and every URL is on homesignal.net');
+us = ix.url_list(paths); print(json.dumps({'urls': us, 'host_ok': all(u.startswith('https://jodytracks.com/') for u in us)}))`);
+ok(good.v && good.v.urls.length === 4 && good.v.host_ok, 'M  every canonical family is accepted and every URL is on jodytracks.com');
 const dup = J(`print(json.dumps(ix.url_list(['/community/84302/', '/community/84302/', '/community/84303/', '/community/84302/'])))`);
 ok(dup.v && dup.v.length === 2, 'O  duplicate changed inputs collapse to one URL');
 
 // ---------------------------------------------------------------- N — batch size
 const bs = J(`
-urls = [f'https://homesignal.net/community/{i:05d}/' for i in range(25001)]
+urls = [f'https://jodytracks.com/community/{i:05d}/' for i in range(25001)]
 cs = ix.chunks(urls)
 try:
     ix.chunks(urls, 10001); big = 'ACCEPTED'
@@ -77,12 +77,12 @@ const wire = J(`
 sent = []
 def post(url, body, headers):
     sent.append((url, json.loads(body))); return 200, {}, b''
-urls = [f'https://homesignal.net/community/{i:05d}/' for i in range(10001)]
+urls = [f'https://jodytracks.com/community/{i:05d}/' for i in range(10001)]
 rec = ix.submit(urls, ${JSON.stringify(KEY)}, post=post, sleep=lambda s: None)
 b = sent[0][1]
 print(json.dumps({'posts': len(sent), 'endpoint': sent[0][0], 'host': b['host'], 'keyLocation': b['keyLocation'], 'sizes': [len(x[1]['urlList']) for x in sent], 'hasKey': b['key'] == ${JSON.stringify(KEY)}, 'fields': sorted(b)}))`);
-ok(wire.v && wire.v.endpoint === 'https://api.indexnow.org/indexnow' && wire.v.host === 'homesignal.net'
-   && wire.v.keyLocation === 'https://homesignal.net/indexnow.txt' && wire.v.hasKey
+ok(wire.v && wire.v.endpoint === 'https://api.indexnow.org/indexnow' && wire.v.host === 'jodytracks.com'
+   && wire.v.keyLocation === 'https://jodytracks.com/indexnow.txt' && wire.v.hasKey
    && JSON.stringify(wire.v.sizes) === '[10000,1]' && JSON.stringify(wire.v.fields) === '["host","key","keyLocation","urlList"]',
    'N1 the POST is the documented bulk shape: host, key, keyLocation, urlList, to api.indexnow.org, 10,000 max');
 
@@ -95,7 +95,7 @@ def post(url, body, headers):
     if s == 'net': raise OSError('connection reset by peer ' + ${JSON.stringify(KEY)})
     return s, ${extra || '{}'}, b'detail'
 try:
-    rec = ix.submit(['https://homesignal.net/community/84302/'], ${JSON.stringify(KEY)}, post=post, sleep=sleeps.append)
+    rec = ix.submit(['https://jodytracks.com/community/84302/'], ${JSON.stringify(KEY)}, post=post, sleep=sleeps.append)
     print(json.dumps({'ok': True, 'rec': rec, 'calls': calls['n'], 'sleeps': sleeps}))
 except ix.IndexNowError as e:
     print(json.dumps({'ok': False, 'err': str(e), 'calls': calls['n'], 'sleeps': sleeps}))`);
@@ -128,7 +128,7 @@ const hard = sub([403]).v;
 ok(!JSON.stringify(hard).includes(KEY) && !JSON.stringify(sub([200]).v).includes(KEY), 'V1 receipts and errors never contain the key');
 const bad2 = J(`
 try:
-    ix.submit(['https://homesignal.net/community/84302/'], 'short', post=lambda *a: (200, {}, b''))
+    ix.submit(['https://jodytracks.com/community/84302/'], 'short', post=lambda *a: (200, {}, b''))
     print(json.dumps('ACCEPTED'))
 except ix.IndexNowError as e: print(json.dumps('refused'))`);
 ok(bad2.v === 'refused', 'V2 a malformed key (too short) is refused before any request');
@@ -140,11 +140,19 @@ ok(keyChecks.ok && keyChecks.hyphen && keyChecks.len128 && !keyChecks.len129 && 
    && !keyChecks.underscore && !keyChecks.nl && !keyChecks.empty,
    'V3 key format = protocol: 8-128 chars, letters digits hyphen only');
 
+// The CLI runs from a COPY of scripts/ and docs/brand/ whose launch hold is lifted, so these cases exercise the notify MECHANICS
+// (key, delta, live proof, batching) whichever identity the committed contract publishes as. The hold itself is pinned by
+// test/cutover-activation.test.mjs against the real committed file; this copy never touches it.
+const CLI_REPO = mkdtempSync(join(tmpdir(), 'inxrepo-'));
+cpSync(SCRIPTS, join(CLI_REPO, 'scripts'), { recursive: true });
+mkdirSync(join(CLI_REPO, 'docs', 'brand'), { recursive: true });
+cpSync(join(root, 'docs', 'brand'), join(CLI_REPO, 'docs', 'brand'), { recursive: true });
+writeFileSync(join(CLI_REPO, 'docs', 'brand', 'indexnow-jody-hold.json'), '{"hold": false}\n');
 // the CLI: no output path may print the key
 function cli(args, env, files = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'inxcli-'));
   for (const [n, c] of Object.entries(files)) writeFileSync(join(dir, n), typeof c === 'string' ? c : JSON.stringify(c));
-  const r = spawnSync('python3', [join(SCRIPTS, 'indexnow.py'), ...args.map((a) => a.replace('{dir}', dir))],
+  const r = spawnSync('python3', [join(CLI_REPO, 'scripts', 'indexnow.py'), ...args.map((a) => a.replace('{dir}', dir))],
     { encoding: 'utf8', env: { ...process.env, INDEXNOW_KEY: '', GITHUB_EVENT_NAME: '', ...env }, cwd: dir });
   return { ...r, dir, all: r.stdout + r.stderr };
 }
@@ -188,9 +196,9 @@ posted = {'n': 0}
 sleeps = []
 def post(url, body, headers):
     posted['n'] += 1; return 200, {}, b''
-pages = {'https://homesignal.net/community/84302/': b'<html>new</html>'}
+pages = {'https://jodytracks.com/community/84302/': b'<html>new</html>'}
 import hashlib
-want = hashlib.sha256(pages['https://homesignal.net/community/84302/']).hexdigest()[:32]
+want = hashlib.sha256(pages['https://jodytracks.com/community/84302/']).hexdigest()[:32]
 state = {'state_hash': 'c'}
 def get(url):
     ${over}
