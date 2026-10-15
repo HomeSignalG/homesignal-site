@@ -84,12 +84,11 @@ const COPY = [
   'Not school scores, restaurant lists, or generic neighborhood data. HomeSignal focuses on development activity that can change what surrounds the property.',
   'Check Development Activity coverage', 'Enter property address or ZIP', 'Check coverage',
   'HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.',
-  'Simple, transparent pricing', 'Free', '10 Development Activity reports free', 'No credit card required.',
+  'Start free', 'Free', '10 Development Activity reports free', 'No credit card required.',
   'Individual accounts receive 10 individual evaluation reports. Brokerage evaluation accounts share 10 reports across their invited evaluation users.',
-  'Professional', '$79', '/month', '100 new Development Activity reports each month',
-  'Reopen existing reports without using another report.', 'Share existing reports with clients.',
-  'Download or print existing reports.', 'Cancel anytime.', 'Join for $79/month',
-  'Professional — Individual Agents', 'Start with 10 free reports.', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
+  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, every account starts with 10 free reports.',
+  'Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is.',
+  'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
   'Know what’s changing before your client asks.',
   'Run Development Activity reports for the properties you’re working on now.',
   'Brokerage or enterprise? Contact us',
@@ -152,7 +151,7 @@ const REMOVED = [
   ['an invented replacement price, crossed-out price, or urgency', /\$129|normally \$|<s>|<del>|limited time|only \d+ (spots|left)|ends (soon|today)/i]
 ];
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
-ok((text.match(/\$\d+/g) || []).every((p) => p === '$79') && (text.match(/\$\d+/g) || []).length >= 2, 'the only price on the page is the existing $79/month; no replacement price was invented', text.match(/\$\d+/g));
+ok((text.match(/\$\d+/g) || []).length === 0, 'FREE-ONLY (founder, 2026-10-15): no price appears anywhere on the page until a payment processor is connected', text.match(/\$\d+/g));
 ok(/<h3[^>]*>Before a buyer tour<\/h3>/.test(markup) && /<h3[^>]*>Before a listing presentation<\/h3>/.test(markup), 'use cases are concrete transaction moments');
 ok(['Free', 'Professional — Individual Agents', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-band">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
@@ -182,13 +181,10 @@ const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
 ok(cta.length === 3 && cta.every((c) => c.cta === 'start-free'),
   'the hero, pricing and closing "Start free — 10 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
-// Founder, 2026-10-06: "Join for $79/month" is a REAL link, not an inert button. It goes to the Reports page's Billing card, where an existing brokerage
-// owner signs in and presses Subscribe; the signed checkout is made by manage-billing. It must stay a plain internal link: no processor address, no
-// handler, no checkout made from this page.
-const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)].map((m) => ({ tag: m[0], label: m[1] }));
-ok(joins.length === 1 && joins[0].label === 'Join for $79/month' && /\shref="development-activity-reports\.html#billing"/.test(joins[0].tag) && !/aria-disabled|onclick=/.test(joins[0].tag),
-  'Join for $79/month is one live link to the Reports page Billing card (development-activity-reports.html#billing)', joins);
-ok(/Individual real estate agents can subscribe\./.test(text) && !/Subscribing is for brokerage owners/.test(text), 'the Join link says plainly that individual agents can subscribe, and no longer says only brokerage owners can');
+// Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
+const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
+ok(joins.length === 0 && !/Join for|Cancel anytime|\/month/.test(text), 'there is no Join link, no price, no "/month" and no "Cancel anytime" on the landing page (free-only)', joins.map((j) => j[0]));
+ok(/Paid plans (are )?(coming|on the way)/i.test(text), 'the page says paid plans are coming');
 ok(cta.every((c) => /aria-disabled="true"/.test(c.tag) && !/\shref=|onclick=|type="submit"/.test(c.tag)),
   'each commerce button is inert (aria-disabled, no href, no handler): the 10-report entitlement and the $79 checkout do not exist yet', cta.map((c) => c.tag));
 const scriptCode = (noComments.match(/<script>[\s\S]*?<\/script>/g) || []).join('\n').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

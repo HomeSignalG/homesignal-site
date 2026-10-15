@@ -48,8 +48,7 @@ ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-ac
   // Founder, 2026-10-06: the landing page's "Join for $79/month" is a real link to this page's Billing card, and nothing else on it links here.
   const landing = read('development-activity.html').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
   const links = landing.match(/development-activity-reports[^"'\s<]*/g) || [];
-  ok(links.length === 1 && links[0] === 'development-activity-reports.html#billing',
-    '1f the public landing page links this page exactly once, to its Billing card (#billing): the Join for $79/month link', links);
+  ok(links.length === 0, '1f free-only (founder, 2026-10-15): the public landing page no longer links this page\'s Billing card (the Join link is gone)', links);
 }
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
 // 1h. THE SITE BAR (founder, 2026-10-11): this page is a standalone document on purpose (no shell: the shell boots account hydration, a follows sync and a

@@ -225,7 +225,7 @@ const seen = await page.evaluate(() => {
     visibleSoon: soon.filter(vis).length,
     // Positive control for the visibility probe: the coverage button IS visible.
     control: vis(document.getElementById('daCoverBtn')),
-    joinVisible: vis(document.getElementById('daJoin')), joinHref: document.getElementById('daJoin').getAttribute('href'), joinText: document.getElementById('daJoin').textContent, joinTag: document.getElementById('daJoin').tagName,
+    joinVisible: !!document.getElementById('daJoin') && vis(document.getElementById('daJoin')), joinHref: document.getElementById('daJoin') ? document.getElementById('daJoin').getAttribute('href') : null, joinText: document.getElementById('daJoin') ? document.getElementById('daJoin').textContent : null,
     enterpriseVisible: vis(document.getElementById('daEnterprise')),
     finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
   };
@@ -233,8 +233,8 @@ const seen = await page.evaluate(() => {
 ok(seen.control && seen.buttons === 3 && seen.visibleButtons === 0,
   'HIDDEN (founder, 2026-10-02): the three Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
 ok(seen.soon === 3 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
-ok(seen.joinVisible && seen.joinHref === 'development-activity-reports.html#billing' && seen.joinText === 'Join for $79/month' && seen.joinTag === 'A',
-  'Join for $79/month is a VISIBLE link to the Reports page Billing card (founder, 2026-10-06), not a button', seen);
+ok(seen.joinVisible === false && seen.joinHref === null && seen.joinText === null,
+  'FREE-ONLY (founder, 2026-10-15): there is no Join link on the landing page', seen);
 ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
 // A hidden button cannot be clicked by a person; click it from script to prove it still does nothing.
 await page.$$eval('button[data-cta]', (bs) => bs.forEach((b) => b.click()));
