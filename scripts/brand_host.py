@@ -26,6 +26,22 @@ def origin(contract_path: Path = CONTRACT) -> str:
     return o
 
 
+SOURCE_IDENTITY = "homesignal"   # the identity every COMMITTED, generated file is written as (scripts/brand_stage.py overlays the current one at build time)
+
+
+def source_origin(contract_path: Path = CONTRACT) -> str:
+    """The origin of the SOURCE identity (`homesignal`), whatever the contract's current identity is. Committed generated files
+    (sitemap.xml) are written with this one, never with origin(): after the Jody cutover origin() is Jody, and a Jody origin in
+    the committed source tree breaks the invariant that brand_stage.py is the ONLY place the public brand is applied. Unlike
+    origin() it does not require the identity to be active, because the source identity goes inactive at cutover."""
+    c = json.loads(Path(contract_path).read_text(encoding="utf-8"))
+    o = c["identities"][SOURCE_IDENTITY]["origin"].rstrip("/")
+    u = urlsplit(o)
+    if u.scheme != "https" or not u.netloc or u.path or u.query or u.fragment:
+        raise SystemExit(f"ERROR: brand contract source identity {SOURCE_IDENTITY!r} has no https origin: {o!r}")
+    return o
+
+
 def host(contract_path: Path = CONTRACT) -> str:
     return urlsplit(origin(contract_path)).netloc
 
