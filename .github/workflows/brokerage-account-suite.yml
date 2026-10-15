@@ -43,6 +43,9 @@ on:
       - 'test/evaluation_entitlement_mutants.py'
       - 'docs/free-report-limit-10.sql'
       - 'test/free_report_limit_pg/**'
+      - 'docs/free-report-limit-100.sql'
+      - 'test/free_report_limit_100_pg/**'
+      - 'test/lib/docsql.sh'
       - '.github/workflows/brokerage-account-suite.yml'
   push:
     branches: [main]
@@ -57,6 +60,9 @@ on:
       - 'test/evaluation_entitlement_mutants.py'
       - 'docs/free-report-limit-10.sql'
       - 'test/free_report_limit_pg/**'
+      - 'docs/free-report-limit-100.sql'
+      - 'test/free_report_limit_100_pg/**'
+      - 'test/lib/docsql.sh'
       - '.github/workflows/brokerage-account-suite.yml'
   workflow_dispatch: {}
 
@@ -175,3 +181,14 @@ jobs:
         run: |
           set -o pipefail
           bash test/free_report_limit_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/fl.log
+      - name: The free allowance migration (10 to 100) preserves every ledger row, reopens an evaluation that had completed at ten, refuses on a paid credit or an unknown limit, lets that brokerage make exactly 90 more and refuses the 101st, applies twice to the same result, and equals a fresh install of the real SQL of record
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: freelimit_disposable
+        run: |
+          set -o pipefail
+          bash test/free_report_limit_100_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/fl100.log
+          grep -q '^[0-9]* passed, 0 failed' /tmp/fl100.log

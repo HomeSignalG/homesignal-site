@@ -15,11 +15,12 @@ set -euo pipefail
 : "${PGHOST:?}" "${PGDATABASE:?}"
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 SPINE="$root/docs/brokerage-account-spine.sql"
 PRIV="$root/docs/report-private-context.sql"
 SNAP="$root/docs/report-snapshot.sql"
-SQL="$root/docs/evaluation-entitlement.sql"
+SQL="$(docsql evaluation-entitlement)"
 MUTS="$root/test/evaluation_entitlement_mutants.py"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 

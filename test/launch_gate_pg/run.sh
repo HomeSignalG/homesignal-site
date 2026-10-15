@@ -12,11 +12,12 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1
 P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null
 for f in brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive report-rate-limit da-owner-safeguards individual-agent-signup; do
-  P -f "$root/docs/$f.sql" >/dev/null 2>"$here/.apply.err" || { echo "FAIL — docs/$f.sql does not apply"; head -3 "$here/.apply.err"; exit 1; }
+  P -f "$(docsql "$f")" >/dev/null 2>"$here/.apply.err" || { echo "FAIL — docs/$f.sql does not apply"; head -3 "$here/.apply.err"; exit 1; }
 done
 rm -f "$here/.apply.err"
 exec node "$here/roundtrip.mjs"

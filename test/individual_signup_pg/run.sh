@@ -13,12 +13,13 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 SQL="${SIGNUP_SQL:-$root/docs/individual-agent-signup.sql}"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing saved-reports-archive)
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$here/fixture.sql" >/dev/null; }
-apply_deps() { local f; for f in "${DEPS[@]}"; do P -f "$root/docs/$f.sql" >/dev/null 2>"$tmp/dep.err" || { echo "FAIL - docs/$f.sql does not apply"; head -3 "$tmp/dep.err"; exit 1; }; done; }
+apply_deps() { local f; for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>"$tmp/dep.err" || { echo "FAIL - docs/$f.sql does not apply"; head -3 "$tmp/dep.err"; exit 1; }; done; }
 seed_legacy() {
   P -q >/dev/null <<'SQL'
 insert into auth.users (id, email, email_confirmed_at) values

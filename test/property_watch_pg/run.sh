@@ -16,12 +16,13 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 SQL="${WATCH_SQL:-$root/docs/property-watch.sql}"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports)
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null; }
 apply_deps() {
-  for f in "${DEPS[@]}"; do P -f "$root/docs/$f.sql" >/dev/null 2>&1 || { echo "FAIL - docs/$f.sql does not apply"; exit 1; }; done
+  for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>&1 || { echo "FAIL - docs/$f.sql does not apply"; exit 1; }; done
 }
 apply_base() { reset_db; apply_deps; }
 suite() { P -tA -F'|' -f "$here/suite.sql"; }
@@ -193,7 +194,7 @@ echo "ROLLED BACK with $watches watches and $seen told-about rows stored: the 18
 
 # ---- 5. it refuses, creating nothing, when a layer it stands on is absent ---------------------------------------------------------------
 reset_db
-for f in brokerage-account-spine report-private-context report-snapshot evaluation-entitlement; do P -f "$root/docs/$f.sql" >/dev/null 2>&1; done
+for f in brokerage-account-spine report-private-context report-snapshot evaluation-entitlement; do P -f "$(docsql "$f")" >/dev/null 2>&1; done
 if P -f "$SQL" >/dev/null 2>"$here/.refusal.err"; then rm -f "$here/.refusal.err"; echo "FAIL - the watch file APPLIED without the saved-reports functions"; exit 1; fi
 if ! grep -q 'property_watch: apply docs/report-private-context.sql' "$here/.refusal.err" || [ "$(n_mine)" != "0" ]; then
   rm -f "$here/.refusal.err"; echo "FAIL - the refusal without the saved-reports functions did not say why, or left objects behind"; exit 1

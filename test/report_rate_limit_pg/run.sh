@@ -17,13 +17,14 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
-SQL="${RATE_SQL:-$root/docs/report-rate-limit.sql}"
+SQL="${RATE_SQL:-$(docsql report-rate-limit)}"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports report-share report-share-delivery property-watch payment-event-ledger report-header brokerage-billing)
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null; }
 apply_deps() {
   local f
-  for f in "${DEPS[@]}"; do P -f "$root/docs/$f.sql" >/dev/null 2>"$here/.dep.err" || { echo "FAIL - docs/$f.sql does not apply"; head -3 "$here/.dep.err"; exit 1; }; done
+  for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>"$here/.dep.err" || { echo "FAIL - docs/$f.sql does not apply"; head -3 "$here/.dep.err"; exit 1; }; done
   rm -f "$here/.dep.err"
 }
 apply_base() { reset_db; apply_deps; }
@@ -129,11 +130,11 @@ scenarios() {
 if [ "${MUTANT:-0}" = "0" ]; then
   # 6 first: it refuses, creating nothing, when a layer it stands on is absent
   reset_db
-  for f in "${DEPS[@]}"; do [ "$f" = "brokerage-billing" ] || P -f "$root/docs/$f.sql" >/dev/null 2>&1; done
+  for f in "${DEPS[@]}"; do [ "$f" = "brokerage-billing" ] || P -f "$(docsql "$f")" >/dev/null 2>&1; done
   out="$(psql -X -q -v ON_ERROR_STOP=1 -f "$SQL" 2>&1 || true)"
   ok "$(echo "$out" | grep -q 'billing_report_limit' && [ "$(n_mine)" = "0" ] && echo 1 || echo 0)" "P1 with the billing layer absent the file REFUSES by name and creates nothing" "$(echo "$out" | head -c 160)"
   reset_db
-  for f in "${DEPS[@]}"; do [ "$f" = "brokerage-account-spine" ] && continue; P -f "$root/docs/$f.sql" >/dev/null 2>&1 || true; done
+  for f in "${DEPS[@]}"; do [ "$f" = "brokerage-account-spine" ] && continue; P -f "$(docsql "$f")" >/dev/null 2>&1 || true; done
   out="$(psql -X -q -v ON_ERROR_STOP=1 -f "$SQL" 2>&1 || true)"
   ok "$([ "$(n_mine)" = "0" ] && echo 1 || echo 0)" "P2 with the account spine absent it also creates nothing" "$(echo "$out" | head -c 160)"
 fi
