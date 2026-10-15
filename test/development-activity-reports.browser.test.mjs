@@ -1742,7 +1742,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     const w = world({ role: 'owner', used: 10, plan: state });
     const { ctx, page, reports } = await open({ w });
     await waitBilling(page, card);
-    ok(await page.$eval('#trial-cta', (e, st) => !e.parentElement.hidden && e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe'), state), '12p2 a ' + state + ' plan on a used-up trial: the tile still carries the right commercial action');
+    ok(await page.$eval('#trial-cta', (e, [st, shown]) => (!e.parentElement.hidden) === shown && (!shown || e.textContent === (st === 'past_due' ? 'Manage plan' : 'Subscribe')), [state, state !== 'unknown' && state !== 'trialing']), '12p2 a ' + state + ' plan on a used-up trial: the tile carries "Manage plan" (past due), "Subscribe" where a new subscription is possible, and NOTHING while the status is unclear (free-only, founder 2026-10-15)');
     ok(card.test(await billingText(page)) && await page.$eval('#go', (e) => e.disabled) && (await page.$eval('#subscribe', (e) => !e.hidden)) === buy && /10 of 10 free reports used/.test(await text(page, '#trial-count')) && reports.length === 0,
       '12p a ' + state + ' plan on a used-up trial: the card says so, "Make report" stays off, and the checkout is ' + (buy ? 'offered (a new subscription is what is needed)' : 'NOT offered (a second one would bill twice)'), [await billingText(page), buy]);
     await ctx.close();
@@ -1767,7 +1767,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // the provider has confirmed a payment: the page learns it only by asking
   w.plan = 'paid'; w.paidUsed = 0; w.used = 10;
   await page.click('#billing-refresh');
-  await waitBilling(page, /Paid plan/);
+  await waitBilling(page, /Paid plan:/);
   ok(/Paid plan: 0 of 100 reports used this month/.test(await billingText(page)) && /^0 of 100 reports used$/.test(await text(page, '#trial-count')) && await page.$eval('#go', (e) => !e.disabled),
     '12u2 once the database says the plan is paid, "Check again" shows it, and "Make report" opens: the page changed nothing until it was told');
   // the plan can no longer be read: the card says so and forgets the plan it showed (never the old figures)
@@ -1778,7 +1778,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
     '12u3 when the plan can no longer be read the card says so and forgets the plan it showed (never the old figures, never "paid")');
   w.billingFails = false;
   await page.click('#billing-refresh');
-  await waitBilling(page, /Paid plan/);
+  await waitBilling(page, /Paid plan:/);
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
   await page.evaluate(() => { window.__sb.session = null; });
   await page.evaluate(() => window.__sb.listeners.forEach((cb) => cb('SIGNED_OUT', null)));
@@ -1791,7 +1791,7 @@ const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
   // 12v2. a different person signing in on the same tab: the first person's plan is gone in the same moment
   const w = world({ role: 'owner', used: 10, plan: 'paid', paidUsed: 3 });
   const { ctx, page } = await open({ w });
-  await waitBilling(page, /Paid plan/);
+  await waitBilling(page, /Paid plan:/);
   const swap = await page.evaluate(() => {
     const other = { access_token: 'other-token', user: { id: 'b2222222-2222-4222-8222-222222222222', email: 'someone@example.test' } };
     window.__sb.session = other; window.__sb.listeners.forEach((cb) => cb('SIGNED_IN', other));
@@ -2287,8 +2287,9 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
 
 // ---- M. THE CONSOLIDATED WORKSPACE (founder, 2026-10-11): create full width, usage in the account zone, account out of the rail -------------------------------
 for (const [w, h] of [[1440, 900], [1920, 1080], [390, 844]]) {
-  const { ctx, page, errors } = await open({ width: w, height: h, signedIn: true, compare: false });
+  const { ctx, page, errors } = await open({ w: world({ role: 'owner' }), width: w, height: h, signedIn: true, compare: false });   // an owner: free-only copy shows the plan action only where checkout is available
   await waitCount(page, /free reports left/);
+  await waitBilling(page, /Free trial/);
   await make(page, A1);
   await waitBoxes(page, 1);
   if (SHOTS) { await page.screenshot({ path: SHOTS + '/M-' + w + '-viewport.png' }); await shot(page, 'M-' + w + '-full'); }
