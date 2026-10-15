@@ -23,6 +23,7 @@
 // outSR=4326, resultOffset/resultRecordCount paging, exceededTransferLimit honored. Point
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
+import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
@@ -167,6 +168,18 @@ export interface ArcgisRegistryEntry {
    *  explains why this is not expressible as `extra_where` on a mixed-type entry.
    *  Absent ⇒ behaviour unchanged. */
   commercial_work_evidence?: CommercialWorkEvidence;
+  /** MINOR-REPAIR NOISE FILTER (additive, opt-in; sources/record-hygiene.ts). Drops a record only when
+   *  its type_source value is listed in `types` AND its scope text names a routine minor repair (furnace,
+   *  fire-alarm replacement, water-damage repair ...) AND states no development evidence (new
+   *  construction, addition, ADU, demolition, multi-family ...). For layers like Tacoma Accela that file
+   *  everything as one broad "Building" type, so a type whitelist cannot separate noise from projects.
+   *  Counted in the run report as `minor_repairs_dropped`. Absent ⇒ behaviour unchanged. */
+  drop_minor_repairs?: { types: string[] };
+  /** APPLICANT-NAMED TITLES (additive, opt-in). Names the two columns whose join is the title on layers
+   *  where the free-text name column holds the APPLICANT, not a project name (Pierce PALS). The title is
+   *  rebuilt by cleanApplicantTitle(); the raw permit type still survives in `type_raw`. Absent ⇒ the
+   *  column_map.title join, unchanged. */
+  applicant_title?: { type: string; name: string };
   /** Escape hatch for layers whose date column is a STRING, where recency_days' `DATE '…'`
    *  literal cannot apply (the frisco / worcester / anaheim class). Verbatim clause with
    *  `{cutoff}` → 'YYYY-MM-DD' and `{cutoff_compact}` → 'YYYYMMDD' substituted; requires
@@ -226,6 +239,7 @@ export interface ArcgisRunReport {
   no_record_url: number;
   /** Records the Commercial work-evidence gate downgraded to "other project". */
   commercial_downgraded: number;
+  minor_repairs_dropped: number;
   quarantined: { reason: string; sample: string }[];
   /** non-null ⇒ the max_rows cap bound the fetch and this report is INCOMPLETE. */
   truncated_at_max_rows: number | null;
@@ -333,7 +347,7 @@ async function runEntry(
     registry_id: entry.registry_id, service_url: entry.service_url,
     fetched: 0, emitted: 0, excluded_by_status: [], decided_by_status: [], unmapped_statuses: [],
     case_insensitive_matches: [],
-    blank_status: 0, geocode_failures: 0, no_record_url: 0, commercial_downgraded: 0, quarantined: [], truncated_at_max_rows: null,
+    blank_status: 0, geocode_failures: 0, no_record_url: 0, commercial_downgraded: 0, minor_repairs_dropped: 0, quarantined: [], truncated_at_max_rows: null,
   };
   const records: NormalizedRecord[] = [];
 
@@ -504,8 +518,11 @@ async function normalizeRow(
   aliasVerdict: AliasVerdict | null = null,
 ): Promise<NormalizedRecord | null> {
   const cm = entry.column_map;
-  const title = String(readCol(row, cm.title) ?? "").trim();
+  let title = String(readCol(row, cm.title) ?? "").trim();
   const caseNo = valOrNull(readCol(row, cm.case_number));
+  if (entry.applicant_title) {
+    title = cleanApplicantTitle(readCol(row, entry.applicant_title.type), readCol(row, entry.applicant_title.name)) || title;
+  }
 
   // record_url (anti-fabrication): column → template → dataset landing page.
   let recordUrl = extractUrl(readCol(row, cm.record_url));
@@ -517,6 +534,11 @@ async function normalizeRow(
   // classification (never from the title)
   const typeSrcVal = String(readCol(row, cm.type_source) ?? "").trim();
   const typeHit = typeLookup && typeSrcVal ? resolveNormalized(typeLookup, typeSrcVal) : null;
+  if (entry.drop_minor_repairs && entry.drop_minor_repairs.types.includes(typeSrcVal)
+      && isMinorRepairNoise(String(readCol(row, cm.title) ?? ""))) {
+    report.minor_repairs_dropped++;
+    return null;
+  }
   if (typeHit?.caseInsensitive) noteCaseFold(caseFold, "type", typeSrcVal, typeHit.matchedKey);
   // A mapped value always wins; the constant only fills where the publisher states no
   // classifiable type at all. Mirrors status_const, and still never guesses from the title.
