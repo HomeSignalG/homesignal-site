@@ -117,7 +117,12 @@ rejects('3h malformed pin rejected', () => checkPin(good, { contract_version: 1,
 rejects('3i pin cannot launder an invalid contract', () => checkPin(mut((c) => { c.identities.jody.state = 'active'; }), pin), /must be inactive/);
 check('3j supported versions list is exactly [1, 2] (2 = the activation swap, accepted here but NOT committed)', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS) === '[1,2]', JSON.stringify(SUPPORTED_CONTRACT_VERSIONS));
 
-// ---- 4. the public artifact: contract and Jody never ship ---------------------------------
+// ---- 4. the public artifact: the contract never ships; the overlay lands on the CURRENT identity ----
+// The source tree stays HomeSignal-branded. The deploy (pages.yml) applies brand_stage.py for the identity the committed contract
+// names, so what ships is checked here: stage_site (the source artifact), then the same overlay the deploy runs.
+const cur = committed.identities[committed.current_identity];      // the identity the site publishes as (jody after GO LIVE)
+const curOrigin = cur.origin.replace(/\/$/, '');
+const curHost = new URL(curOrigin).host;
 const out = mkdtempSync(join(tmpdir(), 'brand-artifact-'));
 let files = [];
 try {
@@ -132,25 +137,27 @@ try {
     if (!/\.(html|js|json|xml|txt|css|svg|md)$|^CNAME$/.test(f)) continue;
     const t = readFileSync(join(out, f), 'utf8');
     if (/homesignal\.net/.test(t)) withHome++;
-    // The one permitted mention: the Bluesky account's profile link (founder, 2026-10-15: the account's handle is now jodytracks.com).
-    const tt = t.split('https://bsky.app/profile/jodytracks.com').join('');
-    if (/jodytracks|brand-contract/i.test(tt) || /\bJody\b/.test(tt)) hits.push(f);
+    if (/brand-contract/i.test(t)) hits.push(f);
   }
-  check('4c positive control: shipped text files carry homesignal.net', withHome > 20, `withHome=${withHome}`);
-  check('4d no shipped file references jodytracks / brand-contract / Jody', hits.length === 0, hits.join(','));
-  check('4e artifact CNAME is homesignal.net', readFileSync(join(out, 'CNAME'), 'utf8').trim() === 'homesignal.net', 'CNAME');
-} finally { rmSync(out, { recursive: true, force: true }); }
+  check('4c positive control: the SOURCE artifact (before the overlay) carries homesignal.net', withHome > 20, `withHome=${withHome}`);
+  check('4d no shipped file references the brand contract', hits.length === 0, hits.join(','));
 
-// ---- 5. surfaces that carry the production origin still do -------------------------------
-const origin = good.identities.homesignal.origin;
-check('5a CNAME == current identity host', readFileSync('CNAME', 'utf8').trim() === new URL(origin).host, 'CNAME');
-const locs = [...readFileSync('sitemap.xml', 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-check('5b sitemap has a non-empty URL set', locs.length > 1000, `locs=${locs.length}`);
-check('5c every sitemap URL is on the production origin', locs.every((u) => u.startsWith(origin + '/')), locs.find((u) => !u.startsWith(origin + '/')));
-const robotsMaps = [...readFileSync('robots.txt', 'utf8').matchAll(/^Sitemap:\s*(\S+)/gim)].map((m) => m[1]);
-check('5d robots.txt Sitemap lines non-empty and on the production origin', robotsMaps.length >= 1 && robotsMaps.every((u) => u.startsWith(origin + '/')), robotsMaps.join(','));
-check('5e Bluesky DID is still did:web:homesignal.net', JSON.parse(readFileSync('.well-known/did.json', 'utf8')).id === 'did:web:' + new URL(origin).host, 'did');
-check('5f index.html canonical is the production origin', readFileSync('index.html', 'utf8').includes(`rel="canonical" href="${origin}/"`), 'canonical');
+  // Apply the overlay the deploy applies, for the identity the committed contract names.
+  const rep = JSON.parse(execFileSync('python3', ['scripts/brand_stage.py', '--dir', out, '--identity', committed.current_identity], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim().split('\n').slice(-60).join('\n').match(/\{[\s\S]*\}\s*$/)[0]);
+  check('4d2 the overlay leaves nothing unclassified', Object.keys(rep.leftovers || {}).length === 0, JSON.stringify(rep.leftovers));
+  check('4e built artifact CNAME is the current identity host', readFileSync(join(out, 'CNAME'), 'utf8').trim() === curHost, `${readFileSync(join(out, 'CNAME'), 'utf8').trim()} vs ${curHost}`);
+
+  // ---- 5. surfaces that carry the production origin carry the CURRENT one -----------------
+  check('5a built CNAME == current identity host', readFileSync(join(out, 'CNAME'), 'utf8').trim() === curHost, 'CNAME');
+  const locs = [...readFileSync('sitemap.xml', 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  check('5b sitemap has a non-empty URL set', locs.length > 1000, `locs=${locs.length}`);
+  check('5c every sitemap URL is on the current origin', locs.every((u) => u.startsWith(curOrigin + '/')), locs.find((u) => !u.startsWith(curOrigin + '/')));
+  const robotsMaps = [...readFileSync(join(out, 'robots.txt'), 'utf8').matchAll(/^Sitemap:\s*(\S+)/gim)].map((m) => m[1]);
+  check('5d built robots.txt Sitemap lines non-empty and on the current origin', robotsMaps.length >= 1 && robotsMaps.every((u) => u.startsWith(curOrigin + '/')), robotsMaps.join(','));
+  // The DID is the immutable Bluesky identity: it stays on the ORIGINAL HomeSignal host whichever identity is current.
+  check('5e Bluesky DID is still did:web:homesignal.net', JSON.parse(readFileSync(join(out, '.well-known/did.json'), 'utf8')).id === 'did:web:' + new URL(good.identities.homesignal.origin).host, 'did');
+  check('5f built index.html canonical is the current origin', readFileSync(join(out, 'index.html'), 'utf8').includes(`rel="canonical" href="${curOrigin}/"`), 'canonical');
+} finally { rmSync(out, { recursive: true, force: true }); }
 const cfg = readFileSync('config.js', 'utf8');
 check('5g browser runtime config (config.js) is untouched by the contract', !/jody|brand|jodytracks/i.test(cfg) && cfg.includes("DEFAULT_ZIP: '78617'"), 'config.js');
 
