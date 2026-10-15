@@ -49,7 +49,7 @@ const { WAITING, READY, FAILED, INELIGIBLE } = HS.MAPS_CAPTURE_STATES;
 
 
 
-const BASE = (process.env.BASE || 'https://homesignal.net').replace(/\/$/, '');
+const BASE = (process.env.BASE || 'https://jodytracks.com').replace(/\/$/, '');
 const SB = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim();
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
