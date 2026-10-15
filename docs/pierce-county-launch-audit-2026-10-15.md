@@ -62,18 +62,33 @@ cannot separate a furnace swap from a project; only the scope text can.
 * Judgement call: re-roofs on commercial/multifamily buildings and like-for-like mechanical swaps are treated as
   noise. Interior remodels/alterations are kept. Tune the two term lists if you want it stricter or looser.
 
-## Applicant-named titles (`pierce-county-pals-permits`)
-PALS builds the title as `applicationType + projectName`, and `projectName` is mostly the **applicant**: of
-4,683 distinct records, **3,208** carry a "Last, First" name and **177** an entity (LLC, Trust …).
+## Applicant-named titles (`pierce-county-pals-permits`) — founder privacy decision applied 2026-10-15
+PALS builds the title as `applicationType + projectName`, and `projectName` mixes applicants, plat text and project names.
+Decision: **individual homeowner names are stripped entirely; corporate applicants are kept; plat/subdivision text is left as filed.**
 
-* New `cleanApplicantTitle`, opt-in via `applicant_title: { type, name }`:
-  `Construction Residential 3705 Rental LLC` → `Residential construction (applicant: 3705 Rental LLC)`;
-  `Chege, Lucy` → `(applicant: Lucy Chege)`; a genuine project name → `Commercial construction: Gig Harbor Medical Office`.
-* Nothing is invented (no "new", no use). The applicant is labelled as the applicant. Plat text such as
-  `Lake Minterwood, Lot 38, Blk 2` and `Acme Holdings, LLC` are not mangled. Raw type survives in `type_raw`;
-  `source_id` is unchanged.
-* ⚠️ This puts a **person's name** in a resident-visible title (it was already there, un-formatted). Whether
-  individual homeowners' names should be shown is a privacy call I have not made for you.
+| input (type · name) | title |
+|---|---|
+| Construction Single Family Residence · Lucy Chege | `Single Family Residence construction` |
+| Construction Residential · 3705 Rental LLC | `Residential construction (applicant: 3705 Rental LLC)` |
+| Construction Residential · Lake Minterwood, Lot 38, Blk 2 | `Residential construction: Lake Minterwood, Lot 38, Blk 2` |
+
+Measured on the 4,683 distinct PALS records cached on Pierce pages (SQL section 6, an approximation of the TS rule):
+**161 corporate kept · 3,221 plat text kept · 1,301 stripped** (individuals, and anything else that states no entity word).
+
+* ⚠️ **Correction to the first version of this report:** it said 3,208 records carried an individual's "Last, First" name.
+  That was a regex hit count, not a classification; most of those are plat text ("Rolling Brook, Lot 15"). About 1,300
+  records, not 3,200, are stripped.
+* **Entity words are the founder's list, word-bounded** (LLC, INC, CORP, HOLDINGS, PROPERTIES, BUILDERS, HOMES, DEVELOPMENT,
+  GROUP, PARTNERS, LIMITED, CO, LP, plus plural/long forms). Unbounded, `CO` matches Jacob/Rebecca/Marco and `INC` matches
+  Lincoln/Vincent, which would publish individuals; the tests pin those names.
+* **Fail closed.** Code cannot tell "Lucy Chege" from "Gig Harbor Medical Office", so a name is shown only if it positively
+  matches the entity list or the plat shape. A real project name with no entity word is dropped. A name that is shaped
+  "Last, First" is an individual even if it also contains an entity word. Family trusts, churches and public agencies are
+  not on the list and are stripped.
+* **Residual exposure, not fixed here:** this changes records fetched from now on. Names already cached in
+  `development_reports`, materialized into `app_projects`/`app_changes`, drafted into MAPS posts, or carried in the
+  Rule D project-pages object (which keeps untracked pages and "only grows") stay until each is refreshed or purged.
+  Purging them is a separate, destructive step I have not taken.
 
 ## Status mapping
 All raw statuses map; buckets present: proposed 3,081 · approved 9,012 · operating 6,512 · denied 7 (denied =
@@ -84,7 +99,7 @@ registry id saying under-construction. Changing that is a product decision.
 ## Shipped in this change
 * `sources/record-hygiene.ts` (new), wired in `sources/arcgis.ts` (two additive, opt-in options + report counter).
 * `jurisdiction-registry.json`: one line each on Tacoma and Pierce PALS.
-* `test/record-hygiene.test.mjs` (46 checks, incl. the real connector end to end; two mutations of the wiring each fail it).
+* `test/record-hygiene.test.mjs` (67 checks, incl. the real connector end to end; mutations of the wiring each fail it).
 * `scripts/audits/pierce-county-launch-audit.sql`.
 
 ## Not done / needs you

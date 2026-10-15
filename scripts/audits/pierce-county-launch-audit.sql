@@ -87,11 +87,20 @@ select 'tacoma_distinct_records' k, count(*)::text v from f
 union all select 'would_drop', count(*)::text from f where dropped
 union all select 'would_keep', count(*)::text from f where not dropped;
 
--- ── 6. Applicant-named titles on Pierce PALS (entity / "Last, First" shaped project names) ───────────
+-- ── 6. Applicant-named titles on Pierce PALS — how cleanApplicantTitle (sources/record-hygiene.ts) treats the
+--       name column. FOUNDER DECISION 2026-10-15: corporate kept, plat untouched, everything else (individuals) stripped.
+--       SQL approximation of the TS rule (same word lists); the TS tests are the authority. The name is the title
+--       minus its leading permit type. NOTE: most "Last, First"-shaped names are PLAT text ("Rolling Brook, Lot 15").
 with z as (select c.zip_codes[1] zip from public.communities c where c.state='WA' and c.county='Pierce' and c.level='zip'),
-e as (select distinct on (x->>'source_id') x->>'title' t from z join public.development_reports r using (zip), jsonb_array_elements(r.sites) x
-      where x->>'source_registry_id'='pierce-county-pals-permits')
-select count(*) distinct_pals_records,
-       count(*) filter (where t ~* '(^|[^a-z0-9])(llc|inc|corp|ltd|lp|llp|pllc|trust|holdings|partners|properties)([^a-z0-9]|$)') entity_named,
-       count(*) filter (where t ~ '[A-Za-z]+, [A-Za-z]+') person_comma_named
-from e;
+e as (select distinct on (x->>'source_id')
+        regexp_replace(x->>'title', '^'||regexp_replace(coalesce(x->>'type_raw',''),'([.()*+?\[\]\\|^$])','\\\1','g')||' ?', '') nm
+      from z join public.development_reports r on r.zip=z.zip, jsonb_array_elements(r.sites) x
+      where x->>'source_registry_id'='pierce-county-pals-permits'),
+c as (select nm,
+ (nm ~* '(^|[^a-z0-9])(l\.?l\.?c|inc|corp(?:oration)?|holdings?|propert(?:y|ies)|builders?|homes?|developments?|group|partners?|limited|co|lp)($|[^a-z0-9])') ent,
+ (nm ~* '(^|[^a-z0-9])(lots?|blk|block|tract|plat|phase|div(?:ision)?|parcel|unit|sec(?:tion)?|subdivision)\.?\s*#?[0-9]') plat,
+ (nm ~ '[A-Za-z][A-Za-z''.-]*, [A-Za-z]' and nm !~* ', (llc|inc|corp|co|ltd|llp|lp|pllc|jr|sr)\M' and nm !~* ', (lot|lots|blk|block|unit|phase|tract|parcel|div|division|plat|sec|section)\M') person_pair from e)
+select 'pals_distinct_records' k, count(*)::text v from c
+union all select 'KEPT corporate (applicant: ...)', count(*)::text from c where ent and not person_pair and not (plat and not person_pair)
+union all select 'KEPT plat text, untouched', count(*)::text from c where plat and not person_pair
+union all select 'STRIPPED (individuals and unknown)', count(*)::text from c where nm<>'' and not (plat and not person_pair) and not (ent and not person_pair);
