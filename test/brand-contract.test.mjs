@@ -132,7 +132,9 @@ try {
     if (!/\.(html|js|json|xml|txt|css|svg|md)$|^CNAME$/.test(f)) continue;
     const t = readFileSync(join(out, f), 'utf8');
     if (/homesignal\.net/.test(t)) withHome++;
-    if (/jodytracks|brand-contract/i.test(t) || /\bJody\b/.test(t)) hits.push(f);
+    // The one permitted mention: the Bluesky account's profile link (founder, 2026-10-15: the account's handle is now jodytracks.com).
+    const tt = t.split('https://bsky.app/profile/jodytracks.com').join('');
+    if (/jodytracks|brand-contract/i.test(tt) || /\bJody\b/.test(tt)) hits.push(f);
   }
   check('4c positive control: shipped text files carry homesignal.net', withHome > 20, `withHome=${withHome}`);
   check('4d no shipped file references jodytracks / brand-contract / Jody', hits.length === 0, hits.join(','));
