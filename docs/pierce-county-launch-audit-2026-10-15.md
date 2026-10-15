@@ -131,3 +131,44 @@ registry id saying under-construction. Changing that is a product decision.
   rotation reaches it (~23 h out). Section C of the SQL file is the check.
 * **Still open:** the Rule D project-pages object (ingest-owned storage JSON, keeps untracked pages) is not queryable from SQL
   and may retain old names; purging it is a separate destructive decision.
+
+## Flush record and corrections (2026-10-15, evening)
+
+**What was done, beyond the "let the rotation do it" plan above (founder instruction: flush now).** The same deployed engine was
+called for each of the 61 name-affected Pierce ZIPs as a fresh request (`net.http_post`, the payload the rotation sends, rows
+tracked in `dev_refresh_inflight`), in rounds of 8/12/12/12/13/4, then `public.app_refresh_zip(zip)` was run for each landed ZIP so
+`app_projects` followed immediately instead of at the next 15-minute sweep. `dev_refresh_fire_targets` was not used and no timestamp
+was back-dated. The collector stores about 4 ZIPs per 2-minute tick, so a round lands over 4-6 minutes; round 1 looked stuck and was not.
+
+**Measured after (counts only):** 65 Pierce pages, 62 refreshed after the deploy (the other 3 have no PALS names), all 65 `populated`.
+Uncleaned PALS titles: **0 of 12,836** in `development_reports` and **0 of 12,836** in `app_projects` (queries B2/B3 in
+`scripts/audits/pierce-privacy-backfill.sql`, each beside a non-zero control). `app_community_meta` behind its report: 0. Record ids
+unchanged (0 PALS rows created after the deploy).
+
+**Correction to the verification above.** Sections A1/A2 of the backfill SQL compare a title with its raw permit type, so they only
+work on OLD titles; after cleaning they keep flagging cleaned rows and cannot reach 0. They are now labelled pre-refresh only, and B2/B3
+replace them. (A1/A2's "62 ZIPs still to strip" reading after the flush was this artifact, not a leak.)
+
+**Plat-text residual, measured (the keep-list can keep "First Last, Lot N").** Across 4,675 distinct PALS records, 2,110 are kept as
+plat text; 441 of those open with two capitalised words before a plat keyword, falling in 159 distinct prefixes. A random 12 of the 98
+single-occurrence prefixes were all subdivision names, and the 35 prefixes without a subdivision noun (132 records) read as plat names
+(many "... Add", i.e. addition). **No personal name was found; absence is evidence, not proof**, because there is no list of persons to
+test against. The rule is unchanged. Other fields were checked and carry no applicant text: `label` equals `title` on all 12,836
+entries, `address` is a site address, and `app_projects.provenance` holds only case number, precision, jurisdiction and vintage keys.
+
+**Rows removed by the Tacoma noise filter (not by the privacy rule), and not archived.** Materializing the flushed ZIPs removed
+about 1,965 stale `app_projects` rows, concentrated in Tacoma ZIPs (98404 414 · 98406 302 · 98407 291 · 98422 201 · 98408 178 ·
+98409 171 · 98403 91 · 98418 86 · 98465 63 · 98444 48 · 98402 40 · others under 30), none referenced by `app_changes`
+(`stale_kept_referenced` 0 everywhere). They are minor-repair permits the new rule drops by design (SQL section 5 had sized the cohort at
+2,181 distinct records), but the longitudinal-asset rule says removal should not destroy history, and no snapshot was taken first. Their
+identity is recoverable: ids derive from the case number and the public source still serves them, so reverting `drop_minor_repairs` and
+re-running the same flush would restore them. The privacy-stripped names themselves are intentionally not retained anywhere.
+
+**Other residuals.** Old response bodies in `net._http_response` still contain pre-deploy names until pg_net's retention expires them.
+The `indexnow` job of pages run 38782500923 failed after `build` and `deploy` had succeeded. Read from its log: the notifier waited the
+full 600 s and then refused, because `/community/29904/` was "not serving this build's bytes yet (HTTP 200)"; the job reported
+63 changed pages and **submitted 0**, so nothing was announced. That is the gate working as designed (notify only what is live), not a
+fault in the Pierce work. The likely reason is that later pushes to `main` (#1965, #1967, #1969) replaced this build before it served
+long enough to be seen, but that was not checked, so treat it as a hypothesis; the next successful build carries the same delta forward
+("Carry over notifications an earlier IndexNow job did not send"). ZIP 98397 (no PALS records) is the one non-indexable Pierce page and predates this work (its report was
+refreshed before the deploy and it has 0 `app_projects`).
