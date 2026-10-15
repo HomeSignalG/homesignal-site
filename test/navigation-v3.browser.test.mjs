@@ -9,7 +9,7 @@
 //   1. the logo and Explore lead to index.html, and a signed-in resident with a saved
 //      Address STAYS there (no dashboard bounce), with Explore lit;
 //   2. on a return visit, when the viewed ZIP is the resident's own, the homepage's sample
-//      still reads the sample ZIP its heading names (75034), never the resident's;
+//      still reads the sample ZIP its heading names (98335), never the resident's;
 //   3. every page lights the item of the section it belongs to (the active-item matrix);
 //   4. My Places shows "What's Changed" and "Alert Settings" above the place list;
 //   5. the six support links sit in the ONE shared footer, in order, without overflow at
@@ -198,9 +198,9 @@ ok(JSON.stringify(c.lit) === JSON.stringify(['explore']), '1 Explore is the one 
 // Measured on a RETURN visit. On the first load nothing has stored the resident's ZIP yet,
 // so the viewed ZIP falls back to the default; the first boot's follow sync stores
 // hs:myZip = 84302, so on the second load the viewed ZIP is the resident's own, which is
-// exactly the case a sample must ignore. The sample's ZIP is fixed (75034) by the founder's
+// exactly the case a sample must ignore. The sample's ZIP is fixed (98335) by the founder's
 // Revised Index Design: its list read and its map iframe both name it.
-console.log('--- 2. the homepage sample is 75034 ---');
+console.log('--- 2. the homepage sample is 98335 ---');
 const ctxOf = () => D.page.evaluate(() => ({ myZip: localStorage.getItem('hs:myZip'), communities: localStorage.getItem('hs:myCommunities'),
   active: window.HS && window.HS.state && window.HS.state.activeProperty ? window.HS.state.activeProperty.id : null }));
 const ctxBefore = await ctxOf();
@@ -213,11 +213,11 @@ const reads = await D.page.evaluate(() => (window.__navRpcs || [])
 const view = await D.page.evaluate(() => ({ viewed: window.HS.state.zip, frame: document.getElementById('homeMapFrame').getAttribute('src') }));
 ok(view.viewed === SAVED.zip,
   '2 on the return visit the viewed ZIP is the resident’s own ' + SAVED.zip + ' (positive control)', view);
-ok(reads.length === 1 && reads[0].zip === '75034' && reads[0].kind === 'development',
-  '2 the homepage made exactly one development read, for the sample ZIP 75034, not the resident’s ' + SAVED.zip, reads);
-ok(view.frame === 'homesignalmap.html?embed=1&preview=1&zip=75034', '2 the sample map names 75034 too', view.frame);
+ok(reads.length === 1 && reads[0].zip === '98335' && reads[0].kind === 'development',
+  '2 the homepage made exactly one development read, for the sample ZIP 98335, not the resident’s ' + SAVED.zip, reads);
+ok(view.frame === 'homesignalmap.html?embed=1&preview=1&zip=98335', '2 the sample map names 98335 too', view.frame);
 const heading = await D.page.evaluate(() => document.getElementById('homeResultsHeading').textContent.trim());
-ok(heading === 'See an example: 75034 · Frisco, Texas', '2 the sample heading names 75034 · Frisco, Texas', heading);
+ok(heading === 'See an example: 98335 · Gig Harbor, Washington', '2 the sample heading names 98335 · Gig Harbor, Washington', heading);
 // loading the sample must not alter the resident's saved Places, active property or browser ZIP context (positive control: they are set before)
 const ctxAfter = await ctxOf();
 ok(ctxBefore.myZip !== null && ctxBefore.communities !== null && ctxBefore.active === SAVED.id, '2 the saved context exists before the sample loads (positive control)', ctxBefore);

@@ -1,9 +1,9 @@
 // BUILDS the homepage's "Example property report" preview: assets/home-report-example-{desktop,mobile}.webp + data/home-showcase/preview-receipt.json.
 //
-// WHAT IT IS: the REAL report for 3999 Touraine Dr, Frisco, TX 75034 (report snapshot eaf8c17c-..., generated 2026-10-12), rendered by the one presentation
-// authority lib/da-report-view.js over the report body stored in data/home-showcase/touraine-75034-report-body.json. That file is the stored body BYTE FOR BYTE
+// WHAT IT IS: the REAL report for 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 (report snapshot f7c2c616-..., generated 2026-10-15), rendered by the one presentation
+// authority lib/da-report-view.js over the report body stored in data/home-showcase/point-fosdick-98335-report-body.json. That file is the stored body BYTE FOR BYTE
 // (md5 below equals md5(body) read from the stored-report table). This script invents no project, stage, date, distance or impact sentence, and decides no
-// Type or impact: the view does. What it chooses by hand is ONLY which four rows to keep (one per kind) and the caption saying so.
+// Type or impact: the view does. What it chooses by hand is ONLY which rows to keep (both of the report's two) and the caption.
 //
 //   node scripts/build-home-showcase-preview.mjs           writes the two webp files and the receipt (needs playwright + Python Pillow)
 //   node scripts/build-home-showcase-preview.mjs --check   READ-ONLY: re-renders into a temp dir and compares the RENDERED TEXT with the committed receipt
@@ -17,23 +17,21 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const FIXTURE = join(root, 'data/home-showcase/touraine-75034-report-body.json');
+const FIXTURE = join(root, 'data/home-showcase/point-fosdick-98335-report-body.json');
 const RECEIPT = join(root, 'data/home-showcase/preview-receipt.json');
 const ASSET = { desktop: join(root, 'assets/home-report-example-desktop.webp'), mobile: join(root, 'assets/home-report-example-mobile.webp') };
 const CHECK = process.argv.includes('--check');
 const STRICT_PIXELS = process.argv.includes('--strict-pixels');   // only meaningful where the SAME fonts as the machine that built the assets are installed
 const VIEW_SHA = createHash('sha256').update(readFileSync(join(root, 'lib/da-report-view.js'))).digest('hex');
 
-export const FIXTURE_MD5 = '0cf8f5d321b5fbf4849f380362bb9ba4';   // md5 of the stored report body for report eaf8c17c-1063-4b72-9467-dbf0e1a13909, read from production 2026-10-12
-export const SUBJECT = '3999 Touraine Dr, Frisco, TX 75034';
-// One record per kind, so the four different considerations are visible. Chosen by project_id; the view still renders each row in full.
+export const FIXTURE_MD5 = 'f04579a6f3adfc15f4f7ab3300e884c3';   // md5 of the stored report body for report f7c2c616-6741-4641-88f6-5aeef15e62ad, read from production 2026-10-15
+export const SUBJECT = '4700 Point Fosdick Dr NW, Gig Harbor, WA 98335';
+// Both records of the report are shown (it has only two). Chosen by project_id; the view still renders each row in full.
 export const KEEP = [
-  'arcgis:frisco-active-building-permits:B25-02756',   // Residential, permitted
-  'arcgis:frisco-active-building-permits:B25-03418',   // Commercial (a single-address site, not one of the five Wellness Way permits), permitted
-  'arcgis:frisco-active-building-permits:B26-01529',   // Civic & public (school), permitted
-  'arcgis:txdot-projects-info-all:091824314',          // Roads & infrastructure, proposed / under review
+  'arcgis:pierce-county-pals-permits:1074329',   // Residential, Long Acres Lot 20, proposed / under review
+  'arcgis:pierce-county-pals-permits:1072432',   // Residential, Long Acres Lot 15, permitted / under construction
 ];
-const CAPTION = 'Example property report · real records, as of Oct 12, 2026. Showing 4 of the report’s 9 official records, one of each kind. In the full report each record links to its official source.';
+const CAPTION = 'Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source.';
 // CSS px; deviceScaleFactor 2 => intrinsic 1600 / 688 wide. The report view stacks each record below 760px of ITS OWN width (lib/da-report-view.js STACK_AT), so the
 // desktop frame must be wide enough for the real four-column table (800 - 32 padding = 768 >= 760); the mobile frame is the view's own stacked form of the same four fields.
 const FRAMES = { desktop: { w: 800, vw: 800, layout: 'four-column' }, mobile: { w: 344, vw: 344, layout: 'stacked' } };

@@ -47,7 +47,7 @@ console.log('--- 1. one map, and it is Map 1 ---');
 const iframes = tpl.match(/<iframe[\s\S]*?<\/iframe>/g) || [];
 ok(iframes.length === 1, 'the homepage has exactly one iframe', iframes.length);
 const frame = iframes[0] || '';
-ok(/src="homesignalmap\.html\?embed=1&amp;preview=1&amp;zip=75034"/.test(frame), 'its initial src is exactly homesignalmap.html?embed=1&preview=1&zip=75034');
+ok(/src="homesignalmap\.html\?embed=1&amp;preview=1&amp;zip=98335"/.test(frame), 'its initial src is exactly homesignalmap.html?embed=1&preview=1&zip=98335');
 ok(/title="Sample HomeSignal development map"/.test(frame) && /loading="lazy"/.test(frame) && /tabindex="-1"/.test(frame),
   'title, loading="lazy" and tabindex="-1" are as specified');
 ok(!/\sheight=|style="[^"]*height/.test(frame), 'the sample iframe carries no fixed height');
@@ -56,8 +56,8 @@ ok(/\.home-index__map-preview\.is-sample iframe\{pointer-events:none\}/.test(css
 const imgs = tpl.match(/<img\b[^>]*>/g) || [];
 ok(imgs.length === 1 && /src="assets\/home-report-example-desktop\.webp\?v=\d{8}"/.test(imgs[0]),
   'the only image is the example-report preview (desktop asset)', imgs);
-ok(/alt="Example property report for 3999 Touraine Dr, Frisco, TX 75034, as of Oct 12, 2026: 9 official records[^"]*not site-verified/.test(imgs[0] || '') && /width="1600"/.test(imgs[0] || '')
-   && /height="2034"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || '') && /loading="lazy"/.test(imgs[0] || ''),
+ok(/alt="Example property report for 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335, as of Oct 15, 2026: 2 official records[^"]*not site-verified/.test(imgs[0] || '') && /width="1600"/.test(imgs[0] || '')
+   && /height="1464"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || '') && /loading="lazy"/.test(imgs[0] || ''),
   'the report image has a descriptive alt (real address, counts, not site-verified), width, height, decoding and lazy loading');
 ok(/<source media="\(max-width: 560px\)" srcset="assets\/home-report-example-mobile\.webp\?v=\d{8}" width="688" height="\d+">/.test(tpl),
   'a phone gets the mobile crop of the same report');

@@ -14,24 +14,23 @@ const rd = (f) => readFileSync(join(root, f));
 let fails = 0;
 const ok = (c, n, d) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + n); if (!c) { fails++; if (d !== undefined) console.log('   ' + String(d).slice(0, 400)); } };
 
-const bodyBuf = rd('data/home-showcase/touraine-75034-report-body.json');
-ok(createHash('md5').update(bodyBuf).digest('hex') === '0cf8f5d321b5fbf4849f380362bb9ba4', '1 the report body is byte-identical to the production snapshot (md5 of the stored report body, report eaf8c17c)');
+const bodyBuf = rd('data/home-showcase/point-fosdick-98335-report-body.json');
+ok(createHash('md5').update(bodyBuf).digest('hex') === 'f04579a6f3adfc15f4f7ab3300e884c3', '1 the report body is byte-identical to the production snapshot (md5 of the stored report body, report f7c2c616)');
 const rep = JSON.parse(bodyBuf.toString('utf8'));
 const by = (k) => rep.projects.filter((p) => p.type.key === k).length;
-ok(rep.projects.length === 9 && rep.radius_mi === 0.5 && rep.zip === '75034' && rep.as_of === '2026-10-12', '2 nine official records, 0.5-mile radius, ZIP 75034, as of 2026-10-12');
-ok(by('residential') === 1 && by('commercial') === 6 && by('infrastructure') === 1 && by('civic') === 1, '3 types: Residential 1, Commercial 6, Roads & infrastructure 1, Civic & public 1');
-ok(rep.sections.by_stage.permitted.length === 8 && rep.sections.by_stage.proposed.length === 1, '4 stages: 8 permitted / under construction, 1 proposed / under review');
-ok(rep.projects.filter((p) => (p.homesignal_detected_changes || []).some((c) => c.event_type === 'first_detected' && c.detected_at.startsWith('2026-10-04'))).length === 2, '5 two records first detected by HomeSignal on 2026-10-04');
-ok(rep.projects.filter((p) => p.address === '3501 WELLNESS WAY').length === 5, '6 five commercial permits share one Wellness Way address (not five sites)');
-ok(rep.projects.filter((p) => p.record_date && p.record_date.older_than_a_year).length === 2, '7 two records carry official dates older than a year');
+ok(rep.projects.length === 2 && rep.radius_mi === 0.5 && rep.zip === '98335' && rep.as_of === '2026-10-15', '2 two official records, 0.5-mile radius, ZIP 98335, as of 2026-10-15');
+ok(by('residential') === 2, '3 types: both records Residential');
+ok(rep.sections.by_stage.permitted.length === 1 && rep.sections.by_stage.proposed.length === 1, '4 stages: 1 permitted / under construction, 1 proposed / under review');
+ok(rep.projects.every((p) => p.source_family === 'pierce-county-pals-permits' && /^https:\/\/pals\.piercecountywa\.gov\//.test(p.source.url)), '5 both records are Pierce County PALS permits with an official record link');
+ok(['Construction Residential Long Acres, Lot 15', 'Construction Residential Long Acres, Lot 20'].every((n) => rep.projects.some((p) => p.name === n)), '6 the two records are Long Acres, Lot 15 and Lot 20');
 
 const receipt = JSON.parse(rd('data/home-showcase/preview-receipt.json').toString('utf8'));
 const view = readFileSync(join(root, 'lib/da-report-view.js'), 'utf8');
 const qol = [...view.matchAll(/(?:infrastructure|commercial|residential|civic): '([^']+)'/g)].map((m) => m[1]);
 for (const name of ['desktop', 'mobile']) {
   const t = receipt.frames[name].text;
-  ok(qol.length >= 4 && ['infrastructure', 'residential', 'commercial', 'civic'].every((k) => t.includes(view.match(new RegExp(k + ": '([^']+)'"))[1])), '8 ' + name + ': all four Quality-of-Life sentences in the image are the view\'s own, word for word');
-  ok(/9 official records within 0\.5 miles[^.]*8 permitted \/ under construction · 1 proposed \/ under review/.test(t) && /Showing 4 of the report’s 9 official records/.test(t), '9 ' + name + ': counts and the "4 of 9" disclosure are in the image');
+  ok(t.includes(view.match(/residential: '([^']+)'/)[1]), '8 ' + name + ': the Quality-of-Life sentence in the image is the view\'s own, word for word');
+  ok(/2 official records within 0\.5 miles[^.]*1 permitted \/ under construction · 1 proposed \/ under review/.test(t) && /Both of the report’s 2 official records are shown/.test(t) && !/Frisco|Touraine|75034/.test(t), '9 ' + name + ': counts and the "both of 2" disclosure are in the image; no Frisco content');
   ok(!/Founder Test|\bct\b|@|Test Workspace/i.test(t), '10 ' + name + ': no test-account identity or email in the image text');
   ok(/Proposed \/ Under Review/.test(t) && /Permitted \/ Under Construction/.test(t), '11 ' + name + ': both stages shown with the report\'s own labels');
 }
@@ -61,7 +60,7 @@ r2 = withDamage([DESK, REC], () => {
 ok(r2.status !== 0 && /committed image differs from a fresh render/.test(r2.stdout), '17 with --strict-pixels (same fonts), a same-size image that does not match a fresh render fails even when the receipt is made consistent with it', r2.stdout);
 r2 = withDamage([REC], () => { const rc = JSON.parse(rd(REC).toString('utf8')); rc.view_sha256 = '0'.repeat(64); writeFileSync(join(root, REC), JSON.stringify(rc, null, 1) + '\n'); }, checkRun);
 ok(r2.status !== 0 && /da-report-view\.js changed since the images were built/.test(r2.stdout), '17b images built from an older report view fail --check on any machine, whatever fonts it has', r2.stdout);
-r2 = withDamage([IDX], () => writeFileSync(join(root, IDX), rd(IDX).toString('utf8').replace('width="1600" height="2034"', 'width="1400" height="1900"')), checkRun);
+r2 = withDamage([IDX], () => writeFileSync(join(root, IDX), rd(IDX).toString('utf8').replace('width="1600" height="1464"', 'width="1400" height="1900"')), checkRun);
 ok(r2.status !== 0 && /index\.html does not reference/.test(r2.stdout), '18 the homepage referencing the preview at a stale size fails --check', r2.stdout);
 const post = checkRun();
 ok(post.status === 0, '19 after the damage tests the committed files are restored and --check passes again', post.stdout);
