@@ -288,7 +288,7 @@ ok(row.beforeStrip && row.beforeGrid, '4 ...above the place summary and the plac
 console.log('--- 5. support links in the one shared footer ---');
 const readFooter = (page) => page.evaluate(() => {
   const foot = document.getElementById('hs-footer');
-  const links = foot ? [...foot.querySelectorAll('a')] : [];
+  const links = foot ? [...foot.querySelectorAll('.hs-footer__links a')] : [];
   const fb = foot ? foot.getBoundingClientRect() : { left: 0, right: 0 };
   return {
     footers: document.querySelectorAll('footer').length,
@@ -316,6 +316,8 @@ ok(JSON.stringify(f.hrefs) === JSON.stringify(EXPECT_HREFS), '5 1280px: ...to th
 ok(f.lit === 0 && f.inNav === 0, '5 1280px: support links carry no data-nav and sit outside the primary <nav>', f);
 ok(!f.overflowX && f.outside.length === 0, '5 1280px: nothing overflows the footer', f);
 ok(f.lines === 1, '5 1280px: the footer is one line', f.lines);
+const soc = await D.page.evaluate(() => [...document.querySelectorAll('#hs-footer .hs-footer__soc')].map((a) => a.getAttribute('aria-label') + '=' + a.getAttribute('href')));
+ok(soc.length === 2 && /Bluesky=https:\/\/bsky\.app\//.test(soc[0]) && /Reddit=https:\/\/www\.reddit\.com\/user\//.test(soc[1]), '5 1280px: the footer carries the Bluesky and Reddit icon links, outside the six support links', soc);
 ok(Math.max(...f.linkHeights) <= Math.min(...f.linkHeights) + 1, '5 1280px: no single link wraps', f.linkHeights);
 
 const M = await newPage({ width: 390, height: 844 });

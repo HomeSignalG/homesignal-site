@@ -63,6 +63,8 @@ NAME_RE = re.compile(r"HomeSignal(?![\w\-])")
 SUPPORT_PAGES = {"contact.html", "privacy.html", "terms.html", "refund-policy.html"}
 SUPPORT_MAILBOX = {"jody": "info@jodytracks.com"}
 SUPPORT_RE = re.compile(r"hello@homesignal\.net")
+# Social handles: the source keeps the HomeSignal Reddit account; the Jody tree links the Jody account (founder, 2026-10-15).
+SOCIAL_HANDLES = {"jody": [(re.compile(r"https://www\.reddit\.com/user/HomeSignalnet"), "https://www.reddit.com/user/jodytracks")]}
 
 # What may remain after rewriting a jody tree (everything else is a defect).
 ALLOWED_LEFTOVER = [
@@ -205,6 +207,8 @@ def run(root: Path, identity: str, staging: bool, contract: dict, verification_d
         if rel in SUPPORT_PAGES and identity in SUPPORT_MAILBOX:
             after, k = SUPPORT_RE.subn(SUPPORT_MAILBOX[identity], after)
             report["counts"]["support"] += k
+        for rx, new in SOCIAL_HANDLES.get(identity, []):
+            after = rx.sub(new, after)
         after, t = apply_tagline(rel, after)
         report["counts"]["tagline"] += t
         if p.suffix == ".html":
