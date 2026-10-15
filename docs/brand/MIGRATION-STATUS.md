@@ -12,7 +12,7 @@ Updated in the same PR as each step. Do not create a second status file. HomeSig
 | 6 Integration + rehearsal | engineering DONE: DNS audit (run 37978348576), Bluesky hold (ingest #655/#656), payment check from code, consolidated founder list; founder items open | `docs/brand/CUTOVER-CHECKLIST.md` top table |
 | 7 Cutover | NOT READY, NOT EXECUTED. G1 PASSED, G3 PASSED, G2 PASSED on the Render preview. Open: G2 on homesignal.net, G7 (counsel, auto-renew), G8 (founder GO LIVE). The activation machinery is built as a DRAFT PR and is inert (Step 16) | `docs/brand/CUTOVER-CHECKLIST.md` |
 | 8 Email + Bluesky | Resend domain jodytracks.com VERIFIED (2026-10-10 18:41Z); nothing sent, no outreach, Bluesky untouched | see "Resend verified" below |
-| 9 Search transition + monitoring | not started; IndexNow is HELD for Jody by a committed switch (`docs/brand/indexnow-jody-hold.json`, Step 16) | |
+| 9 Search transition + monitoring | not started; IndexNow RELEASED for Jody 2026-10-15 (`hold: false` in `docs/brand/indexnow-jody-hold.json`; Search Console Change of Address confirmed) | |
 | 16 Cutover PR + audit | DRAFT PR open, NOT merged, inactive; query-string audit, activation rehearsal, competing-CTO audit done | see "Step 16" below |
 
 ## Step 2 — what "supported" means, decided from the inventory (2026-10-09)

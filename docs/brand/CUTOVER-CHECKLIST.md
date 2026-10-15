@@ -245,6 +245,6 @@ Run against the draft PR and the repositories, not against production. Labels: *
 | Hidden or undeployed edge-function changes | Four functions differ from `main` beyond the origin list (table in MIGRATION-STATUS) | diffed against production source | **OPEN: founder authorizes the deploy set** |
 | Render bandwidth exhaustion and DID downtime | 5 GB/month, no card on file: exhaustion spins the workspace down (redirects and DID offline) until next month; commercial-use wording ambiguous | daily probe designed, not activated; weekly Metrics check | **OPEN** |
 | Incomplete monitoring and recovery | No scheduled probe; no bandwidth reading; no tested fallback host | step 20 and step 0 | **OPEN** |
-| IndexNow before launch | held by `docs/brand/indexnow-jody-hold.json` (fails closed), plus the existing seed-on-404 baseline | `cutover-activation.test.mjs` C1-C6 | OFFLINE |
+| IndexNow before launch | RELEASED 2026-10-15 (`hold: false` in `docs/brand/indexnow-jody-hold.json`; fails closed if the file breaks), plus the existing seed-on-404 baseline | `cutover-activation.test.mjs` C1-C6 | OFFLINE |
 
 What was run: `cutover-activation.test.mjs` (31 checks), `cutover-rehearsal.test.mjs` (26), `redirect-fragment-query.browser.test.mjs` (30, Chromium), the brand suites (`brand-contract`, `brand-stage`, `brand-host`, `brand-origins`, `seo-parity`, `redirect-service`) and the full offline unit suite. Each new suite was mutation-tested (the mutations that survived are named in the PR description).

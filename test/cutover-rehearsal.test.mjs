@@ -125,7 +125,7 @@ if (built) {
 
   // (4) safeguards that must survive
   const hold = inR(['-c', 'import sys; sys.path.insert(0,"scripts"); import indexnow as i; print(i.launch_hold() or "NONE")']).stdout.trim();
-  check('5a under the activated contract IndexNow is HELD (nothing is announced to a search engine until a reviewed hold=false)', hold !== 'NONE' && /hold/.test(hold), hold);
+  check('5a under the activated contract IndexNow is RELEASED (hold=false), so the baseline decides what is announced', hold === 'NONE', hold);
   check('5b the immutable Bluesky DID document is shipped unchanged (did:web:homesignal.net)', existsSync(join(C, '.well-known/did.json')) && readFileSync(join(C, '.well-known/did.json')).compare(readFileSync(join(A, '.well-known/did.json'))) === 0, 'did');
   check('5c the old domain\'s Google verification file is not on the Jody host', !existsSync(join(C, 'google59e1ae3ef6b75e3a.html')), 'present');
   // F2: the one deliberate mailbox is the customer-support info@ on the contact + legal pages; nothing else is invented.
@@ -136,7 +136,7 @@ if (built) {
 
 // ---- the repo itself was not touched ----------------------------------------------------------------------------------------------------
 check('6a the committed contract is unchanged by this rehearsal and is the Jody-current v2', readFileSync('docs/brand/brand-contract.v1.json', 'utf8') === committed && JSON.parse(committed).current_identity === 'jody' && JSON.parse(committed).contract_version === 2, 'changed');
-check('6b the Jody IndexNow hold file is still hold=true', JSON.parse(readFileSync('docs/brand/indexnow-jody-hold.json', 'utf8')).hold === true, 'released');
+check('6b the Jody IndexNow hold file is released (hold=false)', JSON.parse(readFileSync('docs/brand/indexnow-jody-hold.json', 'utf8')).hold === false, 'still held');
 
 rmSync(base, { recursive: true, force: true });
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
