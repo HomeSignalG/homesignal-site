@@ -1732,7 +1732,8 @@
         }
       } catch (e) {}
       release();
-      try { HS.followEmbed.onSaved({ existed: !!r.existed }); } catch (e) {}
+      // zip is the property's ZIP only (never the address): the report page uses it to link to the Alerts page, where topics and consent are chosen.
+      try { HS.followEmbed.onSaved({ existed: !!r.existed, zip: m.zip }); } catch (e) {}
       return;
     }
     HS.announcePlaceSaved({

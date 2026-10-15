@@ -18,4 +18,7 @@ ok(/HS\.startFollowEmbed\(address,/.test(frame) && /HS\.startFollowEmbed = funct
 ok(!/\.insert\(|app_properties|\.rpc\(/.test(frame), '9 the frame writes nothing itself: the one writer stays savePlaceRow');
 ok(/if \(HS\.followEmbed\) \{[\s\S]*?onSaved[\s\S]*?return;\s*\}\s*HS\.announcePlaceSaved/.test(shell) && /!HS\.followEmbed\) \{\s*HS\.startOnboarding/.test(shell), '10 inline follow skips the place card, the reload and onboarding, and nothing else');
 ok(/aria-live="polite"/.test(page) && /textContent = 'Following this property\./.test(code), '11 the finished state is announced');
+ok(!/Get notified when HomeSignal finds/.test(page) && /Email alerts are a separate choice/.test(page), '12 the page no longer promises notification from a follow alone');
+ok(/function followDone\(zip\)/.test(code) && /alerts\.html\?zip=' \+ zip/.test(code) && /\^\\d\{5\}\$\/\.test\(zip/.test(code), '13 after a follow the page links to the Alerts page, only for a 5-digit ZIP');
+ok(/onSaved\(\{ existed: !!r\.existed, zip: m\.zip \}\)/.test(shell) && /zip: \(info && \/\^\\d\{5\}\$\/\.test/.test(frame), '14 the frame reports the ZIP only, never the address');
 console.log(fails ? fails + ' FAILED' : 'ALL PASS'); process.exit(fails ? 1 : 0);
