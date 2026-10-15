@@ -149,9 +149,9 @@ try {
 
   // ---- 5. surfaces that carry the production origin carry the CURRENT one -----------------
   check('5a built CNAME == current identity host', readFileSync(join(out, 'CNAME'), 'utf8').trim() === curHost, 'CNAME');
-  const locs = [...readFileSync('sitemap.xml', 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const locs = [...readFileSync(join(out, 'sitemap.xml'), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   check('5b sitemap has a non-empty URL set', locs.length > 1000, `locs=${locs.length}`);
-  check('5c every sitemap URL is on the current origin', locs.every((u) => u.startsWith(curOrigin + '/')), locs.find((u) => !u.startsWith(curOrigin + '/')));
+  check('5c every BUILT sitemap URL is on the current origin (the committed one is written with the source identity; brand_stage applies the public brand)', locs.every((u) => u.startsWith(curOrigin + '/')), locs.find((u) => !u.startsWith(curOrigin + '/')));
   const robotsMaps = [...readFileSync(join(out, 'robots.txt'), 'utf8').matchAll(/^Sitemap:\s*(\S+)/gim)].map((m) => m[1]);
   check('5d built robots.txt Sitemap lines non-empty and on the current origin', robotsMaps.length >= 1 && robotsMaps.every((u) => u.startsWith(curOrigin + '/')), robotsMaps.join(','));
   // The DID is the immutable Bluesky identity: it stays on the ORIGINAL HomeSignal host whichever identity is current.
