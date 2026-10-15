@@ -290,6 +290,10 @@ begin
 end;
 $function$;
 
+-- Supabase default privileges grant EXECUTE to anon directly; the founder-email check inside
+-- refuses anon anyway, but the grant is removed so the first gate is the grant.
+revoke all on function public.hs_request_maps_generation() from public, anon;
+revoke all on function public.hs_maps_generation_status() from public, anon;
 grant execute on function public.hs_request_maps_generation() to authenticated;
 grant execute on function public.hs_maps_generation_status() to authenticated;
 
