@@ -13,7 +13,7 @@
 | `test/brand-origins.test.mjs` | Step 2: generated file == contract, both origins echoed, lookalikes refused, authorization independent of origin. |
 | `docs/brand/MIGRATION-STATUS.md` | The one migration status document. |
 | `docs/brand/CUTOVER-CHECKLIST.md` | Founder actions, GO LIVE sequence, gates, competing-CTO audits. |
-| `docs/brand/indexnow-jody-hold.json` | Step 16: IndexNow is HELD whenever the contract publishes the site as a non-HomeSignal identity (`hold: true`, fails closed). Not read while HomeSignal is current. |
+| `docs/brand/indexnow-jody-hold.json` | Step 16: IndexNow hold for a non-HomeSignal identity; RELEASED 2026-10-15 (`hold: false`), still fails closed if the file is missing or not a boolean. Not read while HomeSignal is current. |
 | `docs/brand/search-console/` | Step 16: empty slot for the Jody host's Google verification file; a file that would not verify is refused at build. |
 | `scripts/brand_host.py`, `scripts/brand_stage.py` | The contract's origin/identity, and the overlay `pages.yml` applies (a no-op while HomeSignal is current). |
 | `test/cutover-activation.test.mjs`, `test/cutover-rehearsal.test.mjs` | Prove the machinery is inert today and that flipping the contract in a throwaway copy yields the proven Jody tree. |
