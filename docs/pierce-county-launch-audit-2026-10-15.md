@@ -107,3 +107,27 @@ registry id saying under-construction. Changing that is a product decision.
   titles and noise until the rolling refresh re-collects each ZIP (~53 h), and `app_projects` follows the next
   materialization.
 * No production data was written or deleted.
+
+## Post-merge record (2026-10-15)
+
+* **Merged** as `65ea03b` (#1955). **Deployed** by dispatching `deploy-edge-functions.yml` (it is dispatch-only; merging does
+  not deploy): run 38778050585, all steps green; `get-address-report` is version 272, updated 17:31:52Z. The only undeployed
+  change to that function tree was this PR (checked with `git log` against the previous deploy commit).
+* **Canary:** one live call of the deployed engine for ZIP 98396 (the same payload the rotation sends; response read from
+  `net._http_response`, nothing stored). 200, EPA ok. All 48 PALS entries kept their `source_id` (identity preserved); 37 plat
+  names preserved verbatim, 10 individual names stripped, 1 corporate applicant kept; core counts equal the cache (development
+  53, facilities 7).
+* **Historical cache (dry run, `scripts/audits/pierce-privacy-backfill.sql`):** 3,825 `development_reports` entries (1,301
+  distinct `source_id`, 62 of 65 report rows) and the same 3,825 `app_projects` rows still carry a name the rule strips. The
+  other columns that could hold it (`developer`, `scope_text`, `parties`) are empty on those rows, no `app_changes` row
+  references a PALS project, and the one PALS-sourced MAPS post is `skipped`.
+* **Backfill = the pipeline's own rotation, not a script that writes.** The 62 affected ZIPs sit at positions 5,244–12,274 of
+  12,722 in the oldest-first rotation (240 ZIPs/h), so all are re-parsed within about 51 hours of the deploy. Two shortcuts were
+  rejected on evidence: `dev_refresh_fire_targets` (the `dev_refresh_targets` queue holds 1,437 unfired August rows) and
+  back-dating `refreshed_at` (falsifies the freshness clock). Record ids do not change: `source_id` / `source_key` derive from
+  the case number.
+* **98396:** still `temporarily_unavailable` after the deploy. The canary response is healthy (EPA ok, counts equal the cache),
+  so the next scheduled refresh is expected to store cleanly and flip it to `populated`; that is a prediction until the
+  rotation reaches it (~23 h out). Section C of the SQL file is the check.
+* **Still open:** the Rule D project-pages object (ingest-owned storage JSON, keeps untracked pages) is not queryable from SQL
+  and may retain old names; purging it is a separate destructive decision.
