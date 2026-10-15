@@ -32,7 +32,7 @@ const naming = (needle) => FUNCS.filter((p) => code[p].includes(needle));
   { const ct = SQL.slice(SQL.indexOf('create table if not exists public.billing_checkout_claim'), SQL.indexOf(');', SQL.indexOf('create table if not exists public.billing_checkout_claim'))).replace(/^\s*--.*$/gm, '');
     ok(!/\burl\b|\baddress\b|\bemail\b/i.test(ct) && /brokerage_id/.test(ct) && /claimed_at/.test(ct), '1f2 the checkout slot table holds a brokerage and a time: no checkout address, no email (the launch gate keeps the address out of every table)'); }
   ok(!/grant (select|insert|update|delete|all)[^;]*on public\.(share_view_window|billing_checkout_claim)/.test(SQL), '1f and nothing is ever granted on them');
-  ok(/if public\.evaluation_report_limit\(\) <> 10 or public\.billing_report_limit\(\) <> 100/.test(SQL), '1g the post-condition refuses to apply if the founder\'s 10 and 100 moved');
+  ok(/if public\.evaluation_report_limit\(\) <> 100 or public\.billing_report_limit\(\) <> 100/.test(SQL), '1g the post-condition refuses to apply if the founder\'s 100 and 100 moved');
   ok(!/\bemail\b|\bip\b|\baddress\b/i.test(SQL.slice(SQL.indexOf('create table if not exists public.share_view_window'), SQL.indexOf('create index if not exists share_view_window_by_start')).replace(/^\s*--.*$/gm, '')),
     '1h the rate-limit counter table has no column that could hold an email or an address');
   ok(/mem\.role <> 'agent'/.test(SQL) && /v_actor\.role <> 'owner'/.test(SQL) && /v_actor\.brokerage_id <> mem\.brokerage_id/.test(SQL), '1i removal is refused unless the asker is an owner of the same brokerage and the target is an agent');

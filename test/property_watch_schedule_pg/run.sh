@@ -11,6 +11,7 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 Q() { P -tA -c "$1"; }
@@ -20,7 +21,7 @@ DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-
 
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public; drop schema if exists cron cascade; drop schema if exists net cascade; drop schema if exists vault cascade;" >/dev/null 2>&1
              P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null; }
-apply_deps() { local dep; for dep in "${DEPS[@]}"; do P -f "$root/docs/$dep.sql" >/dev/null 2>&1 || { echo "FAIL - docs/$dep.sql does not apply"; exit 1; }; done; }
+apply_deps() { local dep; for dep in "${DEPS[@]}"; do P -f "$(docsql "$dep")" >/dev/null 2>&1 || { echo "FAIL - docs/$dep.sql does not apply"; exit 1; }; done; }
 stand_ins() { P -f "$here/fixture_cron.sql" >/dev/null; P -f "$here/fixture_net_vault.sql" >/dev/null; P -f "$here/fixture_monitor.sql" >/dev/null; }
 seed_secret() { Q "insert into vault.decrypted_secrets values ('signup_hook_secret', 'S3CR3T-vault-value')" >/dev/null; }
 apply_base() { reset_db; apply_deps

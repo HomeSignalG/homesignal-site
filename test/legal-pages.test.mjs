@@ -35,7 +35,7 @@ ok(ph.includes('href="https://www.paddle.com/legal/privacy"') && /Paddle acts as
 ok(/When paid checkout is available/.test(text(ph)), 'Privacy payment text is conditional on paid checkout being available');
 // Plan facts, eligibility, free evaluation
 ok(/currently offered as a free evaluation/.test(terms) && /Paid plans are not yet available/.test(terms) && !/\$\d/.test(terms), 'Terms: free evaluation, paid plans not yet available, no price');
-ok(/10 free evaluation reports\. No purchase is required/.test(terms), 'Terms: 10 reports are a free evaluation');
+ok(/100 free evaluation reports\. No purchase is required/.test(terms), 'Terms: 100 reports are a free evaluation');
 ok(/custom quote/.test(terms), 'Terms: brokerage/team/enterprise by custom quote');
 ok(/paid plans are not yet available/i.test(rp) && !/\$\d/.test(rp) && /free evaluation reports do not require payment/i.test(rp), 'Refund Policy: no price, paid plans not yet available, free evaluation needs no payment');
 // Cancellation and refund are consistent across Terms and Refund Policy
@@ -62,7 +62,7 @@ ok(/\/terms\.html/.test(read('scripts/gen_sitemap.py')) && /\/refund-policy\.htm
 const da = read('development-activity.html');
 const dat = text(da);
 ok(!/\$\d/.test(dat) && /Paid plans coming/.test(dat), 'plan page shows no price and says paid plans are coming (free-only, founder 2026-10-15)');
-ok(/10 Development Activity reports free/.test(dat), 'plan page publishes the 10 free reports');
+ok(/100 Development Activity reports free/.test(dat), 'plan page publishes the 100 free reports');
 for (const h of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(da.includes('href="' + h + '"'), 'plan page links ' + h + ' in its own content');
 const customer = [read('development-activity.html'), read('development-activity-reports.html')].map(text).join(' ');
 ok(!/Lemon\s*Squeezy/i.test(customer), 'visible plan pages do not name Lemon Squeezy as the provider');

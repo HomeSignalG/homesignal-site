@@ -2,7 +2,7 @@
 -- DEVELOPMENT ACTIVITY — THREE OWNER SAFEGUARDS (audit item D, founder-approved 2026-10-08: "D approved")
 --
 -- Three independent, ADDITIVE pieces. Each is its own section, owns its own objects and can be rolled back alone (the footer drops them by name).
--- Nothing here changes a table, a column, a constraint or a function that exists: the 10 free reports (evaluation_report_limit), the 100 paid reports
+-- Nothing here changes a table, a column, a constraint or a function that exists: the 100 free reports (evaluation_report_limit), the 100 paid reports
 -- a month (billing_report_limit), the report rate limit's numbers and every membership rule are read, never written, and the post-condition at the
 -- foot refuses to apply if any of them is anything but what it was.
 --
@@ -308,7 +308,7 @@ grant execute on function public.da_owner_safeguards_check()                    
 
 -- ---- POST-CONDITION -----------------------------------------------------------------------------------------------------------------------
 -- Computed over every function and relation this file owns, so one added later that is open to a resident role fails here; and it refuses to leave
--- the founder's numbers anything but what they are (10 free, 100 paid) or the report rate limit's numbers moved.
+-- the founder's numbers anything but what they are (100 free, 100 paid) or the report rate limit's numbers moved.
 do $post$
 declare
   f record;
@@ -336,8 +336,8 @@ begin
       raise exception 'da_owner_safeguards: % has a privilege granted to a role other than its owner', t;
     end if;
   end loop;
-  if public.evaluation_report_limit() <> 10 or public.billing_report_limit() <> 100 then
-    raise exception 'da_owner_safeguards: the founder numbers moved (10 free, 100 paid)';
+  if public.evaluation_report_limit() <> 100 or public.billing_report_limit() <> 100 then
+    raise exception 'da_owner_safeguards: the founder numbers moved (100 free, 100 paid)';
   end if;
   if (select string_agg(bucket || ':' || window_secs || ':' || max_requests, ',' order by bucket collate "C", window_secs) from public.share_view_limits())
        <> 'client:60:30,client:3600:300,client:86400:2000,link:60:120,link:3600:1500' then

@@ -72,7 +72,7 @@ const COPY = [
   'See what’s being proposed, approved, and built around a property — before it surprises your client.',
   'HomeSignal gives real-estate professionals a sourced view of Development Activity around a property, organized by Type and Stage.',
   'You know what’s there. HomeSignal shows you what’s changing.',
-  'Start free — 10 reports', 'View a sample report →',
+  'Start free — 100 reports', 'View a sample report →',
   'Every project is organized by Type and Stage so you can quickly see what it is and where it stands.',
   'Walk into the conversation knowing more.',
   'Before a buyer tour', 'See nearby Development Activity the client may ask about before arriving at the property.',
@@ -84,9 +84,9 @@ const COPY = [
   'Not school scores, restaurant lists, or generic neighborhood data. HomeSignal focuses on development activity that can change what surrounds the property.',
   'Check Development Activity coverage', 'Enter property address or ZIP', 'Check coverage',
   'HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.',
-  'Start free', 'Free', '10 Development Activity reports free', 'No credit card required.',
-  'Individual accounts receive 10 individual evaluation reports. Brokerage evaluation accounts share 10 reports across their invited evaluation users.',
-  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, every account starts with 10 free reports.',
+  'Start free', 'Free', '100 Development Activity reports free', 'No credit card required.',
+  'Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.',
+  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, every account starts with 100 free reports.',
   'Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is.',
   'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
   'Know what’s changing before your client asks.',
@@ -180,7 +180,7 @@ const inSitemap = sitemap.includes('/' + PAGE);
 const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
 ok(cta.length === 3 && cta.every((c) => c.cta === 'start-free'),
-  'the hero, pricing and closing "Start free — 10 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
+  'the hero, pricing and closing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
 // Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
 ok(joins.length === 0 && !/Join for|Cancel anytime|\/month/.test(text), 'there is no Join link, no price, no "/month" and no "Cancel anytime" on the landing page (free-only)', joins.map((j) => j[0]));
@@ -204,7 +204,7 @@ ok(shipped, 'DEPLOYED (founder, 2026-09-29): the page is in the scripts/stage_si
 const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^>]*data-cta="[^"]+"[^>]*>[^<]*<\/button>)\s*<span class="da-soon">Opens at launch\.<\/span>\s*<\/div>/g)]
   .map((m) => ({ hidden: !!m[1], tag: m[2] }));
 // Counted, not matched by tag: three buttons share one tag, so a tag match would let an unhidden
-// "Start free — 10 reports" borrow a hidden sibling's wrapper.
+// "Start free — 100 reports" borrow a hidden sibling's wrapper.
 const isInert = (tag) => /aria-disabled="true"/.test(tag);
 const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
 ok(wrappers.length === 3 && (markup.match(/data-commerce/g) || []).length === 3 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),

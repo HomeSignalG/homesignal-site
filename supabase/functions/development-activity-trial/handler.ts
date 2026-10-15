@@ -1,8 +1,8 @@
-// development-activity-trial — joining a brokerage's 10-report trial, reading one's own trial (Development Activity build step 5c),
+// development-activity-trial — joining a brokerage's 100-report trial, reading one's own trial (Development Activity build step 5c),
 // creating a trial (step 5d) and an owner inviting agents (step 5e; docs/development-activity-build-steps-100526.md).
 //
 // EIGHT ACTIONS:
-//   signup   an individual agent makes their own account (Order L2): the database creates the account, the owner membership and the 10-report
+//   signup   an individual agent makes their own account (Order L2): the database creates the account, the owner membership and the 100-report
 //            evaluation in one transaction, only for a confirmed email, once per person (a repeat is a replay). Never for a person who already
 //            belongs to a brokerage. No admin, no invite, no HomeSignal step.
 //   status   whether this person can make reports here, how many free reports their brokerage's trial has left, and their role.
@@ -42,7 +42,7 @@ export type Deps = AdminGateDeps & {
   roleOf: (userId: string) => Promise<Role | null>;
   /** The kind of account the person belongs to, from the one membership resolver (Order L2). */
   accountTypeOf: (userId: string) => Promise<AccountType | null>;
-  /** An individual agent makes their own account, owner membership and 10-report evaluation in one database transaction (Order L2). */
+  /** An individual agent makes their own account, owner membership and 100-report evaluation in one database transaction (Order L2). */
   signupIndividual: (userId: string, name: string) => Promise<SignedUp>;
   inviteAgent: (userId: string) => Promise<CreatedInvite>;
   /** An owner's team (docs/da-owner-safeguards.sql part A): agents as masked labels, and open invites. NotEntitled for anyone who is not an owner. */
@@ -59,7 +59,7 @@ export const CAPABILITY = {
   method: 'POST { action: "status" } | { action: "signup", name } | { action: "redeem", token } | { action: "create", brokerage_name, seat_limit?, trial_days? } | { action: "invite" } | { action: "team" } | { action: "remove_member", member } | { action: "withdraw_invite", invite }',
   access: 'signed-in user; answers only about their own trial. signup: the signed-in user, for themselves only. create: an internal admin (dashboard_admins) only. invite, team, remove_member, withdraw_invite: an owner of their own brokerage only',
   stores_reports: false,
-  writes: ['an individual account, its owner membership and its 10-report evaluation, when a signed-in agent signs up for themselves',
+  writes: ['an individual account, its owner membership and its 100-report evaluation, when a signed-in agent signs up for themselves',
     'a brokerage membership, when the signed-in person redeems an invite',
     'a brokerage account, its trial and its owner invite, when an admin creates a trial',
     'an agent invite, when a trial owner invites an agent',

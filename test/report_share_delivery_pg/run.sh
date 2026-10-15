@@ -16,13 +16,14 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 SQL="$root/docs/report-share-delivery.sql"
 DEPS=(brokerage-account-spine report-private-context report-snapshot evaluation-entitlement saved-reports)
 SHARE="$root/docs/report-share.sql"
 reset_db() { P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1; P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null; }
 apply_deps() {
-  for f in "${DEPS[@]}"; do P -f "$root/docs/$f.sql" >/dev/null 2>&1 || { echo "FAIL - docs/$f.sql does not apply"; exit 1; }; done
+  for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>&1 || { echo "FAIL - docs/$f.sql does not apply"; exit 1; }; done
   P -f "$SHARE" >/dev/null 2>&1 || { echo "FAIL - docs/report-share.sql does not apply"; exit 1; }
 }
 apply_base() { reset_db; apply_deps; }
@@ -130,7 +131,7 @@ echo "ROLLED BACK with $shares shares stored: the six functions gone, every shar
 
 # ---- 5. it refuses, creating nothing, without the share primitive ----------------------------------------------------------------------
 reset_db
-for f in "${DEPS[@]}"; do P -f "$root/docs/$f.sql" >/dev/null 2>&1; done
+for f in "${DEPS[@]}"; do P -f "$(docsql "$f")" >/dev/null 2>&1; done
 if P -f "$SQL" >/dev/null 2>"$here/.refusal.err"; then rm -f "$here/.refusal.err"; echo "FAIL - the delivery file APPLIED without the share primitive"; exit 1; fi
 if ! grep -q 'report_share_delivery: apply docs/report-share.sql' "$here/.refusal.err" || [ "$(n_mine)" != "0" ]; then
   rm -f "$here/.refusal.err"; echo "FAIL - the refusal without the share primitive did not say why, or left functions behind"; exit 1

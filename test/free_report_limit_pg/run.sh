@@ -20,7 +20,8 @@ DB_A="$PGDATABASE"; DB_B="${PGDATABASE}_fresh"
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 PA() { PGDATABASE="$DB_A" P "$@"; }
 PB() { PGDATABASE="$DB_B" P "$@"; }
-MIG="$root/docs/free-report-limit-10.sql"; NEW="$root/docs/evaluation-entitlement.sql"; OLD="$here/evaluation-entitlement-before.sql"
+MIG="$root/docs/free-report-limit-10.sql"; . "$root/test/lib/docsql.sh"   # TEST-ONLY: this historical 20 -> 10 migration is compared with an install at the limit under test (10); the real 100 is proven by test/free_report_limit_100_pg
+NEW="$(docsql evaluation-entitlement)"; OLD="$here/evaluation-entitlement-before.sql"
 fails=0; n=0
 ok() { n=$((n+1)); if [ "$1" = "1" ]; then echo "PASS — $2"; else fails=$((fails+1)); echo "FAIL — $2 ${3:+[$3]}"; fi; }
 mkdb() { psql -X -q -d postgres -c "drop database if exists $1" -c "create database $1" >/dev/null; }

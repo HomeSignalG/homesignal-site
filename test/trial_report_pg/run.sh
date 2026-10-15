@@ -11,20 +11,21 @@ set -euo pipefail
 case "$PGDATABASE" in *disposable*) ;; *) echo "ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')"; exit 1;; esac
 if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: a Supabase credential is present"; exit 1; fi
 here="$(cd "$(dirname "$0")" && pwd)"; root="$(cd "$here/../.." && pwd)"
+. "$root/test/lib/docsql.sh"   # TEST-ONLY: install the SQL with the free limit under test (10); see that file
 P() { psql -X -q -v ON_ERROR_STOP=1 "$@"; }
 P -c "drop schema if exists auth cascade; drop schema public cascade; create schema public;" >/dev/null 2>&1
 P -f "$root/test/evaluation_entitlement_pg/fixture.sql" >/dev/null
 P -f "$root/docs/brokerage-account-spine.sql" >/dev/null 2>&1 || { echo "FAIL — the account spine does not apply"; exit 1; }
 P -f "$root/docs/report-private-context.sql" >/dev/null 2>&1 || { echo "FAIL — the private context does not apply"; exit 1; }
 P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1 || { echo "FAIL — the snapshot does not apply"; exit 1; }
-P -f "$root/docs/evaluation-entitlement.sql" >/dev/null 2>&1 || { echo "FAIL — the evaluation entitlement does not apply"; exit 1; }
+P -f "$(docsql evaluation-entitlement)" >/dev/null 2>&1 || { echo "FAIL — the evaluation entitlement does not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply"; exit 1; }
 P -f "$root/docs/saved-reports.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports functions do not apply a second time"; exit 1; }
 # the layers the billing file stands on (it splices the six ownership readers of saved reports, share links and the watch, and reads the payment
 # ledger), in the order production applied them, then the header function, then billing: a member's report is stored by
 # public.brokerage_report_issue, which the real handler now calls, so this suite must have it
 for f in report-share report-share-delivery property-watch payment-event-ledger; do
-  P -f "$root/docs/$f.sql" >/dev/null 2>&1 || { echo "FAIL — docs/$f.sql does not apply"; exit 1; }
+  P -f "$(docsql "$f")" >/dev/null 2>&1 || { echo "FAIL — docs/$f.sql does not apply"; exit 1; }
 done
 P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply"; exit 1; }
 P -f "$root/docs/report-header.sql" >/dev/null 2>&1 || { echo "FAIL — the report-header function does not apply a second time"; exit 1; }
@@ -34,8 +35,8 @@ P -f "$root/docs/brokerage-billing.sql" >/dev/null 2>&1 || { echo "FAIL — the 
 P -f "$root/docs/saved-reports-archive.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports archive does not apply"; exit 1; }
 P -f "$root/docs/saved-reports-archive.sql" >/dev/null 2>&1 || { echo "FAIL — the saved-reports archive does not apply a second time"; exit 1; }
 # the report rate limit: the real handler now claims one request from it before any work is done, so this suite must have it (applied twice, as the others are)
-P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply"; exit 1; }
-P -f "$root/docs/report-rate-limit.sql" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply a second time"; exit 1; }
+P -f "$(docsql report-rate-limit)" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply"; exit 1; }
+P -f "$(docsql report-rate-limit)" >/dev/null 2>&1 || { echo "FAIL — the report rate limit does not apply a second time"; exit 1; }
 # Order L2 (docs/individual-agent-signup.sql): the trial function now also reads the account type, so the SQL it reads must be there (applied twice, as the others are)
 P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply"; exit 1; }
 P -f "$root/docs/individual-agent-signup.sql" >/dev/null 2>&1 || { echo "FAIL — the individual signup does not apply a second time"; exit 1; }

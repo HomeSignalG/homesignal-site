@@ -2,7 +2,7 @@
 -- EVALUATION ENTITLEMENT  (Development Activity plan, Order L1 — 2026-10-02)
 -- SQL OF RECORD. PARKED: NOT APPLIED to production. New schema in production needs its own founder go, and
 -- docs/brokerage-account-spine.sql (Order K0) must be applied first: this file hangs off it.
--- The database layer of the 10-report brokerage evaluation, built DARK: nothing calls it, no function is deployed,
+-- The database layer of the 100-report brokerage evaluation, built DARK: nothing calls it, no function is deployed,
 -- no page, schedule or edge function changed, and no report is stored.
 --
 -- WHAT IT IS
@@ -35,18 +35,18 @@
 --     whether a credit is consumed ............ evaluation_report_issue (one credit per SUCCESSFUL call). Whether a
 --                                               limited-coverage or thin report SHOULD be charged is open decision R5; the
 --                                               future handler decides when to call this function, nothing here hard-codes it.
---     how many credits exist .................. evaluation_report_limit(), the one definition of the number 10.
+--     how many credits exist .................. evaluation_report_limit(), the one definition of the number 100.
 --     paid state ................................ a later order (M) writes evaluation.status; public.subscriptions is the
 --                                               map-paywall product and is not read here.
 --
--- THE 10-REPORT CAP HOLDS BY CONSTRAINT AT ANY ISOLATION LEVEL, not by a lock and a count.
+-- THE 100-REPORT CAP HOLDS BY CONSTRAINT AT ANY ISOLATION LEVEL, not by a lock and a count.
 --   A row lock serialises concurrent writers only at READ COMMITTED; at REPEATABLE READ the waiter keeps its old snapshot and a
 --   count taken from it is stale (measured on K0's owner guard: two sessions both passed and left zero owners). So the ledger
 --   carries an ORDINAL: primary key (evaluation_id, ordinal) and CHECK (ordinal between 1 and evaluation_report_limit()). At
---   most 10 distinct ordinals exist per evaluation, so an 11th row cannot be inserted by ANY writer, in any transaction, at any
+--   most 100 distinct ordinals exist per evaluation, so a 101st row cannot be inserted by ANY writer, in any transaction, at any
 --   isolation level, including one that bypasses the functions. Likewise unique (evaluation_id, idempotency_key) and
---   unique (report_id). The status flips to 'complete' in a trigger on the 10th ledger row, so it cannot be skipped.
---   What remains lock-based is only the FRIENDLY behaviour (a retried key returns the stored report, the 11th call says
+--   unique (report_id). The status flips to 'complete' in a trigger on the 100th ledger row, so it cannot be skipped.
+--   What remains lock-based is only the FRIENDLY behaviour (a retried key returns the stored report, the 101st call says
 --   EVALUATION_COMPLETE, the next ordinal is contiguous, agent seats are counted, and an actor's membership is re-read after the
 --   evaluation lock). evaluation_report_issue, evaluation_invite_redeem, evaluation_invite_mint and evaluation_invite_revoke
 --   therefore REFUSE any transaction that is not READ COMMITTED (errcode 55000) instead of
@@ -79,7 +79,7 @@
 --
 -- ERRORS (message, SQLSTATE) — the handler maps on the message
 --   INVITE_UNUSABLE EV001   an unknown, malformed, expired, revoked or already-redeemed invite: ONE generic refusal.
---   EVALUATION_COMPLETE EV002   all 10 credits are used (a retried key still returns its report).
+--   EVALUATION_COMPLETE EV002   all 100 credits are used (a retried key still returns its report).
 --   NOT_ENTITLED EV003      not a member, a removed member, another brokerage, a revoked, expired or suspended evaluation.
 --   ALREADY_A_MEMBER EV004  the person already has an ACTIVE membership somewhere (K0: one per user, so no second pool).
 --   SEAT_LIMIT_REACHED EV005   the evaluation's agent seats are full.
@@ -122,7 +122,7 @@ end $pre$;
 
 -- ---- 1. THE ONE DEFINITION OF THE NUMBER OF FREE REPORTS ---------------------------------------------
 create or replace function public.evaluation_report_limit() returns integer
-language sql immutable as $$ select 10 $$;
+language sql immutable as $$ select 100 $$;
 
 -- ---- 2. THE EVALUATION -------------------------------------------------------------------------------
 create table if not exists public.evaluation (

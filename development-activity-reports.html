@@ -445,7 +445,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 <main class="wrap">
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
-    <p class="sub">For individual real estate agents: 10 free Development Activity reports. Paid plans are coming. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
+    <p class="sub">For individual real estate agents: 100 free Development Activity reports. Paid plans are coming. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>
     <form id="sf" novalidate>
       <label>Your name, shown at the top of your reports<input type="text" id="signup-name" maxlength="120" autocomplete="name" placeholder="Pat Agent"></label>
       <button type="submit" class="go" id="signup-go">Create my account</button>
@@ -779,7 +779,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     count.className = 'count';
     var left = trial && typeof trial.credits_remaining === 'number' ? trial.credits_remaining : null;
     if (a === 'trial') {
-      // usage reads as "7 of 10 free reports used"; only when the allowance is not yet known does it fall back to the count left
+      // usage reads as "7 of 100 free reports used"; only when the allowance is not yet known does it fall back to the count left
       count.textContent = freeLimit !== null && left !== null ? (freeLimit - left) + ' of ' + freeLimit + ' free reports used' : (left === 1 ? '1 free report left' : left + ' free reports left');
       sub.textContent = mine()
         ? 'A report with no development data (“No data ingested”) does not use one.'
@@ -909,7 +909,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
       if (member) { document.body.classList.add('to-billing'); $('account').open = true; $('billing').scrollIntoView(); }   // to-billing: room below the last section, so the card can be brought to the top
       else {
         var ts = $('trial-sub');
-        ts.textContent = 'This email does not have an account yet. Create your individual account below to start with 10 free reports and subscribe from there. For a brokerage, team or enterprise organization: ';
+        ts.textContent = 'This email does not have an account yet. Create your individual account below to start with 100 free reports and subscribe from there. For a brokerage, team or enterprise organization: ';
         var ca = document.createElement('a'); ca.href = 'contact.html'; ca.textContent = 'Request a custom quote'; ts.appendChild(ca);
       }
     }
