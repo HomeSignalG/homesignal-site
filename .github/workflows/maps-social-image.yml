@@ -70,6 +70,9 @@ on:
       stamp_types:
         description: 'true = record the canonical Map 1 Development Type (evidence.visual.type_key) on drafts that already hold a current capture; no new screenshots. Combine with dry=true to preview.'
         default: 'false'
+      site_base:
+        description: 'Origin whose Map 1 page is photographed (default https://homesignal.net, unchanged). Use https://jodytracks.com with dry=true to prove the Jody origin first.'
+        default: ''
       stamp_record_match:
         description: 'true = check that existing project pictures show the post''s own record (the picture''s popup name AND Map 1 now) and record it (evidence.visual.record_match) on drafts and approved posts; no new screenshots. Combine with dry=true to preview.'
         default: 'false'
@@ -85,7 +88,7 @@ env:
   # A STANDING value, not a one-shot token. Changing the file to anything else disables
   # every future run; it is never reset by a successful capture.
   EXPECTED_ENABLE: capture-enabled
-  BASE: https://homesignal.net
+  BASE: ${{ inputs.site_base || 'https://homesignal.net' }}
 
 jobs:
   capture:
