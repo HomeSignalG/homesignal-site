@@ -124,7 +124,8 @@ begin
     raise exception 'duplicate ZIP in list' using errcode = '22023';
   end if;
 
-  delete from public.maps_zip_order;
+  -- WHERE true: the database refuses an unqualified DELETE (pg-safeupdate); same as the Data Center function.
+  delete from public.maps_zip_order where true;
 
   -- WITH ORDINALITY is the whole point: array position becomes founder priority, so the
   -- order the founder uploaded is the order stored, with no sort anywhere in between.
