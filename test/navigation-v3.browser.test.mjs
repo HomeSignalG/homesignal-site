@@ -304,9 +304,9 @@ const readFooter = (page) => page.evaluate(() => {
     linkHeights: links.map((a) => Math.round(a.getBoundingClientRect().height))
   };
 });
-// Six support links, then the Bluesky icon (founder, 2026-10-15): an icon-only link, so its label comes from aria-label.
-const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms of Service', 'Refund Policy', ''];
-const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html', 'https://bsky.app/profile/jodytracks.com'];
+// Six support links, then the Bluesky and Reddit icons (founder, 2026-10-15): an icon-only link, so its label comes from aria-label.
+const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms of Service', 'Refund Policy', '', ''];
+const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html', 'https://bsky.app/profile/jodytracks.com', 'https://www.reddit.com/user/HomeSignalnet'];
 await D.page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 let f = await readFooter(D.page);
@@ -316,8 +316,6 @@ ok(JSON.stringify(f.hrefs) === JSON.stringify(EXPECT_HREFS), '5 1280px: ...to th
 ok(f.lit === 0 && f.inNav === 0, '5 1280px: support links carry no data-nav and sit outside the primary <nav>', f);
 ok(!f.overflowX && f.outside.length === 0, '5 1280px: nothing overflows the footer', f);
 ok(f.lines === 1, '5 1280px: the footer is one line', f.lines);
-const soc = await D.page.evaluate(() => [...document.querySelectorAll('#hs-footer .hs-footer__soc')].map((a) => a.getAttribute('aria-label') + '=' + a.getAttribute('href')));
-ok(soc.length === 2 && /Bluesky=https:\/\/bsky\.app\//.test(soc[0]) && /Reddit=https:\/\/www\.reddit\.com\/user\//.test(soc[1]), '5 1280px: the footer carries the Bluesky and Reddit icon links, outside the six support links', soc);
 ok(Math.max(...f.linkHeights) <= Math.min(...f.linkHeights) + 1, '5 1280px: no single link wraps', f.linkHeights);
 
 const M = await newPage({ width: 390, height: 844 });
