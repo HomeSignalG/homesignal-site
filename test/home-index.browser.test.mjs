@@ -135,7 +135,7 @@ console.log('--- 1. signed out: stays on Explore; the approved header and ONE fo
       gone: ['hs-side', 'locLabel', 'hsAddAddress', 'hsAddZip', 'hs-bell-badge', 'sidebackdrop'].filter((id) => document.getElementById(id)),
       bell: !!document.querySelector('[aria-label="Notifications"]'),
       footers: document.querySelectorAll('footer').length,
-      footLinks: [...document.querySelectorAll('#hs-footer a')].map((a) => a.textContent + '=' + a.getAttribute('href')),
+      footLinks: [...document.querySelectorAll('#hs-footer .hs-footer__links a')].map((a) => a.textContent + '=' + a.getAttribute('href')),
       footerBelowSlot: document.getElementById('hs-slot').compareDocumentPosition(document.getElementById('hs-footer')) & Node.DOCUMENT_POSITION_FOLLOWING,
       enterpriseLinks: [...document.querySelectorAll('a[href="development-activity.html"]')].map((a) => a.textContent.trim()),
       h1: document.querySelector('.home-index__title').textContent,
