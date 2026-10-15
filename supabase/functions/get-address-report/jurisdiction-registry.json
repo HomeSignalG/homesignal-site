@@ -2711,6 +2711,7 @@
         "Site": "Development"
       },
       "extra_where": "permit_type IN ('Building','Land Use','Site')",
+      "drop_minor_repairs": { "types": ["Building"] },
       "recency_days": 365,
       "_receipts": "2026-07-15: max application_date 2026-07-13 (item modified 2026-07-14); 80 statuses + 10 permit_type values VERBATIM via returnDistinctValues; native zip (98402=8,359 all-time -> 365d window); per-record Accela link column. Noise types (ePermit trades, Sign, Special Event, ROW, Utility Connection, Historic, Pre-Application) dropped at source. Found via org-scoped AGO search (orgid:SCwJH1pD8WSn5T5y) - the geohub DCAT path serves HTML, and an UNSCOPED sharing/rest/search returns Calgary lookalikes."
     },
@@ -2827,6 +2828,7 @@
         "SEPA Review": "Development",
         "Environmental Impact Statement": "Development"
       },
+      "applicant_title": { "type": "applicationType", "name": "projectName" },
       "extra_where": "applicationType IN ('Construction Commercial','Construction Residential','Accessory Dwelling Unit','Mobile/Manuf Home Park','Commercial Demolition','Residential Demolition','Conditional Use','Conditional Use-Major Amend','Conditional Use-Minor Amend','Land Division','Land Div - Preliminary/BSP','Land Div - Final','Land Div - Amend/Alter','Land Div - BLA','Land Div - Lot Combo/Seg','Land Use Action','Land Use Permit','Land Use Variance','Short plat','Short Plat Alteration','Preliminary Short Plat','Final Short Plat','Preliminary Large Lot','Large Lot','Large Lot Alteration','Large Lot Final','Plat - Major Amendment','Plat - Minor Amendment','Plat Amendment','Planned Development District','Planned Unit Development','Planned/Phased Development','Rezone','Rezone-Major Amendment','Rezone-Minor Amend to Rezone','Site Dev Commercial','Site Dev Residential','Site Development','Site Plan Review','Site Plan Review by Plan Dir','Site Plan Review-Major Amend','Site Plan Review-Minor Amend','Binding Site Plan Review','Alteration of Binding Site Plan','Shoreline Substantial Develop','Shoreline Permit','Civil Infrastructure On-site','Civil Infrastructure Offsite','Grading, Filling & Clearing','Excavation, Filling, Grading, Surface Mines','Residential Site Development','SEPA Review','Environmental Impact Statement')",
       "spatial_zip_radius_mi": 3,
       "recency_days": 365,
