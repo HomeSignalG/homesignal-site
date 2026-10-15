@@ -141,6 +141,39 @@ for (const [name, h, want, extra] of [
   check(`5h live probe: ${name} ${want ? 'passes' : 'is refused'}`, (r.status === 0) === want, r.stdout.slice(0, 300));
 }
 
+// 6. the www alias (founder-approved 2026-10-15): every case is ONE permanent hop to the apex, same path and query, byte for byte
+const hopProbe = (url, extra = ['--expect-apex-hop', 'homesignal.net']) => new Promise((r) => {
+  const p = spawn('python3', ['scripts/verify_redirect_service.py', '--base', url, ...extra]);
+  let out = ''; p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (out += d));
+  p.on('close', (code) => r({ status: code, stdout: out }));
+});
+const toApex = (loc = (u) => 'https://homesignal.net' + u, status = 301) => (req, res) => { res.writeHead(status, { Location: loc(req.url) }); res.end(); };
+for (const [name, h, want, extra] of [
+  ['a www alias that 301s every path (DID, robots, Google token included) to the apex with the query kept byte for byte', toApex(), true],
+  ['a www alias that 302s', toApex((u) => 'https://homesignal.net' + u, 302), false],
+  ['a www alias that skips the apex and goes straight to jodytracks.com', toApex((u) => 'https://jodytracks.com' + u), false],
+  ['a www alias that sorts the query keys', toApex((u) => 'https://homesignal.net' + sortQ(u)), false],
+  ['a www alias that drops the query string', toApex((u) => 'https://homesignal.net' + u.split('?')[0]), false],
+  ['a www alias that answers 200 on the DID document', (req, res) => { if (req.url === '/.well-known/did.json') { res.writeHead(200); res.end(did); return; } toApex()(req, res); }, false],
+  ['a base that is the apex itself with --expect-apex-hop', toApex(), false, ['--expect-apex-hop', '127.0.0.1:0']],
+]) {
+  const { s, url } = await serve(h);
+  const ex = extra && extra[1] === '127.0.0.1:0' ? ['--expect-apex-hop', url.replace('http://', '')] : extra;
+  const r = await hopProbe(url, ex);
+  s.close();
+  check(`6 www alias probe: ${name} ${want ? 'passes' : 'is refused'}`, (r.status === 0) === want, r.stdout.slice(0, 300));
+}
+{
+  const { s, url } = await serve(toApex());
+  const r = await hopProbe(url, ['--require-https', '--expect-apex-hop', 'homesignal.net']);
+  s.close();
+  check('6 www alias probe: --require-https still refuses a plain-http base', r.status !== 0, r.stdout.slice(0, 200));
+}
+// the workflow wires the input through and the apex path keeps its strict probe
+const wf = readFileSync('.github/workflows/jody-redirect-verify.yml', 'utf8');
+check('6 workflow: expect_apex_hop input exists and is passed to --expect-apex-hop only in probe mode', /expect_apex_hop:/.test(wf) && /APEX_HOP: \$\{\{ inputs\.mode == 'probe' && inputs\.expect_apex_hop \|\| '' \}\}/.test(wf) && /--expect-apex-hop "\$APEX_HOP"/.test(wf), 'not wired');
+check('6 workflow: the default (apex) probe is unchanged - still --files _redirect with the strict/sorted query order', /--base "\$TARGET" --files _redirect --require-https --query-order/.test(wf), 'changed');
+
 rmSync(base, { recursive: true, force: true });
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
