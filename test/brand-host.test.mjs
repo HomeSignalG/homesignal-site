@@ -19,7 +19,11 @@ check('1a the shipped contract is jody-current (the activation swap)', committed
 const r = py('import brand_host as b; print(b.origin()); print(b.host())');
 check('1b origin/host are the Jody origin', r.status === 0 && r.stdout === 'https://jodytracks.com\njodytracks.com\n', r.stdout + r.stderr);
 const m = py('import page_semantics as p, gen_zip_pages as g, gen_sitemap as s, indexnow as i; print(p.BASE, g.BASE, s.BASE, i.HOST)');
-check('1c all four consumers resolve to the same Jody origin', m.status === 0 && m.stdout.trim() === 'https://jodytracks.com https://jodytracks.com https://jodytracks.com jodytracks.com', m.stdout + m.stderr);
+check('1c the build-time consumers resolve to the Jody origin; gen_sitemap (it COMMITS a file) resolves to the SOURCE identity\'s origin (founder, 2026-10-15)', m.status === 0 && m.stdout.trim() === 'https://jodytracks.com https://jodytracks.com https://homesignal.net jodytracks.com', m.stdout + m.stderr);
+const so = py('import brand_host as b; print(b.source_origin())');
+check('1d source_origin() is the homesignal origin whatever the current identity is, and committed sitemap.xml carries no other origin', so.status === 0 && so.stdout.trim() === 'https://homesignal.net' && !readFileSync('sitemap.xml', 'utf8').includes('jodytracks'), so.stdout + so.stderr);
+const gs = readFileSync('scripts/gen_sitemap.py', 'utf8');
+check('1e gen_sitemap.py takes its origin from source_origin() and never from origin()', /BASE = brand_host\.source_origin\(\)/.test(gs) && !/brand_host\.origin\(\)/.test(gs.replace(/#.*$/gm, '')), 'gen_sitemap origin source');
 
 // 2. a contract that makes Jody current moves the answer (the future cutover is a contract change only)
 const jodyActive = JSON.parse(JSON.stringify(contract)); jodyActive.current_identity = 'jody'; jodyActive.identities.jody.state = 'active'; jodyActive.identities.homesignal.state = 'inactive';
