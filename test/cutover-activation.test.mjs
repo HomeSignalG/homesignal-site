@@ -98,7 +98,7 @@ const stage = (d, ...a) => py(['scripts/brand_stage.py', '--dir', d, ...a]);
     check(`C4 Jody is held on ${why} (fails closed)`, typeof hold('jody', f) === 'string', JSON.stringify(hold('jody', f)));
   }
   const committed = JSON.parse(readFileSync('docs/brand/indexnow-jody-hold.json', 'utf8'));
-  check('C5 the committed hold is hold=true (nothing is released by this change)', committed.hold === true, JSON.stringify(committed));
+  check('C5 the committed hold is hold=false (released 2026-10-15, founder)', committed.hold === false, JSON.stringify(committed));
   // the whole guarded step, not just the predicate: a held notify makes no request and is not an error
   const r = py(['-c', `import sys, json; sys.path.insert(0,'scripts'); import indexnow as i
 calls=[]

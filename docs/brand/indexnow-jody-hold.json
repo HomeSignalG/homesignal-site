@@ -1,4 +1,4 @@
 {
-  "hold": true,
-  "note": "IndexNow stays quiet for jodytracks.com until the founder sets hold=false in a reviewed commit (Step 9). Consulted ONLY when the brand contract publishes the site as a non-HomeSignal identity; while HomeSignal is current this file is not read. Fails closed: missing, unreadable or non-boolean means held."
+  "hold": false,
+  "note": "IndexNow is released for jodytracks.com (founder, 2026-10-15, after Search Console Change of Address was confirmed and the Jody host's own baseline matched: 0 URLs to notify). Consulted ONLY when the brand contract publishes the site as a non-HomeSignal identity. Fails closed: missing, unreadable or non-boolean means held; set hold=true in a reviewed commit to pause."
 }
