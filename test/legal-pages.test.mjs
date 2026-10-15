@@ -61,8 +61,8 @@ ok(/\/terms\.html/.test(read('scripts/gen_sitemap.py')) && /\/refund-policy\.htm
 
 const da = read('development-activity.html');
 const dat = text(da);
-ok(da.includes('<div class="da-price">$79<small>/month</small></div>'), 'plan page publishes $79/month in the pricing card');
-ok(/100 new Development Activity reports each month/.test(dat), 'plan page publishes 100 reports/month');
+ok(!/\$\d/.test(dat) && /Paid plans coming/.test(dat), 'plan page shows no price and says paid plans are coming (free-only, founder 2026-10-15)');
+ok(/10 Development Activity reports free/.test(dat), 'plan page publishes the 10 free reports');
 for (const h of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(da.includes('href="' + h + '"'), 'plan page links ' + h + ' in its own content');
 const customer = [read('development-activity.html'), read('development-activity-reports.html')].map(text).join(' ');
 ok(!/Lemon\s*Squeezy/i.test(customer), 'visible plan pages do not name Lemon Squeezy as the provider');
