@@ -1289,30 +1289,79 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     }
     host.innerHTML=fam+themes;
   }
-  // ---- POST ZIP ORDER (MAPS > Data Center Theme only) -------------------------
-  // ONE INPUT CONTROL. The founder uploads a CSV of ZIPs in the order they want Data
-  // Center Theme drafts created; this panel validates it, persists the ORDER, and shows
+  // ---- POST ZIP ORDER (MAPS > Data Center Theme  AND  MAPS > All Maps) ---------
+  // ONE INPUT CONTROL, TWO INDEPENDENT LISTS. The founder uploads a CSV of ZIPs in the order
+  // they want draft posts created; this panel validates it, persists the ORDER, and shows
   // back exactly what was stored. It creates nothing, approves nothing, schedules
   // nothing and publishes nothing — the existing generator reads the list on its next
   // run and every downstream contract is untouched.
   //
-  // IT IS SCOPED TO THE THEME, not to MAPS. Rendering it under "All Maps" would imply it
-  // orders every MAPS theme, which it does not.
+  //   Data Center Theme view  -> public.maps_dc_zip_order  (Data Center posts only)
+  //   All Maps view           -> public.maps_zip_order     (ordinary MAPS posts, any project type)
+  //
+  // The two lists have SEPARATE tables, RPCs, request logs and in-memory state, so managing
+  // Pierce County WA and Denton County TX under All Maps never touches the Data Center ZIPs
+  // (and the reverse). The panel code is shared; only the SCOPE table below differs, so the
+  // two cannot drift apart in behaviour. Neither is rendered under any other MAPS theme
+  // chip: showing a list under a view it does not govern would imply it orders that view.
   var _zipOrder = { rows: [], loaded: false, error: '' };
   // The button's own state. `busy` survives only in memory; `msg` is the last outcome
   // and is re-rendered with the panel so it is not lost to a refresh.
   var _zipGen = { busy: false, msg: '', bad: false };
+  var _zipOrderMaps = { rows: [], loaded: false, error: '' };
+  var _zipGenMaps = { busy: false, msg: '', bad: false };
 
-  function zipOrderVisible(){ return _bskyFamily==='MAPS' && _bskyTheme==='datacenter'; }
+  var ZO_SCOPES = {
+    dc: {
+      key: 'dc',
+      table: 'maps_dc_zip_order',
+      setRpc: 'hs_set_maps_dc_zip_order',
+      genRpc: 'hs_request_maps_dc_generation',
+      statusRpc: 'hs_maps_dc_generation_status',
+      order: _zipOrder, gen: _zipGen,
+      visible: function(){ return _bskyFamily==='MAPS' && _bskyTheme==='datacenter'; },
+      counts: function(p){ return bskyTheme(p)==='datacenter'; },
+      what: 'Data Center Theme',
+      fileTpl: 'homesignal-zip-order-template.csv', fileCur: 'homesignal-zip-order.csv',
+      intro: 'Upload ZIPs in the order you want draft posts created. Running the action also refreshes existing drafts on these ZIPs.',
+      empty: 'No ordered list yet. The generator uses its normal nationwide selection until you upload one.',
+      pick: 'drafts at most one post from real Map 1 project records'
+    },
+    maps: {
+      key: 'maps',
+      table: 'maps_zip_order',
+      setRpc: 'hs_set_maps_zip_order',
+      genRpc: 'hs_request_maps_generation',
+      statusRpc: 'hs_maps_generation_status',
+      order: _zipOrderMaps, gen: _zipGenMaps,
+      visible: function(){ return _bskyFamily==='MAPS' && !_bskyTheme; },
+      counts: function(p){ return true; },
+      what: 'Maps',
+      fileTpl: 'maps-zip-order-template.csv', fileCur: 'maps-zip-order.csv',
+      intro: 'Maps list — any project type. Upload ZIPs in the order you want ordinary MAPS draft posts created, e.g. a county at a time. Separate from the Data Center list. Running the action also refreshes existing drafts on these ZIPs.',
+      empty: 'No Maps ZIP list yet. Maps drafting uses its normal nationwide selection until you upload one.',
+      pick: 'drafts at most one post (any project type) from real Map 1 project records'
+    }
+  };
 
-  async function zipOrderLoad(){
+  /** The scope whose view is open right now, or null. At most one is ever visible. */
+  function zipOrderScope(){
+    if(ZO_SCOPES.dc.visible()) return ZO_SCOPES.dc;
+    if(ZO_SCOPES.maps.visible()) return ZO_SCOPES.maps;
+    return null;
+  }
+  function zipOrderVisible(){ return !!zipOrderScope(); }
+
+  async function zipOrderLoad(sc){
+    sc = sc || zipOrderScope(); if(!sc) return;
+    var st = sc.order;
     try{
-      var r = await window.hsClient.from('maps_dc_zip_order')
+      var r = await window.hsClient.from(sc.table)
         .select('founder_position,zip,uploaded_at').order('founder_position',{ascending:true});
-      if(r.error){ _zipOrder.error = r.error.message||'unavailable'; _zipOrder.rows=[]; }
-      else { _zipOrder.rows = r.data||[]; _zipOrder.error=''; }
-    }catch(e){ _zipOrder.error='unavailable'; _zipOrder.rows=[]; }
-    _zipOrder.loaded = true;
+      if(r.error){ st.error = r.error.message||'unavailable'; st.rows=[]; }
+      else { st.rows = r.data||[]; st.error=''; }
+    }catch(e){ st.error='unavailable'; st.rows=[]; }
+    st.loaded = true;
   }
 
   /** Download a generated text file. No network — the bytes are built in the page. */
@@ -1327,39 +1376,38 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 
   /**
    * Per-ZIP status, derived ONLY from the queue rows already loaded for this render.
-   * ⚖️ 2026-09-21: the panel's action now CREATES AND REFRESHES (founder requirement).
-   * The page itself still creates nothing and refreshes nothing — it holds the anon key and a
-   * founder session, so it asks a SECURITY DEFINER RPC to dispatch the existing workflow, and
-   * the engine does both halves through ONE shared decision (homesignal-ingest
-   * bluesky/lib/maps-refresh.mjs). No second generator, no copy rule in the browser.
-   *
-   * Nothing is fetched and nothing is inferred: a ZIP with no MAPS Data Center Theme post
-   * in the queue shows a dash, never a guess like "no qualifying project" — only the
-   * generator knows that, and it reports it in its own run log.
+   * Nothing is fetched and nothing is inferred: a ZIP with no matching MAPS post in the
+   * queue shows a dash, never a guess like "no qualifying project" — only the generator
+   * knows that, and it reports it in its own run log.
    */
-  function zipOrderStatusMap(queueRows){
+  function zipOrderStatusMap(queueRows, sc){
     var m={};
     (queueRows||[]).forEach(function(p){
       if(p.content_family!=='MAPS' || !p.zip) return;
-      if(bskyTheme(p)!=='datacenter') return;
+      if(!sc.counts(p)) return;
       var cur=m[p.zip];
       // approved outranks draft in the display, so a ZIP that has moved on says so.
-      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft \u2014 will refresh');
+      if(p.status==='approved' || !cur) m[p.zip]= (p.status==='approved'?'Approved':'Draft — will refresh');
     });
     return m;
   }
 
+  function zipOrderQueueRows(){ return Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }); }
+
   function zipOrderRender(queueRows){
     var host=document.getElementById('bsky-zip-order'); if(!host) return;
     if(!zipOrderVisible()){ host.innerHTML=''; return; }
-    var rows=_zipOrder.rows||[];
-    var stat=zipOrderStatusMap(queueRows);
+    var sc=zipOrderScope();
+    var rows=sc.order.rows||[];
+    var gen=sc.gen;
+    var stat=zipOrderStatusMap(queueRows, sc);
     var head='<div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">'+
-      '<strong style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">Post ZIP order</strong>'+
+      '<strong style="font-size:12px;letter-spacing:.06em;text-transform:uppercase">Post ZIP order'+
+      (sc.key==='maps'?' · Maps':'')+'</strong>'+
       (rows.length?('<span class="muted" style="font-size:12px">'+rows.length+' ZIP'+(rows.length===1?'':'s')+
         (rows[0].uploaded_at?(' · uploaded '+new Date(rows[0].uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})):'')+
         '</span>'):'')+'</div>'+
-      '<p class="sub" style="margin:4px 0 10px">Upload ZIPs in the order you want draft posts created. Running the action also refreshes existing drafts on these ZIPs.</p>';
+      '<p class="sub" style="margin:4px 0 10px">'+esc(sc.intro)+'</p>';
 
     // GENERATE is FIRST and is the only accented control here, because it is the only one
     // that WRITES. The rest move a CSV around. It is hidden when the list is empty rather
@@ -1368,9 +1416,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     // a UI-only guard is one refactor away from being the only guard).
     var btns='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
       (rows.length?('<button class="bsky-btn" data-zo="generate"'+
-        (_zipGen.busy?' disabled style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
-                     :' style="background:var(--accent);color:#fff"')+
-        '>'+(_zipGen.busy?'Working\u2026':('Create + refresh drafts for these '+rows.length+' ZIPs'))+
+        (gen.busy?' disabled style="background:var(--accent);color:#fff;opacity:.45;cursor:not-allowed"'
+                 :' style="background:var(--accent);color:#fff"')+
+        '>'+(gen.busy?'Working…':('Create + refresh drafts for these '+rows.length+' ZIPs'))+
         '</button>'):'')+
       '<button class="bsky-btn" data-zo="upload">'+(rows.length?'Replace CSV':'Upload CSV')+'</button>'+
       '<button class="bsky-btn" data-zo="template">Download template</button>'+
@@ -1379,15 +1427,14 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       '</div>'+
       // Carried in state, not written straight to the DOM, so a queue re-render cannot
       // silently erase the only report of what the last click did.
-      (_zipGen.msg?('<div id="zo-gen-status" class="muted" style="font-size:12px;margin:-4px 0 10px;'+
-        'color:'+(_zipGen.bad?'var(--bad,#a12)':'inherit')+'">'+esc(_zipGen.msg)+'</div>'):'');
+      (gen.msg?('<div id="zo-gen-status" class="muted" style="font-size:12px;margin:-4px 0 10px;'+
+        'color:'+(gen.bad?'var(--bad,#a12)':'inherit')+'">'+esc(gen.msg)+'</div>'):'');
 
     var body;
-    if(_zipOrder.error){
-      body='<div class="muted">Ordered list unavailable ('+esc(_zipOrder.error)+').</div>';
+    if(sc.order.error){
+      body='<div class="muted">Ordered list unavailable ('+esc(sc.order.error)+').</div>';
     } else if(!rows.length){
-      body='<div class="muted">No ordered list yet. The generator uses its normal '+
-           'nationwide selection until you upload one.</div>';
+      body='<div class="muted">'+esc(sc.empty)+'</div>';
     } else {
       var li='';
       for(var i=0;i<rows.length;i++){
@@ -1423,77 +1470,81 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
    * being rounded up to success.
    */
   async function zipOrderGenerate(){
-    var n=(_zipOrder.rows||[]).length;
+    var sc=zipOrderScope(); if(!sc) return;
+    var gen=sc.gen;
+    var n=(sc.order.rows||[]).length;
     if(!n){ return; }                    // no list => the national scan; never from this button
     // ⚖️ FOUNDER REQUIREMENT 2026-09-21 — this action CREATES and REFRESHES, so the
     // confirm says both. The old wording promised creation only, which is what the button
     // did; a resident-facing surface is not the only place a stale promise costs something.
-    if(!confirm('Create and refresh draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
-                'The engine reads this list in your order and, for each ZIP, drafts at most '+
-                'one post from real Map 1 project records \u2014 and brings any existing '+
+    if(!confirm('Create and refresh '+sc.what+' draft posts for these '+n+' ZIP'+(n===1?'':'s')+'?\n\n'+
+                'The engine reads this list in your order and, for each ZIP, '+sc.pick+
+                ' — and brings any existing '+
                 'unpublished draft up to the current wording and fact-checking rules.\n\n'+
-                'It writes DRAFTS only \u2014 nothing is approved, scheduled or posted, and an '+
+                'It writes DRAFTS only — nothing is approved, scheduled or posted, and an '+
                 'already-approved post is never rewritten.\n\n'+
                 'Runs take about a minute. Some posts may still need a Map screenshot '+
-                'afterwards, so \u201cfinished\u201d does not always mean \u201cready to approve\u201d.')) return;
-    _zipGen.busy=true; _zipGen.bad=false;
-    _zipGen.msg='Requesting a run\u2026';
-    zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+                'afterwards, so “finished” does not always mean “ready to approve”.')) return;
+    gen.busy=true; gen.bad=false;
+    gen.msg='Requesting a run…';
+    zipOrderRender(zipOrderQueueRows());
     try{
-      var r=await window.hsClient.rpc('hs_request_maps_dc_generation');
+      var r=await window.hsClient.rpc(sc.genRpc);
       if(r.error){
         // The RPC's refusals are all self-describing (empty list, cool-off, missing token,
         // not authorized), so its own message is shown rather than a generic failure.
-        _zipGen.busy=false; _zipGen.bad=true;
-        _zipGen.msg='Not started: '+(r.error.message||'the request was refused.');
-        zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+        gen.busy=false; gen.bad=true;
+        gen.msg='Not started: '+(r.error.message||'the request was refused.');
+        zipOrderRender(zipOrderQueueRows());
         return;
       }
-      _zipGen.msg='Run requested \u2014 waiting for GitHub to answer\u2026';
-      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
-      zipGenPoll(0);
+      gen.msg='Run requested — waiting for GitHub to answer…';
+      zipOrderRender(zipOrderQueueRows());
+      zipGenPoll(sc, 0);
     }catch(err){
-      _zipGen.busy=false; _zipGen.bad=true;
-      _zipGen.msg='Not started: the request could not be sent.';
-      zipOrderRender(Object.keys(_bskyRows||{}).map(function(k){ return _bskyRows[k]; }));
+      gen.busy=false; gen.bad=true;
+      gen.msg='Not started: the request could not be sent.';
+      zipOrderRender(zipOrderQueueRows());
     }
   }
 
   /** Read back what GitHub actually said. Bounded -- an unanswered request is reported, not spun on. */
-  function zipGenPoll(tries){
+  function zipGenPoll(sc, tries){
+    var gen=sc.gen;
     setTimeout(async function(){
       var st=null;
       try{
-        var r=await window.hsClient.rpc('hs_maps_dc_generation_status');
+        var r=await window.hsClient.rpc(sc.statusRpc);
         st=(r && !r.error && r.data && r.data[0]) ? r.data[0] : null;
       }catch(e){ st=null; }
-      if(st && st.state==='pending' && tries<4){ zipGenPoll(tries+1); return; }
-      _zipGen.busy=false;
+      if(st && st.state==='pending' && tries<4){ zipGenPoll(sc, tries+1); return; }
+      gen.busy=false;
       if(!st){
-        _zipGen.bad=true; _zipGen.msg='Run requested, but its outcome could not be read.';
+        gen.bad=true; gen.msg='Run requested, but its outcome could not be read.';
       } else if(st.state==='accepted'){
-        _zipGen.bad=false;
+        gen.bad=false;
         // ⚠️ "ACCEPTED" IS NOT "READY", AND NEITHER IS "FINISHED". The run reports its own
         // created / updated / unchanged / held / awaiting-image counts on its Actions summary;
         // this message must not imply that every post it touched can be approved. A held draft
         // and a draft awaiting its Map screenshot both finish the run without being publishable.
-        _zipGen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. It creates missing '+
-                    'drafts and refreshes existing ones (about a minute) \u2014 reload to see them. '+
-                    'Check the run\u2019s own summary for anything it held or that still needs a '+
-                    'Map screenshot; finishing is not the same as being ready to approve.';
+        gen.msg='GitHub accepted the run for '+st.zip_count+' ZIPs. It creates missing '+
+                'drafts and refreshes existing ones (about a minute) — reload to see them. '+
+                'Check the run’s own summary for anything it held or that still needs a '+
+                'Map screenshot; finishing is not the same as being ready to approve.';
       } else if(st.state==='pending'){
-        _zipGen.bad=true;
-        _zipGen.msg='Run requested, but GitHub has not answered yet. Check the workflow before retrying.';
+        gen.bad=true;
+        gen.msg='Run requested, but GitHub has not answered yet. Check the workflow before retrying.';
       } else {
-        _zipGen.bad=true;
-        _zipGen.msg='GitHub did not accept the run'+
-                    (st.http_status?(' (HTTP '+st.http_status+')'):'')+': '+(st.detail||'no detail');
+        gen.bad=true;
+        gen.msg='GitHub did not accept the run'+
+                (st.http_status?(' (HTTP '+st.http_status+')'):'')+': '+(st.detail||'no detail');
       }
       await refreshBluesky();            // re-render, and pick up any drafts already written
     }, tries===0 ? 4000 : 6000);
   }
 
   async function zipOrderFileChosen(e){
+    var sc=zipOrderScope(); if(!sc) return;
     var file=e.target.files && e.target.files[0]; if(!file) return;
     e.target.value='';                                   // so the same file can be re-picked
     var text=await file.text();
@@ -1507,29 +1558,30 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       return;
     }
     var note=parsed.warnings.length?('\n\n'+parsed.warnings.join('\n')):'';
-    if(!confirm('Save this order for future Data Center Theme draft creation?\n\n'+
+    if(!confirm('Save this order for future '+sc.what+' draft creation?\n\n'+
                 parsed.zips.length+' ZIP'+(parsed.zips.length===1?'':'s')+', starting '+
                 parsed.zips.slice(0,3).join(', ')+(parsed.zips.length>3?'…':'')+
-                '\n\nThis replaces the ordered list only. Existing drafts, approved, '+
+                '\n\nThis replaces the '+sc.what+' ordered list only. Existing drafts, approved, '+
                 'scheduled and published posts are not changed.'+note)) return;
     try{
       // ONE TRANSACTION server-side. A half-completed replace cannot leave an empty list.
-      var r=await window.hsClient.rpc('hs_set_maps_dc_zip_order',{p_zips:parsed.zips});
+      var r=await window.hsClient.rpc(sc.setRpc,{p_zips:parsed.zips});
       if(r.error){ alert('Save failed, your current order is unchanged: '+(r.error.message||'')); return; }
     }catch(err){ alert('Save failed, your current order is unchanged.'); return; }
-    await zipOrderLoad();
+    await zipOrderLoad(sc);
     refreshBluesky();
   }
 
   function zipOrderAction(act){
+    var sc=zipOrderScope(); if(!sc) return;
     if(act==='generate'){ zipOrderGenerate(); return; }
     if(act==='upload'){ var f=document.getElementById('zo-file'); if(f) f.click(); return; }
     if(act==='template'){
-      zipOrderDownload('homesignal-zip-order-template.csv', HS.zipOrderTemplateCsv()); return;
+      zipOrderDownload(sc.fileTpl, HS.zipOrderTemplateCsv()); return;
     }
     if(act==='current'){
-      var zips=(_zipOrder.rows||[]).map(function(r){ return r.zip; });
-      zipOrderDownload('homesignal-zip-order.csv', HS.zipOrderToCsv(zips)); return;
+      var zips=(sc.order.rows||[]).map(function(r){ return r.zip; });
+      zipOrderDownload(sc.fileCur, HS.zipOrderToCsv(zips)); return;
     }
   }
 
@@ -1568,9 +1620,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         counts.themes[tl[ti].key]=(buckets.byTheme[tl[ti].key]||[]).length;
       }
       bskyRenderNav(counts);
-      // The ordered-ZIP panel is part of the Data Center Theme view. Load it lazily —
-      // only when that theme is actually selected — so the other tabs pay nothing.
-      if(zipOrderVisible() && !_zipOrder.loaded) await zipOrderLoad();
+      // The ordered-ZIP panel belongs to two views (Data Center Theme, All Maps), each with
+      // its own list. Load the open view's list lazily — only when it is selected — so the
+      // other tabs pay nothing.
+      var zoScope=zipOrderScope();
+      if(zoScope && !zoScope.order.loaded) await zipOrderLoad(zoScope);
       zipOrderRender(rows);
       var visible;
       if(_bskyFamily==='MAPS'){

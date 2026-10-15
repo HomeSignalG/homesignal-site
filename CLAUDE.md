@@ -1605,6 +1605,24 @@ legal/framing change not covered by the one-time sign-off.
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
 
+## 7.04a THE MAPS (ALL THEMES) ZIP LIST IS A SECOND, INDEPENDENT LIST (2026-10-15)
+
+The Acquisition Dashboard's POST ZIP ORDER panel now exists in two scopes that share ONE code path (`ZO_SCOPES` in
+`acquisition.html`) and nothing else: **Data Center Theme** view -> `public.maps_dc_zip_order`; **All Maps** view ->
+`public.maps_zip_order` (ordinary MAPS posts, any project type). Separate tables, setter RPCs
+(`hs_set_maps_dc_zip_order` / `hs_set_maps_zip_order`), generate/status RPCs, request logs, cool-offs and in-memory state,
+so e.g. Pierce County WA / Denton County TX can be managed under All Maps without touching the Data Center ZIPs. The CSV
+contract is shared (`lib/maps-dc-zip-order.js`). DDL of record: `docs/maps-zip-order.sql`.
+- The Maps button dispatches the EXISTING `bluesky-generate-maps.yml` with `maps_order=true`; the engine half is
+  homesignal-ingest `generate-maps.mjs --maps-order` (CLAUDE.md there). An empty list refuses in the RPC and the UI and the
+  script throws: it can never become the nationwide scan.
+- ⛔ **APPLY ORDER: merge the ingest PR (declares the `maps_order` input) BEFORE applying `docs/maps-zip-order.sql`.** A dispatch
+  carrying an undeclared input is rejected by GitHub with 422.
+- Verified by executing the file twice (idempotent) on PostgreSQL 16 with stubbed `auth`/`net`/`vault`: ordered replace,
+  malformed/duplicate rejected leaving the stored list intact, empty list refused, cool-off, non-founder refused, anon denied,
+  dispatch body carries `maps_order: "true"`. Not applied to production by the session that wrote it.
+- Pinned by `test/maps-zip-order.test.mjs`; the Data Center list's `test/maps-dc-zip-order.test.mjs` passes unchanged.
+
 ## 7.04 THE DATA CENTER THEME BUTTON CREATES **AND** REFRESHES ⚖️ FOUNDER REQUIREMENT (2026-09-21)
 
 **The Acquisition Dashboard's "Create + refresh drafts" action does both halves: it creates
