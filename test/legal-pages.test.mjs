@@ -34,10 +34,10 @@ ok(th.includes('href="https://paddle.net"') && rph.includes('href="https://paddl
 ok(ph.includes('href="https://www.paddle.com/legal/privacy"') && /Paddle acts as the Merchant of Record/.test(text(ph)), 'Privacy links the Paddle Privacy Notice and discloses Merchant of Record');
 ok(/When paid checkout is available/.test(text(ph)), 'Privacy payment text is conditional on paid checkout being available');
 // Plan facts, eligibility, free evaluation
-ok(/Professional plan for individual real estate agents at \$79 per month/.test(terms) && /100 new Development Activity reports each month/.test(terms), 'Terms: individual-agent Professional plan, $79/month, 100 reports');
-ok(/10 free evaluation reports without purchasing a subscription/.test(terms), 'Terms: 10 reports are a free evaluation');
+ok(/currently offered as a free evaluation/.test(terms) && /Paid plans are not yet available/.test(terms) && !/\$\d/.test(terms), 'Terms: free evaluation, paid plans not yet available, no price');
+ok(/10 free evaluation reports\. No purchase is required/.test(terms), 'Terms: 10 reports are a free evaluation');
 ok(/custom quote/.test(terms), 'Terms: brokerage/team/enterprise by custom quote');
-ok(/\$79 per month for 100 new Development Activity reports each month/.test(rp) && /free evaluation reports do not require payment/i.test(rp), 'Refund Policy states the plan and that free evaluation reports need no payment');
+ok(/paid plans are not yet available/i.test(rp) && !/\$\d/.test(rp) && /free evaluation reports do not require payment/i.test(rp), 'Refund Policy: no price, paid plans not yet available, free evaluation needs no payment');
 // Cancellation and refund are consistent across Terms and Refund Policy
 ok(/Cancellation prevents future renewal charges\. It does not automatically refund payments already made/.test(terms) && /Cancellation does not automatically refund previous charges/.test(rp) && /does not automatically refund a payment already made/.test(rp), 'Terms and Refund Policy keep cancellation separate from refunds');
 ok(!/\b\d+[- ]day\b|money-back|guaranteed refund/i.test(rp), 'Refund Policy promises no window or guarantee');
@@ -46,7 +46,7 @@ for (const [n, h] of Object.entries({ 'terms.html': th, 'privacy.html': ph, 'ref
 ok(!/\b(hours|business hours|within \d+|response time)\b/i.test(text(ch).slice(text(ch).indexOf('Other ways to reach us'))), 'Contact page invents no hours or response-time promise');
 ok(!/personal, non-commercial/i.test(terms), 'Terms do not carry the personal, non-commercial clause');
 ok(/HomeSignal/.test(terms), 'Terms name HomeSignal');
-ok(/\$79 per month/.test(terms) && /100 new Development Activity reports/.test(terms), 'Terms state the $79/month, 100-report plan');
+ok(!/\$79|per month/.test(terms + rp), 'Terms and Refund Policy carry no $79 or monthly price');
 ok(/href="refund-policy\.html"/.test(read('terms.html')), 'Terms link the Refund Policy');
 ok(/share[^.]*reports[^.]*clients/i.test(terms), 'Terms allow sharing reports with clients');
 
