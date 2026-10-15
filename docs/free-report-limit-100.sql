@@ -1,6 +1,6 @@
 -- ============================================================================
 -- FREE DEVELOPMENT ACTIVITY REPORTS: 10 -> 100  (founder, 2026-10-15)
--- MIGRATION. PARKED: NOT APPLIED to production. Applying it needs the founder's separate go.
+-- MIGRATION. APPLIED to production 2026-10-15 (founder: "apply") via apply_migration `free_report_limit_100`, without this file's begin;/commit; (the runner wraps it). Read back: limit 100, 3 active evaluations, ledger fingerprint unchanged.
 --
 -- WHAT CHANGES
 --   public.evaluation_report_limit()  10 -> 100. That function is the ONE definition of the free allowance; the ledger's ordinal CHECK,
