@@ -308,6 +308,47 @@ def verification_sample(state, delta, k=6):
     return {"present": {p: state.entries[p]["wb"] for p in pick(here)}, "absent": pick(gone)}
 
 
+def _artifact_file(site_dir, path):
+    rel = path.lstrip("/")
+    if path.endswith("/"):
+        rel += "index.html"
+    f = os.path.join(site_dir, rel)
+    root = os.path.realpath(site_dir)
+    if not os.path.realpath(f).startswith(root + os.sep):
+        raise ValueError(f"path escapes the artifact: {path!r}")
+    return f
+
+
+def rehash_verification(delta, site_dir):
+    """Re-derive the post-deploy byte proof from the FINAL artifact.
+
+    `wb` is hashed when a page is generated, and the brand overlay (scripts/brand_stage.py) rewrites
+    pages afterwards, so under any non-source identity the live bytes can never equal `wb`. The sample
+    keeps its paths; only the expected hashes are re-read from the files that are actually deployed.
+    A sampled page missing from the artifact is an error, never a skipped check."""
+    present = (delta.get("verify") or {}).get("present") or {}
+    out = {}
+    for path in sorted(present):
+        f = _artifact_file(site_dir, path)
+        if not os.path.isfile(f):
+            raise FileNotFoundError(f"sampled page is not in the artifact: {path!r}")
+        with open(f, "rb") as fh:
+            out[path] = hashlib.sha256(fh.read()).hexdigest()[:32]
+    delta.setdefault("verify", {})["present"] = out
+    return delta
+
+
+def _cmd_rehash(a):
+    with open(a.delta, encoding="utf-8") as fh:
+        delta = json.load(fh)
+    n = len((delta.get("verify") or {}).get("present") or {})
+    rehash_verification(delta, a.dir)
+    with open(a.delta, "w", encoding="utf-8") as fh:
+        json.dump(delta, fh, indent=1, sort_keys=True)
+    print(f"rehashed {n} sampled page(s) from {a.dir}")
+    return 0
+
+
 def decide(delta, *, freshness, sha, reseed=False):
     """Does this run have something to publish?
 
@@ -445,6 +486,10 @@ def main(argv=None):
     d.add_argument("--sha", default="")
     d.add_argument("--reseed", default="false")
     d.set_defaults(fn=_cmd_decide)
+    r = sub.add_parser("rehash-verify", help="re-derive the post-deploy byte proof from the final artifact (after the brand overlay)")
+    r.add_argument("--delta", required=True)
+    r.add_argument("--dir", required=True)
+    r.set_defaults(fn=_cmd_rehash)
     f = sub.add_parser("fetch-baseline", help="capture the previous LIVE page state before building")
     f.add_argument("--out", required=True)
     f.set_defaults(fn=_cmd_fetch)

@@ -274,6 +274,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/indexnow.py carry-over --delta "$RUNNER_TEMP/indexnow-delta.json"
 
+      # The byte proof the indexnow job checks was hashed at generation, BEFORE the brand overlay rewrote
+      # the pages. Under the Jody identity the live bytes could never equal it (run 38804507687 and
+      # 38782500923 both failed on it, nothing submitted). Re-derive it from the final artifact.
+      - name: Re-derive the post-deploy byte proof from the final artifact
+        if: github.event_name != 'pull_request'
+        run: python3 scripts/page_semantics.py rehash-verify --delta "$RUNNER_TEMP/indexnow-delta.json" --dir _site
+
       # One decision, from the delta the generator just wrote. A freshness run with nothing new to
       # publish stops here (every later step is gated on it): no Playwright, no upload, no deploy.
       - name: Decide whether this run publishes
