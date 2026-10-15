@@ -26,6 +26,9 @@ on:
         default: exact
         type: choice
         options: [exact, sorted]
+      expect_apex_hop:
+        description: Only for mode=probe on the www alias - the apex host every case must 301 to (e.g. homesignal.net). Founder-approved 2026-10-15 (www -> apex -> jodytracks.com). Leave empty when probing the apex.
+        default: ''
       keep_site:
         description: Keep the throw-away Netlify site afterwards
         default: false
@@ -103,11 +106,17 @@ jobs:
         env:
           TARGET: ${{ inputs.mode == 'probe' && inputs.base_url || steps.deploy.outputs.url }}
           QUERY_ORDER: ${{ inputs.query_order }}
+          APEX_HOP: ${{ inputs.mode == 'probe' && inputs.expect_apex_hop || '' }}
         run: |
           [ -n "$TARGET" ] || { echo "no target URL"; exit 1; }
           case "$TARGET" in https://*) ;; *) echo "target must be https://"; exit 1;; esac
           echo "probing $TARGET"
-          python3 scripts/verify_redirect_service.py --base "$TARGET" --files _redirect --require-https --query-order "${QUERY_ORDER:-exact}"
+          if [ -n "$APEX_HOP" ]; then
+            # the www alias: one permanent hop to the apex, same path and query; the apex probe proves everything after that
+            python3 scripts/verify_redirect_service.py --base "$TARGET" --require-https --expect-apex-hop "$APEX_HOP"
+          else
+            python3 scripts/verify_redirect_service.py --base "$TARGET" --files _redirect --require-https --query-order "${QUERY_ORDER:-exact}"
+          fi
       - name: Delete the throw-away site
         if: ${{ always() && inputs.mode == 'deploy-and-probe' && steps.deploy.outputs.site_id != '' && !inputs.keep_site }}
         env:
