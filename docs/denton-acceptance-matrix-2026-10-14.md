@@ -328,3 +328,35 @@ Not validated: record_url is dataset-precision (the city's Active Projects map),
 - **db:** production read-only SQL via mcp Supabase execute_sql, zip-keyed; no writes
 
 Acceptance logic was re-run on (audit JSON from run 38597050743, pages JSON from run 38619142539) and reproduces UNKNOWN 14 / PASS 5 / FAIL 13. Per-ZIP detail, audit counters and the nine category reasons are in the JSON.
+
+---
+
+## Post-refresh re-audit — 2026-10-16 (read-only, measured)
+
+Run: `denton-launch-audit` #44, run id 38979247658, dispatched from `main` at `a0f882af`, all jobs succeeded
+(`data`, `pages`, `accept`; `jurisdictions`/`coverage`/`sources`/`investigate` are skipped by design).
+
+**Preconditions (database, read-only; control = 12,722 `development_reports`):** all 32 Denton ZIPs have
+`refreshed_at` after 2026-10-14 18:04Z (newest 2026-10-16 22:36Z). `app_projects` now holds 543 rows across the seven
+`denton-city-projects-*` registry ids, in 14 of the 32 ZIPs (75027, 75077, 76201-76207, 76209, 76210, 76226).
+
+**Verdicts (accept step output): PASS 5 · UNKNOWN 15 · FAIL 12.** Total 32.
+- PASS (5, PO Box path): 75027, 75029, 76202, 76204, 76206.
+- FAIL (12): 75033, 75036, 75068, 76207, 76226, 76227, 76247, 76249, 76258, 76259, 76262, 76266.
+  Reasons: eligible source records missing from serving (1 to 1,438 per ZIP, largest 76247 = 1,438, 75068 = 1,246,
+  76266 = 818, 76259 = 591, 76207 = 508); 75033 also has 3 dots whose source record the publisher does not return;
+  76207 has 1 line/polygon dot not on the publisher's geometry; 75068, 76227 and 76262 have dots whose source id is shared
+  by several official features.
+- UNKNOWN (15): 75007, 75010, 75022, 75028, 75056, 75057, 75065, 75067, 75077, 76201, 76203, 76205, 76208, 76209, 76210.
+
+**No geographic ZIP passes.** `source_coverage` and `classification` are `not_run` and `evidence` and
+`eligibility_reconciliation` are `incomplete` for every geographic ZIP, so none can reach PASS.
+
+**Not done, and why:** `docs/denton-acceptance-evidence.json` was NOT generated. The audit produced no measured evidence for
+source coverage, classification or per-record evidence, and the file must not be filled from anything else.
+
+**Pages test origin:** the test targets `https://homesignal.net`, which now 301s to `jodytracks.com` (#1980/#1983); the
+browser follows the redirect. The final URL was not separately recorded in the output read for this update.
+
+**Verdict unchanged: NO-GO on data currency / reconciliation.** The refresh completed; it did not close the
+missing-record counts above.
