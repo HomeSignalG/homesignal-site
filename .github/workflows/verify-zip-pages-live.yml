@@ -38,7 +38,10 @@ jobs:
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install chromium
       - name: Prove the production ZIP pages
         env:
-          SITE_BASE: https://homesignal.net
+          # The Jody origin (docs/brand/brand-contract.v1.json, current_identity jody). homesignal.net now
+          # redirects here, so probing it makes every page "redirect" and carry a jodytracks.com canonical:
+          # 26 false failures in the 2026-10-16 run, all of them the "no redirect" / "self-canonical" checks.
+          SITE_BASE: https://jodytracks.com
           # ONLY THE NON-DERIVED CONTROLS ARE PINNED. Classes A-H are read from the
           # membership the build published into the artifact it deployed
           # (zip-page-controls.json), so a reclassification by normal ingestion substitutes
