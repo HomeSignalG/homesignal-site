@@ -31,7 +31,7 @@
 // (verify-zip-pages-live.yml): index,follow on a Rule F pass, noindex,follow on a fail,
 // UA-invariant, and /community/00000/ never indexable. It is not duplicated here.
 //
-// Config via env: SITE_BASE (default https://homesignal.net), SAMPLE (cap walked ZIPs for
+// Config via env: SITE_BASE (default https://jodytracks.com), SAMPLE (cap walked ZIPs for
 // a quick smoke run), CONCURRENCY (default 8).
 
 import { readFileSync } from 'node:fs';
@@ -56,7 +56,7 @@ const grab = (name) => {
 };
 const SUPABASE_URL = grab('SUPABASE_URL');
 const SUPABASE_ANON_KEY = grab('SUPABASE_ANON_KEY');
-const SITE_BASE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
+const SITE_BASE = (process.env.SITE_BASE || 'https://jodytracks.com').replace(/\/$/, '');
 const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 const CONCURRENCY = Math.max(1, process.env.CONCURRENCY ? parseInt(process.env.CONCURRENCY, 10) : 8);
 

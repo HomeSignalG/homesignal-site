@@ -53,6 +53,9 @@ jobs:
         run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
       - name: Verify community pages
         env:
-          SITE_BASE: https://homesignal.net
+          # The Jody origin (docs/brand/brand-contract.v1.json, current_identity jody). homesignal.net now
+          # 301s here; the walk follows redirects, but it then measured a redirect hop and a foreign host
+          # instead of the site's own pages. Same change as verify-zip-pages-live (#1980).
+          SITE_BASE: https://jodytracks.com
           COUNTY: ${{ github.event.inputs.county }}
         run: node scripts/verify-communities.mjs
