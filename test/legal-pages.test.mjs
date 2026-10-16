@@ -27,20 +27,15 @@ for (const [f, title] of Object.entries(pages)) {
 const terms = text(read('terms.html'));
 const rp = text(read('refund-policy.html')), rph = read('refund-policy.html'), th = read('terms.html'), ph = read('privacy.html'), ch = read('contact.html');
 // Paddle disclosures and links
-ok(/Paddle acts as the online reseller and Merchant of Record/.test(terms), 'Terms disclose Paddle as Merchant of Record for Paddle-processed orders');
-ok(/The payment provider and applicable terms are identified during checkout/.test(terms), 'Terms say the provider is identified at checkout');
-ok(th.includes('href="https://www.paddle.com/legal/refund-policy"') && rph.includes('href="https://www.paddle.com/legal/refund-policy"'), 'Terms and Refund Policy link the Paddle Refund Policy');
-ok(th.includes('href="https://paddle.net"') && rph.includes('href="https://paddle.net"'), 'Terms and Refund Policy link Paddle buyer support (paddle.net)');
 ok(ph.includes('href="https://www.paddle.com/legal/privacy"') && /Paddle acts as the Merchant of Record/.test(text(ph)), 'Privacy links the Paddle Privacy Notice and discloses Merchant of Record');
 ok(/When paid checkout is available/.test(text(ph)), 'Privacy payment text is conditional on paid checkout being available');
 // Plan facts, eligibility, free evaluation
-ok(/currently offered as a free evaluation/.test(terms) && /Paid plans are not yet available/.test(terms) && !/\$\d/.test(terms), 'Terms: free evaluation, paid plans not yet available, no price');
+ok(/currently offered as a free evaluation/.test(terms) && !/\$\d/.test(terms), 'Terms: free evaluation, no price');
 ok(/100 free evaluation reports\. No purchase is required/.test(terms), 'Terms: 100 reports are a free evaluation');
-ok(/custom quote/.test(terms), 'Terms: brokerage/team/enterprise by custom quote');
-ok(/paid plans are not yet available/i.test(rp) && !/\$\d/.test(rp) && /free evaluation reports do not require payment/i.test(rp), 'Refund Policy: no price, paid plans not yet available, free evaluation needs no payment');
+ok(/HomeSignal currently charges nothing, so there is nothing to refund\./.test(rp) && !/\$\d/.test(rp), 'Refund Policy: retired to the single statement that nothing is charged');
+ok(!/Paddle|cancel|renew|paid access|subscription|money-back|\b\d+[- ]day\b/i.test(terms + ' ' + rp), 'Terms and Refund Policy carry no Paddle, cancellation, renewal, paid-access, subscription or refund-window text (free-only, founder 2026-10-16)');
+ok(/Nothing is sold, and no payment is requested or accepted/.test(terms) && /free during the evaluation/.test(terms), 'Terms: free-only, nothing sold');
 // Cancellation and refund are consistent across Terms and Refund Policy
-ok(/Cancellation prevents future renewal charges\. It does not automatically refund payments already made/.test(terms) && /Cancellation does not automatically refund previous charges/.test(rp) && /does not automatically refund a payment already made/.test(rp), 'Terms and Refund Policy keep cancellation separate from refunds');
-ok(!/\b\d+[- ]day\b|money-back|guaranteed refund/i.test(rp), 'Refund Policy promises no window or guarantee');
 // Phone on all four pages
 for (const [n, h] of Object.entries({ 'terms.html': th, 'privacy.html': ph, 'refund-policy.html': rph, 'contact.html': ch })) ok(h.includes('<a href="tel:+15716019432"') && text(h).includes('571-601-9432'), n + ' carries the support phone as a tel:+15716019432 link');
 ok(!/\b(hours|business hours|within \d+|response time)\b/i.test(text(ch).slice(text(ch).indexOf('Other ways to reach us'))), 'Contact page invents no hours or response-time promise');
@@ -68,8 +63,6 @@ const customer = [read('development-activity.html'), read('development-activity-
 ok(!/Lemon\s*Squeezy/i.test(customer), 'visible plan pages do not name Lemon Squeezy as the provider');
 ok(!/HomeSignal, Inc|\bLLC\b|Corporation/.test(terms + ' ' + read('404.html')), 'no unverified corporate-entity name is claimed');
 ok(/sole proprietorship/.test(terms), 'Terms identify HomeSignal as a sole proprietorship');
-ok(/prevents the next renewal charge/.test(terms) && /through the end of the billing period you have already paid/.test(terms) && /returns to the applicable free level/.test(terms) && /saved remain accessible/.test(terms), 'Terms carry the founder cancellation rule');
-ok(!/\b\d+[- ]day\b/i.test(text(read('refund-policy.html'))), 'Refund Policy states no fixed refund window');
 for (const f of ['privacy.html', 'terms.html', 'refund-policy.html']) ok(/<body[^>]*data-page-type="legal"/.test(read(f)), f + ' declares data-page-type="legal"');
 ok(/STATIC_PAGE_TYPES = \['legal', 'support'\]/.test(read('shell.js')) && /HS\.isStaticPage\(\)\) \{/.test(read('shell.js')), 'the shared where-line injector honors the page type');
 process.exit(fails ? 1 : 0);
