@@ -10,6 +10,36 @@ the repo is what ships.
 
 ---
 
+## GOVERNING DOCUMENT — read this before any other instruction in this file
+
+**`docs/engineering-charter.md`** (transcript of the founder-authored
+`docs/HomeSignal-Engineering-Project-Charter.docx`, v1.0) is the **HomeSignal
+Engineering Project Charter**. It applies to every engineering session,
+investigation, recommendation, implementation, and deployment — read it in
+full now, before acting on anything else in this file.
+
+**The short version, because it changes how the rest of this file should be read:**
+the current launch phase is **fixed at the existing 12,722 ZIP pages** — the
+mission is to *populate* them with legitimate first-party development markers,
+not to grow the inventory. The only primary success metric is *previously
+development-empty existing ZIP pages that now display verified first-party
+development markers*. Counties/states/connectors/repos touched are explicitly
+**non-goals**. Geographic expansion (new ZIP pages, new counties, new
+communities) is **P5 — only after explicit approval**, never automatic.
+
+**This supersedes any conflicting "standing authority" language elsewhere in
+this file.** Sections below (§0, §3's community-build runbook, the per-state
+"DONE"/no-stop directives in the status logs) were written for an earlier,
+expansion-phase mandate and describe *how* to expand communities/ZIPs
+correctly if and when expansion is approved — they do **not** grant standing
+authority to initiate new expansion during the current charter phase. Before
+starting work, run the charter's **Objective Check**: does this directly
+increase populated existing ZIP pages? If no, stop, explain why, and wait for
+approval — do not fall back on the older "just ship it" standing answers to
+bypass that check.
+
+---
+
 ## Claims discipline — verify the field, attach the evidence (read before asserting)
 
 Most broken rules are just claims that weren't verified. Operational, not abstract:
