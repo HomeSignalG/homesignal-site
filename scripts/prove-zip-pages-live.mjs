@@ -29,7 +29,7 @@ import { chromium } from 'playwright';
 import { CLASSIFY, PINNED_ONLY, CONTROLS_FILE, chooseControls,
          membersFromPublished } from './lib/zip-page-controls.mjs';
 
-const SITE = (process.env.SITE_BASE || 'https://homesignal.net').replace(/\/$/, '');
+const SITE = (process.env.SITE_BASE || 'https://jodytracks.com').replace(/\/$/, '');
 const UA_MOB = 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/W.X.Y.Z Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 const UA_DESK = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/W.X.Y.Z Safari/537.36';
 
