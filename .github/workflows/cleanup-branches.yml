@@ -1,0 +1,84 @@
+# Delete branches that are FINISHED WITH. REPORT ONLY unless apply=true AND the fingerprint
+# the report printed is pasted back in.
+#
+# DISPATCH ONLY, DELIBERATELY. There is no `schedule:`, no `push:` and no `pull_request:`
+# trigger. A branch delete is irreversible-in-practice, so it must be something a human asked
+# for at a moment they chose, and merging this file can never delete anything by itself.
+#
+# HOW TO USE (two runs):
+#   1. Actions -> "Cleanup finished branches" -> Run workflow, leave apply OFF. Open the run:
+#      the Summary lists every branch as DELETABLE or HELD (with the reason) and ends with a
+#      FINGERPRINT line.
+#   2. Run it again with apply ON and that fingerprint in expected_fingerprint. If anything
+#      changed since the report you read, the fingerprint no longer matches and nothing is
+#      deleted.
+#
+# NO SECRET IS INVOLVED. The run's own GITHUB_TOKEN (contents: write) may delete refs in this
+# repo and nowhere else. scripts/cleanup-branches.mjs documents the rule that decides which
+# branches are deletable; the decision suite below gates every run.
+#
+# MIRRORED in homesignal-site (same file, same script bytes). Edit both.
+name: Cleanup finished branches
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Branch prefix ending in / (cursor/) or ONE exact branch name'
+        required: false
+        default: 'cursor/'
+      apply:
+        description: 'Delete the branches the report lists (false = report only)'
+        type: boolean
+        required: false
+        default: false
+      expected_fingerprint:
+        description: 'Required when apply is on: the FINGERPRINT line from the report run'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: cleanup-branches
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # A branch's copy of this file could be edited to do anything; main's copy is the one
+      # that was merged. Fail on any other ref (a failing step, not a job `if:`, because a
+      # skipped job reports green).
+      - name: Refuse to run from any ref but main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Run this workflow from main (got $GITHUB_REF)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+
+      # The DECISION is what is being trusted, so its own suite gates the run.
+      - name: Decision suite
+        run: node --test test/branch-cleanup.test.mjs
+
+      # Mirror every pull request's head ref locally. Closed PRs keep refs/pull/N/head, so a
+      # commit that only a PR holds is still "preserved" after its branch is deleted.
+      - name: Mirror pull-request refs
+        run: git fetch --no-tags origin '+refs/pull/*/head:refs/pr/*'
+
+      - name: Cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLEANUP_TARGET: ${{ github.event.inputs.target }}
+          CLEANUP_APPLY: ${{ github.event.inputs.apply }}
+          CLEANUP_EXPECT: ${{ github.event.inputs.expected_fingerprint }}
+        run: node scripts/cleanup-branches.mjs
