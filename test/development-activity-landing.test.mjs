@@ -45,8 +45,12 @@ console.log('--- 1. the shared shell, unchanged ---');
 ok(/<template id="hs-content">/.test(src) && /<\/template>/.test(src), 'content lives in <template id="hs-content"> like every shell page');
 ok(/<body data-nav="enterprise"( data-enterprise="overview")?>/.test(src), 'v3 declares the Enterprise identity, so its sidebar item lights here');
 const scripts = (h) => (h.match(/<script[^>]*\ssrc="[^"]+"/g) || []).map((s) => s.match(/src="([^"]+)"/)[1]);
-ok(JSON.stringify(scripts(src)) === JSON.stringify(scripts(contact)),
-  'loads exactly the same script set, in the same order, with the same cache keys as contact.html', { page: scripts(src), contact: scripts(contact) });
+// The sample is drawn by the real report view, so this page loads that view and the Type authority it reads, and nothing else beyond the shell set.
+const SAMPLE_LIBS = [/^lib\/project-type\.js\?v=[0-9a-f]{8}$/, /^lib\/da-report-view\.js\?v=[0-9a-f]{8}$/];
+const pageScripts = scripts(src);
+ok(JSON.stringify(pageScripts.filter((x) => !SAMPLE_LIBS.some((re) => re.test(x)))) === JSON.stringify(scripts(contact))
+   && SAMPLE_LIBS.every((re) => pageScripts.some((x) => re.test(x))),
+  'loads the same script set, order and cache keys as contact.html, plus the report view and the Type authority it reads', { page: pageScripts, contact: scripts(contact) });
 const meta = (h, re) => (h.match(re) || [''])[0];
 ok(meta(src, /<meta http-equiv="Content-Security-Policy"[^>]*>/) === meta(contact, /<meta http-equiv="Content-Security-Policy"[^>]*>/),
   'carries the byte-identical Content-Security-Policy');
@@ -91,9 +95,7 @@ const COPY = [
   'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
   'Know what’s changing before your client asks.',
   'Run Development Activity reports for the properties you’re working on now.',
-  'Brokerage or enterprise? Contact us',
-  'Development activity within 0.5 miles of this property', 'Only tracked development/project activity is shown.',
-  'Development Activity Map', 'Recent Official Activity'
+  'Brokerage or enterprise? Contact us'
 ];
 const plain = text.replace(/\s*\/\s*month/, '/month');
 const missing = COPY.filter((c) => !text.includes(c) && !plain.includes(c));
@@ -253,15 +255,15 @@ ok(/functions\.invoke\('geocode-address'/.test(script), 'an address is resolved 
 ok(!/12722|zipList|const ZIPS|ZIPS\s*=/.test(script), 'no hard-coded ZIP list: coverage is read, not restated');
 ok(!/REPORT-READY|CHANGE-READY|LIMITED COVERAGE/.test(script.replace(/does not determine report-ready or change-ready status/, '')),
   'the check never assigns Report-Ready / Change-Ready / Limited Coverage (that preflight does not exist yet)');
-const TYPE_LABELS = ['Residential', 'Commercial', 'Industrial', 'Data Center', 'Roads & Infrastructure', 'Civic & Public'];
-ok(TYPE_LABELS.every((l) => script.includes("label: '" + l + "'")), 'the Type filter carries the six canonical Types, in the approved order');
-ok(/key: 'other', label: 'Other Project'/.test(script) && /count\(function \(i\) \{ return i\.type === 'other'; \}\)/.test(script),
-  'Other Project is the fallback Type and only renders when an entry carries it');
-ok(['Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction'].every((l) => script.includes("label: '" + l + "'")), 'the three approved Stage sections');
-ok(!/lifecycle|LIFECYCLE|under_construction|permitted:|'operating'|'unknown'/.test(script.replace(/stage: 'permitted'/g, '').replace(/key: 'permitted'/g, '')
-   .replace(/Stage labels are display\s+groupings only and create no lifecycle value/, '')),
-  'Stage is a display grouping only: no lifecycle key is created (founder ruling R2)');
-ok(/type: '[a-z]+',\s+stage: '[a-z]+'/.test(script) && (script.match(/stage: '/g) || []).length >= 9, 'every sample entry carries Type and Stage as separate fields');
+// The sample is the REAL report: drawn by lib/da-report-view.js. This page must not carry a second copy of the layout.
+ok(/HS\.daReportView/.test(script) && /\.mount\(host, sampleResponse\(\)/.test(script), 'the sample is mounted through HS.daReportView.mount, the view every customer report uses');
+ok(!/daTypeChips|daStageLinks|daPlot|daStages|daMetrics|daFilterStatus|da-card|da-rhead|da-rsec|markerShape|TYPES\s*=|STAGES\s*=/.test(noComments),
+  'no hand-built report layout remains on this page (chips, plot, stage cards and metrics all come from the view)');
+const rows = [...script.matchAll(/\['s\d+',\s*'([a-z]+)',\s*'(approved|proposed|permitted)'/g)];
+ok(rows.length >= 9, 'the sample carries at least 9 illustrative entries', rows.length);
+ok(['residential', 'commercial', 'industrial', 'datacenter', 'infrastructure', 'civic'].every((k) => rows.some((r) => r[1] === k)), 'the sample shows each of the six canonical Types');
+ok(['approved', 'proposed', 'permitted'].every((k) => rows.some((r) => r[2] === k)), 'the sample shows each of the three Stages (Type and Stage are separate fields)');
+ok(!/source: \{ url: '/.test(script) && /url: null/.test(script), 'no sample entry carries a link: a fake official source URL would be a fabricated record reference');
 
 console.log(fails ? '\n' + fails + ' FAILURE(S)' : '\nALL PASS');
 process.exit(fails ? 1 : 0);

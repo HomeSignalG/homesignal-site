@@ -40,7 +40,7 @@
   .da-soon{display:block;font-size:12px;color:var(--ink-3);margin-top:6px}
   .da-off[aria-disabled="true"]{opacity:.45;cursor:not-allowed}
   .da-off[aria-disabled="true"]:hover{background:var(--green)}
-  .da a:focus-visible,.da button:focus-visible,.da input:focus-visible,.da-card:focus-visible,.da-mk:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+  .da a:focus-visible,.da button:focus-visible,.da input:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 
   /* coverage check */
   .da-lab{display:block;font-size:12.5px;font-weight:700;margin:0 0 6px}
@@ -53,67 +53,8 @@
   .da-result.err{background:#f7f9f7;border:1px solid var(--line);color:var(--ink-2)}
   .da-result small{display:block;margin-top:6px;font-size:12.5px;opacity:.85}
 
-  /* sample report */
+  /* sample report: the report itself is drawn by lib/da-report-view.js (its own scoped stylesheet); only the caption is this page's */
   .da-cap{font-size:13px!important;color:var(--ink-3)!important;margin:0 0 12px!important;max-width:none!important}
-  .da-report{background:#fff;border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow-sm);padding:26px 28px}
-  .da-rhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 24px;padding-bottom:18px;border-bottom:1px solid var(--line-2)}
-  .da-rhead .da-addr{font-size:17px;font-weight:700;letter-spacing:-.01em;text-transform:uppercase;margin:6px 0 2px}
-  .da-rhead .da-side{text-align:right;font-size:13px;color:var(--ink-2)}
-  .da-rhead .da-side b{display:block;color:var(--ink);font-size:13.5px}
-  .da-rsec{padding:20px 0;border-bottom:1px solid var(--line-2)}
-  .da-rsec:last-child{border-bottom:0;padding-bottom:0}
-  .da-rlab{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:0 0 12px}
-  .da-metrics{display:flex;flex-wrap:wrap;gap:14px 40px}
-  .da-metric b{display:block;font-size:30px;letter-spacing:-.02em;line-height:1.1}
-  .da-metric span{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3)}
-  .da-recent{font-size:13.5px!important;margin:14px 0 0!important;max-width:none!important}
-
-  .da-scanrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 12px}
-  .da-scanrow .da-k{flex:0 0 100%;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
-  .da-scanrow .da-k em{font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;font-size:12.5px;color:var(--ink-3)}
-  .da-chip{cursor:pointer;background:#fff;padding:6px 10px}
-  .da-chip:hover{background:#f7f9f7}
-  .da-chip[aria-pressed="true"]{background:var(--green-tint);border-color:var(--green);color:var(--green-deep)}
-  .da-stagelink{font-size:12.5px;font-weight:600;color:var(--ink);text-decoration:none;background:#f4f6f4;border:1px solid var(--line);padding:7px 12px;border-radius:999px}
-  .da-stagelink:hover{background:var(--green-tint)}
-  .da-stagelink b{color:var(--green);margin-left:4px}
-  .da-status{font-size:13px!important;color:var(--ink-2)!important;margin:4px 0 0!important;min-height:20px;max-width:none!important}
-
-  .da-plotwrap{display:flex;flex-wrap:wrap;gap:8px 32px;align-items:center}
-  .da-plot{width:100%;max-width:340px;height:auto;flex:none}
-  .da-plotside{flex:1;min-width:220px}
-  .da-plotside p{font-size:13.5px!important;margin:0 0 8px!important}
-  .da-legend{list-style:none;margin:10px 0 0;padding:0;font-size:12.5px;color:var(--ink-2)}
-  .da-legend li{display:flex;align-items:center;gap:9px;margin-bottom:6px}
-  .da-legend svg{flex:none}
-  .da-mk{cursor:pointer;transition:opacity .15s ease}
-  .da-mk.dim{opacity:.16}
-  .da-mk text{font-family:var(--font);font-size:11px;font-weight:700;text-anchor:middle;dominant-baseline:central;pointer-events:none}
-  .da-mk.sel .da-shape{stroke-width:3}
-
-  #daStages{padding-top:0}
-  .da-stage{padding:20px 0 4px;border-top:1px solid var(--line-2)}
-  #daStages .da-stage:first-child{border-top:0}
-  .da-stagehead{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
-  .da-stagehead h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;margin:0}
-  .da-stagehead span{font-size:12.5px;color:var(--ink-3)}
-  .da-empty{font-size:13px!important;color:var(--ink-3)!important;margin:0 0 16px!important}
-  .da-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:16px}
-  .da-card{border:1px solid var(--line);border-radius:12px;padding:14px 15px;background:#fff;cursor:pointer}
-  .da-card:hover{border-color:var(--line)}
-  .da-card.sel{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
-  .da-card h4{font-size:14.5px;letter-spacing:-.01em;margin:0 0 8px;display:flex;gap:9px;align-items:flex-start}
-  .da-num{flex:none;width:20px;height:20px;border-radius:50%;background:#eef1ee;color:var(--ink-2);font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:1px}
-  .da-tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px}
-  .da-tag{font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px;border:1px solid var(--line);color:var(--ink-2);background:#fff}
-  .da-tag i{font-style:normal;font-weight:500;color:var(--ink-3);margin-right:4px}
-  .da-s-approved{background:var(--green-tint);border-color:#cbe7d5;color:var(--green-deep)}
-  .da-s-permitted{background:var(--green-deep);border-color:var(--green-deep);color:#fff}
-  .da-s-permitted i{color:#cbe7d5}
-  .da-s-proposed{background:#fff;border:1px dashed var(--amber);color:var(--amber)}
-  .da-s-proposed i{color:var(--amber);opacity:.8}
-  .da-card p{font-size:13px!important;margin:0 0 5px!important;max-width:none!important}
-  .da-card .da-src{color:var(--ink-3)!important;font-size:12.5px!important;margin:8px 0 0!important}
 
   /* section layouts */
   .da-cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
@@ -137,8 +78,6 @@
     .da h1{font-size:29px}
     .da h2{font-size:20px}
     .da section{padding:36px 0}
-    .da-report{padding:18px 16px}
-    .da-rhead .da-side{text-align:left}
     .da-price{font-size:34px}
   }
 </style>
@@ -193,59 +132,10 @@
       </div>
     </section>
 
-    <!-- 3. PRODUCT PROOF: the report's real information hierarchy, sample entries. Follows pricing (founder, 2026-10-06); the sample teaches Type and Stage. -->
+    <!-- 3. PRODUCT PROOF: the REAL report layout (lib/da-report-view.js, the view every customer report is drawn by) over illustrative entries. Follows pricing (founder, 2026-10-06); the sample teaches Type and Stage. -->
     <section id="sample">
       <p class="da-cap">Sample Development Activity report. The property, projects, distances and dates below are illustrative entries, not records for a real address. In a real report every project links to its official source.</p>
-      <div class="da-report" id="daReport">
-        <div class="da-rhead">
-          <div>
-            <div class="da-eyebrow">HomeSignal Development Activity</div>
-            <div class="da-addr">1234 Sample Street</div>
-            <div class="da-muted">Sample property</div>
-          </div>
-          <div class="da-side">
-            <b>Sample Realty · Agent Name</b>
-            Generated <span id="daGenerated"></span>
-          </div>
-        </div>
-
-        <div class="da-rsec" id="daActivity">
-          <div class="da-rlab">Recent Official Activity</div>
-          <div class="da-metrics" id="daMetrics"></div>
-          <p class="da-recent" id="daRecent"></p>
-        </div>
-
-        <div class="da-rsec" id="daScan">
-          <div class="da-scanrow" role="group" aria-label="Type filter">
-            <div class="da-k">Type<em>What kind of development is it?</em></div>
-            <div id="daTypeChips" style="display:contents"></div>
-          </div>
-          <div class="da-scanrow" role="group" aria-label="Stage sections">
-            <div class="da-k">Stage<em>How far along is it?</em></div>
-            <div id="daStageLinks" style="display:contents"></div>
-          </div>
-          <p class="da-status" id="daFilterStatus" role="status" aria-live="polite"></p>
-        </div>
-
-        <div class="da-rsec" id="daMap">
-          <div class="da-rlab">Development Activity Map</div>
-          <div class="da-plotwrap">
-            <svg class="da-plot" id="daPlot" viewBox="0 0 360 360" role="img" aria-label="Development activity within 0.5 miles of the sample property"></svg>
-            <div class="da-plotside">
-              <p><b>Development activity within 0.5 miles of this property</b></p>
-              <p>Only tracked development/project activity is shown.</p>
-              <ul class="da-legend" id="daLegend"></ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="da-rsec" id="daStages"></div>
-
-        <div class="da-rsec">
-          <div class="da-rlab">Official Evidence &amp; Coverage</div>
-          <p class="da-muted">Sources · published timing · status · freshness · limitations · official links</p>
-        </div>
-      </div>
+      <div id="daReport"></div>
       <p class="da-cap da-teach">Every project is organized by Type and Stage so you can quickly see what it is and where it stands.</p>
     </section>
 
@@ -319,6 +209,8 @@
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="lib/data.js"></script>
+<script src="lib/project-type.js?v=108e00a6"></script>
+<script src="lib/da-report-view.js?v=226679f8"></script>
 <script src="lib/topic-prefs.js"></script>
 <script src="lib/templates.js?v=6b61281a"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
@@ -332,10 +224,9 @@
        It can prove exactly two things: the ZIP is inside the HomeSignal ZIP network, or it is not.
        It does NOT classify Report-Ready / Change-Ready / Limited Coverage: that preflight does not exist
        yet (frozen plan, Master Step 10), so this page never claims it.
-   (2) SAMPLE REPORT. A structural sample with illustrative entries. Type and Stage are separate fields;
-       the Type filter narrows the same list across all three Stage sections. Stage labels are display
-       groupings only and create no lifecycle value (founder ruling R2). Every count is computed from
-       the entries below, so the numbers on the page cannot disagree with the list.
+   (2) SAMPLE REPORT. Drawn by lib/da-report-view.js, the one view every customer report uses, over illustrative
+       entries shaped like the engine's response. This page owns no report layout, so the sample cannot drift from
+       the real report; Type, Stage, counts, map and table all come from the view.
    The three Start free buttons are inert (aria-disabled) and HIDDEN (founder, 2026-10-02): the 100-report entitlement
    entitlement is a launch blocker (plan sections 18 and 25); the old Join link is a link, not a button. */
 (function () {
@@ -387,218 +278,65 @@
   }
 
   // ---------------------------------------------------------------- sample report
-  var TYPES = [
-    { key: 'all', label: 'All' },
-    { key: 'residential', label: 'Residential' },
-    { key: 'commercial', label: 'Commercial' },
-    { key: 'industrial', label: 'Industrial' },
-    { key: 'datacenter', label: 'Data Center' },
-    { key: 'infrastructure', label: 'Roads & Infrastructure' },
-    { key: 'civic', label: 'Civic & Public' },
-    { key: 'other', label: 'Other Project' }   // fallback Type: its chip renders only when an entry carries it
+  // The sample is drawn by the SAME view that draws every customer report (lib/da-report-view.js), so it cannot drift from the real
+  // layout: when the report changes, this section changes with it. What this page supplies is only the DATA, in the shape the national
+  // report engine returns. Every entry is illustrative (no real address, project or agency), and no entry carries a link: a real report
+  // links each record to its official source. Dates are offsets from today so the sample always reads as a recent report.
+  // [id, Type key, stage key, miles, bearing (deg, 0 = north), title, publisher status, publisher stage, event kind, event label, days ago, agency]
+  var SAMPLE = [
+    ['s1', 'residential',    'approved',  0.3, 40,  '186-unit residential project',           'Approved',                  'Approved',     'approved', 'Approved', 23, 'County Planning Commission'],
+    ['s2', 'commercial',     'approved',  0.4, 160, 'Retail building site plan',              'Site plan approved',        'Approved',     'approved', 'Approved', 30, 'City Planning Department'],
+    ['s3', 'civic',          'approved',  0.5, 250, 'School expansion',                       'Approved',                  'Approved',     'approved', 'Approved', 37, 'School District Board'],
+    ['s4', 'residential',    'proposed',  0.2, 100, 'Subdivision application',                'Application under review',  'Under review', 'filed',    'Filed',    25, 'City Planning Department'],
+    ['s5', 'infrastructure', 'proposed',  0.4, 330, 'Road improvement planning application',  'Application under review',  'Under review', 'filed',    'Filed',    28, 'State Transportation Department'],
+    ['s6', 'industrial',     'proposed',  0.3, 205, 'Warehouse site-plan application',        'Application filed',         'Accepted',     'filed',    'Filed',    32, 'County Planning Commission'],
+    ['s7', 'datacenter',     'proposed',  0.5, 65,  'Rezoning application for a data center campus', 'Rezoning application under review', 'Under review', 'filed', 'Filed', 35, 'County Planning Commission'],
+    ['s8', 'residential',    'permitted', 0.4, 292, 'Townhome building permits',              'Approved',                  'Issued',       'issued',   'Issued',   27, 'City Building Department'],
+    ['s9', 'infrastructure', 'permitted', 0.2, 355, 'Road widening',                          'Approved',                  'Issued',       'issued',   'Issued',   39, 'State Transportation Department']
   ];
-  var STAGES = [
-    { key: 'approved',  label: 'Approved / Coming' },
-    { key: 'proposed',  label: 'Proposed / Under Review' },
-    { key: 'permitted', label: 'Permitted / Under Construction' }
-  ];
-  // Illustrative entries. dist is miles from the sample property; angle only positions the plot marker.
-  var ITEMS = [
-    { n: 1, type: 'residential',    stage: 'approved',  dist: 0.3, angle: 35,  date: '2026-09-24', title: '186-unit project approved',                    status: 'Approved',                        review: 'Review published project details and construction timing.', source: 'County Planning Commission' },
-    { n: 2, type: 'commercial',     stage: 'approved',  dist: 0.4, angle: 160, date: '2026-09-17', title: 'Retail building site plan approved',           status: 'Site plan approved',              review: 'Review the approved site plan and timing.',                 source: 'City Planning Department' },
-    { n: 3, type: 'civic',          stage: 'approved',  dist: 0.5, angle: 250, date: '2026-09-10', title: 'School expansion approved',                    status: 'Approved',                        review: 'Review published project details and schedule.',            source: 'School District Board' },
-    { n: 4, type: 'residential',    stage: 'proposed',  dist: 0.2, angle: 100, date: '2026-09-22', title: 'Subdivision application under review',        status: 'Application under review',        review: 'Review application and hearing schedule.',                  source: 'City Planning Department' },
-    { n: 5, type: 'infrastructure', stage: 'proposed',  dist: 0.4, angle: 330, date: '2026-09-19', title: 'Planning application under review',            status: 'Application under review',        review: 'Review application and agency schedule.',                   source: 'State Transportation Department' },
-    { n: 6, type: 'industrial',     stage: 'proposed',  dist: 0.3, angle: 205, date: '2026-09-15', title: 'Warehouse site-plan application filed',        status: 'Application filed',               review: 'Review application and hearing schedule.',                  source: 'County Planning Commission' },
-    { n: 7, type: 'datacenter',     stage: 'proposed',  dist: 0.5, angle: 65,  date: '2026-09-12', title: 'Rezoning application for a data center campus', status: 'Rezoning application under review', review: 'Review application and hearing schedule.',               source: 'County Planning Commission' },
-    { n: 8, type: 'residential',    stage: 'permitted', dist: 0.4, angle: 292, date: '2026-09-20', title: 'Townhome building permits issued',             status: 'Permit issued',                   review: 'Review permit details and construction timing.',            source: 'City Building Department' },
-    { n: 9, type: 'infrastructure', stage: 'permitted', dist: 0.2, angle: 355, date: '2026-09-08', title: 'Road widening under construction',             status: 'Construction started',            review: 'Review project details and construction schedule.',         source: 'State Transportation Department' }
-  ];
-  var state = { type: 'all', sel: null };
-  var NS = 'http://www.w3.org/2000/svg';
-  var ITEM_BY = {};
-  var chips = {}, stageEls = {};
+  var STAGE_LABEL = { approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction' };
+  function isoDaysAgo(n) { var d = new Date(Date.now() - n * 86400000); return d.toISOString().slice(0, 10); }
 
-  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function svg(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-  function labelOf(list, key) { for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i].label; return key; }
-  function fmt(iso) { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-  function count(pred) { return ITEMS.filter(pred).length; }
-
-  // A stage marker is drawn by shape AND outline, never colour alone:
-  // approved = solid circle, proposed = dashed hollow circle, permitted = solid square.
-  function markerShape(stage, r) {
-    if (stage === 'permitted') return svg('rect', { class: 'da-shape', x: -r, y: -r, width: r * 2, height: r * 2, rx: 3, fill: '#0f5c37', stroke: '#0f5c37', 'stroke-width': 2 });
-    if (stage === 'proposed') return svg('circle', { class: 'da-shape', r: r, fill: '#fff', stroke: '#c47a1a', 'stroke-width': 2, 'stroke-dasharray': '3 2.5' });
-    return svg('circle', { class: 'da-shape', r: r, fill: '#157a49', stroke: '#157a49', 'stroke-width': 2 });
-  }
-  function markerInk(stage) { return stage === 'proposed' ? '#c47a1a' : '#fff'; }
-
-  function buildActivity() {
-    var m = document.getElementById('daMetrics');
-    STAGES.forEach(function (s) {
-      var d = el('div', 'da-metric');
-      d.appendChild(el('b', '', String(count(function (i) { return i.stage === s.key; }))));
-      d.appendChild(el('span', '', s.label));
-      m.appendChild(d);
-    });
-    var latest = ITEMS.slice().sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0];
-    document.getElementById('daRecent').textContent = 'Most recent: ' + labelOf(TYPES, latest.type) + ' — ' + latest.title + ' · ' + latest.dist.toFixed(1) + ' mi · ' + fmt(latest.date);
-    document.getElementById('daGenerated').textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  function buildScan() {
-    var host = document.getElementById('daTypeChips');
-    TYPES.forEach(function (t) {
-      if (t.key === 'other' && !count(function (i) { return i.type === 'other'; })) return;
-      var b = el('button', 'wchip da-chip', t.label);
-      b.type = 'button';
-      b.setAttribute('aria-pressed', t.key === 'all' ? 'true' : 'false');
-      b.dataset.type = t.key;
-      b.addEventListener('click', function () { state.type = t.key; apply(); });
-      chips[t.key] = b;
-      host.appendChild(b);
-    });
-    var sl = document.getElementById('daStageLinks');
-    STAGES.forEach(function (s) {
-      var a = el('a', 'da-stagelink', s.label);
-      a.href = '#daStage-' + s.key;
-      var c = el('b', '', '');
-      a.appendChild(c);
-      stageEls[s.key] = { navCount: c };
-      sl.appendChild(a);
-    });
-  }
-
-  function buildPlot() {
-    var p = document.getElementById('daPlot'), C = 180, R = 150;
-    [1, 0.5].forEach(function (f) { p.appendChild(svg('circle', { cx: C, cy: C, r: R * f, fill: 'none', stroke: '#e4e8e4', 'stroke-width': 1, 'stroke-dasharray': f === 1 ? '' : '2 4' })); });
-    p.appendChild(svg('line', { x1: C - R, y1: C, x2: C + R, y2: C, stroke: '#eef1ee', 'stroke-width': 1 }));
-    p.appendChild(svg('line', { x1: C, y1: C - R, x2: C, y2: C + R, stroke: '#eef1ee', 'stroke-width': 1 }));
-    var t = svg('text', { x: C + R - 4, y: C - 8, 'text-anchor': 'end', 'font-size': 10, fill: '#83918a', 'font-family': 'inherit' });
-    t.textContent = '0.5 mi';
-    p.appendChild(t);
-    var subj = svg('g', {});
-    subj.appendChild(svg('rect', { x: C - 7, y: C - 7, width: 14, height: 14, fill: '#16211c', transform: 'rotate(45 ' + C + ' ' + C + ')' }));
-    var st = svg('text', { x: C, y: C + 24, 'text-anchor': 'middle', 'font-size': 10, 'font-weight': 700, fill: '#16211c', 'font-family': 'inherit' });
-    st.textContent = 'Property';
-    subj.appendChild(st);
-    p.appendChild(subj);
-    ITEMS.forEach(function (it) {
-      var r = (it.dist / 0.5) * R, th = it.angle * Math.PI / 180;
-      var g = svg('g', { class: 'da-mk', tabindex: '0', role: 'button', transform: 'translate(' + (C + r * Math.cos(th)).toFixed(1) + ' ' + (C - r * Math.sin(th)).toFixed(1) + ')' });
-      g.setAttribute('aria-label', 'Project ' + it.n + ': ' + it.title + ', ' + labelOf(TYPES, it.type) + ', ' + labelOf(STAGES, it.stage) + ', ' + it.dist.toFixed(1) + ' miles');
-      g.appendChild(markerShape(it.stage, 11));
-      var tx = svg('text', { fill: markerInk(it.stage) });
-      tx.textContent = String(it.n);
-      g.appendChild(tx);
-      g.addEventListener('click', function () { select(it.n); });
-      g.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(it.n); } });
-      p.appendChild(g);
-      it.mk = g;
-    });
-    var lg = document.getElementById('daLegend');
-    STAGES.forEach(function (s) {
-      var li = el('li');
-      var sv = svg('svg', { width: 24, height: 24, viewBox: '-12 -12 24 24', 'aria-hidden': 'true' });
-      sv.appendChild(markerShape(s.key, 8));
-      li.appendChild(sv);
-      li.appendChild(document.createTextNode(s.label));
-      lg.appendChild(li);
-    });
-  }
-
-  function buildStages() {
-    var host = document.getElementById('daStages');
-    STAGES.forEach(function (s) {
-      var sec = el('div', 'da-stage');
-      sec.id = 'daStage-' + s.key;
-      var head = el('div', 'da-stagehead');
-      head.appendChild(el('h3', '', s.label));
-      var cnt = el('span', '', '');
-      head.appendChild(cnt);
-      sec.appendChild(head);
-      var empty = el('p', 'da-empty', '');
-      empty.hidden = true;
-      sec.appendChild(empty);
-      var cards = el('div', 'da-cards');
-      ITEMS.filter(function (i) { return i.stage === s.key; }).forEach(function (it) {
-        var c = el('article', 'da-card');
-        c.tabIndex = 0;
-        c.dataset.n = String(it.n);
-        c.dataset.type = it.type;
-        c.dataset.stage = it.stage;
-        var h = el('h4');
-        h.appendChild(el('span', 'da-num', String(it.n)));
-        h.appendChild(document.createTextNode(it.title));
-        c.appendChild(h);
-        var tags = el('div', 'da-tags');
-        var ts = el('span', 'da-tag da-s-' + it.stage);
-        ts.appendChild(el('i', '', 'Stage'));
-        ts.appendChild(document.createTextNode(s.label));
-        var tt = el('span', 'da-tag');
-        tt.appendChild(el('i', '', 'Type'));
-        tt.appendChild(document.createTextNode(labelOf(TYPES, it.type)));
-        tags.appendChild(ts); tags.appendChild(tt);
-        tags.appendChild(el('span', 'da-tag', it.dist.toFixed(1) + ' mi'));
-        c.appendChild(tags);
-        c.appendChild(el('p', '', 'Publisher status: ' + it.status + ' · ' + fmt(it.date)));
-        c.appendChild(el('p', '', it.review));
-        c.appendChild(el('p', 'da-src', it.source + ' · Official source →'));
-        c.addEventListener('click', function () { select(it.n); });
-        c.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(it.n); } });
-        it.card = c;
-        cards.appendChild(c);
+  /** The engine's response shape ({ status, report, render }), as national-report.ts returns it, over the illustrative entries. */
+  function sampleResponse() {
+    var PT = window.HS && window.HS.categoryFor;
+    var projects = [], byStage = { approved: [], proposed: [], permitted: [] }, byLife = { approved: [], proposed: [], operating: [], unknown: [] };
+    var dist = {}, bearing = {}, activity = [];
+    SAMPLE.forEach(function (r) {
+      var cat = PT ? PT(r[1]) : null;
+      var life = r[2] === 'proposed' ? 'proposed' : 'approved';
+      projects.push({
+        project_id: r[0], source_family: 'illustrative-sample', name: r[5],
+        type: { key: r[1], label: cat ? cat.label : r[1] },
+        lifecycle: { key: life, label: life === 'proposed' ? 'Proposed' : 'Approved' },
+        stage: { key: r[2], label: STAGE_LABEL[r[2]] },
+        publisher_status: r[6], publisher_stage: r[7],
+        publisher_event: { kind: r[8], label: r[9], date: isoDaysAgo(r[10]) },
+        record_date: { kind: r[8], label: r[9], date: isoDaysAgo(r[10]), older_than_a_year: false, verify: null },
+        developer: null, size: null, investment: null,
+        source: { url: null, attribution: r[11] }
       });
-      sec.appendChild(cards);
-      stageEls[s.key].count = cnt;
-      stageEls[s.key].empty = empty;
-      stageEls[s.key].cards = cards;
-      host.appendChild(sec);
+      byStage[r[2]].push(r[0]); byLife[life].push(r[0]); activity.push(r[0]);
+      dist[r[0]] = r[3]; bearing[r[0]] = r[4];
     });
-  }
-
-  function select(n) {
-    state.sel = state.sel === n ? null : n;
-    ITEMS.forEach(function (it) {
-      var on = it.n === state.sel;
-      it.card.classList.toggle('sel', on);
-      it.mk.classList.toggle('sel', on);
-    });
-  }
-
-  // One function decides what is shown: the same Type predicate hides cards and dims markers.
-  function apply() {
-    var t = state.type, tl = labelOf(TYPES, t);
-    var match = function (it) { return t === 'all' || it.type === t; };
-    ITEMS.forEach(function (it) {
-      var on = match(it);
-      it.card.hidden = !on;
-      it.mk.classList.toggle('dim', !on);
-      it.mk.setAttribute('aria-hidden', on ? 'false' : 'true');
-      it.mk.setAttribute('tabindex', on ? '0' : '-1');
-    });
-    if (state.sel && !match(ITEM_BY[state.sel])) select(state.sel);
-    Object.keys(chips).forEach(function (k) { chips[k].setAttribute('aria-pressed', k === t ? 'true' : 'false'); });
-    var total = 0, parts = [];
-    STAGES.forEach(function (s) {
-      var n = count(function (i) { return i.stage === s.key && match(i); });
-      total += n;
-      stageEls[s.key].navCount.textContent = String(n);
-      stageEls[s.key].count.textContent = n + (n === 1 ? ' project' : ' projects');
-      stageEls[s.key].empty.hidden = n > 0;
-      stageEls[s.key].empty.textContent = n > 0 ? '' : 'No ' + tl + ' projects in this stage in this sample.';
-      stageEls[s.key].cards.hidden = n === 0;
-      parts.push(s.label + ' ' + n);
-    });
-    document.getElementById('daFilterStatus').textContent = t === 'all'
-      ? 'Showing all ' + total + ' projects across the three Stage sections.'
-      : 'Showing ' + total + ' ' + tl + (total === 1 ? ' project' : ' projects') + ' across the three Stage sections: ' + parts.join(' · ') + '.';
+    return {
+      status: 'OK',
+      report: {
+        product: 'HOMESIGNAL DEVELOPMENT ACTIVITY', report_version: 'development-activity-national-3', as_of: isoDaysAgo(0), zip: '', radius_mi: 0.5, recent_days: 90,
+        activity: { outcome: 'DEVELOPMENT_SHOWN', label: 'Development shown' },
+        coverage: { zip_supported: true, state: 'CHANGE_READY', change_ready: true, area_truncated: false, limitations: [] },
+        sections: { what_changed_recently: [], recent_official_activity: activity, by_lifecycle: byLife, by_stage: byStage },
+        projects: projects
+      },
+      render: { distances_mi: dist, bearings_deg: bearing }
+    };
   }
 
   function init() {
-    ITEMS.forEach(function (it) { ITEM_BY[it.n] = it; });
-    buildActivity(); buildScan(); buildPlot(); buildStages(); apply();
+    var V = window.HS && window.HS.daReportView, host = document.getElementById('daReport');
+    if (V && host) {
+      V.mount(host, sampleResponse(), { subject: '1234 Sample Street', label: 'Sample property', brokerage: 'Sample Realty', agent: 'Agent Name', hide: ['compare', 'watch', 'share', 'pdf'] });
+    }
     document.getElementById('daCoverBtn').addEventListener('click', checkCoverage);
     // The commerce buttons are inert until entitlement and checkout exist.
     document.querySelectorAll('.da-off').forEach(function (b) {

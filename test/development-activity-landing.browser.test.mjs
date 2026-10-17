@@ -64,28 +64,22 @@ async function open(width, height) {
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
   await page.goto(base + '/development-activity.html', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#daReport .da-card', { timeout: 30000 });
+  await page.waitForSelector('#daReport .da-rv tbody tr', { timeout: 30000 });
   return { ctx, page, errors };
 }
 
+// What the REAL report view shows, read from its own markup (lib/da-report-view.js): the records table rows, the map markers, the pressed chips.
 const shape = (page) => page.evaluate(() => {
-  const vis = (n) => !n.hidden && n.offsetParent !== null;
-  const stages = ['approved', 'proposed', 'permitted'].map((k) => {
-    const sec = document.getElementById('daStage-' + k);
-    return {
-      key: k,
-      shown: [...sec.querySelectorAll('.da-card')].filter(vis).map((c) => c.dataset.n + ':' + c.dataset.type),
-      count: sec.querySelector('.da-stagehead span').textContent,
-      empty: (() => { const e = sec.querySelector('.da-empty'); return e && !e.hidden ? e.textContent : ''; })(),
-      nav: [...document.querySelectorAll('#daStageLinks a')].find((a) => a.getAttribute('href') === '#daStage-' + k).querySelector('b').textContent
-    };
-  });
+  const vis = (n) => !n.hidden && !n.hasAttribute('hidden');
+  const rows = [...document.querySelectorAll('#daReport .da-rv-table tbody tr')];
+  const mks = [...document.querySelectorAll('#daReport .da-rv-mk')];
   return {
-    pressed: [...document.querySelectorAll('#daTypeChips .da-chip')].filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.textContent),
-    stages,
-    dimmed: [...document.querySelectorAll('#daPlot .da-mk.dim')].length,
-    markers: document.querySelectorAll('#daPlot .da-mk').length,
-    status: document.getElementById('daFilterStatus').textContent
+    pressed: [...document.querySelectorAll('#daReport .da-rv-chip[aria-pressed="true"]')].map((b) => b.getAttribute('data-da-filter') + ':' + b.getAttribute('data-da-value')),
+    shown: rows.filter(vis).map((r) => r.getAttribute('data-da-stage') + ':' + r.getAttribute('data-da-type')),
+    rows: rows.length,
+    hiddenMarkers: mks.filter((m) => !vis(m)).length,
+    markers: mks.length,
+    noMatch: (() => { const e = document.querySelector('#daReport .da-rv-nomatch'); return e && !e.hidden ? e.textContent : ''; })()
   };
 });
 
@@ -119,93 +113,74 @@ ok(JSON.stringify(shell.lit) === JSON.stringify(['enterprise']),
   'exactly one header item is lit, and it is Enterprise: this page is the Enterprise item', shell.lit);
 ok(shell.inSlot, 'the page content is mounted in the shell slot');
 
-console.log('--- 2. the sample keeps the real report hierarchy ---');
+console.log('--- 2. the sample IS the real report: same view, same section order ---');
 const order = await page.evaluate(() => {
   const r = document.getElementById('daReport');
-  const idx = (sel) => { const n = r.querySelector(sel); return n ? [...r.querySelectorAll('*')].indexOf(n) : -1; };
   return {
-    header: idx('.da-rhead'), activity: idx('#daActivity'), scan: idx('#daScan'), map: idx('#daMap'),
-    approved: idx('#daStage-approved'), proposed: idx('#daStage-proposed'), permitted: idx('#daStage-permitted'),
-    evidence: [...r.querySelectorAll('.da-rlab')].map((n) => n.textContent),
-    text: r.textContent
+    heads: [...r.querySelectorAll('.da-rv-h2, .da-rv-brieflab')].map((n) => n.textContent.trim()),
+    eyebrow: (r.querySelector('.da-rv-eyebrow') || {}).textContent,
+    viewTitles: window.HS.daReportView.TITLES,
+    text: r.textContent,
+    actions: r.querySelectorAll('.da-rv-actions, .da-rv-act').length,
+    links: r.querySelectorAll('a[href]').length
   };
 });
-const seq = [order.header, order.activity, order.scan, order.map, order.approved, order.proposed, order.permitted];
-ok(seq.every((n, i) => n > -1 && (i === 0 || n > seq[i - 1])),
-  'header → Recent Official Activity → Type + Stage scan → Development Activity Map → Approved → Proposed → Permitted', seq);
-ok(order.evidence[0] === 'Recent Official Activity' && order.evidence.includes('Development Activity Map') && order.evidence.includes('Official Evidence & Coverage'),
-  'the report labels are the approved ones', order.evidence);
-ok(!/what changed|what exists today/i.test(order.text), 'the sample makes no "What Changed" claim and has no What Exists Today section');
-ok(/1234 Sample Street/i.test(order.text) && /Sample Realty · Agent Name/.test(order.text) && /Generated /.test(order.text),
-  'property, brokerage/agent identity and generated date are present');
+const want = ['Client Briefing: Nearby Activity', order.viewTitles.filters, order.viewTitles.records, order.viewTitles.map, order.viewTitles.history, order.viewTitles.evidence];
+ok(JSON.stringify(order.heads) === JSON.stringify(want),
+  'sections in the real report\'s order: briefing → Type and stage → Nearby Development → Development Activity Map → Change History → Official evidence & coverage', order.heads);
+ok(order.eyebrow === 'JODY Development Activity', 'the header carries the report view\'s own eyebrow', order.eyebrow);
+ok(/1234 Sample Street/i.test(order.text) && /Sample Realty · Agent Name/.test(order.text) && /Generated /.test(order.text) && /Search radius 0\.5 miles/.test(order.text),
+  'property, brokerage/agent identity, generated date and search radius are present');
+ok(order.actions === 0, 'the sample shows no report-action buttons (Compare / Watch / Share / PDF do nothing on a marketing page)', order.actions);
+ok(order.links === 0, 'the sample links nowhere: its illustrative entries have no official source to link');
+ok(!/what exists today/i.test(order.text), 'the sample has no What Exists Today section');
 
-console.log('--- 3. Type and Stage are separate concepts ---');
+console.log('--- 3. Type and Stage are separate fields, in the real filters ---');
 const initial = await shape(page);
-ok(JSON.stringify(await page.$$eval('#daTypeChips .da-chip', (b) => b.map((x) => x.textContent))) ===
-  JSON.stringify(['All', 'Residential', 'Commercial', 'Industrial', 'Data Center', 'Roads & Infrastructure', 'Civic & Public']),
-  'the Type row is All · Residential · Commercial · Industrial · Data Center · Roads & Infrastructure · Civic & Public');
-ok(initial.pressed.join() === 'All', 'All is selected first', initial.pressed);
-ok(JSON.stringify(await page.$$eval('#daStageLinks a', (a) => a.map((x) => x.firstChild.textContent))) ===
-  JSON.stringify(['Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction']), 'the Stage row is the three approved sections');
-const cardParts = await page.$$eval('.da-card', (cs) => cs.map((c) => ({
-  type: c.querySelector('.da-tag:not([class*="da-s-"]) i')?.textContent === 'Type',
-  stage: c.querySelector('[class*="da-s-"] i')?.textContent === 'Stage',
-  stageClass: [...c.querySelector('[class*="da-s-"]').classList].find((x) => x.startsWith('da-s-')),
-  dataStage: c.dataset.stage
-})));
-ok(cardParts.length === 9 && cardParts.every((c) => c.type && c.stage && c.stageClass === 'da-s-' + c.dataStage),
-  'every card states its Type and its Stage as two separate, labelled tags', cardParts.slice(0, 2));
-ok(initial.stages.map((s) => s.shown.length).join() === '3,4,2' && initial.stages.map((s) => s.nav).join() === '3,4,2', 'all 9 entries show: 3 / 4 / 2', initial.stages);
-ok(initial.dimmed === 0 && initial.markers === 9, 'all nine plot markers are drawn and none is dimmed');
+ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="type"]', (b) => b.map((x) => x.firstChild.textContent.trim()))) ===
+  JSON.stringify(['All', 'Residential', 'Commercial', 'Industrial', 'Data center', 'Roads & infrastructure', 'Civic & public']),
+  'the Type row is the canonical Type authority\'s labels, in the plan\'s order');
+ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="stage"]', (b) => b.map((x) => x.firstChild.textContent.trim()))) ===
+  JSON.stringify(['All', 'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction']), 'the Stage row is the three approved stages');
+ok(initial.pressed.join() === 'type:all,stage:all', 'All is selected first on both rows', initial.pressed);
+ok(initial.rows === 9 && initial.shown.length === 9 && initial.markers === 9 && initial.hiddenMarkers === 0, 'all 9 entries are in the table and on the map', initial);
+const stageCount = (k) => initial.shown.filter((x) => x.startsWith(k + ':')).length;
+ok(['approved', 'proposed', 'permitted'].map(stageCount).join() === '3,4,2', 'Approved / Proposed / Permitted hold 3 / 4 / 2', initial.shown);
 
-console.log('--- 4. selecting a Type filters that Type across all three Stage sections ---');
-const TYPES = { Residential: 'residential', Commercial: 'commercial', Industrial: 'industrial', 'Data Center': 'datacenter', 'Roads & Infrastructure': 'infrastructure', 'Civic & Public': 'civic' };
-const allCards = await page.$$eval('.da-card', (cs) => cs.map((c) => ({ n: c.dataset.n, type: c.dataset.type, stage: c.dataset.stage })));
-for (const [label, key] of Object.entries(TYPES)) {
-  await page.click('#daTypeChips .da-chip:text-is("' + label + '")');
+console.log('--- 4. Type and Stage filters narrow the table and the map together ---');
+const KEYS = { Residential: 'residential', Commercial: 'commercial', Industrial: 'industrial', 'Data center': 'datacenter', 'Roads & infrastructure': 'infrastructure', 'Civic & public': 'civic' };
+const chipSel = (dim, label) => '#daReport .da-rv-chip[data-da-filter="' + dim + '"]:has-text("' + label + '")';
+for (const [label, key] of Object.entries(KEYS)) {
+  await page.click(chipSel('type', label));
   const s = await shape(page);
-  const want = ['approved', 'proposed', 'permitted'].map((st) => allCards.filter((c) => c.type === key && c.stage === st).map((c) => c.n + ':' + c.type));
-  const got = s.stages.map((x) => x.shown);
-  const total = want.flat().length;
-  ok(JSON.stringify(got) === JSON.stringify(want), label + ': shows exactly its entries in each of the three Stage sections', { want, got });
-  ok(s.pressed.join() === label, label + ': only that chip is pressed', s.pressed);
-  ok(s.dimmed === 9 - total, label + ': the same projects are dimmed on the evidence plot (' + (9 - total) + ')', s.dimmed);
-  ok(s.stages.every((x, i) => x.nav === String(want[i].length)), label + ': the Stage row counts follow', s.stages.map((x) => x.nav));
-  ok(s.stages.every((x, i) => (want[i].length === 0) === (x.empty !== '')), label + ': a Stage with none says so plainly instead of vanishing', s.stages.map((x) => x.empty));
-  ok(new RegExp('Showing ' + total + ' ').test(s.status) && s.status.includes('three Stage sections'), label + ': the status line names the count and the three Stage sections', s.status);
+  const wantRows = initial.shown.filter((x) => x.endsWith(':' + key));
+  ok(JSON.stringify(s.shown) === JSON.stringify(wantRows), label + ': the table shows exactly its entries', { wantRows, got: s.shown });
+  ok(s.hiddenMarkers === 9 - wantRows.length, label + ': the same projects leave the map (' + (9 - wantRows.length) + ')', s.hiddenMarkers);
 }
-await page.click('#daTypeChips .da-chip:text-is("Residential")');
-const res = await shape(page);
-ok(res.stages.map((x) => x.shown.length).join() === '1,1,1', 'Residential appears in Approved / Coming, Proposed / Under Review AND Permitted / Under Construction at once', res.stages.map((x) => x.shown));
-await page.click('#daTypeChips .da-chip:text-is("Commercial")');
-const com = await shape(page);
-ok(com.stages[1].empty === 'No Commercial projects in this stage in this sample.' && com.stages[2].empty === 'No Commercial projects in this stage in this sample.',
-  'Commercial has none in two Stages and the page says exactly that', com.stages.map((x) => x.empty));
-await page.click('#daStageLinks a >> nth=2');
-const afterStage = await shape(page);
-ok(afterStage.pressed.join() === 'Commercial', 'choosing a Stage does not change the Type: they are independent', afterStage.pressed);
-await page.click('#daTypeChips .da-chip:text-is("All")');
+await page.click(chipSel('type', 'Residential'));
+await page.click(chipSel('stage', 'Permitted / Under Construction'));
+const both = await shape(page);
+ok(JSON.stringify(both.shown) === JSON.stringify(['permitted:residential']), 'Type and Stage combine, and neither changes the other', both.shown);
+await page.click(chipSel('type', 'Commercial'));
+const none = await shape(page);
+ok(none.shown.length === 0 && /No records match the filters/.test(none.noMatch), 'a combination with no entries says so plainly instead of an empty table', none);
+await page.click('#daReport .da-rv-chip[data-da-filter="type"][data-da-value="all"]');
+await page.click('#daReport .da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
 const back = await shape(page);
-ok(back.stages.map((s) => s.shown.length).join() === '3,4,2' && back.dimmed === 0, 'All restores every entry');
+ok(back.shown.length === 9 && back.hiddenMarkers === 0, 'All restores every entry');
 
-console.log('--- 5. evidence plot: fixed 0.5 mile, linked to the cards, no photographs ---');
+console.log('--- 5. map: fixed 0.5 mile, the real plot, no photographs ---');
 const plot = await page.evaluate(() => ({
-  ringLabel: [...document.querySelectorAll('#daPlot text')].some((t) => t.textContent === '0.5 mi'),
-  subject: [...document.querySelectorAll('#daPlot text')].some((t) => t.textContent === 'Property'),
-  dists: [...document.querySelectorAll('.da-card')].map((c) => parseFloat(c.querySelector('.da-tags span:last-child').textContent)),
+  ringLabel: [...document.querySelectorAll('#daReport .da-rv-plot text')].some((t) => t.textContent === '0.5 mi'),
+  subject: [...document.querySelectorAll('#daReport .da-rv-plot text')].some((t) => t.textContent === 'Property'),
+  dists: [...document.querySelectorAll('#daReport .da-rv-table tbody tr .da-rv-td--dev .da-rv-sub:last-child')].map((n) => parseFloat(n.textContent)),
   controls: document.querySelectorAll('#daReport select, #daReport input[type=range], #daReport [name*=radius]').length,
   imgs: document.querySelectorAll('img, picture, video, canvas').length
 }));
 ok(plot.ringLabel && plot.subject, 'the plot marks the subject property and the 0.5 mile ring');
-ok(plot.dists.every((d) => d > 0 && d <= 0.5), 'every entry is within 0.5 mile', plot.dists);
+ok(plot.dists.length === 9 && plot.dists.every((d) => d > 0 && d <= 0.5), 'every entry is within 0.5 mile', plot.dists);
 ok(plot.controls === 0, 'no radius selector exists on the page');
 ok(plot.imgs === 0, 'no image, photograph, canvas or video on the page');
-await page.click('.da-card[data-n="1"]');
-const sel1 = await page.evaluate(() => ({ card: document.querySelector('.da-card[data-n="1"]').classList.contains('sel'), mk: [...document.querySelectorAll('#daPlot .da-mk')][0].classList.contains('sel') }));
-ok(sel1.card && sel1.mk, 'selecting a project card selects its marker on the plot');
-await page.click('#daPlot .da-mk >> nth=3');
-const sel4 = await page.evaluate(() => document.querySelector('.da-card[data-n="4"]').classList.contains('sel') && !document.querySelector('.da-card[data-n="1"]').classList.contains('sel'));
-ok(sel4, 'selecting a marker selects its project card');
 
 console.log('--- 6. the commerce buttons are hidden and inert; Enterprise is a real link ---');
 // Positive control: the same probe DOES see a modal when one is really open, so a zero below means something.
@@ -295,11 +270,9 @@ ok(true, 'Enter in the field runs the check');
 
 if (SHOTS) {
   mkdirSync(SHOTS, { recursive: true });
-  await page.click('#daTypeChips .da-chip:text-is("All")');
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(SHOTS, 'desktop-top.png') });
   await page.screenshot({ path: join(SHOTS, 'desktop-full.png'), fullPage: true });
-  await page.click('#daTypeChips .da-chip:text-is("Residential")');
   await page.locator('#sample').screenshot({ path: join(SHOTS, 'desktop-sample-residential.png') });
 }
 ok(D.errors.length === 0, 'no uncaught page errors on desktop', D.errors);
@@ -307,11 +280,11 @@ await D.ctx.close();
 
 console.log('--- 8. phone width ---');
 const M = await open(390, 844);
-const mob = await M.page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, chips: document.querySelectorAll('#daTypeChips .da-chip').length }));
-ok(mob.sw <= mob.cw, 'no horizontal scroll at 390px', mob);
-await M.page.click('#daTypeChips .da-chip:text-is("Data Center")');
+const mob = await M.page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth, chips: document.querySelectorAll('#daReport .da-rv-chip').length }));
+ok(mob.sw <= mob.cw && mob.chips > 0, 'no horizontal scroll at 390px', mob);
+await M.page.click('#daReport .da-rv-chip[data-da-filter="type"]:has-text("Data center")');
 const mshape = await shape(M.page);
-ok(mshape.stages.map((s) => s.shown.length).join() === '0,1,0' && mshape.dimmed === 8, 'the Type filter works on a phone', mshape.stages.map((s) => s.shown));
+ok(JSON.stringify(mshape.shown) === JSON.stringify(['proposed:datacenter']) && mshape.hiddenMarkers === 8, 'the Type filter works on a phone', mshape.shown);
 if (SHOTS) { await M.page.evaluate(() => window.scrollTo(0, 0)); await M.page.screenshot({ path: join(SHOTS, 'mobile-top.png') }); await M.page.screenshot({ path: join(SHOTS, 'mobile-full.png'), fullPage: true }); }
 ok(M.errors.length === 0, 'no uncaught page errors on mobile', M.errors);
 await M.ctx.close();
