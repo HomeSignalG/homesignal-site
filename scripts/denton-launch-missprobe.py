@@ -50,15 +50,19 @@ for z, ids in IDS.items():
             yr = time.gmtime(a["DateReceiv"] / 1000).tm_year if a.get("DateReceiv") else None
             rows.append((a["OBJECTID"], str(a["PermitID"]), a.get("PermitType"), a.get("PermitStat"), yr, g["x"], g["y"]))
         vals = ",".join(f"({o},'{p}','{(t or '').replace(chr(39), '')}','{(s or '').replace(chr(39), '')}',{y if y else 'null'},{x},{yy})" for o, p, t, s, y, x, yy in rows)
-        res = sql(f"""with c as (select home_lat la, home_lng ln, geo.zip_membership_boundary('{z}') g from public.development_reports where zip='{z}'),
+        res = sql(f"""with c as materialized (select home_lat la, home_lng ln, geo.zip_membership_boundary('{z}') g from public.development_reports where zip='{z}'),
           v(oid,pid,typ,st,yr,x,y) as (values {vals})
           select v.oid, v.pid, v.typ, v.st, v.yr,
             geo.zip_point_membership_in(c.g, v.y, v.x) verdict,
             (abs(v.y-c.la) <= 3/69.0 and abs(v.x-c.ln) <= 3/(69.17*cos(radians(c.la)))) in_3mi_square,
-            (st_distance(st_setsrid(st_makepoint(c.ln,c.la),4269)::geography, st_setsrid(st_makepoint(v.x,v.y),4269)::geography)/1609.34)::numeric(6,1) mi_from_centre,
-            exists(select 1 from public.app_projects p where p.registry_id='denton-county-dev-permits' and (p.source_key='arcgis:denton-county-dev-permits:'||v.pid or p.source_key like 'arcgis:denton-county-dev-permits:'||v.pid||'#%')) stored,
-            exists(select 1 from geo.n5_serving_membership m where m.source_key='arcgis:denton-county-dev-permits:'||v.pid or m.source_key like 'arcgis:denton-county-dev-permits:'||v.pid||'#%') served_any
+            (st_distance(st_setsrid(st_makepoint(c.ln,c.la),4269)::geography, st_setsrid(st_makepoint(v.x,v.y),4269)::geography)/1609.34)::numeric(6,1) mi_from_centre
           from v cross join c""")
+        keys = ",".join("'arcgis:denton-county-dev-permits:" + p + "'" for _, p, *_ in rows)
+        stored = {r["source_key"] for r in sql(f"select source_key from public.app_projects where registry_id='denton-county-dev-permits' and source_key in ({keys})")}
+        served = {r["source_key"] for r in sql(f"select source_key from geo.n5_serving_membership where source_key in ({keys})")}
+        for r in res:
+            k = "arcgis:denton-county-dev-permits:" + r["pid"]
+            r["stored"] = k in stored; r["served_any"] = k in served
         n = len(res); inside = [r for r in res if r["verdict"] == "member"]
         out[z] = {"sampled": len(ids), "found_at_publisher": len(feats), "with_point": n, "inside_zip_polygon": len(inside),
                   "inside_polygon_and_in_3mi_square": sum(1 for r in inside if r["in_3mi_square"]),
