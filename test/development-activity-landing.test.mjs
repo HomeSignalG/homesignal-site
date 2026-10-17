@@ -86,7 +86,7 @@ const COPY = [
   'HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.',
   'Start free', 'Free', '100 Development Activity reports free', 'No credit card required.',
   'Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.',
-  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, every account starts with 100 free reports.',
+  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, enjoy free reports.',
   'Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is.',
   'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
   'Know what’s changing before your client asks.',
