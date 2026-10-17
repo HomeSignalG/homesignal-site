@@ -1,0 +1,35 @@
+name: verify-zip-meetings-tile
+
+# Dispatch-only, read-only. Opens the named ZIP pages in Chromium on the live site and reads the
+# meetings count the Government & civic group shows. No schedule, no secrets, no writes.
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated 5-digit ZIPs, e.g. 98221,98273'
+        required: true
+      min:
+        description: 'Minimum meetings each page must show'
+        required: false
+        default: '1'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Read the meetings tile
+        env:
+          SITE_BASE: https://jodytracks.com
+          ZIPS: ${{ inputs.zips }}
+          MIN: ${{ inputs.min }}
+        run: node scripts/verify-zip-meetings-tile.mjs
