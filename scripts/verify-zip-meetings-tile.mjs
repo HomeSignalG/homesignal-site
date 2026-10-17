@@ -24,7 +24,8 @@ for (const zip of ZIPS) {
     await page.goto(`${SITE_BASE}/community/${zip}/`, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForFunction(() => /Government\s*&\s*civic/i.test((document.getElementById('commPage') || {}).textContent || ''), { timeout: 45000 });
     const t = await page.evaluate(() => (document.getElementById('commPage').textContent || '').replace(/\s+/g, ' '));
-    const m = t.match(/Government\s*&\s*civic\s*—\s*(\d+)\s+(upcoming|recent)\s+meetings?/i);
+    // lib/community-page.js writes: 'Government & civic — <n> <upcoming|recent> · <m> notices' (no word 'meetings').
+    const m = t.match(/Government\s*&\s*civic\s*—\s*(\d+)\s+(upcoming|recent)\s*·/i);
     const tile = t.match(/(\d+)\s*(Public|Recent) meetings/i);
     const quiet = /No upcoming public meetings on file/i.test(t);
     if (!m) row.why = 'Government & civic meetings count not found';
