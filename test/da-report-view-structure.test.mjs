@@ -150,16 +150,16 @@ const C = code(SRC);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
 
-// ---- 5. the words: stage labels equal the landing page's pinned labels ------------------------------------------------------------------------
+// ---- 5. the words: the view owns the stage labels, and the landing page's sample takes them from it ---------------------------------------------
 {
   const landing = read('development-activity.html'), landingTest = read('test/development-activity-landing.test.mjs');
-  const labels = [...landing.matchAll(/\{ key: '(approved|proposed|permitted)',\s+label: '([^']+)' \}/g)].map((m) => m[2]);
-  ok(labels.join(' | ') === 'Approved / Coming | Proposed / Under Review | Permitted / Under Construction', '5a (control) the landing page\'s three stage labels were found', labels);
-  ok(landingTest.includes("['Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction'].every(") , '5b and the landing page test still pins exactly those three');
-  ok(C.includes("approved: 'Approved / Coming'") && C.includes("proposed: 'Proposed / Under Review'") && labels[0] === 'Approved / Coming' && labels[1] === 'Proposed / Under Review',
-    '5c the view\'s two stage labels equal the landing page\'s (so a label change must be made in both places on purpose)');
-  ok(C.includes("permitted: 'Permitted / Under Construction'") && labels[2] === 'Permitted / Under Construction' && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
-    '5d the third landing label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
+  // The landing page used to hand-build the report and pin its own copy of these labels here. It now draws its sample THROUGH the view, so there is one copy.
+  ok(!/\{ key: '(approved|proposed|permitted)',\s+label: '/.test(landing) && /HS\.daReportView/.test(landing) && /\.mount\(host, sampleResponse\(\)/.test(landing),
+    '5a the landing page holds no stage labels of its own: its sample is mounted through the view');
+  ok(landingTest.includes('no hand-built report layout remains on this page'), '5b and the landing page test still fails if a hand-built layout comes back');
+  ok(C.includes("approved: 'Approved / Coming'") && C.includes("proposed: 'Proposed / Under Review'"), '5c the view carries the first two stage labels');
+  ok(C.includes("permitted: 'Permitted / Under Construction'") && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
+    '5d the third label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
   ok(C.includes("var EYEBROW = 'JODY Development Activity';"), '5e the eyebrow is the Jody name (founder 2026-10-14, audit F4; supersedes R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
 }
@@ -179,10 +179,12 @@ const C = code(SRC);
     }
   };
   walk('.');
-  const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html', CLIENT_PAGE = 'shared-report.html';
+  const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html', CLIENT_PAGE = 'shared-report.html', LANDING_PAGE = 'development-activity.html';
   const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
     'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md', 'docs/development-activity-build-steps-100526.md',
     // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
+    // 2026-10-17: the public landing page draws its SAMPLE report through the view, replacing a hand-built copy of an older layout
+    LANDING_PAGE, 'test/development-activity-landing.test.mjs', 'test/development-activity-landing.browser.test.mjs',
     REVIEW_PAGE, 'test/development-activity-review.test.mjs', 'test/development-activity-review.browser.test.mjs', 'test/lib-cache-keys.test.mjs',
     // build step 5c: the customer page for invited trial members, and its tests
     CUSTOMER_PAGE, 'test/development-activity-reports.test.mjs', 'test/development-activity-reports.browser.test.mjs',
@@ -207,8 +209,8 @@ const C = code(SRC);
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
   const pages = readdirSync(root).filter((f) => f.endsWith('.html')).concat(readdirSync(join(root, 'partials')).map((f) => 'partials/' + f));
   const loaders = pages.filter((p) => /da-report-view/.test(read(p)));
-  ok(pages.length > 10 && loaders.sort().join() === [CLIENT_PAGE, CUSTOMER_PAGE, REVIEW_PAGE].sort().join() && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
-    '6c exactly three pages load it, the private review page, the customer page and the client\'s share-link page; no other page, partial, the ZIP-page generator or shell.js (' + pages.length + ' pages scanned)', loaders);
+  ok(pages.length > 10 && loaders.sort().join() === [CLIENT_PAGE, CUSTOMER_PAGE, REVIEW_PAGE, LANDING_PAGE].sort().join() && !/da-report-view/.test(read('scripts/gen_zip_pages.py')) && !/da-report-view/.test(read('shell.js')),
+    '6c exactly four pages load it, the private review page, the customer page, the client\'s share-link page and the public landing page (sample report only); no other page, partial, the ZIP-page generator or shell.js (' + pages.length + ' pages scanned)', loaders);
   const keys = read('test/lib-cache-keys.test.mjs');
   ok(/'lib\/da-report-view\.js'\]/.test(keys) || /'lib\/da-report-view\.js',/.test(keys), '6d now that a page loads it, it is in lib-cache-keys CONTENT_KEYED, so its tag must carry its content hash (§1)');
   ok([REVIEW_PAGE, CUSTOMER_PAGE, CLIENT_PAGE].every((pg) => /<meta name="robots" content="noindex, nofollow">/.test(read(pg)) && new RegExp('^Disallow: /' + pg.replace('.', '\\.') + '$', 'm').test(read('robots.txt'))),
