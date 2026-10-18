@@ -6,7 +6,8 @@ b411 as (select * from public.zip_government_bodies('98411')),
 b333 as (select * from public.zip_government_bodies('98333')),
 b601 as (select * from public.zip_government_bodies('84601')),
 b003 as (select * from public.zip_government_bodies('84003')),
-b005 as (select * from public.zip_government_bodies('84005'))
+b005 as (select * from public.zip_government_bodies('84005')),
+b001 as (select * from public.zip_government_bodies('10001'))
 select * from (values
  ('01 98466 lists the county and three cities', (select count(*) = 4 from b466), (select string_agg(name, ', ' order by sort_key) from b466)),
  ('02 98466 cities ordered by share', (select array_agg(name order by sort_key) from b466 where body_kind='city') = array['University Place','Fircrest','Tacoma'], ''),
@@ -24,6 +25,9 @@ select * from (values
  ('14 84601 the unmatched Census place shows too (no community yet)', (select count(*) = 1 from b601 where community_id is null and census_place_geoid='4962470'), ''),
  ('15 84003 a coded chain city shows once, with its share', (select count(*) = 1 and bool_and(area_share = 0.9) from b003 where name='American Fork'), (select string_agg(name, ', ') from b003)),
  ('16 84005 a root city is not listed twice', (select count(*) = 1 from b005), (select string_agg(body_kind||':'||name, ', ') from b005)),
+ ('16b 84005 a root city reports its OWN share, not the land outside it', (select area_share = 0.935 from b005), (select area_share::text from b005)),
+ ('16c 10001 a borough root that is the city absorbs it (no "no source" city row)', (select count(*) = 1 and bool_and(community_id = '00000000-0000-0000-0000-0000000000c3') from b001), (select string_agg(body_kind||':'||name||':'||coalesce(community_id::text,'-'), ', ') from b001)),
+ ('16d 10001 the borough root reports the city share 1', (select area_share = 1 from b001), ''),
  ('17 unknown and malformed ZIPs return nothing', (select count(*) = 0 from public.zip_government_bodies('00000')) and (select count(*) = 0 from public.zip_government_bodies('9846x')), ''),
  ('18 anon may execute the function', has_function_privilege('anon','public.zip_government_bodies(text)','execute'), ''),
  ('19 anon may not read the overlap table', not has_table_privilege('anon','geo.zcta_place_overlap','select'), ''),

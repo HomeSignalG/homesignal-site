@@ -13,8 +13,9 @@
 -- Columns:
 --   community_id  the HomeSignal community that PUBLISHES this body's content, or null when no
 --                 community exists for it yet (the page says so; it never borrows another body)
---   area_share    share of the ZIP's LAND AREA (0..1). For the root: the land no incorporated
---                 place covers. Null when not measured. ⚠️ Never present it as population.
+--   area_share    share of the ZIP's LAND AREA (0..1). For a county root: the land no
+--                 incorporated place covers. For a root that is itself a city (it carries
+--                 census_place_geoid): that city's own share. Null when not measured. ⚠️ Never present it as population.
 --   measured      false when the ZIP has no Census ZCTA (PO box / single-organization ZIPs) —
 --                 the page must say "not measured", never "0%".
 --   has_source    the community exists and carries at least one government topic.
@@ -60,9 +61,13 @@ as $fn$
   cities as (
     -- each incorporated place >= 1%, joined to the city community that publishes it
     select p.place_geoid, p.place_name, p.area_share,
+           -- a ROOT that is itself the city (NYC's boroughs, Philadelphia, an independent
+           -- city, Eagle Mountain UT) carries that place's code, and wins: the root already
+           -- publishes the city's content, so the city is not listed a second time.
            (select c.id from public.communities c
-             where c.census_place_geoid = p.place_geoid and c.level = 'city'
-             order by c.id limit 1) as cid
+             where c.census_place_geoid = p.place_geoid
+               and (c.level = 'city' or c.id = (select id from root))
+             order by (c.id = (select id from root)) desc, c.id limit 1) as cid
     from places p
     where p.area_share >= 0.01
   ),
@@ -78,8 +83,13 @@ as $fn$
     select r.level as body_kind, r.id as community_id,
            coalesce(nullif(r.name, ''), r.county) as name,
            r.census_place_geoid,
-           case when (select m from zmeasured)
-                then greatest(0, 1 - coalesce((select sum(area_share) from places), 0)) end
+           case when not (select m from zmeasured) then null
+                -- a root that is itself a city: that city's own land share
+                when r.census_place_geoid is not null
+                  then coalesce((select p.area_share from places p
+                                  where p.place_geoid = r.census_place_geoid), 0)
+                -- a county: the land no incorporated place covers
+                else greatest(0, 1 - coalesce((select sum(area_share) from places), 0)) end
              as area_share,
            0 as sort_key
     from root r

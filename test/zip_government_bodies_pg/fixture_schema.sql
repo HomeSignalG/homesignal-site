@@ -34,7 +34,12 @@ insert into public.communities values
  ('00000000-0000-0000-0000-0000000000a4','Eagle Mountain','Utah','UT','city',null,array['84005'],array['County Commission & county business'],'4920120'),
  ('00000000-0000-0000-0000-0000000000f7','Eagle Mountain (84005)','Utah','UT','zip','00000000-0000-0000-0000-0000000000a4',array['84005'],array[]::text[],null);
 
-insert into geo.zcta_boundary values ('98466'),('98444'),('98333'),('84601'),('84003'),('84005');
+-- a consolidated city-county: five borough roots that are all the one city
+insert into public.communities values
+ ('00000000-0000-0000-0000-0000000000c3','New York County','New York','NY','county',null,array['10001'],array['County Commission & county business'],'3651000'),
+ ('00000000-0000-0000-0000-0000000000c4','Kings County','Kings','NY','county',null,array['11201'],array['County Commission & county business'],'3651000'),
+ ('00000000-0000-0000-0000-0000000000f8','Chelsea (10001)','New York','NY','zip','00000000-0000-0000-0000-0000000000c3',array['10001'],array[]::text[],null);
+insert into geo.zcta_boundary values ('98466'),('98444'),('98333'),('84601'),('84003'),('84005'),('10001');
 -- 98411 is a PO-box ZIP: no ZCTA, no overlap rows.
 insert into geo.zcta_place_overlap (zcta5, place_geoid, place_name, place_class, place_funcstat, zcta_arealand, part_arealand) values
  ('98466','5373465','University Place city','C1','A',1000,631),
@@ -46,4 +51,5 @@ insert into geo.zcta_place_overlap (zcta5, place_geoid, place_name, place_class,
  ('98444','5388888','Balance of X','C8','F',1000,50),         -- not a government
  ('84601','4962470','Provo city','C1','A',1000,980),
  ('84003','4901310','American Fork city','C1','A',1000,900),
- ('84005','4920120','Eagle Mountain city','C1','A',1000,1000);
+ ('84005','4920120','Eagle Mountain city','C1','A',1000,935),
+ ('10001','3651000','New York city','C1','A',1000,1000);

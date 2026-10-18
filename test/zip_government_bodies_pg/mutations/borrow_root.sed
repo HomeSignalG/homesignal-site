@@ -1,1 +1,1 @@
-s/order by c.id limit 1) as cid/order by c.id limit 1) as cid_unused, (select id from root) as cid/
+s/order by (c.id = (select id from root)) desc, c.id limit 1) as cid/order by c.id limit 1) as cid_unused, (select id from root) as cid/
