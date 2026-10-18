@@ -2197,8 +2197,17 @@
           ? await HS.data.communityGovTopics(zip) : null;
         communityId = (ct && ct.rootId) || null;
       } catch (e) { communityId = null; }
-      const canonical = util.topicPrefsFromCanonicalRows(
-        util.selectPlaceRows(res.data, { communityId: communityId, zip: zip }));
+      const rootRows = util.selectPlaceRows(res.data, { communityId: communityId, zip: zip });
+      // The other governments covering this ZIP (zipGovernment): their rows come back as
+      // "<communityId>|<topic>" so the picker shows them under the right heading.
+      let bodyIds = [];
+      try {
+        const gov = HS.data.zipGovernment ? await HS.data.zipGovernment(zip) : null;
+        bodyIds = gov ? gov.bodies.map(b => b.communityId).filter(id => id && id !== communityId) : [];
+      } catch (e) { bodyIds = []; }
+      const bodyRows = util.qualifyBodyRows(res.data, bodyIds);
+      const canonical = util.topicPrefsFromCanonicalRows(rootRows.concat(bodyRows));
+      state.govSelectionOn = util.communitiesWithSelection(rootRows.concat(bodyRows));
       const localRes = await HS.sb().from('app_topic_prefs')
         .select('category, topics, share_consent')
         .eq('user_id', uid);
@@ -2236,11 +2245,16 @@
     // Government categories render the LIVE community's labels (cascaded up the
     // chain), never the seed's — the popup must show this place's topics
     // word-for-word. Seed mode / unmodeled ZIP falls back to the seed list.
+    let groups = null;   // [{ name, note, items: [{ key, label }] }] when several governments
     if (CAT_TO_TOPICS_KEY[key] && key !== 'news' && HS.data.communityGovTopics) {
       try {
         const ct = await HS.data.communityGovTopics(state.zip);
         if (ct && ct.labels && ct.labels.length) d.items = ct.labels;
       } catch (e) { /* fall back to seed labels; save still anchors via its own lookup */ }
+      try {
+        const gov = HS.data.zipGovernment ? await HS.data.zipGovernment(state.zip) : null;
+        groups = util.topicGroupsFor(gov, key === 'gov' ? 'notices' : 'meetings');
+      } catch (e) { groups = null; /* one government, as before */ }
     }
     $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
     $('tmEmail').textContent = state.session ? state.session.user.email : 'sign in to save';
@@ -2250,14 +2264,27 @@
     // user's own previously-saved picks come back checked.
     const onSet = new Set(saved ? saved.topics : []);
     const g = $('tmGrid'); g.innerHTML = '';
-    d.items.forEach(it => {
-      const on = onSet.has(it);
+    const chip = (pickKey, label) => {
+      const on = onSet.has(pickKey);
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'tchip' + (on ? ' on' : '');
-      b.innerHTML = '<span class="box">' + (on ? '✓' : '') + '</span><span>' + HS.esc(it) + '</span>';
+      b.dataset.key = pickKey;
+      b.innerHTML = '<span class="box">' + (on ? '✓' : '') + '</span><span>' + HS.esc(label) + '</span>';
       b.onclick = function () { const o = b.classList.toggle('on'); b.querySelector('.box').textContent = o ? '✓' : ''; updTCount(); };
       g.appendChild(b);
-    });
+    };
+    if (groups) {
+      // One heading per government, county first, cities by share of the ZIP's land.
+      groups.forEach(gr => {
+        const h = document.createElement('div');
+        h.className = 'tgov';
+        h.innerHTML = '<b>' + HS.esc(gr.name) + '</b>' + (gr.note ? '<span>' + HS.esc(gr.note) + '</span>' : '');
+        g.appendChild(h);
+        gr.items.forEach(it => chip(it.key, it.label));
+      });
+    } else {
+      d.items.forEach(it => chip(it, it));
+    }
     // consent ALWAYS defaults unchecked unless the user previously opted in (policy > mockup)
     $('tmConsent').checked = saved ? !!saved.share_consent : false;
     $('tmForm').classList.remove('hidden'); $('tmDone').classList.add('hidden');
@@ -2274,7 +2301,7 @@
     // Without the resume, a verified code sent the resident to location.pathname: ?zip=
     // dropped and the picks gone, so they had to choose again, possibly on another ZIP.
     if (!HS.requireAuth('save-topics', HS.saveTopics)) return;
-    const chips = [...document.querySelectorAll('#tmGrid .tchip.on span:last-child')].map(s => s.textContent);
+    const chips = [...document.querySelectorAll('#tmGrid .tchip.on')].map(b => b.dataset.key || b.querySelector('span:last-child').textContent);
     const cats = HS.data.topicCategories();
     state.topicPrefs[TCUR] = { topics: chips, share_consent: $('tmConsent').checked };
     cacheTopicPrefs(state.topicPrefs, state.session && state.session.user && state.session.user.id);
@@ -2307,9 +2334,13 @@
     if (!/^\d{5}$/.test(zip)) throw new Error('no valid ZIP on file — set your area first');
     const ct = await HS.data.communityGovTopics(zip);
     if (!ct || !ct.rootId) throw new Error('this ZIP has no community to subscribe to yet');
+    // A city pick is "<communityId>|<topic>" (util.splitPickKey) and is filed on THAT city's
+    // community, where its content is filed — delivery matches per community, so a city
+    // pick filed on the county could never be sent. Plain picks stay on the chain root.
+    const split = util.splitPicksByCommunity(state.topicPrefs, ct.rootId);
     const topics = {}, subs = [], seen = {};
     Object.keys(CAT_TO_PIPELINE).forEach(cat => {
-      const picks = (state.topicPrefs[cat] && state.topicPrefs[cat].topics) || [];
+      const picks = (split[ct.rootId] && split[ct.rootId][CAT_TO_TOPICS_KEY[cat]]) || [];
       topics[CAT_TO_TOPICS_KEY[cat]] = picks;
       picks.forEach(t => {
         const k = CAT_TO_PIPELINE[cat] + ' ' + t;
@@ -2328,14 +2359,41 @@
       p_data_licensing_agreed: !!licensing, p_marketing_consent_copy: CONSENT_COPY,
       p_referral_source: ref.source || null, p_referral_campaign: ref.campaign || null
     };
-    let r = await HS.sb().rpc('signup_complete', args);
-    if (r.error && r.error.code === 'PGRST202') {
-      // referral params not applied to the DB yet (migration pending) — retry with
-      // the original 8-arg signature so signups keep working either deploy order.
-      delete args.p_referral_source; delete args.p_referral_campaign;
-      r = await HS.sb().rpc('signup_complete', args);
+    const call = async (a) => {
+      let r = await HS.sb().rpc('signup_complete', a);
+      if (r.error && r.error.code === 'PGRST202') {
+        // referral params not applied to the DB yet (migration pending) — retry with
+        // the original 8-arg signature so signups keep working either deploy order.
+        delete a.p_referral_source; delete a.p_referral_campaign;
+        r = await HS.sb().rpc('signup_complete', a);
+      }
+      if (r.error) throw new Error(r.error.message || 'subscription save failed');
+    };
+    // every other government with picks now OR a selection before (so unticking all of
+    // one city's topics reaches it and clears it)
+    const others = Object.keys(split).concat(state.govSelectionOn || [])
+      .filter((id, i, a) => id && id !== ct.rootId && a.indexOf(id) === i);
+    const rootPicks = subs.length;
+    // The root is written as before; with nothing picked anywhere it still raises the
+    // "empty selection" refusal, so a resident never silently loses alerts.
+    if (rootPicks || !others.some(id => util.pickCount(split[id]))) await call(args);
+    else if (util.hadSelection(state.govSelectionOn, ct.rootId)) {
+      const c = await HS.sb().rpc('clear_alert_selection', { p_email: email, p_community_id: ct.rootId, p_streams: ['notices', 'meetings'] });
+      if (c.error) throw new Error(c.error.message || 'subscription save failed');
     }
-    if (r.error) throw new Error(r.error.message || 'subscription save failed');
+    for (const id of others) {
+      const t = split[id];
+      if (util.pickCount(t)) {
+        const sub = [];
+        ['notices', 'meetings'].forEach(st => (t[st] || []).forEach(tp => sub.push({ pipeline_type: 'government_notice', topic: tp })));
+        await call(Object.assign({}, args, { p_community_id: id, p_topics: { notices: t.notices || [], meetings: t.meetings || [] }, p_subscriptions: sub }));
+      } else if (util.hadSelection(state.govSelectionOn, id)) {
+        // every topic of this government unticked: clear only its selection
+        const c = await HS.sb().rpc('clear_alert_selection', { p_email: email, p_community_id: id, p_streams: ['notices', 'meetings'] });
+        if (c.error) throw new Error(c.error.message || 'subscription save failed');
+      }
+    }
+    state.govSelectionOn = Object.keys(split).filter(id => util.pickCount(split[id]));
   }
 
   // -------------------------------------------------- premium waitlist --------
