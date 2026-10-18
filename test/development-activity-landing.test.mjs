@@ -78,7 +78,7 @@ const COPY = [
   'HomeSignal gives real-estate professionals a sourced view of Development Activity around a property, organized by Type and Stage.',
   'You know what’s there. HomeSignal shows you what’s changing.',
   'Start free — 100 reports', 'View a sample report →',
-  'Every project is organized by Type and Stage so you can quickly see what it is and where it stands.',
+  'Click Type or Stage',
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
   'Pricing', 'Free', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
   'Professional', 'Individual Agents', 'Paid plans coming soon', 'For agents who need ongoing property intelligence.',
