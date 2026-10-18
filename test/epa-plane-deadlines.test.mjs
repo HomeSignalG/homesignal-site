@@ -97,7 +97,7 @@ console.log('\n== 0. composition lock — both index.ts call sites use resolvePl
   ok(planeCalls.length === 2,
     '0b. BOTH call sites (ZIP and address) go through resolvePlanes',
     `got ${planeCalls.length} typed resolvePlanes calls`);
-  const overlayWired = index.match(/overlay:\s*\(deadlineAt\)\s*=>\s*facilitySites\([^)]*deadlineAt\)/g) || [];
+  const overlayWired = index.match(/overlay:\s*\(deadlineAt\)\s*=>\s*facilitySites\([^)]*deadlineAt(?:, frsStart)?\)/g) || [];
   ok(overlayWired.length === 2,
     '0c. both overlays pass the absolute deadline into facilitySites',
     `got ${overlayWired.length}`);

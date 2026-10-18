@@ -190,7 +190,28 @@ export async function frsAt(
  * duration, so the same value can bound the ladder AND the caller's outer guard without the
  * two drifting apart. `now` is injectable so the deadline is testable without real waiting.
  */
-export type FrsOptions = { deadlineAt?: number; now?: () => number; sleep?: (ms: number) => Promise<void> };
+export type FrsOptions = {
+  deadlineAt?: number;
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  /** Start the ladder at this rung instead of the requested radius (see frsStartRung). */
+  startMi?: number;
+};
+
+/**
+ * START WHERE THE LAST ANSWER SAYS IS ENOUGH (2026-10-18). A dense ZIP spends 3-4 requests on
+ * process-limit refusals ("3:process_limit","2:process_limit","1.5:process_limit") before a rung
+ * answers, and each extra request is another chance for EPA to fail (about half of single probes
+ * failed on 2026-10-18). The caller may pass the rung its stored, capped facility list already fits
+ * inside. Only a rung of the ladder strictly smaller than the requested radius is honoured; anything
+ * else means "no hint". The caller decides whether the hinted answer is complete (index.ts).
+ */
+export function frsStartRung(hint: unknown, radiusMi: number): number | undefined {
+  const h = Number(hint);
+  if (hint === null || hint === undefined || !Number.isFinite(h)) return undefined;
+  if (!(h < radiusMi)) return undefined;
+  return frsRadii(radiusMi).includes(h) ? h : undefined;
+}
 
 /**
  * WAIT BEFORE RETRYING A REFUSED ATTEMPT (2026-10-18). The ladder fired every request back to back.
@@ -219,7 +240,9 @@ export async function frsFacilities(
   let reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null = null;
   let attempts = 0;
   const failures: string[] = [];
-  for (const rad of frsRadii(radiusMi)) {
+  const start = opts.startMi !== undefined ? frsStartRung(opts.startMi, radiusMi) : undefined;
+  const radii = frsRadii(radiusMi).filter((r) => start === undefined || r <= start);
+  for (const rad of radii) {
     let transientExhausted = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       // NEVER START AN ATTEMPT THE BUDGET CANNOT PAY FOR. Checked BEFORE the attempt, so the
