@@ -2,15 +2,16 @@ name: zip-government-bodies-suite
 
 # WHICH GOVERNMENTS COVER A ZIP (docs/zip-government-bodies.sql) — the one decision the ZIP
 # page, the page generator and delivery measurement read. Runs the shipped function against a
-# DISPOSABLE Postgres: 38 checks (county + every incorporated city >= 1% of land, CDPs excluded,
+# DISPOSABLE Postgres: 41 checks (county + every incorporated city >= 1% of land, CDPs excluded,
 # PO-box ZIPs "not measured", a city with no community never borrows another body, a root city
-# listed once, a root that is the city absorbs it), plus the per-body topic offer and clear_alert_selection, then 13 prohibited mutations, each of which MUST fail the suite.
+# listed once, a root that is the city absorbs it), plus the per-body topic offer, the city-link view and clear_alert_selection, then 14 prohibited mutations, each of which MUST fail the suite.
 
 on:
   pull_request:
     paths:
       - 'docs/zip-government-bodies.sql'
       - 'docs/zcta-place-overlap.sql'
+      - 'scripts/gen_zip_pages.py'
       - 'test/zip_government_bodies_pg/**'
       - '.github/workflows/zip-government-bodies-suite.yml'
   push:

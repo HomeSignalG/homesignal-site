@@ -1,1 +1,1 @@
-s/and (c.level = 'city' or c.id = (select id from root))/and c.level = 'city'/
+s/(select r.id from root r where r.census_place_geoid = p.place_geoid),/null,/

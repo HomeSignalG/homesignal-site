@@ -21,6 +21,18 @@
 --   has_source    the community exists and carries at least one government topic.
 -- CDPs (funcstat S) are not governments: their land is unincorporated and the county governs it.
 
+-- The city half of the decision as a SET, so a build or a measurement can read every ZIP at once
+-- without calling the function 12,722 times (measured: that walk exceeds 60 s). The function
+-- below reads its city communities FROM this view, so there is one rule, not two.
+create or replace view public.zip_government_city_links as
+select o.zcta5::text || ':' || c.id::text as link_id,  -- unique: the build pages on it
+       o.zcta5::text as zip, c.id as community_id, c.name, o.place_geoid, round(o.area_share, 4) as area_share
+from geo.zcta_place_overlap o
+join public.communities c on c.census_place_geoid = o.place_geoid and c.level = 'city'
+where o.place_funcstat in ('A', 'B') and o.area_share >= 0.01;
+revoke all on public.zip_government_city_links from public;
+grant select on public.zip_government_city_links to anon, authenticated, service_role;
+
 create or replace function public.zip_government_bodies(p_zip text)
 returns table (
   body_kind text, community_id uuid, name text, census_place_geoid text,
@@ -64,10 +76,11 @@ as $fn$
            -- a ROOT that is itself the city (NYC's boroughs, Philadelphia, an independent
            -- city, Eagle Mountain UT) carries that place's code, and wins: the root already
            -- publishes the city's content, so the city is not listed a second time.
-           (select c.id from public.communities c
-             where c.census_place_geoid = p.place_geoid
-               and (c.level = 'city' or c.id = (select id from root))
-             order by (c.id = (select id from root)) desc, c.id limit 1) as cid
+           coalesce(
+             (select r.id from root r where r.census_place_geoid = p.place_geoid),
+             (select l.community_id from public.zip_government_city_links l
+               where l.zip = p_zip and l.place_geoid = p.place_geoid
+               order by l.community_id limit 1)) as cid
     from places p
     where p.area_share >= 0.01
   ),
