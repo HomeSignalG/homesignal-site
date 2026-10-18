@@ -11,6 +11,14 @@
 -- government of their own: land inside them is unincorporated and governed by the county.
 -- ⚠️ area_share is LAND AREA, never population. Never label it "% of residents".
 --
+-- APPLIED 2026-10-18 through db-sql.yml (runs 39150434861 + 39150497735; the Supabase MCP tool
+-- hangs on a SECURITY DEFINER create). Loaded from pg_net response 43363:
+--   select geo.load_zcta_place_overlap(43363, '45c7e0e7b528c2021cb406e8f9aedc84');
+-- Fingerprint md5(string_agg(zcta5|place_geoid|part_arealand order by … collate "C")) =
+--   8ccece3be6b16182ec01e421e85364e8 over the table AND over the source text, parsed separately.
+-- 34,460 pairs are incorporated places (funcstat A). Control 98466: University Place 63.1%,
+-- Fircrest 25.5%, Tacoma 11.4%. RLS on; anon cannot select.
+--
 -- ADDITIVE ONLY: a new table, a loader function and one nullable column on public.communities.
 -- No grants to anon or authenticated: pages read it only through the decision function (step 2).
 
