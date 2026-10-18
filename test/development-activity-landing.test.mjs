@@ -78,23 +78,12 @@ const COPY = [
   'You know what’s there. HomeSignal shows you what’s changing.',
   'Start free — 100 reports', 'View a sample report →',
   'Every project is organized by Type and Stage so you can quickly see what it is and where it stands.',
-  'Walk into the conversation knowing more.',
-  'Before a buyer tour', 'See nearby Development Activity the client may ask about before arriving at the property.',
-  'Before a listing presentation', 'Know what is proposed, approved, or actively changing nearby before prospective buyers raise the question.',
-  'When a client asks, “What are they building over there?”', 'Show the project, Type, Stage, distance, and source instead of relying on rumor.',
-  'Don’t give your client a rumor. Show them the record.',
-  'HomeSignal summarizes selected official public records from its covered sources and may not include every project or change.',
-  'Clear enough for your client. Sourced enough for you.',
-  'Not school scores, restaurant lists, or generic neighborhood data. HomeSignal focuses on development activity that can change what surrounds the property.',
-  'Check Development Activity coverage', 'Enter property address or ZIP', 'Check coverage',
-  'HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.',
+  'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
   'Start free', 'Free', '100 Development Activity reports free', 'No credit card required.',
   'Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.',
   'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, enjoy free reports.',
   'Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is.',
   'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
-  'Know what’s changing before your client asks.',
-  'Run Development Activity reports for the properties you’re working on now.',
   'Brokerage or enterprise? Contact us'
 ];
 const plain = text.replace(/\s*\/\s*month/, '/month');
@@ -123,18 +112,16 @@ const FORBIDDEN = [
   ['"supported ZIP" phrasing', /supported ZIP/i]
 ];
 FORBIDDEN.forEach(([label, re]) => ok(!re.test(text), 'the page does not contain ' + label, (text.match(re) || [])[0]));
-ok((noComments.match(/12,722/g) || []).length >= 2 && !/12,722\s+supported/i.test(noComments), '12,722 is always the product NETWORK of canonical ZIPs, never "supported"');
+ok((noComments.match(/12,722/g) || []).length >= 1 && !/12,722\s+supported/i.test(noComments), '12,722 is always the product NETWORK of canonical ZIPs, never "supported"');
 
 console.log('--- 2c. information architecture (100726 revision plan) ---');
 // Order is asserted on the rendered markup, not on comments: hero → sample → use cases → trust → coverage → pricing → final.
 const at = (re) => { const m = re.exec(markup); return m ? m.index : -1; };
 const ORDER = [
-  ['hero', /id="hero"/], ['pricing', /id="pricing"/], ['sample', /id="sample"/], ['transaction moments', /Walk into the conversation knowing more\./],
-  ['trust', /Don’t give your client a rumor\. Show them the record\./], ['coverage', /id="coverage"/],
-  ['final conversion', /Know what’s changing before your client asks\./]
+  ['hero', /id="hero"/], ['pricing', /id="pricing"/], ['sample', /id="sample"/], ['coverage', /id="coverage"/]
 ].map(([k, re]) => [k, at(re)]);
 ok(ORDER.every(([, i], n) => i > -1 && (n === 0 || i > ORDER[n - 1][1])),
-  'hero → pricing → sample → use cases → trust → coverage → final conversion (founder, 2026-10-06: pricing before the sample; coverage still sits after the proof)', ORDER);
+  'hero → pricing → sample → coverage (founder, 2026-10-18: the use-case, trust and closing sections were removed; founder, 2026-10-06: pricing before the sample; coverage still sits after the proof)', ORDER);
 ok(at(/id="daReport"/) > -1 && (markup.match(/id="daReport"/g) || []).length === 1, 'exactly one interactive sample report exists (it was moved, not rebuilt)');
 // Regression: the sections this revision removed or merged must not quietly return.
 const REMOVED = [
@@ -154,11 +141,10 @@ const REMOVED = [
 ];
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
 ok((text.match(/\$\d+/g) || []).length === 0, 'FREE-ONLY (founder, 2026-10-15): no price appears anywhere on the page until a payment processor is connected', text.match(/\$\d+/g));
-ok(/<h3[^>]*>Before a buyer tour<\/h3>/.test(markup) && /<h3[^>]*>Before a listing presentation<\/h3>/.test(markup), 'use cases are concrete transaction moments');
+ok(!/Walk into the conversation|Show them the record|Clear enough for your client|before your client asks/i.test(text), 'founder, 2026-10-18: the use-case, trust and closing sections are gone');
 ok(['Free', 'Professional — Individual Agents', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-band">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
-const finalAt = at(/class="da-final"/);
-ok((markup.slice(coverageAt, finalAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
+ok((markup.slice(coverageAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
 ok(!/href="#coverage"/.test(markup), 'nothing links to the coverage section from the hero or the close: it is an availability utility, not a call to action');
 ok(/href="#sample"/.test(markup) && /id="sample"/.test(markup), 'the hero\'s sample link has a real target');
 const bodyWords = text.replace(/\s+/g, ' ').split(' ').length;
@@ -181,8 +167,8 @@ const shipped = stage.includes("'" + PAGE + "'");
 const inSitemap = sitemap.includes('/' + PAGE);
 const noindex = /<meta name="robots" content="noindex, nofollow">/.test(src);
 const cta = [...markup.matchAll(/<button[^>]*data-cta="([^"]+)"[^>]*>([^<]*)<\/button>/g)].map((m) => ({ cta: m[1], label: m[2], tag: m[0] }));
-ok(cta.length === 3 && cta.every((c) => c.cta === 'start-free'),
-  'the hero, pricing and closing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
+ok(cta.length === 2 && cta.every((c) => c.cta === 'start-free'),
+  'the hero and pricing "Start free — 100 reports" buttons are present (Join for $79/month is a link now, checked below)', cta.map((c) => c.cta));
 // Founder, 2026-10-15: FREE-ONLY. The "Join for $79/month" link is gone with the price; no page link goes to a Billing card or a checkout.
 const joins = [...markup.matchAll(/<a\b[^>]*data-cta="join"[^>]*>([^<]*)<\/a>/g)];
 ok(joins.length === 0 && !/Join for|Cancel anytime|\/month/.test(text), 'there is no Join link, no price, no "/month" and no "Cancel anytime" on the landing page (free-only)', joins.map((j) => j[0]));
@@ -209,8 +195,8 @@ const wrappers = [...markup.matchAll(/<div data-commerce( hidden)?>\s*(<button[^
 // "Start free — 100 reports" borrow a hidden sibling's wrapper.
 const isInert = (tag) => /aria-disabled="true"/.test(tag);
 const visibleInert = cta.filter((c) => isInert(c.tag)).length > wrappers.filter((w) => w.hidden && isInert(w.tag)).length;
-ok(wrappers.length === 3 && (markup.match(/data-commerce/g) || []).length === 3 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
-  'each of the three inert Start free buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
+ok(wrappers.length === 2 && (markup.match(/data-commerce/g) || []).length === 2 && wrappers.every((w) => cta.some((c) => c.tag === w.tag)),
+  'each of the two inert Start free buttons sits, with its "Opens at launch." note, in its own <div data-commerce>', wrappers);
 ok(wrappers.every((w) => w.hidden) && !visibleInert, 'HIDDEN (founder, 2026-10-02): every inert commerce button is inside a hidden wrapper', wrappers);
 ok(/\[hidden\]\{display:none!important\}/.test(cssBlock), 'the page CSS makes [hidden] win over any display rule, so a hidden wrapper cannot reappear');
 const indexable = /<meta name="robots" content="index, follow">/.test(src) && !/noindex/i.test(noComments);
