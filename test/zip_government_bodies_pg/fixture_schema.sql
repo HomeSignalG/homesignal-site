@@ -1,5 +1,5 @@
 -- Minimal stand-ins for the production objects the function reads (disposable database only).
-drop schema if exists geo cascade; drop table if exists public.communities cascade;
+drop schema if exists geo cascade; drop table if exists public.communities, public.users, public.user_subscriptions cascade;
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
@@ -53,3 +53,21 @@ insert into geo.zcta_place_overlap (zcta5, place_geoid, place_name, place_class,
  ('84003','4901310','American Fork city','C1','A',1000,900),
  ('84005','4920120','Eagle Mountain city','C1','A',1000,935),
  ('10001','3651000','New York city','C1','A',1000,1000);
+
+-- identities and selections, for clear_alert_selection
+drop schema if exists auth cascade; create schema auth;
+create table auth._jwt (claims jsonb);
+create function auth.jwt() returns jsonb language sql stable as $$ select claims from auth._jwt limit 1 $$;
+create table public.users (id uuid primary key, email text not null, community_id uuid not null, unique (email, community_id));
+create table public.user_subscriptions (user_id uuid, community_id uuid, stream text, topic text, origin text, sort_order int default 0,
+  primary key (user_id, community_id, stream, topic));
+insert into public.users values
+ ('00000000-0000-0000-0000-00000000aa01','res@example.com','00000000-0000-0000-0000-0000000000c1'),
+ ('00000000-0000-0000-0000-00000000aa02','res@example.com','00000000-0000-0000-0000-0000000000a1'),
+ ('00000000-0000-0000-0000-00000000aa03','other@example.com','00000000-0000-0000-0000-0000000000a1');
+insert into public.user_subscriptions values
+ ('00000000-0000-0000-0000-00000000aa01','00000000-0000-0000-0000-0000000000c1','meetings','Elections & voting','explicit',1),
+ ('00000000-0000-0000-0000-00000000aa02','00000000-0000-0000-0000-0000000000a1','meetings','Elections & voting','explicit',1),
+ ('00000000-0000-0000-0000-00000000aa02','00000000-0000-0000-0000-0000000000a1','notices','City government (Tacoma)','explicit',1),
+ ('00000000-0000-0000-0000-00000000aa02','00000000-0000-0000-0000-0000000000a1','notices','County Commission & county business','follow_floor',0),
+ ('00000000-0000-0000-0000-00000000aa03','00000000-0000-0000-0000-0000000000a1','meetings','Elections & voting','explicit',1);

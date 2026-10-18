@@ -117,3 +117,87 @@ $fn$;
 
 revoke all on function public.zip_government_bodies(text) from public;
 grant execute on function public.zip_government_bodies(text) to anon, authenticated, service_role;
+
+-- ── The topics each body offers, per stream ─────────────────────────────────────────────────
+-- What a resident may pick for each government on this ZIP's page, so a pick always matches the
+-- category that body's content is filed under (email matching is word-for-word, per community):
+--   notices   the body's own government_topics (a Utah city's notices are "City government (X)")
+--   meetings  the root: its government_topics (as before). A city: the six canonical meeting
+--             topics — every meetings row of an enrolled community carries exactly one of them
+--             (homesignal-ingest ingest.py::CANONICAL_MEETING_TOPICS and the DB CHECK
+--             meetings_category_canonical). Measured 2026-10-18: Provo's 32 meetings are filed
+--             under those six, never under "City government (Provo)".
+-- A body with no community offers nothing (has_source false): there is nothing to deliver yet.
+create or replace function public.zip_government_topics(p_zip text)
+returns table (community_id uuid, body_kind text, name text, area_share numeric,
+               measured boolean, stream text, topic text, sort_key int, topic_order int)
+language sql
+stable
+security definer
+set search_path = public, geo
+as $fn$
+  with b as (select * from public.zip_government_bodies(p_zip)),
+  six(topic, ord) as (values
+    ('County Commission & county business', 1), ('Planning, zoning & development', 2),
+    ('Property taxes & assessments', 3), ('Public safety & emergencies', 4),
+    ('Water districts & utilities', 5), ('Elections & voting', 6))
+  select b.community_id, b.body_kind, b.name, b.area_share, b.measured, s.stream, s.topic,
+         b.sort_key, s.ord::int
+  from b
+  join public.communities c on c.id = b.community_id
+  cross join lateral (
+    select 'notices'::text as stream, t.topic, t.ord
+      from unnest(coalesce(c.government_topics, '{}'::text[])) with ordinality t(topic, ord)
+    union all
+    select 'meetings', t.topic, t.ord
+      from unnest(coalesce(c.government_topics, '{}'::text[])) with ordinality t(topic, ord)
+     where b.sort_key = 0
+    union all
+    select 'meetings', six.topic, six.ord from six where b.sort_key <> 0
+  ) s
+  order by b.sort_key, b.name, s.stream, s.ord;
+$fn$;
+
+revoke all on function public.zip_government_topics(text) from public;
+grant execute on function public.zip_government_topics(text) to anon, authenticated, service_role;
+
+-- ── Clearing ONE body's selection ───────────────────────────────────────────────────────────
+-- signup_complete refuses an empty selection (D3: never a silent revoke). On a multi-government
+-- page a resident can untick every topic of ONE city while keeping the county's, which is an
+-- explicit action on that body. This removes only that identity's explicit rows in the named
+-- streams. It never touches consent, follow_floor rows, another community or another person.
+create or replace function public.clear_alert_selection(
+  p_email text, p_community_id uuid, p_streams text[]
+) returns int
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_jwt_email text := lower(coalesce(auth.jwt() ->> 'email', ''));
+  v_email     text := lower(trim(p_email));
+  v_n int;
+begin
+  if v_jwt_email = '' then
+    raise exception 'clear_alert_selection must be called from an authenticated session';
+  end if;
+  if v_email is null or v_email = '' or v_email <> v_jwt_email then
+    raise exception 'email does not match authenticated identity';
+  end if;
+  if p_community_id is null then raise exception 'community_id is required'; end if;
+  if p_streams is null or cardinality(p_streams) = 0
+     or not (p_streams <@ array['notices','meetings']::text[]) then
+    raise exception 'streams must be a non-empty subset of {notices, meetings}';
+  end if;
+  delete from public.user_subscriptions s
+   using public.users u
+   where u.id = s.user_id and u.email = v_email and u.community_id = p_community_id
+     and s.community_id = p_community_id and s.origin = 'explicit'
+     and s.stream = any (p_streams);
+  get diagnostics v_n = row_count;
+  return v_n;
+end
+$fn$;
+
+revoke all on function public.clear_alert_selection(text, uuid, text[]) from public, anon;
+grant execute on function public.clear_alert_selection(text, uuid, text[]) to authenticated, service_role;
