@@ -74,7 +74,8 @@ ok('the original migration file names the aligned SQL as the function of record'
 
 console.log('\n== ingest matches the probe on status ==');
 ok('ingest treats any status other than 200 as transient',
-   /if \(r\.status !== 200\) return TRANSIENT;/.test(ingest)
+   // 2026-10-18: the transient attempt also carries the status as `why` (observability only).
+   /if \(r\.status !== 200\) return \{ \.\.\.TRANSIENT, why: String\(r\.status\) \};/.test(ingest)
    && !/r\.status >= 500 \|\| r\.status === 429/.test(ingest));
 ok('recognizedFrsPayload still requires Results+list or a bare FRSFacility array',
    /function recognizedFrsPayload/.test(ingest)

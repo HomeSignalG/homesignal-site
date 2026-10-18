@@ -235,6 +235,26 @@ for (const [label, text] of SCHEMA_BODIES) {
     `got ok=${out.ok} reason=${out.reason}`);
 }
 
+{
+  // 2026-10-18: every failed attempt is recorded as "<radius>:<why>", so a ZIP that keeps failing
+  // explains itself (rate limit vs timeout vs unparseable body vs process limit).
+  const f = recorder((rad, nth) => (rad > 1 ? res(200, PROCESS_LIMIT) : res(429, 'slow down')));
+  const out = await frsFacilities(47.25, -122.44, 3, f);
+  ok(out.ok === false && JSON.stringify(out.failures) ===
+       JSON.stringify(['3:process_limit', '2:process_limit', '1.5:process_limit', '1:429', '1:429', '1:429']),
+    '6g. failures records each failed attempt with its radius and cause',
+    `got ${JSON.stringify(out.failures)}`);
+  const g = recorder(() => res(200, '{"Results":{"FRSFacility":[{"RegistryId":"1"'));
+  const outG = await frsFacilities(41.5, -112.0, 3, g);
+  ok(outG.failures.length === 3 && outG.failures.every((x) => x === '3:SyntaxError'),
+    '6g2. an unparseable body is recorded as SyntaxError, not as a bare "transient"',
+    `got ${JSON.stringify(outG.failures)}`);
+  const h = recorder(() => res(200, body([FACILITY])));
+  const outH = await frsFacilities(41.5, -112.0, 3, h);
+  ok(outH.ok === true && Array.isArray(outH.failures) && outH.failures.length === 0,
+    '6g3. a first-try success carries an empty failures list');
+}
+
 // ── 7. process limit then successful back-off → valid smaller-radius result ───────────────────
 // Live-confirmed 2026-08-13 for ZIP 63118: r=3 refused, r=1 returned 61 KB of real facilities.
 {

@@ -56,6 +56,8 @@ export type FrsAttempt = {
   tooBig: boolean;
   schema: boolean;
   rows: Record<string, unknown>[];
+  /** For a failed attempt only: the HTTP status, or the thrown error's name. Observability. */
+  why?: string;
 };
 
 /** The result of the whole back-off sequence. `ok:false` must NEVER be persisted as zero. */
@@ -69,6 +71,11 @@ export type FrsOutcome = {
   reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null;
   /** how many HTTP attempts were made (observability: a 1 means it worked first try) */
   attempts: number;
+  /** One entry per failed attempt, "<radius>:<why>", e.g. "1:429", "1:TimeoutError", "3:process_limit".
+   * Observability only (2026-10-18): "transient" alone could not say whether EPA rate-limited,
+   * timed out, or sent a body that would not parse, which is what left 1,120 stale facility
+   * layers undiagnosed. Nothing branches on it. */
+  failures: string[];
 };
 
 /** One attempt's own network timeout. The deadline may shorten it, never lengthen it. */
@@ -162,11 +169,12 @@ export async function frsAt(
     // Probe and ingest now agree: only HTTP 200 is an answer. A 204 / other 2xx used to
     // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
-    if (r.status !== 200) return TRANSIENT;
+    if (r.status !== 200) return { ...TRANSIENT, why: String(r.status) };
     const text = await r.text();
     return recognizedFrsPayload(parseEpaJson(text));
-  } catch (_e) {
-    return TRANSIENT;                          // network/parse → transient
+  } catch (e) {
+    // network/parse → transient. The error NAME (TimeoutError, SyntaxError, TypeError…) says which.
+    return { ...TRANSIENT, why: e instanceof Error ? e.name : "error" };
   }
 }
 
@@ -190,6 +198,7 @@ export async function frsFacilities(
   const deadlineAt = opts.deadlineAt;
   let reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null = null;
   let attempts = 0;
+  const failures: string[] = [];
   for (const rad of frsRadii(radiusMi)) {
     let transientExhausted = false;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -204,12 +213,13 @@ export async function frsFacilities(
         const remaining = deadlineAt - now();
         if (remaining <= 0) {
           // NOT a zero — the same `ok:false` refusal a 429 produces. See the header.
-          return { ok: false, rows: [], radius_used: null, reason: "deadline", attempts };
+          return { ok: false, rows: [], radius_used: null, reason: "deadline", attempts, failures };
         }
         timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
       }
       attempts++;
-      const { ok, tooBig, schema, rows } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
+      const { ok, tooBig, schema, rows, why } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
+      if (!ok) failures.push(`${rad}:${tooBig ? "process_limit" : schema ? "schema" : why ?? "unknown"}`);
       if (ok) {
         // A zero at a SMALLER radius is not a whole-ZIP zero. Process-limit back-off
         // answered a tighter circle; "nothing here" does not prove the requested
@@ -218,13 +228,13 @@ export async function frsFacilities(
         // writes (observable via radius_used / pre_cap) — that is undercount, not a
         // false zero.
         if (rows.length === 0 && rad < radiusMi) {
-          return { ok: false, rows: [], radius_used: null, reason: "partial_scope", attempts };
+          return { ok: false, rows: [], radius_used: null, reason: "partial_scope", attempts, failures };
         }
-        return { ok: true, rows, radius_used: rad, reason: null, attempts };
+        return { ok: true, rows, radius_used: rad, reason: null, attempts, failures };
       }
       if (schema) {
         // Same body will come back on retry. Not a zero, not a reason to shrink the circle.
-        return { ok: false, rows: [], radius_used: null, reason: "schema", attempts };
+        return { ok: false, rows: [], radius_used: null, reason: "schema", attempts, failures };
       }
       if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
       reason = "transient";                            // else transient → retry the same radius
@@ -239,9 +249,9 @@ export async function frsFacilities(
     // "No answer at the radius we asked for" is the honest outcome, and ok:false preserves the
     // page's last-known-good instead of overwriting it with a smaller truth.
     if (transientExhausted) {
-      return { ok: false, rows: [], radius_used: null, reason: "transient", attempts };
+      return { ok: false, rows: [], radius_used: null, reason: "transient", attempts, failures };
     }
   }
   // Every radius and every retry failed. This is NOT zero facilities — it is no answer.
-  return { ok: false, rows: [], radius_used: null, reason: reason ?? "transient", attempts };
+  return { ok: false, rows: [], radius_used: null, reason: reason ?? "transient", attempts, failures };
 }
