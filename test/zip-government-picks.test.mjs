@@ -117,7 +117,7 @@ ok(eq(u.placeColumnsFor({ place: { geoid: TACG, name: 'Tacoma' }, placeChecked: 
 ok(eq(u.placeColumnsFor({ place: null, placeChecked: true }, 'T'), { place_geoid: null, place_checked_at: 'T' }), '6m a no-city answer is saved as checked');
 ok(eq(u.placeColumnsFor({ place: null, placeChecked: false }, 'T'), {}), '6n an unasked geocode writes nothing');
 ok(eq(u.placeColumnsFor({ place: { geoid: 'x' }, placeChecked: true }, 'T'), { place_geoid: null, place_checked_at: 'T' }), '6o a malformed GEOID is never saved');
-ok((shell.match(/HS\.topicPrefsUtil\.placeColumnsFor\(m, /g) || []).length === 2, '6p both save paths write the place columns');
+ok((shell.match(/Object\.assign\(row, placeColumns\(m\)\);/g) || []).length === 2 && /HS\.topicPrefsUtil\.placeColumnsFor/.test(shell), '6p both save paths write the place columns, from the one rule');
 ok(/util\.homePlaceFor\(state\.properties, state\.zip\)/.test(shell), '6q the picker reads the saved home');
 ok(/placeGeoid: b\.census_place_geoid/.test(data), '6r bodies carry their Census place code');
 
