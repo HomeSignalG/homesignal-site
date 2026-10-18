@@ -618,6 +618,11 @@ subscribers.
   now holds for county and news picks only: a **city** pick is keyed
   `"<communityId>|<topic>"` and filed on THAT city's community, because the city publishes
   it. ZIPs with no Census area (PO boxes) say "not measured" rather than listing guesses.
+  - **City communities exist only for cities whose own source we read** (Pierce WA, 2026-10-18:
+    Tacoma, Gig Harbor, Sumner, Edgewood, Milton, University Place; `level=city`, `zip_codes '{}'`,
+    seed `docs/pierce-city-communities-seed.sql`, which also records the 12 held cities and why).
+    Measure it with `scripts/audits/county-launch-readiness.sql` checks 9 and 13. Meetings are read
+    live, so a city's meetings do not appear in `app_changes`; `has_source` is the signal.
 - **Universal topics are shared** across all communities (News, Emerging Tech,
   Global Best Practices — see `topics.js::UNIVERSAL_TOPICS`); you never configure
   them per community.

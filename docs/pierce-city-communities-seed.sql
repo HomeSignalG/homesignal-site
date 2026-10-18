@@ -43,3 +43,6 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 --                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
 --   Buckley, Orting, Ruston, South Prairie, Wilkeson  no CivicPlus / CivicClerk / Legistar
 --                  source found that serves current council agendas; source discovery owed
+--   Fircrest       WordPress Events Calendar API is live (108 events) and ingest's city_events
+--                  reads it, but its council events carry timezone "UTC+0", so a 7 PM meeting
+--                  would be stored at noon Pacific; needs a date-only mode in city_events first
