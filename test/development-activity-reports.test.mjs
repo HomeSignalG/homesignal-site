@@ -48,7 +48,9 @@ ok(!/development-activity-reports/.test(read('sitemap.xml')) && !/development-ac
   // Founder, 2026-10-06: the landing page's "Join for $79/month" is a real link to this page's Billing card, and nothing else on it links here.
   const landing = read('development-activity.html').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
   const links = landing.match(/development-activity-reports[^"'\s<]*/g) || [];
-  ok(links.length === 0, '1f free-only (founder, 2026-10-15): the public landing page no longer links this page\'s Billing card (the Join link is gone)', links);
+  // Founder, 2026-10-17: the Free column links "My reports" so a visitor knows where to start. That is the plain page, never the Billing card.
+  ok(links.length === 1 && links[0] === 'development-activity-reports.html' && /<a class="da-link" href="development-activity-reports\.html" id="daMyReports">/.test(landing),
+    '1f free-only (founder, 2026-10-15): the landing page does not link the Billing card (the Join link is gone); its one link is the plain "My reports" start link (2026-10-17)', links);
 }
 ok(/<meta name="referrer" content="no-referrer">/.test(page), '1g it sends no referrer');
 // 1h. THE SITE BAR (founder, 2026-10-11): this page is a standalone document on purpose (no shell: the shell boots account hydration, a follows sync and a

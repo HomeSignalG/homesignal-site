@@ -215,7 +215,8 @@ const linkingCust = [...content].filter(([f, body]) => f !== CUSTOMER_PAGE && f 
 ok(JSON.stringify(linkingCust) === JSON.stringify(['development-activity.html', 'partials/shell.html']),
   'P6d the only staged files naming the customer page are the shell\'s "My reports" entry and the landing page\'s Join for $79/month link', linkingCust);
 const landingLinks = (content.get('development-activity.html') || '').replace(/<!--[\s\S]*?-->/g, '').match(new RegExp(CUSTOMER_PAGE.replace('.', '\\.') + '[^"\'\\s<]*', 'g')) || [];
-ok(landingLinks.length === 0, 'P6e free-only (founder, 2026-10-15): the landing page no longer names the customer page (the Join link is gone)', landingLinks);
+// Founder, 2026-10-17: the Free column links the plain "My reports" page so a visitor knows where to start; the Join/Billing link stays gone.
+ok(landingLinks.length === 1 && landingLinks[0] === CUSTOMER_PAGE, 'P6e free-only (founder, 2026-10-15): the landing page names the customer page only through the plain "My reports" start link (2026-10-17); the Join/Billing link is gone', landingLinks);
 ok(robots.includes(CUSTOMER_PAGE) && readRepo('scripts/stage_site.py').includes("'" + CUSTOMER_PAGE + "'"), 'P6e control: the same detector finds the page name where it really is');
 ok(!/service_role|SERVICE_ROLE/.test(cust) && /view: 'customer'/.test(cust) && !/'internal'/.test(cust),
   'P6f the customer page carries no service-role key and only ever asks for the customer view');
