@@ -181,7 +181,8 @@ GENERATOR_KEYED.forEach((rel) => ok(new RegExp('src="/' + rel.replace(/[.*+?^${}
 // `.top .topadd .topadd-short{display:none}` lives only in app.css, and the chips read
 // "＋ Add an addressAddress" / "＋ Add a zip codeZIP" with no chip styling at all.
 // A hard refresh hid it, which is exactly why it could be shipped and reviewed as green.
-const STYLE_KEYED = ['app.css'];
+// layout.css (2026-10-18) is the shared layout tokens + container every page reads, so it is keyed the same way.
+const STYLE_KEYED = ['layout.css', 'app.css'];
 // Pinned at its measured membership, like §2: app.css is the ONLY same-origin stylesheet in
 // the repo, so this set is EMPTY and a new unkeyed one fails immediately. The three
 // jsDelivr sheets (leaflet, maplibre-gl) are versioned in their own URL and are not ours

@@ -2193,14 +2193,16 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   const g = await page.evaluate(() => {
     const r = (sel) => { const e = document.querySelector(sel).getBoundingClientRect(); return { l: e.left, r: e.right, t: e.top + scrollY, b: e.bottom + scrollY, w: e.width }; };
     const rep = document.getElementById('report');
-    return { rail: r('#rail'), report: r('#report .da-rv'), vw: innerWidth,
+    const wrapEl = document.querySelector('main.wrap'), wcs = getComputedStyle(wrapEl), wr = wrapEl.getBoundingClientRect();
+    return { rail: r('#rail'), report: r('#report .da-rv'), vw: innerWidth, wrap: { l: wr.left + parseFloat(wcs.paddingLeft), r: wr.right - parseFloat(wcs.paddingRight) },
       underReport: [...document.getElementById('current').children].map((e) => e.id || e.tagName).filter((id) => id !== 'current-title' && id !== 'status' && id !== 'creditnote' && id !== 'report' && id !== 'report-empty' && id !== 'compare-result'),
       onceEach: ['share', 'watch', 'saved', 'compare', 'account', 'rail-actions'].map((id) => document.querySelectorAll('#' + id).length),
       railHas: ['#rail-actions', '#share', '#watch', '#saved', '#compare'].every((q) => !!document.querySelector('#rail ' + q)) && ['#rf', '#account', '#billing', '#profile', '#team'].every((q) => !document.querySelector('#rail ' + q)),
       reportHas: !!rep.querySelector('#share, #watch, #saved, #account, .da-rv-actions') };
   });
   ok(g.rail.w >= 300 && g.rail.w <= 360 && g.rail.l < g.report.l, `L5a at ${width}px the rail is 300-360px wide and sits left of the report`, g.rail);
-  ok(g.report.w > g.rail.w * 2.8 && g.report.r > g.vw * 0.9 - 40, `L5b at ${width}px the report takes the far larger share of the width`, [g.report.w, g.rail.w, g.vw]);
+  // The workspace is the shared 1440px workspace tier (layout.css, 2026-10-18): the report fills the container to its right edge. (Until then the pin was a share of the WINDOW, which only held while the cap was 1800px.)
+  ok(g.report.w > g.rail.w * 2.8 && Math.abs(g.report.r - g.wrap.r) <= 1, `L5b at ${width}px the report takes the far larger share of the width and reaches the workspace container's right edge`, [g.report.w, g.rail.w, g.report.r, g.wrap.r]);
   // THE FULL-WIDTH CREATE SECTION and the quieter usage strip (founder, 2026-10-11)
   const h = await page.evaluate(() => {
     const box = (e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top + scrollY, b: r.bottom + scrollY, w: r.width, h: r.height }; };
@@ -2214,7 +2216,7 @@ for (const [width, height] of [[1440, 900], [1920, 1080]]) {
   ok(h.trialInHeader && h.trial.b <= h.headerB + 1 && h.trial.h < 90 && /^3 of 10 free reports used$|^\d+ of 10 free reports used$/.test(h.count) && h.cta.w > 0 && h.trial.t < h.create.t, `L5s at ${width}px the usage count and Subscribe sit in the site bar's account zone, small, above the form`, h);
 
   { const surface = g.report.r - g.rail.l;   // the working surface: from the rail's left edge to the report's right edge
-    ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / g.vw >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the window)`, { w: g.report.w, surface, vw: g.vw }); }
+    ok(g.report.w >= 950 && g.report.w / surface >= 0.70 && g.report.w / surface <= 0.80 && g.report.w / (g.wrap.r - g.wrap.l) >= 0.70, `L5b2 at ${width}px the report is at least 950px wide and 70-80% of the working surface (and 70%+ of the workspace container)`, { w: g.report.w, surface, wrap: g.wrap }); }
   ok(g.railHas && !g.reportHas && g.underReport.length === 0 && g.onceEach.every((n) => n === 1), `L5c at ${width}px report tools, Saved and Compare are in the rail, Create and Account are not, each once, and nothing but the report is on the right`, g);
   // the six most recent are listed; the rest wait behind "View all saved reports"
   ok((await page.$$eval('#saved-list li:not([hidden])', (e) => e.length)) === 6 && !(await drawn(page, '#saved-more')) , `L5d six saved reports show without a "view all" button`);

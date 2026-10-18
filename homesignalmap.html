@@ -44,7 +44,8 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="app.css?v=ba77bc72"/>
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
+<link rel="stylesheet" href="app.css?v=05fceb86"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -58,7 +59,7 @@
   *{box-sizing:border-box}
   html,body{margin:0}
   body{font-family:var(--font);color:var(--ink);background:var(--paper);line-height:1.5}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  /* .wrap is also .hs-container: the width and side gutters come from layout.css (this page is the full-bleed tier). */
   a{color:var(--green)}
 
   /* NOTE: the page's old top-bar + auth-modal CSS was removed in the shell conversion — the shared
@@ -139,7 +140,7 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
     box-shadow:0 14px 34px -26px rgba(8,30,28,.5)}
   .mapcard{padding:14px}
-  .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
+  .map-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:11px;gap:10px}  /* wraps: at 390px the caption + 2D/3D switch were 27px wider than the card */
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
   /* ZIP mode hides #radSel (body.zipmode .radsel). A ZIP is not a radius around a point,
      so there is no "widen the search" control. 2D / 3D aerial / 3D satellite all frame the
@@ -638,13 +639,13 @@
      from how-it-works.html. It is still in ZIP_NAV_PAGES and MAP_PAGES. Before v3 it
      declared "dev" (A-021), and before that a retired "maps" entry. Contract asserted by
      test/nav-identity.test.mjs. -->
-<body data-nav="explore" data-explore="map">
+<body data-nav="explore" data-explore="map" data-layout="full">
 <!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
      share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
      the shell owns them now. Page content lives in the <template> below; shell.js moves it into
      #hs-slot on boot, so any DOM-touching init must run inside HS.onReady (see the bottom script). -->
 <template id="hs-content">
-  <div class="wrap">
+  <div class="wrap hs-container">
     <div class="head">
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
       <h1>Development around your home</h1>

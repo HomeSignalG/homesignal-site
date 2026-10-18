@@ -8,6 +8,7 @@
 <meta name="description" content="HomeSignal internal government source archive.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
 <style>
 /* ============================================================================
    GOVERNMENT SOURCE ARCHIVE — internal operator surface.
@@ -32,10 +33,10 @@
 --red:#c23b34;--violet:#5b4bb5;--shadow-sm:0 1px 2px rgba(16,33,28,.06);}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:22px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top{padding:22px 0;border-bottom:1px solid var(--line);background:var(--panel)}
 header.top h1{margin:0;font-size:20px;letter-spacing:.2px}
 header.top .meta{color:var(--muted);font-size:12.5px;margin-top:6px;max-width:900px}
-.wrap{padding:22px 26px;max-width:1500px}
+.wrap{padding-block:22px}  /* width and gutters: .hs-container (layout.css), workspace tier */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
 .card h3{margin:0 0 4px;font-size:15px}
 .card .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
@@ -112,18 +113,20 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
 .auth-toggle a{color:var(--accent);cursor:pointer;font-weight:600}
 </style>
 </head>
-<body>
+<body data-layout="workspace">
 
 <div id="gate"><div class="gate-card" id="gate-card"><div class="gate-loading">Loading…</div></div></div>
 
 <div id="ga-root" style="display:none">
   <header class="top">
+   <div class="hs-container">
     <h1>HomeSignal — Government Source Archive</h1>
     <div class="meta">Preserved government evidence, and the record of how it was acquired.
       The government URL is <b>provenance</b>; the HomeSignal archive is <b>preservation</b> — a
       document vanishing from an agency website changes the first and not the second.</div>
+   </div>
   </header>
-  <div class="wrap" id="ga-body"></div>
+  <div class="wrap hs-container" id="ga-body"></div>
 </div>
 
 <div id="auth-overlay" class="auth-overlay">

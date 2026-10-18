@@ -9,6 +9,7 @@
 <meta name="description" content="A private Development Activity report shared with you by your agent.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
 <style>
 /* ============================================================================
    DEVELOPMENT ACTIVITY — THE CLIENT'S PAGE (build step 8 of
@@ -31,8 +32,8 @@
 :root{--bg:#f4f6f4;--panel:#ffffff;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header.top .in{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+header.top{padding:16px 0;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
 header.top .brand{margin:0;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--accent)}
 .go{font:inherit;font-size:14.5px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;min-height:44px}
 .go:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
@@ -42,7 +43,7 @@ a.go[hidden]{display:none}
 .go.sec{background:var(--panel);color:var(--accent);border:1px solid var(--line);font-weight:500}
 header.top .acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .invite a.go{margin-top:12px;padding:10px 18px;color:#fff;text-decoration:none}
-.follow-top{max-width:1120px;margin:0 auto;padding:0 16px}
+.follow-top{/* width and gutters: .hs-container (layout.css) */}
 .follow-top .follow-panel{max-width:560px;margin-left:auto}
 .follow-panel{margin:12px 0 0;padding:12px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;color:var(--ink)}
 .follow-panel[hidden]{display:none}
@@ -54,7 +55,7 @@ header.top .acts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .go.follow.done{background:#eaf4ee;color:#1f5f3e;border:1px solid #cfe5d7;cursor:default;pointer-events:none}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:560px){header.top .acts{flex-direction:column;align-items:stretch;width:100%}header.top .acts .go{width:100%}}
-.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:14px}
+.wrap{padding-block:20px 56px;display:grid;gap:14px}  /* width and gutters: .hs-container (layout.css) */
 #status{margin:0;font-size:15px;min-height:1.5em}
 #status.err{color:var(--red);font-weight:600}
 .notice{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
@@ -80,7 +81,7 @@ noscript p{margin:16px;font-weight:600}
 </head>
 <body data-state="loading">
 <header class="top">
-  <div class="in">
+  <div class="in hs-container">
     <p class="brand">JODY Development Activity</p>
     <div class="acts">
     <a class="go follow" id="follow" href="#" hidden>Follow this property</a>
@@ -88,8 +89,8 @@ noscript p{margin:16px;font-weight:600}
     </div>
   </div>
 </header>
-<div id="followTop" class="follow-top"></div>
-<main class="wrap">
+<div id="followTop" class="follow-top hs-container"></div>
+<main class="wrap hs-container">
   <p id="status" role="status" aria-live="polite">Loading the report…</p>
   <div id="gone" class="notice" hidden></div>
   <div id="report"></div>

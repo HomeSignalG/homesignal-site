@@ -199,7 +199,7 @@ const zipNavLiteral = (shellJsSrc.match(/HS\.ZIP_NAV_PAGES = \[([^\]]*)\]/) || [
 ok(subLinks.length === 3 && subLinks.every((l) => zipNavLiteral.indexOf("'" + l.split('|')[0] + "'") >= 0),
   '...and all three are ZIP_NAV_PAGES targets, so paintNavHrefs stamps the viewed ZIP on them');
 for (const [f, tok] of [['development.html', 'qol'], ['homesignalmap.html', 'map'], ['community.html', 'activity']])
-  ok(new RegExp('<body data-nav="explore" data-explore="' + tok + '">').test(read(f)),
+  ok(new RegExp('<body data-nav="explore" data-explore="' + tok + '"( data-layout="(reading|workspace|full)")?>').test(read(f)),
     f + ' names its dropdown entry with data-explore="' + tok + '"');
 ok(/data-explore="activity"/.test(read('scripts/gen_zip_pages.py')),
   'the generated /community/<zip>/ documents name the Activity entry too');
