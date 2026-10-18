@@ -92,5 +92,34 @@ ok(/rpc\('clear_alert_selection'/.test(shell), '5c unticking every topic of one 
 ok(/rpc\('zip_government_bodies'/.test(data) && /rpc\('zip_government_topics'/.test(data), '5d the page reads the two canonical functions');
 ok(!/zcta_place_overlap/.test(data + shell), '5e the page never reads the overlap table itself');
 
+// 6 — the saved home's own government (step 7): from the Census geocoder's place answer only
+const TACG = '5370000', UPG = '5373465';
+const govP = { rootId: ROOT, measured: true, bodies: [
+  Object.assign({}, gov.bodies[0], { placeGeoid: null }),
+  Object.assign({}, gov.bodies[1], { placeGeoid: UPG }),
+  Object.assign({}, gov.bodies[2], { placeGeoid: TACG }) ] };
+const inTac = u.topicGroupsFor(govP, 'meetings', { placeGeoid: TACG });
+ok(inTac[2].home && /^Your home is in this city · /.test(inTac[2].note) && !inTac[0].home && !inTac[1].home, '6a a home inside Tacoma marks Tacoma, and only Tacoma');
+const outside = u.topicGroupsFor(govP, 'meetings', { placeGeoid: null });
+ok(outside[0].home && /outside any city, so the county governs it/.test(outside[0].note) && !outside[2].home, '6b a home outside every city marks the county');
+const elsewhere = u.topicGroupsFor(govP, 'meetings', { placeGeoid: '5300001' });
+ok(elsewhere.every(g => !g.home && !/Your home/.test(g.note)), '6c a home in a city not listed for this ZIP claims nothing');
+ok(u.topicGroupsFor(govP, 'meetings').every(g => !g.home), '6d no known home: nothing is claimed (notes as before)');
+ok(eq(u.topicGroupsFor(govP, 'meetings').map(g => g.note), u.topicGroupsFor(gov, 'meetings').map(g => g.note)), '6e without a home the notes are byte-identical to before');
+const P = (zip, geoid, checked, extra) => Object.assign({ zip: zip, place_geoid: geoid, place_checked_at: checked ? '2026-10-18T00:00:00Z' : null }, extra || {});
+ok(eq(u.homePlaceFor([P('98466', TACG, true)], '98466'), { placeGeoid: TACG }), '6f a checked home in the ZIP is used');
+ok(u.homePlaceFor([P('98466', null, false)], '98466') === null, '6g a home saved before the geocoder was asked claims nothing');
+ok(eq(u.homePlaceFor([P('98466', null, true)], '98466'), { placeGeoid: null }), '6h a checked home outside every city is known');
+ok(u.homePlaceFor([P('98466', TACG, true), P('98466', UPG, true)], '98466') === null, '6i two homes in different cities: nothing is claimed');
+ok(u.homePlaceFor([P('98467', TACG, true)], '98466') === null, '6j a home in another ZIP is not used');
+ok(u.homePlaceFor([P('98466', TACG, true, { sample: true })], '98466') === null, '6k a sample home is never used');
+ok(eq(u.placeColumnsFor({ place: { geoid: TACG, name: 'Tacoma' }, placeChecked: true }, 'T'), { place_geoid: TACG, place_checked_at: 'T' }), '6l a city answer is saved');
+ok(eq(u.placeColumnsFor({ place: null, placeChecked: true }, 'T'), { place_geoid: null, place_checked_at: 'T' }), '6m a no-city answer is saved as checked');
+ok(eq(u.placeColumnsFor({ place: null, placeChecked: false }, 'T'), {}), '6n an unasked geocode writes nothing');
+ok(eq(u.placeColumnsFor({ place: { geoid: 'x' }, placeChecked: true }, 'T'), { place_geoid: null, place_checked_at: 'T' }), '6o a malformed GEOID is never saved');
+ok((shell.match(/Object\.assign\(row, placeColumns\(m\)\);/g) || []).length === 2 && /HS\.topicPrefsUtil\.placeColumnsFor/.test(shell), '6p both save paths write the place columns, from the one rule');
+ok(/util\.homePlaceFor\(state\.properties, state\.zip\)/.test(shell), '6q the picker reads the saved home');
+ok(/placeGeoid: b\.census_place_geoid/.test(data), '6r bodies carry their Census place code');
+
 console.log(fails ? `\n${fails} FAILURE(S)` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

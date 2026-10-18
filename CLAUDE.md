@@ -607,6 +607,17 @@ subscribers.
 - **Content + subscriptions anchor at the chain ROOT** (the content-bearing community —
   the county today); the page scopes displayed content by the ancestor topic set, so a
   sibling town's meetings never leak onto another's page.
+- ⚖️ **A ZIP page ALSO reads every city that covers part of its land (founder, option 3,
+  2026-10-18).** `public.zip_government_bodies(zip)` (`docs/zip-government-bodies.sql`) lists
+  the county plus each incorporated place with ≥1% of the ZIP's land (Census ZCTA↔place
+  overlap, `docs/zcta-place-overlap.sql`), labelled as a LAND share, never population; a
+  city counts as having a source only when it has an active feed. `app_refresh_zip` reads
+  Government Notices and the meeting mirror for all of them
+  (`docs/app-refresh-zip-every-government.sql`; rollback archived under tag
+  `pre-every-government`); **Local News stays root-only.** So the root-anchor rule above
+  now holds for county and news picks only: a **city** pick is keyed
+  `"<communityId>|<topic>"` and filed on THAT city's community, because the city publishes
+  it. ZIPs with no Census area (PO boxes) say "not measured" rather than listing guesses.
 - **Universal topics are shared** across all communities (News, Emerging Tech,
   Global Best Practices — see `topics.js::UNIVERSAL_TOPICS`); you never configure
   them per community.

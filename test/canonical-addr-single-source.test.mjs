@@ -40,7 +40,7 @@ test('the production ladder is COMPOSED in exactly one place, and every consumer
 });
 
 test('no NEW Census geocoder: the callers are exactly the three that predate this change', () => {
-  const callers = FILES.filter((f) => readFileSync(f, 'utf8').includes('geocoding.geo.census.gov/geocoder/locations'))
+  const callers = FILES.filter((f) => readFileSync(f, 'utf8').includes('geocoding.geo.census.gov/geocoder/'))   // locations/ or geographies/ (geocode-address v2)
     .filter((f) => !f.startsWith('scripts/verify-geocodes'))   // the geofence VERIFIER, not a geocoder
     .sort();
   const geoAddr = readFileSync('supabase/functions/geocode-address/index.ts', 'utf8');

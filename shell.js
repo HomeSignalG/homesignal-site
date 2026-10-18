@@ -748,6 +748,7 @@
       lat: m.lat, lng: m.lng, label: 'home',
       input_address: String(addr || '').trim() || null
     };
+    Object.assign(row, placeColumns(m));
     // FIX 17 — onboarding uses the SAME saved-place contract as HS.saveHome.
     //
     // It used to find whichever row was isRealHome and UPDATE it, which encoded a
@@ -1622,7 +1623,10 @@
       ok: true,
       match: {
         matchedAddress: m.matchedAddress || '', lat: m.lat, lng: m.lng, zip: zip,
-        city: m.city || null, state: m.state || null
+        city: m.city || null, state: m.state || null,
+        // The incorporated city Census puts this point in (geocode-address v2). Carried
+        // only as Census stated it; placeChecked false means it was not asked.
+        place: m.place || null, placeChecked: m.placeChecked === true
       }
     };
   };
@@ -1671,6 +1675,12 @@
     return String(e.code || '') === DUP_CODE
       || /duplicate key value|app_properties_user_place_key/i.test(String(e.message || ''));
   }
+  // The two saved-home place columns (docs/app-properties-place.sql), from the geocode
+  // match. The rule lives in lib/topic-prefs.js (placeColumnsFor); nothing about alerts.
+  function placeColumns(m) {
+    const f = HS.topicPrefsUtil && HS.topicPrefsUtil.placeColumnsFor;
+    return f ? f(m, new Date().toISOString()) : {};
+  }
   async function savePlaceRow(row) {
     let r = null;
     try { r = await HS.sb().from('app_properties').insert(row).select().single(); } catch (e) { r = { error: e }; }
@@ -1712,6 +1722,7 @@
       lat: m.lat, lng: m.lng, label: 'home',
       input_address: _homeInput || null
     };
+    Object.assign(row, placeColumns(m));
     const r = await savePlaceRow(row);
     if (!r.data) {
       $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
@@ -2254,7 +2265,8 @@
       } catch (e) { /* fall back to seed labels; save still anchors via its own lookup */ }
       try {
         const gov = HS.data.zipGovernment ? await HS.data.zipGovernment(state.zip) : null;
-        groups = util.topicGroupsFor(gov, key === 'gov' ? 'notices' : 'meetings');
+        groups = util.topicGroupsFor(gov, key === 'gov' ? 'notices' : 'meetings',
+          util.homePlaceFor(state.properties, state.zip));
       } catch (e) { groups = null; /* one government, as before */ }
     }
     $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
