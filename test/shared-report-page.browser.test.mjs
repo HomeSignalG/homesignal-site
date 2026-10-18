@@ -230,7 +230,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
     const rv = document.querySelector('.da-rv').getBoundingClientRect(), h = getComputedStyle(document.querySelector('.da-rv-h2')), addr = getComputedStyle(document.querySelector('.da-rv-addr'));
     return { w: Math.round(rv.width), h2: parseFloat(h.fontSize), weight: Number(h.fontWeight), upper: h.textTransform, addr: parseFloat(addr.fontSize) };
   });
-  ok(m.w >= 1000 && m.w <= 1120, '8a on a 1920 px screen the report is a comfortable 1000-1120 px column (it was 928 px)', m);
+  ok(m.w >= 1000 && m.w <= 1180, '8a on a 1920 px screen the report is a comfortable 1000-1180 px column (the shared reading tier, layout.css; it was 928 px, then 1120)', m);
   ok(m.h2 >= 20 && m.weight >= 600 && m.upper === 'none', '8b a section heading is at least 20 px, semibold and not small uppercase', m);
   ok(m.addr > m.h2, '8c the property address is the strongest element, larger than any section heading', m);
   await ctx.close();
