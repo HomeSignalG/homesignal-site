@@ -96,6 +96,10 @@ ok(/Yes, choose my alerts →/.test(zipCard), 'ZIP save card has the approved CT
 ok(/Government notices/.test(zipCard) && /Upcoming meetings/.test(zipCard) && /Local news/.test(zipCard) && /ZIP 78617/.test(zipCard),
   'ZIP save card names the three alert types and the ZIP', zipCard);
 ok(/Not now/.test(zipCard), 'ZIP save card offers Not now', zipCard);
+const cardBox = await page.evaluate(() => { const r = document.getElementById('hsOptin').getBoundingClientRect();
+  return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, vw: innerWidth, vh: innerHeight }; });
+ok(Math.abs(cardBox.cx - cardBox.vw / 2) <= 2 && Math.abs(cardBox.cy - cardBox.vh / 2) <= 2,
+  'save card is centred in the window', cardBox);
 ok(!/Emailing you/.test(zipCard) && !/Email me these alerts/.test(zipCard),
   'ZIP save card does not claim email was activated', zipCard);
 
