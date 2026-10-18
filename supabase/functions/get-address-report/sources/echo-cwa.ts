@@ -1,3 +1,4 @@
+import { parseEpaJson } from "./epa-frs.ts";
 // EPA ECHO + ICIS-NPDES (CWA) enrichment — report what happened, never infer it.
 //
 // WHY THIS IS ITS OWN MODULE (2026-09-27). Until now `echoEnrich` / `cwaPermitEnrich`
@@ -81,8 +82,10 @@ const CWA_RESTORE_FIELDS = ["permits", "permit_status", "compliance_tracking_on"
 
 type FetchLike = (input: string, init?: unknown) => Promise<Response>;
 
+// The same EPA records reach ECHO, so ECHO uses the one repair in epa-frs.ts (backslashes and raw
+// control characters) rather than a second copy that would drift.
 export function echoParse(text: string): Record<string, unknown> {
-  return JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\")) as Record<string, unknown>;
+  return parseEpaJson(text) as Record<string, unknown>;
 }
 
 export function echoYear(mdY?: string): string | null {

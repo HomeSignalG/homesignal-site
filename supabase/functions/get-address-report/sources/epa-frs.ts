@@ -117,6 +117,30 @@ export function recognizedFrsPayload(data: unknown): FrsAttempt {
   return SCHEMA;
 }
 
+/**
+ * Parse an EPA (FRS or ECHO) response body. EPA emits two kinds of invalid JSON inside string values, and either
+ * one made JSON.parse throw, which `frsAt` reports as TRANSIENT and retries — forever, because the
+ * same record comes back on every request:
+ *   1. backslashes that are not JSON escapes ("BAD\NAME CO") — the v13 defect;
+ *   2. RAW CONTROL CHARACTERS (2026-10-18). Measured: FRS RegistryId-bearing record
+ *      "…WATER SYSTEM" at "7415 CHAMBERS CREEK RD W<TAB>" (Pierce County WA). Any ZIP whose search
+ *      circle contained it got `epa.ok:false reason:transient` on every refresh, so its facility
+ *      layer stopped refreshing (98467 since 2026-08-20). Nationally 1,120 ZIPs carried a facility
+ *      layer older than 7 days with `facilities_unavailable`; this is the deterministic shape that
+ *      produces that state.
+ * U+0000–U+001F become a space. Outside a string that is still JSON whitespace; inside a string it
+ * turns a stray tab or newline into a space, which no reader of an address or name depends on.
+ * A body that still does not parse throws, and `frsAt` keeps treating that as transient (a body
+ * truncated by the network looks the same and is worth retrying).
+ */
+export function parseEpaJson(text: string): unknown {
+  const repaired = text
+    .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
+    // deno-lint-ignore no-control-regex
+    .replace(/[\u0000-\u001f]/g, " ");
+  return JSON.parse(repaired);
+}
+
 // One FRS query at a fixed radius; tooBig = FRS process-limit refusal (shrink), transient = retry.
 export async function frsAt(
   lat: number,
@@ -140,9 +164,7 @@ export async function frsAt(
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
     if (r.status !== 200) return TRANSIENT;
     const text = await r.text();
-    // Escape any backslash that isn't a valid JSON escape so JSON.parse survives FRS payloads.
-    const data = JSON.parse(text.replace(/\\(?!["\\/bfnrtu])/g, "\\\\"));
-    return recognizedFrsPayload(data);
+    return recognizedFrsPayload(parseEpaJson(text));
   } catch (_e) {
     return TRANSIENT;                          // network/parse → transient
   }
