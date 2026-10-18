@@ -47,8 +47,9 @@ const showFn = (shell.match(/HS\.showAreaOptin = function[\s\S]*?(?=\n  HS\.enab
 ok(showFn.length > 0, 'showAreaOptin is locatable in shell.js');
 ok(/saved to My Places/.test(showFn), 'card title states saved to My Places');
 ok(/Want email alerts\?/.test(showFn), 'invitation is the approved "Want email alerts?" line');
+ok(/Government notices, Upcoming meetings and Local news/.test(showFn), 'card names the three alert types');
 ok(/id="optinAlertsCta"/.test(showFn), 'CTA has id=optinAlertsCta');
-ok(/Choose your alert topics →/.test(showFn), 'CTA text is exactly the approved copy');
+ok(/Yes, choose my alerts →/.test(showFn), 'CTA text is exactly the approved copy');
 ok(/alertsHrefForSavedPlace/.test(showFn), 'CTA href comes from alertsHrefForSavedPlace');
 ok(!/enableAreaEmail/.test(showFn), 'card does not call enableAreaEmail');
 ok(!/optinYes/.test(showFn), 'card has no Email-me button');

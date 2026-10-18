@@ -64,7 +64,7 @@ ok(!/optinYes/.test(showFn) && !/Email me these alerts/.test(showFn),
    'the post-save card has no "Email me these alerts" control');
 ok(!/Emailing you/.test(showFn) && !/Now following development/.test(showFn),
    'the post-save card never claims email alerts were activated');
-ok(/id="optinAlertsCta"/.test(showFn) && /Choose your alert topics →/.test(showFn),
+ok(/id="optinAlertsCta"/.test(showFn) && /Yes, choose my alerts →/.test(showFn),
    'the post-save card offers the approved Alerts CTA');
 ok(/Want email alerts\?/.test(showFn) && /saved to My Places/.test(showFn),
    'the post-save card states My Places save + a separate email-alerts invitation');
