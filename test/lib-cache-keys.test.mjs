@@ -51,11 +51,15 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 // lib/da-report-view.js joined the set with its first page, the private review page (Development Activity build
 // step 4). It is the whole customer report layout, so a fix in it that a warm browser never fetches would show the
 // founder an old layout while the tests prove the new one.
+// lib/data.js and lib/topic-prefs.js joined the set with the multi-government ZIP page (2026-10-18): the topic
+// picker in shell.js calls helpers that live in them, so a warm browser pairing a new shell.js with an old copy of
+// either would break the picker. Both were keyless on every page until then.
 // lib/da-report-compare.js joined the set with its one page, the customer page (Development Activity build step 10). It is the whole
 // side-by-side comparison, so a fix in it that a warm browser never fetches would show an agent an old comparison.
 const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-theme.js', 'lib/maps-capture-policy.js',
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
-  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js'];
+  'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js',
+  'lib/data.js', 'lib/topic-prefs.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 
@@ -92,7 +96,7 @@ CONTENT_KEYED.forEach((rel) => {
 // nothing, which is the failure mode §2 exists to prevent: an absence that reads as a pass.
 // Now shell.js is content-keyed above and the rest are pinned at measured membership.
 const KNOWN_KEYLESS = new Set([
-  'lib/data.js', 'lib/topic-prefs.js', 'lib/impact.js', 'lib/gov-notice-copy.js',
+  'lib/impact.js', 'lib/gov-notice-copy.js',
   'lib/coverage-copy.js', 'lib/why.js',
   'config.js', 'seed/delvalle.js', 'share.js', 'assets/acquisition-video-producer.js'
 ]);
@@ -181,7 +185,8 @@ GENERATOR_KEYED.forEach((rel) => ok(new RegExp('src="/' + rel.replace(/[.*+?^${}
 // `.top .topadd .topadd-short{display:none}` lives only in app.css, and the chips read
 // "＋ Add an addressAddress" / "＋ Add a zip codeZIP" with no chip styling at all.
 // A hard refresh hid it, which is exactly why it could be shipped and reviewed as green.
-const STYLE_KEYED = ['app.css'];
+// layout.css (2026-10-18) is the shared layout tokens + container every page reads, so it is keyed the same way.
+const STYLE_KEYED = ['layout.css', 'app.css'];
 // Pinned at its measured membership, like §2: app.css is the ONLY same-origin stylesheet in
 // the repo, so this set is EMPTY and a new unkeyed one fails immediately. The three
 // jsDelivr sheets (leaflet, maplibre-gl) are versioned in their own URL and are not ours

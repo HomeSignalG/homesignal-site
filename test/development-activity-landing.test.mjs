@@ -55,7 +55,8 @@ const meta = (h, re) => (h.match(re) || [''])[0];
 ok(meta(src, /<meta http-equiv="Content-Security-Policy"[^>]*>/) === meta(contact, /<meta http-equiv="Content-Security-Policy"[^>]*>/),
   'carries the byte-identical Content-Security-Policy');
 ok(meta(src, /<link rel="stylesheet"[^>]*>/) === meta(contact, /<link rel="stylesheet"[^>]*>/), 'links the same app.css version');
-ok((src.match(/<link rel="stylesheet"/g) || []).length === 1, 'links exactly one stylesheet (app.css); everything else is scoped inline');
+ok((src.match(/<link rel="stylesheet"[^>]*href="(layout|app)\.css\?v=/g) || []).length === 2 && (src.match(/<link rel="stylesheet"/g) || []).length === 2,
+  'links exactly two stylesheets (layout.css, the shared layout tokens, and app.css); everything else is scoped inline');
 ok(!/<nav\b|<aside\b|<header\b|<footer\b/i.test(markup), 'no nav, aside, header or footer element: the shell owns all chrome');
 const classTokens = [...markup.matchAll(/\sclass="([^"]*)"/g)].flatMap((m) => m[1].split(/\s+/)).filter(Boolean);
 const CHROME = ['logo', 'side', 'nav', 'sidefoot', 'upsell', 'top', 'menubtn', 'sharebtn', 'app', 'main', 'loc', 'topadds', 'avatar', 'ib', 'sidebackdrop'];

@@ -93,6 +93,7 @@ ROOT_FILES = (
     'unsubscribe.html',
     # runtime styles + scripts
     'app.css',
+    'layout.css',
     'communities.js',
     'config.js',
     'events.js',
