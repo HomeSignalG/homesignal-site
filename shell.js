@@ -2016,7 +2016,7 @@
     if (!label) return;
     let box = $('hsOptin');
     if (!box) { box = document.createElement('div'); box.id = 'hsOptin'; document.body.appendChild(box); }
-    box.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;'
+    box.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;'
       + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
     const href = HS.alertsHrefForSavedPlace(info);
