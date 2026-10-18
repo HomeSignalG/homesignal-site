@@ -24,8 +24,11 @@
      and every colour, radius and font is an existing app.css token. No new visual language. */
   [hidden]{display:none!important}
   .da{max-width:980px}
-  .da section{padding:46px 0;border-top:1px solid var(--line-2)}
-  .da section.da-first{border-top:0;padding-top:10px}
+  .da section{padding:28px 0;border-top:1px solid var(--line-2)}
+  .da section.da-first{border-top:0;padding-top:10px;padding-bottom:20px}
+  /* tighter rhythm inside the sample report on this page only (the shared report view is untouched) */
+  .da .da-rv-sec{padding:22px 0 4px;margin-top:0}
+  .da .da-rv-hero{margin-top:18px}
   .da h1{font-size:36px;letter-spacing:-.025em;line-height:1.12;margin:8px 0 16px;max-width:780px}
   .da h2{font-size:22px;letter-spacing:-.015em;line-height:1.28;margin:0 0 14px}
   .da h3{font-size:15px;letter-spacing:-.01em;margin:0 0 6px}
@@ -87,7 +90,7 @@
   @media(max-width:620px){
     .da h1{font-size:29px}
     .da h2{font-size:20px}
-    .da section{padding:36px 0}
+    .da section{padding:24px 0}
     .da-price{font-size:34px}
   }
 </style>
