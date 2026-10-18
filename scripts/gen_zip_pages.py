@@ -171,6 +171,10 @@ def fetch_data(key, now_iso):
                                  "alert_id,community_id,source_url", "&active=is.true",
                                  keyset="alert_id")
     d["communities"] = fetch_all("communities", key, "id,name,parent_id,level,zip_codes")
+    # every city community whose land overlaps a ZIP by >= 1% — the set form of
+    # public.zip_government_bodies (docs/zip-government-bodies.sql), read by the page too
+    d["gov_links"] = fetch_all("zip_government_city_links", key, "link_id,zip,community_id,name",
+                               keyset="link_id")
     d["meetings"] = fetch_all("meetings", key,
                               "id,community_id,title,meeting_date,category,source_url",
                               f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
@@ -619,6 +623,10 @@ def assemble(d, now_iso):
     for m in d["meetings"]:
         mtgs_by_cid.setdefault(m.get("community_id"), []).append(m)
 
+    gov_links = {}
+    for link in d.get("gov_links") or []:
+        gov_links.setdefault(link.get("zip"), []).append(link)
+
     def places_of(community):
         base = re.sub(r"\s*\(\d{5}\)\s*$", "", community.get("name") or "")
         return [x.strip().lower() for x in base.split("/") if x.strip()]
@@ -635,6 +643,13 @@ def assemble(d, now_iso):
             ids.append(up["parent_id"])
             up = by_id.get(up["parent_id"])
             hops += 1
+        # EVERY GOVERNMENT COVERING THE ZIP, as the page reads it (lib/data.js::meetings via
+        # zipGovernment): a city whose land overlaps the ZIP publishes on its own community.
+        extra_names = []
+        for link in gov_links.get(z, []):
+            if link["community_id"] not in ids:
+                ids.append(link["community_id"])
+            extra_names.append((link.get("name") or "").strip().lower())
         rows = []
         for cid in ids:
             # FORWARD-DATED ONLY, asserted here rather than trusted from the fetch. The
@@ -645,13 +660,15 @@ def assemble(d, now_iso):
             rows.extend(m for m in mtgs_by_cid.get(cid, [])
                         if (m.get("meeting_date") or "") >= meeting_cutoff(now_iso))
         rows.sort(key=lambda m: (m.get("meeting_date") or "", str(m.get("id"))))
-        pl = places_of(c)
+        pl = places_of(c) + extra_names
+        gov_name = {link["community_id"]: link.get("name") for link in gov_links.get(z, [])}
         keep = []
         for m in rows[:24]:                      # the page's own .limit(24)
             city = CITY_RE.match(m.get("category") or "")
             if city and city.group(1).strip().lower() not in pl:
                 continue                          # another town's council — not this ZIP's
-            keep.append(m)
+            keep.append(dict(m, government=gov_name[m.get("community_id")])
+                        if m.get("community_id") in gov_name else m)
         return keep[:UM_CAP]                      # the page's own .slice(0, 12)
 
     plane = d.get("_dev_plane") or {}
@@ -814,7 +831,7 @@ def _items(items, heading, empty, kind, zip_code=""):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=ba77bc72">\n'
+APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=30e00a0d">\n'
 
 
 def coverage_panel(p):
@@ -856,7 +873,8 @@ def render(p, built):
     ln_show = [x for x in p["ln"] if not x["weather"]][:LN_CAP]
     wx = [x for x in p["ln"] if x["weather"]][:3]
     um_show = p["um"][:UM_CAP]
-    um_items = [{"title": m.get("title"), "url": m.get("source_url"),
+    um_items = [{"title": ((m.get("government") + ": ") if m.get("government") else "") + (m.get("title") or ""),
+                 "url": m.get("source_url"),
                  "date": (m.get("meeting_date") or "")[:10]} for m in um_show]
 
     county_bit = f" in {esc(p['county'])} County" if p["county"] else ""
@@ -1008,7 +1026,7 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
-        '<script src="/lib/data.js"></script>\n<script src="/lib/topic-prefs.js"></script>\n'
+        '<script src="/lib/data.js?v=710f8daa"></script>\n<script src="/lib/topic-prefs.js?v=3a82cc17"></script>\n'
         '<script src="/lib/templates.js?v=6b61281a"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
@@ -1024,9 +1042,9 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=78757d3e"></script>\n'
+        '<script src="/shell.js?v=60e0abfe"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=8861dadd"></script>\n'
+        '<script src="/lib/community-page.js?v=9ed32b7c"></script>\n'
         "</body>\n</html>\n")
 
 
