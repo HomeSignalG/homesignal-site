@@ -194,6 +194,47 @@ for (const [label, text] of SCHEMA_BODIES) {
     '6d. FRS invalid-backslash payload → repaired and parsed, ok:true (v13 defect stays fixed)');
 }
 
+{
+  // 2026-10-18: FRS returns RAW CONTROL CHARACTERS inside string values. Shape copied from the real
+  // record (raw TAB after the street, Pierce County WA). Before the fix JSON.parse threw, frsAt
+  // reported TRANSIENT, and every ZIP covering the record never refreshed its facility layer.
+  const TAB_PAYLOAD = '{\n"Results":{\n"FRSFacility":[\n{\n"RegistryId":"110000000001",\n' +
+    '"FacilityName":"CHAMBERS CREEK WATER SYSTEM",\n"LocationAddress":"7415 CHAMBERS CREEK RD W\t",\n' +
+    '"Latitude83":"47.2","Longitude83":"-122.57"}\n]\n}\n}\n';
+  ok(/\t/.test(TAB_PAYLOAD) && (() => { try { JSON.parse(TAB_PAYLOAD); return false; } catch { return true; } })(),
+    '6e0. control: the raw-tab payload really is invalid JSON (so 6e tests the repair, not a no-op)');
+  const f = recorder(() => res(200, TAB_PAYLOAD));
+  const out = await frsFacilities(47.2033, -122.5688, 3, f);
+  ok(out.ok === true && out.rows.length === 1 && out.radius_used === 3 && out.attempts === 1,
+    '6e. FRS payload with a raw TAB inside a string → repaired and parsed on the first attempt, ok:true',
+    `got ok=${out.ok} reason=${out.reason} attempts=${out.attempts} rows=${out.rows.length}`);
+  ok(out.rows[0] && out.rows[0].LocationAddress === '7415 CHAMBERS CREEK RD W ',
+    '6e2. the control character becomes a space; the rest of the value is untouched',
+    `got ${JSON.stringify(out.rows[0] && out.rows[0].LocationAddress)}`);
+  const NUL_AND_NEWLINE = '{"Results":{"FRSFacility":[{"RegistryId":"2","FacilityName":"A\u0000B\nC","Latitude83":"1","Longitude83":"2"}]}}';
+  const f2 = recorder(() => res(200, NUL_AND_NEWLINE));
+  const out2 = await frsFacilities(41.5, -112.0, 3, f2);
+  ok(out2.ok === true && out2.rows[0].FacilityName === 'A B C',
+    '6e3. every control character U+0000–U+001F is repaired, not only tab',
+    `got ok=${out2.ok} name=${JSON.stringify(out2.rows[0] && out2.rows[0].FacilityName)}`);
+}
+{
+  // ECHO reads the same EPA records, so it must use the same repair (one function, not a copy).
+  const { echoParse } = await import(join(root, 'supabase/functions/get-address-report/sources/echo-cwa.ts'));
+  let parsed = null;
+  try { parsed = echoParse('{"Results":{"Facilities":[{"FacName":"7415 CHAMBERS CREEK RD W\t"}]}}'); } catch {}
+  ok(parsed && parsed.Results.Facilities[0].FacName === '7415 CHAMBERS CREEK RD W ',
+    '6e4. ECHO parse repairs the same raw control character (shared repair, not a second copy)');
+}
+{
+  // A body that still cannot parse stays TRANSIENT (a network-truncated body looks the same).
+  const f = recorder(() => res(200, '{"Results":{"FRSFacility":[{"RegistryId":"1"'));
+  const out = await frsFacilities(41.5, -112.0, 3, f);
+  ok(out.ok === false && out.reason === 'transient',
+    '6f. a truncated, unparseable body is still ok:false transient — never a zero',
+    `got ok=${out.ok} reason=${out.reason}`);
+}
+
 // ── 7. process limit then successful back-off → valid smaller-radius result ───────────────────
 // Live-confirmed 2026-08-13 for ZIP 63118: r=3 refused, r=1 returned 61 KB of real facilities.
 {
