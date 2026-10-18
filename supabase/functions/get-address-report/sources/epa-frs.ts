@@ -58,6 +58,8 @@ export type FrsAttempt = {
   rows: Record<string, unknown>[];
   /** For a failed attempt only: the HTTP status, or the thrown error's name. Observability. */
   why?: string;
+  /** Seconds from a Retry-After header on a refused attempt, when EPA sent one. */
+  retryAfterS?: number;
 };
 
 /** The result of the whole back-off sequence. `ok:false` must NEVER be persisted as zero. */
@@ -169,7 +171,10 @@ export async function frsAt(
     // Probe and ingest now agree: only HTTP 200 is an answer. A 204 / other 2xx used to
     // fall through to JSON.parse and become a schema miss or, before that, a silent zero.
     // 5xx and 429 remain transient (retried); 403/404 remain not-a-zero.
-    if (r.status !== 200) return { ...TRANSIENT, why: String(r.status) };
+    if (r.status !== 200) {
+      const ra = Number((r as { headers?: { get?: (k: string) => string | null } }).headers?.get?.("retry-after"));
+      return { ...TRANSIENT, why: String(r.status), ...(Number.isFinite(ra) && ra >= 0 ? { retryAfterS: ra } : {}) };
+    }
     const text = await r.text();
     return recognizedFrsPayload(parseEpaJson(text));
   } catch (e) {
@@ -185,7 +190,21 @@ export async function frsAt(
  * duration, so the same value can bound the ladder AND the caller's outer guard without the
  * two drifting apart. `now` is injectable so the deadline is testable without real waiting.
  */
-export type FrsOptions = { deadlineAt?: number; now?: () => number };
+export type FrsOptions = { deadlineAt?: number; now?: () => number; sleep?: (ms: number) => Promise<void> };
+
+/**
+ * WAIT BEFORE RETRYING A REFUSED ATTEMPT (2026-10-18). The ladder fired every request back to back.
+ * A dense ZIP needs several radius steps, and by the third or fourth request in a second EPA answers
+ * 429 / 502, then refuses the immediate retries too. Measured on ZIP 98402 (downtown Tacoma) with
+ * `failures`: ["3:process_limit","2:process_limit","1.5:429","1.5:429","1.5:502"], while the same
+ * 1-mile request sent alone returns 208 KB in under 10 s. So a transient failure now waits before
+ * its retry: EPA's Retry-After when it sends one (capped), else these delays.
+ * Only on the deadlined path, which is the production path: the wait is bounded by the same budget,
+ * and a wait that would not leave time for the retry ends the ladder as "deadline" instead.
+ */
+export const FRS_RETRY_BACKOFF_MS = [2000, 5000];
+const FRS_RETRY_AFTER_CAP_MS = 10000;
+const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export async function frsFacilities(
   lat: number,
@@ -195,6 +214,7 @@ export async function frsFacilities(
   opts: FrsOptions = {},
 ): Promise<FrsOutcome> {
   const now = opts.now ?? (() => Date.now());
+  const sleep = opts.sleep ?? realSleep;
   const deadlineAt = opts.deadlineAt;
   let reason: "process_limit" | "transient" | "deadline" | "schema" | "partial_scope" | null = null;
   let attempts = 0;
@@ -218,7 +238,7 @@ export async function frsFacilities(
         timeoutMs = Math.min(FRS_ATTEMPT_TIMEOUT_MS, remaining);
       }
       attempts++;
-      const { ok, tooBig, schema, rows, why } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
+      const { ok, tooBig, schema, rows, why, retryAfterS } = await frsAt(lat, lng, rad, fetchImpl, timeoutMs);
       if (!ok) failures.push(`${rad}:${tooBig ? "process_limit" : schema ? "schema" : why ?? "unknown"}`);
       if (ok) {
         // A zero at a SMALLER radius is not a whole-ZIP zero. Process-limit back-off
@@ -239,6 +259,16 @@ export async function frsFacilities(
       if (tooBig) { reason = "process_limit"; break; } // too large → next smaller radius
       reason = "transient";                            // else transient → retry the same radius
       transientExhausted = attempt === 2;              // ...but only at THIS radius (see below)
+      if (!transientExhausted && deadlineAt !== undefined) {
+        const wait = retryAfterS !== undefined
+          ? Math.min(retryAfterS * 1000, FRS_RETRY_AFTER_CAP_MS)
+          : FRS_RETRY_BACKOFF_MS[attempt] ?? FRS_RETRY_BACKOFF_MS[FRS_RETRY_BACKOFF_MS.length - 1];
+        if (deadlineAt - now() - wait <= 0) {
+          // No time left to retry after waiting: the honest outcome is the deadline, not a hammered retry.
+          return { ok: false, rows: [], radius_used: null, reason: "deadline", attempts, failures };
+        }
+        await sleep(wait);
+      }
     }
     // A TRANSIENT failure MUST NOT SHRINK THE SEARCH AREA. Falling through to the next, smaller
     // radius here is what silently undercounted EPA facilities fleet-wide (2026-08-27): under
