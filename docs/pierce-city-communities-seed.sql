@@ -13,3 +13,20 @@ from public.communities p
 where p.slug = 'pierce-county-wa'
   and not exists (select 1 from public.communities where slug = 'tacoma-wa');
 -- applied: id ef2d3dce-6b65-46bc-af1c-15ae6d185a70
+
+-- Step 2 (2026-10-18): five more cities whose own council source was probed live and is current.
+-- The Census place id is read from geo.zcta_place_overlap inside the insert (never typed).
+--   Gig Harbor, Sumner, Edgewood: CivicClerk Events API (gigharborwa / sumnerwa / edgewoodwa tenants)
+--   Milton, University Place:     CivicPlus AgendaCenter, City Council category (City-Council-2)
+-- Feeds: homesignal-ingest feeds.csv mtg-<slug>-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Gig Harbor', 'gig-harbor-wa'), ('Sumner', 'sumner-wa'), ('Edgewood', 'edgewood-wa'),
+             ('Milton', 'milton-wa'), ('University Place', 'university-place-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-18: Edgewood 33a95f8d-f307-434b-a576-e0212914ccb8 · Gig Harbor 02df5066-1749-4d18-b205-8999c737be09 ·
+--   Milton 8c63da95-108e-4274-8ab0-d2a5e3a5f873 · Sumner ba440325-22fc-47e0-966f-ece704af4b78 ·
+--   University Place b4679c20-167f-4b66-85ea-704277cad918
