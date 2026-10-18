@@ -230,7 +230,7 @@ ok(inSitemap, 'LISTED: the page is in the sitemap generator\'s static list (scri
 ok(!/data-commerce[^>]*>[\s\S]*?id="daEnterprise"[\s\S]*?<\/div>/.test(markup.replace(/<div data-commerce[^>]*>[\s\S]*?<\/span>\s*<\/div>/g, '')),
   'the working action, Contact HomeSignal, is not inside a commerce wrapper (the browser test checks it is visible)');
 ok(!/HS\.data\.(projects|facilities)|from\('app_projects'\)|rpc\(/.test(noComments), 'the sample reads no production project data: it is labelled illustrative and shows no real record');
-ok(/Sample Development Activity report\. The property, projects, distances and dates below are illustrative entries, not records for a real address\./.test(text), 'the sample is labelled illustrative in plain words');
+ok(/Sample Development Activity report\. The property, projects, distances and dates above are illustrative entries, not records for a real address\./.test(text), 'the sample is labelled illustrative in plain words');
 
 console.log('--- 5. Type and Stage are two fields, and the coverage check reuses existing authorities ---');
 const script = (noComments.match(/<script>\s*\/\*\s*Development Activity landing page[\s\S]*?<\/script>/) || [''])[0];
