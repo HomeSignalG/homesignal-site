@@ -748,6 +748,7 @@
       lat: m.lat, lng: m.lng, label: 'home',
       input_address: String(addr || '').trim() || null
     };
+    Object.assign(row, HS.topicPrefsUtil.placeColumnsFor(m, new Date().toISOString()));
     // FIX 17 — onboarding uses the SAME saved-place contract as HS.saveHome.
     //
     // It used to find whichever row was isRealHome and UPDATE it, which encoded a
@@ -1622,7 +1623,10 @@
       ok: true,
       match: {
         matchedAddress: m.matchedAddress || '', lat: m.lat, lng: m.lng, zip: zip,
-        city: m.city || null, state: m.state || null
+        city: m.city || null, state: m.state || null,
+        // The incorporated city Census puts this point in (geocode-address v2). Carried
+        // only as Census stated it; placeChecked false means it was not asked.
+        place: m.place || null, placeChecked: m.placeChecked === true
       }
     };
   };
@@ -1712,6 +1716,7 @@
       lat: m.lat, lng: m.lng, label: 'home',
       input_address: _homeInput || null
     };
+    Object.assign(row, HS.topicPrefsUtil.placeColumnsFor(m, new Date().toISOString()));
     const r = await savePlaceRow(row);
     if (!r.data) {
       $('homeConfirmMsg').textContent = "Couldn't save this place — please try again.";
@@ -2253,7 +2258,8 @@
       } catch (e) { /* fall back to seed labels; save still anchors via its own lookup */ }
       try {
         const gov = HS.data.zipGovernment ? await HS.data.zipGovernment(state.zip) : null;
-        groups = util.topicGroupsFor(gov, key === 'gov' ? 'notices' : 'meetings');
+        groups = util.topicGroupsFor(gov, key === 'gov' ? 'notices' : 'meetings',
+          util.homePlaceFor(state.properties, state.zip));
       } catch (e) { groups = null; /* one government, as before */ }
     }
     $('tmTitle').textContent = d.title; $('tmSub').textContent = d.sub; $('tmBadge').textContent = d.badge;
