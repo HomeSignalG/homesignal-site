@@ -389,6 +389,7 @@ async function facilitySites(
       radius_used: outcome.radius_used,
       reason: outcome.reason,
       attempts: outcome.attempts,
+      failures: outcome.failures,
       raw_rows: rows.length,
       pre_cap: preCap,
       kept: sites.length,
