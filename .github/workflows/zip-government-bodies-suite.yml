@@ -1,0 +1,61 @@
+name: zip-government-bodies-suite
+
+# WHICH GOVERNMENTS COVER A ZIP (docs/zip-government-bodies.sql) — the one decision the ZIP
+# page, the page generator and delivery measurement read. Runs the shipped function against a
+# DISPOSABLE Postgres: 20 checks (county + every incorporated city >= 1% of land, CDPs excluded,
+# PO-box ZIPs "not measured", a city with no community never borrows another body, a root city
+# listed once), then 7 prohibited mutations, each of which MUST fail the suite.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/zip-government-bodies.sql'
+      - 'docs/zcta-place-overlap.sql'
+      - 'test/zip_government_bodies_pg/**'
+      - '.github/workflows/zip-government-bodies-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/zip-government-bodies.sql'
+      - 'test/zip_government_bodies_pg/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bodies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: zgb_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped function passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: zgb_disposable
+        run: |
+          set -o pipefail
+          bash test/zip_government_bodies_pg/run.sh 2>&1 | grep -v NOTICE
