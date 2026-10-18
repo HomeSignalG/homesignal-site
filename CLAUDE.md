@@ -3600,6 +3600,21 @@ supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the R
 - Pinned by `test/dev-refresh-collect-once-per-response.test.mjs`. Its §1 proves that the new body,
   minus the named additions, **equals** the superseded body.
 
+### ✅ DENSE ZIPS START THE EPA LADDER WHERE THEIR STORED LIST FITS; THE GUARD USES THE FACILITY CLOCK (2026-10-18) — APPLIED
+SQL of record **`docs/dev-frs-start-hint.sql`** (migration `dev_frs_start_hint`, spliced from the live bodies).
+Engine: `sources/epa-frs.ts::frsStartRung`, `index.ts::facilitySites`. Pinned by `test/epa-frs-start-rung.test.mjs`.
+- **Why:** 1,170 ZIPs had an EPA layer >7 days old. At the 40-facility cap, ZIPs whose stored list fits in
+  ≤1 mi were 46% stale (41 of 89) against 1.4% for those that need the full 3 mi: each dense ZIP spent 3-4
+  process-limit refusals before an answer, and about half of single EPA requests failed that day.
+- `public.dev_frs_start_mi(zip)` gives the smallest rung below 3 mi that holds the stored list, only when it
+  is at the cap; the fire functions send it as `frs_start_mi`. The engine starts there, and runs the full
+  ladder again if the hinted answer has fewer than 40 or is a zero at the smaller circle, so the kept
+  nearest-40 is the same answer. A failed hinted read stays "no answer" (never a zero, never a shrink).
+- **The clock half of the parked file below is now LIVE on its own:** `dev_refresh_collect` passes
+  `d.facilities_refreshed_at` to `dev_epa_write_refused` (4 calls). The rest of that file (epa_last_outcome,
+  reverse coupling, the fail-closed `epa.ok`) is still parked; do not replay its full body.
+- Not helped: dense ZIPs stored BELOW the cap (e.g. Manhattan 10095 with 9) still walk the full ladder.
+
 ### ✅ THE EPA WRITE-GUARD JUDGES FRESHNESS BY THE FACILITY CLOCK (2026-09-27) — PARKED
 SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from the once-per-response
 body (never retyped). Pinned by `test/dev-epa-facility-clock-and-outcome.test.mjs`. **Not applied.**

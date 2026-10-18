@@ -63,7 +63,7 @@
 // that address — never an assumed check.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { frsFacilities } from "./sources/epa-frs.ts";
+import { frsFacilities, frsStartRung } from "./sources/epa-frs.ts";
 import {
   echoEnrich,
   cwaPermitEnrich,
@@ -349,32 +349,51 @@ async function facilitySites(
   homeLng: number,
   radiusMi: number,
   deadlineAt?: number,
+  startMi?: number,
 ): Promise<FacilityPlane> {
   // `undefined` selects frsFacilities' own default fetch; the deadline rides in opts.
-  // With no deadlineAt the ladder is byte-for-byte its previous self.
-  const outcome = await frsFacilities(homeLat, homeLng, radiusMi, undefined, { deadlineAt });
-  const rows = outcome.rows;
-  const kept: Record<string, unknown>[] = [];
-  for (const rr of rows) {
-    const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
-    if (!isFinite(lat) || !isFinite(lng)) continue;
-    const name = String(rr.FacilityName ?? rr.FacName ?? "Facility").trim();
-    if (!looksIndustrial(name)) continue;
-    const [e, n] = toEN(homeLat, homeLng, lat, lng);
-    const d = Math.hypot(e, n);
-    if (d > radiusMi + 0.05) continue;
-    const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
-    // NO LIFECYCLE IS EMITTED HERE (2026-09-24). A site's `type` is its lifecycle stage
-    // (proposed | approved | built), and this used to stamp `type: "built"` on EVERY FRS
-    // row. FRS returns no lifecycle field at all — registration is not operation — so that
-    // value was manufactured, and it became "Operating" on Map 1, the ZIP page and the
-    // facility detail page. Omitted rather than guessed: the canonical lifecycle contract
-    // (lib/map.js trackerSiteItem → statusTier) resolves a record with no lifecycle evidence
-    // to `unknown`. Nothing else reads a facility element's `type` (checked: app_source_key,
-    // dev_sites_deduped, the facility insert in app_refresh_zip, and the DC geography views).
-    kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
+  // With no deadlineAt and no startMi the ladder is byte-for-byte its previous self.
+  const keepRows = (rows: Record<string, unknown>[]) => {
+    const kept: Record<string, unknown>[] = [];
+    for (const rr of rows) {
+      const lat = Number(rr.Latitude83 ?? rr.FacLat), lng = Number(rr.Longitude83 ?? rr.FacLong);
+      if (!isFinite(lat) || !isFinite(lng)) continue;
+      const name = String(rr.FacilityName ?? rr.FacName ?? "Facility").trim();
+      if (!looksIndustrial(name)) continue;
+      const [e, n] = toEN(homeLat, homeLng, lat, lng);
+      const d = Math.hypot(e, n);
+      if (d > radiusMi + 0.05) continue;
+      const rid = String(rr.RegistryId ?? rr.RegistryID ?? "").trim();
+      // NO LIFECYCLE IS EMITTED HERE (2026-09-24). A site's `type` is its lifecycle stage
+      // (proposed | approved | built), and this used to stamp `type: "built"` on EVERY FRS
+      // row. FRS returns no lifecycle field at all — registration is not operation — so that
+      // value was manufactured, and it became "Operating" on Map 1, the ZIP page and the
+      // facility detail page. Omitted rather than guessed: the canonical lifecycle contract
+      // (lib/map.js trackerSiteItem → statusTier) resolves a record with no lifecycle evidence
+      // to `unknown`. Nothing else reads a facility element's `type` (checked: app_source_key,
+      // dev_sites_deduped, the facility insert in app_refresh_zip, and the DC geography views).
+      kept.push({ label: name, e, n, lat, lng, _d: d, scope: "point", layer: classifyLayer(name), registry_id: rid, src: rid ? `EPA FRS · registry ${rid}` : "EPA FRS", record_url: rid ? `https://echo.epa.gov/detailed-facility-report?fid=${rid}` : "" });
+    }
+    kept.sort((a, b) => (a._d as number) - (b._d as number));
+    return kept;
+  };
+  let outcome = await frsFacilities(homeLat, homeLng, radiusMi, undefined, { deadlineAt, startMi });
+  let kept = keepRows(outcome.rows);
+  // A HINTED ANSWER COUNTS ONLY WHEN IT IS PROVABLY THE SAME ANSWER (2026-10-18). FRS returns every
+  // facility inside the circle, and the page keeps the nearest MAX_FACILITIES. So when the smaller
+  // hinted circle already holds MAX_FACILITIES qualifying facilities, the nearest MAX_FACILITIES of
+  // the full radius are exactly these. With fewer, or a zero at the smaller circle, the full ladder
+  // runs as before, inside the same deadline. A failed hinted read is returned as it is (no answer;
+  // the stored layer is kept): during an EPA outage more requests only make it worse.
+  let hintFallback = false;
+  if (startMi !== undefined && outcome.radius_used !== radiusMi &&
+      ((outcome.ok && kept.length < MAX_FACILITIES) || outcome.reason === "partial_scope")) {
+    hintFallback = true;
+    const full = await frsFacilities(homeLat, homeLng, radiusMi, undefined, { deadlineAt });
+    outcome = { ...full, attempts: outcome.attempts + full.attempts, failures: [...outcome.failures, ...full.failures] };
+    kept = keepRows(full.rows);
   }
-  kept.sort((a, b) => (a._d as number) - (b._d as number));
+  const rows = outcome.rows;
   // `pre_cap` is the product-filtered count BEFORE MAX_FACILITIES. `kept` is after the cap.
   // A ZIP sitting at exactly 40 cannot be told apart from a cap-hit without this number.
   const preCap = kept.length;
@@ -393,6 +412,8 @@ async function facilitySites(
       raw_rows: rows.length,
       pre_cap: preCap,
       kept: sites.length,
+      start_mi: startMi ?? null,
+      hint_fallback: hintFallback,
     },
   };
 }
@@ -633,6 +654,9 @@ async function handleRequest(req: Request): Promise<Response> {
       [clat, clng] = c;
     }
     const zipRadius = Math.min(Math.max(Number(body.radius_mi) || ZIP_RADIUS_MI, 0.5), MAX_RADIUS_MI);
+    // The refresh passes `frs_start_mi` (public.dev_frs_start_mi): the ladder rung this ZIP's stored,
+    // capped facility list fits inside. Anything that is not a smaller rung of the ladder is ignored.
+    const frsStart = frsStartRung(body.frs_start_mi, zipRadius);
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
     const communityIds = await resolveCommunityIds(supabase, zip);
     // Polygon bounding box of this ZIP for the radius-scoped connectors (sources/scope-box.ts).
@@ -655,7 +679,7 @@ async function handleRequest(req: Request): Promise<Response> {
     // row); the EPA overlay can only ever degrade to "unavailable".
     const planes = await resolvePlanes<Record<string, unknown>[], FacilityPlane>({
       core: () => devSites(supabase, clat, clng, communityIds),
-      overlay: (deadlineAt) => facilitySites(clat, clng, zipRadius, deadlineAt),
+      overlay: (deadlineAt) => facilitySites(clat, clng, zipRadius, deadlineAt, frsStart),
       overlayUnavailable: facilitiesUnavailable,
     });
     const devRaw = planes.core;
