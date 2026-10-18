@@ -205,9 +205,9 @@ const seen = await page.evaluate(() => {
     finalContactVisible: vis(document.getElementById('daEnterpriseFinal'))
   };
 });
-ok(seen.control && seen.buttons === 3 && seen.visibleButtons === 0,
-  'HIDDEN (founder, 2026-10-02): the three Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
-ok(seen.soon === 3 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
+ok(seen.control && seen.buttons === 2 && seen.visibleButtons === 0,
+  'HIDDEN (founder, 2026-10-02): the two Start free buttons are on the page and none is visible (control: the coverage button is)', seen);
+ok(seen.soon === 2 && seen.visibleSoon === 0, 'no "Opens at launch." note is visible either', seen);
 ok(seen.joinVisible === false && seen.joinHref === null && seen.joinText === null,
   'FREE-ONLY (founder, 2026-10-15): there is no Join link on the landing page', seen);
 ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (Brokerage / Enterprise tier) and the closing "Contact us" are visible: they are the page\'s working actions', seen);
@@ -215,7 +215,7 @@ ok(seen.enterpriseVisible && seen.finalContactVisible, 'Contact HomeSignal → (
 await page.$$eval('button[data-cta]', (bs) => bs.forEach((b) => b.click()));
 const afterClicks = await page.evaluate(() => ({ overlays: document.querySelectorAll('.overlay.show, .modal.show').length, onboarding: document.querySelectorAll('.onboarding.show').length }));
 ok(page.url() === urlBefore && afterClicks.overlays === 0 && afterClicks.onboarding === 0,
-  'clicking any of the three Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
+  'clicking any of the two Start free buttons from script opens nothing and goes nowhere', { url: page.url(), afterClicks });
 ok((await page.$$eval('button[data-cta]', (bs) => bs.every((b) => b.getAttribute('aria-disabled') === 'true'))), 'each is aria-disabled so assistive technology reads it as unavailable');
 ok(await page.$eval('#daEnterprise', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Request a Custom Quote')
    && await page.$eval('#daEnterpriseFinal', (a) => a.getAttribute('href') === 'contact.html' && a.textContent === 'Contact us'), 'both enterprise links open the existing contact page');
@@ -224,11 +224,11 @@ ok(await page.$eval('#hero a.da-link', (a) => a.getAttribute('href') === '#sampl
 const geo = await page.evaluate(() => {
   const top = (sel) => { const n = document.querySelector(sel); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
   const h2 = (txt) => { const n = [...document.querySelectorAll('.da h2')].find((e) => e.textContent.includes(txt)); return n ? Math.round(n.getBoundingClientRect().top + scrollY) : -1; };
-  return { hero: top('#hero h1'), pricing: top('#pricing'), sample: top('#sample'), moments: h2('Walk into the conversation'), trust: h2('Show them the record'), coverage: top('#coverage'), final: h2('before your client asks'),
+  return { hero: top('#hero h1'), pricing: top('#pricing'), sample: top('#sample'), coverage: top('#coverage'),
     coverageLinks: document.querySelectorAll('a[href="#coverage"]').length };
 });
-const gseq = [geo.hero, geo.pricing, geo.sample, geo.moments, geo.trust, geo.coverage, geo.final];
-ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order (founder, 2026-10-06: pricing before the sample): hero → pricing → sample → use cases → trust → coverage → final conversion', geo);
+const gseq = [geo.hero, geo.pricing, geo.sample, geo.coverage];
+ok(gseq.every((n, i) => n > -1 && (i === 0 || n > gseq[i - 1])), 'rendered order (founder, 2026-10-06: pricing before the sample): hero → pricing → sample → coverage', geo);
 ok(geo.coverageLinks === 0, 'no hero/closing link to coverage', geo);
 
 console.log('--- 7. coverage check: answers only what it can prove ---');
