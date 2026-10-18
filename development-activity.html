@@ -57,9 +57,6 @@
   .da-cap{font-size:13px!important;color:var(--ink-3)!important;margin:0 0 12px!important;max-width:none!important}
 
   /* section layouts */
-  .da-cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
-  .da-col-cta{display:flex;flex-direction:column}
-  .da-col-cta .da-cta{margin-top:auto!important;padding-top:16px}   /* the two buttons share one bottom line across the columns */
   .da-cols2{display:grid;grid-template-columns:1fr 1fr;gap:40px}
   .da-list{margin:0 0 12px;padding-left:20px;max-width:680px}
   .da-list li{font-size:14.5px;color:var(--ink-2);margin-bottom:6px;line-height:1.55}
@@ -71,9 +68,20 @@
   .da-band{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green);margin:0 0 6px!important}
   .da-teach{margin:14px 0 0!important}
   .da-contrast{margin:22px 0 0!important}
+  /* pricing: one outer container, three equal bordered cards (existing tokens only) */
+  .da-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:24px;border:1px solid var(--line);border-radius:16px}
+  .da-plan{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 24px}
+  .da-plan-name{font-size:15px!important;font-weight:700;color:var(--ink)!important;margin:0 0 4px!important}
+  .da-plan-sub{font-size:13.5px!important;color:var(--ink-2)!important;margin:0 0 4px!important}
+  .da-offer{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:var(--ink);margin:14px 0 10px}
+  .da-plan-text{font-size:14.5px!important;color:var(--ink-2)!important;margin:0!important}
+  .da-plan .da-cta{margin:auto 0 0!important;padding-top:22px}
+  .da-plan .da-cta .mbtn{display:block;text-align:center}
+  .da-legal{font-size:13px!important;color:var(--ink-2)!important;margin:16px 0 0!important;max-width:none!important}
   .da-final{text-align:left}
   @media(max-width:900px){
-    .da-cols3,.da-cols2{grid-template-columns:1fr}
+    .da-cols2{grid-template-columns:1fr}
+    .da-plans{grid-template-columns:1fr;padding:16px}
     .da-cols2{gap:32px}
   }
   @media(max-width:620px){
@@ -105,34 +113,32 @@
 
     <!-- FREE-ONLY (founder, 2026-10-15): no price is shown until a payment processor is connected; "Paid plans coming". Supersedes the Join link below. 2. PRICING (founder, 2026-10-06: before the sample report): Free / Professional / Brokerage-Enterprise. The old price is removed. -->
     <section id="pricing">
-      <h2>Start free</h2>
-      <div class="da-cols3">
-        <div class="da-col-cta">
-          <p class="da-band">Free</p>
-          <div class="da-price da-sm">100 Development Activity reports free</div>
-          <p>No credit card required.</p>
+      <h2>Pricing</h2>
+      <div class="da-plans">
+        <div class="da-plan">
+          <p class="da-plan-name">Free</p>
+          <div class="da-offer">100 Development Activity reports free</div>
+          <p class="da-plan-text">No credit card required.</p>
           <div data-commerce hidden>
             <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start free — 100 reports</button>
             <span class="da-soon">Opens at launch.</span>
           </div>
-          <p class="da-muted" style="margin-top:14px!important">Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.</p>
-          <p class="da-cta"><a class="mbtn" href="development-activity-reports.html" id="daMyReports">Go to My reports to start</a></p>
+          <p class="da-cta"><a class="mbtn" href="development-activity-reports.html" id="daMyReports">Start Free</a></p>
         </div>
-        <div>
-          <p class="da-band">Professional — Individual Agents</p>
-          <div class="da-price da-sm">Paid plans coming</div>
-          <p>Paid plans for individual agents are on the way. Until then, enjoy free reports.</p>
-          <p class="da-muted">Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is. See the <a class="da-link" href="terms.html">Terms of Service</a>, <a class="da-link" href="refund-policy.html">Refund Policy</a> and <a class="da-link" href="privacy.html">Privacy Notice</a>.</p>
-          <p class="da-muted">Brokerages, teams, and enterprise organizations: see Brokerage &amp; Enterprise custom pricing.</p>
+        <div class="da-plan">
+          <p class="da-plan-name">Professional</p>
+          <p class="da-plan-sub">Individual Agents</p>
+          <div class="da-offer">Paid plans coming soon</div>
+          <p class="da-plan-text">For agents who need ongoing property intelligence.</p>
         </div>
-        <div class="da-col-cta">
-          <p class="da-band">Brokerage &amp; Enterprise</p>
-          <div class="da-price da-sm">Custom Pricing</div>
-          <p>HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.</p>
-          <p>Contact us to discuss your number of agents, anticipated report volume, and business requirements.</p>
-          <p class="da-cta"><a class="mbtn" href="contact.html" id="daEnterprise">Request a Custom Quote</a></p>
+        <div class="da-plan">
+          <p class="da-plan-name">Brokerage &amp; Enterprise</p>
+          <div class="da-offer">Custom Pricing</div>
+          <p class="da-plan-text">Tailored reporting for teams, brokerages, and enterprise organizations.</p>
+          <p class="da-cta"><a class="mbtn" href="contact.html" id="daEnterprise">Request a Quote</a></p>
         </div>
       </div>
+      <p class="da-legal">See the <a class="da-link" href="terms.html">Terms of Service</a>, <a class="da-link" href="privacy.html">Privacy Notice</a> and <a class="da-link" href="refund-policy.html">Refund Policy</a>.</p>
     </section>
 
     <!-- 3. PRODUCT PROOF: the REAL report layout (lib/da-report-view.js, the view every customer report is drawn by) over illustrative entries. Follows pricing (founder, 2026-10-06); the sample teaches Type and Stage. -->
@@ -142,67 +148,17 @@
       <p class="da-cap da-teach">Every project is organized by Type and Stage so you can quickly see what it is and where it stands.</p>
     </section>
 
-    <!-- 4. TRANSACTION MOMENTS -->
-    <section>
-      <h2>Walk into the conversation knowing more.</h2>
-      <div class="da-cols3">
-        <div>
-          <h3>Before a buyer tour</h3>
-          <p>See nearby Development Activity the client may ask about before arriving at the property.</p>
-        </div>
-        <div>
-          <h3>Before a listing presentation</h3>
-          <p>Know what is proposed, approved, or actively changing nearby before prospective buyers raise the question.</p>
-        </div>
-        <div>
-          <h3>When a client asks, “What are they building over there?”</h3>
-          <p>Show the project, Type, Stage, distance, and source instead of relying on rumor.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5. EVIDENCE AS THE TRUST PROPOSITION + the one-line contrast -->
-    <section>
-      <h2>Don’t give your client a rumor. Show them the record.</h2>
-      <p>Each supported project keeps its facts connected to the official source, including where available: project, Type, Stage or publisher status, distance, published timing, the latest supported change or event, and freshness or limitations. HomeSignal summarizes selected official public records from its covered sources and may not include every project or change.</p>
-      <div class="da-example">
-        <p class="da-x">Instead of:</p>
-        <p>“I heard they’re building apartments somewhere over there.”</p>
-      </div>
-      <div class="da-example">
-        <p class="da-x">Give the client:</p>
-        <p style="margin:0;font-weight:700;color:var(--ink)">0.3 mi · Residential · APPROVED / COMING</p>
-        <p style="margin:0">186-unit project approved</p>
-        <p style="margin:0">Review published project details and construction timing.</p>
-        <p style="margin:0;color:var(--ink-3)">Official source →</p>
-      </div>
-      <h3 style="font-size:17px">Clear enough for your client. Sourced enough for you.</h3>
-      <p class="da-contrast">Not school scores, restaurant lists, or generic neighborhood data. HomeSignal focuses on development activity that can change what surrounds the property.</p>
-    </section>
-
     <!-- 6. COVERAGE: an availability utility, after the product has shown its value -->
     <section id="coverage">
-      <h2>Check Development Activity coverage</h2>
-      <p>HomeSignal’s Development Activity product is built across a national network of 12,722 canonical ZIP codes. Source depth and report readiness vary by property.</p>
+      <h2>What’s changing near your next property?</h2>
+      <p>Enter an address or ZIP code to check available development activity.</p>
       <label class="da-lab" for="daCoverInput">Enter property address or ZIP</label>
       <div class="field da-field">
         <input id="daCoverInput" type="text" autocomplete="off" placeholder="123 Main St, Austin, TX  or  78617" onkeydown="if(event.key==='Enter')document.getElementById('daCoverBtn').click()">
         <button class="mbtn" type="button" id="daCoverBtn">Check coverage</button>
       </div>
       <p class="da-result err" id="daCoverResult" role="status" aria-live="polite" hidden></p>
-    </section>
-
-    <!-- 7. FINAL CONVERSION: the agent outcome; coverage is deliberately not repeated here. -->
-    <section class="da-final">
-      <h2>Know what’s changing before your client asks.</h2>
-      <p>Run Development Activity reports for the properties you’re working on now.</p>
-      <div class="da-actions" style="margin-top:14px">
-        <div data-commerce hidden>
-          <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start free — 100 reports</button>
-          <span class="da-soon">Opens at launch.</span>
-        </div>
-        <p class="da-muted">Brokerage or enterprise? <a class="da-link" href="contact.html" id="daEnterpriseFinal">Contact us</a></p>
-      </div>
+      <p class="da-muted" style="margin-top:14px!important">Brokerage or enterprise? <a class="da-link" href="contact.html" id="daEnterpriseFinal">Contact us</a></p>
     </section>
 
   </div>
