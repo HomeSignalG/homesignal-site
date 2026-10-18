@@ -158,6 +158,7 @@ as $fn$
          b.sort_key, s.ord::int
   from b
   join public.communities c on c.id = b.community_id
+  -- a government with no source yet offers nothing: no pick may promise mail nothing sends
   cross join lateral (
     select 'notices'::text as stream, t.topic, t.ord
       from unnest(coalesce(c.government_topics, '{}'::text[])) with ordinality t(topic, ord)
@@ -168,6 +169,7 @@ as $fn$
     union all
     select 'meetings', six.topic, six.ord from six where b.sort_key <> 0
   ) s
+  where b.has_source
   order by b.sort_key, b.name, s.stream, s.ord;
 $fn$;
 

@@ -24,6 +24,8 @@ insert into public.communities values
  ('00000000-0000-0000-0000-0000000000f2','Parkland (98444)','Pierce','WA','zip','00000000-0000-0000-0000-0000000000c1',array['98444'],array[]::text[],null),
  ('00000000-0000-0000-0000-0000000000f3','Tacoma (98411)','Pierce','WA','zip','00000000-0000-0000-0000-0000000000c1',array['98411'],array[]::text[],null),
  ('00000000-0000-0000-0000-0000000000f4','Fox Island (98333)','Pierce','WA','zip','00000000-0000-0000-0000-0000000000c1',array['98333'],array[]::text[],null),
+ -- a city community created before its feeds are wired: no government topics yet
+ ('00000000-0000-0000-0000-0000000000a8','Fircrest','Pierce','WA','city','00000000-0000-0000-0000-0000000000c1',array[]::text[],array[]::text[],'5324250'),
  -- a coded city that covers only 0.5% of 98444: below the floor everywhere
  ('00000000-0000-0000-0000-0000000000a9','Lakewood','Pierce','WA','city','00000000-0000-0000-0000-0000000000c1',array[]::text[],array['City government (Lakewood)'],'5399999'),
  -- Utah: a chain city with no Census code yet, and one with a code
