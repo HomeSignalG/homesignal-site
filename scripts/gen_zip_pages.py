@@ -1024,7 +1024,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=78757d3e"></script>\n'
+        '<script src="/shell.js?v=6539e46e"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=8861dadd"></script>\n'
         "</body>\n</html>\n")
