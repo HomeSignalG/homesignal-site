@@ -79,11 +79,9 @@ const COPY = [
   'Start free — 100 reports', 'View a sample report →',
   'Every project is organized by Type and Stage so you can quickly see what it is and where it stands.',
   'What’s changing near your next property?', 'Enter an address or ZIP code to check available development activity.', 'Enter property address or ZIP', 'Check coverage',
-  'Start free', 'Free', '100 Development Activity reports free', 'No credit card required.',
-  'Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.',
-  'Paid plans coming', 'Paid plans for individual agents are on the way. Until then, enjoy free reports.',
-  'Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is.',
-  'Professional — Individual Agents', 'Brokerage & Enterprise', 'Custom Pricing', 'HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.', 'Contact us to discuss your number of agents, anticipated report volume, and business requirements.', 'Request a Custom Quote',
+  'Pricing', 'Free', '100 Development Activity reports free', 'No credit card required.', 'Start Free',
+  'Professional', 'Individual Agents', 'Paid plans coming soon', 'For agents who need ongoing property intelligence.',
+  'Brokerage & Enterprise', 'Custom Pricing', 'Tailored reporting for teams, brokerages, and enterprise organizations.', 'Request a Quote',
   'Brokerage or enterprise? Contact us'
 ];
 const plain = text.replace(/\s*\/\s*month/, '/month');
@@ -91,7 +89,7 @@ const missing = COPY.filter((c) => !text.includes(c) && !plain.includes(c));
 ok(missing.length === 0, 'every approved sentence, heading, CTA and price string is present verbatim', missing);
 const H1 = (markup.match(/<h1[^>]*>([\s\S]*?)<\/h1>/g) || []);
 ok(H1.length === 1, 'exactly one h1', H1.length);
-ok(/<a class="mbtn" href="contact\.html" id="daEnterprise">Request a Custom Quote<\/a>/.test(src) && /<a class="da-link" href="contact\.html" id="daEnterpriseFinal">Contact us<\/a>/.test(src),
+ok(/<a class="mbtn" href="contact\.html" id="daEnterprise">Request a Quote<\/a>/.test(src) && /<a class="da-link" href="contact\.html" id="daEnterpriseFinal">Contact us<\/a>/.test(src),
   'the Brokerage / Enterprise tier and the closing secondary path are both real links to the existing contact page');
 
 console.log('--- 2b. the prohibitions ---');
@@ -133,7 +131,7 @@ const REMOVED = [
   ['"Things to Review With Your Client" as a landing-page section', /things to review with your client/i],
   ['the standalone MLS differentiation section', /Your MLS tells you about the property/i],
   ['the standalone "Not another neighborhood report" section', /Not another neighborhood report/i],
-  ['the generic persona buckets (For buyers / For listings / For agents)', /For buyers|For listings|For agents/],
+  ['the generic persona buckets (For buyers / For listings / For agents)', /<h[23][^>]*>\s*For (buyers|listings|agents)\b/i],
   ['the old "Built for the client conversation" heading', /Built for the client conversation/i],
   ['a second Check coverage action beside the one coverage section', /Check coverage →/],
   ['the "New Member Price" label (the offer is Free / Professional / Brokerage-Enterprise)', /New Member Price/],
@@ -142,7 +140,7 @@ const REMOVED = [
 REMOVED.forEach(([label, re]) => ok(!re.test(text), 'the page does not bring back ' + label, (text.match(re) || [])[0]));
 ok((text.match(/\$\d+/g) || []).length === 0, 'FREE-ONLY (founder, 2026-10-15): no price appears anywhere on the page until a payment processor is connected', text.match(/\$\d+/g));
 ok(!/Walk into the conversation|Show them the record|Clear enough for your client|before your client asks/i.test(text), 'founder, 2026-10-18: the use-case, trust and closing sections are gone');
-ok(['Free', 'Professional — Individual Agents', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-band">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
+ok(['Free', 'Professional', 'Brokerage &amp; Enterprise'].every((b) => new RegExp('<p class="da-plan-name">' + b + '</p>').test(markup)), 'the pricing hierarchy is Free / Professional / Brokerage / Enterprise');
 const coverageAt = at(/id="coverage"/), pricingAt = at(/id="pricing"/);
 ok((markup.slice(coverageAt).match(/id="daCoverBtn"/g) || []).length === 1 && (markup.match(/id="daCoverBtn"/g) || []).length === 1, 'the coverage checker exists once, inside the coverage section');
 ok(!/href="#coverage"/.test(markup), 'nothing links to the coverage section from the hero or the close: it is an availability utility, not a call to action');
