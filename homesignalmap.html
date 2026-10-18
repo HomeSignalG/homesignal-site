@@ -123,6 +123,15 @@
   .zip-email-note{font-size:12.5px;color:var(--soft);margin-top:7px}
   .zip-email-msg{font-size:12.5px;color:var(--violation);margin-top:4px}
   .zip-email-msg:empty{display:none}
+  /* Save the searched ADDRESS to My Places. Offered only once an address search has resolved
+     (revealed from that success path) and never in ZIP mode. */
+  .save-addr{display:none;margin:14px 0 4px}
+  .save-addr:not([hidden]){display:block}
+  body.zipmode .save-addr{display:none}
+  .save-addr-btn{min-height:44px;padding:11px 18px;border:1px solid var(--green);border-radius:11px;
+    background:#fff;color:var(--green);font:700 14px var(--font);cursor:pointer}
+  .save-addr-btn:hover{background:#f1f8f4}
+  .save-addr-btn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -692,6 +701,11 @@
         <button type="button" class="zip-email-btn" id="zipEmailBtn">Sign up for emails on what is changing in this zip code</button>
         <div class="zip-email-note" id="zipEmailNote"></div>
         <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
+      </div>
+      <!-- Hidden until an address search resolves. It opens the shell's ONE add-an-address flow
+           (sign-in, Census confirmation, Save), pre-filled; this click alone saves nothing. -->
+      <div class="save-addr" id="saveAddr" hidden>
+        <button type="button" class="save-addr-btn" id="saveAddrBtn">Save this address to My Places</button>
       </div>
     </div>
 
@@ -2118,6 +2132,7 @@ HS.onReady(function(){
     document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
+    var _sa = $("saveAddr"); if(_sa) _sa.hidden = true;   // re-offered only when THIS search resolves
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
     status("Finding " + address + " …");
     geocodeAddress(address).then(function(g){
@@ -2188,6 +2203,14 @@ HS.onReady(function(){
         }
         N5_NOTE = HS.n5CoverageNote(n5.rows, radiusLabel(radius));
         render(data);
+        // Offer to save THIS resolved address through the shell's one flow (HS.openHome:
+        // sign-in if needed, Census confirmation, then the save to My Places).
+        var _saB = $("saveAddrBtn"), _saW = $("saveAddr");
+        if(_saB && _saW && window.HS && typeof HS.openHome === "function"){
+          var _saAddr = String(m.matchedAddress || address || "").trim();
+          _saB.onclick = function(){ HS.openHome(_saAddr); };
+          _saW.hidden = false;
+        }
       });
     }).catch(function(err){
       if(!currentReq(token)) return;
