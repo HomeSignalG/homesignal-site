@@ -30,3 +30,16 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-18: Edgewood 33a95f8d-f307-434b-a576-e0212914ccb8 · Gig Harbor 02df5066-1749-4d18-b205-8999c737be09 ·
 --   Milton 8c63da95-108e-4274-8ab0-d2a5e3a5f873 · Sumner ba440325-22fc-47e0-966f-ece704af4b78 ·
 --   University Place b4679c20-167f-4b66-85ea-704277cad918
+
+-- HELD 2026-10-18 (no community row, so the ZIP pages keep saying "HomeSignal is not reading
+-- this city yet"). Each was probed through pg_net; none has a current first-party council source
+-- the shipped adapters read.
+--   Fife           AgendaCenter City-Council-2 serves 100 agendas, newest 2018-10-23 (archive)
+--   Steilacoom     AgendaCenter Town-Council-1 serves 6 agendas, newest 2021-03-02 (archive)
+--   DuPont, Puyallup  CivicPlus client-rendered "Loading" shell (no server-side agendas);
+--                  puyallupwa CivicClerk tenant 404
+--   Lakewood       lakewoodwa CivicClerk tenant 404; no Legistar tenant found
+--   Federal Way    webapi.legistar.com/v1/federalway answers 500 "LegistarConnectionString
+--                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
+--   Buckley, Orting, Ruston, South Prairie, Wilkeson  no CivicPlus / CivicClerk / Legistar
+--                  source found that serves current council agendas; source discovery owed
