@@ -1,0 +1,38 @@
+/* ============================================================================
+   THE SHARED LAYOUT SYSTEM — three width tiers, one gutter, one container.
+   (founder request, 2026-10-18: "one coherent, polished interface — not three visibly unrelated layouts")
+
+   This file is the ONLY place a page width, a side gutter or the header/content alignment is decided.
+   app.css, partials/shell.html and every page read these tokens; a page never writes its own
+   max-width / side padding for its outer container.
+
+   THE THREE TIERS (a page picks one with <body data-layout="...">; no attribute = reading)
+     reading    1180px   prose, marketing, account, settings and report-reading pages     (default)
+     workspace  1440px   dense working pages: the Development Activity Reports workspace
+     full       none     interactive maps that should use every pixel the window gives them
+
+   THE GUTTER is clamp(16px, 4vw, 40px): 16px on a phone, 40px from 1000px up, fluid between.
+
+   THE CONTAINER, .hs-container, has a CONTENT box equal to the tier width (the gutter is added on
+   top as padding), so at any window wider than the tier the content is exactly 1180 / 1440 wide, and at
+   any narrower window it is the window minus two gutters. The site header's inner row, the page
+   content and the footer all use it, so the logo's left edge IS the content's left edge on every page.
+
+   Page-internal reading measures (a 70ch paragraph, an 840px policy column) are NOT page widths and stay
+   with their component; they sit inside the container, left-aligned with the logo. */
+:root{
+  --hs-w-reading:1180px;
+  --hs-w-workspace:1440px;
+  --hs-gutter:clamp(16px,4vw,40px);
+  --hs-max:calc(var(--hs-w-reading) + 2 * var(--hs-gutter));
+}
+body[data-layout="workspace"]{--hs-max:calc(var(--hs-w-workspace) + 2 * var(--hs-gutter))}
+body[data-layout="full"]{--hs-max:none}
+
+.hs-container{
+  box-sizing:border-box;
+  width:100%;
+  max-width:var(--hs-max);
+  margin-inline:auto;
+  padding-inline:var(--hs-gutter);
+}

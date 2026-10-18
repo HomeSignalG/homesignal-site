@@ -8,6 +8,7 @@
 <meta name="description" content="HomeSignal internal review page for the Development Activity report.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
 <style>
 /* ============================================================================
    DEVELOPMENT ACTIVITY — PRIVATE REVIEW PAGE (build step 4 of
@@ -31,13 +32,13 @@
 :root{--bg:#f4f6f4;--panel:#ffffff;--panel2:#f7f9f7;--line:#e4e8e4;--ink:#16211c;--muted:#4a5a52;--accent:#157a49;--red:#b3322b}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:20px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header.top .in{max-width:1120px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+header.top{padding:20px 0;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
 header.top h1{margin:0;font-size:20px}
 header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
 .who{font-size:13px;color:var(--muted)}
 .who button,.linkbtn{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
-.wrap{max-width:1120px;margin:0 auto;padding:20px 16px 56px;display:grid;gap:18px}
+.wrap{padding-block:20px 56px;display:grid;gap:18px}  /* width and gutters: .hs-container (layout.css) */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
 form{display:grid;gap:12px}
 .row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
@@ -76,7 +77,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
 </head>
 <body>
 <header class="top">
-  <div class="in">
+  <div class="in hs-container">
     <div>
       <h1>Development Activity — private review</h1>
       <p class="meta">For HomeSignal admins only. Type any U.S. address to see the report a client would get for it. Reports are made live and nothing is saved. Below the report, you can start a brokerage's trial.</p>
@@ -85,7 +86,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap hs-container">
   <section class="card" aria-label="Make a report">
     <form id="rf" novalidate>
       <label>Property address

@@ -9,6 +9,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="https://homesignal.net/acquisition.html">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
 <style>
 /* ============================================================
    Dashboard styles (structure from the artifact — DESIGN ONLY, no
@@ -21,7 +22,7 @@
 --shadow-sm:0 1px 2px rgba(16,33,28,.06);}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:22px 26px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top{padding:22px 0;border-bottom:1px solid var(--line);background:var(--panel)}
 header.top h1{margin:0;font-size:20px;letter-spacing:.2px}
 header.top .meta{color:var(--muted);font-size:12.5px;margin-top:6px}
 .legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;font-size:12.5px}
@@ -44,7 +45,7 @@ nav.tabs button.active{background:var(--accent);color:#fff;border-color:var(--ac
 .daylabel{color:var(--ink);font-size:13px;font-weight:600;min-width:120px}
 .winbtn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12.5px}
 .winbtn:hover{color:var(--ink)}
-main{padding:20px 24px;max-width:1180px;margin:0 auto}
+main{padding-block:20px}  /* width and gutters: .hs-container (layout.css) */
 .tab{display:none}.tab.active{display:block}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px;margin:8px 0 18px}
 .tile{background:var(--panel);border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:13px 14px;box-shadow:var(--shadow-sm)}
@@ -86,7 +87,7 @@ padding:2px 7px;border-radius:20px;border:1px solid var(--line)}
 .pillars{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 14px}
 .pillar{flex:1 1 180px;text-align:center;background:linear-gradient(180deg,#ffffff,#f4f6f4);border:1px solid var(--line);
 border-radius:10px;padding:11px;font-size:12.5px;color:#33423a;font-weight:600}
-footer{color:var(--muted);font-size:12px;padding:18px 24px;border-top:1px solid var(--line);max-width:1180px;margin:0 auto}
+footer{color:var(--muted);font-size:12px;padding-block:18px;border-top:1px solid var(--line)}
 
 /* ===== Gate (login / no-access / loading) — shown until authorized ===== */
 #dash-root{display:none}
@@ -201,6 +202,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <!-- DASHBOARD: structure only. Tab bodies are injected from the gated RPC after an allowlisted login. -->
 <div id="dash-root">
   <header class="top">
+   <div class="hs-container">
     <h1>HomeSignal — Acquisition Dashboard</h1>
     <div class="meta" id="dash-meta">One engine: data ingestion · project detection · public-records intelligence · homeowner-behavior intelligence · distribution &amp; acquisition.</div>
     <div class="legend">
@@ -208,9 +210,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       <span><i class="dot persist"></i> needs rollup — signal exists, persist/join it</span>
       <span><i class="dot pending"></i> instrumentation pending — not collected; never faked</span>
     </div>
+   </div>
   </header>
   <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button></nav>
-  <main>
+  <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
     <div class="tab" id="tab-projects"></div>
@@ -226,7 +229,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-premium"></div>
     <div class="tab" id="tab-arearequests"></div>
   </main>
-  <footer>Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
+  <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
 
 <!-- AUTH MODAL (email OTP) -->
