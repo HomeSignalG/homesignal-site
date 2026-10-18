@@ -18,7 +18,8 @@
 --                 census_place_geoid): that city's own share. Null when not measured. ⚠️ Never present it as population.
 --   measured      false when the ZIP has no Census ZCTA (PO box / single-organization ZIPs) —
 --                 the page must say "not measured", never "0%".
---   has_source    the community exists and carries at least one government topic.
+--   has_source    the root: it carries government topics. Any other body: an ACTIVE feed runs for
+--                 it (public.feeds). A city whose feeds are all inactive offers nothing.
 -- CDPs (funcstat S) are not governments: their land is unincorporated and the county governs it.
 
 -- The city half of the decision as a SET, so a build or a measurement can read every ZIP at once
@@ -121,8 +122,15 @@ as $fn$
   )
   select b.body_kind, b.community_id, b.name, b.census_place_geoid,
          round(b.area_share, 4), (select m from zmeasured),
-         coalesce((select cardinality(c.government_topics) > 0
-                     from public.communities c where c.id = b.community_id), false),
+         -- has_source: the root as before (it carries government topics); any other body
+         -- only when an ACTIVE feed runs for it — what runs, not what a row says.
+         case when b.sort_key = 0
+              then coalesce((select cardinality(c.government_topics) > 0
+                               from public.communities c where c.id = b.community_id), false)
+              else b.community_id is not null and exists (
+                     select 1 from public.feeds f
+                      where f.community_id = b.community_id::text and f.active
+                        and f.target_table in ('alerts', 'meetings')) end,
          b.sort_key
   from bodies b
   order by b.sort_key, b.name;
@@ -134,8 +142,9 @@ grant execute on function public.zip_government_bodies(text) to anon, authentica
 -- ── The topics each body offers, per stream ─────────────────────────────────────────────────
 -- What a resident may pick for each government on this ZIP's page, so a pick always matches the
 -- category that body's content is filed under (email matching is word-for-word, per community):
---   notices   the body's own government_topics (a Utah city's notices are "City government (X)")
---   meetings  the root: its government_topics (as before). A city: the six canonical meeting
+--   notices   the body's own government_topics (a Utah city's notices are "City government (X)");
+--             for a city, only while an active alerts feed runs for it
+--   meetings  the root: its government_topics (as before). A city with an active meetings feed: the six canonical meeting
 --             topics — every meetings row of an enrolled community carries exactly one of them
 --             (homesignal-ingest ingest.py::CANONICAL_MEETING_TOPICS and the DB CHECK
 --             meetings_category_canonical). Measured 2026-10-18: Provo's 32 meetings are filed
@@ -158,18 +167,22 @@ as $fn$
          b.sort_key, s.ord::int
   from b
   join public.communities c on c.id = b.community_id
-  -- a government with no source yet offers nothing: no pick may promise mail nothing sends
+  -- a government with no source offers nothing: each stream below needs an active feed for it
+  -- (or, for the root, its own topics), so no pick can promise mail that nothing sends
   cross join lateral (
     select 'notices'::text as stream, t.topic, t.ord
       from unnest(coalesce(c.government_topics, '{}'::text[])) with ordinality t(topic, ord)
+     where b.sort_key = 0 or exists (select 1 from public.feeds f where f.community_id = c.id::text
+                                       and f.active and f.target_table = 'alerts')
     union all
     select 'meetings', t.topic, t.ord
       from unnest(coalesce(c.government_topics, '{}'::text[])) with ordinality t(topic, ord)
      where b.sort_key = 0
     union all
-    select 'meetings', six.topic, six.ord from six where b.sort_key <> 0
+    select 'meetings', six.topic, six.ord from six
+     where b.sort_key <> 0 and exists (select 1 from public.feeds f where f.community_id = c.id::text
+                                         and f.active and f.target_table = 'meetings')
   ) s
-  where b.has_source
   order by b.sort_key, b.name, s.stream, s.ord;
 $fn$;
 

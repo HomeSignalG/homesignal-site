@@ -2,9 +2,9 @@ name: zip-government-bodies-suite
 
 # WHICH GOVERNMENTS COVER A ZIP (docs/zip-government-bodies.sql) — the one decision the ZIP
 # page, the page generator and delivery measurement read. Runs the shipped function against a
-# DISPOSABLE Postgres: 41 checks (county + every incorporated city >= 1% of land, CDPs excluded,
+# DISPOSABLE Postgres: 44 checks (county + every incorporated city >= 1% of land, CDPs excluded,
 # PO-box ZIPs "not measured", a city with no community never borrows another body, a root city
-# listed once, a root that is the city absorbs it), plus the per-body topic offer, the city-link view and clear_alert_selection, then 14 prohibited mutations, each of which MUST fail the suite.
+# listed once, a root that is the city absorbs it), plus the per-body topic offer, the city-link view and clear_alert_selection, then 16 prohibited mutations, each of which MUST fail the suite.
 
 on:
   pull_request:

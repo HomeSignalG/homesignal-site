@@ -7,6 +7,8 @@ select * from (values
  ('T4 98466 a city with no community offers nothing', (select count(*) = 0 from t466 where name='University Place'), ''),
  ('T5 84601 Provo meetings include County Commission & county business (where its 32 meetings are filed)', (select count(*) = 1 from t601 where community_id='00000000-0000-0000-0000-0000000000a2' and stream='meetings' and topic='County Commission & county business'), ''),
  ('T7 a city community with no source yet offers nothing (not even the six meeting topics)', (select count(*) = 0 from t466 where name='Fircrest'), ''),
+ ('T8 84601 Provo offers meetings but no notices: its notices feed is inactive', (select count(*) = 0 from t601 where community_id='00000000-0000-0000-0000-0000000000a2' and stream='notices') and (select count(*) = 6 from t601 where community_id='00000000-0000-0000-0000-0000000000a2' and stream='meetings'), ''),
+ ('T9 a city whose only feed is inactive has no source', (select not has_source from public.zip_government_bodies('98466') where name='Fircrest'), ''),
  ('T6 every offered row names a community', (select bool_and(community_id is not null) from t466), '')
 ) x(name, pass, detail);
 ;

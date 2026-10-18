@@ -1,5 +1,5 @@
 -- Minimal stand-ins for the production objects the function reads (disposable database only).
-drop schema if exists geo cascade; drop table if exists public.communities, public.users, public.user_subscriptions cascade;
+drop schema if exists geo cascade; drop table if exists public.communities, public.users, public.user_subscriptions, public.feeds cascade;
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
@@ -75,3 +75,15 @@ insert into public.user_subscriptions values
  ('00000000-0000-0000-0000-00000000aa02','00000000-0000-0000-0000-0000000000a1','notices','City government (Tacoma)','explicit',1),
  ('00000000-0000-0000-0000-00000000aa02','00000000-0000-0000-0000-0000000000a1','notices','County Commission & county business','follow_floor',0),
  ('00000000-0000-0000-0000-00000000aa03','00000000-0000-0000-0000-0000000000a1','meetings','Elections & voting','explicit',1);
+
+-- what runs: Tacoma has meetings and notices feeds; Provo meetings only; American Fork both;
+-- Eagle Mountain both; Cedar Valley-like inactive feed on American Fork's notices is NOT counted
+create table public.feeds (feed_id text primary key, active boolean, community_id text, target_table text);
+insert into public.feeds values
+ ('t-m','t','00000000-0000-0000-0000-0000000000a1','meetings'),
+ ('t-a','t','00000000-0000-0000-0000-0000000000a1','alerts'),
+ ('p-m','t','00000000-0000-0000-0000-0000000000a2','meetings'),
+ ('p-a','f','00000000-0000-0000-0000-0000000000a2','alerts'),
+ ('af-m','t','00000000-0000-0000-0000-0000000000a3','meetings'),
+ ('af-a','t','00000000-0000-0000-0000-0000000000a3','alerts'),
+ ('fc-m','f','00000000-0000-0000-0000-0000000000a8','meetings');
