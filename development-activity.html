@@ -58,6 +58,8 @@
 
   /* section layouts */
   .da-cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+  .da-col-cta{display:flex;flex-direction:column}
+  .da-col-cta .da-cta{margin-top:auto!important;padding-top:16px}   /* the two buttons share one bottom line across the columns */
   .da-cols2{display:grid;grid-template-columns:1fr 1fr;gap:40px}
   .da-list{margin:0 0 12px;padding-left:20px;max-width:680px}
   .da-list li{font-size:14.5px;color:var(--ink-2);margin-bottom:6px;line-height:1.55}
@@ -105,16 +107,16 @@
     <section id="pricing">
       <h2>Start free</h2>
       <div class="da-cols3">
-        <div>
+        <div class="da-col-cta">
           <p class="da-band">Free</p>
           <div class="da-price da-sm">100 Development Activity reports free</div>
           <p>No credit card required.</p>
-          <p style="margin-top:10px"><a class="da-link" href="development-activity-reports.html" id="daMyReports">Go to My reports to start →</a></p>
           <div data-commerce hidden>
             <button type="button" class="mbtn da-off" data-cta="start-free" aria-disabled="true">Start free — 100 reports</button>
             <span class="da-soon">Opens at launch.</span>
           </div>
           <p class="da-muted" style="margin-top:14px!important">Individual accounts receive 100 individual evaluation reports. Brokerage evaluation accounts share 100 reports across their invited evaluation users.</p>
+          <p class="da-cta"><a class="mbtn" href="development-activity-reports.html" id="daMyReports">Go to My reports to start</a></p>
         </div>
         <div>
           <p class="da-band">Professional — Individual Agents</p>
@@ -123,12 +125,12 @@
           <p class="da-muted">Free evaluation reports need no payment. Nothing is charged today, and details will be posted here before anything is. See the <a class="da-link" href="terms.html">Terms of Service</a>, <a class="da-link" href="refund-policy.html">Refund Policy</a> and <a class="da-link" href="privacy.html">Privacy Notice</a>.</p>
           <p class="da-muted">Brokerages, teams, and enterprise organizations: see Brokerage &amp; Enterprise custom pricing.</p>
         </div>
-        <div>
+        <div class="da-col-cta">
           <p class="da-band">Brokerage &amp; Enterprise</p>
           <div class="da-price da-sm">Custom Pricing</div>
           <p>HomeSignal offers tailored solutions for real estate brokerages, teams, and enterprise organizations.</p>
           <p>Contact us to discuss your number of agents, anticipated report volume, and business requirements.</p>
-          <p><a class="mbtn" href="contact.html" id="daEnterprise">Request a Custom Quote</a></p>
+          <p class="da-cta"><a class="mbtn" href="contact.html" id="daEnterprise">Request a Custom Quote</a></p>
         </div>
       </div>
     </section>
