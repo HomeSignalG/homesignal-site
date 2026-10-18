@@ -44,7 +44,8 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="app.css?v=30e00a0d"/>
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
+<link rel="stylesheet" href="app.css?v=6dd97374"/>
 <style>
   :root{
     --ink:#0F1A1C; --soft:#46565A; --mute:#5b6d71; --line:#E7ECEA; --paper:#EEF2F1; --card:#fff;
@@ -58,7 +59,7 @@
   *{box-sizing:border-box}
   html,body{margin:0}
   body{font-family:var(--font);color:var(--ink);background:var(--paper);line-height:1.5}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  /* .wrap is also .hs-container: the width and side gutters come from layout.css (this page is the full-bleed tier). */
   a{color:var(--green)}
 
   /* NOTE: the page's old top-bar + auth-modal CSS was removed in the shell conversion — the shared
@@ -123,6 +124,15 @@
   .zip-email-note{font-size:12.5px;color:var(--soft);margin-top:7px}
   .zip-email-msg{font-size:12.5px;color:var(--violation);margin-top:4px}
   .zip-email-msg:empty{display:none}
+  /* Save the searched ADDRESS to My Places. Offered only once an address search has resolved
+     (revealed from that success path) and never in ZIP mode. */
+  .save-addr{display:none;margin:14px 0 4px}
+  .save-addr:not([hidden]){display:block}
+  body.zipmode .save-addr{display:none}
+  .save-addr-btn{min-height:44px;padding:11px 18px;border:1px solid var(--green);border-radius:11px;
+    background:#fff;color:var(--green);font:700 14px var(--font);cursor:pointer}
+  .save-addr-btn:hover{background:#f1f8f4}
+  .save-addr-btn:focus-visible{outline:2px solid var(--green-bright);outline-offset:2px}
 
   .status{margin:18px 0;font-size:14px;color:var(--soft)}
   .status.err{color:var(--violation)}
@@ -139,7 +149,7 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
     box-shadow:0 14px 34px -26px rgba(8,30,28,.5)}
   .mapcard{padding:14px}
-  .map-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;gap:10px}
+  .map-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:11px;gap:10px}  /* wraps: at 390px the caption + 2D/3D switch were 27px wider than the card */
   .map-cap{font-weight:600;font-size:13px;color:var(--soft)}
   /* ZIP mode hides #radSel (body.zipmode .radsel). A ZIP is not a radius around a point,
      so there is no "widen the search" control. 2D / 3D aerial / 3D satellite all frame the
@@ -638,13 +648,13 @@
      from how-it-works.html. It is still in ZIP_NAV_PAGES and MAP_PAGES. Before v3 it
      declared "dev" (A-021), and before that a retired "maps" entry. Contract asserted by
      test/nav-identity.test.mjs. -->
-<body data-nav="explore" data-explore="map">
+<body data-nav="explore" data-explore="map" data-layout="full">
 <!-- Shell conversion: the shared left-sidebar chrome (sidebar + top bar + all modals, incl. auth &
      share) is injected by shell.js. This page's own top-bar and email-OTP auth modal were removed —
      the shell owns them now. Page content lives in the <template> below; shell.js moves it into
      #hs-slot on boot, so any DOM-touching init must run inside HS.onReady (see the bottom script). -->
 <template id="hs-content">
-  <div class="wrap">
+  <div class="wrap hs-container">
     <div class="head">
       <div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>
       <h1>Development around your home</h1>
@@ -692,6 +702,11 @@
         <button type="button" class="zip-email-btn" id="zipEmailBtn">Sign up for emails on what is changing in this zip code</button>
         <div class="zip-email-note" id="zipEmailNote"></div>
         <div class="zip-email-msg" id="zipEmailMsg" role="status" aria-live="polite"></div>
+      </div>
+      <!-- Hidden until an address search resolves. It opens the shell's ONE add-an-address flow
+           (sign-in, Census confirmation, Save), pre-filled; this click alone saves nothing. -->
+      <div class="save-addr" id="saveAddr" hidden>
+        <button type="button" class="save-addr-btn" id="saveAddrBtn">Save this address to My Places</button>
       </div>
     </div>
 
@@ -911,7 +926,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=04347737"></script>
+<script src="shell.js?v=7d11ea4b"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -2118,6 +2133,7 @@ HS.onReady(function(){
     document.title = "Development around " + address + " — HomeSignal";
     $("go").disabled = true;
     N5_NOTE = "";
+    var _sa = $("saveAddr"); if(_sa) _sa.hidden = true;   // re-offered only when THIS search resolves
     var radius = CUR_RADIUS;                // pinned for this search, so a later click cannot rewrite it
     status("Finding " + address + " …");
     geocodeAddress(address).then(function(g){
@@ -2188,6 +2204,14 @@ HS.onReady(function(){
         }
         N5_NOTE = HS.n5CoverageNote(n5.rows, radiusLabel(radius));
         render(data);
+        // Offer to save THIS resolved address through the shell's one flow (HS.openHome:
+        // sign-in if needed, Census confirmation, then the save to My Places).
+        var _saB = $("saveAddrBtn"), _saW = $("saveAddr");
+        if(_saB && _saW && window.HS && typeof HS.openHome === "function"){
+          var _saAddr = String(m.matchedAddress || address || "").trim();
+          _saB.onclick = function(){ HS.openHome(_saAddr); };
+          _saW.hidden = false;
+        }
       });
     }).catch(function(err){
       if(!currentReq(token)) return;

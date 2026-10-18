@@ -831,7 +831,8 @@ def _items(items, heading, empty, kind, zip_code=""):
 OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
-APP_CSS_LINK = '<link rel="stylesheet" href="/app.css?v=30e00a0d">\n'
+APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=c3f3f5d5">\n'
+                '<link rel="stylesheet" href="/app.css?v=6dd97374">\n')
 
 
 def coverage_panel(p):
@@ -1042,7 +1043,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=04347737"></script>\n'
+        '<script src="/shell.js?v=7d11ea4b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=9ed32b7c"></script>\n'
         "</body>\n</html>\n")

@@ -2031,11 +2031,12 @@
       + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
       + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
     const href = HS.alertsHrefForSavedPlace(info);
+    const zipTxt = /^\d{5}$/.test(String(info.zip || '')) ? ' for ZIP ' + info.zip : '';
     box.innerHTML =
       '<div id="optinTitle" style="font-weight:700;color:var(--ink,#12261d)">✓ ' + HS.esc(label) + ' saved to My Places</div>'
-      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">Want email alerts? '
-      + '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="color:var(--green,#157a49);font-weight:700;text-decoration:underline">Choose your alert topics →</a></div>'
+      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">Want email alerts? Get Government notices, Upcoming meetings and Local news' + HS.esc(zipTxt) + '.</div>'
       + '<div style="display:flex;gap:10px;align-items:center">'
+      +   '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="background:var(--green,#157a49);color:#fff;border-radius:9px;padding:9px 14px;font-weight:700;text-decoration:none">Yes, choose my alerts →</a>'
       +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
       + '</div>';
     $('optinNo').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; };

@@ -9,6 +9,7 @@
 <meta name="description" content="Make Development Activity reports for your brokerage's HomeSignal trial.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
 <style>
 /* ============================================================================
    DEVELOPMENT ACTIVITY — THE CUSTOMER PAGE (build step 5c of
@@ -75,8 +76,8 @@
    "Share this report with your client" box (seen live in Manual Test Part B, 2026-10-04). Keep it ABOVE every display rule's reach: !important. */
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-header.top{padding:20px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
-header.top .in{max-width:1800px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
+header.top{padding:20px 0;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .in{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;justify-content:space-between}
 header.top h1{margin:0;font-size:20px}
 header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch}
 /* THE SITE BAR (founder, 2026-10-11: "Development Activity and My Reports belong to one polished, coherent HomeSignal product").
@@ -87,7 +88,7 @@ header.top .meta{color:var(--muted);font-size:13px;margin:4px 0 0;max-width:70ch
    Enterprise is the active section, so the page goes straight from the bar to its title: no second Enterprise row, no repeated HomeSignal label.
    The right of the bar is the ACCOUNT ZONE: report usage and the one plan action, the Account control, and who is signed in. The bar is hidden by the print rule below. */
 header.sitebar{background:var(--panel);border-bottom:1px solid var(--line)}
-header.sitebar .in{max-width:1800px;margin:0 auto;padding:0 24px;min-height:72px;display:flex;flex-wrap:wrap;align-items:center;gap:0 32px}
+header.sitebar .in{min-height:72px;display:flex;flex-wrap:wrap;align-items:center;gap:0 32px}
 .sb-brand{display:inline-flex;align-items:center;gap:9px;min-height:44px;font-size:17px;font-weight:700;color:var(--ink);text-decoration:none;flex:none}
 .sb-mark{width:28px;height:28px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
 .sb-mark svg{width:15px;height:15px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -135,7 +136,7 @@ body:not(:has(#account .card:not([hidden]))) .acct-btn{display:none}
 .who{font-size:13px;color:var(--muted)}
 .who button{min-height:36px}
 .who button{font:inherit;font-size:13px;font-weight:600;color:var(--accent);background:none;border:none;padding:4px 0;cursor:pointer}
-.wrap{max-width:1800px;margin:0 auto;padding:12px 24px 56px;display:grid;gap:18px}
+.wrap{padding-block:12px 56px;display:grid;gap:18px}  /* width, centring and side gutters: .hs-container (layout.css), workspace tier */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
 #trial .count{margin:0}
 #trial .count.out{color:var(--red)}
@@ -244,7 +245,6 @@ input[type=text]:focus-visible{outline:3px solid var(--accent);outline-offset:1p
    Account and administration (secondary, closed until wanted).
    ============================================================================ */
 header.top{padding:8px 0 12px}
-header.top .in{padding:0 24px}
 header.top h1{font-size:26px;letter-spacing:-.01em}
 header.top .meta{font-size:14px;margin-top:4px;max-width:none}
 .wrap{gap:14px;padding-top:14px}
@@ -413,9 +413,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .auth-toggle .auth-link{background:none;border:none;padding:0;font:inherit;font-weight:600;text-decoration:underline}
 </style>
 </head>
-<body>
+<body data-layout="workspace">
 <header class="sitebar">
-  <div class="in">
+  <div class="in hs-container">
     <a class="sb-brand" href="index.html"><span class="sb-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg></span><span>Home<span>Signal</span></span></a>
     <nav class="sb-nav" aria-label="HomeSignal site"><a href="index.html">Explore</a><a href="properties.html">My Places</a><a href="development-activity.html" aria-current="page">Enterprise</a></nav>
     <div class="sb-acct">
@@ -434,7 +434,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </header>
 <header class="top">
-  <div class="in">
+  <div class="in hs-container">
     <div>
       <h1>Development Activity Reports</h1>
       <p class="meta">Create, review, share and monitor property-specific reports on the official development records near an address.</p>
@@ -442,7 +442,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap hs-container">
   <section class="card" id="signup" aria-labelledby="signup-title" hidden>
     <h2 id="signup-title">Create your individual account</h2>
     <p class="sub">For individual real estate agents: 100 free Development Activity reports. Paid plans are coming. Brokerages, teams and enterprise organizations: <a href="contact.html" id="signup-quote">request a custom quote</a>.</p>

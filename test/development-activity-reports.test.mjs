@@ -73,7 +73,7 @@ ok(!/class="entnav"/.test(page) && !/class="brand"/.test(headerTop), '1h4 below 
 ok(/<h1>Development Activity Reports<\/h1>/.test(headerTop), '1h5 the header under the bar holds the page title');
 ok(/id="who"/.test(bar) && !/id="who"/.test(headerTop), '1h6 the account area (email and Sign out) lives in the bar, so it is on screen with the navigation');
 ok(!/https?:\/\//.test(siteNav + bar.replace(/<svg[\s\S]*?<\/svg>/, '')) && !/target=|rel=|onclick/.test(bar), '1i ...plain same-site links: no address of another site, no new window, no script');
-ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && !/rel="stylesheet"/.test(page), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document');
+ok(!/<script[^>]+src="[^"]*(shell|app)\.(js|css)/.test(page) && (page.match(/<link[^>]*rel="stylesheet"[^>]*>/g) || []).every((l) => /href="layout\.css\?v=[0-9a-f]{8}"/.test(l)), '1i2 the page still loads neither the shell nor app.css: it stays a standalone document (its only stylesheet is layout.css, the shared width/gutter tokens)');
 ok(/header\.sitebar,header\.top,[^{]*\{display:none!important\}/.test(page.replace(/\s+/g, ' ')), '1j the print rule that hides the header (and now the site bar) is still there, so neither prints');
 
 // ---- 2. keys and sign-in ----------------------------------------------------------------------------------------------------------------------
@@ -263,7 +263,7 @@ ok(/sessionEpoch\+\+;/.test(code) && /var epochAtAsk = sessionEpoch;/.test(code)
 // ---- 11. layout (founder, 2026-10-11): Create is full width above the workspace; usage is a quiet account strip in the header --------------------------
 {
   const html = read(PAGE);
-  const body = html.slice(html.indexOf('<body>'));
+  const body = html.slice(html.indexOf('<body'));
   const iHeaderEnd = body.indexOf('</header>', body.indexOf('<header class="top"')), iCreate = body.indexOf('id="create-title"'), iWs = body.indexOf('<div class="ws">'), iRail = body.indexOf('<aside class="rail"');
   ok(iCreate > iHeaderEnd && iCreate < iWs && iWs < iRail, '11a Create a property report sits above the two-column workspace, not inside the rail');
   ok(body.indexOf('id="rf"') === body.lastIndexOf('id="rf"') && body.indexOf('id="go"') === body.lastIndexOf('id="go"') && body.indexOf('id="trial-cta"') === body.lastIndexOf('id="trial-cta"'), '11b one form, one Generate button and one Subscribe / Manage plan button: nothing is duplicated');
