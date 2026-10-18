@@ -92,7 +92,10 @@ if (process.env.HS_SCREENSHOT_DIR) {
 const zipCard = await page.locator('#hsOptin').innerText();
 ok(/saved to My Places/.test(zipCard), 'ZIP save card states My Places', zipCard);
 ok(/Want email alerts\?/.test(zipCard), 'ZIP save card invites email alerts separately', zipCard);
-ok(/Choose your alert topics →/.test(zipCard), 'ZIP save card has the approved CTA', zipCard);
+ok(/Yes, choose my alerts →/.test(zipCard), 'ZIP save card has the approved CTA', zipCard);
+ok(/Government notices/.test(zipCard) && /Upcoming meetings/.test(zipCard) && /Local news/.test(zipCard) && /ZIP 78617/.test(zipCard),
+  'ZIP save card names the three alert types and the ZIP', zipCard);
+ok(/Not now/.test(zipCard), 'ZIP save card offers Not now', zipCard);
 ok(!/Emailing you/.test(zipCard) && !/Email me these alerts/.test(zipCard),
   'ZIP save card does not claim email was activated', zipCard);
 
@@ -181,7 +184,7 @@ const addrCard = await page.locator('#hsOptin').innerText();
 ok(/2200 CALDWELL LN, DEL VALLE, TX 78617/.test(addrCard),
   'address card uses the confirmed address identity', addrCard);
 ok(/saved to My Places/.test(addrCard), 'address card states My Places', addrCard);
-ok(/Want email alerts\?/.test(addrCard) && /Choose your alert topics →/.test(addrCard),
+ok(/Want email alerts\?/.test(addrCard) && /Yes, choose my alerts →/.test(addrCard),
   'address card has the approved invitation + CTA', addrCard);
 ok(!/Emailing you/.test(addrCard), 'address card does not claim email was activated', addrCard);
 const addrHref = await page.getAttribute('#optinAlertsCta', 'href');
