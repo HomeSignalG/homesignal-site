@@ -38,7 +38,7 @@ if (maj < 22 || (maj === 22 && min < 6)) {
 
 const { resolvePlanes, CoreDeadlineError, CORE_DEADLINE_MS, OVERLAY_DEADLINE_MS, OVERLAY_GRACE_MS } =
   await import(join(FN, 'sources/planes.ts'));
-const { frsFacilities, frsRadii, FRS_ATTEMPT_TIMEOUT_MS } = await import(join(FN, 'sources/epa-frs.ts'));
+const { frsFacilities, frsRadii, FRS_ATTEMPT_TIMEOUT_MS, FRS_RETRY_BACKOFF_MS } = await import(join(FN, 'sources/epa-frs.ts'));
 
 let fails = 0;
 const ok = (cond, name, detail) => {
@@ -265,7 +265,7 @@ console.log('\n== 7. the FRS ladder itself stops at the deadline (the cooperativ
     perRadius = 0;                       // fast refusal → next radius, transient counter resets
     return Promise.resolve({ status: 200, text: () => Promise.resolve(LIMIT) });
   };
-  const out = await frsFacilities(41.5, -112.0, 3, mixed, { deadlineAt: 65_000, now });
+  const out = await frsFacilities(41.5, -112.0, 3, mixed, { deadlineAt: 65_000, now, sleep: async (ms) => { t += ms; } });
   ok(out.ok === false, '7a. the ladder reports ok:false');
   ok(out.reason === 'deadline', '7b. the reason names the deadline', `got ${out.reason}`);
   ok(out.rows.length === 0 && out.radius_used === null, '7c. no rows and no radius claimed');
@@ -288,7 +288,7 @@ console.log('\n== 7b. the PURE-transient early return is PRESERVED, not replaced
   // radius and return a real-but-far-smaller number. Same outcome with or without a deadline.
   let t = 0; const now = () => t;
   const hang = () => { t += FRS_ATTEMPT_TIMEOUT_MS; return Promise.resolve({ status: 503, text: () => Promise.resolve('') }); };
-  const out = await frsFacilities(41.5, -112.0, 3, hang, { deadlineAt: 1_000_000, now });
+  const out = await frsFacilities(41.5, -112.0, 3, hang, { deadlineAt: 1_000_000, now, sleep: async (ms) => { t += ms; } });
   ok(out.ok === false && out.reason === 'transient' && out.attempts === 3,
     '7g. unchanged: 3 transients at one radius still stop there, reason "transient"',
     `ok=${out.ok} reason=${out.reason} attempts=${out.attempts}`);
@@ -305,13 +305,14 @@ console.log('\n== 8. the deadline SHORTENS the last attempt rather than overrunn
   try {
     let t = 0; const now = () => t;
     const hang = () => { t += 20_000; return Promise.resolve({ status: 503, text: () => Promise.resolve('') }); };
-    // Budget 25s: attempt 1 gets the full 30s cap (25s remains → capped to 25s), attempt 2 has
-    // only 5s left and must be asked for 5s, not 30s.
-    await frsFacilities(41.5, -112.0, 3, hang, { deadlineAt: 25_000, now });
+    // Budget 25s: attempt 1 gets the full 30s cap (25s remains → capped to 25s). It fails at t=20s;
+    // the ladder waits 2s before retrying (FRS_RETRY_BACKOFF_MS, 2026-10-18), so attempt 2 has
+    // only 3s left and must be asked for 3s, not 30s.
+    await frsFacilities(41.5, -112.0, 3, hang, { deadlineAt: 25_000, now, sleep: async (ms) => { t += ms; } });
     ok(asked.length >= 2, '8a. at least two attempts were made', JSON.stringify(asked));
     ok(asked[0] === 25_000, '8b. the first attempt is capped to the remaining budget, not 30s',
       `got ${asked[0]}`);
-    ok(asked[1] === 5_000, '8c. the last attempt is capped to the 5s that actually remained',
+    ok(asked[1] === 3_000, '8c. the last attempt is capped to the 3s that actually remained after the 2s wait',
       `got ${asked[1]}`);
     ok(asked.every((ms) => ms <= FRS_ATTEMPT_TIMEOUT_MS),
       '8d. and no attempt is ever given MORE than the historical 30s', JSON.stringify(asked));
@@ -355,6 +356,49 @@ console.log('\n== 10. a healthy-but-slow FRS is NOT converted into a false unkno
   const out = await frsFacilities(41.5, -112.0, 3, slow, { deadlineAt: OVERLAY_DEADLINE_MS, now });
   ok(out.ok === true && out.rows.length === 1,
     '10b. a 29s successful read still succeeds under the 45s budget', `ok=${out.ok} rows=${out.rows.length}`);
+}
+
+console.log('\n== 11. a refused attempt WAITS before its retry, inside the budget (2026-10-18) ==');
+{
+  // The ZIP 98402 shape, measured: two process-limit refusals, then EPA rate-limits the immediate
+  // retries ("1.5:429","1.5:429","1.5:502"). With a wait before each retry the third try is let through.
+  const LIMIT = JSON.stringify({ Results: { Error: { ErrorMessage: 'Process Limit would be exceeded' } } });
+  const OKBODY = JSON.stringify({ Results: { FRSFacility: [{ RegistryId: '1', FacilityName: 'ACME STEEL', Latitude83: '47.25', Longitude83: '-122.44' }] } });
+  let t = 0; const now = () => t; const waits = []; let n15 = 0;
+  const f = (url) => {
+    const rad = Number(new URL(url).searchParams.get('search_radius'));
+    t += 300;
+    if (rad > 1.5) return Promise.resolve({ status: 200, text: () => Promise.resolve(LIMIT) });
+    n15++;
+    return Promise.resolve(n15 < 3 ? { status: 429, text: () => Promise.resolve('') } : { status: 200, text: () => Promise.resolve(OKBODY) });
+  };
+  const out = await frsFacilities(47.25, -122.44, 3, f, { deadlineAt: 45_000, now, sleep: async (ms) => { waits.push(ms); t += ms; } });
+  ok(out.ok === true && out.radius_used === 1.5 && out.rows.length === 1,
+    '11a. rate-limited twice, then answered after waiting: ok:true at the radius asked for',
+    `ok=${out.ok} radius=${out.radius_used} failures=${JSON.stringify(out.failures)}`);
+  ok(JSON.stringify(waits) === JSON.stringify(FRS_RETRY_BACKOFF_MS),
+    '11b. it waited the declared backoff before each retry', JSON.stringify(waits));
+
+  // Retry-After is honoured (capped at 10 s).
+  const w2 = []; let t2 = 0; let k = 0;
+  const g = () => { t2 += 100; k++; return Promise.resolve(k < 2
+    ? { status: 429, headers: { get: (h) => (h.toLowerCase() === 'retry-after' ? '4' : null) }, text: () => Promise.resolve('') }
+    : { status: 200, text: () => Promise.resolve(OKBODY) }); };
+  const outG = await frsFacilities(41.5, -112.0, 3, g, { deadlineAt: 45_000, now: () => t2, sleep: async (ms) => { w2.push(ms); t2 += ms; } });
+  ok(outG.ok === true && JSON.stringify(w2) === '[4000]', '11c. a Retry-After of 4 s is honoured', JSON.stringify(w2));
+
+  // A wait that would leave no time to retry ends the ladder as "deadline" — it never sleeps past the budget.
+  const w3 = []; let t3 = 0;
+  const h = () => { t3 = 44_000; return Promise.resolve({ status: 429, text: () => Promise.resolve('') }); };
+  const outH = await frsFacilities(41.5, -112.0, 3, h, { deadlineAt: 45_000, now: () => t3, sleep: async (ms) => { w3.push(ms); t3 += ms; } });
+  ok(outH.ok === false && outH.reason === 'deadline' && w3.length === 0,
+    '11d. no time left to wait and retry → "deadline", no sleep past the budget',
+    `ok=${outH.ok} reason=${outH.reason} waits=${JSON.stringify(w3)}`);
+
+  // CONTROL — with no deadline the ladder never waits (it stays byte-for-byte its previous self).
+  const w4 = [];
+  await frsFacilities(41.5, -112.0, 3, () => Promise.resolve({ status: 503, text: () => Promise.resolve('') }), { sleep: async (ms) => { w4.push(ms); } });
+  ok(w4.length === 0, '11e. CONTROL — undeadlined, no wait is ever taken', JSON.stringify(w4));
 }
 
 console.log(`\n${fails === 0 ? 'ALL PASS' : fails + ' FAILING'} — epa-plane-deadlines`);
