@@ -34,6 +34,17 @@ chain as (
   where x.cid is not null
 ),
 chain_ids as (select distinct cid from chain),
+-- overlap cities (option 3, 2026-10-18): every incorporated place with >=1% of a page's land, from the
+-- canonical public.zip_government_city_links. app_refresh_zip reads Government Notices and meetings for
+-- the chain AND these cities; Local News stays root-only, so ln below keeps reading the chain alone.
+links as (select l.zip, l.community_id cid, l.name from public.zip_government_city_links l join pages using (zip)),
+gov_ids as (select cid from chain_ids union select cid from links),
+-- every city a page lists, from the ONE canonical listing (public.zip_government_bodies), including cities
+-- with no community row yet: has_source is false for them, and those are the cities nothing reads.
+bodies as (
+  select pg.zip, b.census_place_geoid geoid, b.name, b.has_source
+  from pages pg cross join lateral public.zip_government_bodies(pg.zip) b where b.body_kind = 'city'
+),
 rep as (select d.* from public.development_reports d join pages using (zip)),
 dev as (
   select substring(p.source_key from '^[a-z]+:([^:]+)') src, p.zip, p.created_at
@@ -42,20 +53,19 @@ dev as (
 src as (select src, count(distinct zip) zips, max(created_at) newest_new from dev group by src),
 gn as (
   select max(a.created_at) newest, count(*) n from public.alerts a
-  where a.community_id in (select cid from chain_ids) and a.pipeline_type = 'government_notice'
+  where a.community_id in (select cid from gov_ids) and a.pipeline_type = 'government_notice'
 ),
-mt as (select max(m.created_at) newest, count(*) n from public.meetings m where m.community_id in (select cid from chain_ids)),
+mt as (select max(m.created_at) newest, count(*) n from public.meetings m where m.community_id in (select cid from gov_ids)),
 ln as (
   select max(a.created_at) newest, count(*) n from public.alerts a
   where a.community_id in (select cid from chain_ids) and a.category = 'local_news'
 ),
 feeds as (
   select f.target_table, count(*) filter (where f.active) active_n, count(*) n
-  from public.feeds f where f.community_id in (select cid::text from chain_ids) group by f.target_table
+  from public.feeds f where f.community_id in (select cid::text from gov_ids) group by f.target_table
 ),
-places as (  -- non-county places on the chain, i.e. cities, and whether any feed is attached to them
-  select c.id, c.name, exists (select 1 from public.feeds f where f.community_id = c.id::text and f.active) has_feed
-  from public.communities c where c.id in (select cid from chain_ids) and c.level = 'city'
+places as (  -- each city listed on any page, and whether it has an active source
+  select geoid, min(name) name, bool_or(has_source) has_feed, count(distinct zip) zips from bodies group by geoid
 ),
 render as (
   select pg.zip, count(ch.id) filter (where ch.category = 'Local News') news, count(ch.id) total
@@ -88,7 +98,7 @@ select * from (
          case when newest_new < now() - interval '60 days' then 'FLAG' else 'PASS' end
   from src
   union all
-  select 6, 'government-notice feeds on the chain: active / total, by table',
+  select 6, 'government feeds on the chain + overlap cities: active / total, by table',
          coalesce((select string_agg(target_table || ' ' || active_n || '/' || n, ', ' order by target_table) from feeds), 'none'),
          coalesce((select sum(n) from feeds), 0)::text,
          case when coalesce((select sum(active_n) from feeds), 0) = 0 then 'FAIL' else 'PASS' end
@@ -101,11 +111,18 @@ select * from (
          case when n = 0 or newest < now() - interval '90 days' then 'FAIL'
               when newest < now() - interval '30 days' then 'FLAG' else 'PASS' end from mt
   union all
-  select 9, 'city places on the chain with no active feed (government is county-only there)',
-         (select count(*) filter (where not has_feed) from places) || ' of ' || (select count(*) from places),
+  select 9, 'cities listed on the pages with no active source (unread there)',
+         (select count(*) filter (where not has_feed) from places) || ' of ' || (select count(*) from places)
+           || coalesce(': ' || (select string_agg(name, ', ' order by name collate "C") filter (where not has_feed) from places), ''),
          (select count(*) from pages)::text,
          case when (select count(*) filter (where not has_feed) from places) > 0 then 'FLAG'
               when (select count(*) from places) = 0 then 'FLAG' else 'PASS' end
+  union all
+  select 13, 'pages listing a city that has an active source',
+         (select count(distinct zip) from bodies where has_source) || ' of ' || (select count(*) from pages)
+           || ' (pages listing any city: ' || (select count(distinct zip) from bodies) || ')',
+         (select count(*) from bodies)::text,
+         case when (select count(*) from bodies) = 0 then 'FLAG' else 'PASS' end
   union all
   select 10, 'local news stored: rows / newest', n || ' / ' || coalesce(newest::date::text, '-'), n::text,
          case when n = 0 then 'FAIL' when newest < now() - interval '14 days' then 'FLAG' else 'PASS' end from ln
