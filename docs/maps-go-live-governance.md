@@ -409,6 +409,25 @@ dry-runs, suites, golden guards · post-deploy measurement · opening, merging a
 - **Reconcile any number given in an instruction against the artifact** before acting on it.
 - **Scope is fixed at authorization;** new findings become new `QUEUE.md` items.
 
+### 5a. A county "ready for launch" verdict requires `scripts/audits/county-launch-readiness.sql` (2026-10-18)
+
+Run it for the county immediately before the verdict, and list every row that is not PASS in the
+verdict itself. It covers every feed that puts data on the county's ZIP pages, each on its own
+clock:
+- development refresh and each development source;
+- the EPA facility layer;
+- government-notice and meeting feeds;
+- city places with no feed;
+- local news;
+- pages rendering nothing.
+
+Data-centre markers and source-specific privacy checks are named at its foot as not covered; say
+so if they were not checked separately.
+
+*Why:* Pierce County WA was called ready after checking only the development permits that had just
+changed. The EPA facility layer refreshes on its own clock (`facilities_refreshed_at`) and was older
+than 7 days on 11 of 65 pages. A check of one clock is not a check of the page.
+
 ---
 
 ## 6. Queue discipline
