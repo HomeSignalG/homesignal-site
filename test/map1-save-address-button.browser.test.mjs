@@ -129,7 +129,10 @@ ok(a.text === 'Save this address to My Places', '2b with the exact label', a.tex
 
 // 3. Clicking it opens the shell's add-an-address flow with the resolved address, saving nothing itself.
 await page.evaluate(() => { window.__openHomeCalls = []; window.HS.openHome = function (x) { window.__openHomeCalls.push(x); }; });
+await page.evaluate(() => { window.__evs = []; window.HS.logEvent = function (t, p) { window.__evs.push([t, p]); }; });
 await page.click('#saveAddrBtn');
+const evs = await page.evaluate(() => window.__evs);
+ok(evs.length === 1 && evs[0][0] === 'save_address_click' && Object.keys(evs[0][1] || {}).length === 0, '3b click logs save_address_click with no payload (no address)', evs);
 const calls = await page.evaluate(() => window.__openHomeCalls);
 ok(calls.length === 1 && /2200 CALDWELL LN/i.test(calls[0]), '3a click calls HS.openHome once with the resolved address', calls);
 
