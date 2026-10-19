@@ -36,3 +36,31 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 --   Renton, Kent, Kirkland, Shoreline, Burien, SeaTac, Tukwila, Sammamish, Issaquah, Bothell, Federal Way
 --                  no Legistar tenant (webapi answers 500 "LegistarConnectionString setting is not set
 --                  up") and no CivicClerk tenant (404); their own sites are the next probe
+
+-- Step 2 (2026-10-19): three more cities, each source probed live through pg_net.
+--   Duvall           CivicPlus AgendaCenter, City Council category (City-Council-1): 22 agendas, newest 2026-10-20
+--   Black Diamond    CivicPlus iCalendar catID 14 "Main Calendar": City Council, work sessions, Planning and Civil
+--                    Service meetings through 2027-01-19, plus holiday entries the feed's filter drops
+--   Lake Forest Park CivicPlus iCalendar catID 14 "Meetings Calendar": City Council regular meetings, work sessions
+--                    and committees through 2026-12-17 (its AgendaCenter categories stop in 2022)
+-- Feeds: homesignal-ingest feeds.csv mtg-<slug>-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Duvall', 'duvall-wa'), ('Black Diamond', 'black-diamond-wa'), ('Lake Forest Park', 'lake-forest-park-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Duvall 39baaa64-1734-47d6-8343-e5c401aba224 (5319035)
+--   · Black Diamond 0761eaf7-e4ec-463a-ba19-e4a409aa6c59 (5306330)
+--   · Lake Forest Park 5ca7a034-47c5-44f4-a010-1b72b413e479 (5337270)
+
+-- HELD after step 2 (2026-10-19), each probed through pg_net:
+--   Kent             Granicus kentwa: view_id 1 empty, 2-8 return 404
+--   Mercer Island    CivicClerk tenant carries vendor "Test ..." rows (see above)
+--   Renton, Kirkland, Shoreline, SeaTac, Bothell   their own sites answer 403 to pg_net
+--   Issaquah         Cloudflare challenge page; not worked around
+--   Burien, Tukwila, Sammamish, Federal Way, Newcastle, Normandy Park, Maple Valley, Covington
+--                    /AgendaCenter answers 404 (a different CMS); next probe is each city's own CMS
+--   Woodinville, Enumclaw   host does not resolve from pg_net
+--   No eSCRIBE tenant found for any King city.
