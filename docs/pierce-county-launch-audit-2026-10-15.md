@@ -163,6 +163,11 @@ about 1,965 stale `app_projects` rows, concentrated in Tacoma ZIPs (98404 414 ·
 2,181 distinct records), but the longitudinal-asset rule says removal should not destroy history, and no snapshot was taken first. Their
 identity is recoverable: ids derive from the case number and the public source still serves them, so reverting `drop_minor_repairs` and
 re-running the same flush would restore them. The privacy-stripped names themselves are intentionally not retained anywhere.
+**Archived 2026-10-19.** `public.filtered_source_records_archive` (RLS on, no anon/authenticated access, append-only) now holds
+**2,324** Tacoma records the filter drops, each with the publisher's row verbatim. They were read back from the public layer for
+application dates 2025-10-15 to 2026-10-16 (6,016 rows read, equal to the source's own count) and chosen by the shipped
+`isMinorRepairNoise` (#2037, run 39186074325). The id fingerprint is `02f2fbd3fffd1f535060a102a3ec482a`, the same in the run and in the
+database. Re-run `archive-filtered-source-records.yml` (dispatch, `apply=true`) to add later drops; records already archived are never rewritten.
 
 **Other residuals.** Old response bodies in `net._http_response` still contain pre-deploy names until pg_net's retention expires them.
 The `indexnow` job of pages run 38782500923 failed after `build` and `deploy` had succeeded. Read from its log: the notifier waited the
