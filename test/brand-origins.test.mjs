@@ -57,8 +57,8 @@ check('4c the unauthenticated control is actually refused', (await status('https
 const gateSrc = readFileSync('supabase/functions/_shared/admin-gate.ts', 'utf8');
 check('5a admin-gate.ts holds no literal origin list', !/https:\/\/(www\.)?(homesignal\.net|jodytracks\.com)/.test(gateSrc.replace(/\/\/.*$/gm, '')), 'literal');
 const consumers = execFileSync('git', ['grep', '--untracked', '-l', 'brand-origins.generated', '--', 'supabase', 'scripts', 'lib'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).sort();
-const WANT_CONSUMERS = ['scripts/gen-brand-origins.mjs', 'supabase/functions/_shared/admin-gate.ts', 'supabase/functions/_shared/billing-reads.ts', 'supabase/functions/_shared/evaluation-reads.ts', 'supabase/functions/_shared/share-reads.ts', 'supabase/functions/_shared/watch-email.ts'].sort();
-check('5b only the gate, the four link/sender modules and the generator reference the generated module', JSON.stringify(consumers) === JSON.stringify(WANT_CONSUMERS), consumers.join());
+const WANT_CONSUMERS = ['scripts/gen-brand-origins.mjs', 'supabase/functions/_shared/admin-gate.ts', 'supabase/functions/_shared/billing-reads.ts', 'supabase/functions/_shared/changes-since-report.ts', 'supabase/functions/_shared/evaluation-reads.ts', 'supabase/functions/_shared/share-reads.ts', 'supabase/functions/_shared/watch-email.ts'].sort();
+check('5b only the gate, the link/sender/name modules and the generator reference the generated module', JSON.stringify(consumers) === JSON.stringify(WANT_CONSUMERS), consumers.join());
 
 // 6. outbound links: built from the contract's CURRENT identity. While the contract is v1 every emitted string is exactly the one that
 // used to be written out in the source (so this deploys with no behaviour change); under the v2 swap they follow the contract.

@@ -49,6 +49,7 @@ import {
   dayOf, detectedChangeEntries, isChangeReady, materialEvents, PRODUCT_NAME, selectDetectedChanges, SOURCE_NOT_FULLY_READ, sourcesNotFullyRead,
   validateRights,
 } from './national-report.ts';
+import { PUBLIC_NAME } from './brand-origins.generated.ts';
 import type { LedgerProject, ReportableEvent, SourceHealth, View, WrittenEvent } from './national-report.ts';
 
 /** A ledger event with the instant the ledger WROTE it. Defined in national-report.ts beside ReportableEvent, so the shared read layer does not import its own consumer. */
@@ -76,7 +77,7 @@ export const NEW_PROJECTS_NOT_COVERED = {
 };
 export const RECORDED_AFTER_REPORT = {
   code: 'RECORDED_AFTER_REPORT',
-  text: 'Some changes below were recorded by HomeSignal after the report was issued, from a source record that was retrieved before it. The report may already show the new state; compare with the report.',
+  text: 'Some changes below were recorded by ' + PUBLIC_NAME + ' after the report was issued, from a source record that was retrieved before it. The report may already show the new state; compare with the report.',
 };
 export const SOURCES_NOT_INCLUDED_SINCE = {
   code: 'SOURCES_NOT_INCLUDED',
