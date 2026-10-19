@@ -64,3 +64,29 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 --                    /AgendaCenter answers 404 (a different CMS); next probe is each city's own CMS
 --   Woodinville, Enumclaw   host does not resolve from pg_net
 --   No eSCRIBE tenant found for any King city.
+
+-- Step 3 (2026-10-19): three cities whose own sites answer 403 to pg_net, read from a GitHub runner
+-- (recon-fetch runs 39317469083..39318202273; the runner is the network path production ingest uses):
+--   Bothell    CivicPlus AgendaCenter City-Council-5: 33 agendas 2026-01-06..2026-10-20
+--   Shoreline  Granicus RSS view_id 4 (the view the city embeds on its council-meetings page):
+--              City Council regular meetings and workshops, newest 2026-10-19
+--   SeaTac     AgendaQuick tenant id=73282 (embedded on its online-agendas page): council meetings,
+--              study sessions and budget workshops; only City Council meeting types are listed
+-- Feeds: homesignal-ingest feeds.csv mtg-<slug>-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Bothell', 'bothell-wa'), ('Shoreline', 'shoreline-wa'), ('SeaTac', 'seatac-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Bothell 08c89ef6-1d9d-419f-9934-bb8f4e1cc436 (5307380)
+--   · Shoreline ea11a907-acc8-4e20-b515-18b675ec592e (5363960)
+--   · SeaTac 74b8f1bf-a550-4e3c-9d55-0465b8d44d73 (5362288)
+
+-- HELD after step 3 (2026-10-19), re-read from a runner:
+--   Renton     agendas are on PrimeGov (renton.primegov.com, public JSON API answers 200); no PrimeGov
+--              adapter exists yet
+--   Kirkland   OpenCities site; its council and agendas pages link no agenda platform in their HTML
+--   Issaquah   Cloudflare "Attention Required" to the runner too; not worked around
+--   The other cities held after step 2 are unchanged.
