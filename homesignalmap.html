@@ -926,7 +926,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=774b1f53"></script>
+<script src="shell.js?v=64bf3cb8"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -2209,7 +2209,10 @@ HS.onReady(function(){
         var _saB = $("saveAddrBtn"), _saW = $("saveAddr");
         if(_saB && _saW && window.HS && typeof HS.openHome === "function"){
           var _saAddr = String(m.matchedAddress || address || "").trim();
-          _saB.onclick = function(){ HS.openHome(_saAddr); };
+          _saB.onclick = function(){
+        try{ if(typeof HS.logEvent === "function") HS.logEvent("save_address_click", {}); }catch(e){}
+        HS.openHome(_saAddr);
+      };
           _saW.hidden = false;
         }
       });

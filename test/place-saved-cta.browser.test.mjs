@@ -103,6 +103,12 @@ ok(Math.abs(cardBox.cx - cardBox.vw / 2) <= 2 && Math.abs(cardBox.cy - cardBox.v
 ok(!/Emailing you/.test(zipCard) && !/Email me these alerts/.test(zipCard),
   'ZIP save card does not claim email was activated', zipCard);
 
+await page.evaluate(() => { window.__dis = []; const o = window.HS.logEvent; window.HS.logEvent = function (t, p) { window.__dis.push([t, p]); }; window.__origLog = o; });
+await page.click('#optinNo');
+const disEv = await page.evaluate(() => window.__dis);
+ok(disEv.length === 1 && disEv[0][0] === 'place_saved_alerts_dismiss' && disEv[0][1].zip_code === '78617', 'Not now logs place_saved_alerts_dismiss with the ZIP only', disEv);
+await page.evaluate(() => { window.HS.logEvent = window.__origLog; window.HS.showAreaOptin({ zip: '78617', kind: 'zip', topics: [] }); });
+
 const zipCtaHref = await page.getAttribute('#optinAlertsCta', 'href');
 ok(zipCtaHref === 'alerts.html?zip=78617', 'ZIP CTA preserves ZIP via alerts.html?zip=', zipCtaHref);
 
@@ -119,8 +125,11 @@ ok(following.enableCalls === 0, 'follow did not call enableAreaEmail', following
 
 const prefsBefore = await page.evaluate(() => JSON.stringify(window.HS.state.topicPrefs || {}));
 
+await page.evaluate(() => { window.HS.logEvent = function (t, p) { try { sessionStorage.setItem('__ev', JSON.stringify([t, p])); } catch (e) {} }; });
 await page.click('#optinAlertsCta');
 await page.waitForURL(/alerts\.html\?zip=78617/, { timeout: 10000 });
+const yesEv = await page.evaluate(() => sessionStorage.getItem('__ev'));
+ok(yesEv === JSON.stringify(['place_saved_alerts_yes', { zip_code: '78617' }]), 'Yes click logs place_saved_alerts_yes with the ZIP only', yesEv);
 if (process.env.HS_SCREENSHOT_DIR) {
   await page.screenshot({ path: join(process.env.HS_SCREENSHOT_DIR, 'zip-cta-alerts.png'), fullPage: false });
 }
