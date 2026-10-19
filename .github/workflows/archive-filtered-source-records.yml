@@ -1,0 +1,55 @@
+name: archive-filtered-source-records
+
+# Keeps the source records a registry noise filter drops (today: tacoma-accela-permits
+# drop_minor_repairs) in public.filtered_source_records_archive. Report-only unless apply=true.
+# The table DDL (docs/filtered-source-records-archive.sql) must be applied first.
+# Evidence comes back through this job's log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: "arcgis registry_id whose filtered records to archive"
+        default: "tacoma-accela-permits"
+        required: true
+      since:
+        description: "earliest publisher file date to read (YYYY-MM-DD)"
+        default: "2025-10-15"
+        required: true
+      apply:
+        description: "write to the archive (false = report only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-filtered-source-records
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    # Holds SUPABASE_SERVICE_ROLE_KEY: never on pull_request, dispatch from main only.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline checks
+        run: node --experimental-strip-types test/archive-filtered-source-records.test.mjs
+      - name: Archive
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REGISTRY: ${{ inputs.registry }}
+          SINCE: ${{ inputs.since }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ "$APPLY" = "true" ]; then extra+=(--apply); fi
+          node --experimental-strip-types scripts/archive-filtered-source-records.mjs --registry "$REGISTRY" --since "$SINCE" "${extra[@]}"
