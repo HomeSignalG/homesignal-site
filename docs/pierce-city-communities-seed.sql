@@ -43,6 +43,16 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 --                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
 --   Buckley, Orting, Ruston, South Prairie, Wilkeson  no CivicPlus / CivicClerk / Legistar
 --                  source found that serves current council agendas; source discovery owed
---   Fircrest       WordPress Events Calendar API is live (108 events) and ingest's city_events
---                  reads it, but its council events carry timezone "UTC+0", so a 7 PM meeting
---                  would be stored at noon Pacific; needs a date-only mode in city_events first
+--   (Fircrest was held here until 2026-10-19; see Step 3 below.)
+
+-- Step 3 (2026-10-19): Fircrest. Its WordPress Events Calendar API tags council events "UTC+0" with a
+-- local wall clock; homesignal-ingest city_events now keeps such events date-only (#702).
+-- Feed: mtg-fircrest-wa-city-catchall (jurisdiction_slug fircrest-wa).
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Fircrest', 'fircrest-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Fircrest e83b558a-de12-43c8-b918-230e2224bd0e (Census place 5323970)
