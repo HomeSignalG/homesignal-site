@@ -136,6 +136,12 @@ ok(evs.length === 1 && evs[0][0] === 'save_address_click' && Object.keys(evs[0][
 const calls = await page.evaluate(() => window.__openHomeCalls);
 ok(calls.length === 1 && /2200 CALDWELL LN/i.test(calls[0]), '3a click calls HS.openHome once with the resolved address', calls);
 
+const ret = await page.evaluate(() => window.HS.returnToAddressAfterSave);
+ok(/2200 CALDWELL LN/i.test(ret || ''), '3c click records the searched address for the post-save reload to run again', ret);
+const shellSrc = await readFile(join(root, 'shell.js'), 'utf8');
+const iStash = shellSrc.indexOf("sessionStorage.setItem('hs.homeSearchAddress'"), iReload = shellSrc.indexOf('setTimeout(() => location.reload(), 900)');
+ok(iStash > 0 && iReload > iStash, '3d saveHome hands that address to the map page one-time handoff BEFORE it reloads', { iStash, iReload });
+
 // 4. A new search hides it until that search resolves; a failed search leaves it hidden.
 geocodeCalls = [];
 const prev = routeHandler;

@@ -1764,6 +1764,9 @@
     $('homeConfirm').classList.add('hidden');
     $('homeDone').classList.remove('hidden');
     release();
+    // The map page names the address it was showing; its own one-time handoff (read once, then removed)
+    // runs that search again after the reload, so the resident is not left on an empty map.
+    if (HS.returnToAddressAfterSave) { try { sessionStorage.setItem('hs.homeSearchAddress', String(HS.returnToAddressAfterSave)); } catch (e) {} }
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
   };
 
