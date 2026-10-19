@@ -103,6 +103,37 @@ ok(Math.abs(cardBox.cx - cardBox.vw / 2) <= 2 && Math.abs(cardBox.cy - cardBox.v
 ok(!/Emailing you/.test(zipCard) && !/Email me these alerts/.test(zipCard),
   'ZIP save card does not claim email was activated', zipCard);
 
+// Dialog semantics: labelled modal, backdrop, focus inside, Tab wraps, Escape closes and logs, focus returns.
+const dlg = await page.evaluate(() => { const b = document.getElementById('hsOptin'), k = document.getElementById('hsOptinBackdrop');
+  return { role: b.getAttribute('role'), modal: b.getAttribute('aria-modal'), lab: b.getAttribute('aria-labelledby'),
+    backShown: !!k && getComputedStyle(k).display !== 'none', focus: document.activeElement && document.activeElement.id }; });
+ok(dlg.role === 'dialog' && dlg.modal === 'true' && dlg.lab === 'optinTitle', 'post-save card is a labelled modal dialog', dlg);
+ok(dlg.backShown, 'a backdrop dims the page behind the dialog', dlg);
+ok(dlg.focus === 'optinAlertsCta', 'focus moves into the dialog (the Yes link)', dlg);
+await page.keyboard.press('Tab');
+ok((await page.evaluate(() => document.activeElement.id)) === 'optinNo', 'Tab moves to Not now', null);
+await page.keyboard.press('Tab');
+ok((await page.evaluate(() => document.activeElement.id)) === 'optinAlertsCta', 'Tab wraps inside the dialog', null);
+await page.keyboard.press('Shift+Tab');
+ok((await page.evaluate(() => document.activeElement.id)) === 'optinNo', 'Shift+Tab wraps backwards', null);
+await page.evaluate(() => { window.__esc = []; window.__oL = window.HS.logEvent; window.HS.logEvent = function (t, p) { window.__esc.push([t, p]); }; });
+await page.keyboard.press('Escape');
+const esc = await page.evaluate(() => ({ ev: window.__esc, open: getComputedStyle(document.getElementById('hsOptin')).display !== 'none',
+  back: getComputedStyle(document.getElementById('hsOptinBackdrop')).display !== 'none' }));
+ok(esc.ev.length === 1 && esc.ev[0][0] === 'place_saved_alerts_dismiss' && !esc.open && !esc.back, 'Escape closes the dialog and logs a dismiss', esc);
+await page.evaluate(() => { window.HS.logEvent = window.__oL; window.HS.showAreaOptin({ zip: '78617', kind: 'zip', topics: [] }); });
+await page.evaluate(() => { window.__e2 = []; window.__oL2 = window.HS.logEvent; window.HS.logEvent = function (t, p) { window.__e2.push(t); }; });
+await page.mouse.click(5, 5);
+const bk = await page.evaluate(() => ({ ev: window.__e2, open: getComputedStyle(document.getElementById('hsOptin')).display !== 'none' }));
+ok(bk.ev.length === 1 && bk.ev[0] === 'place_saved_alerts_dismiss' && !bk.open, 'clicking the backdrop closes the dialog', bk);
+await page.evaluate(() => { window.HS.logEvent = window.__oL2; window.HS.showAreaOptin({ zip: '78617', kind: 'zip', topics: [] }); });
+// Phone width: the dialog fits and is not cut off.
+await page.setViewportSize({ width: 360, height: 640 });
+const ph = await page.evaluate(() => { const r = document.getElementById('hsOptin').getBoundingClientRect();
+  return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight }; });
+ok(ph.l >= 0 && ph.r <= ph.vw && ph.t >= 0 && ph.b <= ph.vh, 'dialog fits inside a 360x640 phone window', ph);
+await page.setViewportSize({ width: 1280, height: 800 });
+
 await page.evaluate(() => { window.__dis = []; const o = window.HS.logEvent; window.HS.logEvent = function (t, p) { window.__dis.push([t, p]); }; window.__origLog = o; });
 await page.click('#optinNo');
 const disEv = await page.evaluate(() => window.__dis);
