@@ -25,7 +25,7 @@ const ch = fn(shell, 'HS.consumeFollowHandoff');
 ok(/removeItem\('hs\.followProperty'\)/.test(ch) && /HS\.openHome\(want\)/.test(ch) && /want\.length > 200/.test(ch), '2a it reads the key once, removes it in the same step and opens the add-an-address flow');
 ok(/HS\.consumeFollowHandoff\(\)/.test(shell.slice(shell.indexOf('HS.startOnboarding();'))), '2b boot calls it, and not in an embed');
 const oh = fn(shell, 'HS.openHome = function');
-ok(/HS\.openAuth\(want \? function \(\) \{ return HS\.openHome\(want\); \} : undefined\)/.test(oh), '2c signed out: the EXISTING sign-in modal, resuming the same flow after the code');
+ok(/HS\.openAuth\(want \? function \(\) \{ (?:HS\.returnToAddressAfterSave = retAddr; )?return HS\.openHome\(want\); \} : undefined\)/.test(oh), '2c signed out: the EXISTING sign-in modal, resuming the same flow after the code');
 ok(/a\.value = want; HS\.findHome\(\)/.test(oh), '2d signed in: the address goes through findHome (Census confirmation), so nothing is saved before the resident taps Save');
 ok(!/app_properties|app_follows|\.insert\(|\.upsert\(/.test(ch + oh), '2e neither the hand-off nor openHome writes anything: the one writer stays savePlaceRow');
 ok((shell.match(/from\('app_properties'\)\.(insert|upsert)/g) || []).length === (read('shell.js').match(/from\('app_properties'\)\.(insert|upsert)/g) || []).length && /async function savePlaceRow/.test(shell), '2f savePlaceRow is still the writer');
