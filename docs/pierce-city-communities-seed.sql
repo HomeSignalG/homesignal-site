@@ -36,14 +36,18 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- the shipped adapters read.
 --   Fife           AgendaCenter City-Council-2 serves 100 agendas, newest 2018-10-23 (archive)
 --   Steilacoom     AgendaCenter Town-Council-1 serves 6 agendas, newest 2021-03-02 (archive)
---   DuPont, Puyallup  CivicPlus client-rendered "Loading" shell (no server-side agendas);
---                  puyallupwa CivicClerk tenant 404
---   Lakewood       lakewoodwa CivicClerk tenant 404; no Legistar tenant found
 --   Federal Way    webapi.legistar.com/v1/federalway answers 500 "LegistarConnectionString
 --                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
---   Buckley, Orting, Ruston, South Prairie, Wilkeson  no CivicPlus / CivicClerk / Legistar
---                  source found that serves current council agendas; source discovery owed
---   (Fircrest was held here until 2026-10-19; see Step 3 below.)
+--   Orting         www.cityoforting.org answers 403 Access Denied to automated requests (2026-10-19)
+--   Ruston         WordPress Events Manager iCal (/events/?ical=1, 65 events in 2026); no shipped
+--                  adapter reads it yet
+--   Lakewood       no CivicClerk / Legistar tenant; agendas are dated PDFs on cityoflakewood.us,
+--                  which no shipped parser reads yet
+--   South Prairie  townofsouthprairie.com is a hosting placeholder page (2026-10-19)
+--   Wilkeson       a Wix blog of announcements, no meeting calendar
+--   (Fircrest was held here until 2026-10-19; see Step 3. Buckley, Puyallup and DuPont until
+--   2026-10-19 too, see Step 4: Puyallup moved to puyallupwa.gov, and both it and DuPont publish
+--   their meetings as CivicPlus iCalendar feeds rather than in AgendaCenter.)
 
 -- Step 3 (2026-10-19): Fircrest. Its WordPress Events Calendar API tags council events "UTC+0" with a
 -- local wall clock; homesignal-ingest city_events now keeps such events date-only (#702).
@@ -56,3 +60,20 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'pierce-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-19: Fircrest e83b558a-de12-43c8-b918-230e2224bd0e (Census place 5323970)
+
+-- Step 4 (2026-10-19): Buckley, Puyallup, DuPont. Each source was probed live through pg_net:
+--   Buckley   CivicPlus AgendaCenter, City Council category (City-Council-3): 27 agendas, newest 2026-10-20
+--   Puyallup  CivicPlus iCalendar catID 36 "City Council, Boards, & Commissions Meetings" (read from the
+--             city's own iCalendar directory, puyallupwa.gov): 18 meeting events, newest 2026-12-28
+--   DuPont    CivicPlus iCalendar catID 14 "City of DuPont Calendar": 24 City Council meetings plus
+--             holiday closures; the feed keeps only meeting|council|commission|session
+-- Feeds: homesignal-ingest feeds.csv mtg-<slug>-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Buckley', 'buckley-wa'), ('Puyallup', 'puyallup-wa'), ('DuPont', 'dupont-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Buckley d15b0a35-4acf-40b8-b702-fbc6daa3ddce (5308570) · Puyallup f90d2726-9ded-4637-a9a0-76413240d88f
+--   (5356695) · DuPont 236fd97f-7cea-4e7b-96fa-99a2a39feb76 (5318965)
