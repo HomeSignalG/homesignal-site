@@ -1181,6 +1181,12 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     and is deliberately NOT bundled into the deployment change.
   - **`docs/` and `test/` are no longer served publicly** — the artifact excludes them. No
     shipped page ever linked to either (checked: zero `href` references).
+- 🔒 **A workflow push never becomes the head of an open PR (2026-10-19).** A push made with
+  `GITHUB_TOKEN` starts no workflows, so a bot commit on a branch with an open PR leaves that
+  PR with no checks on its head. Every pushing workflow calls `scripts/guard_bot_push.sh
+  <target>` first (copy of the homesignal-ingest script, #720): 0 = push, 3 = refused (step
+  red), 4 = refused on a push-started run (step green, nothing pushed), 1 = could not check.
+  Pinned by `test/bot-push-guard.test.mjs`.
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file

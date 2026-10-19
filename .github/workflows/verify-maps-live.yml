@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read   # guard_bot_push.sh asks whether the branch has an open PR
 
 jobs:
   walk:
@@ -38,6 +39,8 @@ jobs:
           git config user.name "verify-maps-live"
           git add -A
           git commit -q -m "live verification screenshots (run ${GITHUB_RUN_ID})"
+          # A push from this job must not become the head of an open PR (its checks would never run).
+          GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/scripts/guard_bot_push.sh" "ci-live-shots" || { [ $? -eq 4 ] && exit 0; exit 1; }
           git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-live-shots
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
