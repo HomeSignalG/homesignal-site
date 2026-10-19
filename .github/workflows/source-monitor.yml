@@ -38,6 +38,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read   # guard_bot_push.sh asks whether the branch has an open PR
   actions: write
 
 concurrency:
@@ -109,6 +110,8 @@ jobs:
           # (observed 2026-08-02, run 30765171160). Rebase onto the moved tip and retry —
           # the commit only ever touches the report + registry, so a rebase is safe.
           for attempt in 1 2 3 4; do
+            # A push from this job must not become the head of an open PR (its checks would never run).
+            GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/scripts/guard_bot_push.sh" "${{ github.ref_name }}" || { [ $? -eq 4 ] && exit 0; exit 1; }
             if git push origin "HEAD:${{ github.ref_name }}"; then
               echo "pushed on attempt $attempt"; exit 0
             fi
