@@ -95,7 +95,7 @@ console.log('--- 1. the box and the line under it ---');
       helper: helper ? helper.textContent.trim() : null,
       myPlacesLine: [...document.querySelectorAll('.home-index a')].filter((a) => /My Places/.test(a.textContent)).length,
       heroDash: [...document.querySelectorAll('.home-index a')].filter((a) => /dashboard\.html/.test(a.getAttribute('href') || '')).length,
-      headerMyPlaces: [...document.querySelectorAll('.hs-nav a')].filter((a) => a.getAttribute('href') === 'properties.html').length
+      headerMyPlaces: [...document.querySelectorAll('.hs-nav a[data-nav="props"]')].filter((a) => a.getAttribute('href') === 'properties.html').length
     };
   });
   ok(m.placeholder === 'Enter an address or ZIP code', '1 the box says "Enter an address or ZIP code"', m.placeholder);

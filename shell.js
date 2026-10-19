@@ -2688,7 +2688,7 @@
       if (head && head.classList.contains('menu-open') && !head.contains(e.target)) closeMenu();
     });
     // the nav dropdowns (Explore, Enterprise): a button toggles one; an entry, Escape or a click outside closes it
-    ['hs-explore', 'hs-enterprise'].forEach(function (id) {
+    ['hs-explore', 'hs-places', 'hs-enterprise'].forEach(function (id) {
       const btn = $(id + '-toggle');
       if (btn) btn.addEventListener('click', function () {
         const g = $(id);

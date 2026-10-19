@@ -476,7 +476,7 @@ await away();
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
-  ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|Enterprise|Enterprise overview|My reports',
+  ok(m.items.join('|') === 'Explore|Quality of Life Impact|Development Map|Activity|My Places|My Places|Alert Settings|Enterprise|Enterprise overview|My reports',
     '8 phone: the Menu panel lists the three pages under Explore', m.items);
   ok(!m.caret && JSON.stringify(m.current) === JSON.stringify(['activity']) && m.minH >= 44 && m.overflow === 0,
     '8 phone: no chevron, the current page marked, 44px targets, no sideways scroll', m);
