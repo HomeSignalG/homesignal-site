@@ -2027,25 +2027,58 @@
     if (!label) return;
     let box = $('hsOptin');
     if (!box) { box = document.createElement('div'); box.id = 'hsOptin'; document.body.appendChild(box); }
+    // A real dialog: dimmed backdrop, labelled, focus moves in and returns, Escape and Tab handled.
+    let back = $('hsOptinBackdrop');
+    if (!back) { back = document.createElement('div'); back.id = 'hsOptinBackdrop'; document.body.insertBefore(back, box); }
+    back.style.cssText = 'position:fixed;inset:0;z-index:59;background:rgba(18,38,29,.45)';
+    back.style.display = '';
     box.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;'
-      + 'max-width:440px;width:calc(100% - 32px);background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
-      + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:14px 16px;font:400 13.5px/1.4 var(--font,system-ui)';
+      + 'max-width:440px;width:calc(100% - 32px);max-height:calc(100% - 32px);overflow:auto;box-sizing:border-box;'
+      + 'background:#fff;border:1px solid #d9e2dc;border-radius:14px;'
+      + 'box-shadow:0 8px 28px rgba(0,0,0,.18);padding:16px 18px;font:400 13.5px/1.4 var(--font,system-ui)';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'optinTitle');
+    box.setAttribute('aria-describedby', 'optinSub');
     const href = HS.alertsHrefForSavedPlace(info);
     const zipTxt = /^\d{5}$/.test(String(info.zip || '')) ? ' for ZIP ' + info.zip : '';
     box.innerHTML =
       '<div id="optinTitle" style="font-weight:700;color:var(--ink,#12261d)">✓ ' + HS.esc(label) + ' saved to My Places</div>'
-      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 10px">Want email alerts? Get Government notices, Upcoming meetings and Local news' + HS.esc(zipTxt) + '.</div>'
-      + '<div style="display:flex;gap:10px;align-items:center">'
-      +   '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="background:var(--green,#157a49);color:#fff;border-radius:9px;padding:9px 14px;font-weight:700;text-decoration:none">Yes, choose my alerts →</a>'
-      +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
+      + '<div id="optinSub" style="color:var(--ink-3,#5a6b63);margin:4px 0 12px">Want email alerts? Get Government notices, Upcoming meetings and Local news' + HS.esc(zipTxt) + '.</div>'
+      + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+      +   '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="background:var(--green,#157a49);color:#fff;border-radius:9px;padding:10px 14px;font-weight:700;text-decoration:none">Yes, choose my alerts →</a>'
+      +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:13px;padding:10px 6px">Not now</button>'
       + '</div>';
     const optZip = /^\d{5}$/.test(String(info.zip || '')) ? String(info.zip) : null;
+    if (HS._optinOff) HS._optinOff();
+    const prevFocus = document.activeElement;
+    function closeOptin() {
+      document.removeEventListener('keydown', onKey, true);
+      HS._optinOff = null;
+      box.style.display = 'none'; box.innerHTML = '';
+      back.style.display = 'none';
+      try { if (prevFocus && prevFocus.focus && document.body.contains(prevFocus)) prevFocus.focus(); } catch (e) {}
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); dismiss(); return; }
+      if (e.key !== 'Tab') return;
+      const f = [$('optinAlertsCta'), $('optinNo')].filter(Boolean);
+      if (!f.length) return;
+      const i = f.indexOf(document.activeElement), last = f.length - 1;
+      e.preventDefault();
+      f[e.shiftKey ? (i <= 0 ? last : i - 1) : (i < 0 || i === last ? 0 : i + 1)].focus();
+    }
+    function dismiss() {
+      logEvent('place_saved_alerts_dismiss', { zip_code: optZip });
+      closeOptin();
+    }
     // Counts only; no address. The Yes link still navigates normally.
     $('optinAlertsCta').addEventListener('click', function () { logEvent('place_saved_alerts_yes', { zip_code: optZip }); });
-    $('optinNo').onclick = function () {
-      logEvent('place_saved_alerts_dismiss', { zip_code: optZip });
-      box.style.display = 'none'; box.innerHTML = '';
-    };
+    $('optinNo').onclick = dismiss;
+    back.onclick = dismiss;
+    document.addEventListener('keydown', onKey, true);
+    HS._optinOff = function () { document.removeEventListener('keydown', onKey, true); };
+    try { $('optinAlertsCta').focus(); } catch (e) {}
   };
   // The affirmative: the ONLY caller of enable_area_email_alerts, the ONLY writer of
   // marketing_consent. Sends the floor labels under the 'notices' key + the consent copy
