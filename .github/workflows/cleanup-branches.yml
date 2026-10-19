@@ -9,13 +9,17 @@
 #   1. Actions -> "Cleanup finished branches" -> Run workflow, leave apply OFF. Open the run:
 #      the Summary lists every branch as DELETABLE or HELD (with the reason) and ends with a
 #      FINGERPRINT line.
-#   2. Run it again with apply ON and that fingerprint in expected_fingerprint. If anything
-#      changed since the report you read, the fingerprint no longer matches and nothing is
-#      deleted.
+#   2. Run it again with apply ON and the 16 characters after "FINGERPRINT:" in
+#      expected_fingerprint. If anything changed since the report you read, the fingerprint no
+#      longer matches and nothing is deleted. Each delete is atomic (a lease on the sha the
+#      report saw), so a branch that moved after the report is skipped, never deleted.
 #
 # NO SECRET IS INVOLVED. The run's own GITHUB_TOKEN (contents: write) may delete refs in this
 # repo and nowhere else. scripts/cleanup-branches.mjs documents the rule that decides which
 # branches are deletable; the decision suite below gates every run.
+#
+# The main-only guard below stops ACCIDENTS (dispatching a branch's copy by mistake). It is not
+# a security boundary: a branch can edit its own copy of this file.
 #
 # MIRRORED in homesignal-site (same file, same script bytes). Edit both.
 name: Cleanup finished branches
@@ -33,7 +37,7 @@ on:
         required: false
         default: false
       expected_fingerprint:
-        description: 'Required when apply is on: the FINGERPRINT line from the report run'
+        description: 'Required when apply is on: only the 16 characters after FINGERPRINT: in the report run'
         required: false
         default: ''
 

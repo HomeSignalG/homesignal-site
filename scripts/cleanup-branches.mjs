@@ -2,12 +2,14 @@
 // Delete branches that are FINISHED WITH — never one that still carries work.
 //
 // REPORT ONLY unless --apply (or CLEANUP_APPLY=true) AND the fingerprint the report printed is
-// handed back (--expect / CLEANUP_EXPECT). A report that nobody has read cannot be applied.
+// handed back (--expect / CLEANUP_EXPECT). Refusals never repeat the fingerprint, so the only
+// place to get it is the report itself.
 //
 // MIRROR: this file is byte-identical in homesignal-site (scripts/cleanup-branches.mjs) and
 // homesignal-ingest (scripts/cleanup_branches.mjs). It is a TOOL, not a truth decision, so a
-// second copy is the lesser evil next to a cross-repo token — but an edit here is an edit
-// there, and each repo's test pins this file's sha256 so a one-sided edit fails loudly.
+// second copy is the lesser evil next to a cross-repo token. Each repo's test pins this file's
+// sha256: that catches an accidental edit in ONE repo; it cannot see the other repo, so keep
+// the two pins equal by hand when you change it.
 //
 // WHY A WORKFLOW AT ALL. The sandbox's GitHub proxy refuses branch deletion, and the GitHub
 // web UI has no multi-select: 134 leftover `cursor/` branches would be 134 separate clicks.
@@ -17,29 +19,42 @@
 // names in this file. A branch under the target is DELETABLE only when ALL of these hold:
 //   1. it is not the default branch and not protected;
 //   2. no OPEN pull request has it as its head (deleting the head closes that PR);
-//   3. no OPEN pull request has it as its base (deleting the base closes that PR);
-//   4. its name is plain ASCII path text (anything odd is held, not escaped);
-//   5. EVERY commit on it is reachable from the default branch or from some pull request's
-//      ref (refs/pull/N/head). That is the data-loss test: after deletion nothing becomes
-//      unreachable. A branch merged by squash passes through its PR ref; a branch merged by
-//      merge commit passes through the default branch; a branch whose PR was closed unmerged
-//      passes through its PR ref; a branch with NO pull request and commits main lacks FAILS.
+//   3. no OPEN pull request has it as its base, fork PRs included (same reason);
+//   4. no release names it as its target branch;
+//   5. its name is plain ASCII path text (anything odd is held, not escaped);
+//   6. EVERY commit on it is reachable from the default branch or from the head of a CLOSED
+//      pull request. That is the data-loss test: after deletion nothing becomes unreachable.
+//      An OPEN pull request's ref does not count, because a force-push moves it. A squash-
+//      merged or closed-unmerged branch passes through its own closed PR's ref; a branch with
+//      no PR and commits main lacks FAILS.
 // Anything that fails is HELD with its reasons printed. "Cannot tell" is HELD, never deleted.
 //
+// THE CONTROLS ON THE INPUTS: every mirrored refs/pr/<N> must be in the PR list read from the
+// API (else the list is incomplete), and every CLOSED PR's mirrored ref must equal the head
+// sha the API reports (else the mirror is stale). Either failure refuses the whole run.
+//
+// THE DELETE IS ATOMIC. It is a `git push --force-with-lease=refs/heads/<name>:<planned sha>`
+// of an empty ref, so it succeeds only if the branch still points where the report saw it. A
+// commit pushed after the report makes the lease fail and the branch is SKIPPED. Just before
+// each delete the open-PR checks (head and base) are repeated; an unreadable answer skips.
+//
 // STRICT ON PURPOSE: a branch updated after its PR closed (e.g. "Merge branch 'main' into …")
-// has a tip that no PR ref holds, so it is HELD even though the only unreachable commit is
-// that merge. Loosening that is a decision for a human reading the report, not a default.
+// has a tip that no closed PR holds, so it is HELD even if that merge is its only extra commit.
+//
+// NOT CONSULTED: GitHub environments, deployment branch policies and anything else outside
+// git, branches and pull requests. The main-only guard in the workflow stops accidents; it is
+// not a security boundary (a branch could edit its own copy of the workflow).
 //
 // WHAT RESTORING LOOKS LIKE. A pull request page keeps a "Restore branch" button after the
 // head branch is deleted, and refs/pull/N/head keeps the commits regardless.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const MAX_DELETE = 200;           // blast-radius ceiling; the fingerprint is the real guard
-export const PR_REF_GLOB = 'refs/pr/*';  // where the workflow mirrors refs/pull/*/head
 const PLAIN = /^[A-Za-z0-9][A-Za-z0-9._\/-]*$/;
+const FP_SHAPE = /^[0-9a-f]{16}$/;
 
 // ---------------------------------------------------------------------------------------
 // target: a PREFIX ending in "/" (everything under it) or ONE exact branch name. No globs, no
@@ -55,6 +70,7 @@ export function parseTarget(raw) {
 }
 
 const matches = (t, name) => (t.kind === 'prefix' ? name.startsWith(t.value) : name === t.value);
+const plainName = (n) => PLAIN.test(n) && !n.includes('..') && !n.includes('//') && !n.endsWith('/') && !n.endsWith('.lock');
 
 // Collation-free by construction: names are hashed after a plain code-unit sort, in this
 // process, on both sides of every comparison (rule 9 concerns a DB sorting against a
@@ -65,9 +81,10 @@ export function fingerprint(names) {
 
 // ---------------------------------------------------------------------------------------
 // PURE decision. `unpreserved` maps branch -> array of commit shas that neither the default
-// branch nor any PR ref holds. A branch ABSENT from the map (or null) means "could not be
-// measured" and is HELD.
-export function selectDeletable({ repo, target, defaultBranch, branches, prs, unpreserved }) {
+// branch nor any closed PR holds. A branch ABSENT from the map (or null) means "could not be
+// measured" and is HELD. `merged` (branch -> bool) and `releaseTargets` (branch -> [tags])
+// are optional.
+export function selectDeletable({ repo, target, defaultBranch, branches, prs, unpreserved, merged, releaseTargets }) {
   const t = typeof target === 'string' ? parseTarget(target) : target;
   const me = String(repo).toLowerCase();
   const names = new Set(branches.map((b) => b.name));
@@ -83,6 +100,7 @@ export function selectDeletable({ repo, target, defaultBranch, branches, prs, un
       push(headPrs, p.head_ref, p.number);
       if (p.state === 'open') push(openHead, p.head_ref, p.number);
     }
+    // The base is always a branch of THIS repo, whoever opened the PR (forks included).
     if (p.state === 'open' && p.base_ref) push(openBase, p.base_ref, p.number);
   }
 
@@ -93,20 +111,20 @@ export function selectDeletable({ repo, target, defaultBranch, branches, prs, un
     const reasons = [];
     if (b.name === defaultBranch) reasons.push('default-branch');
     if (b.protected) reasons.push('protected');
-    if (!PLAIN.test(b.name) || b.name.includes('..') || b.name.includes('//') || b.name.endsWith('/')) {
-      reasons.push('unusual-name');
-    }
+    if (!plainName(b.name)) reasons.push('unusual-name');
     if (openHead.has(b.name)) reasons.push(`open-pr-head:#${openHead.get(b.name).join(',#')}`);
     if (openBase.has(b.name)) reasons.push(`open-pr-base:#${openBase.get(b.name).join(',#')}`);
+    const rel = releaseTargets ? releaseTargets.get(b.name) : undefined;
+    if (rel && rel.length) reasons.push(`release-target:${rel.join(',')}`);
     const u = unpreserved ? unpreserved.get(b.name) : undefined;
     if (u === undefined || u === null) reasons.push('preservation-unknown');
     else if (u.length > 0) reasons.push(`unpreserved-commits:${u.length}`);
-    const row = { name: b.name, sha: b.sha, prs: headPrs.get(b.name) || [] };
+    const row = { name: b.name, sha: b.sha, prs: headPrs.get(b.name) || [], merged: !!(merged && merged.get(b.name)) };
     if (reasons.length) held.push({ ...row, reasons });
     else deletable.push(row);
   }
   // Every targeted branch lands in exactly one of the two lists (the loop above has no other
-  // exit); tests/ pins targeted = deletable + held so a change that drops one fails there.
+  // exit); the tests pin targeted = deletable + held so a change that drops one fails there.
   const byName = (a, c) => (a.name < c.name ? -1 : a.name > c.name ? 1 : 0);
   deletable.sort(byName);
   held.sort(byName);
@@ -119,10 +137,12 @@ export function selectDeletable({ repo, target, defaultBranch, branches, prs, un
   };
 }
 
-// Commits on `tip` that are reachable from neither the default branch nor any PR ref.
-// Empty array = deleting the branch makes nothing unreachable.
-export function unpreservedCommits({ git, tip, defaultBranch }) {
-  const out = git(['rev-list', tip, '--not', `origin/${defaultBranch}`, `--glob=${PR_REF_GLOB}`, '--']);
+// Commits on `tip` reachable from neither the default branch nor any preserver sha (the heads
+// of CLOSED pull requests). Empty array = deleting the branch makes nothing unreachable.
+// Preservers go through stdin as ^<sha> lines: --not does not reach revisions read by --stdin.
+export function unpreservedCommits({ git, tip, defaultBranch, preservers = [] }) {
+  const input = preservers.map((s) => `^${s}`).join('\n') + '\n';
+  const out = git(['rev-list', '--stdin', tip, `^origin/${defaultBranch}`], input);
   return out.split('\n').map((s) => s.trim()).filter(Boolean);
 }
 
@@ -137,6 +157,13 @@ export function listAll(api, path) {
     if (chunk.length < 100) return items;
   }
   throw new Error(`more than 100 pages from ${path}: refusing to guess`);
+}
+
+// The last line of an error's stderr (or message): what GitHub or git actually said.
+export function errText(e) {
+  const raw = String((e && e.stderr && e.stderr.toString()) || (e && e.message) || e || '');
+  const lines = raw.split('\n').map((s) => s.trim()).filter(Boolean);
+  return (lines[lines.length - 1] || 'unknown error').slice(0, 300);
 }
 
 function parseArgs(argv, env) {
@@ -158,7 +185,7 @@ function parseArgs(argv, env) {
 export function run({ argv = [], env = {}, api, git, log = console.log, summary = () => {} }) {
   const refuse = (msg) => {
     log(`REFUSED: ${msg}`);
-    summary(`## Refused\n\n${msg}\n`);
+    summary(`## Refused — nothing was deleted\n\n${msg}\n`);
     return { exit: 1, refused: msg, deleted: [], skipped: [], failed: [] };
   };
   let opts;
@@ -169,6 +196,18 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
   } catch (e) {
     return refuse(e.message);
   }
+  // The second run's two inputs, checked before anything is read. None of these messages
+  // repeats a fingerprint: the report is the only place to get one.
+  if (!opts.apply && opts.expect) {
+    return refuse('You pasted a fingerprint but "apply" is OFF, so NOTHING WAS DELETED. Run again with apply ticked.');
+  }
+  if (opts.apply && !opts.expect) {
+    return refuse('apply needs the fingerprint from a report run. Run with apply OFF first, open that run\'s Summary, and copy the 16 characters after FINGERPRINT:.');
+  }
+  if (opts.apply && !FP_SHAPE.test(opts.expect)) {
+    return refuse(`expected_fingerprint must be exactly the 16 characters after "FINGERPRINT:" (lowercase letters a-f and digits). You pasted ${opts.expect.length} characters.`);
+  }
+
   const repo = env.GITHUB_REPOSITORY || '';
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return refuse(`GITHUB_REPOSITORY is not owner/repo: ${JSON.stringify(repo)}`);
   const owner = repo.split('/')[0];
@@ -191,27 +230,62 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
   if (localDefault !== defRow.sha) {
     return refuse(`checkout is stale: origin/${defaultBranch} is ${localDefault.slice(0, 10)} here, ${String(defRow.sha).slice(0, 10)} on GitHub. Run again.`);
   }
-  const prRefs = git(['for-each-ref', '--format=%(refname)', 'refs/pr/']).split('\n').filter(Boolean).length;
-  if (prRefs === 0) return refuse('no pull-request refs were fetched (refs/pr/*); without them nothing can be proven preserved');
+  const prRefs = new Map();   // PR number -> sha of the mirrored refs/pr/<N>
+  for (const line of git(['for-each-ref', '--format=%(refname) %(objectname)', 'refs/pr/']).split('\n')) {
+    const m = /^refs\/pr\/(\d+) ([0-9a-f]{40})$/.exec(line.trim());
+    if (m) prRefs.set(Number(m[1]), m[2]);
+  }
+  if (prRefs.size === 0) return refuse('no pull-request refs were fetched (refs/pr/*); without them nothing can be proven preserved');
 
   const prs = listAll(api, `repos/${repo}/pulls?state=all`).map((p) => ({
     number: p.number,
     state: p.state,
     head_ref: p.head && p.head.ref,
     head_repo: (p.head && p.head.repo && p.head.repo.full_name) || '',
+    head_sha: p.head && p.head.sha,
     base_ref: p.base && p.base.ref,
   }));
   if (prs.length === 0) return refuse('pull-request read returned nothing; refusing to decide without it');
+  const prByNumber = new Map(prs.map((p) => [p.number, p]));
+  const missingFromList = [...prRefs.keys()].filter((n) => !prByNumber.has(n));
+  if (missingFromList.length) {
+    return refuse(`the pull-request list is incomplete: ${missingFromList.length} mirrored refs (first refs/pr/${missingFromList[0]}) have no PR in it. Run again.`);
+  }
+  const preservers = [];
+  let closedWithoutRef = 0;
+  for (const p of prs) {
+    if (p.state !== 'closed') continue;   // an OPEN PR's ref moves on force-push: never a preserver
+    const local = prRefs.get(p.number);
+    if (!local) { closedWithoutRef++; continue; }
+    if (local !== p.head_sha) {
+      return refuse(`the pull-request ref mirror is stale: refs/pr/${p.number} is ${local.slice(0, 10)} here, ${String(p.head_sha).slice(0, 10)} on GitHub. Run again.`);
+    }
+    preservers.push(local);
+  }
+
+  const releaseTargets = new Map();
+  for (const r of listAll(api, `repos/${repo}/releases`)) {
+    if (r && r.target_commitish) {
+      releaseTargets.set(r.target_commitish, [...(releaseTargets.get(r.target_commitish) || []), r.tag_name || `id ${r.id}`]);
+    }
+  }
 
   const unpreserved = new Map();
+  const merged = new Map();
   for (const b of branches.filter((x) => matches(t, x.name))) {
     try {
-      unpreserved.set(b.name, unpreservedCommits({ git, tip: b.sha, defaultBranch }));
+      unpreserved.set(b.name, unpreservedCommits({ git, tip: b.sha, defaultBranch, preservers }));
     } catch (_) {
       unpreserved.set(b.name, null);   // object missing locally => cannot tell => HELD
     }
+    try {
+      git(['merge-base', '--is-ancestor', b.sha, `origin/${defaultBranch}`]);
+      merged.set(b.name, true);
+    } catch (_) {
+      merged.set(b.name, false);
+    }
   }
-  const plan = selectDeletable({ repo, target: t, defaultBranch, branches, prs, unpreserved });
+  const plan = selectDeletable({ repo, target: t, defaultBranch, branches, prs, unpreserved, merged, releaseTargets });
   // A target that matches NOTHING is indistinguishable from a clean result unless it is
   // refused: "cursor" (no slash) is a valid exact name that no branch has.
   if (plan.targeted === 0) {
@@ -219,11 +293,12 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
   }
 
   // ----- the report -----------------------------------------------------------------
+  const nMerged = plan.deletable.filter((d) => d.merged).length;
   const lines = [];
   lines.push(`# Branch cleanup report: ${repo}  target ${t.kind === 'prefix' ? t.value + '*' : t.value}`);
   lines.push('');
-  lines.push(`default branch ${defaultBranch} · ${branches.length} branches · ${prs.length} pull requests read · ${prRefs} PR refs mirrored`);
-  lines.push(`targeted ${plan.targeted} = **${plan.deletable.length} deletable** + **${plan.held.length} held**`);
+  lines.push(`default branch ${defaultBranch} · ${branches.length} branches · ${prs.length} pull requests read · ${prRefs.size} PR refs mirrored · ${preservers.length} closed-PR heads count as keepers${closedWithoutRef ? ` (${closedWithoutRef} closed PRs had no ref)` : ''}`);
+  lines.push(`targeted ${plan.targeted} = **${plan.deletable.length} deletable** (${nMerged} merged into ${defaultBranch}, ${plan.deletable.length - nMerged} kept only by a closed pull request) + **${plan.held.length} held**`);
   lines.push('');
   if (plan.held.length) {
     lines.push('## HELD (will not be touched)');
@@ -231,7 +306,10 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
     lines.push('');
   }
   lines.push('## DELETABLE');
-  for (const d of plan.deletable) lines.push(`- \`${d.name}\` ${String(d.sha).slice(0, 10)}${d.prs.length ? ` (PRs #${d.prs.join(', #')})` : ' (merged by ancestry, no PR)'}`);
+  for (const d of plan.deletable) {
+    const how = d.merged ? `merged into ${defaultBranch}` : `NOT merged; its commits stay in closed PR #${d.prs.join(', #')}`;
+    lines.push(`- \`${d.name}\` ${String(d.sha).slice(0, 10)} — ${how}`);
+  }
   lines.push('');
   lines.push(`FINGERPRINT: ${plan.fingerprint}`);
   const report = lines.join('\n');
@@ -240,7 +318,7 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
 
   if (!opts.apply) {
     const how = plan.deletable.length
-      ? `REPORT ONLY — nothing deleted. To delete exactly these ${plan.deletable.length}: run again with apply=true and expected_fingerprint=${plan.fingerprint}`
+      ? `REPORT ONLY — nothing deleted. To delete exactly these ${plan.deletable.length}: run again with apply ticked and the FINGERPRINT above in expected_fingerprint.`
       : 'REPORT ONLY — nothing is deletable.';
     log(how);
     summary(`\n**${how}**\n`);
@@ -249,12 +327,12 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
 
   // ----- apply ----------------------------------------------------------------------
   if (plan.deletable.length === 0) {
-    log('APPLY: nothing deletable.');
+    log('APPLY: nothing deletable, nothing deleted.');
+    summary('\n**APPLY: nothing deletable, nothing deleted.**\n');
     return { exit: 0, plan, deleted: [], skipped: [], failed: [] };
   }
-  if (!opts.expect) return refuse(`apply needs expected_fingerprint (this report's is ${plan.fingerprint})`);
   if (opts.expect !== plan.fingerprint) {
-    return refuse(`expected_fingerprint ${opts.expect} does not match this run's ${plan.fingerprint}: the population changed since the report you read. Read the new report first.`);
+    return refuse('expected_fingerprint does not match this run: the list changed since that report, or the fingerprint came from another repo or target. Run the report again and use its fingerprint.');
   }
   if (plan.deletable.length > MAX_DELETE) return refuse(`${plan.deletable.length} exceeds the ceiling of ${MAX_DELETE}`);
 
@@ -262,17 +340,28 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
   const deleted = [];
   const skipped = [];
   const failed = [];
+  const enc = (n) => encodeURIComponent(n);
   for (const b of plan.deletable) {
     try {
-      // Re-read at the last moment: the report is minutes old.
-      const now = api(`repos/${repo}/branches/${b.name}`);
-      if (!now || !now.commit || now.commit.sha !== b.sha) { skipped.push([b.name, 'tip moved since the report']); continue; }
-      const open = api(`repos/${repo}/pulls?state=open&head=${encodeURIComponent(`${owner}:${b.name}`)}`);
-      if (Array.isArray(open) && open.length) { skipped.push([b.name, `open PR #${open[0].number} appeared`]); continue; }
-      api(`repos/${repo}/git/refs/heads/${b.name}`, 'DELETE');
-      deleted.push(b.name);
+      // The report is minutes old: repeat the open-PR checks. Anything unreadable skips.
+      const asHead = api(`repos/${repo}/pulls?state=open&head=${enc(`${owner}:${b.name}`)}`);
+      const asBase = api(`repos/${repo}/pulls?state=open&base=${enc(b.name)}`);
+      if (!Array.isArray(asHead) || !Array.isArray(asBase)) { skipped.push([b.name, 'could not read open pull requests']); continue; }
+      if (asHead.length) { skipped.push([b.name, `open PR #${asHead[0].number} now has it as head`]); continue; }
+      if (asBase.length) { skipped.push([b.name, `open PR #${asBase[0].number} now has it as base`]); continue; }
     } catch (e) {
-      failed.push([b.name, String(e.message).split('\n')[0]]);
+      skipped.push([b.name, `could not read open pull requests: ${errText(e)}`]);
+      continue;
+    }
+    try {
+      // Atomic: succeeds only if the branch still points at the planned sha.
+      git(['push', `--force-with-lease=refs/heads/${b.name}:${b.sha}`, 'origin', `:refs/heads/${b.name}`]);
+      deleted.push(b.name);
+      log(`DELETED ${b.name} (was ${b.sha})`);   // logged at once, so a crash still leaves a record
+    } catch (e) {
+      const all = String((e && e.stderr && e.stderr.toString()) || (e && e.message) || '');
+      if (/stale info|fetch first|non-fast-forward/i.test(all)) skipped.push([b.name, 'tip moved since the report (lease refused)']);
+      else failed.push([b.name, errText(e)]);
     }
   }
 
@@ -285,12 +374,13 @@ export function run({ argv = [], env = {}, api, git, log = console.log, summary 
   out.push(`APPLIED: deleted ${deleted.length} · skipped ${skipped.length} · failed ${failed.length}`);
   for (const [n, why] of skipped) out.push(`  SKIPPED ${n}: ${why}`);
   for (const [n, why] of failed) out.push(`  FAILED  ${n}: ${why}`);
+  if (skipped.length) out.push('  Skipped branches were left alone. Run the report again to see them.');
   if (stillThere.length) out.push(`  VERIFY FAILED: still present after delete: ${stillThere.join(', ')}`);
-  if (collateral.length) out.push(`  VERIFY FAILED: gone but not on the plan: ${collateral.join(', ')}`);
+  if (collateral.length) out.push(`  VERIFY FAILED: gone but not deleted by this run: ${collateral.join(', ')}`);
   const restore = plan.deletable.filter((d) => deletedSet.has(d.name) && d.prs.length);
   if (restore.length) out.push(`  Restore any of them from its pull request page (${restore.length} have one).`);
   log(out.join('\n'));
-  summary('\n' + out.join('\n') + '\n');
+  summary('\n## Apply result\n\n' + out.map((l) => l.trim()).join('\n\n') + '\n');
   const bad = failed.length || stillThere.length || collateral.length;
   return { exit: bad ? 1 : 0, plan, deleted, skipped, failed, stillThere, collateral };
 }
@@ -303,9 +393,24 @@ export function ghApi(path, method) {
   const s = out.trim();
   return s ? JSON.parse(s) : null;
 }
-const realGit = (args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+const realGit = (args, input) => execFileSync('git', args, {
+  encoding: 'utf8',
+  maxBuffer: 64 * 1024 * 1024,
+  input: input === undefined ? '' : input,
+  stdio: ['pipe', 'pipe', 'pipe'],
+});
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Compare REAL paths: Node resolves the main module through symlinks, argv[1] does not, so a
+// plain URL comparison silently skips main (exit 0, nothing done) under a symlinked path.
+function invokedAsCli() {
+  try {
+    return !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch (_) {
+    return false;
+  }
+}
+
+if (invokedAsCli()) {
   const res = run({
     argv: process.argv.slice(2),
     env: process.env,

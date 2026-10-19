@@ -9,28 +9,31 @@
 //   §3 the data-loss rule on REAL git — "nothing becomes unreachable" is a git fact, so it is
 //      tested against git, not against a fixture of what we think git says
 //   §4 run() end to end on a fake GitHub — report-only deletes nothing; apply needs the
-//      fingerprint; last-moment re-reads; verification by re-listing
-//   §5 the workflow file          — dispatch-only, apply defaults false, main-only, no secrets
+//      fingerprint; input controls; atomic delete; last-moment re-checks; verification
+//   §5 the command line           — exit code and the entry guard, including a symlinked path
+//   §6 the workflow file          — dispatch-only, apply defaults false, main-only, no secrets
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT_REL = '../scripts/cleanup-branches.mjs'; // homesignal-ingest: '../scripts/cleanup_branches.mjs'
 const SCRIPT_PATH = join(HERE, SCRIPT_REL);
-const WORKFLOW = join(HERE, '..', '.github', 'workflows', 'cleanup-branches.yml');
+const ROOT = join(HERE, '..');
+const SELF_REL = relative(ROOT, fileURLToPath(import.meta.url));
+const WORKFLOW = join(ROOT, '.github', 'workflows', 'cleanup-branches.yml');
 const M = await import(SCRIPT_REL);
 
-// The script is a byte-identical mirror in two repos. Editing it means editing both, and this
-// pin is what makes a one-sided edit fail instead of drifting.
-const PINNED_SHA256 = '3386a80206ddc6705da6e9084d1706e8b6055752beff7eac8eb49e6f5b2f5c9c';
+// The script is a byte-identical mirror in two repos. This pin catches an accidental edit in
+// THIS repo; keep it equal to the other repo's pin by hand.
+const PINNED_SHA256 = 'a1bd10493528ac9205c143bc800c17c8ddd6e0a430cf0c74b6b87e6ea54193e2';
 
-test('the script is the pinned mirror (edit BOTH repos, then update this pin)', () => {
+test('the script is the pinned mirror (edit BOTH repos, then update this pin in both)', () => {
   const got = createHash('sha256').update(readFileSync(SCRIPT_PATH)).digest('hex');
   assert.equal(got, PINNED_SHA256);
 });
@@ -62,11 +65,14 @@ function plan(over = {}) {
     br('cursor/no-pr-unique-work', 'd1'),            // the FinCEN shape
     br('cursor/open-pr', 'e1'),                      // the #638 shape
     br('cursor/is-a-base', 'f1'),
+    br('cursor/base-of-a-fork-pr', 'f2'),
     br('cursor/protected-one', 'g1', { protected: true }),
     br('cursor/weird name', 'h1'),
     br('cursor/never-measured', 'i1'),
     br('cursor/fork-clash', 'j1'),
+    br('cursor/release-source', 'l1'),
     br('feature/not-targeted', 'k1'),
+    br('old-cursor/inside-a-longer-name', 'n1'),     // contains "cursor/" but does not start with it
   ];
   const prs = [
     pr(1, 'closed', 'cursor/squash-merged'),
@@ -74,14 +80,18 @@ function plan(over = {}) {
     pr(3, 'open', 'cursor/open-pr'),
     pr(4, 'open', 'someone/else', { base_ref: 'cursor/is-a-base' }),
     pr(5, 'open', 'cursor/fork-clash', { head_repo: 'stranger/demo' }), // a FORK's branch of the same name
+    pr(6, 'open', 'patch-1', { head_repo: 'stranger/demo', base_ref: 'cursor/base-of-a-fork-pr' }),
   ];
+  const ok = (n) => [n, none];
   const unpreserved = new Map([
-    ['cursor/merged-by-ancestry', none], ['cursor/squash-merged', none], ['cursor/closed-unmerged', none],
-    ['cursor/no-pr-unique-work', ['x1', 'x2']], ['cursor/open-pr', none], ['cursor/is-a-base', none],
-    ['cursor/protected-one', none], ['cursor/weird name', none], ['cursor/fork-clash', none],
+    ok('cursor/merged-by-ancestry'), ok('cursor/squash-merged'), ok('cursor/closed-unmerged'),
+    ['cursor/no-pr-unique-work', ['x1', 'x2']], ok('cursor/open-pr'), ok('cursor/is-a-base'), ok('cursor/base-of-a-fork-pr'),
+    ok('cursor/protected-one'), ok('cursor/weird name'), ok('cursor/fork-clash'), ok('cursor/release-source'),
     // 'cursor/never-measured' deliberately ABSENT
   ]);
-  return M.selectDeletable({ repo: REPO, target: 'cursor/', defaultBranch: 'main', branches, prs, unpreserved, ...over });
+  const merged = new Map([['cursor/merged-by-ancestry', true]]);
+  const releaseTargets = new Map([['cursor/release-source', ['v1.0']]]);
+  return M.selectDeletable({ repo: REPO, target: 'cursor/', defaultBranch: 'main', branches, prs, unpreserved, merged, releaseTargets, ...over });
 }
 
 test('§2 every hold reason fires, and only the finished-with branches are deletable', () => {
@@ -93,9 +103,17 @@ test('§2 every hold reason fires, and only the finished-with branches are delet
   assert.equal(why['cursor/no-pr-unique-work'], 'unpreserved-commits:2');
   assert.equal(why['cursor/open-pr'], 'open-pr-head:#3');
   assert.equal(why['cursor/is-a-base'], 'open-pr-base:#4');
+  assert.equal(why['cursor/base-of-a-fork-pr'], 'open-pr-base:#6', 'a fork PR targeting our branch holds it too');
   assert.equal(why['cursor/protected-one'], 'protected');
   assert.equal(why['cursor/weird name'], 'unusual-name');
   assert.equal(why['cursor/never-measured'], 'preservation-unknown');
+  assert.equal(why['cursor/release-source'], 'release-target:v1.0');
+});
+
+test('§2 the merged label is carried, never guessed', () => {
+  const p = plan();
+  assert.equal(p.deletable.find((d) => d.name === 'cursor/merged-by-ancestry').merged, true);
+  assert.equal(p.deletable.find((d) => d.name === 'cursor/closed-unmerged').merged, false);
 });
 
 test('§2 a FORK\'s open PR with the same branch name neither holds nor preserves our branch', () => {
@@ -104,31 +122,43 @@ test('§2 a FORK\'s open PR with the same branch name neither holds nor preserve
   assert.deepEqual(fork.prs, [], 'and the stranger\'s PR is not credited to it');
 });
 
-test('§2 partition identity: targeted = deletable + held, and non-targets are never touched', () => {
+test('§2 partition identity, and a prefix only matches at the START of a name', () => {
   const p = plan();
-  assert.equal(p.targeted, 10, 'ten cursor/ names in the fixture; main and feature/not-targeted are outside the target');
+  assert.equal(p.targeted, 12, 'twelve names start with cursor/');
   assert.equal(p.deletable.length + p.held.length, p.targeted);
-  assert.ok(![...p.deletable, ...p.held].some((x) => x.name === 'feature/not-targeted' || x.name === 'main'));
+  const touched = new Set([...p.deletable, ...p.held].map((x) => x.name));
+  for (const n of ['feature/not-targeted', 'main', 'old-cursor/inside-a-longer-name']) assert.ok(!touched.has(n), n);
 });
 
-test('§2 the default branch and an unmeasured read can never be deletable', () => {
+test('§2 names git allows but this tool will not touch are held', () => {
+  const odd = ['cursor/a..b', 'cursor/end/', 'cursor/x.lock', 'cursor/ünicode', 'cursor/a@{b', 'cursor/back\\slash', 'cursor/t~1', 'cursor/c^2', 'cursor/q?'];
+  const branches = [br('main', 'm0'), ...odd.map((n) => br(n, 's')), br('cursor/a.b_c-d', 'ok')];
+  const unpreserved = new Map([...odd, 'cursor/a.b_c-d'].map((n) => [n, none]));
+  const p = M.selectDeletable({ repo: REPO, target: 'cursor/', defaultBranch: 'main', branches, prs: [], unpreserved });
+  assert.deepEqual(p.deletable.map((d) => d.name), ['cursor/a.b_c-d'], 'control: an ordinary name is deletable');
+  for (const h of p.held) assert.deepEqual(h.reasons, ['unusual-name'], h.name);
+  assert.equal(p.held.length, odd.length);
+});
+
+test('§2 the default branch is held even when targeted exactly, and an unmeasured read is held', () => {
   const branches = [br('main', 'm0'), br('cursor/x', 'x0')];
-  const p = M.selectDeletable({ repo: REPO, target: 'cursor/x', defaultBranch: 'main', branches, prs: [], unpreserved: new Map() });
-  assert.equal(p.deletable.length, 0);
-  assert.deepEqual(p.held[0].reasons, ['preservation-unknown']);
-  // no unpreserved map at all
+  const d = M.selectDeletable({ repo: REPO, target: 'main', defaultBranch: 'main', branches, prs: [], unpreserved: new Map([['main', none]]) });
+  assert.equal(d.deletable.length, 0);
+  assert.deepEqual(d.held[0].reasons, ['default-branch']);
   const q = M.selectDeletable({ repo: REPO, target: 'cursor/x', defaultBranch: 'main', branches, prs: [], unpreserved: null });
-  assert.equal(q.deletable.length, 0);
+  assert.deepEqual(q.held[0].reasons, ['preservation-unknown']);
   assert.throws(() => M.selectDeletable({ repo: REPO, target: 'cursor/', defaultBranch: 'main', branches: [br('cursor/x', 'x0')], prs: [], unpreserved: new Map() }), /default branch/);
 });
 
-test('§2 fingerprint is order-independent, 16 hex, and moves with any single change', () => {
+test('§2 the fingerprint binds exactly the deletable names', () => {
+  const p = plan();
+  assert.equal(p.fingerprint, M.fingerprint(p.deletable.map((d) => d.name)));
   const a = M.fingerprint(['b', 'a', 'c']);
   assert.match(a, /^[0-9a-f]{16}$/);
   assert.equal(a, M.fingerprint(['c', 'b', 'a']));
-  assert.notEqual(a, M.fingerprint(['a', 'b']));
-  assert.notEqual(a, M.fingerprint(['a', 'b', 'd']));
-  assert.notEqual(a, M.fingerprint(['a', 'b', 'c', 'c2']));
+  for (const other of [['a', 'b'], ['a', 'b', 'd'], ['a', 'b', 'c', 'c2']]) assert.notEqual(a, M.fingerprint(other));
+  const lessOne = plan({ unpreserved: new Map([['cursor/squash-merged', none]]) });
+  assert.notEqual(lessOne.fingerprint, p.fingerprint, 'a different deletable set gives a different fingerprint');
 });
 
 // ===== §3 the data-loss rule, against REAL git ==============================================
@@ -142,258 +172,379 @@ function world() {
   const T = {};
   // merged by fast-forward: main holds every commit
   g('checkout', '-q', '-b', 'merged-ff'); T.mergedFf = commit('ff.txt', 'ff'); g('checkout', '-q', 'main'); g('merge', '-q', '--ff-only', 'merged-ff');
-  // squash-merged: branch commits are NOT in main, the PR ref holds them
-  g('checkout', '-q', '-b', 'squash-pr'); commit('s1.txt', 's1'); T.squash = commit('s2.txt', 's2'); g('update-ref', 'refs/pr/10', T.squash);
+  // squash-merged: branch commits are NOT in main, the closed PR's head holds them
+  g('checkout', '-q', '-b', 'squash-pr'); commit('s1.txt', 's1'); T.squash = commit('s2.txt', 's2');
   g('checkout', '-q', 'main'); commit('squashed.txt', 'the squash commit');
-  // closed unmerged: only the PR ref holds it
-  g('checkout', '-q', '-b', 'closed-pr'); T.closed = commit('k.txt', 'k1'); g('update-ref', 'refs/pr/11', T.closed); g('checkout', '-q', 'main');
-  // advanced past its PR ref by a real commit
-  g('checkout', '-q', '-b', 'advanced'); const a1 = commit('a1.txt', 'a1'); g('update-ref', 'refs/pr/12', a1); T.advanced = commit('a2.txt', 'a2 after the PR closed'); T.advancedExtra = T.advanced; g('checkout', '-q', 'main');
+  // closed unmerged: only the closed PR's head holds it
+  g('checkout', '-q', '-b', 'closed-pr'); T.closed = commit('k.txt', 'k1'); g('checkout', '-q', 'main');
+  // advanced past its PR head by a real commit
+  g('checkout', '-q', '-b', 'advanced'); T.advancedPrHead = commit('a1.txt', 'a1'); T.advanced = commit('a2.txt', 'a2 after the PR closed'); g('checkout', '-q', 'main');
   // updated from main after its PR closed: the tip is a merge commit nothing holds
-  g('checkout', '-q', '-b', 'update-merge'); const u1 = commit('u1.txt', 'u1'); g('update-ref', 'refs/pr/13', u1);
+  g('checkout', '-q', '-b', 'update-merge'); T.updatePrHead = commit('u1.txt', 'u1');
   g('checkout', '-q', 'main'); commit('later-main.txt', 'main moved on');
   g('checkout', '-q', 'update-merge'); g('merge', '-q', '--no-edit', 'main'); T.updateMerge = g('rev-parse', 'HEAD'); g('checkout', '-q', 'main');
   // orphan work: two commits, no PR, not in main
   g('checkout', '-q', '-b', 'orphan'); commit('o1.txt', 'o1'); T.orphan = commit('o2.txt', 'o2'); g('checkout', '-q', 'main');
+  // stacked: step-a's commit is held ONLY by an OPEN PR on step-b
+  g('checkout', '-q', '-b', 'step-a'); T.stepA = commit('sa.txt', 'a1'); g('checkout', '-q', '-b', 'step-b'); T.stepB = commit('sb.txt', 'b1'); g('checkout', '-q', 'main');
   // merged by merge commit (no-ff): main holds it
   g('checkout', '-q', '-b', 'merge-commit'); T.mergeCommit = commit('mc.txt', 'mc'); g('checkout', '-q', 'main'); g('merge', '-q', '--no-ff', '-m', 'merge mc', 'merge-commit');
   g('update-ref', 'refs/remotes/origin/main', g('rev-parse', 'main'));
-  const git = (args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: ENV });
+  // remote-tracking refs and PR refs exist in a real checkout: neither may count by itself
+  g('update-ref', 'refs/remotes/origin/orphan', T.orphan);
+  g('update-ref', 'refs/pr/14', T.stepB);
+  const git = (args, input) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env: ENV, input: input === undefined ? '' : input });
+  // closed-PR heads, as the tool passes them
+  T.closedHeads = [T.squash, T.closed, T.advancedPrHead, T.updatePrHead];
   return { dir, git, T };
 }
 
 test('§3 nothing is "preserved" that deleting would make unreachable (real git)', () => {
   const { git, T } = world();
-  const u = (tip) => M.unpreservedCommits({ git, tip, defaultBranch: 'main' });
+  const u = (tip) => M.unpreservedCommits({ git, tip, defaultBranch: 'main', preservers: T.closedHeads });
   assert.deepEqual(u(T.mergedFf), [], 'fast-forward merged: main holds it');
   assert.deepEqual(u(T.mergeCommit), [], 'merge-commit merged: main holds it');
-  assert.deepEqual(u(T.squash), [], 'squash merged: the PR ref holds it');
-  assert.deepEqual(u(T.closed), [], 'closed unmerged: the PR ref holds it');
+  assert.deepEqual(u(T.squash), [], 'squash merged: the closed PR head holds it');
+  assert.deepEqual(u(T.closed), [], 'closed unmerged: the closed PR head holds it');
   assert.deepEqual(u(T.advanced), [T.advanced], 'a commit pushed after the PR closed is NOT held');
   assert.deepEqual(u(T.updateMerge), [T.updateMerge], 'an update-from-main merge after close is NOT held (strict on purpose)');
-  assert.equal(u(T.orphan).length, 2, 'work with no PR and not in main is NOT held');
+  assert.equal(u(T.orphan).length, 2, 'work with no PR is NOT held, even though a remote-tracking ref points at it');
 });
 
-test('§3 the PR-ref glob really is what protects the squash/closed cases (control)', () => {
+test('§3 an OPEN pull request\'s ref is not a keeper (a force-push would move it)', () => {
   const { git, T } = world();
-  git(['update-ref', '-d', 'refs/pr/10']);
-  git(['update-ref', '-d', 'refs/pr/11']);
-  assert.equal(M.unpreservedCommits({ git, tip: T.squash, defaultBranch: 'main' }).length, 2, 'without its PR ref the squash branch has 2 unheld commits');
-  assert.equal(M.unpreservedCommits({ git, tip: T.closed, defaultBranch: 'main' }).length, 1);
+  assert.deepEqual(M.unpreservedCommits({ git, tip: T.stepA, defaultBranch: 'main', preservers: T.closedHeads }), [T.stepA],
+    'refs/pr/14 (open) holds step-a today; the tool must not rely on it');
+  assert.deepEqual(M.unpreservedCommits({ git, tip: T.stepA, defaultBranch: 'main', preservers: [T.stepB] }), [],
+    'control: had that PR been closed, its head would hold step-a');
+});
+
+test('§3 the preserver list is what protects the squash/closed cases (control)', () => {
+  const { git, T } = world();
+  assert.equal(M.unpreservedCommits({ git, tip: T.squash, defaultBranch: 'main', preservers: [] }).length, 2);
+  assert.equal(M.unpreservedCommits({ git, tip: T.closed, defaultBranch: 'main', preservers: [] }).length, 1);
 });
 
 // ===== §4 run() end to end on a fake GitHub =================================================
-function fakeGithub({ extraBranches = [], hooks = {} } = {}) {
+const sha = (s) => createHash('sha1').update(s).digest('hex');
+const ORIG_BRANCHES = () => [
+  { name: 'main', commit: { sha: sha('m0') }, protected: true },
+  { name: 'cursor/one', commit: { sha: sha('o1') }, protected: false },
+  { name: 'cursor/two', commit: { sha: sha('t1') }, protected: false },
+  { name: 'cursor/keep', commit: { sha: sha('k1') }, protected: false },
+  { name: 'other/untouched', commit: { sha: sha('u1') }, protected: false },
+];
+const prRow = (number, state, ref, s, o = {}) => ({ number, state, head: { ref, repo: { full_name: o.headRepo || REPO }, sha: s }, base: { ref: o.base || 'main' } });
+
+function fakeGithub({ extraBranches = [], extraPrs = [], releases = [], hooks = {} } = {}) {
   const S = {
-    default: 'main',
-    branches: [
-      { name: 'main', commit: { sha: 'm0' }, protected: true },
-      { name: 'cursor/one', commit: { sha: 'o1' }, protected: false },
-      { name: 'cursor/two', commit: { sha: 't1' }, protected: false },
-      { name: 'cursor/keep', commit: { sha: 'k1' }, protected: false },
-      { name: 'other/untouched', commit: { sha: 'u1' }, protected: false },
-      ...extraBranches,
-    ],
-    prs: [
-      { number: 1, state: 'closed', merged_at: 'x', head: { ref: 'cursor/one', repo: { full_name: REPO } }, base: { ref: 'main' } },
-      { number: 2, state: 'closed', merged_at: null, head: { ref: 'cursor/two', repo: { full_name: REPO } }, base: { ref: 'main' } },
-    ],
+    branches: [...ORIG_BRANCHES(), ...extraBranches],
+    prs: [prRow(1, 'closed', 'cursor/one', sha('o1')), prRow(2, 'closed', 'cursor/two', sha('t1')), ...extraPrs],
+    releases,
     unpreserved: { 'cursor/one': [], 'cursor/two': [], 'cursor/keep': ['zz'] },
-    deletes: [], calls: [],
+    merged: { 'cursor/one': true },
+    extraRefs: [],   // refs/pr lines not backed by a PR, to simulate an incomplete list
+    refOverride: {}, // PR number -> sha, to simulate a stale mirror
+    deletes: [], pushes: [], calls: [],
   };
-  // /(?:^|&)page=/ and not /page=/, which would match the 'per_page=100' inside the query
   const page = (arr, q) => { const n = Number(/(?:^|&)page=(\d+)/.exec(q)[1]); return arr.slice((n - 1) * 100, n * 100); };
   S.api = (path, method) => {
     S.calls.push([method || 'GET', path]);
-    if (method === 'DELETE') {
-      const name = path.split('/git/refs/heads/')[1];
-      if (hooks.failDelete === name) throw new Error('HTTP 422');
-      S.deletes.push(name);
-      if (hooks.ghostDelete === name) return null;   // 204, yet the branch is still there
-      S.branches = S.branches.filter((b) => b.name !== name);
-      if (hooks.collateral) S.branches = S.branches.filter((b) => b.name !== hooks.collateral);
-      return null;
-    }
     if (path === `repos/${REPO}`) return { default_branch: 'main' };
     let m;
     if ((m = /^repos\/[^/]+\/[^/]+\/branches\?(.*)$/.exec(path))) return page(S.branches, m[1]);
-    if ((m = /^repos\/[^/]+\/[^/]+\/branches\/(.+)$/.exec(path))) {
-      if (hooks.moveTip === m[1]) return { name: m[1], commit: { sha: 'MOVED' } };
-      const b = S.branches.find((x) => x.name === m[1]); if (!b) throw new Error('HTTP 404'); return b;
+    if (/pulls\?state=open&head=/.test(path)) {
+      if (hooks.recheckGarbage) return null;
+      return hooks.openHeadAppears && path.includes(encodeURIComponent(`HomeSignalG:${hooks.openHeadAppears}`)) ? [{ number: 99 }] : [];
     }
-    if (/pulls\?state=open&head=/.test(path)) return hooks.openPrAppears && path.includes(encodeURIComponent(`HomeSignalG:${hooks.openPrAppears}`)) ? [{ number: 99 }] : [];
+    if (/pulls\?state=open&base=/.test(path)) return hooks.openBaseAppears && path.endsWith(`base=${encodeURIComponent(hooks.openBaseAppears)}`) ? [{ number: 98 }] : [];
     if ((m = /^repos\/[^/]+\/[^/]+\/pulls\?state=all&(.*)$/.exec(path))) return page(S.prs, m[1]);
+    if ((m = /^repos\/[^/]+\/[^/]+\/releases\?(.*)$/.exec(path))) return page(S.releases, m[1]);
     throw new Error('fake github: unexpected ' + path);
   };
-  S.git = (args) => {
-    if (args[0] === 'rev-parse') return 'm0\n';
-    if (args[0] === 'for-each-ref') return 'refs/pr/1\nrefs/pr/2\n';
+  const fail = (stderr) => { const e = new Error('Command failed'); e.stderr = stderr; throw e; };
+  S.git = (args, input) => {
+    if (args[0] === 'rev-parse') return (hooks.staleCheckout ? sha('OLD') : sha('m0')) + '\n';
+    if (args[0] === 'for-each-ref') {
+      const lines = S.prs.map((p) => `refs/pr/${p.number} ${S.refOverride[p.number] || p.head.sha}`);
+      return [...lines, ...S.extraRefs].join('\n') + '\n';
+    }
     if (args[0] === 'rev-list') {
-      const tip = args[1]; const name = S.branches.find((b) => b.commit.sha === tip)?.name;
+      assert.equal(args[1], '--stdin');
+      assert.ok(input === undefined || /^(\^[0-9a-f]{40}\n)*\n?$/.test(input), 'preservers arrive on stdin as ^sha lines');
+      const name = S.branches.find((b) => b.commit.sha === args[2])?.name;
       if (!(name in S.unpreserved)) throw new Error('missing object');
       return S.unpreserved[name].join('\n');
+    }
+    if (args[0] === 'merge-base') {
+      const name = S.branches.find((b) => b.commit.sha === args[2])?.name;
+      if (!S.merged[name]) fail('');
+      return '';
+    }
+    if (args[0] === 'push') {
+      S.pushes.push(args);
+      const lease = /^--force-with-lease=refs\/heads\/(.+):([0-9a-f]{40})$/.exec(args[1]);
+      assert.ok(lease, 'every delete carries a lease on the planned sha');
+      assert.equal(args[3], `:refs/heads/${lease[1]}`);
+      const name = lease[1];
+      const b = S.branches.find((x) => x.name === name);
+      if (hooks.leaseStale === name || !b || b.commit.sha !== lease[2]) fail(` ! [rejected]        ${name} (stale info)\nerror: failed to push some refs`);
+      if (hooks.failPush === name) fail('remote: Permission to HomeSignalG/demo.git denied to github-actions[bot].\nfatal: unable to access: The requested URL returned error: 403');
+      S.deletes.push(name);
+      if (hooks.ghostDelete === name) return '';
+      S.branches = S.branches.filter((x) => x.name !== name);
+      if (hooks.collateral) S.branches = S.branches.filter((x) => x.name !== hooks.collateral);
+      return '';
     }
     throw new Error('unexpected git ' + args.join(' '));
   };
   return S;
 }
 const ENVV = { GITHUB_REPOSITORY: REPO };
-const go = (S, argv = [], env = {}) => { const logs = []; const r = M.run({ argv, env: { ...ENVV, ...env }, api: S.api, git: S.git, log: (l) => logs.push(l) }); return { r, logs: logs.join('\n') }; };
+const go = (S, argv = [], env = {}) => {
+  const logs = []; const sums = [];
+  const r = M.run({ argv, env: { ...ENVV, ...env }, api: S.api, git: S.git, log: (l) => logs.push(l), summary: (s) => sums.push(s) });
+  return { r, logs: logs.join('\n'), summary: sums.join('\n') };
+};
+const fpOf = (S) => go(S, ['--target', 'cursor/']).r.plan.fingerprint;
 
-test('§4 REPORT ONLY deletes nothing, names the fingerprint, and holds the unmerged work', () => {
+test('§4 REPORT ONLY deletes nothing and prints a report a human can approve', () => {
   const S = fakeGithub();
-  const { r, logs } = go(S, ['--target', 'cursor/']);
-  assert.equal(r.exit, 0, logs);
-  assert.equal(S.deletes.length, 0);
-  assert.equal(S.calls.filter(([m]) => m === 'DELETE').length, 0);
+  const { r, logs, summary } = go(S, ['--target', 'cursor/']);
+  assert.equal(r.exit, 0);
+  assert.equal(S.pushes.length, 0);
   assert.deepEqual(r.plan.deletable.map((d) => d.name), ['cursor/one', 'cursor/two']);
-  assert.deepEqual(r.plan.held.map((h) => h.name), ['cursor/keep']);
+  assert.equal(r.plan.fingerprint, M.fingerprint(['cursor/one', 'cursor/two']));
+  assert.match(logs, /- `cursor\/one` [0-9a-f]{10} — merged into main/);
+  assert.match(logs, /- `cursor\/two` [0-9a-f]{10} — NOT merged; its commits stay in closed PR #2/);
+  assert.match(logs, /- `cursor\/keep` — unpreserved-commits:1/);
+  assert.match(logs, /2 deletable\*\* \(1 merged into main, 1 kept only by a closed pull request\) \+ \*\*1 held/);
   assert.match(logs, new RegExp(`FINGERPRINT: ${r.plan.fingerprint}`));
+  assert.ok(summary.includes(`FINGERPRINT: ${r.plan.fingerprint}`), 'the Summary carries the report');
   assert.match(logs, /REPORT ONLY/);
 });
 
-test('§4 a typo in apply REPORTS: only the literal string "true" deletes', () => {
+test('§4 a typo in apply never deletes, even with the RIGHT fingerprint pasted', () => {
   for (const v of ['True', 'TRUE', '1', 'yes', 'false', '', ' true']) {
     const S = fakeGithub();
-    go(S, [], { CLEANUP_TARGET: 'cursor/', CLEANUP_APPLY: v, CLEANUP_EXPECT: 'whatever' });
-    assert.equal(S.deletes.length, 0, `CLEANUP_APPLY=${JSON.stringify(v)} must not delete`);
+    const fp = fpOf(fakeGithub());
+    const { r, logs } = go(S, [], { CLEANUP_TARGET: 'cursor/', CLEANUP_APPLY: v, CLEANUP_EXPECT: fp });
+    assert.equal(S.pushes.length, 0, `CLEANUP_APPLY=${JSON.stringify(v)} must not delete`);
+    assert.equal(r.exit, 1, 'a pasted fingerprint with apply off is a refusal, not a green run');
+    assert.match(logs, /apply" is OFF, so NOTHING WAS DELETED/);
   }
 });
 
-test('§4 apply with no fingerprint, or the wrong one, refuses and deletes nothing', () => {
-  const S0 = fakeGithub();
-  const fp = go(S0, ['--target', 'cursor/']).r.plan.fingerprint;
-  for (const expect of ['', '0000000000000000', fp.toUpperCase() === fp ? 'x' : fp.toUpperCase()]) {
+test('§4 refusals about the fingerprint never repeat it', () => {
+  const fp = fpOf(fakeGithub());
+  const cases = [
+    ['', /apply needs the fingerprint from a report run/],
+    [`FINGERPRINT: ${fp}`, /exactly the 16 characters/],
+    [fp.toUpperCase(), /exactly the 16 characters/],
+    [fp.slice(0, 15), /exactly the 16 characters/],
+    ['0000000000000000', /does not match this run/],
+  ];
+  for (const [expect, why] of cases) {
     const S = fakeGithub();
     const { r, logs } = go(S, ['--target', 'cursor/', '--apply', '--expect', expect]);
     assert.equal(r.exit, 1, `expect=${JSON.stringify(expect)}`);
-    assert.equal(S.deletes.length, 0);
-    // WHICH refusal fires matters: a missing fingerprint must say so, not read as a mismatch.
-    assert.match(logs, expect === '' ? /apply needs expected_fingerprint/ : /does not match this run's/);
+    assert.equal(S.pushes.length, 0);
+    assert.match(logs, why);
+    const refusal = logs.split('\n').filter((l) => l.startsWith('REFUSED'));
+    assert.equal(refusal.length, 1);
+    assert.ok(!refusal[0].includes(fp), 'the refusal does not hand out the fingerprint');
   }
 });
 
-test('§4 apply with the right fingerprint deletes exactly the plan, then verifies by re-listing', () => {
+test('§4 apply with the right fingerprint deletes exactly the plan, by lease, and logs each delete', () => {
   const S = fakeGithub();
-  const fp = go(fakeGithub(), ['--target', 'cursor/']).r.plan.fingerprint;
-  const { r, logs } = go(S, ['--target', 'cursor/', '--apply', '--expect', fp]);
+  const fp = fpOf(fakeGithub());
+  const { r, logs, summary } = go(S, ['--target', 'cursor/', '--apply', '--expect', fp]);
   assert.equal(r.exit, 0, logs);
   assert.deepEqual(S.deletes.sort(), ['cursor/one', 'cursor/two']);
+  assert.deepEqual(S.pushes.map((p) => p[1]).sort(), [`--force-with-lease=refs/heads/cursor/one:${sha('o1')}`, `--force-with-lease=refs/heads/cursor/two:${sha('t1')}`]);
   assert.deepEqual(S.branches.map((b) => b.name).sort(), ['cursor/keep', 'main', 'other/untouched']);
+  assert.match(logs, new RegExp(`DELETED cursor/one \\(was ${sha('o1')}\\)`));
   assert.match(logs, /APPLIED: deleted 2 · skipped 0 · failed 0/);
+  assert.match(summary, /## Apply result/);
 });
 
-test('§4 the population changing between report and apply refuses (that is what the fingerprint is for)', () => {
-  const fp = go(fakeGithub(), ['--target', 'cursor/']).r.plan.fingerprint;
-  const S = fakeGithub({ extraBranches: [{ name: 'cursor/new-arrival', commit: { sha: 'n1' }, protected: false }] });
+test('§4 the population changing between report and apply refuses', () => {
+  const fp = fpOf(fakeGithub());
+  const S = fakeGithub({ extraBranches: [{ name: 'cursor/new-arrival', commit: { sha: sha('n1') }, protected: false }] });
   S.unpreserved['cursor/new-arrival'] = [];
   const { r } = go(S, ['--target', 'cursor/', '--apply', '--expect', fp]);
   assert.equal(r.exit, 1);
-  assert.equal(S.deletes.length, 0);
+  assert.equal(S.pushes.length, 0);
 });
 
-test('§4 last-moment re-reads: a moved tip or a newly opened PR is skipped, not deleted', () => {
-  const fp = go(fakeGithub(), ['--target', 'cursor/']).r.plan.fingerprint;
-  const A = fakeGithub({ hooks: { moveTip: 'cursor/one' } });
-  const a = go(A, ['--target', 'cursor/', '--apply', '--expect', fp]);
+test('§4 a commit pushed after the report makes the lease fail: SKIPPED, not deleted, not failed', () => {
+  const fp = fpOf(fakeGithub());
+  const S = fakeGithub({ hooks: { leaseStale: 'cursor/one' } });
+  const { r, logs } = go(S, ['--target', 'cursor/', '--apply', '--expect', fp]);
+  assert.deepEqual(S.deletes, ['cursor/two']);
+  assert.match(logs, /SKIPPED cursor\/one: tip moved since the report \(lease refused\)/);
+  assert.equal(r.failed.length, 0);
+  assert.equal(r.exit, 0);
+});
+
+test('§4 last-moment re-checks: a new open PR (head OR base), or an unreadable answer, skips', () => {
+  const fp = fpOf(fakeGithub());
+  const A = fakeGithub({ hooks: { openHeadAppears: 'cursor/one' } });
+  assert.match(go(A, ['--target', 'cursor/', '--apply', '--expect', fp]).logs, /SKIPPED cursor\/one: open PR #99 now has it as head/);
   assert.deepEqual(A.deletes, ['cursor/two']);
-  assert.match(a.logs, /SKIPPED cursor\/one: tip moved/);
-  const B = fakeGithub({ hooks: { openPrAppears: 'cursor/two' } });
-  const b = go(B, ['--target', 'cursor/', '--apply', '--expect', fp]);
+  const B = fakeGithub({ hooks: { openBaseAppears: 'cursor/two' } });
+  assert.match(go(B, ['--target', 'cursor/', '--apply', '--expect', fp]).logs, /SKIPPED cursor\/two: open PR #98 now has it as base/);
   assert.deepEqual(B.deletes, ['cursor/one']);
-  assert.match(b.logs, /SKIPPED cursor\/two: open PR #99/);
+  const C = fakeGithub({ hooks: { recheckGarbage: true } });
+  assert.match(go(C, ['--target', 'cursor/', '--apply', '--expect', fp]).logs, /SKIPPED cursor\/one: could not read open pull requests/);
+  assert.equal(C.deletes.length, 0, 'cannot tell => skip');
 });
 
-test('§4 a failed delete and a collateral deletion are both loud (exit 1)', () => {
-  const fp = go(fakeGithub(), ['--target', 'cursor/']).r.plan.fingerprint;
-  const F = fakeGithub({ hooks: { failDelete: 'cursor/one' } });
+test('§4 a failed delete says WHY, does not stop the others, and fails the run', () => {
+  const fp = fpOf(fakeGithub());
+  const F = fakeGithub({ hooks: { failPush: 'cursor/one' } });
   const f = go(F, ['--target', 'cursor/', '--apply', '--expect', fp]);
   assert.equal(f.r.exit, 1);
-  assert.match(f.logs, /FAILED  cursor\/one/);
-  assert.deepEqual(F.deletes, ['cursor/two'], 'one failure does not stop the others');
+  assert.match(f.logs, /FAILED {2}cursor\/one: fatal: unable to access: The requested URL returned error: 403/);
+  assert.deepEqual(F.deletes, ['cursor/two']);
+});
+
+test('§4 verification by re-listing catches a delete that did not take, and a collateral loss', () => {
+  const fp = fpOf(fakeGithub());
+  const G = fakeGithub({ hooks: { ghostDelete: 'cursor/one' } });
+  const g = go(G, ['--target', 'cursor/', '--apply', '--expect', fp]);
+  assert.equal(g.r.exit, 1);
+  assert.match(g.logs, /VERIFY FAILED: still present after delete: cursor\/one/);
   const C = fakeGithub({ hooks: { collateral: 'other/untouched' } });
   const c = go(C, ['--target', 'cursor/', '--apply', '--expect', fp]);
   assert.equal(c.r.exit, 1);
-  assert.match(c.logs, /gone but not on the plan: other\/untouched/);
+  assert.match(c.logs, /gone but not deleted by this run: other\/untouched/);
 });
 
-test('§4 a delete that was ACCEPTED but did not take effect is caught by the re-listing', () => {
-  const fp = go(fakeGithub(), ['--target', 'cursor/']).r.plan.fingerprint;
-  const S = fakeGithub({ hooks: { ghostDelete: 'cursor/one' } });
-  const { r, logs } = go(S, ['--target', 'cursor/', '--apply', '--expect', fp]);
-  assert.equal(r.exit, 1);
-  assert.match(logs, /VERIFY FAILED: still present after delete: cursor\/one/);
+test('§4 the inputs are checked: an incomplete PR list or a stale ref mirror refuses the run', () => {
+  const inc = fakeGithub(); inc.extraRefs.push(`refs/pr/77 ${sha('x77')}`);
+  assert.match(go(inc, ['--target', 'cursor/']).logs, /REFUSED: the pull-request list is incomplete: 1 mirrored refs \(first refs\/pr\/77\)/);
+  const stale = fakeGithub(); stale.refOverride[2] = sha('old head');
+  assert.match(go(stale, ['--target', 'cursor/']).logs, /REFUSED: the pull-request ref mirror is stale: refs\/pr\/2/);
+  const open = fakeGithub({ extraPrs: [prRow(3, 'open', 'cursor/elsewhere', sha('e1'))] }); open.refOverride[3] = sha('moved');
+  assert.equal(go(open, ['--target', 'cursor/']).r.exit, 0, 'control: an OPEN PR\'s ref may move; it is never a keeper, so no refusal');
 });
 
 test('§4 refuses a broken read rather than deciding on it', () => {
-  const noPrRefs = fakeGithub(); noPrRefs.git = (a) => (a[0] === 'for-each-ref' ? '' : fakeGithub().git(a));
+  const noPrRefs = fakeGithub(); const g0 = noPrRefs.git; noPrRefs.git = (a, i) => (a[0] === 'for-each-ref' ? '' : g0(a, i));
   assert.match(go(noPrRefs, ['--target', 'cursor/']).logs, /REFUSED: no pull-request refs/);
-  const noPrs = fakeGithub(); noPrs.prs = [];
+  const noPrs = fakeGithub(); noPrs.prs = []; noPrs.extraRefs.push(`refs/pr/1 ${sha('o1')}`);
   assert.match(go(noPrs, ['--target', 'cursor/']).logs, /REFUSED: pull-request read returned nothing/);
-  const stale = fakeGithub(); stale.git = (a) => (a[0] === 'rev-parse' ? 'OLD\n' : fakeGithub().git(a));
-  assert.match(go(stale, ['--target', 'cursor/']).logs, /REFUSED: checkout is stale/);
+  assert.match(go(fakeGithub({ hooks: { staleCheckout: true } }), ['--target', 'cursor/']).logs, /REFUSED: checkout is stale/);
   assert.match(go(fakeGithub(), ['--target', 'main']).logs, /REFUSED: target is the default branch/);
   assert.match(go(fakeGithub(), ['--target', 'cursor']).logs, /REFUSED: target "cursor" matched no branch/);
   assert.equal(go(fakeGithub(), ['--target', 'cursor/']).r.exit, 0, 'control: the correctly spelled target is not refused');
-  assert.equal(M.run({ argv: [], env: {}, api: () => ({}), git: () => '' , log() {} }).exit, 1, 'no GITHUB_REPOSITORY');
+  assert.equal(M.run({ argv: [], env: {}, api: () => ({}), git: () => '', log() {} }).exit, 1, 'no GITHUB_REPOSITORY');
 });
 
-test('§4 pagination: 250 branches are all read, and the delete ceiling refuses a huge plan', () => {
-  const extra = Array.from({ length: 250 }, (_, i) => ({ name: `cursor/bulk-${String(i).padStart(3, '0')}`, commit: { sha: `b${i}` }, protected: false }));
-  const S = fakeGithub({ extraBranches: extra });
-  for (const e of extra) S.unpreserved[e.name] = [];
+test('§4 a branch git cannot measure is HELD at run level (cannot tell is never deletable)', () => {
+  const S = fakeGithub({ extraBranches: [{ name: 'cursor/no-object', commit: { sha: sha('gone') }, protected: false }] });
+  // no unpreserved entry: the fake rev-list throws "missing object" for it
   const { r } = go(S, ['--target', 'cursor/']);
-  assert.equal(r.plan.targeted, 253, 'one, two, keep + 250: a 100-row page limit would have hidden most of them');
-  const fp = r.plan.fingerprint;
-  const S2 = fakeGithub({ extraBranches: extra });
-  for (const e of extra) S2.unpreserved[e.name] = [];
-  const big = go(S2, ['--target', 'cursor/', '--apply', '--expect', fp]);
+  assert.deepEqual(r.plan.held.find((h) => h.name === 'cursor/no-object').reasons, ['preservation-unknown']);
+});
+
+test('§4 open-PR, fork-base, protected and release holds come through run() end to end', () => {
+  const extraBranches = [
+    { name: 'cursor/has-open-pr', commit: { sha: sha('h1') }, protected: false },
+    { name: 'cursor/fork-target', commit: { sha: sha('f1') }, protected: false },
+    { name: 'cursor/locked', commit: { sha: sha('p1') }, protected: true },
+    { name: 'cursor/released', commit: { sha: sha('r1') }, protected: false },
+  ];
+  const extraPrs = [
+    prRow(3, 'open', 'cursor/has-open-pr', sha('h1')),
+    prRow(4, 'open', 'patch-1', sha('fk'), { headRepo: 'stranger/demo', base: 'cursor/fork-target' }),
+  ];
+  const S = fakeGithub({ extraBranches, extraPrs, releases: [{ id: 1, tag_name: 'v9', target_commitish: 'cursor/released' }] });
+  for (const b of extraBranches) S.unpreserved[b.name] = [];
+  const why = Object.fromEntries(go(S, ['--target', 'cursor/']).r.plan.held.map((h) => [h.name, h.reasons.join('|')]));
+  assert.equal(why['cursor/has-open-pr'], 'open-pr-head:#3');
+  assert.equal(why['cursor/fork-target'], 'open-pr-base:#4');
+  assert.equal(why['cursor/locked'], 'protected');
+  assert.equal(why['cursor/released'], 'release-target:v9');
+});
+
+test('§4 pagination: 250 branches and 250 PRs are all read; an open PR on page 3 still holds', () => {
+  const extraBranches = Array.from({ length: 250 }, (_, i) => ({ name: `cursor/bulk-${String(i).padStart(3, '0')}`, commit: { sha: sha(`b${i}`) }, protected: false }));
+  const extraPrs = Array.from({ length: 250 }, (_, i) => prRow(100 + i, 'closed', `old/${i}`, sha(`p${i}`)));
+  extraPrs[249] = prRow(349, 'open', 'cursor/bulk-249', sha('b249'));
+  const S = fakeGithub({ extraBranches, extraPrs });
+  for (const e of extraBranches) S.unpreserved[e.name] = [];
+  const { r } = go(S, ['--target', 'cursor/']);
+  assert.equal(r.plan.targeted, 253, 'one, two, keep + 250: a 100-row page limit would hide most of them');
+  assert.deepEqual(r.plan.held.find((h) => h.name === 'cursor/bulk-249').reasons, ['open-pr-head:#349'], 'the PR on page 3 was read');
+  const S2 = fakeGithub({ extraBranches, extraPrs });
+  for (const e of extraBranches) S2.unpreserved[e.name] = [];
+  const big = go(S2, ['--target', 'cursor/', '--apply', '--expect', r.plan.fingerprint]);
   assert.equal(big.r.exit, 1);
   assert.match(big.logs, /exceeds the ceiling/);
-  assert.equal(S2.deletes.length, 0);
+  assert.equal(S2.pushes.length, 0);
 });
 
-// ===== §5 the workflow file ==================================================================
+// ===== §5 the command line ===================================================================
+test('§5 run as a command, the refusal exit code reaches the shell (also through a symlink)', () => {
+  const env = { ...process.env, GITHUB_REPOSITORY: '', GITHUB_STEP_SUMMARY: '', CLEANUP_APPLY: '', CLEANUP_EXPECT: '', CLEANUP_TARGET: '' };
+  const direct = spawnSync(process.execPath, [SCRIPT_PATH, '--target', 'cursor/'], { encoding: 'utf8', env });
+  assert.equal(direct.status, 1, direct.stderr);
+  assert.match(direct.stdout, /REFUSED: GITHUB_REPOSITORY is not owner\/repo/);
+  const dir = mkdtempSync(join(tmpdir(), 'bc-link-'));
+  const link = join(dir, 'linked.mjs');
+  symlinkSync(SCRIPT_PATH, link);
+  const viaLink = spawnSync(process.execPath, [link, '--target', 'cursor/'], { encoding: 'utf8', env });
+  assert.equal(viaLink.status, 1, 'through a symlink the tool still runs; it must not exit 0 having done nothing');
+  assert.match(viaLink.stdout, /REFUSED/);
+});
+
+// ===== §6 the workflow file ==================================================================
 const WF = readFileSync(WORKFLOW, 'utf8');
-const stripComments = (s) => s.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
-const WFC = stripComments(WF);
+const WFC = WF.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+const block = (start, end) => WFC.slice(WFC.indexOf(start), WFC.indexOf(end, WFC.indexOf(start) + 1));
 
-test('§5 dispatch-only: no schedule, push, pull_request or workflow_run trigger', () => {
-  const on = WFC.slice(WFC.indexOf('\non:'), WFC.indexOf('\npermissions:'));
-  assert.match(on, /workflow_dispatch:/);
-  for (const t of ['schedule:', 'push:', 'pull_request', 'workflow_run', 'repository_dispatch', 'release:']) {
-    assert.ok(!on.includes(t), `must not be triggered by ${t}`);
-  }
+test('§6 dispatch-only: workflow_dispatch is the ONLY trigger', () => {
+  const on = block('\non:', '\npermissions:');
+  const keys = on.split('\n').filter((l) => /^ {2}[a-z_]+:/.test(l)).map((l) => l.trim().replace(/:.*$/, ''));
+  assert.deepEqual(keys, ['workflow_dispatch']);
 });
 
-test('§5 apply defaults to false and the fingerprint input exists', () => {
-  assert.match(WFC, /apply:[\s\S]*?type: boolean[\s\S]*?default: false/);
-  assert.match(WFC, /expected_fingerprint:/);
-  assert.match(WFC, /target:[\s\S]*?default: 'cursor\/'/);
+test('§6 apply defaults to false and the inputs exist', () => {
+  assert.match(WFC, /apply:\n\s+description: [^\n]+\n\s+type: boolean\n\s+required: false\n\s+default: false\n/);
+  assert.match(WFC, /expected_fingerprint:\n/);
+  assert.match(WFC, /target:\n\s+description: [^\n]+\n\s+required: false\n\s+default: 'cursor\/'\n/);
 });
 
-test('§5 least privilege, no secrets, one run at a time', () => {
-  const perms = WFC.slice(WFC.indexOf('\npermissions:'), WFC.indexOf('\nconcurrency:'));
+test('§6 least privilege, no secrets, one run at a time', () => {
+  const perms = block('\npermissions:', '\nconcurrency:');
   assert.deepEqual(perms.split('\n').map((l) => l.trim()).filter(Boolean), ['permissions:', 'contents: write', 'pull-requests: read']);
   assert.ok(!/secrets\./.test(WFC), 'uses the run\'s own token only');
-  assert.match(WFC, /github\.token/);
-  assert.match(WFC, /concurrency:[\s\S]*?cancel-in-progress: false/);
+  assert.match(WFC, /\n\s+GH_TOKEN: \$\{\{ github\.token \}\}\n/);
+  assert.match(WFC, /concurrency:\n\s+group: cleanup-branches\n\s+cancel-in-progress: false\n/);
 });
 
-test('§5 refuses any ref but main BEFORE checkout, and runs this suite before the tool', () => {
-  const iGuard = WFC.indexOf('refs/heads/main');
-  const iCheckout = WFC.indexOf('actions/checkout');
-  const iSuite = WFC.indexOf('node --test');
-  const iTool = WFC.indexOf('cleanup_branches.mjs', iSuite) >= 0 ? WFC.indexOf('cleanup_branches.mjs', iSuite) : WFC.indexOf('cleanup-branches.mjs', iSuite);
-  assert.ok(iGuard > 0 && iGuard < iCheckout, 'main-only guard first');
-  assert.ok(iSuite > iCheckout && iTool > iSuite, 'suite gates the run');
-  assert.match(WFC, /fetch-depth: 0/);
-  assert.match(WFC, /refs\/pull\/\*\/head:refs\/pr\/\*/);
+test('§6 the main-only guard, the suite gate and the tool step are exactly what they claim', () => {
+  const guard = /\n\s+if \[ "\$GITHUB_REF" != "refs\/heads\/main" \]; then\n[^\n]*\n\s+exit 1\n\s+fi\n/;
+  assert.match(WFC, guard, 'the guard compares GITHUB_REF to main and exits 1');
+  const iGuard = WFC.search(guard);
+  const iCheckout = WFC.indexOf('uses: actions/checkout@');
+  const iSuite = WFC.indexOf(`run: node --test ${SELF_REL}\n`);
+  const iMirror = WFC.indexOf(`run: git fetch --no-tags origin '+refs/pull/*/head:refs/pr/*'\n`);
+  const iTool = WFC.indexOf(`run: node scripts/${basename(SCRIPT_PATH)}\n`);
+  assert.ok(iGuard > 0 && iGuard < iCheckout, 'guard before checkout');
+  assert.ok(iSuite > iCheckout, `this very suite (${SELF_REL}) gates the run`);
+  assert.ok(iMirror > iSuite && iTool > iMirror, 'PR refs mirrored before the tool runs, and the tool takes no extra flags');
+  assert.match(WFC, /fetch-depth: 0\n/);
 });
 
-test('§5 inputs reach the script only through env, never interpolated into shell', () => {
-  for (const line of WFC.split('\n')) {
-    if (line.includes('github.event.inputs')) assert.match(line, /^\s*CLEANUP_[A-Z]+: \$\{\{ github\.event\.inputs\.[a-z_]+ \}\}\s*$/, line);
-  }
-  assert.ok(WFC.includes('CLEANUP_APPLY'));
+test('§6 inputs reach the script only through env, never interpolated into shell', () => {
+  const lines = WFC.split('\n').filter((l) => l.includes('github.event.inputs'));
+  assert.deepEqual(lines.map((l) => l.trim()).sort(), [
+    'CLEANUP_APPLY: ${{ github.event.inputs.apply }}',
+    'CLEANUP_EXPECT: ${{ github.event.inputs.expected_fingerprint }}',
+    'CLEANUP_TARGET: ${{ github.event.inputs.target }}',
+  ]);
 });
