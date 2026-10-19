@@ -2039,7 +2039,13 @@
       +   '<a id="optinAlertsCta" href="' + HS.esc(href) + '" style="background:var(--green,#157a49);color:#fff;border-radius:9px;padding:9px 14px;font-weight:700;text-decoration:none">Yes, choose my alerts →</a>'
       +   '<button type="button" id="optinNo" style="background:none;border:0;color:var(--ink-3,#5a6b63);cursor:pointer;font-size:12.5px">Not now</button>'
       + '</div>';
-    $('optinNo').onclick = function () { box.style.display = 'none'; box.innerHTML = ''; };
+    const optZip = /^\d{5}$/.test(String(info.zip || '')) ? String(info.zip) : null;
+    // Counts only; no address. The Yes link still navigates normally.
+    $('optinAlertsCta').addEventListener('click', function () { logEvent('place_saved_alerts_yes', { zip_code: optZip }); });
+    $('optinNo').onclick = function () {
+      logEvent('place_saved_alerts_dismiss', { zip_code: optZip });
+      box.style.display = 'none'; box.innerHTML = '';
+    };
   };
   // The affirmative: the ONLY caller of enable_area_email_alerts, the ONLY writer of
   // marketing_consent. Sends the floor labels under the 'notices' key + the consent copy
