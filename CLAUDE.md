@@ -3619,6 +3619,12 @@ Engine: `sources/epa-frs.ts::frsStartRung`, `index.ts::facilitySites`. Pinned by
   `d.facilities_refreshed_at` to `dev_epa_write_refused` (4 calls). The rest of that file (epa_last_outcome,
   reverse coupling, the fail-closed `epa.ok`) is still parked; do not replay its full body.
 - Not helped: dense ZIPs stored BELOW the cap (e.g. Manhattan 10095 with 9) still walk the full ladder.
+- ⛔ **Do not drain `dev_refresh_targets` to "catch up" (checked 2026-10-19).** About 1,423 unfired rows sit
+  there and no cron fires them, but the rolling sweep (job 14) already covers them. Measured: 1,380 were
+  core-refreshed in the last 53 h and 1,212 have an EPA layer under 7 days old. The other 43 were all
+  ATTEMPTED in the last 53 h, and their writes were refused, so firing them again changes nothing. Nationally,
+  EPA-stale ZIPs fell 1,170 → 1,061 the same day, at about 200 EPA writes an hour. Draining the queue only adds
+  EPA load. Do not clear the table either: `commercial_fire_batch` and `dev_echo_queue_wipe_retries` read it too.
 
 ### ✅ THE EPA WRITE-GUARD JUDGES FRESHNESS BY THE FACILITY CLOCK (2026-09-27) — PARKED
 SQL of record: **`docs/dev-epa-facility-clock-and-outcome.sql`**, spliced from the once-per-response
