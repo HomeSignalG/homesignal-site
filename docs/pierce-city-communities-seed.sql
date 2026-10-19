@@ -39,14 +39,10 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 --   Federal Way    webapi.legistar.com/v1/federalway answers 500 "LegistarConnectionString
 --                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
 --   Orting         www.cityoforting.org answers 403 Access Denied to automated requests (2026-10-19)
---   Ruston         WordPress Events Manager iCal (/events/?ical=1, 65 events in 2026); no shipped
---                  adapter reads it yet
---   Lakewood       no CivicClerk / Legistar tenant; agendas are dated PDFs on cityoflakewood.us,
---                  which no shipped parser reads yet
 --   South Prairie  townofsouthprairie.com is a hosting placeholder page (2026-10-19)
 --   Wilkeson       a Wix blog of announcements, no meeting calendar
 --   (Fircrest was held here until 2026-10-19; see Step 3. Buckley, Puyallup and DuPont until
---   2026-10-19 too, see Step 4: Puyallup moved to puyallupwa.gov, and both it and DuPont publish
+--   2026-10-19 too, see Step 4; Ruston and Lakewood see Step 5: Puyallup moved to puyallupwa.gov, and both it and DuPont publish
 --   their meetings as CivicPlus iCalendar feeds rather than in AgendaCenter.)
 
 -- Step 3 (2026-10-19): Fircrest. Its WordPress Events Calendar API tags council events "UTC+0" with a
@@ -77,3 +73,17 @@ cross join (select id from public.communities where slug = 'pierce-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-19: Buckley d15b0a35-4acf-40b8-b702-fbc6daa3ddce (5308570) · Puyallup f90d2726-9ded-4637-a9a0-76413240d88f
 --   (5356695) · DuPont 236fd97f-7cea-4e7b-96fa-99a2a39feb76 (5318965)
+
+-- Step 5 (2026-10-19): Ruston and Lakewood. Ruston is a TOWN in the Census, so each row is matched on
+-- its own Census place name.
+--   Ruston    the town's WordPress Events Manager iCal (rustonwa.org/events/?ical=1), read by the shared iCal parser
+--   Lakewood  dated agenda PDFs on cityoflakewood.us (notice_list parser dated_pdf_links)
+-- Feeds: homesignal-ingest feeds.csv mtg-ruston-wa-city-catchall, mtg-lakewood-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Ruston', 'ruston-wa', 'Ruston town'), ('Lakewood', 'lakewood-wa', 'Lakewood city')) v(name, slug, census_name)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.census_name
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Ruston b8ba528b-4245-4c6e-8282-6b2c1ff49edd (5360510) · Lakewood 2908e5b0-32ee-4c35-893f-26b91d67bb2d (5338038)
