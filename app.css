@@ -143,6 +143,8 @@
   .btn.primary:hover{background:var(--green-deep)}
   .btn.ghost{color:var(--ink-2);border-color:transparent}
   .win{font-size:11.5px;font-weight:700;color:var(--red);background:var(--red-tint);padding:4px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px}
+  /* a cancelled public meeting stays listed with this badge (lib/templates.js cancelledBadge) */
+  .mtg-cancelled{display:inline-block;font-size:11px;font-weight:700;color:var(--ink-2);background:var(--line);padding:2px 7px;border-radius:6px;vertical-align:middle}
   .win.soft{color:var(--amber);background:var(--amber-tint)}
 
   .cd.traffic{background:var(--amber)} .cd.water{background:var(--blue)} .cd.air{background:var(--violet)}

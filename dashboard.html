@@ -7,7 +7,7 @@
 <title>HomeSignal — Dashboard</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="layout.css?v=c3f3f5d5">
-<link rel="stylesheet" href="app.css?v=6dd97374">
+<link rel="stylesheet" href="app.css?v=aad7c2d4">
 <style>
   /* Dashboard-scoped only — app.css is untouched (Fix 8 §1). */
   /* §4: main ~70-75%, rail ~25-30%. app.css ships 1.55fr/.95fr (62/38) for the older pages. */
@@ -319,10 +319,10 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=97bf2c11"></script>
+<script src="lib/data.js?v=c18bd28e"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=6b61281a"></script>
-<script src="lib/dashboard-aggregate.js?v=2aa31001"></script>
+<script src="lib/templates.js?v=a01bf2ff"></script>
+<script src="lib/dashboard-aggregate.js?v=b7d7219e"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=f6b5353a"></script>
@@ -838,7 +838,8 @@ HS.onReady(async function () {
       var cta = d.kind === 'meeting' ? 'View meeting →' : 'Review official notice →';
       var ext = d.kind === 'meeting';
       return '<div class="drow">' + dateBlock(d.dateYmd)
-        + '<div class="dmain"><div class="dt">' + HS.esc(d.title) + '</div>'
+        + '<div class="dmain"><div class="dt">' + HS.esc(d.title)
+        + (d.kind === 'meeting' && d.cancelled === true ? ' ' + HS.tpl.cancelledBadge(d) : '') + '</div>'
         + '<div class="dmeta">' + meta2.join('') + '</div></div>'
         + (href ? '<a class="cgo" href="' + HS.esc(href) + '"'
             + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + cta + '</a>' : '')
