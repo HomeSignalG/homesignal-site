@@ -43,7 +43,17 @@
           <a href="community.html" data-sub="activity">Activity</a>
         </div>
       </div>
-      <a href="properties.html" data-nav="props">My Places</a>
+      <!-- THE MY PLACES DROPDOWN (founder, 2026-10-19): the Alerts page had no way in from the
+           main page, only a button inside My Places. Built exactly like Explore's and Enterprise's.
+           "My Places" itself still goes to properties.html; the entries carry no data-nav. -->
+      <div class="hs-navgroup" id="hs-places">
+        <a href="properties.html" data-nav="props">My Places</a>
+        <button type="button" class="hs-navcaret" id="hs-places-toggle" aria-label="My Places pages" aria-expanded="false" aria-controls="hs-places-sub"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="hs-navsub" id="hs-places-sub">
+          <a href="properties.html" data-sub="places">My Places</a>
+          <a href="alerts.html" data-sub="alerts">Alert Settings</a>
+        </div>
+      </div>
       <!-- THE ENTERPRISE DROPDOWN (founder, 2026-10-05): "My reports" is how an agent gets back to
            the reports page (development-activity-reports.html), which no other page linked. It is
            built exactly like the Explore dropdown (same classes, same open/close behaviour).

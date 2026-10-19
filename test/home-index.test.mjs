@@ -162,7 +162,10 @@ ok(/id="hs-signin"[^>]*onclick="HS\.openAuth\(\)">Sign in</.test(header) && /id=
   'Sign in uses the existing auth; the avatar keeps its existing behaviour');
 ok(/id="hs-menubtn" aria-label="Menu" aria-expanded="false" aria-controls="hs-nav"/.test(header), 'one Menu button controls the nav');
 ok((shellNoComments.match(/<nav class="hs-nav"/g) || []).length === 1, 'one nav element serves both widths (no second copy of the links)');
-ok(!/Dashboard|Alerts|Development<|About|Sign up|search/i.test(header.replace(/HomeSignal/g, '')), 'no Dashboard, Alerts, Development, About, search or Sign up item in the header');
+// The one sanctioned entry is "Alert Settings" inside the My Places dropdown (founder, 2026-10-19).
+const placesSub = (header.match(/<div class="hs-navsub" id="hs-places-sub">[\s\S]*?<\/div>/) || [''])[0];
+ok(/href="alerts\.html"[^>]*>Alert Settings</.test(placesSub), 'Alert Settings is reachable from the My Places dropdown');
+ok(!/Dashboard|Alerts|Development<|About|Sign up|search/i.test(header.replace(placesSub, '').replace(/HomeSignal/g, '')), 'no Dashboard, Alerts, Development, About, search or Sign up item in the header');
 ok(!/id="hs-side"|class="side"|id="locLabel"|id="hsAddAddress"|id="hsAddZip"|aria-label="Notifications"|class="upsell"|id="sidebackdrop"/.test(shellNoComments),
   'the sidebar, Viewing chip, Place adds, bell and upsell are gone from the chrome');
 ok(/HS\.openSwitcher = function/.test(shellJs) && /HS\.addHome = function/.test(shellJs) && /HS\.openLoc = function/.test(shellJs)
