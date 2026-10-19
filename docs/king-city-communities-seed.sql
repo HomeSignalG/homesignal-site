@@ -86,7 +86,21 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 
 -- HELD after step 3 (2026-10-19), re-read from a runner:
 --   Renton     agendas are on PrimeGov (renton.primegov.com, public JSON API answers 200); no PrimeGov
---              adapter exists yet
+--              adapter exists yet (wired in step 4 below)
 --   Kirkland   OpenCities site; its council and agendas pages link no agenda platform in their HTML
 --   Issaquah   Cloudflare "Attention Required" to the runner too; not worked around
 --   The other cities held after step 2 are unchanged.
+
+-- Step 4 (2026-10-19): Renton, read through a new PrimeGov adapter (homesignal-ingest adapters/primegov.py).
+--   renton.primegov.com/api/v2/PublicPortal/ListUpcomingMeetings, from a runner: 200, 6 meetings 2026-10-19..10-21
+--   (Regular City Council Meeting, Committee of the Whole, committees, Planning Commission); the 2026 archive from
+--   2026-01-05. Dry run (run 39331535471): City Council, committees and commissions, 2026-01-05..2026-10-21.
+-- Feed: homesignal-ingest feeds.csv mtg-renton-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Renton', 'renton-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-19: Renton 9760bdd6-8c81-4a74-922a-efd354fd68b9 (5357745)
