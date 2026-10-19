@@ -1535,12 +1535,16 @@
   HS.openHome = function (prefill) {
     if (CFG.DATA_SOURCE !== 'supabase') { if (HS.toast) HS.toast('Adding an address needs the live site.'); return; }
     const want = typeof prefill === 'string' ? prefill.trim() : '';
+    // Only the map's Save button names an address to search again after the reload; take it once, so a later
+    // add-an-address from the header cannot inherit it.
+    const retAddr = HS.returnToAddressAfterSave || null; HS.returnToAddressAfterSave = null;
     if (!state.session || state.session.demo) {
-      HS.openAuth(want ? function () { return HS.openHome(want); } : undefined);
+      HS.openAuth(want ? function () { HS.returnToAddressAfterSave = retAddr; return HS.openHome(want); } : undefined);
       const sub = $('authSub');
       if (sub) sub.textContent = 'Sign in first — then add an address to see what’s changing around it.';
       return;
     }
+    _homeReturn = retAddr;
     _homeMatch = null;
     _homeInput = null;
     _savingHome = false;
@@ -1698,6 +1702,7 @@
   }
 
   let _savingHome = false;
+  let _homeReturn = null;   // the address the map page was showing when Save was clicked (this flow only)
   HS.saveHome = async function () {
     const m = _homeMatch; if (!m || !state.session) return;
     // In-flight guard. UX only — it stops the second click from ever leaving the browser,
@@ -1766,7 +1771,7 @@
     release();
     // The map page names the address it was showing; its own one-time handoff (read once, then removed)
     // runs that search again after the reload, so the resident is not left on an empty map.
-    if (HS.returnToAddressAfterSave) { try { sessionStorage.setItem('hs.homeSearchAddress', String(HS.returnToAddressAfterSave)); } catch (e) {} }
+    if (_homeReturn) { try { sessionStorage.setItem('hs.homeSearchAddress', String(_homeReturn)); } catch (e) {} }
     setTimeout(() => location.reload(), 900);   // rebuild every tile/map with the real home
   };
 
