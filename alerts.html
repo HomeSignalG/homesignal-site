@@ -7,7 +7,7 @@
 <title>HomeSignal — Alerts</title>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'self'">
 <link rel="stylesheet" href="layout.css?v=c3f3f5d5">
-<link rel="stylesheet" href="app.css?v=6dd97374">
+<link rel="stylesheet" href="app.css?v=aad7c2d4">
 </head>
 <body data-nav="props">
 <template id="hs-content">
@@ -53,9 +53,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=97bf2c11"></script>
+<script src="lib/data.js?v=c18bd28e"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=6b61281a"></script>
+<script src="lib/templates.js?v=a01bf2ff"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=1e4b8b64"></script>
@@ -103,6 +103,9 @@ HS.onReady(async function () {
 
   var newsTopics = (HS.data.topicCategories().news && HS.data.topicCategories().news.items) || [];
 
+  // A meeting MIRROR (an app_changes row titled "Public meeting — …") carries no
+  // is_cancelled field, so it is left unbadged. The cancelled decision belongs to the
+  // database (public.is_cancelled on meetings); no title pattern is applied here.
   function isMeetingMirror(ch) {
     return /^Public meeting\s*[—–-]/i.test(ch.title || '');
   }
@@ -123,7 +126,11 @@ HS.onReady(async function () {
       title: m.title || m.body,
       plain_language: (m.government ? m.government + ' · ' : '') + 'Public meeting' + (when ? ' on ' + when : '') + (m.location ? ' at ' + m.location : '') + '.',
       occurred_at: m.starts_at,
-      window_closes_at: m.window_closes_at || m.starts_at,
+      // A cancelled meeting stays in this tab and in its count, with a "Cancelled" badge
+      // (HS.tpl.windowPill reads `cancelled`). It is NOT a window that "needs you soon",
+      // so it carries no closing date and lands in its topic group, not the urgent band.
+      cancelled: m.cancelled === true,
+      window_closes_at: m.cancelled === true ? null : (m.window_closes_at || m.starts_at),
       source_ref: m.source_ref,
       related_project_id: m.related_project_id,
       lens: 'safety',

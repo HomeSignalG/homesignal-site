@@ -175,8 +175,11 @@ def fetch_data(key, now_iso):
     # public.zip_government_bodies (docs/zip-government-bodies.sql), read by the page too
     d["gov_links"] = fetch_all("zip_government_city_links", key, "link_id,zip,community_id,name",
                                keyset="link_id")
+    # is_cancelled is a PostgREST computed field (public.is_cancelled(public.meetings), SQL of
+    # record homesignal-ingest supabase/migrations/20261019190000_meetings_is_cancelled.sql) -
+    # the ONE cancelled decision. A cancelled meeting stays listed, marked "Cancelled".
     d["meetings"] = fetch_all("meetings", key,
-                              "id,community_id,title,meeting_date,category,source_url",
+                              "id,community_id,title,meeting_date,category,source_url,is_cancelled",
                               f"&meeting_date=gte.{urllib.parse.quote(meeting_cutoff(now_iso))}")
     return d
 
@@ -824,7 +827,8 @@ def _items(items, heading, empty, kind, zip_code=""):
             note = f' <span class="quiet">{esc(WEATHER_NOTE)}</span>' if u else ""
         when = esc(it.get("date") or "")
         inner = f'<a href="{esc(u)}" rel="nofollow noopener">{t}</a>{note}' if u else t
-        li.append(f'<li>{inner}{f" <time>{when}</time>" if when else ""}</li>')
+        badge = ' <span class="mtg-cancelled">Cancelled</span>' if it.get("cancelled") is True else ""
+        li.append(f'<li>{inner}{badge}{f" <time>{when}</time>" if when else ""}</li>')
     return (f'<section class="zsec"><h2>{esc(heading)}</h2><ul>' + "".join(li) + "</ul></section>")
 
 
@@ -832,7 +836,7 @@ OG_IMAGE = f"{BASE}/og-default.png"
 # ONE stylesheet tag for every generated page type (ZIP and city), so its cache key is
 # written once and test/lib-cache-keys.test.mjs keeps seeing exactly one generator tag.
 APP_CSS_LINK = ('<link rel="stylesheet" href="/layout.css?v=c3f3f5d5">\n'
-                '<link rel="stylesheet" href="/app.css?v=6dd97374">\n')
+                '<link rel="stylesheet" href="/app.css?v=aad7c2d4">\n')
 
 
 def coverage_panel(p):
@@ -876,7 +880,8 @@ def render(p, built):
     um_show = p["um"][:UM_CAP]
     um_items = [{"title": ((m.get("government") + ": ") if m.get("government") else "") + (m.get("title") or ""),
                  "url": m.get("source_url"),
-                 "date": (m.get("meeting_date") or "")[:10]} for m in um_show]
+                 "date": (m.get("meeting_date") or "")[:10],
+                 "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
     county_bit = f" in {esc(p['county'])} County" if p["county"] else ""
     lead = ("Development records, government notices, public meetings and local news"
@@ -1027,8 +1032,8 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261002a"></script>\n'
-        '<script src="/lib/data.js?v=97bf2c11"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=6b61281a"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/data.js?v=c18bd28e"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/templates.js?v=a01bf2ff"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1045,7 +1050,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=1e4b8b64"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=9ed32b7c"></script>\n'
+        '<script src="/lib/community-page.js?v=329f7b0f"></script>\n'
         "</body>\n</html>\n")
 
 
