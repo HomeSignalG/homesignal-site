@@ -3773,7 +3773,7 @@
           "WORKDESC"
         ],
         "status_raw": "STATUS",
-        "type_source": "NEWCLASS",
+        "type_source": "NEWTYPE",
         "file_date": "ISSUEDATE",
         "address": "PROP_ADDRE",
         "lat": "__lat",
@@ -3781,30 +3781,46 @@
         "case_number": "FOLDERNUMB"
       },
       "file_date_kind": "issued",
-      "include_types": [
-        "New Construction",
-        "Addition",
-        "Replacement",
-        "First",
-        "Move",
-        "Alteration"
-      ],
+      "extra_where": "NEWCLASS IN ('New Construction','Addition','Replacement','First','Move','Alteration')",
       "type_map": {
-        "New Construction": "Development",
-        "Addition": "Development",
-        "Replacement": "Development",
-        "First": "Development",
-        "Move": "Development",
-        "Alteration": "Development"
+        "Single Family Dwelling": "Residential",
+        "Rowhouse": "Residential",
+        "Row House": "Residential",
+        "Townhouse": "Residential",
+        "Accessory Dwelling Unit": "Residential",
+        "Duplex": "Residential",
+        "Duplex/Two Family Dwelling": "Residential",
+        "Apartments/Condos": "Residential",
+        "Floating Home": "Residential",
+        "Special Residential": "Residential",
+        "Business": "Commercial",
+        "Mercantile": "Commercial",
+        "Hotel/Motel": "Commercial",
+        "Factory/Industrial": "Industrial",
+        "Storage": "Industrial",
+        "Institutional": "Civic/Public",
+        "Assembly": "Development",
+        "Conversion": "Development",
+        "Accessory Structure": "Development"
+      },
+      "commercial_work_evidence": {
+        "column": "NEWCLASS",
+        "qualifying": [
+          "New Construction",
+          "Addition",
+          "Alteration",
+          "Replacement"
+        ],
+        "note": "NEWTYPE is the building occupancy; NEWCLASS is the work. Move and First are not qualifying commercial work."
       },
       "status_to_bucket": {
         "approved": [
           "Issued",
-          "Approved to Issue"
+          "Approved to Issue",
+          "Under Inspection"
         ],
         "operating": [
-          "Final",
-          "Under Inspection"
+          "Final"
         ],
         "proposed": [
           "Application",
