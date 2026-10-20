@@ -13283,3 +13283,40 @@ Audit of the 668 existing Texas ZIP pages (22 counties); full record in
     STATUS Planned / Under Review / Under Construction; PROJ_TYPE SDP/SIP/SSP/ZON/PUD;
     GENERAL_USE RES/NON-RES/MIX). It has **no date column**, so currency cannot be proven from it;
     wiring it needs its own pass.
+
+## TEXAS PRE-LAUNCH RULINGS (2026-10-20, founder) — Austin permits ON, Round Rock HELD, Denton city on Map 1
+
+- **`austin-issued-construction-permits` — ON for ZIP pages, strictly filtered.** `zip_mode: false` removed;
+  `extra_where` = `permit_type_desc = 'Building Permit' AND work_class IN ('New', 'Addition', 'Demolition')
+  AND latitude IS NOT NULL AND longitude IS NOT NULL`; `lat`/`lng` mapped to `latitude`/`longitude`, so every
+  kept row is placed by the publisher's own point and nothing is geocoded. Last 365 days (pg_net, the
+  connector's window): New 2,869 (985 with coordinates), Addition 16 (9), Demolition 692 (579). Excluded at
+  source: Repair 2,691, Remodel 2,076, Addition and Remodel 892, Interior Demo Non-Structural 188, Shell 31,
+  Relocation 6, and every Electrical / Plumbing / Mechanical / Driveway permit. The exact clause was run live
+  for 78704: 177 rows, statuses Active / Final / Expired, all already mapped.
+  - `Addition and Remodel` (791 with coordinates) is a separate work_class and is NOT included: the ruling
+    named "Addition". Including it is a one-word change if wanted.
+  - Rights: cleared by R7 (2026-10-04) for the ZIP pages; `report-rights.json` is unchanged (246 sources).
+- **Map 1 classification** (`docs/n5-tx-sources-classified-2026-10-20.sql`, applied 2026-10-20 as migration
+  `n5_tx_sources_classified_20261020`): a source with no `geo.n5_accepted_source` row is frozen UNCLASSIFIED
+  and Map 1 draws none of its records. 12 ZIP-mode sources had no row, 11 of them Texas.
+  - `austin-issued-construction-permits` -> PROVEN (publisher points only).
+  - `denton-city-projects-*` (7 layers) -> RECOVERY: 127 keys on 15 Denton pages had **0** Map 1 members
+    (control `denton-county-dev-permits`, same pages: 20,422 of 20,422). The layers are polygons on
+    maps.cityofdenton.com with identity `Project_ID` (basis `source_id:case_number`), the shape of
+    fort-worth-zoning-cases and dallas-specific-use-permits, which are RECOVERY.
+  - Not changed: harris-county-permits, harris-county-plats, houston-plat-applications,
+    san-antonio-prelim-plan-review (no records on any page today) and baltimore-city-housing-permits
+    (Maryland, 258 keys, 0 members; outside this Texas scope).
+  - Takes effect with the next N5 generation; the ACTIVE `n5-national-2026-10-20` is unchanged.
+- **Round Rock `Current_Developments_View/2` — HELD (ruling).** Probed 2026-10-20 for a date to unlock it:
+  - The layer declares editor tracking (`CreationDate` / `EditDate`, last data edit 2026-09-10), but the public
+    view withholds both fields: asking for them returns `PROJ_NAME` only. No relationship, no related table.
+  - `CASE_ID` encodes a year (`SDP2301-0003` = 2023-01, `SDP26-00021` = 2026) on most rows, but some read
+    `TBD` or carry two IDs; a filing date derived from an ID pattern would be inferred, not published.
+  - `TRAKiTPermits_FinalData_v2` (same org) is a fee-payment extract last edited 2022-08-10: no join source.
+  - `Public_Notices_Public_View/1` (same org) is CURRENT (941 notices, last edit 2026-10-14; City Council,
+    Planning and Zoning Commission, Zoning Board of Adjustments; `Meeting_Date_Converted`, `Posted_Date_Converted`,
+    `Doc_Share_URL`) but carries no case-ID field, so it cannot date the projects. It is a lead for Round Rock's
+    GOVERNMENT tile (ingest), not for this layer.
+  - Unlock path: the city exposing `CreationDate`/`EditDate` (or a filed date) in the public view.
