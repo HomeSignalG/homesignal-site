@@ -10183,6 +10183,7 @@
         "lng": "__lng"
       },
       "file_date_kind": "decided",
+      "recency_days": 365,
       "spatial_zip_radius_mi": 5,
       "use_type_const": "Development",
       "status_to_bucket": {
