@@ -7122,6 +7122,12 @@
           "VOID"
         ]
       },
+      "issued_promotes": {
+        "statuses": [
+          "OPEN"
+        ],
+        "column": "PER_ISSUE_DATE"
+      },
       "out_fields": [
         "OBJECTID",
         "PER_NUM",

@@ -24,6 +24,7 @@
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
 import { attemptFetch } from "./fetch-retry.ts";
+import { dropNullIsland } from "./null-island.ts";
 import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
@@ -43,6 +44,7 @@ import { fenceGeocode, noteFenceOutcome } from "./geo-fence.ts";
 import { applyCommercialWorkEvidence } from "./commercial-eligibility.ts";
 import type { CommercialWorkEvidence } from "./commercial-eligibility.ts";
 import { buildGeocodeInput } from "./geo-input.ts";
+import { issuedPromotedBucket, type IssuedPromotes } from "./issued-promotes.ts";
 import { aliasFileFor, applyIdentityAlias, type AliasVerdict, type IdentityAliasFiles } from "./identity-aliases.ts";
 
 // ───────────────────────────── registry entry + types ─────────────────────────────
@@ -111,6 +113,11 @@ export interface ArcgisRegistryEntry {
    *  (e.g. `issued_date IS NOT NULL`) so it never outruns the data. Never use it to override
    *  a real status column — entries that have one keep mapping it. */
   status_const?: string;
+  /** OPT-IN (founder ruling 2026-10-20, §7.12a: an issued permit is "approved"). For a layer whose
+   *  status word does not change at issuance (Phoenix OPEN), a row in `statuses` whose own issue-date
+   *  `column` is filled, parseable and not in the future is bucketed "approved" instead of "proposed".
+   *  Fails closed to the mapped bucket. See sources/issued-promotes.ts. */
+  issued_promotes?: IssuedPromotes;
   /** Dataset-level use_type for layers whose only type-bearing column is FREE TEXT, i.e. a
    *  vocabulary that cannot be enumerated and therefore cannot be mapped (Rule 5 terminal).
    *  The MIRROR of status_const, and subject to the same discipline: it is a constant because
@@ -479,7 +486,11 @@ async function runEntry(
     const statusRaw = String(entry.status_const ?? readCol(row, entry.column_map.status_raw) ?? "").trim();
     if (!statusRaw) { report.blank_status++; continue; }
     const hit = resolveNormalized(lookup, statusRaw);
-    const bucket = hit.value;
+    const mapped = hit.value;
+    const bucket = mapped === undefined ? undefined : issuedPromotedBucket(
+      entry.issued_promotes, statusRaw, mapped,
+      entry.issued_promotes ? isoDay(readCol(row, entry.issued_promotes.column)) : null,
+      new Date().toISOString().slice(0, 10));
     if (bucket === undefined) {                                        // unmapped → exclude + FLAG
       unmappedCount.set(statusRaw, (unmappedCount.get(statusRaw) ?? 0) + 1);
       // Name a concrete record so the flag is actionable, not just a count.
@@ -561,6 +572,7 @@ async function normalizeRow(
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
   let lng = numOrNull(readCol(row, cm.lng));
+  [lat, lng] = dropNullIsland(lat, lng);   // (0,0) means "no coordinates" (sources/null-island.ts)
   const address = valOrNull(readCol(row, cm.address));
   let geoPrecision: NormalizedRecord["geo_precision"];
   let scope: "point" | "area";
