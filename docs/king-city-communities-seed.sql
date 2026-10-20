@@ -104,3 +104,23 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'king-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-19: Renton 9760bdd6-8c81-4a74-922a-efd354fd68b9 (5357745)
+
+-- Step 5 (2026-10-20): Kirkland and Issaquah, the two cities held after step 3, each found on a vendor host.
+--   Kirkland   City Council: Granicus view_id 54 agenda RSS (kirkland.granicus.com), the view behind kirklandwa.gov's
+--              "Council Meeting Minutes and Agendas" page; dry run (run 39346462964): 47 meetings 2024-10-24..2026-10-06.
+--              City boards: PrimeGov kirklandwa.primegov.com (Planning Commission, Hearing Examiner, Design Review
+--              Board; the council is not on it); dry run (run 39346465556): 2026-01-05..2026-10-22.
+--   Issaquah   CivicWeb agenda portal issaquah.civicweb.net: City Council regular and special meetings, Committee of
+--              the Whole, three standing committees and city boards, 69 meetings; dry run (run 39346460310):
+--              2025-09-10..2026-11-17. issaquahwa.gov itself answers a Cloudflare challenge; not worked around.
+-- Feeds: homesignal-ingest feeds.csv mtg-kirkland-wa-city-catchall, mtg-kirkland-wa-boards-catchall,
+-- mtg-issaquah-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Kirkland', 'kirkland-wa'), ('Issaquah', 'issaquah-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-20: Kirkland 208db6e6-e102-480e-b9fc-6c1a9f193901 (5335940)
+--   · Issaquah 1d613aff-a838-4df9-a17f-b96c64ec4db7 (5333805)
