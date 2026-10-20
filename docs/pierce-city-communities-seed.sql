@@ -34,8 +34,8 @@ where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- HELD 2026-10-18 (no community row, so the ZIP pages keep saying "HomeSignal is not reading
 -- this city yet"). Each was probed through pg_net; none has a current first-party council source
 -- the shipped adapters read.
---   Fife           AgendaCenter City-Council-2 serves 100 agendas, newest 2018-10-23 (archive)
---   Steilacoom     AgendaCenter Town-Council-1 serves 6 agendas, newest 2021-03-02 (archive)
+--   (Fife and Steilacoom were held here until 2026-10-20: their AgendaCenter pages are archives
+--   (newest 2018-10-23 / 2021-03-02), but both publish current CivicPlus iCalendar feeds; see Step 6.)
 --   Federal Way    webapi.legistar.com/v1/federalway answers 500 "LegistarConnectionString
 --                  setting is not set up" (King County city; 1.9% of one Pierce ZIP)
 --   Orting         www.cityoforting.org answers 403 Access Denied to automated requests (2026-10-19)
@@ -87,3 +87,21 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'pierce-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-19: Ruston b8ba528b-4245-4c6e-8282-6b2c1ff49edd (5360510) · Lakewood 2908e5b0-32ee-4c35-893f-26b91d67bb2d (5338038)
+
+-- Step 6 (2026-10-20): Fife and Steilacoom. Their AgendaCenter pages are archives, but each town's own
+-- CivicPlus iCalendar directory (iCalendar.aspx) lists a current council calendar. catIDs were READ from
+-- that directory, never guessed. Probed live through pg_net:
+--   Fife        catID 22 "City Council Meetings": 32 events 2026-10-20 .. 2027-08-24 (meetings + study sessions)
+--               catID 35 "Boards & Commissions Meetings": Planning Commission + Parks Advisory Board, 2026-11-02 ..
+--   Steilacoom  catID 23 "Civic Events": 37 events, all "Town Council", 2026-10-20 .. 2028-04-18
+--               (catID 14, the main calendar, also carries community events such as "Pumpkin Walk")
+-- Feeds: homesignal-ingest feeds.csv mtg-fife-wa-city-catchall, mtg-fife-wa-boards-catchall,
+--   mtg-steilacoom-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Fife', 'fife-wa', 'Fife city'), ('Steilacoom', 'steilacoom-wa', 'Steilacoom town')) v(name, slug, census_name)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.census_name
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-20: Fife bc25c108-a6c1-4a8c-ae51-ffcf1cb85ec1 (5323795) · Steilacoom 0a21aa49-aa23-45bc-b418-330e385e9ab7 (5367770)
