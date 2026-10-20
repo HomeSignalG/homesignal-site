@@ -26,8 +26,12 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // Founder approval 2026-10-14 (genuine, relayed by the coordinator) cleared exactly seven City of Denton Planning/Projects sources
 // (denton-city-projects-*): 240 -> 247 ids. Prior value 32af7ab5a9f963a562e9af19eab246bf (240 ids, 2026-10-04).
 // Recomputed read-only in the production database (db-sql run 38598272960, scratch branch never merged) over a VALUES list GENERATED from the registry: n=247, md5 009d7cd0... (same algorithm as the 240-id value).
-const FINGERPRINT_2026_10_04 = '009d7cd035eeab4fcf1df21b08f8bf3a';
-const EXPECTED_IDS = 247;
+// 2026-10-20 Texas pre-launch: round-rock-large-development-projects RETIRED (its layer answers 499 Token Required),
+// 247 -> 246 ids. A removal narrows the cleared list and clears nothing new. Recomputed read-only in the production database
+// over a VALUES list generated from the registry: n=246, md5 9bdf1b3e...; the same query with that one id added back reproduces
+// the prior value 009d7cd0... exactly (positive control).
+const FINGERPRINT_2026_10_04 = '9bdf1b3ed7c5f9a9c61714ec281a0f14';
+const EXPECTED_IDS = 246;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();

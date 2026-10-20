@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`247` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `009d7cd035eeab4fcf1df21b08f8bf3a`.
+`246` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `9bdf1b3ed7c5f9a9c61714ec281a0f14`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -242,7 +242,6 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `raleigh-building-permits`
 - `reno-ldc-projects`
 - `ridot-rhode-restore-projects`
-- `round-rock-large-development-projects`
 - `salem-structure-permits`
 - `san-antonio-permits-issued`
 - `san-antonio-prelim-plan-review`
