@@ -3335,6 +3335,24 @@ permits included.
 - Pinned by `test/issued-permit-is-approved.test.mjs`, keyed on `file_date_kind`, never on a source name.
 - Stored rows change as the rolling refresh revisits each ZIP after the report engine is deployed.
 
+## 7.12b MAP 1 MAY DRAW PERMITS LOCATED BY GEOCODING THEIR OWN ADDRESS ⚖️ FOUNDER RULING (2026-10-20) — APPLIED
+
+Seven registry sources whose records are placed only by geocoding their own street address
+(Boulder, Virginia Beach, Worcester, Hartford, Naperville, Anaheim land-use, Prince George's)
+were frozen as `NOAUTH` in `geo.n5_accepted_source`, so every N5 generation withheld them from
+Map 1. Found in the Colorado pre-launch audit: Boulder's permits were on its ZIP pages and drew no
+dots. The founder ruled Map 1 may draw them.
+
+- **SQL of record:** `docs/n5-geocoded-sources-served-2026-10-20.sql` (applied as migration
+  `20261020142431 n5_geocoded_sources_served_20261020`; stored statements md5 `cfcaf606…`, equal to
+  the file). The set is computed in the database and fingerprinted (n=7, `158f6256…`); the update
+  refuses while a generation is BUILDING. After apply only `(null)` is still `NOAUTH`.
+- **The geocode fence still holds:** the stored point is the geocode that already passed
+  `sources/geo-fence.ts`; a failed fence nulls the point, and N5 then rejects the key.
+- **Takes effect with the next generation**, not the serving one. Rollback is in the file's footer.
+- 📌 **Known label, not changed:** the radius RPC names these points `proven_stored_point`, a term
+  N2 defined for a publisher's own coordinate.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
