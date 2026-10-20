@@ -73,7 +73,45 @@ PMN readers per city (ingest), enrolled for meetings.
 HomeSignalG/homesignal-ingest#752; meetings enrollment 343 -> 353 applied in production, md5 95b8e739 equal
 to `ingest.py`). The other 183 cities are the next tranches, largest first.
 
+## Finding 4 — Eagle Mountain (84005) had no county on its chain (FIXED 2026-10-20)
+
+The Eagle Mountain city community had `parent_id` null, so ZIP 84005 inherited only the city and never
+Utah County. Before the fix it had 0 users and 0 subscriptions. Production migration
+`eagle_mountain_city_parent_utah_county_20261020` set the parent to Utah County
+(`625a808d-74f0-491a-95a7-0d7ebd1e3761`). It was guarded: it refused unless the row was still a city
+with a null parent. `app_refresh_zip('84005')` then ran. `zip_government_bodies('84005')` now lists Utah
+County and Eagle Mountain, and the page carries 9 Utah County government notices and 6 local news items.
+
+## Finding 5 — Tremonton's meetings stopped on 2026-08-07: the city moved websites (FIXED in ingest)
+
+All 4 Tremonton meetings readers read `tremontoncity.gov/events/feed/`, and nothing new arrived after
+2026-08-07. The rendered-page probe (homesignal-ingest run 39468226933) found the city's new site loads
+its agendas from `https://tremontoncity.gov/api/agendas` (JSON). homesignal-ingest#752 adds the
+`agenda_api_json` parser and points the 4 readers at it. Its dry run (run 39470296440) read 7 real
+meetings dated 2026-10-07 to 2026-10-21. The city's 7 news readers on `/feed/` also return nothing now.
+The new site's equivalent is `/api/mayor-posts`. They are left as they are, because Tremonton's
+government notices still arrive from PMN.
+
+## Re-check after the fixes (2026-10-20 ~18:00 UTC)
+
+- **SLC (check 14):** 25 ZIPs were refreshed through the deployed engine. Every SLC report came back
+  without `slc-planning-petitions` sites, and after `app_refresh_zip` **0 rows remain on any page**
+  (12 ZIPs before). Map 1 draws from the N5 serving generation, so its dots drop on the next daily
+  build.
+- **EPA (check 4):** 4 of the 14 stale pages refreshed (84014, 84078, 84079, 84603). The other 10 got
+  answers that EPA refused (`429` / process limit), so their stored layer is kept and marked unknown. It is
+  never written as zero. The rolling refresh retries them. Firing more requests at a rate-limited EPA
+  would only make it worse.
+- Readiness check after the refresh: development reports 0 pages older than 72 h. Notices, meetings and
+  local news are all current to 2026-10-20. No page renders nothing.
+
 ## Not defects (checked)
+
+- **Brigham City meetings** look empty on the city page in plain HTML (1 link; 67 once the page runs in a
+  browser), but the reader stores the agenda PDFs from `aptg.co`: 56 meetings, newest stored 2026-10-09.
+- **Iron County's commission archive** reader is thin (newest stored 2026-07-29), but Iron's notices
+  arrive from PMN: 43 rows, newest 2026-10-15.
+- **Weber's commission page** lists 5 "test new server" PDFs. The placeholder rule sets them aside.
 
 - **Stratos AI Data Center Campus** is withheld from Map 1: Compute Atlas gives `41.5, -113.5`, a rounded
   area point (`GEOGRAPHY_UNRESOLVED`, `ROUNDED_COORDINATES`/`PUBLISHER_AREA_POINT`). That is the
