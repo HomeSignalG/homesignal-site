@@ -8902,6 +8902,7 @@
         "Townhouse": "Residential",
         "Duplex": "Residential",
         "2nd Unit Added": "Residential",
+        "ADU   Accessory Dwelling Unit": "Residential",
         "Apt/Condo/Townhouse": "Residential",
         "Single Dwelling Unit": "Residential",
         "Manufactured Home": "Residential",
@@ -16124,7 +16125,8 @@
         "KNOWN_THIN": "WARNING - FOUR FIELDS ONLY: OBJECTID, PermitType, CreatedDate, GlobalID. No title, no address, no case number, no description, no valuation. Each pin is labelled by its PermitType and 141 of 177 rows carry the identical string 'Planning Application'. The records are REAL (real point, real date, real self-describing type), so this is thin labelling and NOT fabrication - but a resident sees many identically-named pins. Recorded so a later session does not mistake it for a defect.",
         "cross_state_trap": "the AGO account 'GISOrangeCity' is Orange City FLORIDA (its own items say 'Septic To Sewer, Orange City Florida'). The real City of Orange CA account is 'jmcpherson@cityoforange.org_cityoforange', identified by the EMAIL DOMAIN in the owner string, never by the matching display name.",
         "expected_lift": "5 dark Orange County ZIP pages",
-        "geometry": "coordinates come from the feature's OWN point geometry via the connector's flattened __lat/__lng, never a column default. The layer has no lat/lng attribute columns at all. Omitting these emitted records with NO coordinates - caught by test/city-of-orange-connector.test.mjs before any deploy, which is what that test is for."
+        "geometry": "coordinates come from the feature's OWN point geometry via the connector's flattened __lat/__lng, never a column default. The layer has no lat/lng attribute columns at all. Omitting these emitted records with NO coordinates - caught by test/city-of-orange-connector.test.mjs before any deploy, which is what that test is for.",
+        "freshness_flag_2026-10-20": "FLAGGED FOR ENDPOINT REPAIR (founder ruling 2026-10-20: older than 30 days). Live pg_net GETs 2026-10-20 (requests 11195 / 11196): max CreatedDate 2026-05-20 over 177 rows (ISO strings, so the string max is the date max), and the layer description itself says \"This data set is current as of 5/27/2026\" and that the table \"will be updated monthly\". editingInfo.lastEditDate 2026-10-07 with no newer CreatedDate. The connector selector is correct; the city has not refreshed the source table since May. Repair = a fresher first-party City of Orange endpoint or the city resuming its monthly refresh. NOT ASKED of the city yet."
       }
     },
     {
