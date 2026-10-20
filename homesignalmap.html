@@ -1276,6 +1276,12 @@ HS.onReady(function(){
   // `unknown` bucket to fall into. Returns the CANONICAL key verbatim (operating, not the
   // legacy "built" spelling) so the legend chip, the filter map and the 3D views key on
   // one vocabulary.
+  // How many PROJECTS a list of sites is: distinct zip_project_ref through the shared counter
+  // (HS.zipAuthProjectCount, the rails' identity), plus one for each site that has no ref.
+  function projectsIn(list){
+    var withRef = (list || []).filter(function(s){ return s && s.zip_project_ref; });
+    return HS.zipAuthProjectCount(withRef) + ((list || []).length - withRef.length);
+  }
   function bucketOf(t, site){
     var s = site || { type: t };
     var lc = (HS.resolveTrackerMarker ? HS.resolveTrackerMarker(s, function(){ return ""; }).lifecycle : null);
@@ -2736,8 +2742,14 @@ HS.onReady(function(){
     // only the Proposed records that are projects with a source-published point. Area-scope items
     // (hearing and agenda notices) stay in the Proposed rail under "Hearings and notices in this
     // area" but are not projects and are not counted here.
+    // PROJECTS, NOT PINS (2026-10-20): a road project published as line segments draws one
+    // marker per segment (NCDOT STIP: 28110 showed "8" for 3 projects). The rails already count
+    // it once through HS.zipAuthProjectCount; the counter uses the same identity. A site with no
+    // project ref (address mode, a data-centre row) is its own project, exactly as in the rails.
     var propPoints = permits.filter(function(s){ return bucketOf(s.type)==="proposed"; });
-    var propActive = HS.activeUndecidedCount ? HS.activeUndecidedCount(propPoints) : propPoints.length;
+    var propLive = HS.isActiveUndecided ? propPoints.filter(function(s){ return HS.isActiveUndecided(s); }) : null;
+    var propActive = (propLive && HS.zipAuthProjectCount) ? projectsIn(propLive)
+      : (HS.activeUndecidedCount ? HS.activeUndecidedCount(propPoints) : propPoints.length);
     $("cDev").textContent  = DEV_UNMEASURED ? "\u2014"
       : ((data.counts && data.counts.proposed_active) != null ? data.counts.proposed_active
          : propActive);
