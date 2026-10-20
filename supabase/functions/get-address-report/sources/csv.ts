@@ -32,6 +32,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import { pointInBox, validBounds, widensLegacy, scopeBox, type ZipBounds } from "./scope-box.ts";
+import { dropNullIsland } from "./null-island.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
 import type {
@@ -371,6 +372,7 @@ async function normalizeRow(
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
   let lng = numOrNull(readCol(row, cm.lng));
+  [lat, lng] = dropNullIsland(lat, lng);   // (0,0) means "no coordinates" (sources/null-island.ts)
   const address = valOrNull(readCol(row, cm.address));
   let geoPrecision: NormalizedRecord["geo_precision"];
   let scope: "point" | "area";

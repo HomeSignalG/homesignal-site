@@ -28,6 +28,7 @@
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
 import { attemptFetch } from "./fetch-retry.ts";
+import { dropNullIsland } from "./null-island.ts";
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
@@ -592,6 +593,7 @@ async function normalizeRow(
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
   let lng = numOrNull(readCol(row, cm.lng));
+  [lat, lng] = dropNullIsland(lat, lng);   // (0,0) means "no coordinates" (sources/null-island.ts)
   const address = valOrNull(readCol(row, cm.address));
   let geoPrecision: NormalizedRecord["geo_precision"];
   let scope: "point" | "area";

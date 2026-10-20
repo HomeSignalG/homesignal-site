@@ -27,6 +27,7 @@
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
 import { attemptFetch } from "./fetch-retry.ts";
+import { dropNullIsland } from "./null-island.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -262,6 +263,7 @@ async function normalizeRow(
   // else geocode a full street address → address; else jurisdiction.
   let lat = numOrNull(row["__lat"] ?? readCol(row, cm.lat));
   let lng = numOrNull(row["__lng"] ?? readCol(row, cm.lng));
+  [lat, lng] = dropNullIsland(lat, lng);   // (0,0) means "no coordinates" (sources/null-island.ts)
   const address = valOrNull(readCol(row, cm.address));
   let geoPrecision: NormalizedRecord["geo_precision"];
   let scope: "point" | "area";
