@@ -9,7 +9,7 @@ its control beside it.
 | Miami-Dade | 80 | 147, newest 10-16 | 123 | Miami permits (22 pages), FDOT |
 | Hillsborough | 58 | 31, newest 10-13 | 35 | FDOT |
 | Broward | 55 | 51, newest 10-12 | 51 | FDOT |
-| **Palm Beach** | 53 | **0 (held)** | **0** | FDOT |
+| **Palm Beach** | 53 | **0 → wired (ingest #775)** | **0 → wired** | FDOT |
 | Orange | 49 | 33, newest 10-12 | 36 | FDOT |
 | Pinellas | 48 | 35, newest 10-15 | 33 | FDOT |
 | Lee | 36 | 26, newest 10-16 | 26 | Lee development orders (32), FDOT |
@@ -41,10 +41,13 @@ FAIL: EPA facility layer older than 7 days on 19 pages (below).
 2. **St. Johns County had no government source — WIRED (ingest #775).** The Clerk of Court's
    agenda page lists the BCC agenda PDFs; 19 agendas, newest 2026-10-20. Enrollment 358 → 359,
    applied and fingerprinted.
-3. **Palm Beach County stays dark, held with evidence.** CivicClerk `palmbeachfl` is the Town of
-   Palm Beach; NovusAgenda `palmbeach` returns its error page; Legistar `pbc` is the county but
-   its newest event is 2026-04-27 (176 days, past `GOV_STALE_DAYS = 90`) and its InSite calendar
-   has 0 meeting links. A rendered probe of the county's own sites is seeded in ingest.
+3. **Palm Beach County had no government source — WIRED (ingest #775) from the county's own site.**
+   Every vendor tenant is wrong or stale: CivicClerk `palmbeachfl` is the Town of Palm Beach;
+   NovusAgenda `palmbeach` returns its error page; Legistar `pbc` and Granicus `pbc` are the county
+   but newest 2026-04-27 (176 days, past `GOV_STALE_DAYS = 90`). The rendered-browser probe (run
+   39476539991) showed the county moved from pbcgov.org to `discover.pbc.gov`, whose BCC Agenda page
+   lists the current agendas as `Agenda_Master/YYYYMMDD.pdf` (newest 2026-10-20). Enrollment applied
+   as the live 366 union of concurrent sessions + Palm Beach = 367, fingerprinted before and after.
 4. **EPA facility layer stale on 19 pages — EXTERNAL.** All 19 carry `facilities_unavailable`
    (shown as unknown, never as zero). Six were run through the live engine: two now read cleanly
    (33068 → 23, 33760 → 40); four were refused on EPA's own HTTP 502s and connection failures.
@@ -69,3 +72,5 @@ FAIL: EPA facility layer older than 7 days on 19 pages (below).
   rejections still stand: Tampa WAF-blocks the engine, Orlando is ungeolocatable, Fort Lauderdale
   is stalled). New-source discovery is a separate pass.
 - FL city councils: no city communities exist yet; adding them is a site seed.
+- After ingest #775 merges: `load-feeds-to-db.yml` from `main`, then `golive-feed.yml` for the four
+  St. Johns / Palm Beach feeds; meetings and notices appear on the 65 pages after that.
