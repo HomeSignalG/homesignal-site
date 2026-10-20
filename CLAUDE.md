@@ -3379,6 +3379,16 @@ Audit of the 200 Oregon ZIP pages (10 counties). Test: `test/oregon-prelaunch-20
   Measured over all 1,501 stored records naming an ADU: qualifying 9 -> 83, and the only source that
   changes is Portland (+74 new ADUs); every other change is ROUTINE -> UNRESOLVED (both not drawn).
 
+## 7.12d AN ESTIMATED END DATE IS NOT A DECISION (Florida pre-launch, 2026-10-20)
+
+`column_map.decision_date` is read as a decision: `decisionEvidenceLevel()` returns `date_only`, and
+`app_refresh_zip` falls back to it when `file_date` is empty and stamps `date_kind = 'decided'`.
+`fdot-active-construction-projects` mapped it to `EstEndDate`, so 577 FDOT rows (390 in the future,
+to 2029) read "(decided)" on generated project pages. Seven entries mapped a scheduled or estimated
+end there (FDOT, UDOT x2, Clark NV, Lexington KY, Columbia MO, Lake County IL); none does now.
+Never map an estimated, scheduled or end date as `decision_date`. Pinned by
+`test/estimated-end-is-not-a-decision.test.mjs`. Receipt: `docs/florida-prelaunch-audit-2026-10-20.md`.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another

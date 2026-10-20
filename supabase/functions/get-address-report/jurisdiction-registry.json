@@ -4777,7 +4777,6 @@
         "status_raw": "pin_stat_nm",
         "type_source": "proj_typ_nm",
         "file_date": "created_dt",
-        "decision_date": "est_compl_dat",
         "address": "proj_loc",
         "lat": "__lat",
         "lng": "__lng",
@@ -6063,7 +6062,6 @@
         "title": "PRONAME",
         "status_raw": "PROSTATUS",
         "file_date": "BIDOPEN",
-        "decision_date": "EstConstComplete",
         "lat": "__lat",
         "lng": "__lng",
         "case_number": "PRONUM"
@@ -10175,7 +10173,6 @@
           "RoadwayId"
         ],
         "file_date": "StartDate",
-        "decision_date": "EstEndDate",
         "case_number": "ContractId",
         "lat": "__lat",
         "lng": "__lng"
@@ -10462,7 +10459,6 @@
         "title": "DescriptionOfWork",
         "status_raw": "Status",
         "file_date": "EstimatedStartDate",
-        "decision_date": "EstimatedEndDate",
         "lat": "__lat",
         "lng": "__lng",
         "case_number": "RequestID"
@@ -11866,7 +11862,6 @@
         ],
         "status_raw": "project_status_desc",
         "file_date": "project_start_date",
-        "decision_date": "project_end_date",
         "case_number": "project_number",
         "lat": "__lat",
         "lng": "__lng"
@@ -11948,7 +11943,6 @@
         ],
         "status_raw": "Status",
         "file_date": "Start_Date",
-        "decision_date": "End_Date",
         "address": "From_At",
         "record_url": "Site_URL",
         "lat": "__lat",
@@ -15139,7 +15133,6 @@
         "status_raw": "pin_stat_nm",
         "type_source": "proj_typ_nm",
         "file_date": "created_dt",
-        "decision_date": "est_compl_dat",
         "address": "proj_loc",
         "lat": "__lat",
         "lng": "__lng",
