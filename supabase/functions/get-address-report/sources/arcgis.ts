@@ -23,6 +23,7 @@
 // outSR=4326, resultOffset/resultRecordCount paging, exceededTransferLimit honored. Point
 // geometry {x:lng,y:lat} is flattened into __lng/__lat so the column_map reads it uniformly.
 
+import { attemptFetch } from "./fetch-retry.ts";
 import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
@@ -991,12 +992,17 @@ async function getWithBackoff(url: string, deps: ArcgisDeps): Promise<unknown> {
       }
     : { headers, signal: AbortSignal.timeout(30000) };
   let delay = 800;
+  let lastNet: Error | null = null;   // connection reset etc. (sources/fetch-retry.ts)
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await deps.fetch(fetchUrl, makeInit());
+    const a = await attemptFetch(() => deps.fetch(fetchUrl, makeInit()));
+    if ("retry" in a) { lastNet = a.retry; await sleep(delay); delay *= 2; continue; }
+    const res = a.res;
+    lastNet = null;
     if (res.status === 429 || res.status >= 500) { await sleep(delay); delay *= 2; continue; }
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${fetchUrl}`);
     return await res.json();
   }
+  if (lastNet) throw lastNet;
   throw new Error(`rate-limited/5xx after retries: ${fetchUrl}`);
 }
 

@@ -70,7 +70,8 @@ const sql = `case
   when ${fam} then 'DEVELOPMENT'
   else 'UNRESOLVED' end`;
 
-const NORM = c => `(' ' || btrim(regexp_replace(lower(coalesce(${c},'')), '[^a-z0-9]+', ' ', 'g')) || ' ')`;
+// The ' accessory dwelling ' -> ' adu dwelling ' rewrite mirrors HS.residentialNormalize (2026-10-20).
+const NORM = c => `replace((' ' || btrim(regexp_replace(lower(coalesce(${c},'')), '[^a-z0-9]+', ' ', 'g')) || ' '), ' accessory dwelling ', ' adu dwelling ')`;
 const mode = process.argv[2];
 if (mode === '--norm') process.stdout.write(
   `${NORM('type_raw')} as tr, ${NORM('name')} as nm, ${inList('registry_id', LABEL)} as lbl`);

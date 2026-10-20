@@ -27,6 +27,7 @@
 // entry.geographic), $where for the ZIP filter + optional recency window, $limit/$offset
 // paging, optional app-token header (SOCRATA_APP_TOKEN) to raise rate limits, 429 back-off.
 
+import { attemptFetch } from "./fetch-retry.ts";
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
@@ -807,12 +808,17 @@ async function getWithBackoff(url: string, deps: SocrataDeps): Promise<unknown> 
   const headers: Record<string, string> = { "Accept": "application/json", "User-Agent": "HomeSignal public-records refresh (contact: admin@homesignal.net)" };
   if (deps.appToken) headers["X-App-Token"] = deps.appToken;
   let delay = 800;
+  let lastNet: Error | null = null;   // connection reset etc. (sources/fetch-retry.ts)
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await deps.fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+    const a = await attemptFetch(() => deps.fetch(url, { headers, signal: AbortSignal.timeout(30000) }));
+    if ("retry" in a) { lastNet = a.retry; await sleep(delay); delay *= 2; continue; }
+    const res = a.res;
+    lastNet = null;
     if (res.status === 429 || res.status >= 500) { await sleep(delay); delay *= 2; continue; }   // back off
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     return await res.json();
   }
+  if (lastNet) throw lastNet;
   throw new Error(`rate-limited/5xx after retries: ${url}`);
 }
 

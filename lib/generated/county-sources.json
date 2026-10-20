@@ -1617,7 +1617,7 @@
         "id": "portland-building-permits",
         "label": "City of Portland",
         "scope": "city",
-        "commercial": false
+        "commercial": true
       }
     ],
     "OR|Deschutes": [
@@ -1655,7 +1655,7 @@
         "id": "portland-building-permits",
         "label": "City of Portland",
         "scope": "city",
-        "commercial": false
+        "commercial": true
       }
     ],
     "OR|Washington": [
@@ -1663,7 +1663,7 @@
         "id": "portland-building-permits",
         "label": "City of Portland",
         "scope": "city",
-        "commercial": false
+        "commercial": true
       }
     ],
     "PA|Allegheny": [

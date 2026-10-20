@@ -87,6 +87,7 @@ import { readAllRows } from "./sources/pg-pages.ts";
 import { decisionFor, isActiveUndecided } from "./sources/decision.ts";
 import jurisdictionRegistry from "./jurisdiction-registry.json" with { type: "json" };
 import { applyYields, buildYieldsMap } from "./sources/yields.ts";
+import { refuseFutureFilingDates } from "./sources/date-sanity.ts";
 // registry_id -> yields_to, built once at module load; empty map ⇒ applyYields is a no-op.
 const YIELDS_MAP = buildYieldsMap(jurisdictionRegistry as Record<string, unknown>);
 const SOCRATA_ENTRIES = (jurisdictionRegistry as unknown as { socrata?: SocrataRegistryEntry[] }).socrata ?? [];
@@ -920,8 +921,9 @@ async function handleRequest(req: Request): Promise<Response> {
     // assembly. If the yielded-to fetch failed/returned nothing this cycle, the yield set is
     // empty and every yielding record survives — an outage degrades to dual-source absence,
     // never silent point-job loss. No stored id lists; recomputed per report.
+    // A filing/issue date after today is refused (the record stays undated); sources/date-sanity.ts.
     const permitSites = dedupeExactPermits(applyYields(
-      [...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites],
+      refuseFutureFilingDates([...tabsSites, ...socrataSites, ...arcgisSites, ...ckanSites, ...csvSites, ...cartoSites], today),
       YIELDS_MAP,
     ));
     const devRecords = [...devReal, ...permitSites];

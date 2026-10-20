@@ -3353,6 +3353,32 @@ dots. The founder ruled Map 1 may draw them.
 - 📌 **Known label, not changed:** the radius RPC names these points `proven_stored_point`, a term
   N2 defined for a publisher's own coordinate.
 
+## 7.12c OREGON PRE-LAUNCH (2026-10-20) — four engine/registry fixes, all universal, none Oregon-keyed
+
+Audit of the 200 Oregon ZIP pages (10 counties). Test: `test/oregon-prelaunch-2026-10-20.test.mjs`.
+- **portland-building-permits had its columns swapped.** Measured on layer 89: NEWCLASS is the WORK
+  ("Standardized Work Description": New Construction, Alteration, Addition, Move, Replacement, First) and
+  NEWTYPE is the BUILDING ("Standardized Building Type", 20 values; groupBy and distinct agree, both sum
+  to 36,560). The entry typed on NEWCLASS, so all 896 cached Portland permits drew as "Other project".
+  Now `type_source` NEWTYPE with every value mapped, the work filter in `extra_where` on NEWCLASS, and
+  `commercial_work_evidence` on NEWCLASS (Business + Move is not Commercial). "Under Inspection" (3,954
+  rows, work in progress) is Approved, not Operating now; Operating now is "Final" only (founder ruling
+  7.12a). The layer is Portland's RESIDENTIAL permits; the city publishes no commercial permit layer.
+- **A connection reset is retried in all four connectors** (`sources/fetch-retry.ts`, used by the
+  arcgis/socrata/ckan/carto backoff loops). Before: only 429/5xx were retried and a reset failed the
+  source for that ZIP. Measured: portlandmaps.com reset 192 fetches on 79 ZIP pages 2026-10-06..20, 100
+  of them blocking a write (Multnomah: 19 of 34 pages not written, oldest write 11 days). A timeout is
+  never retried (each attempt already waits 30 s against a 60 s core budget).
+- **A filed/issued date after today + 1 is refused; the record stays** (`sources/date-sanity.ts`, applied
+  to every permit connector in index.ts). Measured: 306 issued + 12 filed future-dated records across 8
+  sources, e.g. Bend BP20-877 (Mechanical) IssueDate 2033-10-20. Scheduled/estimated/decided/hearing
+  dates are never touched. The refused value is kept as `file_date_refused`.
+- **An Accessory Dwelling Unit is a dwelling, not an accessory object.** `HS.residentialNormalize` (and
+  its SQL twin NORM, `--norm`) rewrite ' accessory dwelling ' to ' adu dwelling ', so ' accessory ' no
+  longer vetoes explicit construction evidence. A bare ADU record is still not development by itself.
+  Measured over all 1,501 stored records naming an ADU: qualifying 9 -> 83, and the only source that
+  changes is Portland (+74 new ADUs); every other change is ROUTINE -> UNRESOLVED (both not drawn).
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another

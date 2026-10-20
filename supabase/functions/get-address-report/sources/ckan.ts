@@ -22,6 +22,7 @@
 // Types and values are imported separately: Node's type stripping (used by the offline
 // fixture scripts) does no type analysis, so a TYPE listed in a value import becomes a real
 // runtime import and fails to resolve. Deno erases it either way.
+import { attemptFetch } from "./fetch-retry.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -402,12 +403,17 @@ export function buildWhere(entry: CkanRegistryEntry, zip: string, zipCol: string
 async function getWithBackoff(url: string, deps: CkanDeps): Promise<unknown> {
   const headers: Record<string, string> = { "Accept": "application/json", "User-Agent": "HomeSignal public-records refresh (contact: admin@homesignal.net)" };
   let delay = 800;
+  let lastNet: Error | null = null;   // connection reset etc. (sources/fetch-retry.ts)
   for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await deps.fetch(url, { headers, signal: AbortSignal.timeout(30000) });
+    const a = await attemptFetch(() => deps.fetch(url, { headers, signal: AbortSignal.timeout(30000) }));
+    if ("retry" in a) { lastNet = a.retry; await sleep(delay); delay *= 2; continue; }
+    const res = a.res;
+    lastNet = null;
     if (res.status === 429 || res.status >= 500) { await sleep(delay); delay *= 2; continue; }
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
     return await res.json();
   }
+  if (lastNet) throw lastNet;
   throw new Error(`rate-limited/5xx after retries: ${url}`);
 }
 
