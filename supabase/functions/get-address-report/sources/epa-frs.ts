@@ -137,6 +137,15 @@ export function recognizedFrsPayload(data: unknown): FrsAttempt {
  *      layer stopped refreshing (98467 since 2026-08-20). Nationally 1,120 ZIPs carried a facility
  *      layer older than 7 days with `facilities_unavailable`; this is the deterministic shape that
  *      produces that state.
+ *   3. A VALUE THAT ENDS IN A BACKSLASH (2026-10-20). Measured on two Utah records: FRS 110012372477
+ *      LocationAddress "UINTAH & OURAY RESERVATION\" (Vernal 84078, 3 mi body) and FRS 110070713364
+ *      FacilityName "REIMSCHUSSEL ESTATES, PLAT \B\" (Provo 84602, 2 mi body). EPA writes the
+ *      backslash raw, so the string's closing quote reads as an escaped quote and the value never
+ *      ends. Every ZIP whose search circle held one of them kept a facility layer that never
+ *      refreshed (84078 since 2026-08-23, 84602 since 2026-08-24); both real bodies parse with this.
+ *      An odd run of backslashes right before a quote that is followed by the next key (`, "Key":`)
+ *      or by the end of an object/array is a literal backslash, so it is doubled. An escaped quote
+ *      inside a value is followed by more text, never by `, "Key":`, so it is left alone.
  * U+0000–U+001F become a space. Outside a string that is still JSON whitespace; inside a string it
  * turns a stray tab or newline into a space, which no reader of an address or name depends on.
  * A body that still does not parse throws, and `frsAt` keeps treating that as transient (a body
@@ -145,6 +154,7 @@ export function recognizedFrsPayload(data: unknown): FrsAttempt {
 export function parseEpaJson(text: string): unknown {
   const repaired = text
     .replace(/\\(?!["\\/bfnrtu])/g, "\\\\")
+    .replace(/(^|[^\\])((?:\\\\)*)\\"(?=\s*(?:,\s*"[^"\\]*"\s*:|[}\]]))/g, '$1$2\\\\"')
     // deno-lint-ignore no-control-regex
     .replace(/[\u0000-\u001f]/g, " ");
   return JSON.parse(repaired);

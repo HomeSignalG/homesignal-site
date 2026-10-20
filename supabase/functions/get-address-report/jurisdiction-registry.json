@@ -1803,8 +1803,9 @@
       },
       "record_url_precision": "record",
       "incremental_field": "AppliedDate",
+      "recency_days": 365,
       "extra_where": "ApplicationSubType NOT IN ('Zoning Verification Letter','Administrative Interpretation','Appeal Admin Decision','Appeal Comm Decision','Determination Non-Conform Use')",
-      "_receipts": "2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 7 ApplicationStatus values (Closed 2,377 / Active 636 / Additional Information 61 / Approved 32 / Accepted 3 / Pre-screen 2 / In Progress 2), all already mapped \u2014 a planning-petition queue has no operating end state, so operating:[]."
+      "_receipts": "2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 7 ApplicationStatus values (Closed 2,377 / Active 636 / Additional Information 61 / Approved 32 / Accepted 3 / Pre-screen 2 / In Progress 2), all already mapped \u2014 a planning-petition queue has no operating end state, so operating:[]. || 2026-10-20 UTAH PRE-LAUNCH: FROZEN SOURCE, recency_days 365 added. pg_net (ids 8704/8705) max(AppliedDate) = 2020-06-09 over all 3,113 rows; the layer has received no filing since then (Salt Lake City moved planning intake to Accela Citizen Access, which publishes no open layer). Its 636 'Active' rows are a 2020 snapshot, not a current queue: production carried 570 records on 11 SLC ZIP pages, 538 of them drawn on Map 1 as Proposed (filed 1982-2020). With a 365-day window on AppliedDate the entry emits 0 records until the city publishes a filing again, and then shows it with no further change. Org catalog checked the same day (services list + item search, orgid mMBpeYj0vPFotzbe): no live replacement (ActivePermitProjects = 9 small-cell permits, Rezone_Petitions last edited 2023)."
     },
     {
       "registry_id": "provo-planning-applications",

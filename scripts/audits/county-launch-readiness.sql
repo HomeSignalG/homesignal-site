@@ -6,7 +6,8 @@
 -- pages, and government and local-news coverage were never measured. A launch verdict must come from this
 -- file, run just before the verdict, and it must name every row that is not PASS.
 --
--- HOW TO RUN: set the two values in `params`, then run the whole file (Supabase SQL editor, the MCP
+-- HOW TO RUN: set the two values in `params` (co = null runs every county of the state at once, which is how
+-- the 2026-10-20 Utah pre-launch audit ran it over 310 pages), then run the whole file (Supabase SQL editor, the MCP
 -- execute_sql tool, or db-sql.yml from a branch). One row per check:
 --   verdict PASS | FLAG (look at it, may be acceptable) | FAIL (not ready until fixed or ruled acceptable)
 --   value    what was measured                control   a non-zero count that proves the query saw data
@@ -15,14 +16,17 @@
 -- Thresholds come from the launch brief and CLAUDE.md, not from this county:
 --   development refresh 72 h FLAG / 7 d FAIL · EPA facility layer 7 d FAIL · government notices and
 --   meetings: newest delivered row 30 d FLAG / 90 d FAIL (GOV_STALE_DAYS) · local news newest 14 d FLAG
---   (the 14-day render window) · a development source with no new row in 60 d FLAG.
+--   (the 14-day render window) · a development source with no new row in 60 d FLAG · a development source whose
+--   NEWEST FILING is older than 365 d FAIL (check 14: a frozen publisher; rows keep a fresh created_at because
+--   the page is re-materialized, so check 5 alone cannot see it — Salt Lake City's planning layer stopped at
+--   2020-06-09 and was still drawn on Map 1 as 538 live proposals until 2026-10-20).
 -- Pages with no Census ZIP boundary are listed, not failed: they are the national Fix 4 class
 -- (PO-box / single-organisation ZIPs) and correctly show no map area.
 
 with params as (select 'WA'::text st, 'Pierce'::text co),
 pages as (
   select c.zip_codes[1] zip, c.id, c.parent_id
-  from public.communities c, params p where c.state = p.st and c.county = p.co and c.level = 'zip'
+  from public.communities c, params p where c.state = p.st and (p.co is null or c.county = p.co) and c.level = 'zip'
 ),
 -- chain: the ZIP page plus up to two ancestors (zip -> city -> county), the cascade the site walks
 chain as (
@@ -47,10 +51,11 @@ bodies as (
 ),
 rep as (select d.* from public.development_reports d join pages using (zip)),
 dev as (
-  select substring(p.source_key from '^[a-z]+:([^:]+)') src, p.zip, p.created_at
+  select substring(p.source_key from '^[a-z]+:([^:]+)') src, p.zip, p.created_at, p.submitted_at
   from public.app_projects p join pages using (zip) where p.record_kind = 'development'
 ),
-src as (select src, count(distinct zip) zips, max(created_at) newest_new from dev group by src),
+src as (select src, count(distinct zip) zips, max(created_at) newest_new, max(submitted_at) newest_filed
+        from dev group by src),
 gn as (
   select max(a.created_at) newest, count(*) n from public.alerts a
   where a.community_id in (select cid from gov_ids) and a.pipeline_type = 'government_notice'
@@ -96,6 +101,11 @@ select * from (
   select 5, 'development source ' || src || ': pages / newest new row',
          zips || ' / ' || newest_new::date, zips::text,
          case when newest_new < now() - interval '60 days' then 'FLAG' else 'PASS' end
+  from src
+  union all
+  select 14, 'development source ' || src || ': newest FILING date (frozen publisher if > 365 d)',
+         coalesce(newest_filed::date::text, 'no dated filing'), zips::text,
+         case when newest_filed < now() - interval '365 days' then 'FAIL' else 'PASS' end
   from src
   union all
   select 6, 'government feeds on the chain + overlap cities: active / total, by table',
