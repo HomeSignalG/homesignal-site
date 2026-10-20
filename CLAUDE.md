@@ -3414,6 +3414,16 @@ Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete`
   reports refreshed in 72 h; 45107 last written 2026-10-12 (re-attempted 10-19). Summit County Planning
   Commission's 1,825-day window and "Submitted for county review" are the PA Act 247 ruling, unchanged.
 
+## 7.12e NORTH CAROLINA PRE-LAUNCH (2026-10-20) — 170 ZIP pages, 10 counties
+
+- **`cabarrus-county-plan-reviews` is FROZEN** (newest B1_FILE_DD 2025-04-03, 0 rows in the last 12 months over 99,748) and
+  drew 20,819 old review records as Proposed on the 10 Cabarrus pages. `recency_days` 730 -> 365 (Spokane/Denton/SLC
+  pattern). Pages 28071, 28107, 28124, 28138 have no other development source, so Guard 2 holds them until their row is
+  7 days old; the other 6 keep NCDOT records and clear on their next refresh. No live replacement layer on the county server.
+- Future-dated issue dates on Brunswick 28451 (2031-01-30) and New Hanover 28401/28409 (2027) were cached before the
+  date-sanity deploy (17:23Z, run 39465519157); they clear on the next rolling refresh.
+- Every NC development site carries a `record_url` (0 missing of ~283k). Chatham and Union have only NCDOT STIP records.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
