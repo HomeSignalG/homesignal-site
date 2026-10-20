@@ -13657,6 +13657,7 @@
     },
     {
       "registry_id": "nysdot-capital-program-projects",
+      "yields_to": "nysdot-capital-program-projects-3",
       "platform": "arcgis",
       "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
       "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
@@ -13769,6 +13770,7 @@
     },
     {
       "registry_id": "nysdot-capital-program-projects-3",
+      "yields_to": "nysdot-capital-program-projects-2",
       "platform": "arcgis",
       "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
       "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
