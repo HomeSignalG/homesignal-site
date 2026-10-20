@@ -140,3 +140,24 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'king-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-20: Mercer Island 197e0e18-639f-484b-967b-355bfcb559da (5345005)
+
+-- Step 7 (2026-10-20): Tukwila, read from the city's own The Events Calendar "city-council" category
+--   (https://www.tukwilawa.gov/events/category/city-council/feed/, read through the REST route with
+--   &categories=city-council by homesignal-ingest adapters/city_events.py); filter meeting|committee|session
+--   drops the coffee chats. Dry run (run 39498378764): council meetings 2026-10-19..2026-12-14.
+-- Step 8 (2026-10-20): Burien, read from its CivicWeb calendar service
+--   (https://burienwa.civicweb.net/Services/MeetingsService.svc/meetings, 60 days back / 180 ahead,
+--   notice_list parser civicweb_meetings_service, which now also splits day-first names like
+--   "City Council Regular Meeting - 26 Oct 2026"). Dry run (run 39499217592): 2026-08-26..2026-12-21,
+--   City Council, Planning Commission, Airport Committee and city boards.
+-- Feeds: homesignal-ingest feeds.csv mtg-tukwila-wa-city-catchall, mtg-burien-wa-city-catchall.
+-- Still held: Kent (its Granicus view is empty; agendas sit in Laserfiche at documents.kentwa.gov).
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Tukwila', 'tukwila-wa'), ('Burien', 'burien-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-20: Tukwila 25bb9bbe-176b-4e59-a524-07ebcf1c11ec (5372625)
+--   · Burien 9c08122a-866b-4638-ac01-b608e180f642 (5308850)
