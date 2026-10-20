@@ -104,8 +104,13 @@ for (const zip of ZIPS) {
     // reach the Approved/Proposed rails, so pooling them under one '(no-ref)' key would report
     // repeats the renderer does not make.
     const refOf = (s) => s.zip_project_ref || s.n5_source_key || s.source_id || s.project_ref || null;
+    // The authoritative-relation checks below compare against app_zip_projects_markers. National
+    // data-centre rows come from another plane (map1_dc_zip_members) and carry no ref by design, so
+    // they are counted apart rather than pooled under '(no-ref)' (27703, 2026-10-20: 4 such rows read
+    // as "4 without identity" and "278 vs 277").
+    const devAuth = dev.filter((s) => s.record_kind !== 'national_project');
     const per = {};
-    dev.forEach((s) => { const k = refOf(s) || '(no-ref)'; per[k] = (per[k] || 0) + 1; });
+    devAuth.forEach((s) => { const k = refOf(s) || '(no-ref)'; per[k] = (per[k] || 0) + 1; });
     const rows = (id) => Array.from(document.querySelectorAll('#' + id + ' .rec'));
     const devRailIds = ['apprList', 'propList'];
     const railRows = devRailIds.reduce((n, id) => n + rows(id).length, 0);
@@ -142,7 +147,8 @@ for (const zip of ZIPS) {
     return {
       railRepeats, uncappedRepeats,
       railSliceSizes: [apprSlice.length, propSlice.length],
-      devSites: dev.length,
+      devSites: devAuth.length,
+      nationalSites: dev.length - devAuth.length,
       uniqueRefs: Object.keys(per).length,
       noRef: per['(no-ref)'] || 0,
       maxPerRef: Object.entries(per).filter(([k]) => k !== '(no-ref)').reduce((a, [, n]) => Math.max(a, n), 0),
@@ -158,7 +164,8 @@ for (const zip of ZIPS) {
 
   console.log(`   page: ${m.devSites} development sites · ${m.uniqueRefs} unique project refs · `
     + `max ${m.maxPerRef} sites on one project · ${m.leafletMarkers} leaflet markers · `
-    + `${m.railRows} rail rows${m.railCapped ? ' (a rail is at its 12-row cap)' : ''}`);
+    + `${m.railRows} rail rows${m.railCapped ? ' (a rail is at its 12-row cap)' : ''}`
+    + (m.nationalSites ? ` · ${m.nationalSites} national data-centre site(s), counted apart` : ''));
   console.log(`   rails: ${m.railSliceSizes[0]} approved + ${m.railSliceSizes[1]} proposed rendered`);
   if (m.multiRefs.length) {
     console.log('   projects carrying several sites: '
