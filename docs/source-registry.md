@@ -13246,3 +13246,27 @@ question. ND: 45 pages → **7**, once the 85% of applications that were DECLINE
 NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The first number is the
 dataset's size; only the second is what a resident would see.** Neither state was wired, and in
 both cases the layer-wide figure would have justified a wire that the honest figure does not.
+
+## TEXAS PRE-LAUNCH (2026-10-20) — one frozen source windowed, one dead source retired
+
+Audit of the 668 existing Texas ZIP pages (22 counties); full record in
+`docs/texas-prelaunch-audit-2026-10-20.md`.
+
+- **`denton-county-dev-permits` — FROZEN, `recency_days: 365` added** (same rule as
+  `slc-planning-petitions`, #2089). pg_net 9272: max(DateReceiv) = 2023-06-09 over 56,500 rows,
+  unchanged since July. Production carried 26,718 rows from it on 28 Denton pages, 26,483 drawn
+  on Map 1 as **Approved** (filed 2018-2023), i.e. presented as current approvals. With the
+  window it emits 0 until the county publishes a filing again. Every affected page keeps other
+  development sources (Denton city, Frisco, TxDOT), so the shrink guard accepts the write.
+- **`round-rock-large-development-projects` — RETIRED (entry removed).** The layer now answers
+  `499 Token Required` (pg_net 9357, 9362). Every refresh of its 6 Williamson pages (78626, 78634,
+  78641, 78664, 78665, 78681) logged `fetch failed: ArcGIS error: Token Required`,
+  `blocked_update: true` (`dev_refresh_source_failures`), so CORE GUARD 1 froze **everything** on
+  those pages (Austin, TxDOT and the rest) since 2026-09-29/30 while every other Williamson page
+  stayed current. Removing the entry makes the source "no longer reported", which the collector's
+  retired-source path accepts as an explained reduction.
+  - **Candidate replacement, not wired:** the city's org now publishes
+    `Current_Developments_View/FeatureServer/2` ("Permits and Projects", polygon, 130 rows; coded
+    STATUS Planned / Under Review / Under Construction; PROJ_TYPE SDP/SIP/SSP/ZON/PUD;
+    GENERAL_USE RES/NON-RES/MIX). It has **no date column**, so currency cannot be proven from it;
+    wiring it needs its own pass.

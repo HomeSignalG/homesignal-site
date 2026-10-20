@@ -1862,69 +1862,6 @@
       "_receipts": "2026-07-27 icon-completeness pass: live groupBy over the whole layer returned StatusDescription values (Approved 72 / Waiting for Revisions 42 / Open 14 / Complete Application 14 / Council 9 / Under Review 9 / ...), all already mapped \u2014 a planning-application queue publishes no completion and no void state. TYPE: the layer schema was re-read in full (dateEntered/PAName/PermitNumber/Location/RecordID/Address/PublicNotSummary/Status/StatusDescription/LastHearingType/...) and carries NO land-use or project-type field \u2014 LastHearingType is a hearing kind, not a use type. type_map is deliberately ABSENT; records stay use_type 'unclassified' (logged), never inferred from the title."
     },
     {
-      "registry_id": "round-rock-large-development-projects",
-      "geocode_assemble": true,
-      "platform": "arcgis",
-      "service_url": "https://services.arcgis.com/KaARkuoKF9vrGr3P/arcgis/rest/services/Large_Development_Projects_view/FeatureServer/0",
-      "dataset_url": "https://www.roundrocktexas.gov/departments/planning-and-development-services/",
-      "jurisdiction": "Round Rock",
-      "coverage": [
-        {
-          "state": "TX",
-          "county": "Williamson"
-        }
-      ],
-      "column_map": {
-        "title": "PROJECT_NAME",
-        "status_raw": "STATUS",
-        "type_source": "CASE_TYPE",
-        "file_date": "DATE_CREATED",
-        "address": "ADDRESS",
-        "lat": "__lat",
-        "lng": "__lng",
-        "case_number": "PROJECT_NO"
-      },
-      "type_map": {
-        "Zoning": "Development",
-        "PUD": "Development",
-        "Concept Plan": "Development",
-        "Preliminary Plat": "Development",
-        "Final Plat": "Development",
-        "Minor Plat": "Development",
-        "Replat": "Development",
-        "Annexation": "Development",
-        "Agreement": "Development"
-      },
-      "status_to_bucket": {
-        "proposed": [
-          "PENDINGCC",
-          "REC_PHASE",
-          "REC_SUBMIT",
-          "REVIEW",
-          "STAFFRVWAD",
-          "STAFFRVWCC",
-          "STAFFRVWPZ"
-        ],
-        "approved": [
-          "ADMINAPPRV",
-          "APPRVDBYCC",
-          "CCAPPROVED",
-          "P&ZAPPROVE",
-          "PLNAPPROVE"
-        ],
-        "operating": [],
-        "exclude": [
-          "CONVERTED"
-        ],
-        "denied": [
-          "REJECTED"
-        ]
-      },
-      "incremental_field": "DATE_CREATED",
-      "zip_where_template": "ADDRESS LIKE '%{zip}%'",
-      "_receipts": "Verified live 2026-07-13 via pg_net: city org (roundrockgis), point geometry (SR 102739 -> outSR 4326), 190 records, 14 statuses + 9 case types VERBATIM from groupBy, fresh (newest DATE_CREATED Sep 2026), ADDRESS carries '... ROUND ROCK TX 786xx' so the Provo zip_where_template pattern scopes per ZIP; survey-description addresses without a ZIP are honestly excluded by the filter. No per-record link -> dataset_url fallback (dataset precision). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 12 STATUS codes (APPRVDBYCC 83 / P&ZAPPROVE 45 / REVIEW 27 / STAFFRVWPZ 12 / ADMINAPPRV 7 / PENDINGCC 5 / REC_PHASE 3 / CONVERTED 2 / CCAPPROVED 1 / REC_SUBMIT 1 / REJECTED 1), all already mapped \u2014 no built/operating code exists in the domain, so operating:[]."
-    },
-    {
       "registry_id": "san-antonio-permits-issued",
       "geocode_assemble": true,
       "platform": "arcgis",
@@ -5209,8 +5146,9 @@
       },
       "record_url_precision": "dataset",
       "spatial_zip_radius_mi": 3,
+      "recency_days": 365,
       "identity_aliases_file": "denton-county-dev-permits.json",
-      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3. | 2026-10-10 Denton data-integrity gate: address mapping corrected from PropertyAc (alias \"Property Account\", an account number that printed as an address, e.g. \"R87447\") to PropertySi (alias \"Property Situs Address\"), populated on 43,242 of 48,161 whitelisted records (live count, 2026-10-10). Source still frozen at max(DateReceiv) 2023-06-09 (56,500 rows, unchanged)."
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3. | 2026-10-10 Denton data-integrity gate: address mapping corrected from PropertyAc (alias \"Property Account\", an account number that printed as an address, e.g. \"R87447\") to PropertySi (alias \"Property Situs Address\"), populated on 43,242 of 48,161 whitelisted records (live count, 2026-10-10). Source still frozen at max(DateReceiv) 2023-06-09 (56,500 rows, unchanged). || 2026-10-20 TEXAS PRE-LAUNCH: FROZEN SOURCE, recency_days 365 added (same rule as slc-planning-petitions, #2089). pg_net 9272 the same day: max(DateReceiv) 1686286800000 = 2023-06-09, count 56,500, unchanged since July. Production carried 26,718 records from this layer on 28 Denton ZIP pages, 26,483 of them drawn on Map 1 as Approved (filed 2018-2023), i.e. presented as current approvals. With a 365-day window on DateReceiv (esriFieldTypeDate) the entry emits 0 records until the county publishes a filing again, and then shows it with no further change."
     },
     {
       "registry_id": "denton-city-projects-decided",
