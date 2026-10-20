@@ -1862,69 +1862,6 @@
       "_receipts": "2026-07-27 icon-completeness pass: live groupBy over the whole layer returned StatusDescription values (Approved 72 / Waiting for Revisions 42 / Open 14 / Complete Application 14 / Council 9 / Under Review 9 / ...), all already mapped \u2014 a planning-application queue publishes no completion and no void state. TYPE: the layer schema was re-read in full (dateEntered/PAName/PermitNumber/Location/RecordID/Address/PublicNotSummary/Status/StatusDescription/LastHearingType/...) and carries NO land-use or project-type field \u2014 LastHearingType is a hearing kind, not a use type. type_map is deliberately ABSENT; records stay use_type 'unclassified' (logged), never inferred from the title."
     },
     {
-      "registry_id": "round-rock-large-development-projects",
-      "geocode_assemble": true,
-      "platform": "arcgis",
-      "service_url": "https://services.arcgis.com/KaARkuoKF9vrGr3P/arcgis/rest/services/Large_Development_Projects_view/FeatureServer/0",
-      "dataset_url": "https://www.roundrocktexas.gov/departments/planning-and-development-services/",
-      "jurisdiction": "Round Rock",
-      "coverage": [
-        {
-          "state": "TX",
-          "county": "Williamson"
-        }
-      ],
-      "column_map": {
-        "title": "PROJECT_NAME",
-        "status_raw": "STATUS",
-        "type_source": "CASE_TYPE",
-        "file_date": "DATE_CREATED",
-        "address": "ADDRESS",
-        "lat": "__lat",
-        "lng": "__lng",
-        "case_number": "PROJECT_NO"
-      },
-      "type_map": {
-        "Zoning": "Development",
-        "PUD": "Development",
-        "Concept Plan": "Development",
-        "Preliminary Plat": "Development",
-        "Final Plat": "Development",
-        "Minor Plat": "Development",
-        "Replat": "Development",
-        "Annexation": "Development",
-        "Agreement": "Development"
-      },
-      "status_to_bucket": {
-        "proposed": [
-          "PENDINGCC",
-          "REC_PHASE",
-          "REC_SUBMIT",
-          "REVIEW",
-          "STAFFRVWAD",
-          "STAFFRVWCC",
-          "STAFFRVWPZ"
-        ],
-        "approved": [
-          "ADMINAPPRV",
-          "APPRVDBYCC",
-          "CCAPPROVED",
-          "P&ZAPPROVE",
-          "PLNAPPROVE"
-        ],
-        "operating": [],
-        "exclude": [
-          "CONVERTED"
-        ],
-        "denied": [
-          "REJECTED"
-        ]
-      },
-      "incremental_field": "DATE_CREATED",
-      "zip_where_template": "ADDRESS LIKE '%{zip}%'",
-      "_receipts": "Verified live 2026-07-13 via pg_net: city org (roundrockgis), point geometry (SR 102739 -> outSR 4326), 190 records, 14 statuses + 9 case types VERBATIM from groupBy, fresh (newest DATE_CREATED Sep 2026), ADDRESS carries '... ROUND ROCK TX 786xx' so the Provo zip_where_template pattern scopes per ZIP; survey-description addresses without a ZIP are honestly excluded by the filter. No per-record link -> dataset_url fallback (dataset precision). | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 12 STATUS codes (APPRVDBYCC 83 / P&ZAPPROVE 45 / REVIEW 27 / STAFFRVWPZ 12 / ADMINAPPRV 7 / PENDINGCC 5 / REC_PHASE 3 / CONVERTED 2 / CCAPPROVED 1 / REC_SUBMIT 1 / REJECTED 1), all already mapped \u2014 no built/operating code exists in the domain, so operating:[]."
-    },
-    {
       "registry_id": "san-antonio-permits-issued",
       "geocode_assemble": true,
       "platform": "arcgis",
@@ -5209,8 +5146,9 @@
       },
       "record_url_precision": "dataset",
       "spatial_zip_radius_mi": 3,
+      "recency_days": 365,
       "identity_aliases_file": "denton-county-dev-permits.json",
-      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3. | 2026-10-10 Denton data-integrity gate: address mapping corrected from PropertyAc (alias \"Property Account\", an account number that printed as an address, e.g. \"R87447\") to PropertySi (alias \"Property Situs Address\"), populated on 43,242 of 48,161 whitelisted records (live count, 2026-10-10). Source still frozen at max(DateReceiv) 2023-06-09 (56,500 rows, unchanged)."
+      "_receipts": "2026-07-27 TX/NV original-workbook wire pass (DC-DP). Denton County's own ArcGIS Server, DEV_Permits layer 0 'Permits'. esriGeometryPoint, 56,500 rows. STATUS: 11 PermitStat values VERBATIM via groupBy (Approved 29,892 / ' ' 26,192 / Withdrawn 235 / Not Issued 95 / Denied 48 / Pending 25 / Annex 6 / 'Not Issussed' 2 (SOURCE TYPO kept verbatim so those rows bucket rather than fail closed) / null 2 / Expired 2 / Submitted 1). The 26,192 blank-status rows fail closed on their own (blank_status). operating:[] \u2014 the domain has no completed/finaled state. TYPE: PermitType is an UNCONTROLLED FREE-TEXT field \u2014 the n-DESC page looks clean (HOUSE 39,484 / MOBILE HOME 4,229 / OTHER 1,378 / COMMERCIAL BUILDING 1,161 / ...) but an ALPHABETICAL enumeration exposes a long one-off tail ('190\\' LATTICE TOWER' 1, '2ND STORY ADDITION' 1, '97294' 1, '-------------------' 1, 'ADD TO GARAGE-APT' 1, ...). Only the high-frequency VERBATIM construction classes are kept, and they are ALSO the extra_where whitelist so the tail is dropped AT SOURCE rather than guessed. DROPPED deliberately: SWIMMING POOL 1,126, WATER WELL 907, GAS / OIL WELL 796, ADDRESS ONLY 378, OTHER 1,378 (ambiguous 'other', Mesa precedent). No ZIP column -> spatial_zip_radius_mi 3. | 2026-10-10 Denton data-integrity gate: address mapping corrected from PropertyAc (alias \"Property Account\", an account number that printed as an address, e.g. \"R87447\") to PropertySi (alias \"Property Situs Address\"), populated on 43,242 of 48,161 whitelisted records (live count, 2026-10-10). Source still frozen at max(DateReceiv) 2023-06-09 (56,500 rows, unchanged). || 2026-10-20 TEXAS PRE-LAUNCH: FROZEN SOURCE, recency_days 365 added (same rule as slc-planning-petitions, #2089). pg_net 9272 the same day: max(DateReceiv) 1686286800000 = 2023-06-09, count 56,500, unchanged since July. Production carried 26,718 records from this layer on 28 Denton ZIP pages, 26,483 of them drawn on Map 1 as Approved (filed 2018-2023), i.e. presented as current approvals. With a 365-day window on DateReceiv (esriFieldTypeDate) the entry emits 0 records until the county publishes a filing again, and then shows it with no further change."
     },
     {
       "registry_id": "denton-city-projects-decided",
@@ -12196,9 +12134,10 @@
         "exclude": []
       },
       "extra_where": "conbegin_forecast IS NOT NULL",
+      "recency_days": 365,
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
-      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. MaineDOT's OWN service on the state GIS host (gis.maine.gov), owner MaineDOT_OpenData, layer 4 'Public Projects Points'. 1,109 rows. *** THIS SOURCE IS ONLY WIREABLE BECAUSE OF THE MULTIPOINT FIX SHIPPED 2026-08-05 (PR #600). *** The layer is esriGeometryMultipoint; before that fix featurePoint() returned null for multipoint, so every record would have had NO coordinates, fallen through to scope 'area', and been dropped by the point-scope-only app_projects materializer - exactly the lake-county-il-construction-program failure. STATUS: USE reporting_status, NEVER proj_status_code. proj_status_code is OPAQUE NUMERIC CODES with NO coded-value domain ('10' 647, '20' 311, '01' 53, '54' 41, '60' 37, '63' 15, '50' 5 = 1,109 exact) - the San Jose '30' fail-closed class, undecodable without guessing. reporting_status on the SAME layer is SELF-DESCRIBING and also sums exactly to 1,109: '2 - Design/Permitting Phase' 503, '4 - Construction Complete' 414, '1 - Awaiting Kick-Off' 117, '3 - Construction Phase' 75. All 4 mapped -> 0 unmapped. STANDING LESSON: never let an opaque field decide when a self-describing one exists on the same layer. DATE CHOSEN ON LIVE NON-NULL COUNTS: conbegin_forecast 501/1,109 - the best available. Others measured and rejected: ko_actual 503 but only 402 survive a 2021 cutoff, ko_forecast 117, conbegin_actual 73, concomp_forecast 72. NO recency_days - all 501 non-null conbegin_forecast values already post-date 2021-08-06 (the window and the IS NOT NULL test return the SAME 501), so a window would be a pure no-op. *** STATED CEILING: only 501 of 1,109 rows (45%) emit. A MAJORITY OF THE LAYER IS UNDATED and is deliberately dropped rather than published undated. Understating is the honest direction. *** Layer 5 is the same projects as LINES (1,138) - points only are wired; wiring both would double-emit. HOST RISK: gis.maine.gov is STATE-HOSTED, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it (governance section 0, the Montgomery-OH/Dayton class). pg_net returned 200 on every probe - the positive control section 0 requires for wire-and-see. VERIFY FROM arcgis_reports POST-DEPLOY.",
+      "_receipts": "2026-08-05 eleven-zero-coverage-states pass. MaineDOT's OWN service on the state GIS host (gis.maine.gov), owner MaineDOT_OpenData, layer 4 'Public Projects Points'. 1,109 rows. *** THIS SOURCE IS ONLY WIREABLE BECAUSE OF THE MULTIPOINT FIX SHIPPED 2026-08-05 (PR #600). *** The layer is esriGeometryMultipoint; before that fix featurePoint() returned null for multipoint, so every record would have had NO coordinates, fallen through to scope 'area', and been dropped by the point-scope-only app_projects materializer - exactly the lake-county-il-construction-program failure. STATUS: USE reporting_status, NEVER proj_status_code. proj_status_code is OPAQUE NUMERIC CODES with NO coded-value domain ('10' 647, '20' 311, '01' 53, '54' 41, '60' 37, '63' 15, '50' 5 = 1,109 exact) - the San Jose '30' fail-closed class, undecodable without guessing. reporting_status on the SAME layer is SELF-DESCRIBING and also sums exactly to 1,109: '2 - Design/Permitting Phase' 503, '4 - Construction Complete' 414, '1 - Awaiting Kick-Off' 117, '3 - Construction Phase' 75. All 4 mapped -> 0 unmapped. STANDING LESSON: never let an opaque field decide when a self-describing one exists on the same layer. DATE CHOSEN ON LIVE NON-NULL COUNTS: conbegin_forecast 501/1,109 - the best available. Others measured and rejected: ko_actual 503 but only 402 survive a 2021 cutoff, ko_forecast 117, conbegin_actual 73, concomp_forecast 72. NO recency_days - all 501 non-null conbegin_forecast values already post-date 2021-08-06 (the window and the IS NOT NULL test return the SAME 501), so a window would be a pure no-op. *** STATED CEILING: only 501 of 1,109 rows (45%) emit. A MAJORITY OF THE LAYER IS UNDATED and is deliberately dropped rather than published undated. Understating is the honest direction. *** Layer 5 is the same projects as LINES (1,138) - points only are wired; wiring both would double-emit. HOST RISK: gis.maine.gov is STATE-HOSTED, not services*.arcgis.com, so a pg_net 200 is NOT evidence the Deno edge runtime can reach it (governance section 0, the Montgomery-OH/Dayton class). pg_net returned 200 on every probe - the positive control section 0 requires for wire-and-see. VERIFY FROM arcgis_reports POST-DEPLOY. || 2026-10-20 MAINE PRE-LAUNCH: FROZEN SOURCE, recency_days 365 added on conbegin_forecast (esriFieldTypeDate, so the DATE literal applies; same rule as denton-county-dev-permits #2094, spokane #2093, slc #2089). pg_net 9866-9868 + 10105-10110: reporting_status counts are IDENTICAL to the 2026-08-05/08-23 wire receipts (points 117/503/75/414, lines 96/366/79/597; forecast-dated 501/363), so not one of 2,247 projects changed phase in two months, and the newest ACTUAL dates on the layer are ko_actual 2025-04-18, conbegin_actual 2025-04-02, concomp_actual 2025-05-28 (pg_net 10068-10070; ~100+ completions a year 2020-2024, 2/4 in 2025, 0 in 2026, pg_net 10006-10057). Production carried 1,066 MaineDOT records on 234 of 273 ME pages, all drawn as Proposed; 301 of 512 distinct projects had a forecast start already past, 181 by more than a year. Filter tested on the live layers (pg_net 10107/10108): conbegin_forecast >= DATE '2025-10-20' -> 390 points / 179 lines, control IS NOT NULL -> 501/363. Phases 3 and 4 are dated by conbegin_actual (73/75, 73/79) and concomp_actual (414/414, 597/597) and could be wired as separate entries, but the layer has recorded no phase change since 2025-05-28, so NOT wired: they would publish a frozen phase as current.",
       "yields_to": "maine-dot-public-projects-lines"
     },
     {
@@ -12240,6 +12179,7 @@
         "exclude": []
       },
       "extra_where": "conbegin_forecast IS NOT NULL",
+      "recency_days": 365,
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "dataset",
       "_receipts": {
@@ -12256,7 +12196,8 @@
         "rows_passing_extra_where_conbegin_forecast_NOT_NULL": 363,
         "overlap_with_points": "NOT PROVEN either way \u2014 6 pin values from the lines layer matched 0 rows in the points layer. That is a small sample, so it is evidence of low overlap, NOT proof of none. yields_to is declared anyway: the yields hook leaves a points record with no matching line untouched, so the declaration is a structural no-op on a disjoint pair and a guard if overlap exists beyond the sample.",
         "probed_utc": "2026-08-23",
-        "why": "The publisher ships this project family across a POINT layer and a LINE layer and only the point layer was wired. A polyline crosses many ZIP radii where a point sits in one, which is what drives dark-page reach."
+        "why": "The publisher ships this project family across a POINT layer and a LINE layer and only the point layer was wired. A polyline crosses many ZIP radii where a point sits in one, which is what drives dark-page reach.",
+        "frozen_2026_10_20": "See maine-dot-public-projects _receipts 2026-10-20 MAINE PRE-LAUNCH (same layer family, same freeze, same rule). Lines layer: 363 -> 179 rows with the window (pg_net 10106/10108)."
       }
     },
     {
@@ -13719,6 +13660,7 @@
     },
     {
       "registry_id": "nysdot-capital-program-projects",
+      "yields_to": "nysdot-capital-program-projects-3",
       "platform": "arcgis",
       "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
       "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/0",
@@ -13831,6 +13773,7 @@
     },
     {
       "registry_id": "nysdot-capital-program-projects-3",
+      "yields_to": "nysdot-capital-program-projects-2",
       "platform": "arcgis",
       "service_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
       "dataset_url": "https://gisportalny.dot.ny.gov/hostingny/rest/services/Projects/CapitalProgramProjects/FeatureServer/2",
