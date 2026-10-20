@@ -14,12 +14,19 @@
 //
 // THE TWO DECISIONS THIS FILE PINS.
 //
-// 1. NO yields_to BETWEEN THE POINT LAYERS, because they are disjoint by PIN. That is
-//    measured, not assumed: layer 0 holds 0 rows for layer 2's PIN 881485, layer 2 holds 0
-//    for layer 0's PIN 581606, and layer 1 holds neither — with CONTROLS PASSING, which is
-//    what makes those zeros real rather than a broken query (the same query shape returns
-//    4 rows for layer 0's own PIN and 15 for layer 2's own). Declaring a yield here would
-//    silently drop real projects.
+// 1. THE POINT LAYERS OVERLAP, SO THEY YIELD IN A CHAIN: base -> layer 2 -> layer 1.
+//    CORRECTED 2026-10-20 (NY pre-launch audit). The first pass (2026-08-23, #885) called the
+//    three layers disjoint by PIN from THREE sampled PINs and said a yield "would silently drop
+//    real projects". Both halves were wrong:
+//      - Production measured 552 PINs across the three layers and 33 of them in TWO layers
+//        (32 in layers 1+2, 1 — 8LC321 — in layers 0+2), 2,394 of 34,685 stored rows. All 33
+//        are byte-identical across layers (same point, description, status, WEPIURL), so each
+//        rendered as two stacked Map 1 pins and counted twice.
+//      - yields_to drops a record ONLY when its target layer emitted the SAME PIN in the same
+//        report (sources/yields.ts). A project unique to its own layer can never yield.
+//    Every overlap involves layer 2, so: layer 0 yields to layer 2, layer 2 yields to layer 1,
+//    layer 1 yields to nothing. Acyclic, so at least one copy of every PIN always survives,
+//    and a failed target fetch keeps the yielding copy (the hook fails open).
 // 2. THE POLYGON TWINS STAY UNWIRED. They mirror the points by exact count, so wiring them
 //    would double every project — and unlike the OH/ME/VT line layers, a polygon twin adds
 //    no project the points lack, so there is nothing to yield TO.
@@ -57,20 +64,35 @@ E.forEach((e, n) => {
   ok(wiredUrls.length === 3, `exactly three layers of this service are wired (got ${wiredUrls.length})`);
 }
 
-// ── 3. NO yields_to — the point layers are disjoint, so a yield would DROP projects ──
-E.forEach((e, n) => {
-  ok(!Object.hasOwn(e, 'yields_to'),
-    `entry ${n + 1} declares no yields_to — the three point layers are disjoint by PIN (measured, controls passing), so a yield would silently drop real projects`);
-});
+// ── 3. The yield chain, and what it does to real rows ───────────────────────────
+ok(E[0].yields_to === IDS[2], 'layer 0 yields to layer 2 (PIN 8LC321 is in both)');
+ok(E[2].yields_to === IDS[1], 'layer 2 yields to layer 1 (32 PINs are in both)');
+ok(!Object.hasOwn(E[1], 'yields_to'), 'layer 1 yields to nothing — the chain ends, so no PIN can lose every copy');
+{
+  const { applyYields, buildYieldsMap } = await import(join(root, 'supabase/functions/get-address-report/sources/yields.ts'));
+  const Y = buildYieldsMap(REG);
+  const r = (n, pin) => ({ source_registry_id: IDS[n], case_number: pin });
+  const keep = (rows) => applyYields(rows, Y).map((s) => s.source_registry_id.slice(-2) + ':' + s.case_number).sort();
+  // Real overlaps from production (2026-10-20).
+  ok(JSON.stringify(keep([r(1, 'X73173'), r(2, 'X73173')])) === JSON.stringify(['-2:X73173']),
+    'X73173 in layers 1 and 2 -> one copy survives (layer 1)');
+  ok(keep([r(0, '8LC321'), r(2, '8LC321')]).length === 1, '8LC321 in layers 0 and 2 -> one copy survives');
+  ok(keep([r(0, 'P'), r(1, 'P'), r(2, 'P')]).length === 1, 'a PIN in all three layers -> exactly one copy survives');
+  // Unique projects are never dropped (the claim #885 got wrong).
+  ok(keep([r(0, '581606'), r(1, '111111'), r(2, '881485')]).length === 3, 'a PIN unique to its own layer never yields');
+  // Fail-open: target layer fetched nothing this report -> the yielding copy survives.
+  ok(keep([r(2, 'X73173')]).length === 1, 'layer 1 empty this report -> layer 2 copy survives');
+  ok(keep([r(0, '8LC321')]).length === 1, 'layer 2 empty this report -> layer 0 copy survives');
+}
 
 // ── 4. The three are identical apart from identity — same schema, same vocabulary ──
 {
-  const differ = new Set(['registry_id', 'service_url', 'dataset_url', '_receipts']);
+  const differ = new Set(['registry_id', 'service_url', 'dataset_url', '_receipts', 'yields_to']);
   const keys = new Set(E.flatMap((e) => Object.keys(e)));
   const drift = [...keys].filter((k) => !differ.has(k)
     && !(JSON.stringify(E[0][k]) === JSON.stringify(E[1][k]) && JSON.stringify(E[1][k]) === JSON.stringify(E[2][k])));
   ok(drift.length === 0,
-    'the three entries are identical apart from registry_id, the two URLs and _receipts — they share one 17-field schema upstream',
+    'the three entries are identical apart from registry_id, the two URLs, yields_to and _receipts — they share one 17-field schema upstream',
     JSON.stringify(drift));
 }
 
