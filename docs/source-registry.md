@@ -848,6 +848,33 @@ composition, fail-closed without centroid, classic-path regression).
 - **data.colorado.gov 'Building Permit Counts in Colorado'**: statewide AGGREGATE counts by
   jurisdiction, not per-permit records — wrong shape (Houston-CKAN class), not wired.
 
+### Colorado pre-launch pass, 2026-10-20 — Douglas / Jefferson / Boulder County (not wired)
+Probed from a GitHub runner (homesignal-ingest `recon-fetch.yml`, runs `39456370525`,
+`39456683043`, `39456904343`, `39457134662`; target files `scripts/recon/co-permits-round{1..4}.json`).
+- **Boulder County Accela** (`maps.bouldercounty.org/arcgis/rest/services/PLANNING/OP_Accela_Point/MapServer/0`):
+  the county's own server, point geometry, 272,399 rows, `SERV_PROV_CODE` = BOCO on all of them,
+  per-record `Link` to `boco.org/CapDetail`. **Not wired:** (1) **STALLED** — the newest
+  `ApplicationDate` is 2026-05-04 (epoch 1777852801000), 5½ months old, although
+  `created_date` on the rows is 2026-10-19, so the layer is republished nightly without new
+  applications; (2) 291 distinct `ApplicationStatus` values, many internal codes (`BLOT`,
+  `BLOTNOT`, `PAC Held`, `TDC Closed`, `IRFA`) and 66,534 null, so it cannot be mapped verbatim
+  without a founder call; (3) the 47 `Module × Type` pairs mix Building with PublicHealth septic,
+  Code enforcement, Licensing and AirQuality. Revisit if a newer `ApplicationDate` appears.
+- **`PLANNING/LONGMONT_Permits`** on the same server is the county line (polyline, 18 rows,
+  layer `BOCO.POLITICAL.COUNTY_LINE`), not permits.
+- **Arvada `ArvadaPermits`** (`services.arcgis.com/pmcEyn9tLWCoX7Dm`): a 2012 personal test item
+  (owner `anku6061`, world extent, 76 rows), not a city source.
+- **Lakewood**: own server `maps.lakewoodco.gov/server` CW folder holds base layers only
+  (CommDev_Data = address/parcel/zoning/hazard layers fed to CentralSquare). The city org's
+  `DevelopmentHighlightsDashboardView` is a hand-kept dashboard (579 points, free-text
+  `ProjectStatus` such as `Completed 2019`, business openings), not a permit ledger.
+- **Castle Rock / Parker / Golden / Jefferson County**: AGO searches return MS4 stormwater,
+  special-district, habitat and Aurora zoning layers only; `gis.crgov.com` 404,
+  `gis.jeffco.us` 404, `apps.douglas.co.us` 502 / 404, Hub DCAT feeds for Arvada, Jeffco and
+  Lakewood 404. Douglas's own `geopendata` BuildingPermits layer is titled "2014 to 2016".
+  **`candidates_exhausted` on ArcGIS for these jurisdictions**; their permits sit in
+  eTRAKiT / CentralSquare lookup portals with no public API.
+
 ---
 
 ## 2026-07-15 — FIVE-STATE DISCOVERY PASS (MI / WA / IL / MN / MA) — RECON ONLY, NOTHING WIRED
