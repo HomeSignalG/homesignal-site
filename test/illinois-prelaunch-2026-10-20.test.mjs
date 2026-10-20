@@ -3,7 +3,8 @@
 //   A date in year 2100 or later is a placeholder whatever its kind (sources/date-sanity.ts).
 //   Measured on app_projects 2026-10-20: 6 development rows nationally carried one, all City of
 //   Champaign IL special use permit 1669-01-01-SU (Effective_ 9999-09-09, kind `decided`), on 6 ZIP
-//   pages. The latest real far-future date was `scheduled` 2050-10-02, so real long-range plans stay.
+//   pages. (2050-10-02 was read here as a real plan; the Massachusetts audit later showed it is MassDOT's
+//   placeholder and the 20-year horizon now withholds it — see the Massachusetts test.)
 // Run: node scripts/run-unit-tests.mjs   (or: node test/illinois-prelaunch-2026-10-20.test.mjs)
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,9 +25,8 @@ const out = refuseFutureFilingDates([
   { case_number: 'p-sched', file_date: '2100-01-01', file_date_kind: 'scheduled' },
   { case_number: 'p-hear', file_date: '2199-09-09', file_date_kind: 'hearing' },
   { case_number: 'p-none', file_date: '2100-10-10' },
-  { case_number: 'plan2050', file_date: '2050-10-02', file_date_kind: 'scheduled' },    // real long-range plan
+  { case_number: 'plan2042', file_date: '2042-07-07', file_date_kind: 'scheduled' },    // longest real schedule
   { case_number: 'dec2029', file_date: '2029-01-23', file_date_kind: 'decided' },       // real far decided
-  { case_number: 'last', file_date: '2099-12-31', file_date_kind: 'estimated' },
   { case_number: 'bend', file_date: '2033-10-20', file_date_kind: 'issued' },           // existing rule
   { case_number: 'undated', file_date: null, file_date_kind: 'decided' },
 ], '2026-10-20');
@@ -36,8 +36,8 @@ ok(o['1669-01-01-SU'].file_date === null && o['1669-01-01-SU'].file_date_refused
   'Champaign SUP 1669-01-01-SU keeps the record, loses 9999-09-09');
 ok(o['p-sched'].file_date === null && o['p-hear'].file_date === null && o['p-none'].file_date === null,
   'scheduled, hearing and kind-less placeholder dates are withheld too');
-ok(o.plan2050.file_date === '2050-10-02' && o.dec2029.file_date === '2029-01-23' && o.last.file_date === '2099-12-31',
-  'real far-future dates below 2100 are untouched');
+ok(o.plan2042.file_date === '2042-07-07' && o.dec2029.file_date === '2029-01-23',
+  'real far-future dates are untouched');
 ok(o.bend.file_date === null && o.bend.file_date_refused === '2033-10-20', 'the filed/issued rule still holds');
 ok(o.undated.file_date === null && !('file_date_refused' in o.undated), 'an undated record is unchanged');
 ok(Object.keys(o['1669-01-01-SU']).sort().join() === 'case_number,file_date,file_date_kind,file_date_refused',
