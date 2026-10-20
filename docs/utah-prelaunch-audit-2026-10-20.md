@@ -69,6 +69,10 @@ Millcreek (6), West Jordan (5), Ogden (5), Sandy (5), Murray, Logan, Draper (4 e
 Every Utah city posts to PMN, so this is the Pierce/King pattern: a city community (site seed) plus two
 PMN readers per city (ingest), enrolled for meetings.
 
+**Step 1 done 2026-10-20** for those ten (`docs/utah-city-communities-seed.sql`, applied; ingest
+HomeSignalG/homesignal-ingest#752; meetings enrollment 343 -> 353 applied in production, md5 95b8e739 equal
+to `ingest.py`). The other 183 cities are the next tranches, largest first.
+
 ## Not defects (checked)
 
 - **Stratos AI Data Center Campus** is withheld from Map 1: Compute Atlas gives `41.5, -113.5`, a rounded
