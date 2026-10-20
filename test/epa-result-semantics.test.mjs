@@ -219,6 +219,36 @@ for (const [label, text] of SCHEMA_BODIES) {
     `got ok=${out2.ok} name=${JSON.stringify(out2.rows[0] && out2.rows[0].FacilityName)}`);
 }
 {
+  // 2026-10-20: a value that ENDS in a raw backslash swallows its closing quote. Shape copied from the
+  // real record (FRS 110012372477, Uintah County UT): every ZIP covering it threw SyntaxError on every
+  // refresh since 2026-08-23, so its facility layer never updated.
+  const TRAIL = '{\n"Results":{\n"FRSFacility":[\n{ "RegistryId":"110012372477", "FacilityName":"COASTAL OIL & GAS CIGE #31",' +
+    ' "LocationAddress":"UINTAH & OURAY RESERVATION\\", "SupplementalLocation":null, "CityName":"VERNAL",' +
+    ' "Latitude83":"40.1","Longitude83":"-109.5" } ,{ "RegistryId":"2", "FacilityName":"ENDS IN SLASH\\",' +
+    ' "Latitude83":"40.2","Longitude83":"-109.6","Note":"LAST\\" }\n]\n}\n}\n';
+  ok((() => { try { JSON.parse(TRAIL); return false; } catch { return true; } })(),
+    '6e5. control: the trailing-backslash payload really is invalid JSON');
+  const f = recorder(() => res(200, TRAIL));
+  const out = await frsFacilities(40.4406, -109.5469, 3, f);
+  ok(out.ok === true && out.rows.length === 2 && out.attempts === 1,
+    '6e6. FRS payload whose value ends in a backslash → repaired and parsed on the first attempt',
+    `got ok=${out.ok} reason=${out.reason} attempts=${out.attempts} rows=${out.rows.length}`);
+  ok(out.rows[0] && out.rows[0].LocationAddress === 'UINTAH & OURAY RESERVATION\\' && out.rows[0].CityName === 'VERNAL'
+    && out.rows[1] && out.rows[1].FacilityName === 'ENDS IN SLASH\\' && out.rows[1].Note === 'LAST\\',
+    '6e7. the backslash is kept as text and the next field is read as its own field (before ",", and before "}")',
+    `got ${JSON.stringify(out.rows)}`);
+  // Over-repair controls: an escaped quote INSIDE a value, a properly escaped trailing backslash, and an
+  // escaped quote followed by a comma inside the text must all be left exactly as they are.
+  const VALID = '{"Results":{"FRSFacility":[{"RegistryId":"3","FacilityName":"THE \\"BIG\\" PLANT, INC",' +
+    '"LocationAddress":"DIR\\\\","CityName":"A \\", B","Latitude83":"1","Longitude83":"2"}]}}';
+  const expected = JSON.parse(VALID).Results.FRSFacility[0];
+  const f2 = recorder(() => res(200, VALID));
+  const out2 = await frsFacilities(41.5, -112.0, 3, f2);
+  ok(out2.ok === true && JSON.stringify(out2.rows[0]) === JSON.stringify(expected),
+    '6e8. valid JSON with escaped quotes and an escaped trailing backslash parses unchanged',
+    `got ${JSON.stringify(out2.rows[0])} want ${JSON.stringify(expected)}`);
+}
+{
   // ECHO reads the same EPA records, so it must use the same repair (one function, not a copy).
   const { echoParse } = await import(join(root, 'supabase/functions/get-address-report/sources/echo-cwa.ts'));
   let parsed = null;
