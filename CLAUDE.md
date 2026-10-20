@@ -3443,6 +3443,16 @@ Audit of the 364 Arizona ZIP pages (11 counties). Tests: `test/issued-promotes.t
 - Government sources (Maricopa wrong-body, the dark counties) are recorded in homesignal-ingest CLAUDE.md
   "ARIZONA PRE-LAUNCH".
 
+## 7.12g A DATE MORE THAN 20 YEARS AHEAD IS A PLACEHOLDER, WHATEVER ITS KIND (2026-10-20)
+
+`sources/date-sanity.ts` also refuses a `scheduled` / `estimated` / `decided` / `hearing` date more
+than `PLACEHOLDER_HORIZON_DAYS` (7,305) ahead; the record stays, the date moves to `file_date_refused`.
+Measured nationally on app_projects: real schedules end at 2042-07-07, nothing is dated 2043-2049, then
+341 MassDOT design projects sat at `ScheduledAdDate` 2050-10-01/02 on 537 of 627 MA pages, and one
+Champaign IL record at `decided` 9999 (also caught by #2100's year-2100 rule, which stays). ⚖️ Founder ruled
+2026-10-20 that the 2050 dates are placeholders, overriding #2100's note calling them a real plan. The rule names no source. Filed/issued dates keep the today+1 rule.
+Test: `test/massachusetts-prelaunch-2026-10-20.test.mjs`. Audit: `docs/massachusetts-prelaunch-audit-2026-10-20.md`.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
