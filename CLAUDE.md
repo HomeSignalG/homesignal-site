@@ -3318,6 +3318,23 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.12a AN ISSUED PERMIT IS "APPROVED", NOT "OPERATING NOW" ⚖️ FOUNDER RULING (2026-10-20)
+
+**A source whose only date is the permit's issue date (`file_date_kind: "issued"`) and that has no
+status column labels its rows with one constant (`status_const`), and that constant is `approved`.**
+An issued permit authorises work; it does not say the building is finished or in use. Found in the
+Colorado pre-launch audit: all 5,516 Aurora permits showed on Map 1 as "Operating now", sign and deck
+permits included.
+
+- 11 ledgers moved `operating` → `approved` (Aurora, Albuquerque, Thurston, Buffalo, Prince George's,
+  New Castle, Huntsville, Chattanooga archive, Knoxville, DeSoto, Flathead). The 10 that pass a
+  verbatim `Issued` label already bucketed it as approved and are unchanged.
+- **Not changed, deliberately:** `nvdot-project-boundaries` (road projects, not permits) and
+  `loudoun-county-residential-permits`, `charleston-county-permits`, `sheridan-county-building-permits`
+  (their date is not declared as an issue date, so the ruling does not reach them without evidence).
+- Pinned by `test/issued-permit-is-approved.test.mjs`, keyed on `file_date_kind`, never on a source name.
+- Stored rows change as the rolling refresh revisits each ZIP after the report engine is deployed.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
