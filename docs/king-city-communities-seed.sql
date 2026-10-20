@@ -124,3 +124,19 @@ cross join (select id from public.communities where slug = 'king-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-20: Kirkland 208db6e6-e102-480e-b9fc-6c1a9f193901 (5335940)
 --   · Issaquah 1d613aff-a838-4df9-a17f-b96c64ec4db7 (5333805)
+
+-- Step 6 (2026-10-20): Mercer Island, held at steps 1-2 because its CivicClerk tenant carries vendor
+-- "Test ..." rows. The city's own Drupal site lists the City Council's meetings server-side:
+--   https://www.mercerisland.gov/meetings?field_microsite_tid_1=27 (pg_net response 9260, HTTP 200,
+--   170,286 bytes): 50 rows 2025-02-18..2026-11-17, 3 upcoming, 0 titles starting Test/Draft; agenda and
+--   packet PDFs on mccmeetings.blob.core.usgovcloudapi.net/mercerwa-pubu/. Read by the notice_list parser
+--   drupal_views_meeting_rows. The CivicClerk tenant is not read.
+-- Feed: homesignal-ingest feeds.csv mtg-mercer-island-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Mercer Island', 'mercer-island-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-20: Mercer Island 197e0e18-639f-484b-967b-355bfcb559da (5345005)
