@@ -1091,19 +1091,24 @@ function numOrNull(v: unknown): number | null {
 
 /** Any ISO-ish or date string → YYYY-MM-DD, else null (absent stays absent). */
 function isoDay(v: unknown): string | null {
+  // A date before 1901 is a placeholder, not a filing: 1899-12-30 is the Excel/OLE zero date and
+  // 1900-01-01 a common "no date" fill. Measured 2026-10-20: 68 stored rows from 4 ArcGIS sources
+  // (champaign-il-special-use-permits 52, denton-county-dev-permits 13, weld-county-site-plan-review 2,
+  // boone-county-ky-planning-board-actions 1) and 0 dated 1901-1919. Such a record keeps no date.
+  const keep = (d: string | null): string | null => (d !== null && d < "1901-01-01" ? null : d);
   if (v == null) return null;
   const s = String(v).trim();
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  if (m) return keep(`${m[1]}-${m[2]}-${m[3]}`);
   const md = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (md) return `${md[3]}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+  if (md) return keep(`${md[3]}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`);
   // YEAR-first slash form, e.g. "2023/01/03". Unambiguous (a 4-digit leading group can never
   // be a month or day) and disjoint from the two patterns above, so this only ever turns a
   // null into a date. Two live sources publish it as a STRING column and every row was being
   // silently dropped: virginia-beach-building-permits (IssueDate) and anaheim-land-use-cases
   // (Application_Received). docs/accuracy-audit-2026-08.md §H1.
   const ymd = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
-  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`;
+  if (ymd) return keep(`${ymd[1]}-${ymd[2].padStart(2, "0")}-${ymd[3].padStart(2, "0")}`);
   return null;
 }
 
