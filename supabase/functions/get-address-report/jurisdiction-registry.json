@@ -1654,7 +1654,7 @@
         "operating": [],
         "exclude": []
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "type_map": {
         "NEW RESI": "Residential",
         "NEW COM": "Commercial",
@@ -1700,7 +1700,7 @@
         "operating": [],
         "exclude": []
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "zip_numeric": true,
       "type_map": {
         "SGU - (New Single Family)": "Residential",
@@ -9262,13 +9262,13 @@
         "MULTI RES": "Residential",
         "COMMBLDG": "Commercial"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "ISSDTTM",
@@ -9457,13 +9457,13 @@
         "Condo": "Residential",
         "Commercial": "Commercial"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "Permit_Issue_DateTime",
@@ -9505,13 +9505,13 @@
         "Residential": "Residential",
         "Non-Residential": "Commercial"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "PERMIT_DAT",
@@ -9571,13 +9571,13 @@
         "Mixed": "Development",
         "Under Construction/Other Uses": "Development"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "DATEISSUED",
@@ -9622,13 +9622,13 @@
         "Modular Home": "Residential",
         "Building (Commercial)": "Commercial"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "Date",
@@ -9673,13 +9673,13 @@
         "Commercial": "Commercial",
         "Health Care": "Civic/Public"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "DateIssued",
@@ -9777,13 +9777,13 @@
         "Miscellaneous Structure": "Development",
         "Non-Res Fire Damage Repair-NT6": "Development"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "IssueDate",
@@ -9983,13 +9983,13 @@
         "GOV OFFICE": "Civic/Public",
         "CHURCH": "Civic/Public"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "DateIssued",
@@ -10034,13 +10034,13 @@
         "Accessory Dwelling": "Residential",
         "Demolition": "Development"
       },
-      "status_const": "operating",
+      "status_const": "approved",
       "status_to_bucket": {
         "proposed": [],
-        "approved": [],
-        "operating": [
-          "operating"
+        "approved": [
+          "approved"
         ],
+        "operating": [],
         "exclude": []
       },
       "incremental_field": "ISSUEDATE",
