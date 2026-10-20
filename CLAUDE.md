@@ -3379,7 +3379,7 @@ Audit of the 200 Oregon ZIP pages (10 counties). Test: `test/oregon-prelaunch-20
   Measured over all 1,501 stored records naming an ADU: qualifying 9 -> 83, and the only source that
   changes is Portland (+74 new ADUs); every other change is ROUTINE -> UNRESOLVED (both not drawn).
 
-## 7.12d AN ESTIMATED END DATE IS NOT A DECISION (Florida pre-launch, 2026-10-20)
+## 7.12e AN ESTIMATED END DATE IS NOT A DECISION (Florida pre-launch, 2026-10-20)
 
 `column_map.decision_date` is read as a decision: `decisionEvidenceLevel()` returns `date_only`, and
 `app_refresh_zip` falls back to it when `file_date` is empty and stamps `date_kind = 'decided'`.
@@ -3388,6 +3388,31 @@ to 2029) read "(decided)" on generated project pages. Seven entries mapped a sch
 end there (FDOT, UDOT x2, Clark NV, Lexington KY, Columbia MO, Lake County IL); none does now.
 Never map an estimated, scheduled or end date as `decision_date`. Pinned by
 `test/estimated-end-is-not-a-decision.test.mjs`. Receipt: `docs/florida-prelaunch-audit-2026-10-20.md`.
+
+## 7.12d OHIO PRE-LAUNCH (2026-10-20) — Cincinnati back on Map 1; the Columbus/Cleveland Type question
+
+Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete` in `n5-national-2026-10-20`,
+30,436 Map 1 members. Government-tile findings are in homesignal-ingest CLAUDE.md "OHIO PRE-LAUNCH".
+- **Cincinnati's permits were never drawn on Map 1.** `geo.n5_accepted_source` had
+  `cincinnati-building-permits` as RECOVERY, and `scripts/n5_shard.py::EXCLUDED_SOURCES` excludes it from
+  recovery (the recovery fetcher reads ArcGIS only), so every generation filed its 2,813 keys
+  SOURCE_EXCLUDED: 0 members, while the engine cache held 2,903 permits on Hamilton's 56 pages. Moved to
+  PROVEN by `docs/n5-cincinnati-proven-2026-10-20.sql` (applied 2026-10-20, read back: PROVEN, RECOVERY
+  78 -> 77). Its stored points: 2,388 publisher coordinates + 426 fenced geocodes, 0 missing, 0 outside
+  Hamilton's box. Control: Chicago / Mesa / Seattle are Socrata sources under PROVEN and are served.
+  Takes effect with the next generation. `EXCLUDED_SOURCES` is left as is: it is only consulted for RECOVERY.
+- **Columbus pins all read "Other project" (15,445 of 15,445), Cleveland 10,788 of 14,452. Founder decision,
+  not changed.** Columbus `type_source` is `B1_PER_SUB_TYPE` (the work: Structural / Demolition) since the
+  2026-08-03 work-class whitelist ruling; the building class is `GENERAL_TYPE` ("1,2,3 Family - New
+  Structure", "Multi Family - ...", "Commercial - ..."). The Portland pattern (7.12c: Type from the building
+  column, the work whitelist into `extra_where`) would type them correctly, but the shipped Residential gate
+  then hides them: measured over the last 365 days, 1,2,3 Family - Other / Structural 10,979, New Structure
+  1,068, Multi Family 1,682 all read UNRESOLVED (the gate has no "new structure" phrase), so about 13,800 pins
+  would leave Columbus pages, about 1,357 of them new homes. Cleveland has the same shape: `USE_GROUP_1`
+  could type its 10,654 "Building Permits" rows.
+- **Freshness:** Columbus / Cleveland / Cincinnati newest filings 2026-10-17 / 10-17 / 10-16; 330 of 335
+  reports refreshed in 72 h; 45107 last written 2026-10-12 (re-attempted 10-19). Summit County Planning
+  Commission's 1,825-day window and "Submitted for county review" are the PA Act 247 ruling, unchanged.
 
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 

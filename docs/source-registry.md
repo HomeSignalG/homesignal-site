@@ -13247,6 +13247,19 @@ NM: 19 pages → **5**, once the layer stalled since 2023 was excluded. **The fi
 dataset's size; only the second is what a resident would see.** Neither state was wired, and in
 both cases the layer-wide figure would have justified a wire that the honest figure does not.
 
+## MAINE PRE-LAUNCH (2026-10-20) — the MaineDOT layer is frozen; stale forecasts windowed
+
+Audit of the 273 existing Maine ZIP pages (10 counties); full record in
+`docs/maine-prelaunch-audit-2026-10-20.md`.
+
+- **`maine-dot-public-projects` + `-lines` — FROZEN, `recency_days: 365` added** on
+  `conbegin_forecast` (same rule as Denton #2094). Phase counts are identical to the August wire
+  receipts and the newest actual date on the layer is 2025-05-28, so MaineDOT has stopped moving
+  projects between phases. 301 of the 512 projects shown as Proposed had a forecast start already
+  past (181 by over a year). Live test of the exact clause: points 501 -> 390, lines 363 -> 179.
+  51 Maine pages go to 0 development records (CORE GUARD 2 holds each about a week); 38 of them
+  drop to noindex on the development surface.
+
 ## TEXAS PRE-LAUNCH (2026-10-20) — one frozen source windowed, one dead source retired
 
 Audit of the 668 existing Texas ZIP pages (22 counties); full record in
