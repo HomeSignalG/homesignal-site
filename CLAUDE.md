@@ -3379,6 +3379,25 @@ Audit of the 200 Oregon ZIP pages (10 counties). Test: `test/oregon-prelaunch-20
   Measured over all 1,501 stored records naming an ADU: qualifying 9 -> 83, and the only source that
   changes is Portland (+74 new ADUs); every other change is ROUTINE -> UNRESOLVED (both not drawn).
 
+## 7.12d ARIZONA PRE-LAUNCH (2026-10-20) — two connector fixes, both universal
+
+Audit of the 364 Arizona ZIP pages (11 counties). Tests: `test/issued-promotes.test.mjs`, `test/null-island-coordinates.test.mjs`.
+- **An issued Phoenix permit is Approved (§7.12a), via the opt-in registry key `issued_promotes: {statuses, column}`**
+  (`sources/issued-promotes.ts`). Phoenix keeps `PERMIT_STAT = OPEN` from intake to final inspection and its map had an
+  empty `approved` bucket, so ~80% of its "Proposed" pins were permits the city had already issued (85008: 843 of 987
+  carried `PER_ISSUE_DATE`, none in the future). It promotes only `proposed`, only from the publisher's own issue-date
+  column, and fails closed (no date, unparseable, or after today + 1). Every other AZ source names its own Issued status.
+- **(0, 0) means "no coordinates"** (`sources/null-island.ts`, applied in all five connectors right after lat/lng are
+  read). Gilbert AZ, Overland Park KS and Little Rock AR publish `Latitude 0 / Longitude 0` for unlocated permits; the pair
+  skipped the geocoder, `app_coord_outlier` later blanked it, and the permit was never pinned. Measured: 9,536 cached
+  records (Overland Park 9,158 on 35 pages), all with a street address. A single zero is kept.
+- **Checked clean, not changed:** 0 future-dated filings and 0 coordinate-less rows in the other AZ permit sources; the
+  83 data-centre markers on 32 AZ pages are all polygon members with a record URL. The 8 AZ ZIPs whose EPA layer is over
+  7 days old all carry `facilities_unavailable` (EPA refused the read; the count shows as unknown). 85006 is unrefreshed
+  since 2026-08-23 and has 21 stored facilities, under the 40 cap, so the start hint cannot help it.
+- Government sources (Maricopa wrong-body, the dark counties) are recorded in homesignal-ingest CLAUDE.md
+  "ARIZONA PRE-LAUNCH".
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
