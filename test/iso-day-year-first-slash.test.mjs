@@ -57,6 +57,14 @@ const CASES = [
   ['JUNE', null],
   ['2011', null],                       // loudoun's YEAR_ISSUED: a year is not a date
   [null, null],
+  // placeholder dates before 1901 are not filings (2026-10-20: 68 stored rows, 4 ArcGIS sources)
+  ['1899-12-30', null],
+  ['1900-01-01', null],
+  ['12/30/1899', null],
+  ['1900/01/01', null],
+  // and the first real year after the cutoff still parses
+  ['1901-01-01', '1901-01-01'],
+  ['1/2/1950', '1950-01-02'],
 ];
 
 const failures = [];
