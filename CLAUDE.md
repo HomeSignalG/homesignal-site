@@ -3385,7 +3385,7 @@ Audit of the 200 Oregon ZIP pages (10 counties). Test: `test/oregon-prelaunch-20
   Measured over all 1,501 stored records naming an ADU: qualifying 9 -> 83, and the only source that
   changes is Portland (+74 new ADUs); every other change is ROUTINE -> UNRESOLVED (both not drawn).
 
-## 7.12e AN ESTIMATED END DATE IS NOT A DECISION (Florida pre-launch, 2026-10-20)
+## 7.12d AN ESTIMATED END DATE IS NOT A DECISION (Florida pre-launch, 2026-10-20)
 
 `column_map.decision_date` is read as a decision: `decisionEvidenceLevel()` returns `date_only`, and
 `app_refresh_zip` falls back to it when `file_date` is empty and stamps `date_kind = 'decided'`.
@@ -3395,7 +3395,7 @@ end there (FDOT, UDOT x2, Clark NV, Lexington KY, Columbia MO, Lake County IL); 
 Never map an estimated, scheduled or end date as `decision_date`. Pinned by
 `test/estimated-end-is-not-a-decision.test.mjs`. Receipt: `docs/florida-prelaunch-audit-2026-10-20.md`.
 
-## 7.12d OHIO PRE-LAUNCH (2026-10-20) — Cincinnati back on Map 1; the Columbus/Cleveland Type question
+## 7.12e OHIO PRE-LAUNCH (2026-10-20) — Cincinnati back on Map 1; the Columbus/Cleveland Type question
 
 Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete` in `n5-national-2026-10-20`,
 30,436 Map 1 members. Government-tile findings are in homesignal-ingest CLAUDE.md "OHIO PRE-LAUNCH".
@@ -3427,7 +3427,7 @@ Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete`
   reports refreshed in 72 h; 45107 last written 2026-10-12 (re-attempted 10-19). Summit County Planning
   Commission's 1,825-day window and "Submitted for county review" are the PA Act 247 ruling, unchanged.
 
-## 7.12e NORTH CAROLINA PRE-LAUNCH (2026-10-20) — 170 ZIP pages, 10 counties
+## 7.12f NORTH CAROLINA PRE-LAUNCH (2026-10-20) — 170 ZIP pages, 10 counties
 
 - **`cabarrus-county-plan-reviews` is FROZEN** (newest B1_FILE_DD 2025-04-03, 0 rows in the last 12 months over 99,748) and
   drew 20,819 old review records as Proposed on the 10 Cabarrus pages. `recency_days` 730 -> 365 (Spokane/Denton/SLC
@@ -3437,7 +3437,7 @@ Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete`
   date-sanity deploy (17:23Z, run 39465519157); they clear on the next rolling refresh.
 - Every NC development site carries a `record_url` (0 missing of ~283k). Chatham and Union have only NCDOT STIP records.
 
-## 7.12f ARIZONA PRE-LAUNCH (2026-10-20) — two connector fixes, both universal
+## 7.12g ARIZONA PRE-LAUNCH (2026-10-20) — two connector fixes, both universal
 
 Audit of the 364 Arizona ZIP pages (11 counties). Tests: `test/issued-promotes.test.mjs`, `test/null-island-coordinates.test.mjs`.
 - **An issued Phoenix permit is Approved (§7.12a), via the opt-in registry key `issued_promotes: {statuses, column}`**
@@ -3456,7 +3456,7 @@ Audit of the 364 Arizona ZIP pages (11 counties). Tests: `test/issued-promotes.t
 - Government sources (Maricopa wrong-body, the dark counties) are recorded in homesignal-ingest CLAUDE.md
   "ARIZONA PRE-LAUNCH".
 
-## 7.12g A DATE MORE THAN 20 YEARS AHEAD IS A PLACEHOLDER, WHATEVER ITS KIND (2026-10-20)
+## 7.12h A DATE MORE THAN 20 YEARS AHEAD IS A PLACEHOLDER, WHATEVER ITS KIND (2026-10-20)
 
 `sources/date-sanity.ts` also refuses a `scheduled` / `estimated` / `decided` / `hearing` date more
 than `PLACEHOLDER_HORIZON_DAYS` (7,305) ahead; the record stays, the date moves to `file_date_refused`.
@@ -3466,7 +3466,7 @@ Champaign IL record at `decided` 9999 (also caught by #2100's year-2100 rule, wh
 2026-10-20 that the 2050 dates are placeholders, overriding #2100's note calling them a real plan. The rule names no source. Filed/issued dates keep the today+1 rule.
 Test: `test/massachusetts-prelaunch-2026-10-20.test.mjs`. Audit: `docs/massachusetts-prelaunch-audit-2026-10-20.md`.
 
-## 7.12h STATE CLEANUP SITES ARE THEIR OWN MAP 1 LAYER ⚖️ FOUNDER DECISION (2026-10-21)
+## 7.12i STATE CLEANUP SITES ARE THEIR OWN MAP 1 LAYER ⚖️ FOUNDER DECISION (2026-10-21)
 
 **Florida DEP's open waste-cleanup sites (10,525 on 2026-10-21: petroleum 6,534, other waste
 3,311, brownfield 327, PFAS 252, Superfund 69, FED 32) are a layer of their own, with their own
