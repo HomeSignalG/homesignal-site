@@ -3484,6 +3484,13 @@ drawing them as "Other project" or listing them only on the ZIP page.
   count, the development counts, the lifecycle rails or the indexability decision.
 - Tests: `test/state_cleanup_pg` (36 checks, 8 mutations killed; `state-cleanup-suite.yml`),
   `test/state-cleanup.test.mjs`, `test/map1-state-cleanup.browser.test.mjs`.
+- ✅ **Applied 2026-10-21 17:03Z** (`db-sql.yml` run `39640349827`; `apply_migration` timed out on the
+  file's size, so the committed file ran instead; the tables went in first as migration
+  `state_cleanup_sites_tables`). First load (run 1, fired by hand) was complete: 10,525 sites stored,
+  10,525 first-seen observations; 23 sites have no point and are stored but never drawn. **406 of the
+  441 Florida ZIP pages carry at least one site (5,307 pins, at most 171 on one page).** ZIP 33301 shows
+  9 by its polygon, where DEP's own ZIP5 field listed 7 (one of them in 33309). Visitors can run only
+  the two readers.
 - **Not done:** the ZIP detail page (`community.html`) does not list them yet; other states'
   cleanup lists would be new `source` values in the same table.
 
