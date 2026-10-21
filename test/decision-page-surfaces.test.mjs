@@ -27,7 +27,7 @@ ok(MAP.length > 100000, `homesignalmap.html read (${MAP.length} bytes — contro
 ok(/function decisionNoteHTML\(/.test(MAP), 'the page has ONE notation renderer, not one per surface');
 ok(/function currentStatusHTML\(/.test(MAP), 'and ONE current-status renderer');
 {
-  const popup = MAP.slice(MAP.indexOf('function popupHTML(s){'), MAP.indexOf('function popupHTML(s){') + 4000);
+  const popup = MAP.slice(MAP.indexOf('function popupHTML(s){'), MAP.indexOf('function popupHTML(s){') + 5000);
   ok(/decisionNoteHTML\(/.test(popup), 'the map POPUP renders the decision notation');
   ok(/currentStatusHTML\(/.test(popup), 'and the current-status line');
   // Order matters: a ruling below the environmental block is a ruling nobody reads. The

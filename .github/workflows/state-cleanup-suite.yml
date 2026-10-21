@@ -1,0 +1,69 @@
+name: state-cleanup-suite
+
+# STATE CLEANUP SITES (docs/state-cleanup-sites.sql): Florida DEP's open cleanup sites, their own
+# Map 1 layer. Runs the SHIPPED SQL against a DISPOSABLE PostGIS with pg_net / pg_cron stand-ins:
+# loader completeness (a short, failed or error-carrying run writes nothing), history kept on change
+# and on removal, ZIP membership by the canonical polygon predicate (never DEP's ZIP5), and who may
+# run what. Every prohibited mutation in test/state_cleanup_pg/mutations MUST fail the suite.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/state-cleanup-sites.sql'
+      - 'test/state_cleanup_pg/**'
+      - '.github/workflows/state-cleanup-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/state-cleanup-sites.sql'
+      - 'test/state_cleanup_pg/**'
+      - '.github/workflows/state-cleanup-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  state-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: state_cleanup_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped SQL passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: state_cleanup_disposable
+        run: |
+          set -o pipefail
+          bash test/state_cleanup_pg/run.sh 2>&1 | grep -v -E 'NOTICE|DETAIL|drop cascades' | tee /tmp/sc.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## State cleanup sites'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|NO-OP|\|f\|' /tmp/sc.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
