@@ -875,6 +875,29 @@ Probed from a GitHub runner (homesignal-ingest `recon-fetch.yml`, runs `39456370
   **`candidates_exhausted` on ArcGIS for these jurisdictions**; their permits sit in
   eTRAKiT / CentralSquare lookup portals with no public API.
 
+### Colorado pre-launch pass, 2026-10-21: Douglas County wired; city orgs re-probed (pg_net)
+- **WIRED: `douglas-county-co-permits`** (#2125). This is the county's own `All_Permits_View` table
+  (286,337 rows, newest 2026-10-18), found in the county DCAT catalog after `apps.douglas.co.us`
+  returned 502. Its point is publisher text in `LOCATION`, read by the new opt-in `latlng_text_col`.
+  It covers unincorporated Douglas only.
+- **City ArcGIS Online orgs were found by `urlKey`** (`<key>.maps.arcgis.com/sharing/rest/portals/self`;
+  only real orgs return an `id`): Lakewood CO `PFikmPaTMlt2KX1O` (`lakewoodco`), Parker
+  `gJ4Ua6egqE4IMu3C` (`parkerco`), Lone Tree `M6RDkiPo9JtEo7N6` (`cityoflonetree`). Searches scoped to
+  each org (`orgid:`, terms permit / development / construction) found no permit ledger:
+  - **Parker `Dev_Review_to_Web_Service/0` "Active Development":** 160 points, fields TOOLTIP / STATUS
+    only, no date column, `lastEditDate` 2025-04-02. **Not wired:** stale, and with no date it cannot
+    be windowed.
+  - **Lone Tree `daily_permit_inspections_view`:** the day's inspection schedule (permit number,
+    address, inspection type, inspector name, today's date). It has no geometry and is not a permit
+    ledger, and it names staff. **Not wired.** The city's CivicData export (`generic_vrecord_17376`)
+    answers a Cloudflare block to pg_net (not worked around); per search results it was last updated
+    2025-06-30.
+  - **Lakewood:** only the reinvestment-district, business-directory and `ED_DevelopmentHighlights`
+    layers, which are hand-kept, as recorded 2026-10-20. Unchanged.
+- The `urlKey` guesses `lovgov`, `cityofloveland`, `loveland`, `arvada`, `cityofarvada`, `cityofgolden`,
+  `golden`, `crgov`, `castlerock`, `townofcastlerock`, `parkeronline` and `townofparker` returned the
+  generic portal (no org), so Loveland, Arvada, Golden and Castle Rock still have no public org found.
+
 ---
 
 ## 2026-07-15 — FIVE-STATE DISCOVERY PASS (MI / WA / IL / MN / MA) — RECON ONLY, NOTHING WIRED
