@@ -3,8 +3,9 @@
 -- small stubs; geo.* is copied verbatim from production (read 2026-10-21).
 drop schema if exists net cascade; drop schema if exists cron cascade; drop schema if exists geo cascade;
 drop function if exists public.state_cleanup_fl_fire(), public.state_cleanup_fl_collect(),
+  public.state_cleanup_fire(text), public.state_cleanup_collect(),
   public.map1_state_cleanup_zip_members(text), public.map1_state_cleanup_near(double precision, double precision, double precision) cascade;
-drop table if exists public.state_cleanup_site_observations, public.state_cleanup_runs, public.state_cleanup_sites cascade;
+drop table if exists public.state_cleanup_site_observations, public.state_cleanup_runs, public.state_cleanup_sources, public.state_cleanup_sites cascade;
 do $$ begin
   if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
   if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
@@ -54,4 +55,6 @@ $$;
 -- 33301 stand-in: a square around downtown Fort Lauderdale (NAD83, like production)
 insert into geo.zcta_boundary values
   ('33301', ST_SetSRID(ST_GeomFromText('POLYGON((-80.16 26.10,-80.11 26.10,-80.11 26.14,-80.16 26.14,-80.16 26.10))'), 4269)),
-  ('33309', ST_SetSRID(ST_GeomFromText('POLYGON((-80.20 26.17,-80.15 26.17,-80.15 26.21,-80.20 26.21,-80.20 26.17))'), 4269));
+  ('33309', ST_SetSRID(ST_GeomFromText('POLYGON((-80.20 26.17,-80.15 26.17,-80.15 26.21,-80.20 26.21,-80.20 26.17))'), 4269)),
+  -- 98239 stand-in: a square around Coupeville WA
+  ('98239', ST_SetSRID(ST_GeomFromText('POLYGON((-122.72 48.19,-122.66 48.19,-122.66 48.23,-122.72 48.23,-122.72 48.19))'), 4269));

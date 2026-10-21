@@ -3491,8 +3491,23 @@ drawing them as "Other project" or listing them only on the ZIP page.
   441 Florida ZIP pages carry at least one site (5,307 pins, at most 171 on one page).** ZIP 33301 shows
   9 by its polygon, where DEP's own ZIP5 field listed 7 (one of them in 33309). Visitors can run only
   the two readers.
-- **Not done:** the ZIP detail page (`community.html`) does not list them yet; other states'
-  cleanup lists would be new `source` values in the same table.
+- **The ZIP detail page (`community.html`) deliberately does not list them.** The 2026-09-25 founder
+  decision limits What's Changing to Development, Government and Local news. The sites are on Map 1.
+- **More states share one loader (2026-10-21).** A state list is one row in
+  `public.state_cleanup_sources` plus one branch in `state_cleanup_map_feature`. The fire
+  (`state_cleanup_fire(source)`), the collect (`state_cleanup_collect()`), the completeness check,
+  the history and the readers are shared; `state_cleanup_fl_fire/_fl_collect` are now wrappers.
+  - **Washington Ecology is the second source.** It loads the 6,428 sites whose SiteStatus is not
+    "No Further Action" (of 14,727). Each pin links to the site's own Ecology page,
+    `apps.ecology.wa.gov/cleanupsearch/site/<CleanupSiteId>`, which answered 200 for a real site
+    and 404 for a made-up id. Status words are shown as published. The layer has no category.
+  - ⛔ **Not loaded, because a pin must link to the site's own public record:**
+    - New Jersey's Known Contaminated Sites (12,600). Its per-site search, njems.nj.gov/DataMiner,
+      answers a bot challenge.
+    - Michigan Part 201 (19,000). There is no public per-site page; RIDE needs a MiLogin.
+  - Tested in `test/state_cleanup_pg`: 50 checks, 11 deliberate breaks, each caught. Three of the
+    breaks are new: a Washington run removing Florida sites, anyone being able to fire a source,
+    and a new OBJECTID counting as a change.
 
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 

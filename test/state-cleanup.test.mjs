@@ -48,6 +48,19 @@ ok(HS.stateCleanupOutcome(null) === 'unavailable' && HS.stateCleanupOutcome({ st
 ok(/not a finding about any owner/.test(HS.stateCleanupPopupHTML(s, esc)), 'A11 the popup carries the public-record framing');
 ok(!/ECHO|purple|violation/i.test(HS.stateCleanupPopupHTML(s, esc)), 'A12 the popup claims nothing EPA');
 
+// Real Washington row shape (Ecology CleanupSites layer, pg_net read 2026-10-21; reader shape from the
+// local PostGIS suite): status in words, no category, the site's own Ecology page.
+const WA = { lat: 48.211804727846456, lng: -122.68578411499313, city: 'COUPEVILLE', name: 'Coupeville Country Store',
+  state: 'WA', agency: 'Washington Ecology', source: 'wa_ecology_cleanup', status: 'Cleanup Started', address: '1 S MAIN ST',
+  site_key: '10008', program_id: '10008', record_url: 'https://apps.ecology.wa.gov/cleanupsearch/site/10008',
+  zip_membership: 'member' };
+const w = HS.stateCleanupSite(WA);
+ok(w && HS.stateCleanupTypeLine(w) === 'Cleanup site · Washington Ecology status: Cleanup Started',
+  'A13 a Washington site reads its own status words, no invented category', w && HS.stateCleanupTypeLine(w));
+ok(HS.stateCleanupStatusLabel(HS.stateCleanupSite({ ...WA, status: 'ACTIVE' })) === 'ACTIVE',
+  'A14 Florida\u2019s code words are not applied to another state\u2019s values');
+ok(/Washington Ecology site documents/.test(HS.stateCleanupPopupHTML(w, esc)), 'A15 the popup names the agency that publishes it');
+
 // ── B ──
 const mk = HS.resolveTrackerMarker(s, (x) => x.registry_id);
 ok(mk.isStateCleanup === true && mk.shape === 'circle' && mk.label === 'C', 'B1 resolveTrackerMarker gives the cleanup marker');
