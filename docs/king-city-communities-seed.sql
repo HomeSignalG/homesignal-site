@@ -184,3 +184,34 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'king-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-21: Sammamish 8ac23312-d212-4ab2-8884-92bdf210c292 (5361115)
+
+-- Step 10 (2026-10-21): Covington and Enumclaw, each from the city's own source; every probe below is a
+--   GitHub-runner GET (homesignal-ingest recon-fetch).
+--   Covington   its PrimeGov portal covingtonwa.primegov.com (ListUpcomingMeetings + this year's archive;
+--               City Council meetings from 2026-01-13). Each meeting links its Packet PDF (doc 3016 and
+--               2480 answer %PDF; an unknown id answers "Document Not Found").
+--   Enumclaw    its CivicPlus iCalendar, catID 14 "City Council" (from the city's iCalendar directory):
+--               City Council Meetings 2026-10-26..2026-12-28, each linking its own event page
+--               (/m/calendar/event/detail/<id>: 200 for a real id, 404 for an unknown one). The feed lists
+--               upcoming meetings only.
+-- Feeds: homesignal-ingest feeds.csv mtg-covington-wa-city-catchall, mtg-enumclaw-wa-city-catchall.
+-- Held after step 10, with what was found:
+--   Kent             council page answers 403; Granicus kentwa view 1 is an empty RSS; Legistar kentwa / kent /
+--                    cityofkent are "not set up"; CivicClerk tenants 404; PrimeGov kentwa exists but its
+--                    upcoming list and 2026 archive are both []. Agendas are in Laserfiche.
+--   Federal Way      Drupal calendar plus Laserfiche WebLink only; Legistar not set up; CivicClerk and Granicus 404.
+--   Medina           CivicClerk tenant medinawa lists only "One Time Event" / "Test" entries (still being set up).
+--   Maple Valley     AgendaCenter 404; its /events/?ical=1 answers 200 with no council or commission events.
+--   Carnation        /events/?ical=1 answers 500.
+--   Woodinville, Hunts Point, Skykomish   hosts tried did not resolve (DNS fetch failed).
+--   Clyde Hill, Algona, Yarrow Point      the agenda and calendar paths tried answered 404.
+--   Beaux Arts       a town site with /agendas and /meeting-calendar pages and no machine-readable feed found.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Covington', 'covington-wa'), ('Enumclaw', 'enumclaw-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-21: Covington 4a700bb6-7278-47b1-8f6f-dcc7e9d7258d (5315290)
+--   · Enumclaw 334f2fe2-c31f-4875-b245-d0d6ea10c20d (5322045)
