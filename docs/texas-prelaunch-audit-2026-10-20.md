@@ -92,3 +92,15 @@ it would have caught Denton County. Run `scripts/audits/county-launch-readiness.
   none: their stored rows carry no topic from the 12 (Fort Bend: 2 of 130 in 30 days).
 - Texas has no Board of Supervisors or LAFCO; the county fallback for unincorporated pages is the
   Commissioners Court feed the ZIP→county cascade already reads.
+
+## 5. Founder rulings, same day (2026-10-20)
+
+1. **Austin issued construction permits: ON**, only Building Permit `New` / `Addition` / `Demolition` rows with
+   native coordinates (registry `extra_where`). Map 1 treatment PROVEN.
+2. **Round Rock `Current_Developments_View/2`: HELD.** No date is reachable: the view hides its edit-tracking
+   fields, the only join candidate (TRAKiT) froze in 2022, and the city's notices layer has no case ID.
+   Details: `docs/source-registry.md` "TEXAS PRE-LAUNCH RULINGS".
+3. **Meeting calendars for Hudspeth, Caldwell and Llano: approved** (homesignal-ingest).
+
+Found while applying ruling 1: **Map 1 drew none of Denton city's 127 planning projects** (7 layers, 15 pages)
+because the sources had no `geo.n5_accepted_source` row. Classified RECOVERY, effective with the next N5 build.
