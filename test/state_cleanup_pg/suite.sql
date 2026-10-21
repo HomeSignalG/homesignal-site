@@ -134,6 +134,53 @@ select pg_temp.ok('a returning site is current again with a returned_to_source o
   (select removed_from_source_at is null from public.state_cleanup_sites where site_key = '89284058')
   and (select count(*) = 1 from public.state_cleanup_site_observations where event = 'returned_to_source' and site_key = '89284058'));
 
+-- 10b. a second source (Washington Ecology), loaded by the same shared fire / collect
+insert into feat values
+ ('wa_coupe', '{"attributes":{"City":"COUPEVILLE","County":"Island","Address":"1 S MAIN ST","ZipCode":"98239","OBJECTID":14212,"SiteRank":null,"SiteStatus":"Cleanup Started","CleanupSiteId":10008,"FacilitySiteId":64473279,"CleanupSiteName":"Coupeville Country Store"},"geometry":{"x":-122.68578411499313,"y":48.211804727846456}}'),
+ ('wa_other', '{"attributes":{"City":"COUPEVILLE","County":"Island","Address":"2 N MAIN ST","ZipCode":"98239-1234","OBJECTID":14213,"SiteRank":null,"SiteStatus":"Awaiting Cleanup","CleanupSiteId":10009,"FacilitySiteId":64473280,"CleanupSiteName":"Test Second Site"},"geometry":{"x":-122.686,"y":48.212}}');
+create temp table fl_snap as select site_key, content_md5, removed_from_source_at from public.state_cleanup_sites where source = 'fl_dep_cleanup';
+select public.state_cleanup_fire('wa_ecology_cleanup');
+select pg_temp.ok('wa fire: one count request + 6 page requests',
+  (select source = 'wa_ecology_cleanup' and cardinality(page_reqs) = 6 from public.state_cleanup_runs order by run_id desc limit 1));
+select pg_temp.ok('wa fire: count and pages carry the not-closed filter, offsets 0..10000',
+  (select count(*) = 7 from net.http_request_log where url like 'https://gis.ecology.wa.gov/%where=SiteStatus%3C%3E%27No%20Further%20Action%27&%')
+  and (select count(*) = 6 from net.http_request_log where url like 'https://gis.ecology.wa.gov/%' and url ~ 'resultOffset=(0|2000|4000|6000|8000|10000)&'));
+select pg_temp.answer(2, array['wa_coupe','wa_other']);
+select public.state_cleanup_collect();
+select pg_temp.ok('wa run complete', (select outcome = 'complete' from public.state_cleanup_runs order by run_id desc limit 1));
+select pg_temp.ok('wa: 2 sites stored under their own source', (select count(*) = 2 from public.state_cleanup_sites where source = 'wa_ecology_cleanup'));
+select pg_temp.ok('wa: record link is the site''s own Ecology page; ZIP+4 cut to 5; status verbatim',
+  (select record_url = 'https://apps.ecology.wa.gov/cleanupsearch/site/10008' and status = 'Cleanup Started' and state = 'WA'
+     from public.state_cleanup_sites where source = 'wa_ecology_cleanup' and site_key = '10008')
+  and (select source_zip5 = '98239' from public.state_cleanup_sites where source = 'wa_ecology_cleanup' and site_key = '10009'));
+select pg_temp.ok('wa: Florida rows untouched by a Washington run',
+  not exists (select site_key, content_md5, removed_from_source_at from public.state_cleanup_sites where source = 'fl_dep_cleanup'
+              except select * from fl_snap)
+  and (select count(*) from public.state_cleanup_sites where source = 'fl_dep_cleanup') = (select count(*) from fl_snap));
+select pg_temp.ok('zip 98239 serves both Washington sites with Ecology as the agency',
+  (select string_agg(x ->> 'site_key', ',' order by x ->> 'site_key') = '10008,10009' and bool_and(x ->> 'agency' = 'Washington Ecology')
+     from jsonb_array_elements(public.map1_state_cleanup_zip_members('98239') -> 'sites') x));
+select pg_temp.ok('florida rows still name Florida DEP',
+  (select bool_and(x ->> 'agency' = 'Florida DEP') from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x));
+-- second Washington run: one site leaves the list, the other only changes its OBJECTID
+update feat set f = jsonb_set(f, '{attributes,OBJECTID}', '99999') where k = 'wa_coupe';
+update public.state_cleanup_runs set fired_at = fired_at - interval '2 hours';
+select public.state_cleanup_fire('wa_ecology_cleanup');
+select pg_temp.answer(1, array['wa_coupe']);
+select public.state_cleanup_collect();
+select pg_temp.ok('wa: a new OBJECTID alone is not a change',
+  (select count(*) = 0 from public.state_cleanup_site_observations where source = 'wa_ecology_cleanup' and event = 'changed'));
+select pg_temp.ok('wa: a site that leaves the list is kept, marked removed; Florida not touched',
+  (select removed_from_source_at is not null from public.state_cleanup_sites where source = 'wa_ecology_cleanup' and site_key = '10009')
+  and not exists (select site_key, content_md5, removed_from_source_at from public.state_cleanup_sites where source = 'fl_dep_cleanup'
+                  except select * from fl_snap));
+do $$ begin
+  perform public.state_cleanup_fire('nope');
+  insert into chk (name, ok, detail) values ('fire refuses an unknown source', false, 'no error');
+exception when others then
+  insert into chk (name, ok, detail) values ('fire refuses an unknown source', sqlerrm like 'unknown state cleanup source%', sqlerrm);
+end $$;
+
 -- 11. who can run what
 select pg_temp.ok('anon can read the ZIP reader', has_function_privilege('anon', 'public.map1_state_cleanup_zip_members(text)', 'execute'));
 select pg_temp.ok('anon can read the near reader', has_function_privilege('anon', 'public.map1_state_cleanup_near(double precision,double precision,double precision)', 'execute'));
@@ -142,5 +189,11 @@ select pg_temp.ok('authenticated cannot collect', not has_function_privilege('au
 select pg_temp.ok('anon cannot read the tables', not has_table_privilege('anon', 'public.state_cleanup_sites', 'select')
   and not has_table_privilege('anon', 'public.state_cleanup_site_observations', 'select'));
 select pg_temp.ok('both cron jobs scheduled', (select count(*) = 2 from cron.job where jobname like 'state-cleanup-fl-%'));
+select pg_temp.ok('washington fire scheduled', (select count(*) = 1 from cron.job where jobname = 'state-cleanup-wa-fire'
+  and command = 'select public.state_cleanup_fire(''wa_ecology_cleanup'')'));
+select pg_temp.ok('anon cannot fire or collect a source', not has_function_privilege('anon', 'public.state_cleanup_fire(text)', 'execute')
+  and not has_function_privilege('anon', 'public.state_cleanup_collect()', 'execute')
+  and not has_function_privilege('authenticated', 'public.state_cleanup_fire(text)', 'execute'));
+select pg_temp.ok('anon cannot read the sources table', not has_table_privilege('anon', 'public.state_cleanup_sources', 'select'));
 
 select name, case when ok then 't' else 'f' end, detail from chk order by n;
