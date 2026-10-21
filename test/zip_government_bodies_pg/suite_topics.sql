@@ -14,4 +14,4 @@ select * from (values
 ;
 select 'V1 the view lists Tacoma on 98466 and 98444, and nothing uncoded', (select count(*) = 2 from public.zip_government_city_links where community_id='00000000-0000-0000-0000-0000000000a1') and (select count(*) = 0 from public.zip_government_city_links where community_id is null), '';
 select 'V2 anon may read the view', has_table_privilege('anon','public.zip_government_city_links','select'), '';
-select 'V3 the view never lists a place below 1% of the ZIP', (select count(*) = 0 from public.zip_government_city_links where place_geoid='5399999'), '';
+select 'V3 the view never lists a place below 1% of the ZIP unless the ZIP is named for it (Lakewood 0.5% of Parkland 98444)', (select count(*) = 0 from public.zip_government_city_links where place_geoid='5399999'), '';

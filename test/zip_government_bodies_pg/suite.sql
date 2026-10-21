@@ -7,7 +7,9 @@ b333 as (select * from public.zip_government_bodies('98333')),
 b601 as (select * from public.zip_government_bodies('84601')),
 b003 as (select * from public.zip_government_bodies('84003')),
 b005 as (select * from public.zip_government_bodies('84005')),
-b001 as (select * from public.zip_government_bodies('10001'))
+b001 as (select * from public.zip_government_bodies('10001')),
+b654 as (select * from public.zip_government_bodies('80654')),
+b155 as (select * from public.zip_government_bodies('98155'))
 select * from (values
  ('01 98466 lists the county and three cities', (select count(*) = 4 from b466), (select string_agg(name, ', ' order by sort_key) from b466)),
  ('02 98466 cities ordered by share', (select array_agg(name order by sort_key) from b466 where body_kind='city') = array['University Place','Fircrest','Tacoma'], ''),
@@ -31,5 +33,10 @@ select * from (values
  ('17 unknown and malformed ZIPs return nothing', (select count(*) = 0 from public.zip_government_bodies('00000')) and (select count(*) = 0 from public.zip_government_bodies('9846x')), ''),
  ('18 anon may execute the function', has_function_privilege('anon','public.zip_government_bodies(text)','execute'), ''),
  ('19 anon may not read the overlap table', not has_table_privilege('anon','geo.zcta_place_overlap','select'), ''),
+ ('21 80654 the town the ZIP is named for is listed below 1% (founder 2026-10-21)', (select count(*) = 1 and bool_and(community_id = '00000000-0000-0000-0000-0000000000a5') and bool_and(area_share = 0.0056) from b654 where body_kind='city'), (select string_agg(name||':'||coalesce(area_share::text,'-'), ', ') from b654)),
+ ('22 98155 a ZIP named for a city that is mostly elsewhere does not list it', (select count(*) = 0 from b155 where name='Seattle'), (select string_agg(name, ', ') from b155)),
+ ('23 98155 a >= 1% city still lists there', (select count(*) = 1 from b155 where name='Lake Forest Park'), ''),
+ ('24 the set view agrees: 80654 links Wiggins, 98155 does not link Seattle', (select count(*) = 1 from public.zip_government_city_links where zip='80654' and community_id='00000000-0000-0000-0000-0000000000a5') and (select count(*) = 0 from public.zip_government_city_links where zip='98155' and community_id='00000000-0000-0000-0000-0000000000a6'), ''),
+ ('25 anon may not read the places view directly', not has_table_privilege('anon','public.zip_government_places','select'), ''),
  ('20 shares are land area 0..1', (select bool_and(area_share between 0 and 1) from (select area_share from b466 union all select area_share from b444) s where area_share is not null), '')
 ) t(name, pass, detail);

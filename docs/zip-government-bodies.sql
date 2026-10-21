@@ -7,7 +7,10 @@
 --   * the chain ROOT of the ZIP's community (the county today; a root city such as
 --     Eagle Mountain UT where that is how it is modelled) — body_kind = its level;
 --   * every INCORPORATED Census place (funcstat A or B) that covers >= 1% of the ZIP's land,
---     from geo.zcta_place_overlap (docs/zcta-place-overlap.sql);
+--     from geo.zcta_place_overlap (docs/zcta-place-overlap.sql), OR is the town the ZIP is named
+--     for with more than half of that town's own land inside the ZIP (founder, 2026-10-21:
+--     Wiggins town is 0.56% of rural ZIP 80654 "Wiggins"). Both are decided once, in
+--     public.zip_government_places below;
 --   * any city community already on the ZIP's own chain that has no Census code yet (shown,
 --     share unknown), so nothing that delivers today disappears before step 9's back-fill.
 -- Columns:
@@ -22,15 +25,38 @@
 --                 it (public.feeds). A city whose feeds are all inactive offers nothing.
 -- CDPs (funcstat S) are not governments: their land is unincorporated and the county governs it.
 
--- The city half of the decision as a SET, so a build or a measurement can read every ZIP at once
--- without calling the function 12,722 times (measured: that walk exceeds 60 s). The function
--- below reads its city communities FROM this view, so there is one rule, not two.
-create or replace view public.zip_government_city_links as
-select o.zcta5::text || ':' || c.id::text as link_id,  -- unique: the build pages on it
-       o.zcta5::text as zip, c.id as community_id, c.name, o.place_geoid, round(o.area_share, 4) as area_share
+-- WHICH INCORPORATED PLACES A ZIP LISTS — the one admission rule, read by the city-links view
+-- and by zip_government_bodies, so there is one rule, not two.
+--   land_share  the place covers >= 1% of the ZIP's land (founder, option 3, 2026-10-18);
+--   named_town  the ZIP's own page is named for the place AND more than half of the place's land
+--               lies inside this ZIP (founder, 2026-10-21). A ZIP's name is its post-office name,
+--               so the name alone is not enough: 98155 "Seattle" holds 0.02% of Seattle and is
+--               Shoreline / Lake Forest Park. Measured 2026-10-21: 575 towns admitted by this
+--               branch (largest 36 km2), 83 named-but-not-home cases left out (all big cities).
+create index if not exists zcta_place_overlap_place_idx on geo.zcta_place_overlap (place_geoid);
+create or replace view public.zip_government_places as
+select o.zcta5::text as zip, o.place_geoid, o.place_name, o.area_share,
+       case when o.area_share >= 0.01 then 'land_share' else 'named_town' end as admitted_by
 from geo.zcta_place_overlap o
-join public.communities c on c.census_place_geoid = o.place_geoid and c.level = 'city'
-where o.place_funcstat in ('A', 'B') and o.area_share >= 0.01;
+where o.place_funcstat in ('A', 'B') and o.area_share > 0
+  and (o.area_share >= 0.01
+       or (exists (select 1 from public.communities z
+                    where z.level = 'zip' and z.zip_codes @> array[o.zcta5::text]
+                      and lower(regexp_replace(z.name, '\s*\(\d{5}\)\s*$', ''))
+                        = lower(regexp_replace(o.place_name,
+                            ' (city and borough|city|town|village|borough|municipality|plantation)$', '')))
+           and o.part_arealand * 2 > (select sum(o2.part_arealand) from geo.zcta_place_overlap o2
+                                       where o2.place_geoid = o.place_geoid)));
+revoke all on public.zip_government_places from public, anon, authenticated;
+grant select on public.zip_government_places to service_role;
+
+-- The city half of the decision as a SET, so a build or a measurement can read every ZIP at once
+-- without calling the function 12,722 times (measured: that walk exceeds 60 s).
+create or replace view public.zip_government_city_links as
+select g.zip || ':' || c.id::text as link_id,  -- unique: the build pages on it
+       g.zip, c.id as community_id, c.name, g.place_geoid, round(g.area_share, 4) as area_share
+from public.zip_government_places g
+join public.communities c on c.census_place_geoid = g.place_geoid and c.level = 'city';
 revoke all on public.zip_government_city_links from public;
 grant select on public.zip_government_city_links to anon, authenticated, service_role;
 
@@ -72,7 +98,7 @@ as $fn$
     where o.zcta5 = p_zip and o.place_funcstat in ('A', 'B') and o.area_share > 0
   ),
   cities as (
-    -- each incorporated place >= 1%, joined to the city community that publishes it
+    -- each place public.zip_government_places admits, joined to the city community that publishes it
     select p.place_geoid, p.place_name, p.area_share,
            -- a ROOT that is itself the city (NYC's boroughs, Philadelphia, an independent
            -- city, Eagle Mountain UT) carries that place's code, and wins: the root already
@@ -83,7 +109,7 @@ as $fn$
                where l.zip = p_zip and l.place_geoid = p.place_geoid
                order by l.community_id limit 1)) as cid
     from places p
-    where p.area_share >= 0.01
+    where p.place_geoid in (select g.place_geoid from public.zip_government_places g where g.zip = p_zip)
   ),
   chain_cities as (
     -- a city already on this ZIP's chain whose Census code is not set yet

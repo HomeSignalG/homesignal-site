@@ -171,7 +171,7 @@ def fetch_data(key, now_iso):
                                  "alert_id,community_id,source_url", "&active=is.true",
                                  keyset="alert_id")
     d["communities"] = fetch_all("communities", key, "id,name,parent_id,level,zip_codes")
-    # every city community whose land overlaps a ZIP by >= 1% — the set form of
+    # every city community the ZIP lists (>= 1% of its land, or the town it is named for) — the set form of
     # public.zip_government_bodies (docs/zip-government-bodies.sql), read by the page too
     d["gov_links"] = fetch_all("zip_government_city_links", key, "link_id,zip,community_id,name",
                                keyset="link_id")
@@ -1032,7 +1032,7 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261021a"></script>\n'
-        '<script src="/lib/data.js?v=c18bd28e"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/data.js?v=f6d0f681"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
         '<script src="/lib/templates.js?v=a01bf2ff"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity

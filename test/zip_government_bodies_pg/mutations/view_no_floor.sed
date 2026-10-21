@@ -1,1 +1,1 @@
-s/where o.place_funcstat in ('A', 'B') and o.area_share >= 0.01;/where o.place_funcstat in ('A', 'B');/
+s/    where p.place_geoid in (select g.place_geoid from public.zip_government_places g where g.zip = p_zip)/    where true/
