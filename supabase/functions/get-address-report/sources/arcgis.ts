@@ -211,6 +211,12 @@ export interface ArcgisRegistryEntry {
    *  as `lat_col BETWEEN ymin AND ymax AND lng_col BETWEEN xmin AND xmax`. Rows still
    *  place by their OWN column coordinates (column_map.lat/lng); nothing is guessed. */
   spatial_latlng_cols?: { lat: string; lng: string };
+  /** A geometry-less table whose publisher states each record's point as ONE text column
+   *  "(lat, lng)" (e.g. Douglas County CO's All_Permits LOCATION, "(39.537744, -104.965045)").
+   *  Read only when column_map.lat/lng gave no point; a value that does not parse as exactly
+   *  two in-range numbers gives no point, and the row falls through to the address geocode
+   *  (if mapped) exactly as before. Absent ⇒ unchanged. */
+  latlng_text_col?: string;
   /** POLYGON layers: ask the SERVER for its own polygon centroid (`returnCentroid=true`),
    *  returned per feature as `{centroid:{x,y}}` alongside the rings. OPT-IN per entry, never
    *  automatic, because the parameter is not universally supported and failure modes differ:
@@ -572,6 +578,10 @@ async function normalizeRow(
   // geography: source coords → point; else geocode a full address → address; else jurisdiction.
   let lat = numOrNull(readCol(row, cm.lat));
   let lng = numOrNull(readCol(row, cm.lng));
+  if ((lat == null || lng == null) && entry.latlng_text_col) {
+    const p = parseLatLngText(row[entry.latlng_text_col]);
+    if (p) { lat = p.lat; lng = p.lng; }
+  }
   [lat, lng] = dropNullIsland(lat, lng);   // (0,0) means "no coordinates" (sources/null-island.ts)
   const address = valOrNull(readCol(row, cm.address));
   let geoPrecision: NormalizedRecord["geo_precision"];
@@ -1126,6 +1136,16 @@ function valOrNull(v: unknown): string | null {
   if (v == null) return null;
   const s = String(v).trim();
   return s === "" ? null : s;
+}
+
+/** "(39.537744, -104.965045)" → {lat, lng}; anything else (blank, one number, out of range) → null. */
+export function parseLatLngText(v: unknown): { lat: number; lng: number } | null {
+  if (typeof v !== "string") return null;
+  const m = v.match(/^\s*\(?\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)?\s*$/);
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  if (!(Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) return null;
+  return { lat, lng };
 }
 
 function numOrNull(v: unknown): number | null {

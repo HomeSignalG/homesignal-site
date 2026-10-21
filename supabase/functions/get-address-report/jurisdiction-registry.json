@@ -16730,6 +16730,94 @@
         "additive_to_existing": "distinct from iowa-dot-bid-projects/-lines, which filter CONTRACT_AWARDED IS NOT NULL (awarded contracts). This layer is pre-award programmed work.",
         "surface_measured": "all 668 geometries tested against all 225 modelled IA ZIP centroids at spatial_zip_radius_mi=3: reaches 135 pages, 61 of them currently dark. IA 86 -> 147 of 225 (38.2% -> 65.3%). No subset excluded - every row is publishable, unlike ND (85% declined) and NM (stalled layer)."
       }
+    },
+    {
+      "registry_id": "douglas-county-co-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/seTexOicoRXDvRsJ/arcgis/rest/services/All_Permits_View/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/seTexOicoRXDvRsJ/arcgis/rest/services/All_Permits_View/FeatureServer/0",
+      "jurisdiction": "Douglas County",
+      "coverage": [
+        {
+          "state": "CO",
+          "county": "Douglas"
+        }
+      ],
+      "column_map": {
+        "title": "DESCRIPTION",
+        "status_raw": "STATUS_CURRENT",
+        "type_source": [
+          "SCOPE_OF_WORK",
+          "CONSTRUCTION_CATEGORY"
+        ],
+        "file_date": "APPLIED_DATE",
+        "decision_date": "ISSUED_DATE",
+        "address": [
+          "ORIGINAL_ADDRESS_1",
+          "ORIGINAL_CITY",
+          "ORIGINAL_STATE"
+        ],
+        "zip": "ORIGINAL_ZIP",
+        "case_number": "PERMIT_NUMBER"
+      },
+      "latlng_text_col": "LOCATION",
+      "out_fields": [
+        "OBJECTID",
+        "PERMIT_NUMBER",
+        "PERMIT_JOB_TYPE",
+        "CONSTRUCTION_CATEGORY",
+        "SCOPE_OF_WORK",
+        "DESCRIPTION",
+        "STATUS_CURRENT",
+        "APPLIED_DATE",
+        "ISSUED_DATE",
+        "ORIGINAL_ADDRESS_1",
+        "ORIGINAL_CITY",
+        "ORIGINAL_STATE",
+        "ORIGINAL_ZIP",
+        "LOCATION"
+      ],
+      "extra_where": "PERMIT_JOB_TYPE IN ('Building','Demolition')",
+      "type_map": {
+        "New Residential": "Residential",
+        "Addition Residential": "Residential",
+        "Alteration Residential": "Residential",
+        "New Multi-Family": "Residential",
+        "Addition Multi-Family": "Residential",
+        "Alteration Multi-Family": "Residential",
+        "New Accessory Use": "Residential",
+        "Addition Accessory Use": "Residential",
+        "Alteration Accessory Use": "Residential",
+        "New Commercial": "Commercial",
+        "Addition Commercial": "Commercial",
+        "Alteration Commercial": "Commercial",
+        "New Other": "Development",
+        "Addition Other": "Development",
+        "Alteration Other": "Development"
+      },
+      "use_type_const": "Development",
+      "commercial_work_evidence": {
+        "column": "SCOPE_OF_WORK",
+        "qualifying": [
+          "New",
+          "Addition",
+          "Alteration"
+        ],
+        "note": "CONSTRUCTION_CATEGORY is the building class; SCOPE_OF_WORK is the work (New / Addition / Alteration), the Columbus pattern."
+      },
+      "status_to_bucket": {
+        "approved": [
+          "ISSUED"
+        ],
+        "operating": [
+          "COMP"
+        ]
+      },
+      "file_date_kind": "filed",
+      "incremental_field": "APPLIED_DATE",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-10-21 Colorado Map 1 dot pass (Douglas County, 14 ZIP pages with no dots). PROBED: 2026-10-21 via pg_net from Postgres (HTTP 200). Found in the county's own DCAT catalog (dcdata-dougco.opendata.arcgis.com), item 'All Permits', modified 2026-10-21. LAYER: All_Permits (geometry-less table), 286,337 rows; maxRecordCount 1000. Newest ISSUED_DATE 2026-10-18, newest APPLIED_DATE 2026-10-18. JURISDICTION: JURISDICTION has one distinct value over all rows: 'Douglas County' (unincorporated county; Castle Rock, Parker and Lone Tree issue their own permits). STATUS: STATUS_CURRENT returnDistinctValues over all rows: COMP, ISSUED. Last 365 days of Building+Demolition: COMP 1,325, ISSUED 1,460 (= 2,785). TYPES: Last 365 days, PERMIT_JOB_TYPE x SCOPE_OF_WORK x CONSTRUCTION_CATEGORY: Building New/Addition/Alteration x Residential 447/43/1,125, Multi-Family 100/0/1, Accessory Use 664/7/136, Commercial 95/1/128; Demolition (no scope, no category) 38. Sum 2,785. 'Other' category exists all-time (returnDistinctValues) and is mapped to Development. Mechanical 3,653, Roofing 1,217, Electrical 974 and Driveway 10 are dropped at source. LOCATION: LOCATION is the publisher's own point as text '(lat, lng)' (e.g. '(39.537744, -104.965045)'), read by latlng_text_col. Blank on 38 of 2,785 rows in the window; those fall back to the address geocode. ZIP: ORIGINAL_ZIP is native and covers 13 of the 14 Douglas ZIP pages with no Map 1 dots on 2026-10-21 (80104 37, 80108 263, 80109 56, 80116 93, 80118 138, 80124 61, 80125 666, 80126 312, 80129 245, 80130 168, 80134 387, 80135 91, 80138 161); 80163 has none. PII: No person or company name field is mapped or fetched. RECORD_URL: No per-record URL field; dataset precision on the layer itself (Boulder precedent). USE_TYPE_CONST: a Demolition row has an EMPTY SCOPE_OF_WORK and an EMPTY CONSTRUCTION_CATEGORY (the publisher stated nothing), so it takes the generic Development label; every non-empty pair is in type_map."
     }
   ],
   "ckan": [
