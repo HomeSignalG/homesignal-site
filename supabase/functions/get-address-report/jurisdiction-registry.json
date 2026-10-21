@@ -3431,10 +3431,10 @@
       "column_map": {
         "title": [
           "GENERAL_TYPE",
-          "B1_PER_SUB_TYPE"
+          "B1_PER_CATEGORY"
         ],
         "status_raw": "PERMIT_STATUS",
-        "type_source": "B1_PER_SUB_TYPE",
+        "type_source": "GENERAL_TYPE",
         "file_date": "ISSUED_DT",
         "address": "SITE_ADDRESS",
         "zip": "B1_SITUS_ZIP",
@@ -3444,19 +3444,27 @@
         "lng": "__lng"
       },
       "file_date_kind": "issued",
-      "include_types": [
-        "Structural",
-        "New Construction",
-        "Major Alteration",
-        "Demolition",
-        "Addition"
-      ],
+      "extra_where": "B1_PER_SUB_TYPE IN ('Structural','New Construction','Major Alteration','Demolition','Addition')",
       "type_map": {
-        "Structural": "Development",
-        "New Construction": "Development",
-        "Major Alteration": "Development",
-        "Demolition": "Development",
-        "Addition": "Development"
+        "1,2,3 Family - New Structure": "Residential",
+        "1,2,3 Family - Other": "Residential",
+        "1,2,3 Family - Demolition": "Residential",
+        "Multi Family - New Structure": "Residential",
+        "Multi Family - Other": "Residential",
+        "Multi Family - Demolition": "Residential",
+        "Commercial - New Structure": "Commercial",
+        "Commercial - Other": "Commercial",
+        "Commercial - Demolition": "Commercial"
+      },
+      "commercial_work_evidence": {
+        "column": "B1_PER_CATEGORY",
+        "qualifying": [
+          "New Structure",
+          "Addition",
+          "Alteration",
+          "Foundation"
+        ],
+        "note": "GENERAL_TYPE is the building class; B1_PER_CATEGORY is the work. Roof, siding, windows, doors, damage, parking lot, fence and deck work is not qualifying commercial work, nor is a demolition (category NA)."
       },
       "status_to_bucket": {
         "proposed": [],
@@ -3482,6 +3490,7 @@
         "icon_completeness_2026_07_27",
         "retarget_type_source_2026_08_03",
         "geometry_fix_2026_08_05",
+        "retype_by_building_class_2026_10_21: Type comes from GENERAL_TYPE (the building class), and the 2026-08-03 work whitelist moved from include_types to extra_where on B1_PER_SUB_TYPE, unchanged. Measured live 2026-10-21 in this entry's own scope (ISSUED_DT in the last 365 days, the five work types), groupBy GENERAL_TYPE x B1_PER_SUB_TYPE: 10 combinations, 15,535 permits, every GENERAL_TYPE value mapped. 1,2,3 Family - New Structure 1,074 and Multi Family - New Structure 292 are new homes and qualify as Residential through the shared rule's ' family new structure ' phrase; the other Residential classes are repair and alteration work (B1_PER_CATEGORY: Roof, Siding, Windows, Doors 9,513; Alteration 1,436; Perimeter Drainage Tile 580; Deck, Patio 329; Damage 327; ...) and are not drawn, per the 2026-09-06 Residential rule (founder confirmed for Columbus 2026-10-21). B1_PER_CATEGORY is added to the title so the rule reads the work.",
         "file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUED_DT` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
       ],
       "out_fields": [
@@ -3489,19 +3498,13 @@
         "B1_PER_SUB_TYPE",
         "PERMIT_STATUS",
         "ISSUED_DT",
+        "B1_PER_CATEGORY",
         "SITE_ADDRESS",
         "B1_SITUS_ZIP",
         "B1_ALT_ID",
         "ACA_URL"
       ],
-      "page_size": 2000,
-      "observed_types_unreviewed": [
-        "Fire Protection",
-        "MEP",
-        "Plans Examination",
-        "Sign",
-        "Special"
-      ]
+      "page_size": 2000
     },
     {
       "registry_id": "cleveland-issued-building-permits",
