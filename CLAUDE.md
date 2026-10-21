@@ -618,6 +618,12 @@ subscribers.
   now holds for county and news picks only: a **city** pick is keyed
   `"<communityId>|<topic>"` and filed on THAT city's community, because the city publishes
   it. ZIPs with no Census area (PO boxes) say "not measured" rather than listing guesses.
+  - ⚖️ **Below 1%, the town a ZIP is named for still lists (founder, 2026-10-21).** Wiggins
+    town is 0.56% of rural ZIP 80654 "Wiggins". A place is admitted when the ZIP page is named
+    for it AND more than half of the place's own land lies in that ZIP; the second half keeps
+    out post-office names (98155 "Seattle" holds 0.02% of Seattle). Decided once, in
+    `public.zip_government_places`; the city-links view and `zip_government_bodies` both read it.
+    Measured 2026-10-21: 575 towns added by it (largest 36 km²), 83 named-but-not-home left out.
   - **City communities exist only for cities whose own source we read** (Pierce WA, 2026-10-18:
     Tacoma, Gig Harbor, Sumner, Edgewood, Milton, University Place; `level=city`, `zip_codes '{}'`,
     seed `docs/pierce-city-communities-seed.sql`, which also records the 12 held cities and why).

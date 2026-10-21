@@ -43,7 +43,16 @@ insert into public.communities values
  ('00000000-0000-0000-0000-0000000000c3','New York County','New York','NY','county',null,array['10001'],array['County Commission & county business'],'3651000'),
  ('00000000-0000-0000-0000-0000000000c4','Kings County','Kings','NY','county',null,array['11201'],array['County Commission & county business'],'3651000'),
  ('00000000-0000-0000-0000-0000000000f8','Chelsea (10001)','New York','NY','zip','00000000-0000-0000-0000-0000000000c3',array['10001'],array[]::text[],null);
-insert into geo.zcta_boundary values ('98466'),('98444'),('98333'),('84601'),('84003'),('84005'),('10001');
+-- named-town rule (2026-10-21): Wiggins town is 0.56% of rural 80654 "Wiggins" and lies wholly
+-- inside it; Seattle is 0.02% of 98155 "Seattle" with almost all of its land in another ZIP.
+insert into public.communities values
+ ('00000000-0000-0000-0000-0000000000c5','Morgan County','Morgan','CO','county',null,array['80654'],array['County Commission & county business'],null),
+ ('00000000-0000-0000-0000-0000000000f9','Wiggins (80654)','Morgan','CO','zip','00000000-0000-0000-0000-0000000000c5',array['80654'],array[]::text[],null),
+ ('00000000-0000-0000-0000-0000000000a5','Wiggins','Morgan','CO','city','00000000-0000-0000-0000-0000000000c5',array[]::text[],array[]::text[],'0884770'),
+ ('00000000-0000-0000-0000-0000000000c6','King County','King','WA','county',null,array['98155','98101'],array['County Commission & county business'],null),
+ ('00000000-0000-0000-0000-0000000000fa','Seattle (98155)','King','WA','zip','00000000-0000-0000-0000-0000000000c6',array['98155'],array[]::text[],null),
+ ('00000000-0000-0000-0000-0000000000a6','Seattle','King','WA','city','00000000-0000-0000-0000-0000000000c6',array[]::text[],array[]::text[],'5363000');
+insert into geo.zcta_boundary values ('98466'),('98444'),('98333'),('84601'),('84003'),('84005'),('10001'),('80654'),('98155'),('98101');
 -- 98411 is a PO-box ZIP: no ZCTA, no overlap rows.
 insert into geo.zcta_place_overlap (zcta5, place_geoid, place_name, place_class, place_funcstat, zcta_arealand, part_arealand) values
  ('98466','5373465','University Place city','C1','A',1000,631),
@@ -56,7 +65,11 @@ insert into geo.zcta_place_overlap (zcta5, place_geoid, place_name, place_class,
  ('84601','4962470','Provo city','C1','A',1000,980),
  ('84003','4901310','American Fork city','C1','A',1000,900),
  ('84005','4920120','Eagle Mountain city','C1','A',1000,935),
- ('10001','3651000','New York city','C1','A',1000,1000);
+ ('10001','3651000','New York city','C1','A',1000,1000),
+ ('80654','0884770','Wiggins town','C1','A',10000,56),        -- 0.56%, all of the town
+ ('98155','5363000','Seattle city','C1','A',10000,2),         -- 0.02%, a sliver of Seattle
+ ('98101','5363000','Seattle city','C1','A',10000,9000),
+ ('98155','5363999','Lake Forest Park city','C1','A',10000,3000);
 
 -- identities and selections, for clear_alert_selection
 drop schema if exists auth cascade; create schema auth;
