@@ -1796,6 +1796,40 @@ def build(pages, out_dir, canonical, built, state=None):
             "max": mx, "max_zip": mxz}
 
 
+MAP_PAGE = "/homesignalmap.html"
+
+
+def render_map_route(z):
+    """The short map address /map/<zip>/ (founder, 2026-10-21): the link people SEE in posts and
+    e-mails, so it carries no page file name. It forwards to the one Map 1 page for this ZIP and
+    keeps any query the link carried (the campaign tags) and the hash. It is not a second map and
+    not a page of its own: noindex, no content, no canonical claim. Map 1 stays the one page."""
+    if not ZIP_RE.match(z):
+        sys.exit(f"ERROR: non-numeric ZIP refused: {z!r}")
+    dest = f"{MAP_PAGE}?zip={z}"
+    return ("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            "<meta name=\"robots\" content=\"noindex, follow\">\n"
+            f"<title>Map for ZIP {z}</title>\n"
+            "<script>(function(){var q=location.search.replace(/^\\?/,'');"
+            f"location.replace('{dest}'+(q?'&'+q:'')+location.hash);}})();</script>\n"
+            f"<meta http-equiv=\"refresh\" content=\"1; url={dest}\">\n"
+            "</head>\n<body>\n"
+            f"<p><a href=\"{dest}\">Open the development map for ZIP {z}</a></p>\n"
+            "</body>\n</html>\n")
+
+
+def build_map_routes(zips, out_dir):
+    """One /map/<zip>/index.html per ZIP that has a community document. Returns the count."""
+    n = 0
+    for z in sorted(zips):
+        d = os.path.join(out_dir, "map", z)
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, "index.html"), "w", encoding="utf-8").write(render_map_route(z))
+        n += 1
+    return n
+
+
 def load_page_state_baseline(path, reseed):
     """The previous live state, or None. None is ONLY for 'there is none' (no path, no file) or an
     explicit reseed. A file that exists but does not validate is a hard error: treating a corrupt
@@ -1965,6 +1999,7 @@ def main():
     # page-semantics authority (scripts/page_semantics.py), no second pass over the content.
     state = ps.PageState(now_iso[:10])
     stats = build(pages, a.out, zips, now_iso[:10], state)
+    nmap = build_map_routes(pages, a.out)
     indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
     ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
@@ -2006,6 +2041,7 @@ def main():
     print(f"rule F fail    : {len(pages) - npass}")
     print(f"rule D pass    : {ndpass}")
     print(f"indexable      : {len(indexable)} (Rule F OR Rule D)")
+    print(f"map routes     : {nmap} (/map/<zip>/)")
     print(f"city pages     : {ncity}")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
           f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
@@ -2027,6 +2063,8 @@ def main():
     print(f"build seconds  : {time.time()-t0:.1f}")
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
+    if nmap != stats["documents"]:
+        sys.exit("ERROR: /map/<zip>/ routes != community documents")
     if stats["bytes"] + proj_bytes > 900 * 1024 * 1024:
         sys.exit("ERROR: artifact exceeds the safe GitHub Pages budget")
     # dev_indexable_zips is ADDITIVE and exists so the crawler proof can NAME the current
@@ -2036,7 +2074,7 @@ def main():
     # only be replaced by hand-querying production. It changes no document, no robots
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
-    json.dump({"documents": stats["documents"], "rule_f_pass": npass,
+    json.dump({"documents": stats["documents"], "map_routes": nmap, "rule_f_pass": npass,
                "canonical_registry": registry_n, "retired_zips": sorted(retired),
                "unverified_zips": sorted(unverified),
                "coverage_zips": {z: m for z, m in sorted(present.items())},

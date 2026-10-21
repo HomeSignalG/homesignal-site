@@ -18,6 +18,10 @@
   // for a NON-canonical 5-digit path afterwards, which lands on the dynamic page's honest
   // "isn't covered yet" state. Both are noindex, so no unknown ZIP can become an indexable
   // community page. No per-ZIP files — the same pattern as /development/ above.
+  // Short map address (2026-10-21). Every built ZIP has a real /map/<zip>/ document; this catches
+  // a ZIP without one, so the link still opens Map 1 with its query kept.
+  var mp = window.location.pathname.match(/^\/map\/(\d{5})\/?$/);
+  if (mp) window.location.replace('/homesignalmap.html?zip=' + mp[1] + (window.location.search ? '&' + window.location.search.slice(1) : ''));
   var c = window.location.pathname.match(/^\/community\/(\d{5})\/?$/);
   if (c) window.location.replace('/community.html?zip=' + c[1]);
 })();

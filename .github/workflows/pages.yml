@@ -311,6 +311,10 @@ jobs:
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
+          # the short map address: one /map/<zip>/ per community document, same ZIPs, nothing else
+          MAPS=$(find _site/map -mindepth 2 -maxdepth 2 -name index.html | wc -l)
+          echo "map routes: $MAPS"; test "$MAPS" -eq "$DOCS"
+          diff <(ls _site/map) <(ls _site/community) >/dev/null
           # ZIP COVERAGE (founder, 2026-10-03): every ZIP in lib/zip-coverage.json keeps a document
           # (a ZIP with no Census-drawn area is not proven inactive), the model ships (shell.js
           # reads it), the model equals what the classification record derives, and the documents
@@ -453,7 +457,8 @@ jobs:
           def generated(p):
               return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
-                      or p.startswith('guides/') or p.startswith('sitemaps/'))
+                      or p.startswith('guides/') or p.startswith('sitemaps/')
+                      or p.startswith('map/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
@@ -494,6 +499,10 @@ jobs:
           fi
           if git ls-files --error-unmatch project/ >/dev/null 2>&1; then
             echo 'ERROR: project/ is tracked in git — generated output must never be committed'
+            exit 1
+          fi
+          if git ls-files --error-unmatch map/ >/dev/null 2>&1; then
+            echo 'ERROR: map/ is tracked in git — generated output must never be committed'
             exit 1
           fi
           if git ls-files --error-unmatch guides/ >/dev/null 2>&1; then
