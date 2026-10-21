@@ -3410,6 +3410,13 @@ Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete`
   1,068, Multi Family 1,682 all read UNRESOLVED (the gate has no "new structure" phrase), so about 13,800 pins
   would leave Columbus pages, about 1,357 of them new homes. Cleveland has the same shape: `USE_GROUP_1`
   could type its 10,654 "Building Permits" rows.
+  - ✅ **COLUMBUS DECIDED AND DONE 2026-10-21 (founder: hide repairs).** Type from `GENERAL_TYPE`, work
+    whitelist in `extra_where`, `B1_PER_CATEGORY` added to the title, Commercial gated on it. The shared
+    rule gained ONE phrase, `' family new structure '` (bare `' new structure '` was measured and refused:
+    it also matched free-text porch coverings and outbuildings in Memphis and Montgomery MD). Measured in
+    the connector's own scope, 15,535 permits: the 1,366 new homes are drawn as Residential, 3,019 pins in
+    all stay visible (Commercial 1,201, Other project 452), and 12,516 repair/alteration permits on
+    existing homes are hidden. Test: `test/columbus-retype-2026-10-21.test.mjs`. Cleveland is not changed.
 - **Freshness:** Columbus / Cleveland / Cincinnati newest filings 2026-10-17 / 10-17 / 10-16; 330 of 335
   reports refreshed in 72 h; 45107 last written 2026-10-12 (re-attempted 10-19). Summit County Planning
   Commission's 1,825-day window and "Submitted for county review" are the PA Act 247 ruling, unchanged.

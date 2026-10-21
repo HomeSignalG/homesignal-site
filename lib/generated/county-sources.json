@@ -1579,7 +1579,7 @@
         "id": "columbus-building-permits",
         "label": "City of Columbus",
         "scope": "city",
-        "commercial": false
+        "commercial": true
       }
     ],
     "OH|Franklin": [
@@ -1587,7 +1587,7 @@
         "id": "columbus-building-permits",
         "label": "City of Columbus",
         "scope": "city",
-        "commercial": false
+        "commercial": true
       }
     ],
     "OH|Hamilton": [

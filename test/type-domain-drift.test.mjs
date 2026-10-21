@@ -145,23 +145,27 @@ const UNCHANGED = [
   // WORK column under a type_source that was supposed to be the building type; the work filter moved
   // to extra_where on NEWCLASS and the Type now comes from NEWTYPE through type_map, so a new NEWTYPE
   // value arrives as `unclassified` (visible) instead of being dropped at the query.
-  ok(WHITELISTED.length === 13,
-    `D1 the include_types fleet is the expected 13 entries (${WHITELISTED.length})`,
+  // 13 -> 12 on 2026-10-21: columbus-building-permits left the same way. Its whitelist was the work
+  // column B1_PER_SUB_TYPE; that filter moved to extra_where and the Type now comes from GENERAL_TYPE
+  // through type_map. Its five baseline values (Fire Protection, MEP, Plans Examination, Sign,
+  // Special) were work types, so they left the baseline with it: 123 -> 118.
+  ok(WHITELISTED.length === 12,
+    `D1 the include_types fleet is the expected 12 entries (${WHITELISTED.length})`,
     WHITELISTED.map((e) => e.registry_id).join(', '));
   const applies = WHITELISTED.filter(typeDriftApplies);
   ok(applies.length === WHITELISTED.length,
-    'D2 every whitelisted entry resolves a single type column, so all 13 are checkable',
+    'D2 every whitelisted entry resolves a single type column, so all 12 are checkable',
     WHITELISTED.filter((e) => !typeDriftApplies(e)).map((e) => e.registry_id).join(', '));
 
   const seeded = WHITELISTED.filter(hasBaseline);
-  ok(seeded.length === 12,
-    `D3 12 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
+  ok(seeded.length === 11,
+    `D3 11 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
   const pending = WHITELISTED.filter((e) => !hasBaseline(e)).map((e) => e.registry_id).sort();
   ok(JSON.stringify(pending) === JSON.stringify(['san-diego-approved-permits']),
     'D4 …and exactly the one that could not be enumerated is BASELINE NOT ESTABLISHED',
     JSON.stringify(pending));
   const total = seeded.reduce((s, e) => s + e.observed_types_unreviewed.length, 0);
-  ok(total === 123, `D5 123 values are recorded observed-not-fetched (${total})`);
+  ok(total === 118, `D5 118 values are recorded observed-not-fetched (${total})`);
 
   // A baseline value that is ALSO whitelisted would be a contradiction: fetched and unfetched.
   // VERBATIM on the baseline side, trimmed on the config side — the connector's own asymmetry.
