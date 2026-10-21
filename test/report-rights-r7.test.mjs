@@ -30,8 +30,11 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // 247 -> 246 ids. A removal narrows the cleared list and clears nothing new. Recomputed read-only in the production database
 // over a VALUES list generated from the registry: n=246, md5 9bdf1b3e...; the same query with that one id added back reproduces
 // the prior value 009d7cd0... exactly (positive control).
-const FINGERPRINT_2026_10_04 = '9bdf1b3ed7c5f9a9c61714ec281a0f14';
-const EXPECTED_IDS = 246;
+// Founder approval 2026-10-21 (Colorado pre-launch, asked and answered in session) cleared exactly one source,
+// douglas-county-co-permits (Douglas County CO's own All_Permits_View): 246 -> 247 ids. Prior value 9bdf1b3ed7c5f9a9c61714ec281a0f14.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = '2fb0d4dda0e77ea6f966a9b10450155a';
+const EXPECTED_IDS = 247;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();

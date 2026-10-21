@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`246` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `9bdf1b3ed7c5f9a9c61714ec281a0f14`.
+`247` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `2fb0d4dda0e77ea6f966a9b10450155a`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -136,6 +136,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `detroit-building-permits`
 - `detroit-demolition-permits`
 - `detroit-trades-permits`
+- `douglas-county-co-permits`
 - `durham-building-permits`
 - `east-baton-rouge-building-permits`
 - `el-paso-new-residential-permits`
