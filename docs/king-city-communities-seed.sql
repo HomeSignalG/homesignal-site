@@ -161,3 +161,26 @@ cross join (select id from public.communities where slug = 'king-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-20: Tukwila 25bb9bbe-176b-4e59-a524-07ebcf1c11ec (5372625)
 --   · Burien 9c08122a-866b-4638-ac01-b608e180f642 (5308850)
+
+-- Step 9 (2026-10-21): Sammamish, read from its CivicWeb calendar service
+--   (https://sammamishwa.civicweb.net/Services/MeetingsService.svc/meetings, the portal the city's
+--   own council page links; same notice_list parser as Burien). pg_net request 16573, 2026-10-21,
+--   from=2026-08-22&to=2027-04-19: 200, City Council Regular Meeting and Work Session (through
+--   Dec 15 2026), special meetings, Planning Commission and city boards; every body is a City of
+--   Sammamish body.
+-- Feed: homesignal-ingest feeds.csv mtg-sammamish-wa-city-catchall.
+-- Held after step 9, each probed through pg_net 2026-10-21:
+--   Federal Way      agendas are in Laserfiche WebLink (docs.federalwaywa.gov), like Kent; the city's
+--                    Drupal calendar lists /event/ pages but no feed (calendar/ical, events/ical,
+--                    calendar/rss all 404)
+--   Newcastle, Normandy Park   CivicWeb tenants exist, but the calendar service returns [] for the same
+--                    range Burien answers, and the portal pages carry forms, not meetings
+--   Pacific          cityofpacificwa.gov answers 403 to pg_net (not worked around)
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'King', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Sammamish', 'sammamish-wa')) v(name, slug)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.name || ' city'
+cross join (select id from public.communities where slug = 'king-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-21: Sammamish 8ac23312-d212-4ab2-8884-92bdf210c292 (5361115)
