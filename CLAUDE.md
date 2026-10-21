@@ -3460,6 +3460,33 @@ Champaign IL record at `decided` 9999 (also caught by #2100's year-2100 rule, wh
 2026-10-20 that the 2050 dates are placeholders, overriding #2100's note calling them a real plan. The rule names no source. Filed/issued dates keep the today+1 rule.
 Test: `test/massachusetts-prelaunch-2026-10-20.test.mjs`. Audit: `docs/massachusetts-prelaunch-audit-2026-10-20.md`.
 
+## 7.12h STATE CLEANUP SITES ARE THEIR OWN MAP 1 LAYER ⚖️ FOUNDER DECISION (2026-10-21)
+
+**Florida DEP's open waste-cleanup sites (10,525 on 2026-10-21: petroleum 6,534, other waste
+3,311, brownfield 327, PFAS 252, Superfund 69, FED 32) are a layer of their own, with their own
+switch, "State cleanup sites", in the Regulatory records row.** The founder chose this over
+drawing them as "Other project" or listing them only on the ZIP page.
+- **Why they can't ride on EPA:** in ZIP 33301, 0 of DEP's 7 sites lie within ~100 m of any of
+  the 24 stored EPA facilities (most are former gas stations). A cleanup site matches no project
+  Type, so under the 2026-09-15 rule it would have no pin.
+- **Data:** `docs/state-cleanup-sites.sql`. The table `public.state_cleanup_sites` holds every
+  site, with append-only history in `state_cleanup_site_observations`. A site that leaves DEP's
+  list keeps its row (`removed_from_source_at`) and is no longer drawn. Loaded daily by pg_cron
+  through pg_net (`state_cleanup_fl_fire` 10:17 UTC, then `state_cleanup_fl_collect`). A run
+  writes only if every request answered and the distinct sites equal DEP's own count; otherwise
+  it writes nothing and marks nothing removed. It does not use `development_reports` or the
+  engine, so an EPA timeout cannot affect it.
+- **Readers:** `map1_state_cleanup_zip_members(zip)` returns ZCTA-polygon members only, through
+  `geo.zip_point_membership_in`, never DEP's ZIP5 (DEP files a 33309 site under 33301).
+  `map1_state_cleanup_near(lat,lng,radius_mi)` serves address mode.
+- **Page:** `lib/state-cleanup.js` owns the mapping, marker (brown circle "C"), popup, list and
+  switch. Every Map 1 surface asks `HS.isStateCleanup`. The sites never enter the EPA facility
+  count, the development counts, the lifecycle rails or the indexability decision.
+- Tests: `test/state_cleanup_pg` (36 checks, 8 mutations killed; `state-cleanup-suite.yml`),
+  `test/state-cleanup.test.mjs`, `test/map1-state-cleanup.browser.test.mjs`.
+- **Not done:** the ZIP detail page (`community.html`) does not list them yet; other states'
+  cleanup lists would be new `source` values in the same table.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another

@@ -882,6 +882,13 @@
           <div class="band-s">On the public record, but the source states no construction or operating stage (EPA-registered facilities are here)</div>
           <div id="unknownList"></div>
         </div>
+        <!-- STATE CLEANUP SITES (founder decision, 2026-10-21): their own band, hidden when this
+             view holds none. Not projects and not EPA facilities (lib/state-cleanup.js). -->
+        <div class="card read" id="cleanupBand" hidden>
+          <div class="band-h">State cleanup sites</div>
+          <div class="band-s">Open cases on the state's cleanup-site list (Florida DEP)</div>
+          <div id="cleanupList"></div>
+        </div>
       </div>
 
       <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
@@ -919,10 +926,11 @@
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=a01bf2ff"></script>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/map.js?v=f98598d2"></script>
+<script src="lib/map.js?v=8c153656"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
-<script src="lib/zip-authoritative.js?v=20261002a"></script>
+<script src="lib/zip-authoritative.js?v=20261021a"></script>
+<script src="lib/state-cleanup.js?v=20261021a"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=02c305ee"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
@@ -1198,6 +1206,10 @@ HS.onReady(function(){
     writeRegulatoryToUrl();
     applyFilter();
   }
+  (function applyStateCleanupFromUrl(){
+    var want = HS.stateCleanupFromUrl ? HS.stateCleanupFromUrl(window.location.href) : null;
+    if(want !== null) HS.setStateCleanupVisible(want);
+  })();
   (function applyRegulatoryFromUrl(){
     var want = readRegulatoryFromUrl();
     if(want === null) return;             // absent or unparseable -> keep the fail-open default
@@ -1222,7 +1234,9 @@ HS.onReady(function(){
     if(wantTypes) TYPE_KEYS.forEach(function(k){ HS.setCategoryFilter(k, !!wantTypes[k]); });
     var wantReg = readRegulatoryFromUrl();
     if(wantReg !== null) HS.setCategoryFilter(HS.REGULATORY_LEGEND.key, wantReg);
-    syncStageControls(); syncTypeControls(); syncRegulatoryChip();
+    var wantCleanup = HS.stateCleanupFromUrl ? HS.stateCleanupFromUrl(window.location.href) : null;
+    if(wantCleanup !== null) HS.setStateCleanupVisible(wantCleanup);
+    syncStageControls(); syncTypeControls(); syncRegulatoryChip(); syncStateCleanupChip();
     applyFilter();
   });
   var siteMarkers = [];
@@ -1399,6 +1413,7 @@ HS.onReady(function(){
   var MARKER_TITLE_STAGE = { proposed:"Proposed", approved:"Approved",
                              operating:"Operating", built:"Operating" };
   function markerTitle(s, mk){
+    if(HS.isStateCleanup && HS.isStateCleanup(s)) return HS.stateCleanupTitle(s);
     var type = (mk && mk.legendLabel) ? String(mk.legendLabel).toLowerCase() : "project";
     var stage = MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
@@ -1783,6 +1798,7 @@ HS.onReady(function(){
   // Type line for the 3D views: facility type + the headline env signal for precise sites (via the
   // shared envTag helper), honest lifecycle + jurisdiction-wide framing for area notices.
   function kind3(s){
+    if(HS.isStateCleanup && HS.isStateCleanup(s)) return "State cleanup site · " + HS.stateCleanupTypeLine(s);
     return s.scope==="point" ? (facilityType(s) + envTag(s))
       : (stageWord(s) + " · jurisdiction-wide");
   }
@@ -1791,6 +1807,15 @@ HS.onReady(function(){
   // severity), the geo_matched honesty note, and the official ECHO + TCEQ drill-down links.
   function infoCard3(s){
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
+    if(HS.isStateCleanup && HS.isStateCleanup(s)){
+      return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"
+        + "<div class='ci-n'>"+esc(s.label||"")+"</div>"
+        + "<div class='ci-t'>"+esc("State cleanup site · " + HS.stateCleanupTypeLine(s))+"</div>"
+        + (s.cleanup && s.cleanup.address ? "<div class='ci-v'>"+esc(s.cleanup.address)+"</div>" : "")
+        + "<div class='ci-v' style='color:#9fb0ad;font-size:11px'>"+esc(HS.STATE_CLEANUP_NOTE)+"</div>"
+        + "<div class='ci-l'><a href='"+esc(s.record_url)+"' target='_blank' rel='noopener'>"
+        + esc(((s.cleanup && s.cleanup.agency) || "State") + " site documents") + " ▸</a></div>";
+    }
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var link = s.url || s.record_url || "";
     // Type line: bare facility type for points (env shows in its own block below, not duplicated);
@@ -2185,7 +2210,14 @@ HS.onReady(function(){
           return { rows: rows, sites: HS.n5SitesFrom(rows, projects, home) };
         });
       });
-      return Promise.all([report, canonical]).then(function(both){
+      // STATE CLEANUP SITES within the same circle (docs/state-cleanup-sites.sql). A failed read
+      // draws none; it never fails the page.
+      var cleanup = fetch(SUPABASE_URL + "/rest/v1/rpc/map1_state_cleanup_near", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_lat: home.lat, p_lng: home.lng, p_radius_mi: radius })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+      return Promise.all([report, canonical, cleanup]).then(function(both){
         if(!currentReq(token)) return;      // a newer search landed while these were in flight
         var res = both[0], n5 = both[1];
         $("go").disabled = false;
@@ -2198,6 +2230,7 @@ HS.onReady(function(){
         data.home = home;
         data.address = data.address || (m.matchedAddress || address);
         data.sites = HS.n5MergeSites(data.sites || [], n5.sites);
+        if(HS.stateCleanupSitesFrom) data.sites = data.sites.concat(HS.stateCleanupSitesFrom(both[2]));
         // The engine's development counters described ITS development set, which no longer
         // renders in address mode. Drop them so render() recomputes from what is actually on
         // screen; the facilities count is still the engine's and is still accurate.
@@ -2457,10 +2490,21 @@ HS.onReady(function(){
             function(){  return HS.nationalPlaneResult({ http: r.status, body: null }); }
           );
         })
-        .catch(function(){ return HS.nationalPlaneResult({ transportError: true }); })
+        .catch(function(){ return HS.nationalPlaneResult({ transportError: true }); }),
+      // STATE CLEANUP SITES (docs/state-cleanup-sites.sql): ZCTA-polygon members only, each row
+      // carrying the canonical verdict. A failed read draws no cleanup sites; it never fails the page.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/map1_state_cleanup_zip_members", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
     ])
       .then(function(both){
         var rows = both[0], rs = both[1], auth = both[2];
+        var cleanupBody = both[4];
+        var cleanupSites = HS.stateCleanupSitesFrom ? HS.stateCleanupSitesFrom(cleanupBody) : [];
+        window.__HS_STATE_CLEANUP = { status: HS.stateCleanupOutcome ? HS.stateCleanupOutcome(cleanupBody) : "unavailable",
+                                      sites: cleanupSites.length };
         var rsSites = HS.zipReportSites(rs);
         var facMembers = HS.zipFacilityMemberCount(rs);
         // Published for the verifiers: the tile, the drawn facilities and this count must agree.
@@ -2553,16 +2597,16 @@ HS.onReady(function(){
                    counts:zipCounts,
                    // THE ONE ZIP-MODE DOOR (lib/zip-authoritative.js): every point plane passes on
                    // canonical membership evidence.
-                   sites: HS.zipModeSites(rsSites, auth, natlSites),
+                   sites: HS.zipModeSites(rsSites, auth, natlSites, cleanupSites),
                    facUnmeasured: facMembers == null,
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable });
-        } else if(authSites.length || natlSites.length){
+        } else if(authSites.length || natlSites.length || cleanupSites.length){
           // No cached report row, but the ZIP's own geography or the national plane is
           // established - render it. The national half is what lets a county with NO local
           // permit/planning connector still show real data-center projects.
           render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
-                   sites: HS.zipModeSites([], auth, natlSites), paywall:false, updated:null, facUnavailable:false });
+                   sites: HS.zipModeSites([], auth, natlSites, cleanupSites), paywall:false, updated:null, facUnavailable:false });
         } else {
           // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
@@ -2652,8 +2696,12 @@ HS.onReady(function(){
     // SEO policy: index only a ZIP page whose stamped substance flag is true AND that rendered
     // real sourced content. Address mode (ZIP_MODE false), thin and empty ZIPs stay noindex.
     // ZIP_INDEXABLE resolves async in loadZip(); whichever setIndexable() call lands last wins.
-    HAS_CONTENT = ZIP_MODE && sites.length > 0;
-    setIndexable(ZIP_MODE && ZIP_INDEXABLE && sites.length > 0);
+    // State cleanup sites are context, not content, for indexing (founder, 2026-10-21): they
+    // never make an otherwise empty page indexable.
+    var cleanupSites = sites.filter(function(s){ return HS.isStateCleanup && HS.isStateCleanup(s); });
+    var contentCount = sites.length - cleanupSites.length;
+    HAS_CONTENT = ZIP_MODE && contentCount > 0;
+    setIndexable(ZIP_MODE && ZIP_INDEXABLE && contentCount > 0);
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
     // agrees with the dot's colour (both derive from the lifecycle stage — see kindLabel/stageOf).
     window.__HS_KIND = kindLabel; window.__HS_STAGE = stageOf; window.__HS_COLORS = COLORS;
@@ -2677,7 +2725,8 @@ HS.onReady(function(){
     // only to route a filing's "record ▸" to the property page.
     var isDevPoint = function(s){ return s.scope==="point" && s.relevance==="development"; };
     var permits = sites.filter(isDevPoint);
-    var fac = sites.filter(function(s){ return s.scope==="point" && s.relevance!=="development"; });
+    var fac = sites.filter(function(s){ return s.scope==="point" && s.relevance!=="development"
+      && !(HS.isStateCleanup && HS.isStateCleanup(s)); });
     var dev = sites.filter(function(s){ return s.scope==="area" && !isCivic(s); });
     var civic = sites.filter(function(s){ return s.scope==="area" && isCivic(s); });
     var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
@@ -2796,6 +2845,12 @@ HS.onReady(function(){
     listInto("builtList", builtRows, "Nothing recorded as operating right now.");
     listInto("unknownList", unknownRows, "Nothing on record here without a stated lifecycle.");
     listInto("apprList", appr, "Nothing approved on record right now.");
+    // STATE CLEANUP SITES — their own band, shown only when this view holds one.
+    var cuBand = $("cleanupBand"), cuList = $("cleanupList");
+    if(cuBand && cuList){
+      cuBand.hidden = !cleanupSites.length;
+      cuList.innerHTML = cleanupSites.length ? HS.stateCleanupListHTML(cleanupSites, esc, LIST_CAP) : "";
+    }
     // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
     // heading a reader takes as a statement about now, and the only one that can hold a
     // decided application. Approved/Operating rails are byte-for-byte unchanged.
@@ -2831,6 +2886,10 @@ HS.onReady(function(){
            + ". These are the sources' own records, not local permit filings;"
            + " open a pin for the original record.")
         : "") +
+      (cleanupSites.length
+        ? (" Cleanup sites from " + esc(cleanupAgencies(cleanupSites)) + " open cleanup-site list; a listing is a"
+           + " public record of a cleanup case, not a finding about any owner.")
+        : "") +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
     // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
     // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
@@ -2840,6 +2899,11 @@ HS.onReady(function(){
     applyEmbedBoundary();
   }
 
+  function cleanupAgencies(list){
+    var seen = {}, out = [];
+    list.forEach(function(s){ var a = (s.cleanup && s.cleanup.agency) || "the state"; if(!seen[a]){ seen[a]=1; out.push(a + "\u2019s"); } });
+    return out.join(" and ");
+  }
   // The polygon, once read, and the layer currently drawn from it.
   var EMBED_BOUNDARY = null, EMBED_BOUNDARY_LAYER = null;
   function applyEmbedBoundary(){
@@ -3091,6 +3155,9 @@ HS.onReady(function(){
   // record can never be filtered in on one surface and out on another. Lifecycle AND
   // category, category being an any-of test over the record's membership set.
   function siteVisible(p){
+    // STATE CLEANUP SITES (founder, 2026-10-21) answer to their OWN switch only — never to the
+    // Status or Type chips, which describe projects (lib/state-cleanup.js).
+    if(HS.isStateCleanup && HS.isStateCleanup(p)) return HS.stateCleanupVisible();
     if(!FILTER[bucketOf(p.type, p)]) return false;
     return HS.categoryVisible ? HS.categoryVisible(HS.resolveTrackerMarker(p, frsRid)) : true;
   }
@@ -3102,6 +3169,7 @@ HS.onReady(function(){
   // object in siteMarkers, it is added to the layer ONCE however many memberships matched.
   // Neither filter can change what the record IS: the symbol was resolved before this ran.
   function markerVisible(x){
+    if(HS.isStateCleanup && HS.isStateCleanup(x.s)) return HS.stateCleanupVisible();
     return !!FILTER[x.bucket] && (HS.categoryVisible ? HS.categoryVisible(x.mk || x.s) : true);
   }
   // ONE icon builder for the 2D layer, so the marker drawn at load and the marker
@@ -3113,7 +3181,7 @@ HS.onReady(function(){
     // regulatory switch off it returns null and the pin renders exactly as any other
     // project pin of its type and stage — the project is not hidden, its regulatory
     // annotation is.
-    var svg = HS.markerSVG(mk.shape, mk.color, '', size,
+    var svg = HS.markerSVG(mk.shape, mk.color, mk.label || '', size,
                            HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     var inner = solidPoint ? svg : '<div style="opacity:0.85">' + svg + '</div>';
     // STATUS IS NEVER COLOUR ALONE — "Proposed data center" rides on the marker itself.
@@ -3335,6 +3403,49 @@ HS.onReady(function(){
     box.addEventListener("change", function(){ setRegulatory(box.checked); });
     host.appendChild(chip);
     syncRegulatoryChip();
+    buildStateCleanupChip(host);
+  }
+
+  // ── STATE CLEANUP SITES — their own chip in the same row (founder, 2026-10-21) ──────────
+  // Writes only HS.setStateCleanupVisible; it never reads or changes a Status, Type or the
+  // Regulatory facilities switch, and none of those changes it.
+  var cleanupChip = null, cleanupBox = null;
+  function syncStateCleanupChip(){
+    var on = HS.stateCleanupVisible ? HS.stateCleanupVisible() : true;
+    if(cleanupBox) cleanupBox.checked = on;
+    if(cleanupChip) cleanupChip.classList.toggle("on", on);
+    if(cleanupBox) cleanupBox.setAttribute("aria-label", "State cleanup sites, " + (on ? "shown on map" : "hidden from map"));
+  }
+  function setStateCleanup(on){
+    HS.setStateCleanupVisible(!!on);
+    syncStateCleanupChip();
+    if(window.history && window.history.replaceState){
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("cleanup", on ? "1" : "0");
+        window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+      } catch(e){}
+    }
+    applyFilter();
+  }
+  function buildStateCleanupChip(host){
+    var L = HS.STATE_CLEANUP_LEGEND;
+    if(!L || !HS.setStateCleanupVisible) return;
+    var chip = document.createElement("label");
+    chip.className = "regchip";
+    chip.id = "cleanupToggle";
+    chip.setAttribute("data-cat", L.key);
+    var box = document.createElement("input");
+    box.type = "checkbox"; box.className = "chipbox"; box.id = "cleanupToggleBox";
+    box.checked = HS.stateCleanupVisible();
+    chip.innerHTML = "<span class='ck' aria-hidden='true'></span>"
+      + "<span class='ic' aria-hidden='true'>" + HS.markerSVG(L.symbol, L.color, L.letter, 15) + "</span>"
+      + "<span class='t'>" + esc(L.chipLabel) + "</span>";
+    chip.insertBefore(box, chip.firstChild);
+    cleanupChip = chip; cleanupBox = box;
+    box.addEventListener("change", function(){ setStateCleanup(box.checked); });
+    host.appendChild(chip);
+    syncStateCleanupChip();
   }
 
   // The class of official document the record link opens, so the label states it up
@@ -3367,6 +3478,7 @@ HS.onReady(function(){
   }
 
   function popupHTML(s){
+    if(HS.isStateCleanup && HS.isStateCleanup(s)) return HS.stateCleanupPopupHTML(s, esc, false);
     var link = s.url || s.record_url || "";
     // For an environmental facility the record_url IS its ECHO report (shown in the env block
     // below), so don't also render a duplicate "EPA facility record" link here; a non-env point
@@ -4087,7 +4199,7 @@ HS.onReady(function(){
     var title = markerTitle(s, mk);
     el.setAttribute("title", title);
     el.setAttribute("aria-label", title);
-    el.innerHTML = HS.markerSVG(mk.shape, mk.color, '', size,
+    el.innerHTML = HS.markerSVG(mk.shape, mk.color, mk.label || '', size,
                                 HS.visibleSignal ? HS.visibleSignal(mk) : mk.signal);
     return el;
   }
