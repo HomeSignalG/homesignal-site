@@ -75,7 +75,7 @@ async function makeWorld({ reportsA = 8 } = {}) {
   w.manage = MH.makeHandler({ ...gate, createShare: async () => { throw new Error('no'); }, listShares: async () => [], revokeShare: async () => false });
   w.watch = WH.makeHandler({ ...gate, startWatch: async () => { throw new Error('no'); }, watchesOf: async () => [], stopWatch: async () => {}, addressOf: async () => null });
   w.billing = BH.makeHandler({ ...gate, usageOf: async (u) => (brokerageOf(u) ? { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null } : null),
-    configured: () => false, createCheckout: async () => { throw new Error('no'); }, checkoutClaim: async () => ({ outcome: 'CLAIMED' }), checkoutRelease: async () => undefined });
+    configured: () => false, checkoutEnabled: () => true, createCheckout: async () => { throw new Error('no'); }, checkoutClaim: async () => ({ outcome: 'CLAIMED' }), checkoutRelease: async () => undefined });
   const planOf = async (u) => (brokerageOf(u) ? { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null } : null);
   w.report = RH.makeHandler({
     ...gate, now: () => NOW, rights: RIGHTS_AB, geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
