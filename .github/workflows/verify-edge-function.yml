@@ -284,6 +284,7 @@ jobs:
             "tucson-commercial-building-permits",
             "tucson-residential-building-permits",
             "virginia-beach-building-permits",
+            "wa-ecology-sepa-register",
             "wake-county-building-permits",
             "worcester-building-permits",
           ].sort();
