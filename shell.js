@@ -8,6 +8,17 @@
   const CFG = window.HS_CONFIG;
   const $ = (id) => document.getElementById(id);
 
+  // THE SHORT MAP ADDRESS (founder, 2026-10-22). homesignalmap.html shows /map/<zip> in the
+  // address bar instead of its own file name, so on that page the ZIP is in the PATH, not in
+  // ?zip=. Every reader of "the ZIP this URL names" asks HS.urlZip(), which accepts both.
+  HS.MAP_ROUTE_RE = /^\/map\/(\d{5})\/?$/;
+  HS.urlZip = function (loc) {
+    loc = loc || location;
+    const q = HS.parseZipParam(loc.search);
+    if (q) return q;
+    const m = String(loc.pathname || '').match(HS.MAP_ROUTE_RE);
+    return m ? m[1] : null;
+  };
   // view-zip helpers (canonical copy: lib/view-zip.js — keep in sync)
   if (!HS.resolveViewedZip) {
     HS.parseZipParam = function (search) {
@@ -120,7 +131,7 @@
     HS.MAP_PAGES = ['homesignalmap.html'];
     HS.hasViewedZipContext = function (opts) {
       opts = opts || {};
-      if (!opts.urlZip) opts.urlZip = HS.parseZipParam(location.search);
+      if (!opts.urlZip) opts.urlZip = HS.urlZip();
       if (opts.myZip == null) opts.myZip = LS.get('myZip', null);
       if (opts.sessionViewZip == null) opts.sessionViewZip = SS.get('viewZip');
       const urlZ = opts.urlZip;
@@ -182,7 +193,7 @@
   // opens the onboarding flow (the host page owns that).
   const IS_EMBED = document.documentElement.classList.contains('hs-embed');
   function captureUrlViewZip() {
-    const z = HS.parseZipParam(location.search);
+    const z = HS.urlZip();
     if (z && !IS_EMBED) SS.set('viewZip', z);
     return z;
   }
@@ -399,6 +410,7 @@
   // the ZIP-map pages and show the panel instead of a map; anything else is untouched.
   HS.zipCoveragePageKind = function (path) {
     path = String(path || '');
+    if (HS.MAP_ROUTE_RE.test(path)) return 'map';
     if (/\/community\/\d{5}\/?$/.test(path)) return 'community';
     const base = path.split('/').pop() || 'index.html';
     if (base === 'community.html') return 'community';
@@ -407,6 +419,7 @@
   };
   HS.isZipPagePath = function (path) {
     path = String(path || '');
+    if (HS.MAP_ROUTE_RE.test(path)) return true;
     if (/\/community\/\d{5}\/?$/.test(path)) return true;
     const base = path.split('/').pop() || 'index.html';
     return (HS.ZIP_NAV_PAGES || []).indexOf(base) >= 0;
@@ -1147,6 +1160,7 @@
     const file = parts[parts.length - 1] || '';
     if (/\.html$/i.test(file)) return file;
     if (parts[0] === 'community') return 'community.html';
+    if (parts[0] === 'map') return 'homesignalmap.html';
     return 'dashboard.html';
   }
   function focusHref(zip) {
@@ -1237,7 +1251,7 @@
   // is that document's URL identity — ranking it below myZip would render a resident's
   // saved area on a page that is about a different ZIP.
   HS.ensureViewedZip = function (pageZip) {
-    const explicit = HS.parseZipParam(location.search)
+    const explicit = HS.urlZip()
       || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
     const z = HS.resolveViewedZip({
       urlZip: explicit,
@@ -1325,7 +1339,7 @@
   // with no ZIP in its route has declared nothing, so the saved address still supplies the
   // default context there, exactly as before. Returns the declared ZIP, or null.
   HS.declareRouteZipPlace = function (pageZip) {
-    const explicit = (HS.parseZipParam ? HS.parseZipParam(location.search) : null)
+    const explicit = HS.urlZip()
       || (pageZip && /^\d{5}$/.test(String(pageZip)) ? String(pageZip) : null);
     if (explicit) HS.setViewPlaceType('zip');
     return explicit || null;
@@ -2821,7 +2835,7 @@
     const addressSearch = ['lat', 'lng', 'addr', 'address'].some(function (k) { return qs.has(k); });
     const covHit = HS.zipCoverageFor({
       coverage: HS.zipCoverageDoc,
-      urlZip: HS.parseZipParam(location.search),
+      urlZip: HS.urlZip(),
       pageZip: document.body && document.body.dataset ? document.body.dataset.zip : null,
       viewedZip: kind === 'map' ? null : state.zip,
       onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)

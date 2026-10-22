@@ -56,8 +56,8 @@ console.log('--- the shared re-assertion helper (no per-page geography rules) --
 ok(/HS\.ensureViewedZip = function/.test(shell), 'shell.js defines the shared ensureViewedZip');
 const ensure = (shell.match(/HS\.ensureViewedZip = function[\s\S]*?\n  \};/) || [''])[0];
 ok(ensure.length > 100, 'ensureViewedZip body found for contract pins', ensure.length);
-ok(/HS\.parseZipParam\(location\.search\)/.test(ensure),
-  'ensureViewedZip reads ?zip= from the page URL');
+ok(/HS\.urlZip\(\)/.test(ensure),
+  'ensureViewedZip reads the ZIP the page URL names (?zip= or /map/<zip>)');
 ok(/HS\.resolveViewedZip\(/.test(ensure),
   'ensureViewedZip falls back through the DOCUMENTED resolver, not a private rule');
 ok(/defaultZip: CFG\.DEFAULT_ZIP/.test(ensure),

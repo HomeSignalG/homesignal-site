@@ -3,6 +3,27 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<!-- THE SHORT MAP ADDRESS (founder, 2026-10-22). A visitor reaching this page for one ZIP sees
+     /map/<zip> in the address bar, not this file's name. /map/<zip>/ is a generated forward back to
+     ?zip=<zip> (scripts/gen_zip_pages.py), so a reload or a copied link lands here again.
+     <base href="/"> comes FIRST: once the address reads /map/<zip>, every relative link, script and
+     fetch on this page must still resolve from the site root, exactly as it did at /homesignalmap.html.
+     Not for an embed (an iframe keeps its own address), an address search, or a lat/lng point. -->
+<base href="/"/>
+<script>
+(function(){
+  try {
+    if (!window.history || !window.history.replaceState) return;
+    var u = new URL(window.location.href);
+    var q = u.searchParams, z = q.get("zip");
+    if (!z || !/^\d{5}$/.test(z)) return;
+    if (q.get("embed") === "1" || q.has("addr") || q.has("address") || q.has("lat") || q.has("lng")) return;
+    q.delete("zip");
+    var rest = q.toString();
+    window.history.replaceState(window.history.state, "", "/map/" + z + (rest ? "?" + rest : "") + u.hash);
+  } catch (e) {}
+})();
+</script>
 <!-- CSP: self + jsDelivr (leaflet / three.js / maplibre-gl), Supabase (edge fn + REST),
      and the map imagery hosts the three views need. MapLibre spins workers from blob:. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; font-src 'self'; form-action 'self'"/>
@@ -922,7 +943,7 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=f6d0f681"></script>
+<script src="lib/data.js?v=ae51d15a"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=a01bf2ff"></script>
 <script src="lib/project-type.js?v=108e00a6"></script>
@@ -932,9 +953,9 @@
 <script src="lib/zip-authoritative.js?v=20261021a"></script>
 <script src="lib/state-cleanup.js?v=20261021b"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
-<script src="lib/premium-waitlist.js?v=02c305ee"></script>
+<script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=e78df56a"></script>
+<script src="shell.js?v=e4216ddb"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -5295,6 +5316,7 @@ HS.onReady(function(){
       loadProperty(a.trim()); return;
     }
     var z = u.searchParams.get("zip");
+    if(!z && window.HS && HS.urlZip) z = HS.urlZip();
     if(!z){ var m = u.pathname.match(/\/development\/(\d{5})\b/); if(m) z = m[1]; }
     // AN EXPLICIT ROUTE ZIP IS A DECLARED ZIP PLACE — synchronous, before loadZip() issues a
     // single fetch, so the Viewing control names the ZIP on first paint rather than a saved

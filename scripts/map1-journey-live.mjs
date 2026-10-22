@@ -136,7 +136,8 @@ for (const [origin, label] of [['community.html', 'C ZIP page'], ['development.h
   c = await chrome();
   info(label + ' -> Map 1', { href, landed: c.path + c.search, active: c.activeTokens });
   ok(href === 'homesignalmap.html?zip=' + ZIP, label + ' -> "View Development Map" carries the viewed ZIP', href);
-  ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
+  // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22).
+  ok(/\/homesignalmap\.html$/.test(c.path) || c.path === '/map/' + ZIP, label + ' -> lands on Map 1', c.path);
   ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
     label + ' -> Explore is still the active item once the page settles', c.activeTokens);
 }
