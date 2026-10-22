@@ -10054,6 +10054,53 @@
       "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output \u2014 recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket \u2014 arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE uses BPTYPE_Desc, the readable twin of the BPTYPE codes (SF/MH/MF/DEMOB/DESF...): \"Single-family\" 48540 / \"Manufactured Home\" 9349 / \"Demolition\" 3381 / \"Multifamily\" 2978 / \"Accessory Dwelling\" 288. NATIVE ZIP: ZIP5 is a string column and the connector's exact predicate ZIP5='98501' returns 8,387 (run 30380342906) \u2014 proven, not assumed. The X/Y columns are STATE-PLANE (wkid 102749), NOT lat/lng, so column_map reads the flattened geometry (__lat/__lng) which the connector reprojects to 4326; mapping X/Y would have placed every marker in the wrong hemisphere. || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
     },
     {
+      "registry_id": "skagit-county-active-permits",
+      "platform": "arcgis",
+      "service_url": "https://geo.skagitcountywa.gov/server/rest/services/Planning/Active_Permits_Last_5_Years/MapServer/7",
+      "dataset_url": "https://geo.skagitcountywa.gov/server/rest/services/Planning/Active_Permits_Last_5_Years/MapServer/7",
+      "jurisdiction": "Skagit County, Washington",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Skagit"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CompDescription",
+          "PermitNumber"
+        ],
+        "type_source": "CompDescription",
+        "file_date": "Issued",
+        "case_number": "PermitNumber",
+        "record_url": "PermitDetails",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "issued",
+      "spatial_zip_radius_mi": 3,
+      "extra_where": "CompDescription IN ('Building (Residential)','Building (Commercial)','Demolition (BLDG)','Manufactured/Modular Structure')",
+      "type_map": {
+        "Building (Residential)": "Residential",
+        "Manufactured/Modular Structure": "Residential",
+        "Building (Commercial)": "Commercial",
+        "Demolition (BLDG)": "Development"
+      },
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "Issued",
+      "recency_days": 730,
+      "record_url_precision": "record",
+      "_receipts": "2026-10-22 Skagit WA permit pass (founder: 'wire it'). PROBED via pg_net from Postgres, HTTP 200. LAYER: Skagit County Planning 'Active Permits Last 5 Years' MapServer/7 'Active Permits', esriGeometryPoint (wkid 102100, flattened to __lat/__lng by the connector), maxRecordCount 2000. FIELDS: OBJECTID, PermitNumber, ParcelNumber, CompDescription, Applied, Approved, Issued (esriFieldTypeDate), PermitID, PermitDetails. No address, ZIP, status or description column; ZIP scoping is spatial (3 mi). STATUS: the layer lists ACTIVE permits only and every row carries Issued, so status_const 'Issued' (an issued permit is Approved, section 7.12a). TYPES (CompDescription groupBy, Issued >= 2024-10-22, the connector's 730-day window): Building (Residential) 377, Building (Commercial) 214, Demolition (BLDG) 50, Manufactured/Modular Structure 28 kept (669); dropped at source: Floodplain Permit 264, Public Health | On Site Septic 262, Water System Evaluation 175, Access Permit (Public Works) 97, Mechanical (Residential) 53, Burn Permits 49, Title Elimination 7, Plumbing (Residential) 7, Mechanical (Commercial) 3. Sum 1,586. Newest Issued 2026-10-20. Rows with Issued or PermitDetails null: 0 (whole layer). RECORD URL: PermitDetails is the county's own Tyler EnerGov self-service permit page per PermitID (Ann Arbor STREAMURL / Pierce urlOnlinePermits precedent). Demolition maps to Development (Pierce precedent). NOTE: with no description column, 'Building (Residential)' and 'Manufactured/Modular Structure' carry no construction evidence, so Map 1's Residential gate (lib/residential-qualify.js) judges them UNRESOLVED and does not draw them; that is the shared rule working, not bypassed. No Skagit city permit layers were found."
+    },
+    {
       "registry_id": "butler-county-ks-permits",
       "geocode_assemble": true,
       "platform": "arcgis",
