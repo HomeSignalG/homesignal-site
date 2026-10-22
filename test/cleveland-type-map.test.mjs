@@ -61,20 +61,25 @@ const HS = global.window.HS;
   // include_types is pushed into the query and an unlisted value is NEVER FETCHED. That is
   // the same mechanism that dropped this entry's `Install Permits` for five months.
   // The list stays EXACT — a set, verbatim, asserted whole — so a future value still gates.
-  const inc = ENTRY.include_types.slice().sort();
-  ok(JSON.stringify(inc) === JSON.stringify(['Building Permits', 'Commercial', 'Fire Permits', 'Install Permits', 'Residential']),
-    '1b include_types is the LIVE in-window vocabulary — all five values, verbatim', JSON.stringify(inc));
-  ok(ENTRY.type_map['Fire Permits'] === 'Development',
-    '1b2 ...and Fire Permits carries a type_map line — a whitelisted value with no mapping is '
-    + 'fetched only to render `unclassified`');
-  ok(!ENTRY.include_types.includes('Building') && !('Building' in ENTRY.type_map),
-    '1c `Building` is GONE from both lists — it matched 0 rows all-time');
-  ok(ENTRY.include_types.includes('Install Permits'),
-    '1d `Install Permits` is whitelisted — 109 live rows were being dropped at source');
-  ok(ENTRY.type_map.Residential === 'Residential' && ENTRY.type_map.Commercial === 'Commercial',
-    '1e the two self-describing values map to their OWN class, not to the generic member');
-  ok(ENTRY.type_map['Building Permits'] === 'Development' && ENTRY.type_map['Install Permits'] === 'Development',
-    '1f …and the two that state no class STAY generic — a specific shape there would be fabricated');
+  // ⚠️ SUPERSEDED 2026-10-22 (the founder's Columbus "hide repairs" ruling applied to Cleveland):
+  // the Type now comes from PERMIT_SUBTYPE + PERMIT_TYPE + PERMIT_CATEGORY, a joined key, and
+  // include_types cannot filter a joined key, so the five-value whitelist moved VERBATIM into
+  // extra_where. The checks below assert the same facts in their new home. The full re-type is
+  // pinned by test/cleveland-retype-2026-10-22.test.mjs.
+  ok(!ENTRY.include_types, '1b include_types is gone (it cannot filter the joined type key)');
+  ok(/PERMIT_SUBTYPE IN \('Building Permits','Commercial','Install Permits','Residential','Fire Permits'\)/.test(ENTRY.extra_where),
+    '1b2 the LIVE in-window vocabulary, all five values verbatim, now filters in extra_where', ENTRY.extra_where);
+  ok(!/'Building'[,)]/.test(ENTRY.extra_where) && !Object.keys(ENTRY.type_map).some((k) => k === 'Building'),
+    '1c `Building` stays GONE — it matched 0 rows all-time');
+  ok(ENTRY.type_map['Fire Permits Construction Project Fire Suppression Systems'] === 'Development'
+    && ENTRY.type_map['Install Permits Construction Project Elevator Dumbwaiter'] === 'Development',
+    '1d Install and Fire permits state no building class and stay generic');
+  ok(ENTRY.type_map['Residential Building Permit New'] === 'Residential'
+    && ENTRY.type_map['Commercial Building Permit New'] === 'Commercial',
+    '1e the self-describing classes map to their OWN class, not to the generic member');
+  ok(ENTRY.type_map['Building Permits Construction Project Residential Building'] === 'Residential'
+    && ENTRY.type_map['Building Permits Construction Project Commercial Building'] === 'Commercial',
+    '1f `Building Permits` now takes its class from PERMIT_CATEGORY, which states one');
 }
 
 // ── 2. THE PAYOFF, through the SHIPPED resolver: the pin shape actually changes ───────────
@@ -105,28 +110,28 @@ const HS = global.window.HS;
 // ── 3. driven end-to-end through the shipped connector ───────────────────────────────────
 {
   const CLE = [{ state: 'OH', county: 'Cuyahoga' }];
-  const row = (sub) => ({
-    OBJECTID: 1, PERMIT_ID: 'B2026-1', PERMIT_SUBTYPE: sub, JOB_DESCRIPTION: 'work',
-    PERMIT_TYPE: 'Building Permit', ISSUE_DATE: Date.parse('2026-08-01'),
+  const row = (sub, type, cat) => ({
+    OBJECTID: 1, PERMIT_ID: 'B2026-1', PERMIT_SUBTYPE: sub, PERMIT_CATEGORY: cat, JOB_DESCRIPTION: 'Alteration',
+    PERMIT_TYPE: type, ISSUE_DATE: Date.parse('2026-08-01'),
     PRIMARY_ADDRESS: '1234 W 25TH ST', LAT: 41.4842, LON: -81.7029,
     ACCELA_CITIZEN_ACCESS_URL: 'https://aca.clevelandohio.gov/record/B2026-1',
   });
-  const drive = async (sub) => {
+  const drive = async (sub, type, cat) => {
     const fetch = async () => new Response(JSON.stringify({
       objectIdFieldName: 'OBJECTID', geometryType: 'esriGeometryPoint', fields: [],
-      features: [{ attributes: row(sub), geometry: { x: -81.7029, y: 41.4842 } }],
+      features: [{ attributes: row(sub, type, cat), geometry: { x: -81.7029, y: 41.4842 } }],
       exceededTransferLimit: false,
     }), { status: 200, headers: { 'content-type': 'application/json' } });
     const { sites } = await arcgisForZip('44113', CLE, [ENTRY], { fetch, zipCentroid: { lat: 41.4842, lng: -81.7029 } });
     return sites[0];
   };
-  const r = await drive('Residential');
+  const r = await drive('Residential', 'Building Permit', 'New');
   ok(r?.use_type === 'Residential', '3a the connector emits use_type Residential', JSON.stringify(r?.use_type));
-  ok(r?.type_raw === 'Residential', '3b …and type_raw records what the publisher said');
-  const i = await drive('Install Permits');
-  ok(!!i, '3c an `Install Permits` row is now EMITTED rather than dropped at source');
+  ok(r?.type_raw === 'Residential Building Permit New', '3b …and type_raw records the joined publisher key', JSON.stringify(r?.type_raw));
+  const i = await drive('Install Permits', 'Construction Project', 'Elevator Dumbwaiter');
+  ok(!!i, '3c an `Install Permits` row is EMITTED rather than dropped at source');
   ok(i?.use_type === 'Development', '3d …and lands on the generic member, as ruled', JSON.stringify(i?.use_type));
-  ok(i?.type_raw === 'Install Permits',
+  ok(i?.type_raw === 'Install Permits Construction Project Elevator Dumbwaiter',
     '3e …with type_raw naming it, so its arrival is auditable rather than invisible');
 }
 
