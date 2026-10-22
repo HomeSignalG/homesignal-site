@@ -71,6 +71,48 @@ select pg_temp.ok('served row carries category, status, record link, agency',
   (select x ->> 'category' = 'PETRO' and x ->> 'status' = 'ACTIVE' and x ->> 'agency' = 'Florida DEP' and x ->> 'record_url' like 'https://prodenv.dep.state.fl.us/%'
      from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x where x ->> 'site_key' = '89287788'));
 
+-- 4b. private homes are not named; shared record links are counted; the checked date is served
+select pg_temp.ok('display name: a residence, a one-word heating oil tank and a residential property are withheld',
+  public.state_cleanup_display_name('Allen Residence') = 'Residential property'
+  and public.state_cleanup_display_name('Mentzer Heating Oil Tank') = 'Residential property'
+  and public.state_cleanup_display_name('ADKINS RESIDENTIAL PROPERTY') = 'Residential property'
+  and public.state_cleanup_display_name('Barker Residential HOT') = 'Residential property'
+  and public.state_cleanup_display_name('BROCK RESIDENCE') = 'Residential property');
+select pg_temp.ok('display name: public and business names are kept',
+  public.state_cleanup_display_name('Town Hall Heating Oil Tank') = 'Town Hall Heating Oil Tank'
+  and public.state_cleanup_display_name('Crown Residences LLC') = 'Crown Residences LLC'
+  and public.state_cleanup_display_name('Viridian Residential Development') = 'Viridian Residential Development'
+  and public.state_cleanup_display_name('Goldfarb Property') = 'Goldfarb Property'
+  and public.state_cleanup_display_name('CITGO (FORMER)') = 'CITGO (FORMER)'
+  and public.state_cleanup_display_name(null) is null);
+update public.state_cleanup_sites set name = 'Ellis Residence' where site_key = '89284058';
+select pg_temp.ok('reader withholds a private name and says so; the stored row keeps it',
+  (select x ->> 'name' = 'Residential property' and (x ->> 'name_withheld')::boolean
+     from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x where x ->> 'site_key' = '89284058')
+  and (select name = 'Ellis Residence' from public.state_cleanup_sites where site_key = '89284058'));
+select pg_temp.ok('reader does not mark an ordinary name withheld',
+  (select x ->> 'name' = 'CITGO (FORMER)' and not (x ? 'name_withheld')
+     from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x where x ->> 'site_key' = '89287788'));
+update public.state_cleanup_sites set name = 'BCGC Gore Building' where site_key = '89284058';
+select pg_temp.ok('a site with its own record link counts 1',
+  (select (x ->> 'record_url_sites')::int = 1 from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x
+    where x ->> 'site_key' = '89287788'));
+create temp table url_keep as select site_key, record_url from public.state_cleanup_sites where site_key = '89282856';
+update public.state_cleanup_sites set record_url = (select record_url from public.state_cleanup_sites where site_key = '89287788') where site_key = '89282856';
+select pg_temp.ok('two current sites sharing a record link each count 2 (across ZIPs)',
+  (select (x ->> 'record_url_sites')::int = 2 from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x
+    where x ->> 'site_key' = '89287788'));
+update public.state_cleanup_sites set removed_from_source_at = now() where site_key = '89282856';
+select pg_temp.ok('a removed site does not count toward a shared record link',
+  (select (x ->> 'record_url_sites')::int = 1 from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x
+    where x ->> 'site_key' = '89287788'));
+update public.state_cleanup_sites s set record_url = k.record_url, removed_from_source_at = null from url_keep k where s.site_key = k.site_key;
+select pg_temp.ok('reader serves checked_at = the run that last confirmed the site',
+  (select (x ->> 'checked_at')::timestamptz = s.last_seen_at
+     from jsonb_array_elements(public.map1_state_cleanup_zip_members('33301') -> 'sites') x
+     join public.state_cleanup_sites s on s.site_key = x ->> 'site_key' where s.site_key = '89287788'));
+select pg_temp.ok('anon cannot call the display-name rule directly', not has_function_privilege('anon', 'public.state_cleanup_display_name(text)', 'execute'));
+
 -- 5. near reader (address mode)
 select pg_temp.ok('near: 0.5 mi of Citgo returns Citgo only',
   (select string_agg(x ->> 'site_key', ',') from jsonb_array_elements(public.map1_state_cleanup_near(26.1195, -80.1284, 0.5) -> 'sites') x) = '89287788');
