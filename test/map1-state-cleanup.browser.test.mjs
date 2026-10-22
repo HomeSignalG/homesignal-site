@@ -58,10 +58,13 @@ const CLEANUP_MEMBER = { lat: 38.9541, lng: -77.3612, city: 'FORT LAUDERDALE', n
   agency: 'Florida DEP', source: 'fl_dep_cleanup', status: 'ACTIVE', address: '1500 E LAS OLAS BLVD',
   category: 'PETRO', site_key: '89287788', program_id: '8839695',
   record_url: 'https://prodenv.dep.state.fl.us/DepNexus/public/electronic-documents/8839695/facility!search',
-  zip_membership: 'member', source_loaded_at: '2026-10-21T07:00:09+00:00' };
+  zip_membership: 'member', source_loaded_at: '2026-10-21T07:00:09+00:00',
+  checked_at: '2026-10-22T10:20:00.16563+00:00', record_url_sites: 2 };
+// A second DEP case filed at the SAME point under the same facility page (2026-10-22): one pin.
+const CLEANUP_SAME = Object.assign({}, CLEANUP_MEMBER, { site_key: '89287790', name: 'CITGO TANK FARM', category: 'OTHCU' });
 const CLEANUP_OUTSIDE = Object.assign({}, CLEANUP_MEMBER, { site_key: '89282856', name: 'SONY PROFESSIONAL PRODUCTS CO',
   lat: 38.9551, lng: -77.3601, zip_membership: 'outside' });
-const CLEANUP = { '20171': { zip: '20171', status: 'complete', sites: [CLEANUP_MEMBER, CLEANUP_OUTSIDE] } };
+const CLEANUP = { '20171': { zip: '20171', status: 'complete', sites: [CLEANUP_MEMBER, CLEANUP_SAME, CLEANUP_OUTSIDE] } };
 const ADDR_TEXT = '13313 Coomes Dr, Del Valle, TX';
 const ADDR_HOME = { lat: 38.9506, lng: -77.3645 };
 const ADDR_DUAL = Object.assign({}, DUAL, { e: 0.22, n: 0.18, lat: 38.95321, lng: -77.36040 });
@@ -145,8 +148,8 @@ async function load(qs) {
 
 await load('');
 const st = await page.evaluate(() => window.__HS_STATE_CLEANUP);
-ok(st && st.status === 'complete' && st.sites === 2, '0: the reader was asked and answered', JSON.stringify(st));
-ok(await cleanupMarkers() === 1, '1: exactly the ZIP member is drawn (the outside site is not)', await cleanupMarkers());
+ok(st && st.status === 'complete' && st.sites === 3 && st.pins === 2, '0: the reader was asked and answered; counts are of sites (3), two pins', JSON.stringify(st));
+ok(await cleanupMarkers() === 1, '1: the two ZIP members at one point are ONE pin (the outside site is not drawn)', await cleanupMarkers());
 const total0 = await allMarkers();
 ok(total0 === 4, '1b: three project/facility markers plus one cleanup marker', total0);
 const tile = await page.evaluate(() => document.getElementById('cFac').textContent.trim());
@@ -155,6 +158,8 @@ const band = await page.evaluate(() => ({ hidden: document.getElementById('clean
   text: document.getElementById('cleanupList').textContent }));
 ok(!band.hidden && /CITGO/.test(band.text) && !/SONY/.test(band.text), '3: the cleanup band lists the member only', JSON.stringify(band));
 ok(/Petroleum · Florida DEP status: Active/.test(band.text), '3b: in DEP\u2019s words', band.text);
+ok(/CITGO TANK FARM/.test(band.text) && (band.text.match(/facility documents \(2 cleanup sites here\)/g) || []).length === 2,
+  '3d: the band lists BOTH sites at the shared point, each saying its link covers 2', band.text);
 const unknown = await page.evaluate(() => document.getElementById('unknownList').textContent);
 ok(!/CITGO/.test(unknown), '3c: not listed as an EPA facility or a project');
 const chip = await page.evaluate(() => { const b = document.getElementById('cleanupToggleBox');
@@ -194,6 +199,8 @@ const popup = await page.evaluate(() => {
 });
 ok(popup && /DepNexus/.test(popup) && /not a finding about any owner/.test(popup) && !/ECHO/.test(popup),
   '10: the popup links DEP\u2019s documents, carries the framing, claims nothing EPA', (popup || '').slice(0, 200));
+ok(popup && /2 cleanup sites at this location/.test(popup) && /CITGO \(FORMER\)/.test(popup) && /CITGO TANK FARM/.test(popup)
+  && /checked Oct 22, 2026/.test(popup), '10b: the one pin\u2019s popup lists both sites and the checked date', (popup || '').slice(0, 300));
 ok(pageErrors.length === 0, '11: no page errors', pageErrors.join(' | '));
 
 await browser.close(); srv.close();

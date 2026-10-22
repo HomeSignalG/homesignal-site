@@ -951,7 +951,7 @@
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
 <script src="lib/zip-authoritative.js?v=20261021a"></script>
-<script src="lib/state-cleanup.js?v=20261021b"></script>
+<script src="lib/state-cleanup.js?v=20261022a"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
@@ -1829,13 +1829,7 @@ HS.onReady(function(){
   function infoCard3(s){
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
     if(HS.isStateCleanup && HS.isStateCleanup(s)){
-      return "<button class='cl' id='mk3close' aria-label='Close'>×</button>"
-        + "<div class='ci-n'>"+esc(s.label||"")+"</div>"
-        + "<div class='ci-t'>"+esc("State cleanup site · " + HS.stateCleanupTypeLine(s))+"</div>"
-        + (s.cleanup && s.cleanup.address ? "<div class='ci-v'>"+esc(s.cleanup.address)+"</div>" : "")
-        + "<div class='ci-v' style='color:#9fb0ad;font-size:11px'>"+esc(HS.STATE_CLEANUP_NOTE)+"</div>"
-        + "<div class='ci-l'><a href='"+esc(s.record_url)+"' target='_blank' rel='noopener'>"
-        + esc(((s.cleanup && s.cleanup.agency) || "State") + " site documents") + " ▸</a></div>";
+      return "<button class='cl' id='mk3close' aria-label='Close'>×</button>" + HS.stateCleanupCardHTML(s, esc);
     }
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var link = s.url || s.record_url || "";
@@ -2525,7 +2519,8 @@ HS.onReady(function(){
         var cleanupBody = both[4];
         var cleanupSites = HS.stateCleanupSitesFrom ? HS.stateCleanupSitesFrom(cleanupBody) : [];
         window.__HS_STATE_CLEANUP = { status: HS.stateCleanupOutcome ? HS.stateCleanupOutcome(cleanupBody) : "unavailable",
-                                      sites: cleanupSites.length };
+                                      sites: HS.stateCleanupMembers ? HS.stateCleanupMembers(cleanupSites).length : cleanupSites.length,
+                                      pins: cleanupSites.length };
         var rsSites = HS.zipReportSites(rs);
         var facMembers = HS.zipFacilityMemberCount(rs);
         // Published for the verifiers: the tile, the drawn facilities and this count must agree.
