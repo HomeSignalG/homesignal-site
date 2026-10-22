@@ -16,10 +16,24 @@ export const REGISTRY_FILE = 'supabase/functions/get-address-report/jurisdiction
 // an ArcGIS entry goes in `arcgis`, everything the gate builds otherwise is Socrata.
 export const familyOf = (entry) => (entry && entry.platform === 'arcgis' ? 'arcgis' : 'socrata');
 
+// Is the SOURCE behind this entry already wired? The same test the monitor uses before it builds
+// an entry (scripts/source-monitor.mjs alreadyWired): an ArcGIS service by its service_url, a
+// Socrata dataset by its dataset_id. The registry_id is NOT the test: the gate builds its id from
+// the jurisdiction and layer name, and hand-written ids often differ (3 of the 8 wired entries
+// reachable from discovery catalogs have ids the gate can never produce, 2026-10-22).
+export function wiredBySource(entry, registry) {
+  if (!entry || !registry) return false;
+  if (entry.service_url && (registry.arcgis || []).some((e) => e && e.service_url === entry.service_url)) return true;
+  if (entry.dataset_id && (registry.socrata || []).some((e) => e && e.dataset_id && e.dataset_id === entry.dataset_id)) return true;
+  return false;
+}
+
 // Split the gate's output into:
-//   proposals: entries whose registry_id is NOT in the registry: real new sources, never wired here
-//   rebuilt:   entries whose registry_id IS already listed (only reachable with --include-wired,
-//              the gate-validation mode). Reported for comparison; never a proposal.
+//   proposals: sources not wired yet, never wired here. If the gate's registry_id is already used
+//              by a DIFFERENT source, the proposal says so (`id_collision`): it needs a new id,
+//              and silently skipping it would lose a real source.
+//   rebuilt:   sources already wired (same service_url / dataset_id; only reachable with
+//              --include-wired, the gate-validation mode). Reported for comparison; never a proposal.
 // One entry per registry_id: the first finding wins, as it did when the first one was appended.
 export function collectProposals(findings, registry) {
   const proposals = [];
@@ -30,8 +44,10 @@ export function collectProposals(findings, registry) {
     if (!entry || !entry.registry_id || seen.has(entry.registry_id)) continue;
     seen.add(entry.registry_id);
     const family = familyOf(entry);
-    const listed = ((registry && registry[family]) || []).some((e) => e && e.registry_id === entry.registry_id);
-    (listed ? rebuilt : proposals).push({ family, registry_id: entry.registry_id, target: f.id || null, entry });
+    const row = { family, registry_id: entry.registry_id, target: f.id || null, entry };
+    if (wiredBySource(entry, registry)) { rebuilt.push(row); continue; }
+    const idTaken = ((registry && registry[family]) || []).some((e) => e && e.registry_id === entry.registry_id);
+    proposals.push(idTaken ? { ...row, id_collision: true } : row);
   }
   return { proposals, rebuilt };
 }
@@ -41,7 +57,8 @@ export function collectProposals(findings, registry) {
 // 2026-10-22), which is a diff nobody can review.
 export function proposalsFileText(proposals) {
   return JSON.stringify((proposals || []).map((p) => ({
-    family: p.family, registry_id: p.registry_id, target: p.target, entry: p.entry,
+    family: p.family, registry_id: p.registry_id, target: p.target,
+    ...(p.id_collision ? { id_collision: true } : {}), entry: p.entry,
   })), null, 2) + '\n';
 }
 
@@ -63,8 +80,9 @@ export function proposalSectionLines(proposals, rebuilt) {
       `The same entries are in this run's \`source-monitor-<run id>\` artifact as \`proposed-registry-entries.json\`. Until an entry is wired, every nightly run proposes it again and fails.`,
     );
     for (const p of proposals) {
-      out.push(``, `#### \`${p.registry_id}\` → registry \`${p.family}\` list${p.target ? ` (target \`${p.target}\`)` : ''}`, ``,
-        '```json', JSON.stringify(p.entry, null, 2), '```');
+      out.push(``, `#### \`${p.registry_id}\` → registry \`${p.family}\` list${p.target ? ` (target \`${p.target}\`)` : ''}`, ``);
+      if (p.id_collision) out.push(`⚠️ This registry_id is already used by a DIFFERENT source in the registry. Give this entry a new, unique registry_id before adding it.`, ``);
+      out.push('```json', JSON.stringify(p.entry, null, 2), '```');
     }
   }
   if (rebuilt && rebuilt.length) {

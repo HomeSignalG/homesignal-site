@@ -28,26 +28,37 @@ const code = (src, marker = '//') => src.split('\n').filter((l) => !l.trim().sta
 
 // ── 1. The proposal module: behaviour on fixtures ────────────────────────────────────────────
 {
+  const SVC = 'https://example.test/arcgis/rest/services/Permits/FeatureServer/0';
   const registry = {
-    arcgis: [{ registry_id: 'existing-arcgis', platform: 'arcgis' }],
-    socrata: [{ registry_id: 'existing-socrata', platform: 'socrata' }],
+    arcgis: [{ registry_id: 'existing-arcgis', platform: 'arcgis', service_url: SVC }],
+    socrata: [{ registry_id: 'existing-socrata', platform: 'socrata', dataset_id: 'abcd-1234' }],
   };
   const before = JSON.stringify(registry);
-  const wire = (id, platform, target) => ({ id: target, result: 'wire', res: { result: 'wire', entry: { registry_id: id, platform, status_to_bucket: { Issued: 'approved' } } } });
+  const wire = (id, platform, target, src) => ({ id: target, result: 'wire', res: { result: 'wire', entry: { registry_id: id, platform, ...src, status_to_bucket: { Issued: 'approved' } } } });
   const findings = [
-    wire('new-arcgis', 'arcgis', 't1'),
-    wire('new-socrata', 'socrata', 't2'),
-    wire('new-arcgis', 'arcgis', 't3'),            // same id found twice: one proposal
-    wire('existing-arcgis', 'arcgis', 't4'),       // already wired: rebuilt, never proposed
+    wire('new-arcgis', 'arcgis', 't1', { service_url: 'https://example.test/new/FeatureServer/0' }),
+    wire('new-socrata', 'socrata', 't2', { dataset_id: 'wxyz-9999' }),
+    wire('new-arcgis', 'arcgis', 't3', { service_url: 'https://example.test/new/FeatureServer/0' }),   // same id twice: one proposal
+    wire('existing-arcgis', 'arcgis', 't4', { service_url: SVC }),        // already wired: rebuilt, never proposed
     { id: 't5', result: 'flag', res: { result: 'flag', shape: 'polygon' } },
     { id: 't6', result: 'stale', res: { result: 'stale' } },
     null,
+    // The review's case (Colorado Springs, 2026-10-22): the gate builds a DIFFERENT id for a service
+    // that is already wired. Same service_url => already wired, never a proposal to wire it twice.
+    wire('city-of-example-planning-applications', 'arcgis', 't7', { service_url: SVC }),
+    // A genuinely new dataset whose gate-built id is already taken by a different source: proposed,
+    // marked as an id collision, never silently skipped.
+    wire('existing-socrata', 'socrata', 't8', { dataset_id: 'new0-0000' }),
   ];
   const { proposals, rebuilt } = collectProposals(findings, registry);
-  ok(JSON.stringify(proposals.map((p) => [p.registry_id, p.family, p.target])) === JSON.stringify([['new-arcgis', 'arcgis', 't1'], ['new-socrata', 'socrata', 't2']]),
-    '1a an entry not in the registry is a proposal, filed under its family, once per registry_id (first finding wins)', proposals);
-  ok(rebuilt.length === 1 && rebuilt[0].registry_id === 'existing-arcgis',
-    '1b an entry already in the registry is "rebuilt" (gate validation), never a proposal', rebuilt);
+  ok(JSON.stringify(proposals.map((p) => [p.registry_id, p.family, p.target, !!p.id_collision])) === JSON.stringify([
+    ['new-arcgis', 'arcgis', 't1', false], ['new-socrata', 'socrata', 't2', false], ['existing-socrata', 'socrata', 't8', true]]),
+    '1a a source not wired yet is a proposal, filed under its family, once per registry_id (first finding wins); a taken id is flagged', proposals);
+  ok(JSON.stringify(rebuilt.map((p) => p.registry_id)) === JSON.stringify(['existing-arcgis', 'city-of-example-planning-applications']),
+    '1b a source already wired (same service_url or dataset_id, whatever its id) is "rebuilt" (gate validation), never a proposal', rebuilt);
+  ok(proposalSectionLines(proposals, rebuilt).join('\n').includes('already used by a DIFFERENT source')
+    && JSON.parse(proposalsFileText(proposals))[2].id_collision === true,
+    '1b2 an id collision is named in the report and in the artifact file');
   ok(JSON.stringify(registry) === before,
     '1c the registry it is handed is NOT modified: the old code pushed the entry into it in memory and then wrote the file');
   ok(collectProposals([], registry).proposals.length === 0 && collectProposals(undefined, undefined).proposals.length === 0,
@@ -58,14 +69,14 @@ const code = (src, marker = '//') => src.split('\n').filter((l) => !l.trim().sta
   ok(proposalsFileText([]) === '[]\n', '1f the artifact file is written even when empty: `[]` is the evidence that nothing was proposed');
   const fileText = proposalsFileText(proposals);
   const parsed = JSON.parse(fileText);
-  ok(parsed.length === 2 && parsed[0].entry.registry_id === 'new-arcgis' && parsed[0].family === 'arcgis' && !('arcgis' in parsed[0].entry && Array.isArray(parsed[0].entry.arcgis)),
+  ok(parsed.length === 3 && parsed[0].entry.registry_id === 'new-arcgis' && parsed[0].family === 'arcgis' && !('arcgis' in parsed[0].entry && Array.isArray(parsed[0].entry.arcgis)),
     '1g the artifact file holds the entries only, never a rewritten registry (a whole-file rewrite reformats ~17,000 unrelated lines)', parsed);
 
   const sec = proposalSectionLines(proposals, rebuilt).join('\n');
   ok(/### Proposed registry entries/.test(sec) && /NOT wired/.test(sec), '1h the report names the proposals as NOT wired', sec);
   ok(sec.includes(REGISTRY_FILE) && /pull request/i.test(sec) && /deploy-edge-functions/.test(sec) && /function=get-address-report/.test(sec),
     '1i …with the plain steps: add the entry to the registry file on a branch, open a PR, then run deploy-edge-functions', sec);
-  ok((sec.match(/```json/g) || []).length === 2 && sec.includes('"registry_id": "new-socrata"'), '1j …and each proposed entry in full, as JSON');
+  ok((sec.match(/```json/g) || []).length === 3 && sec.includes('"registry_id": "new-socrata"'), '1j …and each proposed entry in full, as JSON');
   ok(/Gate validation/.test(sec) && sec.includes('existing-arcgis'), '1k rebuilt entries are listed separately, as validation');
   const onlyRebuilt = proposalSectionLines([], rebuilt).join('\n');
   ok(!/Proposed registry entries/.test(onlyRebuilt) && /Gate validation/.test(onlyRebuilt), '1l an include_wired run with nothing new proposes nothing');
@@ -127,6 +138,15 @@ const stepText = (name) => {
   const prop = stepText('Fail on a proposed registry entry (passed the auto-wire gate, needs a PR to wire)');
   ok(/if: always\(\) && steps\.monitor\.outputs\.registry_proposed == 'true'/.test(prop) && /\n {10}exit 1\n/.test(prop),
     '3h a proposal FAILS the run (never dropped silently)', prop);
+{
+  // A crashed monitor must not pass green: `node … | tee` hides node's exit code (no pipefail), and
+  // with no nightly commit any more nothing else would show the crash (review, 2026-10-22).
+  const run = WF.slice(WF.indexOf('node scripts/source-monitor.mjs'));
+  const step = run.slice(0, run.indexOf('\n      - '));
+  ok(/\| tee monitor-out\.txt\n\s*rc=\$\{PIPESTATUS\[0\]\}/.test(step) && /exit "\$rc"/.test(step)
+    && step.indexOf('exit "$rc"') > step.lastIndexOf('GITHUB_OUTPUT'),
+    '3z a crashed monitor fails its step, AFTER the step outputs are written (node exit code kept past tee)', step.slice(0, 400));
+}
   ok(/open a PR/.test(prop) && /jurisdiction-registry\.json/.test(prop) && /deploy-edge-functions/.test(prop) && /proposed-registry-entries\.json/.test(prop),
     '3i …with plain instructions: where the entry is, which file it goes in, open a PR, then deploy');
 

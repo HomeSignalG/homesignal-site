@@ -75,9 +75,30 @@ function listValue(bodyLines, key) {
   return out;
 }
 
+// Events that run on a pull request's merge ref, never on main. Every OTHER event (schedule,
+// workflow_dispatch, workflow_run, repository_dispatch, workflow_call, issues, issue_comment,
+// pull_request_target, release, ...) runs main's file on main, so it counts, including any event
+// this list has never heard of: unknown is treated as able to run on main (fail closed).
+const PR_REF_ONLY = new Set(['pull_request', 'pull_request_review', 'pull_request_review_comment']);
+
+export function onEvents(text) {
+  const lines = onText(text).split('\n');
+  const first = (lines[0] || '').replace(/^(on|"on"|'on'):\s*/, '').trim();
+  if (first) return first.replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+  const ev = [];
+  let ind = null;
+  for (const l of lines.slice(1)) {
+    const m = l.match(/^(\s+)([A-Za-z_]+)\s*:/);
+    if (!m || isComment(l)) continue;
+    if (ind === null) ind = m[1].length;
+    if (m[1].length === ind) ev.push(m[2]);
+  }
+  return ev;
+}
+
 export function canRunOnMain(text) {
   const on = onText(text);
-  if (/\b(schedule|workflow_dispatch|workflow_run)\b/.test(on)) return true;
+  if (onEvents(text).some((e) => e !== 'push' && !PR_REF_ONLY.has(e))) return true;
   const lines = on.split('\n');
   if (/^(on|"on"|'on'):\s*\S/.test(lines[0])) return /\bpush\b/.test(lines[0]);   // on: push / on: [push, …]
   const pi = lines.findIndex((l) => /^\s+push\s*:/.test(l));
@@ -207,6 +228,10 @@ ok(violations('t.yml', WF(DISPATCH, '      - run: git push -f "https://x-access-
 ok(violations('t.yml', WF('  push:\n    branches: [claude/x]', '      - run: git push\n')).length === 0, '2d a bare push on a workflow that only runs on a feature branch passes');
 ok(violations('t.yml', WF(DISPATCH, '      # ssh-key: ${{ secrets.DEPLOY_KEY }} (removed 2026-10-22)\n      - uses: actions/checkout@v4\n')).length === 0, '2e a comment that names the old credential passes');
 ok(violations('t.yml', WF(DISPATCH, '      - uses: actions/checkout@v4\n        with:\n          persist-credentials: false\n')).length === 0, '2f a plain checkout passes');
+for (const ev of ['repository_dispatch', 'workflow_call', 'issues', 'issue_comment', 'pull_request_target', 'release', 'some_future_event']) {
+  ok(canRunOnMain(WF(`  ${ev}:`, '')), `an event that runs on main counts as able to run there: ${ev}`);
+}
+ok(!canRunOnMain(WF('  pull_request:\n  pull_request_review:', '')), 'pull_request alone cannot run on main');
 ok(!canRunOnMain(WF("  push:\n    tags: ['v*']", '')) && canRunOnMain(WF('  push:\n    paths: [x]', '')) && canRunOnMain('on: [push]\njobs:\n'),
   '2g trigger reading: tags-only push cannot run on main; a push with no branch filter and the list form can');
 

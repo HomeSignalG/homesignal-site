@@ -67,7 +67,10 @@ jobs:
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
           if [ "${{ github.event.inputs.include_wired }}" = "true" ]; then ARGS="--dry-run --include-wired"; fi
           mkdir -p "$SOURCE_MONITOR_OUT_DIR"
+          # tee hides node's exit code (no pipefail), so keep it: a crash must not pass green. The
+          # outputs below are still written, and every later step runs under always().
           node scripts/source-monitor.mjs $ARGS | tee monitor-out.txt
+          rc=${PIPESTATUS[0]}
           cp monitor-out.txt "$SOURCE_MONITOR_OUT_DIR/monitor-out.txt"
           if grep -q '^REGISTRY_PROPOSED=1$' monitor-out.txt; then
             echo "registry_proposed=true" >> "$GITHUB_OUTPUT"
@@ -83,6 +86,10 @@ jobs:
             echo "type_drift=true" >> "$GITHUB_OUTPUT"
           else
             echo "type_drift=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::scripts/source-monitor.mjs exited $rc: the monitor did not finish, so this run's report is incomplete."
+            exit "$rc"
           fi
 
       # The run's evidence, kept 30 days: run-report.md (the same section the job summary shows),
