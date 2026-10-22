@@ -229,8 +229,11 @@ for (const zip of ZIPS) {
        `rails ${before} → ${after}`);
   }
 
-  // 4. The headline must stay project-grained, not marker-grained.
-  ok(String(m.cDev).trim() !== String(b.markers),
+  // 4. The headline must stay project-grained, not marker-grained. Only a headline that
+  //    matches the marker count WHEN that differs from the project count is marker-grained:
+  //    with one marker per project (04101 Portland ME: 5 and 5) the correct project headline
+  //    equals the marker count, and the old test failed a correct page.
+  ok(!(String(m.cDev).trim() === String(b.markers) && b.markers !== b.projects),
      `${zip}: the headline does not report the marker count as a project count`,
      `cDev "${m.cDev}" · markers ${b.markers} · projects ${b.projects}`);
 }
