@@ -101,6 +101,23 @@ stop lists elsewhere in this file still stand: secrets/PII/subscriber data, dest
 non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
 approval step only, not the verification before it.
 
+**Three operating rules (founder, 2026-10-21; same text as homesignal-ingest CLAUDE.md Rule #0b):**
+1. **Merge only after every check has FINISHED, green, on the exact commit being merged.**
+   "Merge" from the founder lifts approval, not this. After any push (a conflict merge included),
+   wait for the new head's checks. Ingest #792 was merged 2 s before its first check started
+   (14:19:07 vs 14:19:09Z). A check that is red by design is named on the PR before merging;
+   every other red check blocks.
+2. **After an outage ends (Actions runners, database, a dead credential), check health and
+   restart what was missed BEFORE reporting status.** Read `public.pipeline_health_check` and
+   `public.ingest_run_heartbeat`, and dispatch each workflow whose scheduled runs failed during
+   the outage. On 2026-10-21 Local News had been dark ~19h and the Oct 20 digest was missed; both
+   were found only when the founder asked "status". A status report also covers GitHub check
+   runs, not only the health table: a daily check failing in GitHub is not "healthy".
+3. **Before dispatching an expensive workflow by hand, check for one already queued or running**
+   (queued / in progress, or started in the last hour). On 2026-10-21 two Local News recovery runs
+   started 14 minutes apart and both ran to completion. Here this also covers the full-corpus
+   verifiers (§5: run them one at a time).
+
 **Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
 
 1. **`jurisdiction-registry.json` only.** No other file.
