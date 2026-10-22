@@ -236,7 +236,7 @@ summary / receipt artifacts).
 | "ingest wrote alerts but the page can't show them" | no dirty queue; sweep 4–7 h | targeted `app_refresh_zip`, then dispatch; detector reads the real read model so a premature dispatch is harmless |
 | "Atlas/Epoch raw acquisition treated as public change" | | nothing dispatches from them; pinned |
 | "Map 1 activation changes public state without Rule D refresh" | plane is daily | activation → plane refresh (needs token) |
-| "a workflow bypasses the system" | | only `pages.yml` deploys; `sitemap.yml` commits go through the same push path |
+| "a workflow bypasses the system" | | only `pages.yml` deploys; `sitemap.yml` commits go through the same push path *(2026-10-22: `sitemap.yml` is deleted and no workflow pushes to `main`; `test/no-deploy-key-push.test.mjs`)* |
 | "unbounded retries / one failed API takes the site down" | | bounded; separate job after `deploy` |
 | "false lastmod" | | moves only with the fingerprint; omitted when unknown |
 | "removals / noindex flips not notified" | | notified; pinned (I, J) |

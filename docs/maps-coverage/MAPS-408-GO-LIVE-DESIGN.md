@@ -212,6 +212,12 @@ republish. A prerender generator is the same shape with a different output, incl
 "never use `[skip ci]`" caveat that workflow already documents. `lib/generated/` is the existing
 precedent for generated, committed, never-hand-edited artifacts.
 
+> **2026-10-22 (founder, "remove deploy key"): that precedent is gone; do not copy it.**
+> `sitemap.yml` is deleted, no workflow may push to `main`, and the deploy key, its `DEPLOY_KEY`
+> secret and the ruleset's deploy-key bypass are being removed (`test/no-deploy-key-push.test.mjs`).
+> A prerender generator today runs inside `pages.yml`'s build, the way `gen_zip_pages.py` writes
+> `/community/<zip>/` into the artifact, and commits nothing.
+
 **§0 is not overridden here — it is put to the founder.** The prerendered page would remain a
 render of DB data with no per-community *authoring* and no per-community *decision*; but §0's
 words are "no per-community HTML files", and this creates 408 of them. That needs a ruling, not an

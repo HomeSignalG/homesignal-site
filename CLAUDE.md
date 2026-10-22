@@ -1202,6 +1202,8 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     inside the artifact.** The served sitemap is therefore correct, but the committed one is
     not what ships. Retiring the community half of `gen_sitemap.py` is the obvious follow-up
     and is deliberately NOT bundled into the deployment change.
+    *(2026-10-22: nothing regenerates the committed file on a schedule any more; `sitemap.yml`
+    is deleted. See "NO WORKFLOW PUSHES TO `main`" below.)*
   - **`docs/` and `test/` are no longer served publicly** — the artifact excludes them. No
     shipped page ever linked to either (checked: zero `href` references).
 - 🔒 **A workflow push never becomes the head of an open PR (2026-10-19).** A push made with
@@ -1210,6 +1212,29 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   <target>` first (copy of the homesignal-ingest script, #720): 0 = push, 3 = refused (step
   red), 4 = refused on a push-started run (step green, nothing pushed), 1 = could not check.
   Pinned by `test/bot-push-guard.test.mjs`.
+- 🔒 **NO WORKFLOW PUSHES TO `main`, AND NONE HOLDS A DEPLOY KEY (2026-10-22, founder "remove
+  deploy key").** Until then `sitemap.yml` (daily) and `source-monitor.yml` (nightly) pushed
+  straight to `main` with the `DEPLOY_KEY` secret, an SSH deploy key that the "Protect Main"
+  ruleset let bypass (`bypass_actors: DeployKey, always`).
+  - **`sitemap.yml` is deleted.** The build throws away both `?zip=` halves of the committed
+    `sitemap.xml` (`gen_zip_pages.py::reconcile_sitemap`; pages run 39735853225 removed 11,702 +
+    11,657, all of them), so the daily commit changed nothing that is served. The 8 static URLs
+    ARE served as committed: after editing `STATIC` in `scripts/gen_sitemap.py`, run
+    `python3 scripts/gen_sitemap.py --static-only` (offline) and commit `sitemap.xml` in the same
+    PR. `test/sitemap-static-half.test.mjs` fails until they agree.
+  - **`source-monitor.yml` reports instead of committing.** Each run's report is in its job
+    summary and in the `source-monitor-<run id>` artifact (30 days);
+    `docs/source-monitor-report.md` is frozen at the last committed run. A candidate that passes
+    the auto-wire gate is no longer written to the registry: the entry goes into the summary and
+    the artifact (`proposed-registry-entries.json`) and the run fails with the steps to wire it
+    by PR, then dispatch `deploy-edge-functions` (`function=get-address-report`). The job holds
+    only `contents: read`. Measured before the change: 0 auto-wires ever (216 registry commits,
+    none by the monitor; 94 committed runs, all "Auto-wired: none").
+  - `test/no-deploy-key-push.test.mjs` fails on any workflow that references
+    `secrets.DEPLOY_KEY`, passes `ssh-key:` to a checkout, or runs a `git push` that can land on
+    `main`. `fetch-tabs-fixtures.yml` now refuses `main` before its push for the same reason.
+  - **After this merges, the founder deletes the deploy key, the `DEPLOY_KEY` secret and the
+    ruleset's deploy-key bypass.** Nothing in either repo needs any of them.
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file
@@ -1641,6 +1666,8 @@ legal/framing change not covered by the one-time sign-off.
 - **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
+  *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
+  from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 - **At batch scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal snapshot.**
   A one-ZIP literal is fine; a whole county (18 ZIPs × ~40-64 sites, mostly the same county
   notices repeated) is ~220 KB of engine output — embedding it as hand-copied JSON is the
@@ -1649,6 +1676,8 @@ legal/framing change not covered by the one-time sign-off.
 - **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
+  *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
+  from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 
 ## 7.04a THE MAPS (ALL THEMES) ZIP LIST IS A SECOND, INDEPENDENT LIST (2026-10-15)
 

@@ -263,6 +263,8 @@ These convert every foreseeable "should I ask?" into "no — do this." Add to th
 - **Development ZIP pages are in the sitemap zero-touch.** `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row, so newly-cached ZIPs become
   indexable with no per-ZIP edit; the daily `sitemap.yml` workflow republishes.
+  *(2026-10-22: `sitemap.yml` is deleted (founder, "remove deploy key"), and the build drops the
+  `homesignalmap.html?zip=` URLs from the served sitemap anyway: `gen_zip_pages.py::reconcile_sitemap`.)*
 - **Registry record pages MUTATE over time — the raw fetch cache is the point-in-time
   evidence archive.** Live registries update records in place (Step-0 verified:
   TDLR TABS2023006449's owner block changed between the source video and the 2026-07-10

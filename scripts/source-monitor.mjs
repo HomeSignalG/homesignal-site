@@ -6,15 +6,22 @@
 //   2. DISCOVERS candidate permit/land-use feeds for facility-floor jurisdictions by
 //      walking the official first-party catalogs in `discovery[]` (ArcGIS service roots,
 //      Socrata catalogs, DCAT feeds, CKAN catalogs).
-//   3. AUTO-WIRES any candidate whose shape the existing generic connectors already
+//   3. PROPOSES any candidate whose shape the existing generic connectors already
 //      handle (ArcGIS FeatureServer / Socrata) AND that passes the FAIL-CLOSED gate
-//      below — by appending a jurisdiction-registry.json entry. No human step.
+//      below: it builds the jurisdiction-registry.json entry and REPORTS it, and prints
+//      REGISTRY_PROPOSED=1 so the workflow fails until a human wires it through a PR.
+//      ⚠️ CHANGED 2026-10-22 (founder, "remove deploy key"): it used to append the entry to
+//      the registry, and the workflow pushed it to main with a deploy key. Nothing is
+//      written to the registry now (scripts/lib/source-monitor-proposals.mjs).
 //   4. FLAGS (never guesses) any live source whose shape the connectors do NOT handle
 //      (CKAN datasets, vendor portals — Accela/eTRAKiT/CitizenServe/OpenGov/Tyler
 //      EnerGov/CivicPlus — polygon-only layers, layers without a native ZIP column…)
-//      into docs/source-monitor-report.md with what connector work it needs.
-//   5. APPENDS a dated run report (re-probed / auto-wired / flagged + a dev-backed-ZIP
-//      snapshot so the next run shows the delta).
+//      into the run report with what connector work it needs.
+//   5. WRITES a dated run report (re-probed / proposed / flagged + a dev-backed-ZIP
+//      snapshot) to stdout, the job summary and, when SOURCE_MONITOR_OUT_DIR is set, to
+//      <dir>/run-report.md (the workflow uploads that folder as the run's artifact).
+//      docs/source-monitor-report.md is no longer appended to: it is frozen at the last
+//      committed run (2026-10-22) and is only READ, for the previous dev-backed count.
 //
 // THE FAIL-CLOSED AUTO-WIRE GATE (v18 anti-fabrication is absolute):
 //   • Host must be on the target's human-pinned `hosts` allowlist (kills the documented
@@ -37,13 +44,15 @@
 //     types (garage sales, re-roofs, signs…) never land. Unknown types are not included.
 //   • record_url: per-record link when a URL-ish column exists, else the official layer /
 //     dataset landing page with record_url_precision:'dataset' (the Provo precedent).
-//   • Every wired entry carries _wired_by + _receipts (live counts, newest date, run id).
+//   • Every proposed entry carries _wired_by + _receipts (live counts, newest date, run id).
 //
-// Usage:  node scripts/source-monitor.mjs [--dry-run]
-//   --dry-run: probe + report to stdout only; write NOTHING (no registry change, no report append).
-// Env: FRESH_DAYS (default 400), MIN_STATUS_COVERAGE (default 0.6), TIMEOUT_MS (default 25000).
+// Usage:  node scripts/source-monitor.mjs [--dry-run [--include-wired]]
+//   --dry-run: labels the run report as a dry run. Since 2026-10-22 neither mode writes to the
+//   repo (no registry change, no report append); --include-wired still requires it.
+// Env: FRESH_DAYS (default 400), MIN_STATUS_COVERAGE (default 0.6), TIMEOUT_MS (default 25000),
+//      SOURCE_MONITOR_OUT_DIR (optional: where run-report.md + proposed-registry-entries.json go).
 
-import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import {
   firstColOf, windowClause, andWhere, windowLabel, renderBytes, differenceCategory,
   unresolvedIndex, UNRESOLVED_VOLUME_BOUND, unreachableRows,
@@ -52,17 +61,21 @@ import {
 import {
   soleTypeCol, typeDriftApplies, hasBaseline, classifyTypeValues, whitelistMappingGaps,
 } from './lib/type-drift.mjs';
+import { collectProposals, proposalSectionLines, proposalsFileText } from './lib/source-monitor-proposals.mjs';
 
 const DRY = process.argv.includes('--dry-run');
 // Gate-validation mode (DRY-RUN ONLY): probe targets even when a registry entry already
 // exists, so the full auto-wire entry builder runs against a known-good live layer and its
-// output can be compared to the human-approved entry. Never combined with a real write.
+// output can be compared to the human-approved entry. Entries it rebuilds are reported, never proposed.
 const INCLUDE_WIRED = DRY && process.argv.includes('--include-wired');
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const TARGETS_PATH = `${ROOT}/scripts/source-monitor-targets.json`;
 const LEXICON_PATH = `${ROOT}/scripts/source-lexicon.json`;
 const REGISTRY_PATH = `${ROOT}/supabase/functions/get-address-report/jurisdiction-registry.json`;
+// READ ONLY since 2026-10-22: the frozen committed report, for the previous dev-backed count.
 const REPORT_PATH = `${ROOT}/docs/source-monitor-report.md`;
+// The run's evidence folder (the workflow uploads it as an artifact). Unset = stdout + summary only.
+const OUT_DIR = process.env.SOURCE_MONITOR_OUT_DIR || '';
 
 const FRESH_DAYS = parseInt(process.env.FRESH_DAYS || '400', 10);
 const MIN_STATUS_COVERAGE = parseFloat(process.env.MIN_STATUS_COVERAGE || '0.6');
@@ -378,8 +391,8 @@ async function probeArcgisLayer(url, target) {
     incremental_field: dateField,
     recency_days: 365,
     record_url_precision: 'dataset',
-    _wired_by: `source-monitor (auto) ${RUN_ID}`,
-    _receipts: `Auto-wired by source-monitor ${RUN_ID}: layer "${info.name}" probed live — point geometry, native ZIP column ${zipField}, newest ${dateField}=${newest}, ${totalRows} rows; ${known.length} statuses mapped via the human-approved lexicon (${knownRows}/${totalRows} rows), ${unknownVals.length} statuses left unmapped→excluded-at-source-of-truth (${unknownVals.slice(0, 8).join('; ') || 'none'}); ${includedTypes.length} lexicon-known types kept at source via extra_where, others dropped. record_url falls back to the official layer (precision dataset).`,
+    _wired_by: `source-monitor gate ${RUN_ID} (proposed; wired by a reviewed PR)`,
+    _receipts: `Built by the source-monitor gate ${RUN_ID}: layer "${info.name}" probed live — point geometry, native ZIP column ${zipField}, newest ${dateField}=${newest}, ${totalRows} rows; ${known.length} statuses mapped via the human-approved lexicon (${knownRows}/${totalRows} rows), ${unknownVals.length} statuses left unmapped→excluded-at-source-of-truth (${unknownVals.slice(0, 8).join('; ') || 'none'}); ${includedTypes.length} lexicon-known types kept at source via extra_where, others dropped. record_url falls back to the official layer (precision dataset).`,
   };
   return { result: 'wire', entry, evidence: `newest ${newest}; ${totalRows} rows; ${known.length} lexicon statuses (${Math.round((knownRows / Math.max(totalRows, 1)) * 100)}% coverage); ${includedTypes.length} lexicon types` };
 }
@@ -463,8 +476,8 @@ async function probeSocrataResource(domain, datasetId, target) {
     incremental_field: dateField,
     recency_days: 365,
     record_url_precision: 'dataset',
-    _wired_by: `source-monitor (auto) ${RUN_ID}`,
-    _receipts: `Auto-wired by source-monitor ${RUN_ID}: "${view.json.name}" (${datasetId}) — updated ${newest}, ${totalRows} rows; ${known.length} lexicon-known statuses (${knownRows}/${totalRows} rows), unmapped→excluded: ${unknownVals.slice(0, 8).join('; ') || 'none'}; ${includedTypes.length} lexicon-known types scoped at source.`,
+    _wired_by: `source-monitor gate ${RUN_ID} (proposed; wired by a reviewed PR)`,
+    _receipts: `Built by the source-monitor gate ${RUN_ID}: "${view.json.name}" (${datasetId}) — updated ${newest}, ${totalRows} rows; ${known.length} lexicon-known statuses (${knownRows}/${totalRows} rows), unmapped→excluded: ${unknownVals.slice(0, 8).join('; ') || 'none'}; ${includedTypes.length} lexicon-known types scoped at source.`,
   };
   return { result: 'wire', entry, evidence: `updated ${newest}; ${totalRows} rows; ${known.length} lexicon statuses; ${includedTypes.length} lexicon types` };
 }
@@ -601,7 +614,6 @@ function row(target, result, evidence, res, url) {
 }
 
 const findings = [];
-const wired = [];
 
 // Phase 1 — re-probe rejected sources
 for (const t of targets.reprobe) {
@@ -628,18 +640,13 @@ for (const t of targets.discovery) {
   else if (t.kind === 'ckan-catalog') await walkCkan(t, findings);
 }
 
-// Phase 3 — wire what passed the gate (append registry entries)
-for (const f of findings) {
-  if (f.res?.result === 'wire' && f.res.entry) {
-    const list = f.res.entry.platform === 'arcgis' ? (registry.arcgis = registry.arcgis || []) : (registry.socrata = registry.socrata || []);
-    if (!list.some((e) => e.registry_id === f.res.entry.registry_id) || INCLUDE_WIRED) {
-      if (!INCLUDE_WIRED) list.push(f.res.entry);
-      wired.push(f.res.entry.registry_id);
-      if (DRY) console.log(`\n--- entry the gate built for ${f.res.entry.registry_id} (dry-run, not written) ---\n${JSON.stringify(f.res.entry, null, 2)}\n`);
-    }
-  }
-}
-if (wired.length && !DRY) writeFileSync(REGISTRY_PATH, JSON.stringify(registry, null, 1) + '\n');
+// Phase 3 — PROPOSE what passed the gate. Nothing is written to the registry (2026-10-22,
+// founder "remove deploy key"): the entry is reported and the workflow fails until a human wires
+// it through a PR. The in-memory registry is not touched either, so the drift checks below cover
+// exactly the entries the connectors read.
+const { proposals, rebuilt } = collectProposals(findings, registry);
+for (const p of proposals) console.log(`\n--- PROPOSED registry entry ${p.registry_id} (registry ${p.family} list; NOT wired, needs a PR) ---\n${JSON.stringify(p.entry, null, 2)}\n`);
+for (const p of rebuilt) console.log(`\n--- entry the gate rebuilt for already-wired ${p.registry_id} (gate validation, not a proposal) ---\n${JSON.stringify(p.entry, null, 2)}\n`);
 
 // Phase 3.5 — STATUS-DOMAIN DRIFT across the WHOLE registry.
 //
@@ -968,20 +975,20 @@ if (existsSync(REPORT_PATH)) {
 const flagged = findings.filter((f) => f.result === 'flag');
 const section = [
   ``,
-  `## Run ${RUN_ID}${DRY ? ' (dry-run — nothing written)' : ''}`,
+  `## Run ${RUN_ID}${DRY ? ' (dry-run)' : ''}`,
   ``,
   `- Sources re-probed: **${targets.reprobe.length}** · discovery targets walked: **${targets.discovery.length}** · candidates evaluated: **${findings.length}**`,
-  `- Auto-wired: ${wired.length ? wired.map((w) => `**${w}**`).join(', ') : '**none**'}`,
+  `- Passed the auto-wire gate — PROPOSED, NOT wired (needs a PR): ${proposals.length ? proposals.map((p) => `**${p.registry_id}**`).join(', ') : '**none**'}`,
   `- Flagged new shapes (connector work needed — never guessed): **${flagged.length}**`,
-  `- Dev-backed ZIP pages (exact): **${snapshot ?? 'unavailable'}**${prevSnapshot != null && snapshot != null ? ` (Δ ${snapshot - prevSnapshot >= 0 ? '+' : ''}${snapshot - prevSnapshot} vs last run)` : ''}`,
-  wired.length ? `- Newly wired entries land on pages after the next engine deploy + nightly refresh (09:00 UTC); the NEXT run's snapshot shows their delta.` : null,
+  `- Dev-backed ZIP pages (exact): **${snapshot ?? 'unavailable'}**${prevSnapshot != null && snapshot != null ? ` (Δ ${snapshot - prevSnapshot >= 0 ? '+' : ''}${snapshot - prevSnapshot} vs the last committed report)` : ''}`,
   ``,
   `| target | result | evidence |`,
   `|---|---|---|`,
   ...findings.map((f) => `| ${f.id} | ${f.result} | ${String(f.evidence).replace(/\|/g, '\\|').slice(0, 300)} |`),
   ...(flagged.length ? [``, `### Flagged shapes — what connector work each needs`, ...flagged.map((f) => `- **${f.id}** — ${f.res?.shape || 'unrecognized shape'}: ${f.res?.needs || ''}`)] : []),
+  ...proposalSectionLines(proposals, rebuilt),
   // Status-domain drift: an unmapped status DROPS records, so it is reported first-class and
-  // fails the run (the workflow greps STATUS_DRIFT=1 after committing this report).
+  // fails the run (the workflow greps STATUS_DRIFT=1; this report is in its summary and artifact).
   ``,
   `### Status-domain drift — unmapped statuses DROP records`,
   `- Registry entries checked: **${driftChecked}** · **gating** (in-window unmapped or volume bound breached): **${driftReal.length}** · unreachable: **${driftUnreachable.length}**`,
@@ -1149,13 +1156,23 @@ const section = [
     : [``, `- Whitelist/mapping invariant holds: every whitelisted value has a \`type_map\` line or a \`use_type_const\`.`]),
 ].filter((x) => x !== null).join('\n') + '\n';
 
-if (!DRY) appendFileSync(REPORT_PATH, section);
+// The run report goes to stdout, the job summary and the evidence folder. Never into the repo:
+// since 2026-10-22 nothing in this job can push (founder, "remove deploy key").
+if (OUT_DIR) {
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(`${OUT_DIR}/run-report.md`, section);
+  // Always written, `[]` included: an empty list is the evidence that the run proposed nothing.
+  writeFileSync(`${OUT_DIR}/proposed-registry-entries.json`, proposalsFileText(proposals));
+}
 console.log(section);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, section);
-console.log(`${DRY ? '[dry-run] ' : ''}done: ${wired.length} wired, ${flagged.length} flagged, ${findings.length} findings, ${driftReal.length} status-drift, ${tdriftReal.length} type-drift (${tdriftChecked} entries checked, ${tdriftNoBaseline.length} without a baseline).`);
-if (wired.length) console.log('REGISTRY_CHANGED=1');
-// Grep-able marker (same idiom as REGISTRY_CHANGED). The workflow fails the run on this
-// AFTER committing the report, so the evidence lands even though the run goes red. Printed
+console.log(`${DRY ? '[dry-run] ' : ''}done: ${proposals.length} proposed (not wired), ${rebuilt.length} rebuilt for validation, ${flagged.length} flagged, ${findings.length} findings, ${driftReal.length} status-drift, ${tdriftReal.length} type-drift (${tdriftChecked} entries checked, ${tdriftNoBaseline.length} without a baseline).`);
+// Grep-able marker: the workflow fails the run on it, after the artifact upload, with plain
+// instructions to wire the entry through a PR. Only genuinely unlisted entries count, so a
+// --include-wired validation run cannot raise it for entries that are already wired.
+if (proposals.length) console.log('REGISTRY_PROPOSED=1');
+// Grep-able marker (same idiom as REGISTRY_PROPOSED). The workflow fails the run on this
+// AFTER uploading the report, so the evidence lands even though the run goes red. Printed
 // last so it is never confused with a per-target line.
 if (driftReal.length) console.log('STATUS_DRIFT=1');
 // Same idiom, same reason, same severity: an unlisted include_types value is never fetched.

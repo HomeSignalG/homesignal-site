@@ -9158,7 +9158,8 @@ guessed into production.
 
 `.github/workflows/source-monitor.yml` + `scripts/source-monitor-targets.json` re-probe **18
 rejected sources** and walk **44 first-party catalogs** nightly at 07:00 UTC, auto-wiring anything
-that recovers AND passes the fail-closed gate. Run `2026-08-07T08:13:08Z`: 18 re-probed, 44
+that recovers AND passes the fail-closed gate *(2026-10-22: proposing it instead; the run fails
+until it is wired by PR, and the report is in the run's summary and artifact, not committed)*. Run `2026-08-07T08:13:08Z`: 18 re-probed, 44
 discovery targets walked, **195 candidates evaluated, auto-wired: none**, 141 flagged for connector
 work, dev-backed ZIP snapshot 471 (Δ +0).
 
