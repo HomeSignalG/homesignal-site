@@ -332,7 +332,32 @@ set search_path to 'public', 'pg_temp'
 as $fn$ select public.state_cleanup_collect() $fn$;
 
 -- ── readers (the only resident-facing door) ─────────────────────────────────────────────
+-- A PRIVATE HOME IS NOT NAMED ON THE MAP (2026-10-22). Publishers name many cleanup cases after
+-- the homeowner ("Allen Residence", "Mentzer Heating Oil Tank", "ADKINS RESIDENTIAL PROPERTY").
+-- The page shows "Residential property" for those; the pin, the address and the agency's own
+-- record link stay, and the stored row keeps the publisher's name (history is never rewritten).
+-- Three narrow rules, measured over every current site on 2026-10-22: 104 matches (FL 5, WA 99),
+-- every one read by hand and every one a home. "<Name> Property" (683 sites) is deliberately NOT
+-- matched: it cannot tell a person from a county or a company, and a wrong label is worse.
+create or replace function public.state_cleanup_display_name(p_name text)
+returns text
+language sql
+immutable
+set search_path to 'pg_temp'
+as $fn$
+  select case when p_name ~* '\mresidence\M'
+                or p_name ~* '\mresidential (property|hot|heating|oil|tank|site|release)\M'
+                or p_name ~* '^\s*[[:alpha:]''.-]+\s+heating oil (tank|release|ust|spill)s?\s*$'
+              then 'Residential property' else p_name end
+$fn$;
+
+-- How many current sites share a record link (DEP files many cases under one facility page).
+create index if not exists state_cleanup_sites_current_url_idx
+  on public.state_cleanup_sites (record_url) where removed_from_source_at is null;
+
 -- One row shape for both readers, so the page has one mapping (HS.stateCleanupSite).
+-- checked_at is when the last complete run of this source confirmed the site (last_seen_at);
+-- record_url_sites counts the current sites sharing this site's record link.
 create or replace function public.state_cleanup_site_json(s public.state_cleanup_sites, verdict text)
 returns jsonb
 language sql
@@ -343,9 +368,13 @@ as $fn$
     'source', s.source, 'site_key', s.site_key,
     'agency', (select c.agency from public.state_cleanup_sources c where c.source = s.source),
     'program_id', s.source_db_id, 'category', s.category, 'status', s.status,
-    'name', s.name, 'address', s.address, 'city', s.city, 'state', s.state,
+    'name', public.state_cleanup_display_name(s.name),
+    'name_withheld', case when public.state_cleanup_display_name(s.name) is distinct from s.name then true end,
+    'address', s.address, 'city', s.city, 'state', s.state,
     'lat', s.lat, 'lng', s.lng, 'record_url', s.record_url,
-    'source_loaded_at', s.source_loaded_at, 'zip_membership', verdict))
+    'record_url_sites', (select count(*) from public.state_cleanup_sites o
+                          where o.record_url = s.record_url and o.removed_from_source_at is null),
+    'source_loaded_at', s.source_loaded_at, 'checked_at', s.last_seen_at, 'zip_membership', verdict))
 $fn$;
 
 create or replace function public.map1_state_cleanup_zip_members(p_zip text)
@@ -404,6 +433,7 @@ revoke all on function public.state_cleanup_fire(text) from public, anon, authen
 revoke all on function public.state_cleanup_collect() from public, anon, authenticated;
 revoke all on function public.state_cleanup_map_feature(text, jsonb, timestamptz) from public, anon, authenticated;
 revoke all on function public.state_cleanup_site_json(public.state_cleanup_sites, text) from public, anon, authenticated;
+revoke all on function public.state_cleanup_display_name(text) from public, anon, authenticated;
 revoke all on function public.map1_state_cleanup_zip_members(text) from public;
 revoke all on function public.map1_state_cleanup_near(double precision, double precision, double precision) from public;
 grant execute on function public.map1_state_cleanup_zip_members(text) to anon, authenticated, service_role;

@@ -5,6 +5,8 @@
 //   C  ZIP mode admits cleanup sites on the server's 'member' verdict only
 //   D  the page: one predicate everywhere; cleanup sites never enter the EPA facility set,
 //      never make a page indexable, and answer only their own switch
+//   E  2026-10-22: a withheld private name, the checked date, a shared record link, and sites at one
+//      point drawn as one pin while every list and count stays per site
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
@@ -99,6 +101,46 @@ ok(/id="cleanupBand" hidden/.test(PAGE), 'D11 the band starts hidden');
 ok(/function buildStateCleanupChip/.test(PAGE) && /buildStateCleanupChip\(host\)/.test(fn('buildRegulatoryRow')),
   'D12 the switch lives in the Regulatory records row');
 ok(!/setCategoryFilter\(HS\.STATE_CLEANUP/.test(PAGE), 'D13 the switch never writes a Type/Regulatory filter key');
+
+// ── E ── (reader shapes from the local PostGIS suite, 2026-10-22)
+const C2 = { ...ROW, checked_at: '2026-10-22T10:20:00.16563+00:00', record_url_sites: 1 };
+const sc = HS.stateCleanupSite(C2);
+ok(HS.stateCleanupCheckedLine(sc) === 'From Florida DEP\u2019s list, checked Oct 22, 2026', 'E1 the checked line', HS.stateCleanupCheckedLine(sc));
+ok(/checked Oct 22, 2026/.test(HS.stateCleanupPopupHTML(sc, esc)) && /checked Oct 22, 2026/.test(HS.stateCleanupCardHTML(sc, esc)),
+  'E2 popup and 3D card both carry it');
+ok(HS.stateCleanupCheckedLine(HS.stateCleanupSite(ROW)) === '' && !/checked/.test(HS.stateCleanupPopupHTML(s, esc)),
+  'E3 no date from the reader -> no checked line (never invented)');
+ok(/Florida DEP site documents/.test(HS.stateCleanupPopupHTML(sc, esc)), 'E4 a link of its own says "site documents"');
+const shared = HS.stateCleanupSite({ ...C2, record_url_sites: 74 });
+ok(HS.stateCleanupLinkLabel(shared) === 'Florida DEP facility documents (74 cleanup sites here)'
+  && /facility documents \(74 cleanup sites here\)/.test(HS.stateCleanupListHTML([shared], esc, 12)),
+  'E5 a shared link says how many sites it covers, in the popup and the list', HS.stateCleanupLinkLabel(shared));
+const home = HS.stateCleanupSite({ ...WA, name: 'Residential property', name_withheld: true });
+ok(home.label === 'Residential property' && home.cleanup.name_withheld === true
+  && /Residential property/.test(HS.stateCleanupPopupHTML(home, esc)), 'E6 a withheld name is shown as the reader sends it');
+const A = { ...C2, site_key: 'a1', name: 'SITE A' }, B = { ...C2, site_key: 'b1', name: 'SITE B', category: 'OTHCU' },
+      D = { ...C2, site_key: 'd1', name: 'SITE D', lat: 26.2, lng: -80.2 };
+const pins = HS.stateCleanupSitesFrom({ status: 'complete', sites: [A, B, D] });
+ok(pins.length === 2, 'E7 two sites at one point + one elsewhere -> two pins', pins.length);
+const grp = pins[0];
+ok(HS.stateCleanupGroupOf(grp).length === 2 && grp.label === '2 cleanup sites at this location'
+  && grp.lat === A.lat && grp.lng === A.lng && grp.record_url === A.record_url && grp.zip_membership === 'member',
+  'E8 the group pin keeps the point, a link and the member verdict');
+ok(pins[1].label === 'SITE D' && !HS.stateCleanupGroupOf(pins[1]), 'E9 a lone site is unchanged');
+ok(HS.stateCleanupMembers(pins).length === 3, 'E10 counts are of sites, not pins');
+const lh = HS.stateCleanupListHTML(pins, esc, 12);
+ok((lh.match(/class='rec'/g) || []).length === 3 && /SITE A/.test(lh) && /SITE B/.test(lh) && /SITE D/.test(lh),
+  'E11 the list shows every site, not the pin');
+const gp = HS.stateCleanupPopupHTML(grp, esc);
+ok(/2 cleanup sites at this location/.test(gp) && /SITE A/.test(gp) && /SITE B/.test(gp) && /Other waste cleanup/.test(gp),
+  'E12 the group popup lists each site with its own type line');
+ok(HS.stateCleanupTitle(grp) === 'State cleanup sites: 2 at this location', 'E13 the group pin title');
+const many = HS.stateCleanupSitesFrom({ status: 'complete', sites: Array.from({ length: 11 }, (_, i) => ({ ...C2, site_key: 'k' + i, name: 'S' + i })) });
+ok(many.length === 1 && /The other 3 are in the State cleanup sites list/.test(HS.stateCleanupPopupHTML(many[0], esc)),
+  'E14 a big group popup caps at 8 and points to the list');
+ok(HS.zipModeSites([], null, [], pins).length === 2, 'E15 ZIP mode admits the group pin on its member verdict');
+ok(/__HS_STATE_CLEANUP = \{[^}]*stateCleanupMembers\(cleanupSites\)\.length/.test(PAGE), 'E16 the published count is of sites');
+ok(/HS\.stateCleanupCardHTML\(s, esc\)/.test(fn('infoCard3')), 'E17 the 3D card uses the shared card');
 
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }
 console.log('ALL PASS');

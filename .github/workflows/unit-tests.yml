@@ -129,7 +129,9 @@ jobs:
     runs-on: ubuntu-latest
     # 25, not 15: the whole browser suite takes 13 to 16 minutes and has grown with every page. At 15 the job was CANCELLED by the limit with no test failing
     # (run 37796324697, 2026-10-08), which reads as red without being a finding. The limit is a hang guard, not a speed target.
-    timeout-minutes: 25
+    # 40, not 25 (2026-10-22): the suite now takes 18 to 20 minutes, and two runs that day were cancelled at 25 with no test
+    # failing (run 39787221900, and run 39789906971 attempt 1, whose last line before the cancel was a PASS).
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

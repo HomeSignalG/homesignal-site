@@ -3542,6 +3542,31 @@ drawing them as "Other project" or listing them only on the ZIP page.
   - Tested in `test/state_cleanup_pg`: 50 checks, 11 deliberate breaks, each caught. Three of the
     breaks are new: a Washington run removing Florida sites, anyone being able to fire a source,
     and a new OBJECTID counting as a change.
+- **Audit follow-up (2026-10-22), five fixes:**
+  - **Health alert.** homesignal-ingest's `state_cleanup_loads` check pages when a source has no
+    complete load in 30 h, or when its newest run failed.
+  - **Private homes are not named.** The readers send "Residential property", with
+    `name_withheld: true`, decided once by `public.state_cleanup_display_name`. The stored row
+    keeps the publisher's name.
+    - The rule has three narrow patterns. Measured: 104 current hits (FL 5, WA 99), every one read
+      and every one a home.
+    - "<Name> Property" (683 sites) is deliberately not matched, because it cannot tell a person
+      from a county or a company.
+  - **"Checked" date.** Every popup says "From <agency>'s list, checked <date>". The date is the
+    reader's `checked_at`, i.e. `last_seen_at`. FL `source_loaded_at` partly echoes our own run
+    time and WA has none, so it is not used.
+  - **Shared links.** A link shared by several sites reads "facility documents (N cleanup sites
+    here)", from the reader's `record_url_sites`, which counts current sites only.
+    - Measured: 453 DEP facility pages cover 1,188 sites, the largest 74.
+  - **One pin per point.** Sites at the same point are one pin, "N cleanup sites at this
+    location".
+    - Grouping is decided once, in `HS.stateCleanupSitesFrom`, so all three map views draw the
+      same thing.
+    - The list and every count stay per site (`HS.stateCleanupMembers`), and the popup lists up
+      to 8 of the sites.
+    - Measured: FL 463 points carry 1,174 sites; WA 107 carry 303.
+  - Tests: the SQL suite has 59 checks and 15 deliberate breaks, each caught; plus
+    `test/state-cleanup.test.mjs` E1–E17 and the browser test's shared-point case.
 
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
