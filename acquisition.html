@@ -297,6 +297,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   window.hsClient = client; window.hsUser = null; window.hsToken = null;
   var step = 'email', pendingEmail = '';
+  // One options value for the first send AND the resend, so the two cannot differ.
+  var OTP_OPTIONS = { shouldCreateUser:true };
   function $(id){ return document.getElementById(id); }
   function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#c23b34':'var(--accent)'; }
   function setStep(s){
@@ -320,7 +322,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var email=($('auth-email').value||'').trim();
     if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
     $('auth-submit').disabled=true; showMsg('Sending your code…',false);
-    try{ var r=await client.auth.signInWithOtp({ email:email, options:{ shouldCreateUser:true } });
+    try{ var r=await client.auth.signInWithOtp({ email:email, options:OTP_OPTIONS });
       if(r.error){ showMsg(r.error.message,true); } else { pendingEmail=email; setStep('code'); showMsg('',false); }
     }catch(e){ showMsg('Something went wrong — please try again.',true); }
     $('auth-submit').disabled=false;
@@ -341,7 +343,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   async function resendCode(){
     if(step!=='code'||!pendingEmail||resendLeft>0) return;
     resendCooldown(RESEND_WAIT_S); showMsg('Sending a new code…',false);
-    try{ var r=await client.auth.signInWithOtp({ email:pendingEmail, options:{ shouldCreateUser:true } });
+    try{ var r=await client.auth.signInWithOtp({ email:pendingEmail, options:OTP_OPTIONS });
       if(r.error){ showMsg(r.error.message,true); return; }
       $('auth-code').value=''; $('auth-code').focus();
       showMsg('We sent a new code to '+pendingEmail+'. Use the newest one.',false);

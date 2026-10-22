@@ -674,6 +674,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   var plan = null, checkoutState = null, subscribing = false; // build step 11: the brokerage's plan as the billing function tells it, whether this person may start a checkout, and a checkout being opened
   var watchFor = null, watchId = null, watchBusy = false; // build step 9: the saved report on screen that can be watched, its watch (if any), and a start or stop in flight
   var step = 'email', pendingEmail = '';
+  // One options value for the first send AND the resend, so the two cannot differ.
+  var OTP_OPTIONS = { shouldCreateUser:true };
   // A report request is identified by a key the page makes once. A retry after a lost answer sends the SAME key for the SAME address,
   // so it can never use a second free report; any answer from the server ends that request and the next report gets a new key.
   var attempt = null; // { key, address }
@@ -729,7 +731,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     var email=($('auth-email').value||'').trim();
     if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
     $('auth-submit').disabled=true; showMsg('Sending your code…',false);
-    try{ var r=await client.auth.signInWithOtp({ email:email, options:{ shouldCreateUser:true } });
+    try{ var r=await client.auth.signInWithOtp({ email:email, options:OTP_OPTIONS });
       if(r.error){ showMsg(r.error.message,true); } else { pendingEmail=email; setStep('code'); showMsg('',false); }
     }catch(e){ showMsg('Something went wrong — please try again.',true); }
     $('auth-submit').disabled=false;
@@ -750,7 +752,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   async function resendCode(){
     if(step!=='code'||!pendingEmail||resendLeft>0) return;
     resendCooldown(RESEND_WAIT_S); showMsg('Sending a new code…',false);
-    try{ var r=await client.auth.signInWithOtp({ email:pendingEmail, options:{ shouldCreateUser:true } });
+    try{ var r=await client.auth.signInWithOtp({ email:pendingEmail, options:OTP_OPTIONS });
       if(r.error){ showMsg(r.error.message,true); return; }
       $('auth-code').value=''; $('auth-code').focus();
       showMsg('We sent a new code to '+pendingEmail+'. Use the newest one.',false);
