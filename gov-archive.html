@@ -138,6 +138,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     <input type="text" id="auth-code" class="auth-input" placeholder="Enter your code" inputmode="numeric" maxlength="8" autocomplete="one-time-code" style="display:none;letter-spacing:6px;text-align:center;font-size:18px;" aria-label="Enter your code">
     <button id="auth-submit" class="auth-submit">Send me a code</button>
     <div id="auth-msg" class="auth-msg"></div>
+    <div class="auth-toggle" id="auth-resend-wrap" style="display:none;">Didn't get it? Check spam, or <a id="auth-resend-link">resend the code</a></div>
     <div class="auth-toggle" id="auth-back-wrap" style="display:none;"><a id="auth-back-link">Use a different email</a></div>
   </div>
 </div>
@@ -155,6 +156,8 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
   var client = window.supabase.createClient(SB_URL, SB_ANON);
   window.hsClient = client; window.hsUser = null;
   var step = 'email', pendingEmail = '';
+  // One options value for the first send AND the resend, so the two cannot differ.
+  var OTP_OPTIONS = { shouldCreateUser:true };
   function $(id){ return document.getElementById(id); }
   function showMsg(t,e){ var m=$('auth-msg'); m.textContent=t||''; m.style.color=e?'#c23b34':'var(--accent)'; }
   function setStep(s){
@@ -162,12 +165,12 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     if (s==='code'){
       $('auth-sub').textContent='We emailed a code to '+pendingEmail+'. Enter it below.';
       $('auth-email').style.display='none'; $('auth-code').style.display='block';
-      $('auth-submit').textContent='Verify & continue'; $('auth-back-wrap').style.display='block';
+      $('auth-submit').textContent='Verify & continue'; $('auth-back-wrap').style.display='block'; $('auth-resend-wrap').style.display='block'; resendCooldown(RESEND_WAIT_S);
       setTimeout(function(){ $('auth-code').focus(); },50);
     } else {
       $('auth-sub').innerHTML="Enter your email and we'll send you a code &mdash; no password needed.";
       $('auth-email').style.display='block'; $('auth-code').style.display='none'; $('auth-code').value='';
-      $('auth-submit').textContent='Send me a code'; $('auth-back-wrap').style.display='none';
+      $('auth-submit').textContent='Send me a code'; $('auth-back-wrap').style.display='none'; $('auth-resend-wrap').style.display='none'; resendCooldown(0);
       setTimeout(function(){ $('auth-email').focus(); },50);
     }
   }
@@ -178,10 +181,32 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     var email=($('auth-email').value||'').trim();
     if(!email||email.indexOf('@')===-1){ showMsg('Please enter a valid email address.',true); return; }
     $('auth-submit').disabled=true; showMsg('Sending your code…',false);
-    try{ var r=await client.auth.signInWithOtp({ email:email, options:{ shouldCreateUser:true } });
+    try{ var r=await client.auth.signInWithOtp({ email:email, options:OTP_OPTIONS });
       if(r.error){ showMsg(r.error.message,true); } else { pendingEmail=email; setStep('code'); showMsg('',false); }
     }catch(e){ showMsg('Something went wrong — please try again.',true); }
     $('auth-submit').disabled=false;
+  }
+  // Resend: the same call, same email, same options as sendCode. Supabase refuses a second
+  // email to one address within 60 s, so the link waits that long.
+  var RESEND_WAIT_S=60, resendTimer=null, resendLeft=0;
+  function resendCooldown(n){
+    if(resendTimer){ clearInterval(resendTimer); resendTimer=null; }
+    resendLeft=n;
+    function paint(){ var a=$('auth-resend-link'); if(!a) return;
+      a.textContent= resendLeft>0 ? 'resend the code ('+resendLeft+'s)' : 'resend the code';
+      a.setAttribute('aria-disabled', resendLeft>0?'true':'false');
+      a.style.opacity= resendLeft>0 ? '0.55' : ''; a.style.pointerEvents= resendLeft>0 ? 'none' : ''; }
+    paint();
+    if(n>0) resendTimer=setInterval(function(){ resendLeft-=1; paint(); if(resendLeft<=0){ clearInterval(resendTimer); resendTimer=null; } },1000);
+  }
+  async function resendCode(){
+    if(step!=='code'||!pendingEmail||resendLeft>0) return;
+    resendCooldown(RESEND_WAIT_S); showMsg('Sending a new code…',false);
+    try{ var r=await client.auth.signInWithOtp({ email:pendingEmail, options:OTP_OPTIONS });
+      if(r.error){ showMsg(r.error.message,true); return; }
+      $('auth-code').value=''; $('auth-code').focus();
+      showMsg('We sent a new code to '+pendingEmail+'. Use the newest one.',false);
+    }catch(e){ showMsg('Something went wrong — please try again.',true); resendCooldown(0); }
   }
   async function verifyCode(){
     var code=($('auth-code').value||'').trim();
@@ -202,6 +227,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums}
     $('auth-submit').addEventListener('click', submitAuth);
     $('auth-email').addEventListener('keydown', function(e){ if(e.key==='Enter') submitAuth(); });
     $('auth-code').addEventListener('keydown', function(e){ if(e.key==='Enter') submitAuth(); });
+    $('auth-resend-link').addEventListener('click', function(e){ e.preventDefault(); resendCode(); });
     $('auth-back-link').addEventListener('click', function(e){ e.preventDefault(); showMsg('',false); setStep('email'); });
     $('auth-overlay').addEventListener('click', function(e){ if(e.target===$('auth-overlay')) closeAuth(); });
     client.auth.getSession().then(function(res){ onSession(res.data.session); });

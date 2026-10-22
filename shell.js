@@ -1069,6 +1069,8 @@
     if ($('authSub')) $('authSub').textContent = "Enter your email and we'll send you a 6-digit code — no password needed.";
     if (b) { b.textContent = 'Send me a code'; b.disabled = false; }
     if ($('authBackWrap')) $('authBackWrap').classList.add('hidden');
+    if ($('authResendWrap')) $('authResendWrap').classList.add('hidden');
+    authResendCooldown(0);
     if ($('authForm')) $('authForm').classList.remove('hidden');
     if ($('authDone')) $('authDone').classList.add('hidden');
     authMsg('New here? Entering your email creates your free account — no password, no spam.', false);
@@ -1080,6 +1082,39 @@
     if (am && am.parentNode) am.parentNode.appendChild(am);
     HS.openModal('authModal');
     setTimeout(() => { if ($('authEmail')) $('authEmail').focus(); }, 50);
+  };
+  // "Resend the code": the same signInWithOtp call, to the same email, with the same
+  // options, so it never creates or changes anything the first send did not. Supabase
+  // refuses a second email to one address within 60 s, so the link waits that long.
+  const AUTH_RESEND_WAIT_S = 60;
+  let _authResendTimer = null, _authResendLeft = 0;
+  function authResendCooldown(seconds) {
+    if (_authResendTimer) { clearInterval(_authResendTimer); _authResendTimer = null; }
+    _authResendLeft = seconds;
+    const paint = () => {
+      const a = $('authResendLink'); if (!a) return;
+      a.textContent = _authResendLeft > 0 ? 'resend the code (' + _authResendLeft + 's)' : 'resend the code';
+      a.setAttribute('aria-disabled', _authResendLeft > 0 ? 'true' : 'false');
+      a.style.opacity = _authResendLeft > 0 ? '0.55' : '';
+      a.style.pointerEvents = _authResendLeft > 0 ? 'none' : '';
+    };
+    paint();
+    if (seconds > 0) _authResendTimer = setInterval(() => {
+      _authResendLeft -= 1; paint();
+      if (_authResendLeft <= 0) { clearInterval(_authResendTimer); _authResendTimer = null; }
+    }, 1000);
+  }
+  HS.authResend = async function () {
+    if (_authStep !== 'code' || !_authEmail || _authResendLeft > 0) return;
+    if (!window.supabase) { authMsg('Sign-in is unavailable right now — please try again.', true); return; }
+    authResendCooldown(AUTH_RESEND_WAIT_S);
+    authMsg('Sending a new code…', false);
+    try {
+      const r = await HS.sb().auth.signInWithOtp({ email: _authEmail, options: { shouldCreateUser: true } });
+      if (r.error) { authMsg(r.error.message, true); return; }
+      if ($('authCode')) { $('authCode').value = ''; $('authCode').focus(); }
+      authMsg('We sent a new code to ' + _authEmail + '. Use the newest one.', false);
+    } catch (e) { authMsg('Something went wrong — please try again.', true); authResendCooldown(0); }
   };
   // "Use a different email" restarts the SAME sign-in, so it keeps the pending action.
   HS.authReset = function () { HS.openAuth(_afterAuth); };
@@ -1131,6 +1166,8 @@
         $('authSub').textContent = 'We emailed a code to ' + email + '. Enter it below to finish.';
         btn.textContent = 'Verify & continue'; btn.disabled = false;
         $('authBackWrap').classList.remove('hidden');
+        if ($('authResendWrap')) $('authResendWrap').classList.remove('hidden');
+        authResendCooldown(AUTH_RESEND_WAIT_S);
         authMsg('', false);
         setTimeout(() => { $('authCode').focus(); }, 50);
       } catch (e) { authMsg('Something went wrong — please try again.', true); btn.disabled = false; }
