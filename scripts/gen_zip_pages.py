@@ -1655,6 +1655,11 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     sitemap full of 404s. Rewriting the copy INSIDE the artifact means the sitemap becomes
     correct at exactly the moment the documents it points at start existing, and stays
     untouched if they never do. Same reason the deploy job is gated on main.
+    (2026-10-22: the Pages source was switched to GitHub Actions on 2026-09-04, so this
+    artifact copy IS what production serves. Nothing regenerates the committed file on a
+    schedule any more: sitemap.yml is deleted, because this function discards both ?zip=
+    halves of it. Only its static half reaches production; test/sitemap-static-half.test.mjs
+    keeps that half equal to gen_sitemap.py STATIC.)
 
     The development half (`homesignalmap.html?zip=`) is REMOVED, not carried over.
 
@@ -1678,7 +1683,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     `scripts/gen_sitemap.py` still WRITES those URLs into the committed sitemap.xml. That
     is left alone for the same reason its community half is: nothing serves the committed
     file, the artifact is what ships, and retiring the committed generator's halves is a
-    separate change (its own docstring already logs that follow-up).
+    separate change (its own docstring already logs that follow-up). (2026-10-22: it is no
+    longer run on a schedule; see scripts/gen_sitemap.py.)
     """
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
