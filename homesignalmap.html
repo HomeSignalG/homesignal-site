@@ -5302,7 +5302,8 @@ HS.onReady(function(){
       handed = String(sessionStorage.getItem("hs.homeSearchAddress") || "").trim();
       sessionStorage.removeItem("hs.homeSearchAddress");
     } catch(_e) { handed = ""; }
-    if(handed && !u.searchParams.get("addr") && !u.searchParams.get("zip")){
+    // The head script moves ?zip= into the path (/map/<zip>), so "the URL names a ZIP" is HS.urlZip().
+    if(handed && !u.searchParams.get("addr") && !u.searchParams.get("zip") && !(window.HS && HS.urlZip && HS.urlZip())){
       $("addr").value = handed;
       run(handed);
       return;

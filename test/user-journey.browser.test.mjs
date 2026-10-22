@@ -359,7 +359,8 @@ for (const [origin, selector, label] of [
   await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 30000 }).catch(() => {});
   c = await chrome();
   info(label + ' -> Map 1', { landed: c.path + c.search, active: c.activeTokens });
-  ok(/\/homesignalmap\.html$/.test(c.path), label + ' -> lands on Map 1', c.path);
+  // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22).
+  ok(/\/homesignalmap\.html$/.test(c.path) || /^\/map\/\d{5}$/.test(c.path), label + ' -> lands on Map 1', c.path);
   ok(c.activeTokens.length === 1 && c.activeTokens[0] === 'explore',
     label + ' -> Explore is the active item after the page settles', c.activeTokens);
 }

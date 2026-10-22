@@ -11,8 +11,7 @@
 // Run: node test/map-short-address.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { spawnSync } from 'node:child_process';
-import { readFile } from './lib/serve-page.mjs';
+import { readFile, mapRoute } from './lib/serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
@@ -25,21 +24,13 @@ const ok = (c, name, extra) => {
 };
 
 const REPO = process.cwd();
-// The forward document exactly as the build writes it.
-const forwardDoc = (z) => {
-  const r = spawnSync('python3', ['-I', '-c', 'import sys; sys.path.insert(0,"scripts"); import gen_zip_pages as g; sys.stdout.write(g.render_map_route(sys.argv[1]))', z], { cwd: REPO, encoding: 'utf8' });
-  if (r.status !== 0) throw new Error('render_map_route failed: ' + r.stderr);
-  return r.stdout;
-};
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const served = [];
 const srv = createServer(async (q, s) => {
-  const [path, qs] = q.url.split('?');
+  const path = q.url.split('?')[0];
   served.push(path);
-  let m = path.match(/^\/map\/(\d{5})$/);
-  if (m) { s.writeHead(301, { Location: '/map/' + m[1] + '/' + (qs ? '?' + qs : '') }); s.end(); return; }   // like GitHub Pages
-  m = path.match(/^\/map\/(\d{5})\/$/);
-  if (m) { s.writeHead(200, { 'Content-Type': 'text/html' }); s.end(forwardDoc(m[1])); return; }
+  const mr = mapRoute(q.url);          // 301 /map/<zip> -> /map/<zip>/ -> the generated forward, like GitHub Pages
+  if (mr) { s.writeHead(mr.status, mr.headers); s.end(mr.body); return; }
   const p = normalize(join(REPO, decodeURIComponent(path)));
   let body;
   try { body = await readFile(p); } catch { s.writeHead(404); s.end('nope'); return; }

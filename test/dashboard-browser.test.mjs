@@ -327,8 +327,9 @@ try {
 // ITS QUERY STRING, so an old bookmark lands on the same ZIP. `place`/`id` were that page's
 // deep-link params; the primary map ignores them, which must not break the page.
 await page.goto(base + '/maps.html?data=seed&zip=78617&place=p1&id=proj-datacenter', { waitUntil: 'networkidle', timeout: 60000 });
-ok(page.url().indexOf('homesignalmap.html') >= 0, 'the retired map URL forwards to the primary map');
-ok(page.url().indexOf('zip=78617') >= 0, 'the forward preserves the ZIP from the old URL');
+// Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22), so either address is the primary map.
+ok(page.url().indexOf('homesignalmap.html') >= 0 || page.url().indexOf('/map/78617') >= 0, 'the retired map URL forwards to the primary map');
+ok(page.url().indexOf('zip=78617') >= 0 || page.url().indexOf('/map/78617') >= 0, 'the forward preserves the ZIP from the old URL');
 ok(await page.locator('#map, #mapInner').count() >= 1, 'the primary map renders its map surface');
 
 // ═══ FIX 8I. The header is the SHARED page-header system, measured against Alerts ═══
