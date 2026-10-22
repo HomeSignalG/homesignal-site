@@ -149,17 +149,20 @@ const UNCHANGED = [
   // column B1_PER_SUB_TYPE; that filter moved to extra_where and the Type now comes from GENERAL_TYPE
   // through type_map. Its five baseline values (Fire Protection, MEP, Plans Examination, Sign,
   // Special) were work types, so they left the baseline with it: 123 -> 118.
-  ok(WHITELISTED.length === 12,
-    `D1 the include_types fleet is the expected 12 entries (${WHITELISTED.length})`,
+  // 12 -> 11 on 2026-10-22: cleveland-issued-building-permits left too. Its Type is now the joined
+  // key PERMIT_SUBTYPE + PERMIT_TYPE + PERMIT_CATEGORY, which include_types cannot filter, so the
+  // subtype whitelist moved verbatim into extra_where. Its baseline was empty, so 118 is unchanged.
+  ok(WHITELISTED.length === 11,
+    `D1 the include_types fleet is the expected 11 entries (${WHITELISTED.length})`,
     WHITELISTED.map((e) => e.registry_id).join(', '));
   const applies = WHITELISTED.filter(typeDriftApplies);
   ok(applies.length === WHITELISTED.length,
-    'D2 every whitelisted entry resolves a single type column, so all 12 are checkable',
+    'D2 every whitelisted entry resolves a single type column, so all 11 are checkable',
     WHITELISTED.filter((e) => !typeDriftApplies(e)).map((e) => e.registry_id).join(', '));
 
   const seeded = WHITELISTED.filter(hasBaseline);
-  ok(seeded.length === 11,
-    `D3 11 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
+  ok(seeded.length === 10,
+    `D3 10 entries carry a seeded baseline (${seeded.length})`, seeded.map((e) => e.registry_id).join(', '));
   const pending = WHITELISTED.filter((e) => !hasBaseline(e)).map((e) => e.registry_id).sort();
   ok(JSON.stringify(pending) === JSON.stringify(['san-diego-approved-permits']),
     'D4 …and exactly the one that could not be enumerated is BASELINE NOT ESTABLISHED',
