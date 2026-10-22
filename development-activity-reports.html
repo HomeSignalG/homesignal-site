@@ -918,7 +918,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     body = body || {};
     if (httpStatus === 0) return 'The payment service could not be reached. Check your connection and try again.';
     if (httpStatus === 401) return 'Sign in first.';
-    if (httpStatus === 503 && body.error === 'billing_not_set_up') return 'Subscribing is not open yet.';
+    if (httpStatus === 503 && (body.error === 'billing_not_set_up' || body.error === 'checkout_disabled')) return 'Subscribing is not open yet.';
     if (httpStatus === 409 && body.error === 'already_paid') return 'Your brokerage already has the plan.';
     if (httpStatus === 409 && body.error === 'checkout_in_progress') return 'A payment page was just opened for your brokerage. Use that tab, or wait a few minutes and press Subscribe again.';
     if (httpStatus === 409) return 'Your brokerage already has a subscription, so a second one was not started.';

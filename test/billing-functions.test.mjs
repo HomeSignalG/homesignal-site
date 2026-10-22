@@ -123,6 +123,7 @@ function mdeps(over = {}) {
     isAdmin: rec('isAdmin', over.isAdmin ?? (async () => false)),
     usageOf: rec('usageOf', over.usageOf ?? (async () => usage())),
     configured: () => over.configured ?? true,
+    checkoutEnabled: () => over.checkoutEnabled ?? true,
     createCheckout: rec('createCheckout', over.createCheckout ?? (async () => 'https://homesignal.lemonsqueezy.com/checkout/custom/abc')),
     checkoutClaim: rec('checkoutClaim', over.checkoutClaim ?? (async () => ({ outcome: 'CLAIMED' }))),
     checkoutRelease: rec('checkoutRelease', over.checkoutRelease ?? (async () => undefined)),
@@ -241,9 +242,9 @@ const named = (name) => mcalls.filter((c) => c[0] === name);
     r = await co(over);
     ok(named('checkoutClaim').length === 0, '2al ' + who + ' never claims the slot');
   }
-  ok(MH.checkoutAvailability(usage({ role: 'owner', state: 'paid' }), true) === 'already_paid' && MH.checkoutAvailability(usage({ role: 'agent', state: 'paid' }), true) === 'not_owner'
-     && MH.checkoutAvailability(usage({ role: 'owner' }), false) === 'not_set_up' && MH.checkoutAvailability(usage({ role: 'owner' }), true) === 'available'
-     && MH.checkoutAvailability(usage({ role: 'owner', state: 'past_due' }), true) === 'subscription_exists' && MH.checkoutAvailability(usage({ role: 'owner', state: 'canceled' }), false) === 'not_set_up',
+  ok(MH.checkoutAvailability(usage({ role: 'owner', state: 'paid' }), true, true) === 'already_paid' && MH.checkoutAvailability(usage({ role: 'agent', state: 'paid' }), true, true) === 'not_owner'
+     && MH.checkoutAvailability(usage({ role: 'owner' }), false, true) === 'not_set_up' && MH.checkoutAvailability(usage({ role: 'owner' }), true, true) === 'available'
+     && MH.checkoutAvailability(usage({ role: 'owner', state: 'past_due' }), true, true) === 'subscription_exists' && MH.checkoutAvailability(usage({ role: 'owner', state: 'canceled' }), false, true) === 'not_set_up',
     '2ac the ONE reading of who may start a checkout, answered directly for its five outcomes');
 }
 
@@ -424,6 +425,26 @@ async function hook(d, raw, { sig, method = 'POST', headers = {} } = {}) {
   d = MD.makeDeps({ url: BASE, serviceKey: SERVICE, billing: BILL }, mkFetch([[/rpc\/billing_usage$/, () => json([PAID])]]));
   const got = await d.usageOf(UID);
   ok(got.state === 'paid' && reqs.length === 1 && reqs[0].url === BASE + '/rest/v1/rpc/billing_usage' && JSON.parse(reqs[0].init.body).p_user_id === UID, '4m the plan is read through the shared reader: one call to billing_usage, by user id');
+}
+
+{
+  // the checkout kill switch (founder, 2026-10-22): the processor may be fully configured and a checkout is still refused
+  const sw = await ask(mdeps({ checkoutEnabled: false, configured: true }), { action: 'checkout' });
+  ok(sw.status === 503 && sw.json.error === 'checkout_disabled' && named('createCheckout').length === 0 && named('checkoutClaim').length === 0,
+    '2sw1 with the switch off an owner\'s checkout is refused 503 checkout_disabled, the slot is never claimed and the processor is never asked, even though it is configured');
+  const st = await ask(mdeps({ checkoutEnabled: false, configured: true }), { action: 'status' });
+  ok(st.status === 200 && st.json.checkout === 'disabled' && st.json.plan && !st.text.includes(SECRET) && !st.text.includes(API_KEY),
+    '2sw2 the plan status is still readable with the switch off, and says checkout is disabled');
+  ok(MH.checkoutAvailability(usage({ role: 'owner' }), true, false) === 'disabled' && MH.checkoutAvailability(usage({ role: 'agent' }), true, false) === 'not_owner'
+     && MH.checkoutAvailability(usage({ role: 'owner', state: 'paid' }), true, false) === 'already_paid' && MH.checkoutAvailability(usage({ role: 'owner' }), false, false) === 'disabled',
+    '2sw3 the switch outranks the processor\'s settings but never hides the truth about a paid plan or a non-owner');
+  const fs = await import('node:fs');
+  const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+  ok(/export const CHECKOUT_ENABLED = false;/.test(read('supabase/functions/_shared/billing-switch.ts')),
+    '2sw4 the SHIPPED switch is off (free evaluation: the Terms say nothing is sold); turning it on is a reviewed edit of this file and this pin');
+  const idx = read('supabase/functions/manage-billing/index.ts');
+  ok(/import \{ CHECKOUT_ENABLED \} from '\.\.\/_shared\/billing-switch\.ts'/.test(idx) && /checkoutEnabled: \(\) => CHECKOUT_ENABLED/.test(idx),
+    '2sw5 the deployed function reads the committed switch and nothing else (no environment setting can turn checkout on)');
 }
 
 console.log('\n' + (n - bad) + ' passed, ' + bad + ' failed of ' + n);
