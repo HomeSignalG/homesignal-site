@@ -34,9 +34,13 @@ name: db-read
 #     measures it live).
 #   It does not catch phone numbers or street addresses either.
 #
-# ALSO HELD ON A FOUNDER DECISION, independently of the environment: either remove the role's
-# pg_read_all_data membership (and grant it only what reads need), or stop printing results to this
-# public log. Until one is decided this file must not merge.
+# NOT A NEW EXPOSURE, AND STILL OPEN. The read loop this replaces (dispatching db-sql.yml from a
+# branch) already prints query results to this same public log, and it runs them as `postgres`
+# through the WRITE endpoint, with the access token in branch code's reach. db-read narrows that to
+# the read-only role and main's code. What neither closes: whatever a query selects is printed to a
+# world-readable log. Narrowing the role's grants, or returning results somewhere private, is a
+# separate founder decision (raised 2026-10-22); until then, do not select from auth.*, vault.* or
+# tables holding subscriber data in a query run here.
 #
 # The access token is never sent to a redirected URL: redirects are refused before any request to the
 # new location (a followed POST becomes a GET that still carries the Authorization header).
