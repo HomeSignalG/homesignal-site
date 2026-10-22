@@ -33,8 +33,12 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // Founder approval 2026-10-21 (Colorado pre-launch, asked and answered in session) cleared exactly one source,
 // douglas-county-co-permits (Douglas County CO's own All_Permits_View): 246 -> 247 ids. Prior value 9bdf1b3ed7c5f9a9c61714ec281a0f14.
 // Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
-const FINGERPRINT_2026_10_04 = '2fb0d4dda0e77ea6f966a9b10450155a';
-const EXPECTED_IDS = 247;
+// Founder approval 2026-10-22 (Washington audit, asked and answered in session) cleared exactly one source,
+// wa-ecology-sepa-register (Washington Department of Ecology's SEPA Register, data.wa.gov mmcb-z6jf; the dataset states no
+// licence, its only usage note links ecology.wa.gov/copyright.html): 247 -> 248 ids. Prior value 2fb0d4dda0e77ea6f966a9b10450155a.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = '3e775c4d19741bdef0d2fee7ec078115';
+const EXPECTED_IDS = 248;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();
