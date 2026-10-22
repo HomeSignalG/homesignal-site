@@ -1032,7 +1032,7 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261021a"></script>\n'
-        '<script src="/lib/data.js?v=f6d0f681"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/data.js?v=ae51d15a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
         '<script src="/lib/templates.js?v=a01bf2ff"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
@@ -1046,9 +1046,9 @@ def render(p, built):
         # (run 33929420398, ZIPs 01001 and 01002). Parity with community.html is asserted by
         # test/zip-page-shared-runtime.test.mjs so the next shared dependency cannot ship to
         # one host only.
-        '<script src="/lib/premium-waitlist.js?v=02c305ee"></script>\n'
+        '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=e78df56a"></script>\n'
+        '<script src="/shell.js?v=e4216ddb"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=329f7b0f"></script>\n'
         "</body>\n</html>\n")

@@ -224,7 +224,8 @@ const LANDING = '/homesignalmap.html?zip=97702&utm_source=bluesky&utm_medium=soc
   ok(iFollow > -1 && iFollow < iRpc, '1k the ZIP is saved to My Places BEFORE the selection', { iFollow, iRpc });
   ok(!F.log.some(e => e.kind === 'rpc' && /subscribe_area_defaults|signup_complete/.test(e.name)),
     '1l nothing is written on the county identity (no floor, no reconcile-to-exact signup)');
-  ok(page.url() === base + LANDING, '1m the page did NOT navigate: ?zip= and utm_* are intact', page.url());
+  // Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22); the utm_* stay.
+  ok(page.url() === base + LANDING.replace(/^\/homesignalmap\.html\?zip=(\d{5})&/, '/map/$1?'), '1m the page did NOT navigate: the ZIP and utm_* are intact', page.url());
   ok((await btn.textContent()).includes("You're signed up") && await btn.isDisabled(),
     '1n the button now says the resident is signed up', await btn.textContent());
   const onb = page.locator('#onboardingOverlay');

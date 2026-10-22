@@ -117,7 +117,7 @@ ok(!/viewPlaceType/.test(cpage.replace("HS.setViewPlaceType('zip')", '')),
 console.log('--- 7. ROUTE-LEVEL declaration is EXPLICIT-ONLY, and shared ---');
 const decl = (shell.match(/  HS\.declareRouteZipPlace = function \(pageZip\) \{[\s\S]*?\n  \};/) || [''])[0];
 ok(decl.length > 100, 'HS.declareRouteZipPlace exists in the shell', decl.length);
-ok(/HS\.parseZipParam/.test(decl) && /pageZip/.test(decl),
+ok(/HS\.urlZip\(\)/.test(decl) && /pageZip/.test(decl),
   'it resolves ?zip= and a page-declared PATH zip — the same contract as ensureViewedZip');
 ok(/if \(explicit\) HS\.setViewPlaceType\('zip'\);/.test(decl),
   'it declares ONLY when the route is explicit, so an undeclared route keeps its default');
