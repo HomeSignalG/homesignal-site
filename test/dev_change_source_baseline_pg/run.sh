@@ -50,6 +50,9 @@ arrive() { # zip, existing id, then extra site expressions...
   Q "select public.sim_observe('$z', false)" >/dev/null; }
 
 scenarios() {
+  # The file's window ends on a fixed date (2026-10-20, production's own window). The checks test the
+  # MECHANISM, so the window is opened relative to now; otherwise every run after that date fails.
+  Q "update public.dev_change_source_baseline set baseline_until = now() + interval '30 days'" >/dev/null
   baselined_zip 76202 E2
   arrive 76202 E2 "$(D D1 denton-city-projects-decided)" "$(D D2 denton-city-projects-zoning)" "$(D D3 denton-city-projects-notlisted)" "public.sim_site('N1','Issued','2026-10-10')"
   t "C01 allowlisted decided -> baseline, not material" "$(ev arcgis:denton-city-projects-decided:D1)" true/false

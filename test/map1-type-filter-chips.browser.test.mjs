@@ -24,7 +24,7 @@
 // Run: node test/map1-type-filter-chips.browser.test.mjs
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile } from './lib/serve-page.mjs';
+import { readFile, mapRoute } from './lib/serve-page.mjs';
 import { extname, join, normalize } from 'node:path';
 import { createRequire } from 'node:module';
 import { fulfillZipModeReport } from './lib/zip-mode-rpc-mock.mjs';
@@ -39,9 +39,12 @@ const ok = (c, name, extra) => {
 const REPO = process.cwd();
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
 const srv = createServer(async (q, s) => {
+  const mr = mapRoute(q.url);          // /map/<zip> as GitHub Pages serves it (Back/Forward land there)
+  if (mr) { s.writeHead(mr.status, mr.headers); s.end(mr.body); return; }
   const p = normalize(join(REPO, decodeURIComponent(q.url.split('?')[0])));
-  try { s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(await readFile(p)); }
-  catch { s.writeHead(404); s.end('nope'); }
+  let body;
+  try { body = await readFile(p); } catch { s.writeHead(404); s.end('nope'); return; }
+  s.writeHead(200, { 'Content-Type': MIME[extname(p)] || 'text/plain' }); s.end(body);
 });
 await new Promise(r => srv.listen(8819, '127.0.0.1', r));
 const base = 'http://127.0.0.1:8819';

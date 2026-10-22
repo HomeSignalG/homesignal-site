@@ -244,10 +244,11 @@ ok(!/<template id="hs-content">/.test(retired) && retired.length < 8000,
   '10 — it is a stub, not a second map experience', retired.length + ' bytes');
 
 await page.goto(BASE + '/maps.html?zip=' + ZIP, { waitUntil: 'domcontentloaded', timeout: 60000 });
-await page.waitForURL(/homesignalmap\.html/, { timeout: 30000 });
-ok(page.url().indexOf('homesignalmap.html') >= 0,
+// Map 1 shows /map/<zip> in the address bar (founder, 2026-10-22), so either address is the primary map.
+await page.waitForURL(/homesignalmap\.html|\/map\/\d{5}/, { timeout: 30000 });
+ok(page.url().indexOf('homesignalmap.html') >= 0 || page.url().indexOf('/map/' + ZIP) >= 0,
   '10 — a resident on the old URL lands on the primary map: ' + page.url());
-ok(page.url().indexOf('zip=' + ZIP) >= 0,
+ok(page.url().indexOf('zip=' + ZIP) >= 0 || page.url().indexOf('/map/' + ZIP) >= 0,
   '10 — the old URL keeps its ZIP across the forward, so the bookmark still works');
 await page.waitForFunction(() => Array.isArray(window.__HS_SITES), null, { timeout: 60000 });
 ok((await page.locator('#map, #mapInner').count()) >= 1, '10 — and the primary map renders there');
