@@ -13,14 +13,11 @@ name: dc-geocode-probe
 #     transaction to READ ONLY before running a single analysis query, and ROLLS BACK.
 # Evidence comes back through this job's log (artifact storage is unreachable from the sandbox).
 
+# Manual dispatch only (2026-10-22). It ran on pull requests that changed it, and its job holds
+# SUPABASE_DB_URL and SUPABASE_SERVICE_ROLE_KEY with no event guard, so every such PR run was handed
+# both. Dispatch it from main after the change merges. (test/workflow-secret-exposure.test.mjs)
 on:
   workflow_dispatch: {}
-  pull_request:
-    paths:
-      - 'scripts/dc-geocode-probe.ts'
-      - 'docs/dc-geocode-probe-inputs.sql'
-      - 'docs/dc-geocode-probe-analysis.sql'
-      - '.github/workflows/dc-geocode-probe.yml'
 
 permissions:
   contents: read

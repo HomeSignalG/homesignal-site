@@ -5,14 +5,12 @@ name: dc-step3c-probe
 # registry row. It measures whether onboarding through dc_evidence_writer is possible; it is not
 # the onboarding.
 #
-# No schedule. It runs when the probe itself changes and on manual dispatch. EPA is asked at
-# ~1 request / 1.2 s (~6 min for the resident facilities); Overpass once, by element id.
+# No schedule. Manual dispatch only (2026-10-22): it also ran on pull requests that changed the
+# probe, and its job handed those PR runs SUPABASE_ACCESS_TOKEN (account-wide) with no event guard.
+# Dispatch it from main after the change merges. EPA is asked at ~1 request / 1.2 s (~6 min for the
+# resident facilities); Overpass once, by element id.
 
 on:
-  pull_request:
-    paths:
-      - 'scripts/dc-step3c-probe-publishers.mjs'
-      - '.github/workflows/dc-step3c-probe.yml'
   workflow_dispatch:
     inputs:
       only:
