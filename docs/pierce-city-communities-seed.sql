@@ -105,3 +105,24 @@ join (select distinct place_geoid, place_name from geo.zcta_place_overlap
 cross join (select id from public.communities where slug = 'pierce-county-wa') p
 where not exists (select 1 from public.communities c where c.slug = v.slug);
 -- applied 2026-10-20: Fife bc25c108-a6c1-4a8c-ae51-ffcf1cb85ec1 (5323795) · Steilacoom 0a21aa49-aa23-45bc-b418-330e385e9ab7 (5367770)
+
+-- Step 7 (2026-10-22): Roy, Eatonville and Carbonado. Each publishes its council agendas as dated PDFs on its own
+-- site (homesignal-ingest notice_list parser dated_pdf_links), probed live through pg_net 2026-10-22:
+--   Roy         cityofroywa.us/council-agendas/      137 agenda dates, newest 2026-09-14 (request 25285)
+--   Eatonville  eatonville-wa.gov/agendas/            134 Town Council agenda dates, newest 2026-10-26 (request 25286)
+--   Carbonado   www.carbonado.org/meeting-minutes     one current agenda, 2026-10-12 (request 25287)
+-- Still held: South Prairie (its Wix pages, /whats-happening and /file-share, link no agenda: 0 agenda hrefs,
+--   requests 25288 / 25293); Orting (403 Access Denied; not worked around); Federal Way (CivicClerk tenant
+--   federalwaywa answers 404, request 25289; a King County city). Not used: washingtonpublicnotices.com
+--   (a newspaper association aggregator; first-party sources only).
+-- Feeds: homesignal-ingest feeds.csv mtg-roy-wa-city-catchall, mtg-eatonville-wa-city-catchall,
+--   mtg-carbonado-wa-city-catchall.
+insert into public.communities (name, county, state, zip_codes, level, parent_id, government_topics, slug, census_place_geoid)
+select v.name, 'Pierce', 'WA', array[]::text[], 'city', p.id, array[]::text[], v.slug, o.place_geoid
+from (values ('Roy', 'roy-wa', 'Roy city'), ('Eatonville', 'eatonville-wa', 'Eatonville town'), ('Carbonado', 'carbonado-wa', 'Carbonado town')) v(name, slug, census_name)
+join (select distinct place_geoid, place_name from geo.zcta_place_overlap
+      where place_geoid like '53%' and place_funcstat = 'A') o on o.place_name = v.census_name
+cross join (select id from public.communities where slug = 'pierce-county-wa') p
+where not exists (select 1 from public.communities c where c.slug = v.slug);
+-- applied 2026-10-22: Roy ecc0e5e3-1749-45b6-9daf-74558ebb75ea (5360160) · Eatonville 383e5e10-c323-4b45-80db-0a21ad36125a
+--   (5320260) · Carbonado 26365276-024e-467d-9d5f-5b397bc9676e (5309970)
