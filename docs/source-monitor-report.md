@@ -48665,3 +48665,13 @@ A permanent tier, not a one-time sweep. Cleveland's `Building` sat in `include_t
 | fairfax-recent-building-permits | APPTYPEALIAS | in-window type read failed (arcgis): ArcGIS in-band error 499: Token Required |
 
 - Whitelist/mapping invariant holds: every whitelisted value has a `type_map` line or a `use_type_const`.
+
+---
+
+## FROZEN 2026-10-22 — later runs are not in this file
+
+Founder, "remove deploy key": `source-monitor.yml` no longer commits. Each nightly run's report is in
+that run's job summary and in its `source-monitor-<run id>` artifact (30 days): `run-report.md`,
+`proposed-registry-entries.json` and the full log. A source that passes the auto-wire gate is
+proposed there and the run fails until it is wired by PR. This file is kept as the record up to
+the run above, and the monitor still reads it for the previous dev-backed count.

@@ -67,9 +67,11 @@ const REG = JSON.parse(readFileSync(join(ROOT, 'supabase/functions/get-address-r
   ok(describeFailure(null) === 'no response object',
     '1f a missing response object is still described, never `undefined` in the report');
 
-  // Body snippets are bounded: a 200KB HTML error page must not land in a committed markdown table.
+  // Body snippets are bounded: a 200KB HTML error page must not land in a markdown table. (The
+  // report was committed to the repo until 2026-10-22; it now goes to the job summary, which
+  // GitHub caps at 1 MiB per step, and to the run's artifact. The bound matters as much.)
   const huge = describeFailure({ ok: false, status: 500, text: 'x'.repeat(50000), json: null });
-  ok(huge.length < 400, '1g the body snippet is truncated — the report is committed to the repo',
+  ok(huge.length < 400, '1g the body snippet is truncated — the report lands in the job summary (1 MiB cap) and the run artifact',
     String(huge.length));
 }
 

@@ -292,6 +292,15 @@ I'll implement §3–§8 immediately on your answers to A–D. Nothing is scaffo
 
 ## 10. Automated source-monitor (nightly) — DESIGN (built 2026-07-14)
 
+> **CHANGED 2026-10-22 (founder, "remove deploy key"): the monitor no longer wires or commits
+> anything.** A candidate that passes the gate below is PROPOSED: its registry entry goes into the
+> run's job summary and `source-monitor-<run id>` artifact (`proposed-registry-entries.json`), and
+> the run fails until a human adds it by PR and then dispatches `deploy-edge-functions`. The run
+> report is in the summary and artifact; `docs/source-monitor-report.md` is frozen. The workflow
+> holds only `contents: read`, with no deploy key and no dispatch. The gate itself is unchanged.
+> Measured before the change: it had never wired anything (216 registry commits, none by the
+> monitor). The "zero human steps" and "one bot commit" text below describes the old design.
+
 **Goal:** Texas-style development depth grows without manual re-checks. Every night the
 system re-probes rejected sources, hunts for new permit/land-use feeds on facility-floor
 jurisdictions, auto-wires anything the existing generic connectors already handle, and

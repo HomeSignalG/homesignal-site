@@ -5,22 +5,22 @@ name: source-monitor
 # 07:00 UTC (before the 09:00 UTC dev_refresh pg_cron): re-probes every source
 # docs/source-registry.md rejected (dead/stale/frozen/blocked), walks official first-party
 # catalogs for facility-floor jurisdictions, and:
-#   • AUTO-WIRES any candidate the generic connectors (ArcGIS/Socrata) already handle that
-#     passes the fail-closed lexicon gate → commits the jurisdiction-registry.json entry +
-#     report, then dispatches deploy-edge-functions so the 09:00 refresh ingests it the
-#     same night. No human step.
-#   • FLAGS (never guesses) new portal shapes into docs/source-monitor-report.md.
+#   • PROPOSES any candidate the generic connectors (ArcGIS/Socrata) already handle that
+#     passes the fail-closed lexicon gate: the jurisdiction-registry.json entry it built goes
+#     into the job summary and the run's artifact, and the run FAILS with plain instructions
+#     to wire it through a PR (then dispatch deploy-edge-functions). Nothing is wired here.
+#   • FLAGS (never guesses) new portal shapes into the run report.
+#   • FAILS on status-domain and type-domain drift (records dropped / never fetched).
+#
+# NO PUSH, NO DEPLOY KEY, NO DISPATCH (2026-10-22, founder "remove deploy key"). Until then this
+# job committed the report (and any auto-wired registry entry) straight to main with an SSH
+# deploy key that the "Protect Main" ruleset let bypass, then dispatched deploy-edge-functions.
+# Now each run's report is in its job summary and in the `source-monitor-<run id>` artifact
+# (kept 30 days); docs/source-monitor-report.md is frozen at the last committed run. The job
+# needs only `contents: read`. test/no-deploy-key-push.test.mjs keeps every workflow that way.
 #
 # Hosted HERE (not homesignal-ingest) because the registry + connectors live here and this
-# repo's scheduled workflows run reliably. Reversible: each run that wires something is one
-# commit ("source-monitor: auto-wire …"); revert it + redeploy to undo.
-#
-# PUSH AUTH: the "Protect Main" ruleset blocks direct pushes from the workflow
-# GITHUB_TOKEN (github-actions[bot] cannot be a ruleset bypass actor), so the push
-# rides the DEPLOY_KEY repo secret — an SSH deploy key covered by the ruleset's
-# "Deploy keys" bypass. The guard step fails the run up front (dry-run included) if
-# the secret is missing, because checkout would otherwise silently fall back to the
-# (blocked) GITHUB_TOKEN and the failure would surface only at push time.
+# repo's scheduled workflows run reliably.
 
 on:
   schedule:
@@ -28,18 +28,16 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'true = probe + report to logs only; write/commit nothing'
+        description: 'true = label the run report as a dry run (since 2026-10-22 neither mode writes or commits anything)'
         required: false
         default: 'false'
       include_wired:
-        description: 'true = gate-validation: also rebuild entries for already-wired targets (forces dry-run)'
+        description: 'true = gate-validation: also rebuild entries for already-wired targets (forces dry-run; rebuilt entries are never proposed)'
         required: false
         default: 'false'
 
 permissions:
-  contents: write
-  pull-requests: read   # guard_bot_push.sh asks whether the branch has an open PR
-  actions: write
+  contents: read
 
 concurrency:
   group: source-monitor
@@ -53,32 +51,28 @@ jobs:
     # at $0. Measured max successful run: 11.6 min -> bound 45.
     timeout-minutes: 45
     steps:
-      - name: Require DEPLOY_KEY (ruleset-bypass push credential)
-        env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-        run: |
-          if [ -z "$DEPLOY_KEY" ]; then
-            echo "::error::DEPLOY_KEY secret is not set. This workflow pushes to main, which the ruleset blocks for GITHUB_TOKEN — add the SSH deploy key as the DEPLOY_KEY Actions secret (Settings → Secrets and variables → Actions) and enable the Deploy keys bypass on the Protect Main ruleset."
-            exit 1
-          fi
       - uses: actions/checkout@v4
         with:
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Run source monitor
         id: monitor
+        env:
+          SOURCE_MONITOR_OUT_DIR: ${{ runner.temp }}/source-monitor
         run: |
           ARGS=""
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
           if [ "${{ github.event.inputs.include_wired }}" = "true" ]; then ARGS="--dry-run --include-wired"; fi
+          mkdir -p "$SOURCE_MONITOR_OUT_DIR"
           node scripts/source-monitor.mjs $ARGS | tee monitor-out.txt
-          if grep -q '^REGISTRY_CHANGED=1$' monitor-out.txt; then
-            echo "registry_changed=true" >> "$GITHUB_OUTPUT"
+          cp monitor-out.txt "$SOURCE_MONITOR_OUT_DIR/monitor-out.txt"
+          if grep -q '^REGISTRY_PROPOSED=1$' monitor-out.txt; then
+            echo "registry_proposed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "registry_changed=false" >> "$GITHUB_OUTPUT"
+            echo "registry_proposed=false" >> "$GITHUB_OUTPUT"
           fi
           if grep -q '^STATUS_DRIFT=1$' monitor-out.txt; then
             echo "status_drift=true" >> "$GITHUB_OUTPUT"
@@ -91,68 +85,48 @@ jobs:
             echo "type_drift=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit report (+ any auto-wired registry entries)
-        if: github.event.inputs.dry_run != 'true'
-        run: |
-          git config user.name "source-monitor[bot]"
-          git config user.email "source-monitor@users.noreply.github.com"
-          git add docs/source-monitor-report.md supabase/functions/get-address-report/jurisdiction-registry.json
-          if git diff --cached --quiet; then
-            echo "No changes to commit (report unchanged?)"; exit 0
-          fi
-          if [ "${{ steps.monitor.outputs.registry_changed }}" = "true" ]; then
-            git commit -m "source-monitor: auto-wire new source(s) + nightly report"
-          else
-            git commit -m "source-monitor: nightly report"
-          fi
-          # The monitor runs ~20 minutes; any merge to main during that window makes a
-          # bare push fail "fetch first" and throws the whole nightly report away
-          # (observed 2026-08-02, run 30765171160). Rebase onto the moved tip and retry —
-          # the commit only ever touches the report + registry, so a rebase is safe.
-          for attempt in 1 2 3 4; do
-            # A push from this job must not become the head of an open PR (its checks would never run).
-            GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/scripts/guard_bot_push.sh" "${{ github.ref_name }}" || { [ $? -eq 4 ] && exit 0; exit 1; }
-            if git push origin "HEAD:${{ github.ref_name }}"; then
-              echo "pushed on attempt $attempt"; exit 0
-            fi
-            echo "push rejected (attempt $attempt) — rebasing onto the moved tip"
-            git fetch origin "${{ github.ref_name }}"
-            git rebase "origin/${{ github.ref_name }}" || { git rebase --abort; echo "::error::rebase conflict on the monitor report — resolve manually"; exit 1; }
-            sleep $((attempt * 4))
-          done
-          echo "::error::could not push the nightly report after 4 attempts"; exit 1
+      # The run's evidence, kept 30 days: run-report.md (the same section the job summary shows),
+      # proposed-registry-entries.json (`[]` when nothing passed the gate) and the full log. This
+      # replaces the nightly commit to docs/source-monitor-report.md. `always()`: a run that goes
+      # red is exactly the run whose evidence matters.
+      - name: Upload the run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-monitor-${{ github.run_id }}
+          path: ${{ runner.temp }}/source-monitor/
+          retention-days: 30
+          if-no-files-found: warn
 
-      - name: Deploy engine so the 09:00 UTC refresh ingests the new source(s)
-        if: github.event.inputs.dry_run != 'true' && steps.monitor.outputs.registry_changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      # A candidate passed the fail-closed auto-wire gate. Until 2026-10-22 this job appended it to
+      # the registry and pushed it to main; that credential is gone, so the finding is reported and
+      # the run goes red until someone wires it through a PR. Never dropped silently: an entry that
+      # is not wired is proposed again on every nightly run. Only entries NOT already in the
+      # registry raise REGISTRY_PROPOSED, so an include_wired validation run cannot trip it on
+      # entries that are already wired.
+      - name: Fail on a proposed registry entry (passed the auto-wire gate, needs a PR to wire)
+        if: always() && steps.monitor.outputs.registry_proposed == 'true'
         run: |
-          gh workflow run deploy-edge-functions.yml \
-            --repo "${{ github.repository }}" \
-            --ref "${{ github.ref_name }}" \
-            -f function=get-address-report
-          echo "deploy-edge-functions dispatched; the nightly dev_refresh (09:00 UTC) + app-content"
-          echo "refresh (09:20 UTC) will materialize the new records onto pages tonight."
+          echo "::error::A source passed the auto-wire gate, but nothing is wired automatically any more. The registry entry it built is in this run's job summary (section 'Proposed registry entries') and in its source-monitor artifact as proposed-registry-entries.json. To wire it, add that entry to supabase/functions/get-address-report/jurisdiction-registry.json on a branch, open a PR and merge it, then run deploy-edge-functions with function=get-address-report."
+          exit 1
 
-      # LAST step on purpose. An unmapped status DROPS records, so the run must go red — but
-      # every existing side effect (report commit, registry auto-wire push, engine deploy
-      # dispatch) has to complete first, or the evidence dies with the failed run and a
-      # legitimately auto-wired source silently never deploys. `| tee` masks node's own exit
-      # code, hence the grep-able STATUS_DRIFT marker (same idiom as REGISTRY_CHANGED).
+      # An unmapped status DROPS records, so the run must go red — but the artifact upload above
+      # has to complete first, or the evidence dies with the failed run. `| tee` masks node's own
+      # exit code, hence the grep-able STATUS_DRIFT marker (same idiom as REGISTRY_PROPOSED).
       - name: Fail on status-domain drift (unmapped statuses are dropping records)
         if: always() && steps.monitor.outputs.status_drift == 'true'
         run: |
-          echo "::error::Unmapped status value(s) found in live data for one or more registry entries — those records are being DROPPED by the connectors. See the 'Status-domain drift' table in docs/source-monitor-report.md (also in this run's job summary) for the exact registry_id, status field, values and record counts, then add each value VERBATIM to that entry's status_to_bucket in jurisdiction-registry.json."
+          echo "::error::Unmapped status value(s) found in live data for one or more registry entries — those records are being DROPPED by the connectors. See the 'Status-domain drift' table in this run's job summary (also in its source-monitor artifact) for the exact registry_id, status field, values and record counts, then add each value VERBATIM to that entry's status_to_bucket in jurisdiction-registry.json."
           exit 1
 
       # Its own step, not folded into the status one: the two failures need DIFFERENT fixes
       # (status_to_bucket vs include_types + type_map), and one shared error message would send
-      # whoever reads it to the wrong file. Same `always()` + last-position discipline so every
-      # side effect above still completes before the run goes red.
+      # whoever reads it to the wrong file. Same `always()` discipline, so the artifact upload
+      # above still completes before the run goes red.
       - name: Fail on type-domain drift (unlisted include_types values are never fetched)
         if: always() && steps.monitor.outputs.type_drift == 'true'
         run: |
-          echo "::error::Live type value(s) found that are in NEITHER include_types NOR observed_types_unreviewed for one or more registry entries. Because include_types is pushed down into the query, those records are NEVER FETCHED — no record, no quarantine, no unclassified pin, only a count that fails to grow (Cleveland's 'Install Permits' was dropped this way for five months). See the 'Type-domain drift' Tier 1 table in docs/source-monitor-report.md (also in this run's job summary), then add each value VERBATIM to that entry's include_types WITH a type_map line — or, if it is deliberate noise, to observed_types_unreviewed with that decision recorded."
+          echo "::error::Live type value(s) found that are in NEITHER include_types NOR observed_types_unreviewed for one or more registry entries. Because include_types is pushed down into the query, those records are NEVER FETCHED — no record, no quarantine, no unclassified pin, only a count that fails to grow (Cleveland's 'Install Permits' was dropped this way for five months). See the 'Type-domain drift' Tier 1 table in this run's job summary (also in its source-monitor artifact), then add each value VERBATIM to that entry's include_types WITH a type_map line — or, if it is deliberate noise, to observed_types_unreviewed with that decision recorded."
           exit 1
       # MOVED AFTER THE MONITOR, 2026-08-19. It used to run first, and for **11+ consecutive
       # runs** (every scheduled run from at least 2026-08-09 through 2026-08-19, plus a dispatch)
@@ -171,11 +145,11 @@ jobs:
       # to be able to fail the job or the assertion is decorative. It still fails the run — it
       # just no longer takes the drift gates down with it.
       #
-      # LAST, and `always()`, for the SAME reason the drift-fail steps are: every side effect
-      # above (report commit, registry auto-wire push, engine deploy dispatch) must complete
-      # first. Merely moving this below the monitor was not enough — a scoreboard throw would
-      # then have SKIPPED the commit step, and the monitor's evidence would die with it, which
-      # is the same class of mistake in a new place.
+      # LAST, and `always()`, for the SAME reason the drift-fail steps are: every step above
+      # (today the artifact upload; until 2026-10-22 the report commit, registry auto-wire push
+      # and engine deploy dispatch) must complete first. Merely moving this below the monitor was
+      # not enough — a scoreboard throw would then have SKIPPED the evidence step, and the
+      # monitor's evidence would die with it, which is the same class of mistake in a new place.
       #
       # Public reads use the committed anon key from config.js. The ONE internal read (dev_zip_source_ids) needs the repo's
       # existing SUPABASE_SERVICE_ROLE_KEY secret, scoped to this step only: anon lost SELECT on app_zip_source_ids on 2026-09-26
