@@ -33,6 +33,11 @@ jobs:
         run: node scripts/fetch-tabs-fixtures.mjs
       - name: Commit fixtures to this branch
         run: |
+          # Never main (2026-10-22): no workflow pushes to main. test/no-deploy-key-push.test.mjs.
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "::error::This workflow commits fixtures to a feature branch and never pushes to main. Dispatch it with ref set to your branch."
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add fixtures/tabs/

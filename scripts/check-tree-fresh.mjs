@@ -51,6 +51,8 @@ if (!containsMain) {
   try { missing = sh('git diff --name-only HEAD...origin/main').split('\n').filter(Boolean); } catch { /* leave empty */ }
 }
 // Nightly automation lands on main constantly and is never what a stale checkout is about.
+// (Since 2026-10-22 neither file is committed nightly any more: sitemap.yml is deleted and
+// source-monitor reports to its job summary and artifact. Kept so an older base still reads clean.)
 const NOISE = new Set(['sitemap.xml', 'docs/source-monitor-report.md']);
 const real = missing.filter((f) => !NOISE.has(f));
 
