@@ -40,8 +40,12 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // wa-ecology-sepa-register (Washington Department of Ecology's SEPA Register, data.wa.gov mmcb-z6jf; the dataset states no
 // licence, its only usage note links ecology.wa.gov/copyright.html): 248 -> 249 ids. Prior value ea181c28aedbb6a7c17e3f16e6ab6460.
 // Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
-const FINGERPRINT_2026_10_04 = 'b011e6f351281ba376cef8444dc98533';
-const EXPECTED_IDS = 249;
+// Founder approval 2026-10-22 (Washington audit step 2, asked and answered in session) cleared exactly one source,
+// spokane-city-permits (City of Spokane's own nightly Accela permit layer, services.spokanegis.org; the layer states no licence,
+// only a 'not a legal document' disclaimer): 249 -> 250 ids. Prior value b011e6f351281ba376cef8444dc98533.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = 'ae89c23c9d47ef1ea20eb40732cbb4d4';
+const EXPECTED_IDS = 250;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();

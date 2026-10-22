@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`249` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `b011e6f351281ba376cef8444dc98533`.
+`250` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `ae89c23c9d47ef1ea20eb40732cbb4d4`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -268,6 +268,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `slc-planning-petitions`
 - `slo-county-planning-permits`
 - `sonoma-county-fire-rebuild-permits`
+- `spokane-city-permits`
 - `spokane-county-building-planning-permits`
 - `stamford-major-developments`
 - `stlouis-county-mo-subdivisions`
