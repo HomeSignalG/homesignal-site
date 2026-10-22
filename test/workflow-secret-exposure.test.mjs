@@ -22,11 +22,9 @@ import assert from 'node:assert/strict';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const wfDir = join(root, '.github', 'workflows');
 
-const KNOWN_EXPOSED = {
-  'dc-geocode-probe.yml:probe': 'zero-write geocoding probe run on PRs that change it (session 01LBMSdQ, 2026-09-24)',
-  'dc-step3c-probe.yml:probe': 'read-only publisher probe run on PRs that change it (session 01F18S91, 2026-09-24)',
-  'dc-step3c-reconcile.yml:reconcile': 'read-only live reconciliation that is a PR verification gate by design (session 01F18S91, 2026-09-24)',
-};
+// Empty since 2026-10-22: dc-geocode-probe and dc-step3c-probe became dispatch-only, and
+// dc-step3c-reconcile runs only its offline core on PRs (the live job is guarded and runs on main).
+const KNOWN_EXPOSED = {};
 
 // A job is excluded from pull_request only by a job-level `if:` that is a pure conjunction (no `||`, no
 // negation) containing one of these conjuncts EXACTLY. `!= 'pull_request'` does not exclude

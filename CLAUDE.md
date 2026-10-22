@@ -2820,9 +2820,20 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
     - ⚠️ **homesignal-ingest runs 14 PR-time database gates with `SUPABASE_WRITE_KEY` by design** (measured
       2026-09-26). This test does not cover them. The fix for both repos is the same boundary: a protected
       environment, or a read-only key for read-only gates.
-    - Three exposures from other sessions are named in its `KNOWN_EXPOSED`, each with a reason:
+      - ✅ **Ingest half done 2026-10-19/20:** ingest's PR checks now read production through its `ci-read`
+        gateway with a short-lived GitHub OIDC token, and no ingest workflow that runs branch code
+        references a secret (homesignal-ingest #723, #727, #731; its `tests/test_workflow_secret_exposure.py`).
+    - Three exposures from other sessions were named in its `KNOWN_EXPOSED`, each with a reason:
       `dc-geocode-probe`, `dc-step3c-probe`, `dc-step3c-reconcile` (a PR gate by design). The list can
       only shrink.
+      - ✅ **Shrunk to zero 2026-10-22.** `dc-geocode-probe` and `dc-step3c-probe` are dispatch-only.
+        `dc-step3c-reconcile` runs its offline core on PRs; its live job (account-wide
+        `SUPABASE_ACCESS_TOKEN`) is guarded `if: github.event_name != 'pull_request'` and runs when the same
+        paths reach `main` and on dispatch, so a breaking change shows red minutes after merge instead of
+        before it. A live pre-merge gate needs a read-only production path, which the site does not have.
+      - ⚠️ **Still open:** all of these workflows can be dispatched from any branch with the secrets. Only
+        the protected `production` environment closes that (founder step 9; draft #1333 is the earlier
+        version of the workflow half).
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
   - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
