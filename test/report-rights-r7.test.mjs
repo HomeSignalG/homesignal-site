@@ -36,8 +36,12 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // Founder approval 2026-10-22 (Skagit WA, asked and answered in session) cleared exactly one source,
 // skagit-county-active-permits (Skagit County Planning's Active Permits layer): 247 -> 248 ids. Prior value 2fb0d4dda0e77ea6f966a9b10450155a.
 // Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
-const FINGERPRINT_2026_10_04 = 'ea181c28aedbb6a7c17e3f16e6ab6460';
-const EXPECTED_IDS = 248;
+// Founder approval 2026-10-22 (Washington audit, asked and answered in session) cleared exactly one source,
+// wa-ecology-sepa-register (Washington Department of Ecology's SEPA Register, data.wa.gov mmcb-z6jf; the dataset states no
+// licence, its only usage note links ecology.wa.gov/copyright.html): 248 -> 249 ids. Prior value ea181c28aedbb6a7c17e3f16e6ab6460.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = 'b011e6f351281ba376cef8444dc98533';
+const EXPECTED_IDS = 249;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();

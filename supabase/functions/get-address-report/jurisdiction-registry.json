@@ -528,6 +528,47 @@
       "_receipts": "2026-07-15: max applieddate 2026-07-13; 19 statuses VERBATIM (distinct); types Master Use Permit (21,169) + Early Design Guidance (3,320) - both kept, no noise; per-record link.url. Successor of the DEAD uyyd-8gak id (views API 404)."
     },
     {
+      "registry_id": "wa-ecology-sepa-register",
+      "geocode_assemble": true,
+      "platform": "socrata",
+      "domain": "data.wa.gov",
+      "dataset_id": "mmcb-z6jf",
+      "dataset_url": "https://data.wa.gov/Natural-Resources-Environment/State-Environmental-Policy-Act-SEPA-Register/mmcb-z6jf",
+      "jurisdiction": "Washington State Department of Ecology (SEPA Register)",
+      "coverage": [
+        {
+          "state": "WA"
+        }
+      ],
+      "column_map": {
+        "title": "proposalname",
+        "type_source": "proposaltypename",
+        "file_date": "publisheddate",
+        "address": "siteline1address",
+        "lat": "sitelatitudedecimal",
+        "lng": "sitelongitudedecimal",
+        "case_number": "sepanumber",
+        "zip": "sitezipcode",
+        "record_url": "separegisterlink"
+      },
+      "type_map": {
+        "Project": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "status_const": "proposed",
+      "record_url_precision": "record",
+      "file_date_kind": "filed",
+      "extra_where": "proposaltypename = 'Project' AND documenttypecode != 'CANADA' AND (documentsubtypecode IS NULL OR documentsubtypecode != 'WITHDRAWN') AND leadagencyname NOT IN ('WA Department of Natural Resources','Washington State Pollution Liability Insurance Agency') AND (sitelatitudedecimal IS NULL OR (sitelatitudedecimal between 45.5 and 49.1 AND sitelongitudedecimal between -124.9 and -116.8))",
+      "incremental_field": "publisheddate",
+      "recency_days": 365,
+      "_receipts": "2026-10-22 founder-approved (WA audit, step 1). Washington State Department of Ecology's own SEPA Register on data.wa.gov (Socrata mmcb-z6jf, attribution 'Washington State Department of Ecology'), data_updated_at 2026-10-22T14:05Z, 191,687 rows 2014-09-03..2026-10-21. Last 365 days (pg_net, connector scope): 5,206 records; proposaltypename Project 3,806 / Nonproject 953 (plans, regulations: excluded) / Combination 142 / blank 305. documentsubtypecode WITHDRAWN (31 project rows) excluded: a withdrawn SEPA determination is the lead agency's act, not an applicant withdrawal, so it is not mapped to the 'withdrawn' decision bucket. CANADA (transboundary notice, 1 row) excluded. Lead agency WA Department of Natural Resources (322, forest practice applications and timber sales, sampled 30 titles) and Washington State Pollution Liability Insurance Agency (69, tank cleanups) excluded as not development. 32 rows carry coordinates outside Washington (most a missing minus sign on longitude, e.g. 122.9568; two are '4','1'): excluded at source by the bbox clause rather than sign-corrected, which would be a guess. Every row is a SEPA notice under environmental review with a comment period, so status_const proposed; publisheddate is the date Ecology posted it (file_date_kind filed). sitezipcode text, 5-digit on 3,258 / ZIP+4 on 10 (ZIP+4 rows miss the native filter; accepted). separegisterlink is a per-record Ecology page (Record.aspx?SEPANumber=), verified: real 202604463 -> 200, 20,670 bytes, title '202604463 - Medina City of'; made-up 999999999 -> 7,583-byte empty shell. Columns deliberately NOT mapped: applicantname, applicantcontactinfo, leadagencycontactname/email/phone (personal contact details). Connector-scope probe (same extra_where, 365 days): 98226 59 records (56 with coordinates), 98273 18 (17), 99336 11 (6), 98901 10 (10), 98036 7 (5), 98103 6 (6), 98074 3 (2), 99203 0. Over the 362 WA ZIP pages, before the DNR/PLIA/bbox exclusions: 221 pages carry at least one project record in their own ZIP (1,539 records), including 17 of the 37 pages Map 1 drew with no dots."
+    },
+    {
       "registry_id": "chicago-building-permits",
       "geocode_assemble": true,
       "platform": "socrata",

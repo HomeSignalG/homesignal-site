@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`248` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `ea181c28aedbb6a7c17e3f16e6ab6460`.
+`249` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `b011e6f351281ba376cef8444dc98533`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -288,6 +288,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `virginia-beach-building-permits`
 - `vtrans-project-locations`
 - `vtrans-project-locations-lines`
+- `wa-ecology-sepa-register`
 - `wake-county-building-permits`
 - `weld-county-site-plan-review`
 - `wisdot-highway-program-6yr`
