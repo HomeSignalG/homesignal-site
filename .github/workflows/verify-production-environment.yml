@@ -1,8 +1,11 @@
 name: verify-production-environment
 
 # Proves that the three PROD_ secrets of the GitHub environment `production` work, without
-# printing any of them. Dispatch-only and writes nothing: the database check runs with
-# default_transaction_read_only=on, every HTTP check is a GET.
+# printing any of them. Dispatch-only and writes nothing: the database check runs inside
+# BEGIN READ ONLY and asserts transaction_read_only = on in the same select (the production URL
+# goes through a pooler that drops PGOPTIONS, so a startup option cannot make it read-only), then
+# rolls back; every HTTP check is a GET, and no redirect is followed, so no key or token reaches
+# another URL. The database password reaches psql through PGPASSWORD, never its argument list.
 #   From main: every row must PASS.
 #   From any other branch: the environment must refuse the job before a runner starts (0 steps).
 #
@@ -16,8 +19,10 @@ name: verify-production-environment
 # test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.
 #
 # Every check prints expected vs observed to the log and the job summary. Observed values are only
-# HTTP codes, counts, the port, the project ref and status, and the control count; never a secret,
-# a response body or the database URL. A single FAIL makes the run red.
+# HTTP codes, counts, the port, the project ref and status, the control count and the read-only
+# setting; never a secret, a response body or the database URL. A single FAIL makes the run red.
+# The anon key from config.js is the negative control, so it is first shown to be valid (it reads a
+# table with a public read policy); an invalid key would also be "refused".
 
 on:
   workflow_dispatch: {}
@@ -82,24 +87,38 @@ jobs:
           # api.supabase.com sits behind Cloudflare, which refuses Python's default User-Agent with
           # HTTP 403 (error 1010) before authentication. Sent on every request here.
           UA = "HomeSignal-verify-prod/1.0 (+https://homesignal.net)"
-          DB_URL = os.environ.get("PROD_DB_URL", "")
-          SERVICE = os.environ.get("SERVICE_KEY", "")
-          TOKEN = os.environ.get("ACCESS_TOKEN", "")
+          # Stripped: a secret pasted with a trailing newline would otherwise fail as a malformed header.
+          DB_URL = os.environ.get("PROD_DB_URL", "").strip()
+          SERVICE = os.environ.get("SERVICE_KEY", "").strip()
+          TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
           rows = []
+
 
           def clean(v, n=60):
               """Observed values are codes, counts and identifiers only: keep a safe charset."""
               return re.sub(r"[^A-Za-z0-9_.,:()<>=/*+ -]", "?", str(v))[:n]
 
+
           def row(name, expected, observed, ok):
               rows.append((name, clean(expected, 80), clean(observed), "PASS" if ok else "FAIL"))
+
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              """Never follow a redirect, so no key or token is sent to another URL. A 3xx becomes an
+              HTTPError and its status fails the check."""
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+
+          OPENER = urllib.request.build_opener(NoRedirect)
+
 
           def get(url, headers=None):
               """GET. Returns (status, parsed JSON or None). status 0 = no HTTP answer. Never prints."""
               h = {"User-Agent": UA, "Accept": "application/json"}
               h.update(headers or {})
               try:
-                  with urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=30) as r:
+                  with OPENER.open(urllib.request.Request(url, headers=h), timeout=30) as r:
                       status, raw = r.status, r.read()
               except urllib.error.HTTPError as e:
                   status, raw = e.code, e.read()
@@ -110,30 +129,50 @@ jobs:
               except ValueError:
                   return status, None
 
+
           def key_headers(key):
               return {"apikey": key, "Authorization": "Bearer " + key}
+
 
           # C0: the three secrets reach this step.
           for name, value in (("PROD_SUPABASE_DB_URL", DB_URL), ("PROD_SUPABASE_SERVICE_ROLE_KEY", SERVICE),
                               ("PROD_SUPABASE_ACCESS_TOKEN", TOKEN)):
               row("C0 %s is set" % name, "set", "set" if value else "MISSING", bool(value))
 
-          # C1: the database URL. Parsed here, never printed.
+          # C1: the database URL. Parsed here into libpq's PG* variables, so the password reaches psql
+          # through its environment (readable only by this user), never its argument list (/proc/*/cmdline
+          # is world-readable). Nothing from the URL is printed except the port.
           row("C1a URL names project %s" % REF, "yes", "yes" if REF in DB_URL else "no", REF in DB_URL)
+          pg = None
           try:
               u = urllib.parse.urlsplit(DB_URL)
-              port = u.port or 5432          # libpq's default; the same rule scripts/dc-*-apply.sh use
               query = urllib.parse.parse_qs(u.query)
+              port = u.port or 5432          # libpq's default; the same rule scripts/dc-*-apply.sh use
               if "port" in query:
                   port = int(query["port"][-1])
-              port_seen = str(port) if u.scheme in ("postgres", "postgresql") else "not a postgres:// URI"
+              if u.scheme not in ("postgres", "postgresql"):
+                  port_seen = "not a postgres:// URI"
+              elif not u.hostname:
+                  port_seen = "no host in the URL"
+              else:
+                  port_seen = str(port)
+                  pg = {"PGHOST": u.hostname, "PGPORT": str(port),
+                        "PGSSLMODE": query.get("sslmode", ["require"])[-1], "PGCONNECT_TIMEOUT": "15"}
+                  if u.username:
+                      pg["PGUSER"] = urllib.parse.unquote(u.username)
+                  if u.password is not None:
+                      pg["PGPASSWORD"] = urllib.parse.unquote(u.password)
+                  if u.path.lstrip("/"):     # empty: libpq defaults the database name to the user name
+                      pg["PGDATABASE"] = urllib.parse.unquote(u.path.lstrip("/"))
           except ValueError:
               port_seen = "unparseable"
+
 
           def classify(err):
               e = err.lower()
               for needle, label in (("password authentication failed", "authentication failed"),
                                     ("tenant or user not found", "pooler: tenant or user not found"),
+                                    ("network is unreachable", "network unreachable (the direct host is IPv6-only; use the session pooler)"),
                                     ("timeout expired", "connect timeout"),
                                     ("could not translate host name", "host name not resolved"),
                                     ("connection refused", "connection refused"),
@@ -144,36 +183,53 @@ jobs:
                       return label
               return "other error (text withheld)"
 
-          env = {k: v for k, v in os.environ.items() if k not in ("SERVICE_KEY", "ACCESS_TOKEN")}
-          env.update(PGCONNECT_TIMEOUT="15",
-                     PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=20s")
-          try:
-              p = subprocess.run(["psql", DB_URL, "-XAtq", "-F,", "-v", "ON_ERROR_STOP=1", "-c",
-                                  "select 1, (select count(*) from public.canonical_zip_registry)"],
-                                 env=env, capture_output=True, text=True, timeout=60)
-              db_seen = p.stdout.strip() if p.returncode == 0 else "psql exit %d (%s)" % (p.returncode, classify(p.stderr))
-          except subprocess.TimeoutExpired:
-              db_seen = "psql timed out"
-          except OSError:
-              db_seen = "psql not runnable"
-          row("C1b read-only select 1 and the canonical ZIP count", "1,12722", db_seen, db_seen == "1,12722")
-          row("C1c port: 5432 (direct or session pooler), never 6543 (transaction pooler)", "5432", port_seen,
+
+          # Read-only is enforced INSIDE the transaction: the production URL goes through a pooler that
+          # drops startup options, so PGOPTIONS (default_transaction_read_only, statement_timeout) never
+          # reaches the server. BEGIN READ ONLY, assert transaction_read_only = on in the same select, roll back.
+          if pg is None:
+              db_seen = "not run: %s" % port_seen
+          else:
+              env = {k: v for k, v in os.environ.items()
+                     if k not in ("PROD_DB_URL", "SERVICE_KEY", "ACCESS_TOKEN") and not k.startswith("PG")}
+              env.update(pg)
+              try:
+                  p = subprocess.run(["psql", "-XAtq", "-F,", "-v", "ON_ERROR_STOP=1",
+                                      "-c", "begin read only",
+                                      "-c", "set local statement_timeout = '20s'",
+                                      "-c", "select 1, (select count(*) from public.canonical_zip_registry), "
+                                            "current_setting('transaction_read_only')",
+                                      "-c", "rollback"],
+                                     env=env, capture_output=True, text=True, timeout=60)
+                  db_seen = p.stdout.strip() if p.returncode == 0 else "psql exit %d (%s)" % (p.returncode, classify(p.stderr))
+              except subprocess.TimeoutExpired:
+                  db_seen = "psql timed out"
+              except OSError:
+                  db_seen = "psql not runnable"
+          row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12722,on",
+              db_seen, db_seen == "1,12722,on")
+          row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
               port_seen == "5432")
 
           # C2: the service-role key. Each positive check is paired with the public anon key on the
-          # same request, so a PASS proves the key can do more than anon can.
+          # same request, so a PASS proves the key can do more than anon can. The anon key is first shown
+          # to be VALID (it reads a table with a public read policy), because an invalid or rotated anon key
+          # would also be "refused" and would make the controls pass without proving anything.
           m = re.search(r"SUPABASE_ANON_KEY:\s*'([^']+)'", open("config.js", encoding="utf-8").read())
           anon = m.group(1) if m else ""
           row("C2 control: anon key found in config.js", "found", "found" if anon else "missing", bool(anon))
+          g, gb = get(REST + "/rest/v1/canonical_zip_registry?select=zip&limit=1", key_headers(anon)) if anon else (0, None)
+          g_n = len(gb) if isinstance(gb, list) else None
+          row("C2 control: anon key is valid (reads canonical_zip_registry, public read policy)", "200, 1 row",
+              "%s, %s row(s)" % (g, g_n), g == 200 and g_n == 1)
           table = REST + "/rest/v1/app_zip_source_ids?limit=0"
           s, _ = get(table, key_headers(SERVICE))
           a, _ = get(table, key_headers(anon)) if anon else (0, None)
           row("C2a service key reads app_zip_source_ids", "200", s, s == 200)
           row("C2b control: anon refused on the same read", "401 or 403", a, a in (401, 403))
-          # Storage: storage.buckets has RLS and no anon policy. The service role bypasses RLS and
-          # sees every bucket; for anon, Storage answers either with an error status or with an empty
-          # list, depending on its version. Both mean anon cannot list buckets, so either passes the
-          # control; anon seeing any bucket fails it (the check could not tell the two keys apart).
+          # Storage: storage.buckets has RLS and no policy, so the service role (which bypasses RLS) sees
+          # every bucket and anon gets 200 with an empty list (measured 2026-10-22: 3 buckets, 0 policies).
+          # Any other anon answer fails the control and needs a look.
           buckets = REST + "/storage/v1/bucket"
           s, sb = get(buckets, key_headers(SERVICE))
           a, ab = get(buckets, key_headers(anon)) if anon else (0, None)
@@ -181,8 +237,8 @@ jobs:
           a_n = len(ab) if isinstance(ab, list) else None
           row("C2c service key lists storage buckets", "200, >= 1 bucket", "%s, %s bucket(s)" % (s, s_n),
               s == 200 and bool(s_n))
-          row("C2d control: anon refused, or sees no bucket", "400/401/403, or 200 with 0 buckets",
-              "%s, %s bucket(s)" % (a, a_n), a in (400, 401, 403) or (a == 200 and a_n == 0))
+          row("C2d control: anon lists no bucket", "200, 0 buckets", "%s, %s bucket(s)" % (a, a_n),
+              a == 200 and a_n == 0)
 
           # C3: the Management API token.
           bearer = {"Authorization": "Bearer " + TOKEN}

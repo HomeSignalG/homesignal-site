@@ -8,20 +8,30 @@
 //   SECRET      take PROD_ secrets only as the whole value of a step-level env key, reference no
 //               other secret anywhere (comments included: GitHub expands ${{ }} inside run comments),
 //               and reference at least one PROD_ secret (a bare environment that guards nothing is noise);
-//   RUN_EXPR    contain no ${{ }} inside run: text outside the R15 allowlist, so every input reaches
-//               the shell only through env.
+//   RUN_EXPR    contain no ${{ }} inside run:, shell:, working-directory: or with: values outside the
+//               R15 allowlist, so every input reaches the shell only through env;
+//   STATUS_IF   (design R11) give every step that holds a PROD_ secret and whose if: calls always(),
+//               failure() or cancelled() the top-level conjunct steps.boundary.outcome != 'failure',
+//               with no ||: those steps still run after the boundary step refuses;
+//   CHECKOUT_REF (design R12) pass no ref: or repository: to actions/checkout.
 // Each workflow must:
 //   TRIGGER     be workflow_dispatch only (no pull_request, pull_request_target or workflow_run);
 //   PERMISSIONS be exactly `contents: read`, with no job-level override;
-//   DEFAULTS    set no defaults:, container: or BASH_ENV/ENV (each can re-route the boundary step's
-//               shell, so its exit 1 would not run, while its text stays byte-equal);
-//   ACTION_PIN  pin any action outside actions/* to a full 40-hex commit SHA with its tag in a comment.
+//   DEFAULTS    set no defaults: or container:, and no env key BASH_ENV, ENV, BASH_FUNC_*, SHELLOPTS,
+//               BASHOPTS or PS4 in any form (block, flow, quoted): each can re-route or neuter the
+//               boundary step's shell (BASH_FUNC_exit%% turns its exit 1 into a no-op) while its text
+//               stays byte-equal;
+//   ACTION_PIN  pin any action outside actions/* to a full 40-hex commit SHA with its tag in a comment;
+//   NO_REDIRECT send no Authorization header through urllib unless redirects are refused (a followed
+//               redirect resends the header to the new URL): the NoRedirect opener, never urlopen.
 // db-read.yml must also:
-//   READ_ONLY   name the read-only endpoint and no other /database/query endpoint.
+//   READ_ONLY   name exactly one API URL (non-comment lines): the canonical ENDPOINT line for
+//               /database/query/read-only, used as the URL of the only Request(.
 //
 // The canonical text and constants live in ONE place, test/lib/production-boundary.mjs. This is not
 // the full rule test (that comes with the switch of the 36 existing jobs). HYGIENE, NOT THE BOUNDARY:
-// a PR can edit this test; the environment's main-only branch rule is what enforces.
+// a PR can edit this test, and a line scanner cannot follow code that builds a URL or an expression
+// from fragments; the environment's main-only branch rule is what enforces.
 //
 // Every check is load-bearing: in-memory fixtures prove it fails on a violating copy, and mutations of
 // the real files prove it fires on them too (each mutation first asserts that the text changed).
@@ -121,13 +131,15 @@ function dedent(text, n) {
   return out.join('\n');
 }
 
-/** Every run: value (inline remainder plus its more-indented continuation lines). */
-function runBlocks(lines) {
+/** Every value of a key (inline remainder plus its more-indented continuation lines). Lines inside
+ *  a run: value are skipped, so script text such as Python's `with` is never read as a key. */
+function keyBlocks(lines, key, skip = new Set()) {
   const out = [];
+  const re = new RegExp(`^(\\s*)(- )?${key}\\s*:(.*)$`);
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
-    if (isCommentLine(l)) continue;
-    const m = l.match(/^(\s*)(- )?run\s*:(.*)$/);
+    if (isCommentLine(l) || skip.has(i)) continue;
+    const m = l.match(re);
     if (!m) continue;
     const keyIndent = m[1].length + (m[2] ? 2 : 0);
     const text = [m[3]];
@@ -135,11 +147,73 @@ function runBlocks(lines) {
     for (; k < lines.length; k++) {
       if (blank(lines[k]) || indentOf(lines[k]) > keyIndent) text.push(lines[k]); else break;
     }
-    out.push({ line: i + 1, text: text.join('\n') });
+    out.push({ line: i + 1, start: i, end: k, text: text.join('\n') });
     i = k - 1;
   }
   return out;
 }
+const runBlocks = (lines) => keyBlocks(lines, 'run');
+
+/** The steps of a job: arrays of {n, l}, each from its `- ` line to the next step. */
+function stepsOf(job) {
+  const s = job.body.findIndex(({ l }) => /^ {4}steps\s*:\s*(#.*)?$/.test(l));
+  if (s < 0) return [];
+  const steps = [];
+  let cur = null;
+  for (let k = s + 1; k < job.body.length; k++) {
+    const { l } = job.body[k];
+    if (/^ {6}- /.test(l)) { cur = [job.body[k]]; steps.push(cur); continue; }
+    if (!skippable(l) && indentOf(l) < 6) break;
+    if (cur) cur.push(job.body[k]);
+  }
+  return steps;
+}
+
+/** A step-level key's value (first line after the colon plus deeper continuation lines), or null. */
+function stepKey(step, key) {
+  const re = new RegExp(`^(?: {6}- | {8})${key}\\s*:(.*)$`);
+  for (let i = 0; i < step.length; i++) {
+    const m = step[i].l.match(re);
+    if (!m) continue;
+    const parts = [m[1]];
+    for (let k = i + 1; k < step.length && (blank(step[k].l) || indentOf(step[k].l) > 8); k++) {
+      if (!isCommentLine(step[k].l)) parts.push(step[k].l);
+    }
+    return parts.join('\n');
+  }
+  return null;
+}
+
+/** An if: value as an expression: block-scalar indicator, quotes and a ${{ }} wrapper removed. */
+function ifExpression(value) {
+  let e = value.trim().replace(/^[|>][+-]?\s*\n/, '').trim();
+  if (e.length >= 2 && (e[0] === '"' || e[0] === "'") && e[e.length - 1] === e[0]) e = e.slice(1, -1).trim();
+  const m = e.match(/^\$\{\{([\s\S]*)\}\}$/);
+  return (m ? m[1] : e).trim();
+}
+
+/** Split an expression on && at parenthesis depth 0, outside '…' strings. */
+function topLevelAnd(e) {
+  const out = [];
+  let depth = 0, quoted = false, cur = '';
+  for (let i = 0; i < e.length; i++) {
+    const c = e[i];
+    if (quoted) { cur += c; if (c === "'") quoted = false; continue; }
+    if (c === "'") { quoted = true; cur += c; continue; }
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    if (depth === 0 && e.startsWith('&&', i)) { out.push(cur.trim()); cur = ''; i++; continue; }
+    cur += c;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+const BOUNDARY_CONJUNCT = "steps.boundary.outcome != 'failure'";
+// The one URL db-read may name, and the forms that must be absent elsewhere (non-comment lines).
+const ENDPOINT_LINE = 'ENDPOINT = "https://api.supabase.com/v1/projects/%s/database/query/read-only" % REF';
+// Env keys that change how bash starts or what its builtins do.
+const SHELL_ENV_KEY = /(^\s*|[{,]\s*)['"]?(BASH_ENV|ENV|BASH_FUNC_[^'"\s:]*|SHELLOPTS|BASHOPTS|PS4)['"]?\s*:/;
 
 // A line that references secrets in any form: ${{ … secrets … }}, secrets.NAME, secrets[...].
 const SECRET_REF = /\$\{\{[^}]*\bsecrets\b|\bsecrets\s*(?:\.\s*[A-Za-z_]|\[)/;
@@ -176,10 +250,11 @@ export function violations(name, text) {
     }
   }
 
-  // DEFAULTS (workflow level)
+  // DEFAULTS (workflow level), and shell-start env keys anywhere, in block, flow or quoted form
   if (lines.some((l) => /^defaults\s*:/.test(l))) v('DEFAULTS', 'workflow-level defaults: is not allowed');
   lines.forEach((l, i) => {
-    if (!isCommentLine(l) && /^\s+(BASH_ENV|ENV)\s*:/.test(l)) v('DEFAULTS', `line ${i + 1}: ${l.trim().split(':')[0]} is not allowed`);
+    const m = isCommentLine(l) ? null : l.match(SHELL_ENV_KEY);
+    if (m) v('DEFAULTS', `line ${i + 1}: env key ${m[2]} is not allowed (it can re-route or neuter the boundary step's shell)`);
   });
 
   // ACTION_PIN
@@ -211,13 +286,36 @@ export function violations(name, text) {
     secretLines.add(i);
   });
 
-  // RUN_EXPR
-  for (const r of runBlocks(lines)) {
-    const exprs = [...r.text.matchAll(/\$\{\{([\s\S]*?)\}\}/g)];
-    if ((r.text.match(/\$\{\{/g) || []).length !== exprs.length) v('RUN_EXPR', `run: at line ${r.line} has an unclosed \${{`);
-    for (const e of exprs) {
-      if (!runExpressionAllowed(e[1])) v('RUN_EXPR', `run: at line ${r.line} expands \${{${e[1]}}}; pass it through env instead`);
+  // RUN_EXPR: run:, and the other values that reach a shell or an action as text
+  const runs = runBlocks(lines);
+  const inRun = new Set();
+  for (const r of runs) for (let k = r.start + 1; k < r.end; k++) inRun.add(k);
+  const scanned = [['run', runs], ...['shell', 'working-directory', 'with'].map((key) => [key, keyBlocks(lines, key, inRun)])];
+  for (const [key, blocks] of scanned) {
+    for (const r of blocks) {
+      const body = r.text.split('\n').filter((l) => !isCommentLine(l) || key === 'run').join('\n');
+      const exprs = [...body.matchAll(/\$\{\{([\s\S]*?)\}\}/g)];
+      if ((body.match(/\$\{\{/g) || []).length !== exprs.length) v('RUN_EXPR', `${key}: at line ${r.line} has an unclosed \${{`);
+      for (const e of exprs) {
+        if (!runExpressionAllowed(e[1])) v('RUN_EXPR', `${key}: at line ${r.line} expands \${{${e[1]}}}; pass it through env instead`);
+      }
     }
+  }
+
+  // NO_REDIRECT
+  const code = lines.filter((l) => !isCommentLine(l)).join('\n');
+  if (/\burlopen\s*\(/.test(code)) v('NO_REDIRECT', 'urlopen( follows redirects and resends the Authorization header; use OPENER.open(');
+  for (const m of code.matchAll(/build_opener\(([^)]*)\)/g)) {
+    if (m[1].trim() !== 'NoRedirect') v('NO_REDIRECT', `build_opener(${m[1]}) is not build_opener(NoRedirect)`);
+  }
+  for (const m of code.matchAll(/([A-Za-z_][A-Za-z0-9_]*)\.open\(/g)) {
+    if (m[1] !== 'OPENER') v('NO_REDIRECT', `${m[1]}.open( is not the NoRedirect OPENER`);
+  }
+  if (/Authorization/.test(code) && !(
+    /class NoRedirect\(urllib\.request\.HTTPRedirectHandler\):/.test(code) &&
+    /def redirect_request\(self, req, fp, code, msg, headers, newurl\):\s*\n\s*return None\s*\n/.test(code) &&
+    /OPENER = urllib\.request\.build_opener\(NoRedirect\)/.test(code) && /\bOPENER\.open\(/.test(code))) {
+    v('NO_REDIRECT', 'sends an Authorization header without the NoRedirect opener (redirect_request returning None)');
   }
 
   // Per job: ENV, BOUNDARY, SECRET (at least one), PERMISSIONS / DEFAULTS overrides
@@ -247,12 +345,41 @@ export function violations(name, text) {
     }
 
     if (!jl.some(({ n }) => secretLines.has(n))) v('SECRET', `${job.name}: names production but references no PROD_ secret`);
+
+    for (const step of stepsOf(job)) {
+      const at = `${job.name}, step at line ${step[0].n + 1}`;
+      // STATUS_IF (R11)
+      const iff = stepKey(step, 'if');
+      if (iff !== null && step.some(({ n }) => secretLines.has(n))) {
+        const e = ifExpression(iff);
+        if (/\b(always|failure|cancelled)\s*\(/.test(e)) {
+          if (e.includes('||')) v('STATUS_IF', `${at}: a status-function if: holding a PROD_ secret may not contain ||`);
+          else if (!topLevelAnd(e).some((c) => c.replace(/\s+/g, ' ') === BOUNDARY_CONJUNCT)) {
+            v('STATUS_IF', `${at}: a status-function if: holding a PROD_ secret needs the top-level conjunct ${BOUNDARY_CONJUNCT}`);
+          }
+        }
+      }
+      // CHECKOUT_REF (R12)
+      const uses = stepKey(step, 'uses');
+      if (uses !== null && /^\s*['"]?actions\/checkout@/.test(uses)) {
+        const w = stepKey(step, 'with');
+        if (w !== null && /(^|[\s{,])['"]?(ref|repository)['"]?\s*:/m.test(w)) {
+          v('CHECKOUT_REF', `${at}: actions/checkout may not take ref: or repository: in a production job`);
+        }
+      }
+    }
   }
 
-  // READ_ONLY (db-read.yml only)
+  // READ_ONLY (db-read.yml only), on non-comment lines
   if (name === 'db-read.yml') {
-    if (!text.includes('/database/query/read-only')) v('READ_ONLY', 'the read-only endpoint /database/query/read-only is not named');
-    if (/\/database\/query(?!\/read-only)/.test(text)) v('READ_ONLY', 'names a /database/query endpoint other than /read-only');
+    const urlLines = lines.filter((l) => !isCommentLine(l) && /api\.supabase\.com|\/database\//.test(l));
+    if (urlLines.length !== 1 || urlLines[0].trim() !== ENDPOINT_LINE) {
+      v('READ_ONLY', `exactly one non-comment line may name the API, and it must be: ${ENDPOINT_LINE} (found ${urlLines.length})`);
+    }
+    const requests = code.match(/\bRequest\(/g) || [];
+    if (requests.length !== 1 || !/\bRequest\(\s*ENDPOINT\s*,/.test(code)) {
+      v('READ_ONLY', `the only Request( must take ENDPOINT as its URL (found ${requests.length} Request()`);
+    }
   }
   return out;
 }
@@ -306,7 +433,8 @@ const BASE = [
   '          TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}',
   '        run: |',
   '          echo "$INPUT_X" "${{ github.sha }}" "${{ steps.boundary.outputs.none }}"',
-  '          echo "POST /v1/projects/x/database/query/read-only"',
+  '          ' + ENDPOINT_LINE,
+  '          req = urllib.request.Request(ENDPOINT, data=b"")',
   '',
 ].join('\n');
 
@@ -331,11 +459,36 @@ ok(BASE.includes(IF_LINE + '\n'), 'fixture control: the base carries the canonic
 ok(violations('fx.yml', BASE).length === 0, 'clean fixture passes every check' + (violations('fx.yml', BASE).length ? ': ' + violations('fx.yml', BASE).join(' | ') : ''));
 ok(violations('db-read.yml', BASE).length === 0, 'clean fixture passes as db-read.yml (read-only endpoint named)');
 
+/** A later step with the given if:, holding a PROD_ secret unless withSecret is false. */
+function statusStep(cond, withSecret = true) {
+  return ['      - name: report', `        if: ${cond}`,
+    ...(withSecret ? ['        env:', '          T: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}'] : []),
+    '        run: echo report', ''].join('\n');
+}
+// The redirect-refusing opener, as the two workflows write it (run-block indent).
+const NR_BLOCK = [
+  '          class NoRedirect(urllib.request.HTTPRedirectHandler):',
+  '              def redirect_request(self, req, fp, code, msg, headers, newurl):',
+  '                  return None',
+  '          OPENER = urllib.request.build_opener(NoRedirect)',
+  '          h = {"Authorization": "Bearer x"}',
+  '          OPENER.open(req)',
+  '',
+].join('\n');
+
 const near = [
   ['an extra comment line inside the boundary step', mut(BASE, '        id: boundary\n', '        id: boundary\n        # an extra comment\n')],
   ['a third-party action pinned to a SHA with its tag', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n      - uses: owner/tool@0123456789abcdef0123456789abcdef01234567 # v1.2.3\n')],
   ['permissions in flow form', mut(BASE, 'permissions:\n  contents: read\n', 'permissions: { contents: read }\n')],
   ['a second PROD_ secret in the same step env', mut(BASE, '          TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n', '          TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n          DB: ${{ secrets.PROD_SUPABASE_DB_URL }}\n')],
+  ['a status-function step holding a secret, with the boundary conjunct', BASE + statusStep("always() && steps.boundary.outcome != 'failure'")],
+  ['the same, wrapped in ${{ }} with failure()', BASE + statusStep("${{ failure() && steps.boundary.outcome != 'failure' }}")],
+  ['a status-function step holding no secret', BASE + statusStep('always()', false)],
+  ['a secret-holding step whose if: calls no status function', BASE + statusStep("github.ref == 'refs/heads/main'")],
+  ['checkout with sparse-checkout and persist-credentials only', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          sparse-checkout: /config.js\n          persist-credentials: false\n')],
+  ['a with: value expanding github.sha', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          path: ${{ github.sha }}\n')],
+  ['an env key that merely contains ENV (MY_ENV)', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      MY_ENV: x\n')],
+  ['an Authorization header sent through the NoRedirect opener', mut(BASE, '          ENDPOINT = ', NR_BLOCK + '          ENDPOINT = ')],
 ];
 for (const [label, text] of near) {
   const vs = violations('fx.yml', text);
@@ -371,7 +524,7 @@ const BAD = [
   // SECRET
   ['SECRET', 'PROD_ secret in job env', mut(mut(BASE, STEP_SECRET, '          TOKEN: x\n'), '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n')],
   ['SECRET', 'PROD_ secret in with:', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          token: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n')],
-  ['SECRET', 'PROD_ secret in run text', mut(BASE, '          echo "POST', '          echo ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n          echo "POST')],
+  ['SECRET', 'PROD_ secret in run text', mut(BASE, '          ENDPOINT = ', '          echo ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n          ENDPOINT = ')],
   ['SECRET', 'PROD_ secret inside a larger expression', mut(BASE, STEP_SECRET, '          TOKEN: ${{ github.sha && secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n')],
   ['SECRET', 'PROD_ secret with text around it', mut(BASE, STEP_SECRET, '          TOKEN: Bearer ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\n')],
   ['SECRET', 'a retired name as a step env value', mut(BASE, STEP_SECRET, '          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}\n')],
@@ -381,11 +534,28 @@ const BAD = [
   ['SECRET', 'workflow-level env holding a PROD_ secret', mut(BASE, 'jobs:\n', 'env:\n  TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}\njobs:\n')],
   ['SECRET', 'a production job with no PROD_ secret', mut(BASE, STEP_SECRET, '          TOKEN: x\n')],
   // RUN_EXPR
-  ['RUN_EXPR', 'inputs.x in run', mut(BASE, '          echo "POST', '          echo "${{ inputs.x }}"\n          echo "POST')],
-  ['RUN_EXPR', 'github.event.inputs.x in run', mut(BASE, '          echo "POST', '          echo "${{ github.event.inputs.x }}"\n          echo "POST')],
-  ['RUN_EXPR', 'github.head_ref in run', mut(BASE, '          echo "POST', '          echo "${{ github.head_ref }}"\n          echo "POST')],
+  ['RUN_EXPR', 'inputs.x in run', mut(BASE, '          ENDPOINT = ', '          echo "${{ inputs.x }}"\n          ENDPOINT = ')],
+  ['RUN_EXPR', 'github.event.inputs.x in run', mut(BASE, '          ENDPOINT = ', '          echo "${{ github.event.inputs.x }}"\n          ENDPOINT = ')],
+  ['RUN_EXPR', 'github.head_ref in run', mut(BASE, '          ENDPOINT = ', '          echo "${{ github.head_ref }}"\n          ENDPOINT = ')],
   ['RUN_EXPR', 'inline run: with an input', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n      - run: echo ${{ inputs.x }}\n')],
-  ['RUN_EXPR', 'unclosed ${{', mut(BASE, '          echo "POST', '          echo "${{ github.sha"\n          echo "POST')],
+  ['RUN_EXPR', 'unclosed ${{', mut(BASE, '          ENDPOINT = ', '          echo "${{ github.sha"\n          ENDPOINT = ')],
+  ['RUN_EXPR', 'an input expanded into shell:', mut(BASE, '      - name: work\n', '      - name: work\n        shell: ${{ inputs.x }} {0}\n')],
+  ['RUN_EXPR', 'an input expanded into working-directory:', mut(BASE, '      - name: work\n', '      - name: work\n        working-directory: ${{ inputs.x }}\n')],
+  ['RUN_EXPR', 'an input expanded into a with: value', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          path: ${{ inputs.x }}\n')],
+  ['RUN_EXPR', 'an input in a flow-form with:', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with: { path: "${{ inputs.x }}" }\n')],
+  // STATUS_IF (R11)
+  ['STATUS_IF', 'if: always() on a secret-holding step', BASE + statusStep('always()')],
+  ['STATUS_IF', 'if: ${{ !cancelled() }}', BASE + statusStep('${{ !cancelled() }}')],
+  ['STATUS_IF', 'if: failure()', BASE + statusStep('failure()')],
+  ['STATUS_IF', 'quoted "always()"', BASE + statusStep('"always()"')],
+  ['STATUS_IF', 'the boundary conjunct with || true', BASE + statusStep("always() && steps.boundary.outcome != 'failure' || true")],
+  ['STATUS_IF', 'the conjunct inverted (== failure)', BASE + statusStep("always() && steps.boundary.outcome == 'failure'")],
+  ['STATUS_IF', 'the conjunct only inside a group joined by ||', BASE + statusStep("always() && (steps.boundary.outcome != 'failure' || github.sha)")],
+  // CHECKOUT_REF (R12)
+  ['CHECKOUT_REF', 'checkout ref: from an input', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          ref: ${{ inputs.x }}\n')],
+  ['CHECKOUT_REF', 'checkout ref: main (constant)', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          ref: main\n')],
+  ['CHECKOUT_REF', 'checkout repository:', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          repository: other/repo\n')],
+  ['CHECKOUT_REF', 'checkout ref in flow form', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with: { ref: main }\n')],
   // PERMISSIONS
   ['PERMISSIONS', 'write-all', mut(BASE, 'permissions:\n  contents: read\n', 'permissions: write-all\n')],
   ['PERMISSIONS', 'contents: write', mut(BASE, '  contents: read\n', '  contents: write\n')],
@@ -397,6 +567,18 @@ const BAD = [
   ['DEFAULTS', 'job defaults', mut(BASE, '    runs-on: ubuntu-latest\n', "    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: 'true {0}'\n")],
   ['DEFAULTS', 'BASH_ENV in job env', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      BASH_ENV: ./x.sh\n')],
   ['DEFAULTS', 'job container', mut(BASE, '    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    container: node:22\n')],
+  ['DEFAULTS', 'BASH_FUNC_exit%% in job env (exit 1 becomes a no-op)', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', "      INPUT_X: ${{ inputs.x }}\n      BASH_FUNC_exit%%: '() { :; }'\n")],
+  ['DEFAULTS', 'flow-form job env with BASH_ENV', mut(BASE, '    env:\n      INPUT_X: ${{ inputs.x }}\n', '    env: { BASH_ENV: /tmp/x, INPUT_X: "${{ inputs.x }}" }\n')],
+  ['DEFAULTS', 'quoted "BASH_ENV" key', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      "BASH_ENV": ./x.sh\n')],
+  ['DEFAULTS', 'SHELLOPTS in job env', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      SHELLOPTS: xtrace\n')],
+  ['DEFAULTS', 'BASHOPTS in job env', mut(BASE, '      INPUT_X: ${{ inputs.x }}\n', '      INPUT_X: ${{ inputs.x }}\n      BASHOPTS: extdebug\n')],
+  ['DEFAULTS', 'workflow-level env PS4', mut(BASE, 'jobs:\n', "env:\n  PS4: '$(x)'\njobs:\n")],
+  ['DEFAULTS', 'ENV in a later step env', mut(BASE, STEP_SECRET, STEP_SECRET + '          ENV: ./x.sh\n')],
+  // NO_REDIRECT
+  ['NO_REDIRECT', 'urlopen( beside an Authorization header', mut(BASE, '          ENDPOINT = ', '          h = {"Authorization": "Bearer x"}\n          urllib.request.urlopen(req)\n          ENDPOINT = ')],
+  ['NO_REDIRECT', 'an Authorization header with no NoRedirect opener', mut(BASE, '          ENDPOINT = ', '          h = {"Authorization": "Bearer x"}\n          ENDPOINT = ')],
+  ['NO_REDIRECT', 'redirect_request that follows the redirect', mut(BASE, '          ENDPOINT = ', NR_BLOCK.replace('return None', 'return super().redirect_request(req, fp, code, msg, headers, newurl)') + '          ENDPOINT = ')],
+  ['NO_REDIRECT', 'a second, default opener', mut(BASE, '          ENDPOINT = ', NR_BLOCK + '          O2 = urllib.request.build_opener()\n          O2.open(req)\n          ENDPOINT = ')],
   // ACTION_PIN
   ['ACTION_PIN', 'third-party action on a tag', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n      - uses: owner/tool@v1\n')],
   ['ACTION_PIN', 'third-party SHA with no tag comment', mut(BASE, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n      - uses: owner/tool@0123456789abcdef0123456789abcdef01234567\n')],
@@ -409,8 +591,11 @@ for (const [code, label, text] of BAD) {
 // READ_ONLY, under the db-read.yml name
 for (const [label, text] of [
   ['write endpoint named', mut(BASE, '/database/query/read-only', '/database/query')],
-  ['read-only endpoint missing', mut(BASE, '          echo "POST /v1/projects/x/database/query/read-only"\n', '')],
-  ['write endpoint beside the read-only one', mut(BASE, '          echo "POST', '          echo "/v1/projects/x/database/query?fallback"\n          echo "POST')],
+  ['read-only endpoint missing', mut(BASE, '          ' + ENDPOINT_LINE + '\n', '')],
+  ['write endpoint beside the read-only one', mut(BASE, '          ENDPOINT = ', '          W = "https://api.supabase.com/v1/projects/%s/database/query" % REF\n          ENDPOINT = ')],
+  ['endpoint built by concatenation', mut(BASE, '"https://api.supabase.com/v1/projects/%s/database/query/read-only"', '"https://api.supabase.com/v1/projects/%s/database/" + "query" + "/read-only"[:0]')],
+  ['a second Request(', mut(BASE, '          ENDPOINT = ', '          r2 = urllib.request.Request(OTHER, data=b"")\n          ENDPOINT = ')],
+  ['the Request( takes another URL', mut(BASE, 'Request(ENDPOINT,', 'Request(OTHER,')],
 ]) {
   const got = codes(violations('db-read.yml', text));
   ok(got.includes('READ_ONLY'), `READ_ONLY fires on: ${label} (got ${got.join(', ') || 'nothing'})`);
@@ -446,8 +631,19 @@ if (real['db-read.yml'] && real['verify-production-environment.yml']) {
     ['BOUNDARY', 'verify-production-environment.yml', 'prefix the boundary if: with false &&', mut(V, realIf, realIf.replace('if: ', 'if: false && '))],
     ['TRIGGER', 'verify-production-environment.yml', 'add a pull_request trigger', mut(V, 'on:\n  workflow_dispatch: {}\n', 'on:\n  workflow_dispatch: {}\n  pull_request:\n')],
     ['RUN_EXPR', 'db-read.yml', 'expand inputs.sql_file into a run:', mut(D, '          set -euo pipefail\n          fail()', '          set -euo pipefail\n          echo "${{ inputs.sql_file }}"\n          fail()')],
-    ['READ_ONLY', 'db-read.yml', 'point at the write endpoint', mut(D, '/database/query/read-only" % os.environ', '/database/query" % os.environ')],
+    ['READ_ONLY', 'db-read.yml', 'point at the write endpoint', mut(D, '/database/query/read-only" % REF', '/database/query" % REF')],
     ['SECRET', 'verify-production-environment.yml', 'move a PROD_ secret to job env', mut(mut(V, '          SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}\n', ''), '      PROJECT_REF: qwnnmljucajnexpxdgxr\n', '      PROJECT_REF: qwnnmljucajnexpxdgxr\n      SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}\n')],
+    // The seven gaps found in review (2026-10-22), each applied to the real file.
+    ['STATUS_IF', 'verify-production-environment.yml', 'append an if: always() step holding a PROD_ secret', V + statusStep('always()')],
+    ['CHECKOUT_REF', 'verify-production-environment.yml', 'give the checkout a ref: from an input', mut(V, '          persist-credentials: false\n', '          persist-credentials: false\n          ref: ${{ github.event.inputs.x }}\n')],
+    ['DEFAULTS', 'db-read.yml', "add BASH_FUNC_exit%%: '() { :; }' to job env", mut(D, '      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr\n', "      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr\n      BASH_FUNC_exit%%: '() { :; }'\n")],
+    ['DEFAULTS', 'db-read.yml', 'flow-form job env with BASH_ENV', mut(D, '    env:\n      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr\n', '    env: { BASH_ENV: /tmp/x, SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr }\n')],
+    ['RUN_EXPR', 'db-read.yml', 'expand an input into shell:', mut(D, '      - name: Validate the branch name and the SQL path\n', '      - name: Validate the branch name and the SQL path\n        shell: ${{ inputs.sql_ref }} {0}\n')],
+    ['RUN_EXPR', 'db-read.yml', 'expand an input into working-directory:', mut(D, '      - name: Validate the branch name and the SQL path\n', '      - name: Validate the branch name and the SQL path\n        working-directory: ${{ inputs.sql_file }}\n')],
+    ['READ_ONLY', 'db-read.yml', 'build the endpoint by concatenation', mut(D, '"https://api.supabase.com/v1/projects/%s/database/query/read-only"', '"https://api.supabase.com/v1/projects/%s/database/" + "query" + "/read-only"[:0]')],
+    // The redirect refusal, on both files.
+    ['NO_REDIRECT', 'db-read.yml', 'send the request through urlopen', mut(D, 'with OPENER.open(req, timeout=120) as r:', 'with urllib.request.urlopen(req, timeout=120) as r:')],
+    ['NO_REDIRECT', 'verify-production-environment.yml', 'let redirect_request follow', mut(V, '        return None\n\n\n          OPENER', '        return super().redirect_request(req, fp, code, msg, headers, newurl)\n\n\n          OPENER')],
   ]) {
     const got = codes(violations(f, text));
     ok(got.includes(code), `real-file mutation: ${f}, ${label} → ${code} (got ${got.join(', ') || 'nothing'})`);
