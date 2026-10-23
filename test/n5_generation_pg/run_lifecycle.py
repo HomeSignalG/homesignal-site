@@ -384,6 +384,75 @@ def main():
     ok("E27 prove_dry against a non-serving baseline passes and records nothing",
        dry == 0 and R.q1(c, "select count(*) from geo.n5_generation_proof") == proofs, why)
 
+    # ------------------------------------------------ THE NEGATIVE CONTROL, AND THAT IT IS NOT VACUOUS
+    # prove_negative runs the data check with wrong declared lists on a generation that passed it
+    # and fails unless the check refuses each. It must write nothing; and it must FAIL when the
+    # check stops refusing (a control that cannot fail proves nothing).
+    snap, proofs0 = R.map_snapshot(c), R.q1(c, "select count(*) from geo.n5_generation_proof")
+    gens0 = R.q1(c, "select count(*) from geo.n5_generation")
+    O = env.orchestrator("prove_negative", GENERATION="", BASELINE="")
+    try:
+        neg, why = O.mode_prove_negative(), None
+    except SystemExit as e:
+        neg, why = None, str(e)
+    ok("E28 prove_negative: the check refuses every wrong declared list for its own reason, and the real list is clean",
+       neg == 0, why)
+    ok("E28 prove_negative wrote nothing (no proof, no generation, Map 1 unchanged)",
+       R.q1(c, "select count(*) from geo.n5_generation_proof") == proofs0
+       and R.q1(c, "select count(*) from geo.n5_generation") == gens0 and R.map_snapshot(c) == snap)
+    saved = R.q1(c, "select pg_get_functiondef('geo.n5_generation_preactivation_problems(text,text,text[])'::regprocedure)")
+    c.cursor().execute("create or replace function geo.n5_generation_preactivation_problems("
+                       "p_generation_id text, p_baseline_generation_id text, p_declared_no_boundary text[]) "
+                       "returns table (check_name text, n bigint) language sql stable as $$ select null::text, null::bigint where false $$;")
+    try:
+        O = env.orchestrator("prove_negative", GENERATION="", BASELINE="")
+        refused = _raises(lambda: O.mode_prove_negative(), "did not behave as expected")
+    finally:
+        c.cursor().execute(saved)
+    ok("E28 CONTROL: with a check that refuses nothing, prove_negative FAILS (it is not vacuous)", refused)
+    ok("E28 the real function is restored (the control passes again)",
+       env.orchestrator("prove_negative", GENERATION="", BASELINE="").mode_prove_negative() == 0)
+
+    # ------------------------------------------------------------ THE LARGE CHANGED ZIPS
+    # A changed ZIP above PROOF_MAX_MEMBERS used to be skipped by every sample. A few are now
+    # rendered; if one cannot be READ it is dropped AND RECORDED, while an ordinary sample ZIP
+    # that cannot be read still stops the proof.
+    O = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY, PROOF_MAX_MEMBERS="1",
+                         PROOF_LARGE_MAX_MEMBERS="1000000", PROOF_LARGE_ZIPS="2")
+    sample = O.proof_sample(g4, R.LEGACY)
+    big = O.proof_large(g4, sample)
+    O0 = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY, PROOF_MAX_MEMBERS="1",
+                          PROOF_LARGE_MAX_MEMBERS="1000000", PROOF_LARGE_ZIPS="0")
+    sample0 = O0.proof_sample(g4, R.LEGACY)
+    ok("E29 CONTROL: with the large slice off, the same cap puts no ZIP above it in the sample",
+       O0.proof_large(g4, sample0) == set(), (sample0, O0.proof_large(g4, sample0)))
+    ok("E29 a changed ZIP above the member cap is now in the sample", len(big) >= 1, (sample, big))
+    real_sql = O.sql
+    victim = sorted(big)[0] if big else None
+
+    def failing(query, tag="", **kw):
+        if tag == f"proof answers {victim}":
+            raise SystemExit("STOP: SQL proof answers failed HTTP 524 (simulated)")
+        return real_sql(query, tag, **kw)
+    O.sql = failing
+    try:
+        data, _ = O.proof_input(g4, R.LEGACY, sample, big)
+        skipped = data.get("large_skipped", [])
+        err = None
+    except SystemExit as e:
+        skipped, err = None, str(e)
+    ok("E29 an unreadable LARGE ZIP is dropped and recorded, the rest of the sample is read",
+       err is None and [x["zip"] for x in skipped] == [victim]
+       and victim not in {z["zip"] for z in data["zips"]} and len(data["zips"]) == len(sample) - 1, err or skipped)
+    ordinary = next((z for z in sample if z not in big), None)
+    def failing_ordinary(query, tag="", **kw):
+        if tag == f"proof answers {ordinary}":
+            raise SystemExit("STOP: SQL proof answers failed HTTP 524 (simulated)")
+        return real_sql(query, tag, **kw)
+    O.sql = failing_ordinary
+    ok("E29 an unreadable ORDINARY sample ZIP still stops the proof",
+       ordinary is not None and _raises(lambda: O.proof_input(g4, R.LEGACY, sample, big), "524"), ordinary)
+
     c.close()
     R.drop_db("n5gen_e2e")
     print("=" * 60)

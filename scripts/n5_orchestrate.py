@@ -34,6 +34,9 @@ MODES
              checks. A failed proof is recorded and stops the tick red.
   prove_dry  read-only rehearsal of the browser half on real data (GENERATION against BASELINE,
              default its predecessor); records nothing
+  prove_negative  read-only NEGATIVE CONTROL for the data half: runs the same check with
+             wrong declared lists on a generation that already passed it (default: the serving
+             one) and fails unless the check refuses each; records nothing
   activate   hand the DECLARED chunk set to the activation gate. Its COMMIT is the one
              serving switch: Map 1 reads only the ACTIVE / ACTIVE_LEGACY generation. The gate
              refuses unless the newest proof passed against the generation still serving.
@@ -108,12 +111,24 @@ FINISH_START_LIMIT_S = int(os.environ.get("FINISH_START_LIMIT_S", "3000"))
 # classified them: read from the committed file every time, never transcribed (claims rule 7).
 DECLARED_NO_BOUNDARY_CSV = os.environ.get("DECLARED_NO_BOUNDARY_CSV", "").strip() or \
     os.path.join(HERE, "..", "docs", "maps-coverage", "fix4", "no-boundary-zip-classification.csv")
-# How many ZIPs the browser renders under both generations. Every ZIP whose membership changes
-# between the two comes first (up to PROOF_CHANGED_ZIPS), then one unmeasured ZIP, then a
-# deterministic spread of ordinary ones. The database refuses a proof under 10 ZIPs.
-PROOF_ZIPS = int(os.environ.get("PROOF_ZIPS", "16"))
-PROOF_CHANGED_ZIPS = int(os.environ.get("PROOF_CHANGED_ZIPS", "8"))
+# How many ZIPs the browser renders under both generations. ZIPs whose membership changes
+# between the two come first (up to PROOF_CHANGED_ZIPS), then PROOF_LARGE_ZIPS of the changed
+# ones too big for that slice, then one unmeasured ZIP, then a deterministic spread of ordinary
+# ones. The database refuses a proof under 10 ZIPs and has no upper bound.
+# MEASURED 2026-10-23 (n5-national-2026-10-23 against -10-22): 750 ZIPs changed, 716 of them
+# within PROOF_MAX_MEMBERS, 34 above it (largest 14,554). The first sizing (16 / 8) rendered 8 of
+# the 750, about 1%, on every one of the 16 proofs to date. A render takes about 1.7 s per side
+# for a ZIP of up to 1,500 markers and about 16 s per side at 14,500 (local, same script).
+PROOF_ZIPS = int(os.environ.get("PROOF_ZIPS", "48"))
+PROOF_CHANGED_ZIPS = int(os.environ.get("PROOF_CHANGED_ZIPS", "32"))
 PROOF_MAX_MEMBERS = int(os.environ.get("PROOF_MAX_MEMBERS", "1500"))
+# The changed ZIPs above PROOF_MAX_MEMBERS were never rendered at all. A few of them (the ones
+# up to PROOF_LARGE_MAX_MEMBERS, an answer of about 3 MB at 5,700) now are. If the answer for
+# one of these cannot be READ, it is dropped from the sample and the browser result says so
+# (large_skipped): a read limit on a big answer must not stop the daily switch, but it must
+# not pass silently either. Every ordinary sample ZIP still fails the proof if it cannot be read.
+PROOF_LARGE_ZIPS = int(os.environ.get("PROOF_LARGE_ZIPS", "2"))
+PROOF_LARGE_MAX_MEMBERS = int(os.environ.get("PROOF_LARGE_MAX_MEMBERS", "6000"))
 # The browser step, as an argv. Tests replace it; production runs the shipped script, and only
 # then is the browser installed (ensure_browser) - an hourly tick that does not prove pays nothing.
 PROOF_BROWSER_DEFAULT = not os.environ.get("PROOF_BROWSER_CMD", "").strip()
@@ -740,8 +755,8 @@ def declared_no_boundary():
 
 
 def proof_sample(gen, base):
-    """The ZIPs the browser renders under both generations: changed ones first, then one
-    unmeasured, then a deterministic spread. Read-only."""
+    """The ZIPs the browser renders under both generations: changed ones first (a few of the
+    large ones included), then one unmeasured, then a deterministic spread. Read-only."""
     rows = sql(f"""
 with ch as (
   select zcta5 zip from (
@@ -757,17 +772,33 @@ c as (select s.zip::text zip, 1 k, md5(s.zip || {lit(gen)}) o
        order by o limit {PROOF_CHANGED_ZIPS}),
 u as (select s.zip::text zip, 2 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
        where s.generation_id = {lit(gen)} and s.status <> 'boundary_complete' order by o limit 1),
+lg as (select s.zip::text zip, 1 k, md5(s.zip || {lit(gen)}) o
+        from geo.maps_zip_geography_status s join ch on ch.zip = s.zip
+       where s.generation_id = {lit(gen)} and s.membership_rows > {PROOF_MAX_MEMBERS}
+         and s.membership_rows <= {PROOF_LARGE_MAX_MEMBERS}
+       order by o limit {PROOF_LARGE_ZIPS}),
 r as (select s.zip::text zip, 3 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
        where s.generation_id = {lit(gen)} and s.status = 'boundary_complete'
          and s.membership_rows between 1 and {PROOF_MAX_MEMBERS}
        order by o limit {PROOF_ZIPS})
-select zip from (select distinct on (zip) zip, k, o from (select * from c union all select * from u
-                 union all select * from r) x order by zip, k) y
+select zip from (select distinct on (zip) zip, k, o from (select * from c union all select * from lg
+                 union all select * from u union all select * from r) x order by zip, k) y
  order by k, o limit {PROOF_ZIPS};""", "proof sample", read_only=True, timeout=300)
     return [r["zip"] for r in rows]
 
 
-def proof_input(gen, base, zips):
+def proof_large(gen, zips):
+    """The sample ZIPs above PROOF_MAX_MEMBERS (the large changed ones). Read-only."""
+    if not zips:
+        return set()
+    arr = "array[" + ",".join(lit(z) for z in zips) + "]::text[]"
+    rows = sql(f"select zip::text zip from geo.maps_zip_geography_status where generation_id = {lit(gen)} "
+               f"and zip::text = any({arr}) and membership_rows > {PROOF_MAX_MEMBERS};",
+               "proof large", read_only=True)
+    return {r["zip"] for r in rows}
+
+
+def proof_input(gen, base, zips, large=frozenset()):
     """Each sample ZIP's answer under both generations, read through the ONE function Map 1
     reads (geo.n5_zip_projects_markers_at), plus the reader-parity control: the SERVING
     generation's answer through that function must equal the public reader's own answer.
@@ -783,16 +814,27 @@ def proof_input(gen, base, zips):
     home = (lambda z: f"(select home_lat from public.development_reports where zip = {lit(z)}) home_lat, "
                       f"(select home_lng from public.development_reports where zip = {lit(z)}) home_lng") \
         if has_reports else (lambda z: "null::float8 home_lat, null::float8 home_lng")
+    skipped = []
     for z in zips:
-        r = sql(f"""select geo.n5_zip_projects_markers_at({lit(gen)}, {lit(z)}, 'development') c,
+        try:
+            r = sql(f"""select geo.n5_zip_projects_markers_at({lit(gen)}, {lit(z)}, 'development') c,
        geo.n5_zip_projects_markers_at({lit(base)}, {lit(z)}, 'development') b,
        geo.n5_zip_projects_markers_at(geo.n5_serving_generation_id(), {lit(z)}, 'development')
          = public.app_zip_projects_markers({lit(z)}, 'development', true) same,
        {home(z)};""", f"proof answers {z}", read_only=True, timeout=300)[0]
+        except SystemExit as e:  # SQLGatewayTimeout is a SystemExit
+            # Only a LARGE ZIP may be dropped, and it is recorded, never silent. An ordinary
+            # sample ZIP that cannot be read still stops the proof.
+            if z not in large:
+                raise
+            skipped.append({"zip": z, "reason": str(e)[:240]})
+            say("proof large ZIP skipped", f"{z}: {str(e)[:160]}")
+            continue
         if not r["same"]:
             reader_mismatch.append(z)
         out["zips"].append({"zip": z, "home_lat": r["home_lat"], "home_lng": r["home_lng"],
                             "candidate": r["c"], "baseline": r["b"]})
+    out["large_skipped"] = skipped
     return out, reader_mismatch
 
 
@@ -836,7 +878,8 @@ def prove(gen):
     declared = declared_no_boundary()
     zips = proof_sample(gen, base)
     say("proof sample", f"{len(zips)} ZIP(s) against {base}: {','.join(zips)}")
-    data, reader_mismatch = proof_input(gen, base, zips)
+    large = proof_large(gen, zips)
+    data, reader_mismatch = proof_input(gen, base, zips, large)
     ensure_browser()
     with tempfile.TemporaryDirectory() as d:
         inp, outp = os.path.join(d, "in.json"), os.path.join(d, "out.json")
@@ -851,6 +894,8 @@ def prove(gen):
         browser["reader_mismatch_zips"] = reader_mismatch
         browser["mismatches"] = int(browser.get("mismatches") or 0) + len(reader_mismatch)
         browser["passed"] = False
+    browser["large_in_sample"] = sorted(large)
+    browser["large_skipped"] = data.get("large_skipped", [])
     import uuid
     run_id = f"{WORKER}-proof-{uuid.uuid4().hex[:12]}"
     arr = "array[" + ",".join(lit(z) for z in declared) + "]::text[]"
@@ -890,7 +935,7 @@ def mode_prove_dry():
         raise SystemExit("STOP: prove_dry: no BASELINE given and the generation has no predecessor.")
     zips = proof_sample(gen, base)
     say("dry proof sample", f"{len(zips)} ZIP(s), {gen} against {base}: {','.join(zips)}")
-    data, reader_mismatch = proof_input(gen, base, zips)
+    data, reader_mismatch = proof_input(gen, base, zips, proof_large(gen, zips))
     ensure_browser()
     import tempfile
     with tempfile.TemporaryDirectory() as d:
@@ -904,6 +949,68 @@ def mode_prove_dry():
                      f"changed={browser.get('differing_zips')}; reader parity mismatches: {reader_mismatch or 'none'}")
     if r.returncode != 0 or not browser.get("passed") or reader_mismatch:
         raise SystemExit("STOP: the dry proof did not pass (nothing was recorded).")
+    return 0
+
+
+def mode_prove_negative():
+    """READ-ONLY NEGATIVE CONTROL for the pre-activation data check, on real data. A check that
+    has only ever passed has not been shown to refuse anything. This runs the SAME function
+    `prove` records (geo.n5_generation_preactivation_problems) on a generation that already
+    passed it, with declared lists that are wrong in a known way, and fails unless the check
+    refuses each one for the reason it should:
+      real list                  -> no problem at all          (the instrument is not always-red)
+      one declared ZIP removed   -> undeclared_missing_boundary == 1
+      empty list                 -> declared_no_boundary_empty == 1
+      a non-canonical ZIP added  -> declared_no_boundary_not_canonical == 1
+      candidate == baseline      -> candidate_is_serving == 1
+    GENERATION defaults to the serving generation and BASELINE to its recorded predecessor.
+    It writes nothing, activates nothing and records no proof."""
+    gen = GENERATION
+    if not gen:
+        rows = sql("select geo.n5_serving_generation_id() g;", "negative serving", read_only=True)
+        gen = rows[0]["g"] if rows else None
+    if not gen:
+        raise SystemExit("STOP: prove_negative: no GENERATION given and none is serving.")
+    base = os.environ.get("BASELINE", "").strip()
+    if not base:
+        rows = sql(f"select predecessor_generation_id p from geo.n5_generation where generation_id={lit(gen)};",
+                   "negative baseline", read_only=True)
+        base = rows[0]["p"] if rows else None
+    if not base:
+        raise SystemExit("STOP: prove_negative: no BASELINE given and the generation has no predecessor.")
+    declared = declared_no_boundary()
+    say("negative control", f"{gen} against {base}, {len(declared)} declared no-boundary ZIP(s)")
+
+    def problems(candidate, baseline, zips):
+        arr = "array[" + ",".join(lit(z) for z in zips) + "]::text[]" if zips else "array[]::text[]"
+        rows = sql(f"select check_name c, n from geo.n5_generation_preactivation_problems("
+                   f"{lit(candidate)}, {lit(baseline)}, {arr});", f"negative {candidate}", read_only=True,
+                   timeout=300)
+        return {r["c"]: int(r["n"]) for r in rows}
+
+    bogus = "00000"
+    if bogus in declared:
+        raise SystemExit("STOP: prove_negative: the control ZIP 00000 is in the declared list.")
+    cases = [
+        ("real list", gen, base, declared, lambda p: p == {}),
+        ("one declared ZIP removed", gen, base, declared[1:], lambda p: p.get("undeclared_missing_boundary") == 1),
+        ("empty list", gen, base, [], lambda p: p.get("declared_no_boundary_empty") == 1),
+        ("a non-canonical ZIP added", gen, base, declared + [bogus],
+         lambda p: p.get("declared_no_boundary_not_canonical") == 1),
+        ("candidate equals baseline", gen, gen, declared, lambda p: p.get("candidate_is_serving") == 1),
+    ]
+    failed = []
+    for name, cand, bl, zips, expect in cases:
+        got = problems(cand, bl, zips)
+        good = bool(expect(got))
+        say("negative control", f"{'OK  ' if good else 'FAIL'} {name}: {json.dumps(got, sort_keys=True)}")
+        if not good:
+            failed.append(name)
+    if failed:
+        raise SystemExit(f"STOP: prove_negative: the data check did not behave as expected for: "
+                         f"{'; '.join(failed)}. Either {gen} no longer passes it (then the first case "
+                         f"shows why) or the check has stopped refusing.")
+    say("negative control", f"all {len(cases)} cases behaved as expected; nothing was written")
     return 0
 
 
@@ -950,7 +1057,7 @@ def mode_discard():
 
 MODES = {"status": lambda: 0, "open": mode_open, "work": mode_work, "publish": mode_publish,
          "unresolved": mode_unresolved, "reconcile": mode_reconcile, "ready": mode_ready,
-         "prove": mode_prove, "prove_dry": mode_prove_dry, "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
+         "prove": mode_prove, "prove_dry": mode_prove_dry, "prove_negative": mode_prove_negative, "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
          "discard": mode_discard}
 
 
