@@ -5200,6 +5200,16 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
 
 ---
 
+### ✅ A FACILITY COUNT EPA DID NOT CONFIRM TODAY SHOWS WITH ITS DATE (2026-10-23, Washington audit step 4)
+When `development_reports.facilities_unavailable` is true, Map 1's counter and the ZIP page strip used to show a dash.
+They now show the stored count with the day it was last confirmed ("· last confirmed Sep 10, 2026"), decided once by
+`HS.facilityCount` (`lib/templates.js`). Basis, measured 2026-10-23 over the 2,045 flagged pages: all 1,570 with a stored
+count above zero carry a facility clock (`facilities_refreshed_at`) older than the core refresh, i.e. the day of the last
+real EPA answer; all 475 with a stored zero carry a clock equal to the core refresh, so a zero is never a confirmed zero
+and stays a dash. No clock, or the ZIP has no facility measurement, also stays a dash. The outage note no longer names the
+fixed date "2026-08-09" (false of every page flagged since). Tests: `test/facilities-unavailable-copy.test.mjs`
+(the rule run on the shipped file), `test/map1-facility-count-dated.browser.test.mjs`.
+
 ## 7.2 Government Source Archive (`gov-archive.html`) — the archive lives in the INGEST repo
 
 Preserved government evidence — DOJ, FinCEN, OFAC, SEC, EPA, OSHA, PHMSA, FERC and the rest — plus

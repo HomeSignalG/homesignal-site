@@ -112,7 +112,7 @@ ok(/var notices = changes\.filter\(function\(x\)\{\s*return \/planning\|governme
 // Government & civic · Local news, and Map 1's Regulatory Records overlay is where R lives.
 ok(/HS\.data\.facilities\(zip, home\)/.test(page)
    && /var facTotal = metaCount\('regulated facilities', facilities\.length\);/.test(page)
-   && /statTile\(facTile, 'Regulated facilities'/.test(page),
+   && /statTile\(facTile, facLabel, ''\)/.test(page) && /: 'Regulated facilities';/.test(page),
   '§4 D — Regulated facilities still reads its own plane (data plane unchanged; count tile still fed)');
 ok(!/Regulated facilities nearby/.test(page) && !/\bfacHtml\b/.test(page) && !/facilities\.slice\(/.test(page),
   '§4 D — What\'s Changing composes no standalone regulatory-inventory section (founder hierarchy, 2026-09-25)');

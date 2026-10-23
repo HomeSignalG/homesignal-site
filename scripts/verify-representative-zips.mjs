@@ -253,7 +253,9 @@ async function verifyZipPage(page, spec, cached) {
     // an outage page claiming a confirmed facility count now fails too, which nothing
     // caught previously.
     if (expect.facilitiesOnly && cached.facilities_unavailable === true) {
-      if (/cannot be confirmed|unavailable rather than zero/i.test(st.facilitiesNote)) {
+      // 2026-10-23: a stored count above zero now shows with its date (HS.facilityCount), so
+      // the note says which day the count was last confirmed. Both forms are honest.
+      if (/cannot be confirmed|unavailable rather than zero|last confirmed on/i.test(st.facilitiesNote)) {
         pass('facilities-only note', 'EPA unavailable → honest count-unknown copy shown');
       } else {
         fail('facilities-only note', `facilities_unavailable=true but note claims a count: `
