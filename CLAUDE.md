@@ -5496,6 +5496,18 @@ live.** Full record: `docs/indexnow-seo-freshness.md`. The rules that must not b
 - **`lastmod` moves only when the fingerprint moves, and is omitted when unknown** — never the build day.
 - Query-string map URLs (`homesignalmap.html?zip=`) and `community.html?zip=` are never submitted.
 
+## ACQUISITION ATTRIBUTION — ONE CHANNEL DECISION, DERIVED REPORTS (2026-10-23)
+
+The Acquisition Dashboard counts by channel through ONE reader, `public.hs_acq_channel_report` (America/Los_Angeles days and weeks, UTC storage),
+and ONE classifier, `public.classify_channel`. The browser (`lib/data.js` `HS.attr`) only reports utm values, the referring HOST and the landing PATH.
+Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`; SQL of record `docs/acquisition-attribution.sql`.
+- ⛔ **Never classify a channel in the browser or in a second query.** `unknown` is never counted as `direct`; history before tracking is
+  `not_collected` and is never backfilled.
+- ⛔ **The report page is not touched.** It calls no extra RPC and keeps no extra storage (`test/development-activity-reports.test.mjs` 3b/4d).
+  Reports are credited at READ time to their brokerage's single active member's account touch; issuance does not record who made a report.
+- Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
+- `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
