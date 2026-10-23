@@ -113,8 +113,10 @@ const BILLING_SQL = 'docs/brokerage-billing.sql';
 // 2026-10-12: docs/saved-reports-archive.sql names the table twice and never reads or writes it: its precondition, and the per-person archive row's foreign key (an archive
 // row points at ONE stored report and can never cascade into it). Pinned exactly by 3g.
 const ARCHIVE_SQL = 'docs/saved-reports-archive.sql';
+// 2026-10-23: docs/acquisition-attribution.sql reads the table READ-ONLY (a count by generated_at, and a join to attribute a report to an account). Pinned by 3h.
+const ACQ_SQL = 'docs/acquisition-attribution.sql';
 const billingSrc = codeOf(BILLING_SQL);
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL || f === ARCHIVE_SQL)
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL || f === ARCHIVE_SQL || f === ACQ_SQL)
    && namesTable.includes(BILLING_SQL) && (billingSrc.match(/\breport_snapshot\b/g) || []).length === 4 && (billingSrc.match(/references public\.report_snapshot \(report_id\)/g) || []).length === 1 && (billingSrc.match(/from public\.report_snapshot s\b/g) || []).length === 2
    && /to_regclass\('public\.report_snapshot'\)/.test(billingSrc) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(billingSrc) && !/grant[^;]*report_snapshot\b(?!_issue)/i.test(billingSrc)
    && (watchSrc.match(/\breport_snapshot\b/g) || []).length === 5 && /references public\.report_snapshot \(report_id\)/.test(watchSrc) && (watchSrc.match(/(?:from|join) public\.report_snapshot s\b/g) || []).length === 3 && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(watchSrc) && !/grant[^;]*report_snapshot/i.test(watchSrc),
@@ -131,6 +133,11 @@ ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA
   const uses = [...t.matchAll(/\breport_snapshot\b[^'"`]*/g)].map((m) => m[0]);
   ok(namesTable.includes(REPORT_DATA) && JSON.stringify(uses) === JSON.stringify(['report_snapshot?select=body&report_id=eq.']) && !/method: '(PUT|PATCH|DELETE)'/.test(t),
     '3e: the report function names the table once, to read ONE stored body by id (a retried trial key), and has no write verb (control: it does name it)', uses);
+}
+{
+  const t = codeOf(ACQ_SQL);
+  ok(namesTable.includes(ACQ_SQL) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(t) && !/grant[^;]*report_snapshot/i.test(t) && !/\b(alter|drop)\s+table\s+(public\.)?report_snapshot\b/i.test(t),
+    '3h: the acquisition SQL names the table only to read it (control: it does name it)', ACQ_SQL);
 }
 {
   const t = codeOf(DELIVERY_SQL).replace(/'(?:[^']|'')*'/g, "''");

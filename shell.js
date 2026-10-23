@@ -1021,6 +1021,8 @@
         state.session = data && data.session ? data.session : null;
       } catch (e) { state.session = null; }
     }
+    // A signed-in account is linked to the visitor's first touch (the database decides whether this visit acquired the account).
+    try { if (state.session && !state.session.demo && HS.attr && !IS_EMBED) HS.attr.claim(HS.sb(), state.session.user && state.session.user.id); } catch (e) {}
     if (!state.session && CFG.DEMO_SESSION) {
       const u = (window.HS_SEED && window.HS_SEED.demoUser) || { id: 'demo', email: 'demo@homesignal.net', name: 'Demo', initials: 'DE' };
       state.session = { user: { id: u.id, email: u.email }, demo: true, name: u.name, initials: u.initials };
@@ -2860,6 +2862,9 @@
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
     captureEntry();             // which page type this visit entered through
+    // First-party attribution (docs/acquisition-attribution.sql): remember and send the FIRST touch before anything records an
+    // event. The browser reports what it saw; the database classifies the channel. Never blocks or breaks the page.
+    try { if (HS.attr) { HS.attr.capture(); HS.attr.send(); } } catch (e) { /* attribution must never break the page */ }
     await injectShell();
     // A ZIP with no standard page (lib/zip-coverage.json): a map page shows the coverage panel
     // and stops here, so no map or development code runs; the community page draws the same
@@ -2877,7 +2882,7 @@
       viewedZip: kind === 'map' ? null : state.zip,
       onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)
     });
-    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
+    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); recordPageView(); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
@@ -2896,7 +2901,14 @@
     } catch (e) {}
     if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     else if (!IS_EMBED) HS.consumeFollowHandoff();
+    recordPageView();
     _resolveReady(HS);
+  }
+  // One page_view per page load (never for an embedded iframe). Carries the visitor and visit-session ids and the viewed ZIP only:
+  // no URL query, no address, no email. Visitors, sessions and returns on the acquisition dashboard are counted from these.
+  function recordPageView() {
+    if (IS_EMBED) return;
+    logEvent('page_view', {});
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
