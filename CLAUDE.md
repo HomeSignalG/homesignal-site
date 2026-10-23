@@ -2659,6 +2659,17 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
     never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
 
+## 7.11b A MISSED ATLAS OR EPOCH READ PAGES — `dc_acquisitions` (2026-10-23)
+
+Both daily data-centre reads (homesignal-ingest `ingest-compute-atlas.yml` 09:40 UTC, `ingest-epoch-ai.yml`
+10:10 UTC) got no GitHub runner on 2026-10-21 and 2026-10-23 and wrote nothing; the hourly monitor read nothing
+about them. `docs/dc-acquisitions-monitor.sql` splices an alertable `dc_acquisitions` check into
+`pipeline_health_tick()` (same splice discipline as ingest's `20261023160000`; it lives here because ingest's
+Step-2A isolation gate forbids that repo naming `dc_*` objects). For every ACTIVE `dc_source` distribution it
+fails when no `SUCCESS_COMPLETE` run completed in 30 h, or the newest run failed or is still open after 2 h.
+Measured first: all 92 runs ever were `SUCCESS_COMPLETE`; the only 48 h gaps in 30 days are the two missed days.
+When it pages, dispatch that source's ingest workflow with `mode=apply`. Test: `test/dc_acquisitions_monitor_pg`.
+
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
 **Every coordinate claim is classified by what the evidence is, and authority follows that
