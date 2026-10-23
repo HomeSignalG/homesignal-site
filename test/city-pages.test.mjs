@@ -86,7 +86,7 @@ ok(typeof TYPE_NOT_STATED === 'string' && TYPE_NOT_STATED.length > 0, 'an ungive
 
 // ---- 3. held ZIPs ----------------------------------------------------------------------
 ok(city.includes('across 2 of the 3 ZIP codes named Amherst'), 'the lead says how many ZIPs were counted');
-ok(/Amherst \(01004\)<\/a> <span class="quiet">not yet measured — not counted<\/span>/.test(city),
+ok(/Amherst \(01004\)<\/a> <span class="quiet">no mapped area — not counted<\/span>/.test(city),
    'the held ZIP is named and marked not counted');
 
 // ---- 4. links ----------------------------------------------------------------------------

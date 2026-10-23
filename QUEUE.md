@@ -96,8 +96,11 @@ Receipt: `docs/maps-coverage/N5-FIX4-NO-BOUNDARY-CLASSIFICATION-2026-10-01.md`. 
     a street address to see development around that address."* One owner,
     `HS.zipNoMappedAreaFact` in `lib/zip-authoritative.js`, on Map 1 and the ZIP / development
     pages; pinned whole in `test/zip-no-mapped-area-copy.test.mjs`. Only a ZIP waiting on a
-    build (producer status `unknown`) keeps "not measured yet". Not changed: the city pages' short
-    "not yet measured — not counted" tag beside these ZIPs.
+    build (producer status `unknown`) keeps "not measured yet". The city pages' short
+    "not yet measured — not counted" tag beside these ZIPs was left at first; 2026-10-23 it is
+    changed to "no mapped area — not counted" in a DRAFT PR awaiting founder approval of the copy.
+    Evidence: the plane's `not_measured` set (generated 2026-10-22, control 5,641 ZIPs) is exactly
+    the 706 no-boundary ZIPs, 706 each, md5 `7d1bf19a913e437a28f68c7442842890` on both sides.
 
   The registry and the page copy were not touched.
 
