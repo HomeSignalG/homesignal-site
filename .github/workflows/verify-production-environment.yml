@@ -9,11 +9,15 @@ name: verify-production-environment
 #   From main: every row must PASS.
 #   From any other branch: the environment must refuse the job before a runner starts (0 steps).
 #
-# DRAFT, DO NOT MERGE YET. This job names the environment `production`, which does not exist yet.
-# A job that names a missing environment can create it with no protection rules, so this file
-# must not reach main until the founder says the environment is ready (deployment branches: main
-# only; no admin bypass; holding PROD_SUPABASE_DB_URL, PROD_SUPABASE_SERVICE_ROLE_KEY and
-# PROD_SUPABASE_ACCESS_TOKEN).
+# The environment `production` exists (founder, 2026-10-23): deployment branches main only, no admin
+# bypass, holding PROD_SUPABASE_SERVICE_ROLE_KEY and PROD_SUPABASE_ACCESS_TOKEN. A job that names a
+# MISSING environment would create it with no protection rules, which is why this file waited for it.
+#
+# PROD_SUPABASE_DB_URL is DEFERRED (founder, 2026-10-23): the database password is not on record and
+# a reset was declined for now, so the URL could not be re-entered. While DB_URL_DEFERRED is True and
+# the secret is absent, its rows read DEFERRED (not PASS, not FAIL). Once the secret is added, the C1
+# checks run in full whatever the flag says, and the run prints a notice to remove the flag. With the
+# flag False, an absent secret FAILS as before.
 #
 # The environment line and the first step are the canonical boundary text in
 # test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.
@@ -71,7 +75,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client >/dev/null
           psql --version
-      - name: Check the three PROD_ secrets (values never printed)
+      - name: Check the PROD_ secrets (values never printed)
         env:
           PROD_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
           SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
@@ -91,6 +95,9 @@ jobs:
           DB_URL = os.environ.get("PROD_DB_URL", "").strip()
           SERVICE = os.environ.get("SERVICE_KEY", "").strip()
           TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
+          # Founder decision 2026-10-23 (see the header): the database URL is not in the environment yet.
+          DB_URL_DEFERRED = True
+          deferred = DB_URL_DEFERRED and not DB_URL
           rows = []
 
 
@@ -100,7 +107,9 @@ jobs:
 
 
           def row(name, expected, observed, ok):
-              rows.append((name, clean(expected, 80), clean(observed), "PASS" if ok else "FAIL"))
+              """ok: True PASS, False FAIL, None DEFERRED (only for the deferred database URL)."""
+              result = "DEFERRED" if ok is None else ("PASS" if ok else "FAIL")
+              rows.append((name, clean(expected, 80), clean(observed), result))
 
 
           class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -134,82 +143,88 @@ jobs:
               return {"apikey": key, "Authorization": "Bearer " + key}
 
 
-          # C0: the three secrets reach this step.
-          for name, value in (("PROD_SUPABASE_DB_URL", DB_URL), ("PROD_SUPABASE_SERVICE_ROLE_KEY", SERVICE),
-                              ("PROD_SUPABASE_ACCESS_TOKEN", TOKEN)):
+          # C0: the secrets reach this step. The database URL may be DEFERRED (see the header).
+          if deferred:
+              row("C0 PROD_SUPABASE_DB_URL is set", "set, or DEFERRED", "DEFERRED (founder, 2026-10-23)", None)
+          else:
+              row("C0 PROD_SUPABASE_DB_URL is set", "set", "set" if DB_URL else "MISSING", bool(DB_URL))
+          for name, value in (("PROD_SUPABASE_SERVICE_ROLE_KEY", SERVICE), ("PROD_SUPABASE_ACCESS_TOKEN", TOKEN)):
               row("C0 %s is set" % name, "set", "set" if value else "MISSING", bool(value))
 
-          # C1: the database URL. Parsed here into libpq's PG* variables, so the password reaches psql
-          # through its environment (readable only by this user), never its argument list (/proc/*/cmdline
-          # is world-readable). Nothing from the URL is printed except the port.
-          row("C1a URL names project %s" % REF, "yes", "yes" if REF in DB_URL else "no", REF in DB_URL)
-          pg = None
-          try:
-              u = urllib.parse.urlsplit(DB_URL)
-              query = urllib.parse.parse_qs(u.query)
-              port = u.port or 5432          # libpq's default; the same rule scripts/dc-*-apply.sh use
-              if "port" in query:
-                  port = int(query["port"][-1])
-              if u.scheme not in ("postgres", "postgresql"):
-                  port_seen = "not a postgres:// URI"
-              elif not u.hostname:
-                  port_seen = "no host in the URL"
-              else:
-                  port_seen = str(port)
-                  pg = {"PGHOST": u.hostname, "PGPORT": str(port),
-                        "PGSSLMODE": query.get("sslmode", ["require"])[-1], "PGCONNECT_TIMEOUT": "15"}
-                  if u.username:
-                      pg["PGUSER"] = urllib.parse.unquote(u.username)
-                  if u.password is not None:
-                      pg["PGPASSWORD"] = urllib.parse.unquote(u.password)
-                  if u.path.lstrip("/"):     # empty: libpq defaults the database name to the user name
-                      pg["PGDATABASE"] = urllib.parse.unquote(u.path.lstrip("/"))
-          except ValueError:
-              port_seen = "unparseable"
-
-
-          def classify(err):
-              e = err.lower()
-              for needle, label in (("password authentication failed", "authentication failed"),
-                                    ("tenant or user not found", "pooler: tenant or user not found"),
-                                    ("network is unreachable", "network unreachable (the direct host is IPv6-only; use the session pooler)"),
-                                    ("timeout expired", "connect timeout"),
-                                    ("could not translate host name", "host name not resolved"),
-                                    ("connection refused", "connection refused"),
-                                    ("does not exist", "relation or database does not exist"),
-                                    ("permission denied", "permission denied"),
-                                    ("ssl", "ssl error")):
-                  if needle in e:
-                      return label
-              return "other error (text withheld)"
-
-
-          # Read-only is enforced INSIDE the transaction: the production URL goes through a pooler that
-          # drops startup options, so PGOPTIONS (default_transaction_read_only, statement_timeout) never
-          # reaches the server. BEGIN READ ONLY, assert transaction_read_only = on in the same select, roll back.
-          if pg is None:
-              db_seen = "not run: %s" % port_seen
+          if deferred:
+              row("C1 database URL checks (C1a-C1c)", "run, or DEFERRED", "DEFERRED: PROD_SUPABASE_DB_URL not set", None)
           else:
-              env = {k: v for k, v in os.environ.items()
-                     if k not in ("PROD_DB_URL", "SERVICE_KEY", "ACCESS_TOKEN") and not k.startswith("PG")}
-              env.update(pg)
+              # C1: the database URL. Parsed here into libpq's PG* variables, so the password reaches psql
+              # through its environment (readable only by this user), never its argument list (/proc/*/cmdline
+              # is world-readable). Nothing from the URL is printed except the port.
+              row("C1a URL names project %s" % REF, "yes", "yes" if REF in DB_URL else "no", REF in DB_URL)
+              pg = None
               try:
-                  p = subprocess.run(["psql", "-XAtq", "-F,", "-v", "ON_ERROR_STOP=1",
-                                      "-c", "begin read only",
-                                      "-c", "set local statement_timeout = '20s'",
-                                      "-c", "select 1, (select count(*) from public.canonical_zip_registry), "
-                                            "current_setting('transaction_read_only')",
-                                      "-c", "rollback"],
-                                     env=env, capture_output=True, text=True, timeout=60)
-                  db_seen = p.stdout.strip() if p.returncode == 0 else "psql exit %d (%s)" % (p.returncode, classify(p.stderr))
-              except subprocess.TimeoutExpired:
-                  db_seen = "psql timed out"
-              except OSError:
-                  db_seen = "psql not runnable"
-          row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12722,on",
-              db_seen, db_seen == "1,12722,on")
-          row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
-              port_seen == "5432")
+                  u = urllib.parse.urlsplit(DB_URL)
+                  query = urllib.parse.parse_qs(u.query)
+                  port = u.port or 5432          # libpq's default; the same rule scripts/dc-*-apply.sh use
+                  if "port" in query:
+                      port = int(query["port"][-1])
+                  if u.scheme not in ("postgres", "postgresql"):
+                      port_seen = "not a postgres:// URI"
+                  elif not u.hostname:
+                      port_seen = "no host in the URL"
+                  else:
+                      port_seen = str(port)
+                      pg = {"PGHOST": u.hostname, "PGPORT": str(port),
+                            "PGSSLMODE": query.get("sslmode", ["require"])[-1], "PGCONNECT_TIMEOUT": "15"}
+                      if u.username:
+                          pg["PGUSER"] = urllib.parse.unquote(u.username)
+                      if u.password is not None:
+                          pg["PGPASSWORD"] = urllib.parse.unquote(u.password)
+                      if u.path.lstrip("/"):     # empty: libpq defaults the database name to the user name
+                          pg["PGDATABASE"] = urllib.parse.unquote(u.path.lstrip("/"))
+              except ValueError:
+                  port_seen = "unparseable"
+
+
+              def classify(err):
+                  e = err.lower()
+                  for needle, label in (("password authentication failed", "authentication failed"),
+                                        ("tenant or user not found", "pooler: tenant or user not found"),
+                                        ("network is unreachable", "network unreachable (the direct host is IPv6-only; use the session pooler)"),
+                                        ("timeout expired", "connect timeout"),
+                                        ("could not translate host name", "host name not resolved"),
+                                        ("connection refused", "connection refused"),
+                                        ("does not exist", "relation or database does not exist"),
+                                        ("permission denied", "permission denied"),
+                                        ("ssl", "ssl error")):
+                      if needle in e:
+                          return label
+                  return "other error (text withheld)"
+
+
+              # Read-only is enforced INSIDE the transaction: the production URL goes through a pooler that
+              # drops startup options, so PGOPTIONS (default_transaction_read_only, statement_timeout) never
+              # reaches the server. BEGIN READ ONLY, assert transaction_read_only = on in the same select, roll back.
+              if pg is None:
+                  db_seen = "not run: %s" % port_seen
+              else:
+                  env = {k: v for k, v in os.environ.items()
+                         if k not in ("PROD_DB_URL", "SERVICE_KEY", "ACCESS_TOKEN") and not k.startswith("PG")}
+                  env.update(pg)
+                  try:
+                      p = subprocess.run(["psql", "-XAtq", "-F,", "-v", "ON_ERROR_STOP=1",
+                                          "-c", "begin read only",
+                                          "-c", "set local statement_timeout = '20s'",
+                                          "-c", "select 1, (select count(*) from public.canonical_zip_registry), "
+                                                "current_setting('transaction_read_only')",
+                                          "-c", "rollback"],
+                                         env=env, capture_output=True, text=True, timeout=60)
+                      db_seen = p.stdout.strip() if p.returncode == 0 else "psql exit %d (%s)" % (p.returncode, classify(p.stderr))
+                  except subprocess.TimeoutExpired:
+                      db_seen = "psql timed out"
+                  except OSError:
+                      db_seen = "psql not runnable"
+              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12722,on",
+                  db_seen, db_seen == "1,12722,on")
+              row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
+                  port_seen == "5432")
 
           # C2: the service-role key. Each positive check is paired with the public anon key on the
           # same request, so a PASS proves the key can do more than anon can. The anon key is first shown
@@ -257,6 +272,10 @@ jobs:
               "%s, %s function(s)" % (f, f_n), f == 200)
 
           fails = sum(1 for r in rows if r[3] == "FAIL")
+          if deferred:
+              print("::notice::PROD_SUPABASE_DB_URL is DEFERRED (founder, 2026-10-23); its checks did not run")
+          elif DB_URL_DEFERRED:
+              print("::notice::PROD_SUPABASE_DB_URL is now set and its checks ran: set DB_URL_DEFERRED to False")
           table_md = ["| check | expected | observed | result |", "|---|---|---|---|"]
           table_md += ["| %s | %s | %s | %s |" % r for r in rows]
           print("\n".join(table_md))
