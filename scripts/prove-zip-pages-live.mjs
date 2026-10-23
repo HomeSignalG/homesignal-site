@@ -119,7 +119,7 @@ const main = async () => {
     ok((s.desc || '').includes(zip), `[${zip}] ZIP-specific meta description`);
     ok(['Government notices', 'Upcoming public meetings', 'Local news']
         .every((x) => s.headings.includes(x)), `[${zip}] all three Alerts headings present`);
-    ok(/homesignalmap\.html\?zip=/.test(s.links) && /href="\/"/.test(s.links),
+    ok((/href="\/map\/\d{5}\/"/.test(s.links) || /homesignalmap\.html\?zip=/.test(s.links)) && /href="\/"/.test(s.links),
        `[${zip}] usable internal links in the initial HTML`);
     ok(!r.xRobots, `[${zip}] no X-Robots-Tag header overriding the page's own directive`);
   }
@@ -293,7 +293,7 @@ const main = async () => {
       h1: (document.querySelector('h1') || {}).textContent || '',
       ssrItems: document.querySelectorAll('#hs-ssr li').length,
       text: (document.body.innerText || ''),
-      navLinks: document.querySelectorAll('a[href*="homesignalmap.html"]').length,
+      navLinks: document.querySelectorAll('a[href*="homesignalmap.html"], a[href^="/map/"]').length,
     }));
     const want = seo(body[k].body).robots;
     ok(after.robots === want, `[${z}] robots is STILL "${want}" after JavaScript`);

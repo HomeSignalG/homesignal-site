@@ -311,10 +311,13 @@ jobs:
                   ! -regex '.*/[0-9][0-9][0-9][0-9][0-9]$' | wc -l)
           echo "non-canonical path shapes: $BAD"; test "$BAD" -eq 0
           test ! -e _site/community/80249            # the removed drift ZIP must not exist
-          # the short map address: one /map/<zip>/ per community document, same ZIPs, nothing else
+          # Map 1 per ZIP: one /map/<zip>/ document per community document, same ZIPs, nothing else;
+          # their shared style and runtime are the two content-addressed files under /map1/
           MAPS=$(find _site/map -mindepth 2 -maxdepth 2 -name index.html | wc -l)
           echo "map routes: $MAPS"; test "$MAPS" -eq "$DOCS"
           diff <(ls _site/map) <(ls _site/community) >/dev/null
+          test "$(ls _site/map1 | grep -cE '^page\.[0-9a-f]{8}\.(js|css)$')" -eq 2
+          test "$(ls _site/map1 | wc -l)" -eq 2
           # ZIP COVERAGE (founder, 2026-10-03): every ZIP in lib/zip-coverage.json keeps a document
           # (a ZIP with no Census-drawn area is not proven inactive), the model ships (shell.js
           # reads it), the model equals what the classification record derives, and the documents
@@ -458,7 +461,7 @@ jobs:
               return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
                       or p.startswith('guides/') or p.startswith('sitemaps/')
-                      or p.startswith('map/'))
+                      or p.startswith('map/') or p.startswith('map1/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'

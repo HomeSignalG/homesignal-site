@@ -51,7 +51,7 @@ BASE = brand_host.origin()   # the contract's current identity (scripts/brand_ho
 # source data contains it (see assert_token_absent).
 BUILD_DAY_TOKEN = "@@HS-BUILD-DAY@@"
 
-FAMILIES = ("zip", "city", "project", "guide")
+FAMILIES = ("zip", "city", "project", "guide", "map")
 
 # A TRACKED project's `as_of` ("Status as of <day>") is set to the plane's own day on every run:
 # the plane producer documents it as bookkeeping ("as_of, changed_on, tracked, held are not facts",
@@ -68,6 +68,7 @@ PATH_RES = {
     "city": re.compile(r"^/city/[a-z]{2}/[a-z0-9]+(?:-[a-z0-9]+)*/$"),
     "project": re.compile(r"^/project/[a-z0-9]+(?:-[a-z0-9]+)*/(?:[a-z0-9]+(?:-[a-z0-9]+)*-)?[0-9a-f]{8}/$"),
     "guide": re.compile(r"^/guides/[a-z0-9]+(?:-[a-z0-9]+)*/$"),
+    "map": re.compile(r"^/map/\d{5}/$"),
 }
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")

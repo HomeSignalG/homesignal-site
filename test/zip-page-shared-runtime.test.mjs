@@ -42,7 +42,12 @@ const genScripts = (py) =>
   [...py.matchAll(/<script src=\\?"([^"\\]+)\\?"/g)].map((m) => norm(m[1]));
 
 const community = htmlScripts(read('community.html'));
-const generated = genScripts(read('scripts/gen_zip_pages.py'));
+// Only the community template: the Map 1 template (class MapTemplate) emits its own script tag for
+// /map/<zip>/ documents, which are a different page with a different runtime.
+const genSrc = read('scripts/gen_zip_pages.py');
+const genCommunity = genSrc.split('class MapTemplate')[0];
+ok(genCommunity.length > 1000 && genCommunity.length < genSrc.length, 'the community template is split from the Map 1 template', genCommunity.length);
+const generated = genScripts(genCommunity);
 
 ok(community.length >= 8, 'community.html loads the shared runtime', community);
 ok(generated.length >= 8, 'the generated ZIP document loads the shared runtime', generated);
