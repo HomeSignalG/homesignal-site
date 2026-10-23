@@ -26,10 +26,10 @@ alter table public.events add column if not exists ref_content  text;
 
 alter table public.events drop constraint if exists events_ref_labels_bounded;
 alter table public.events add constraint events_ref_labels_bounded check (
-  (ref_source   is null or ref_source   ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_medium   is null or ref_medium   ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_campaign is null or ref_campaign ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_content  is null or ref_content  ~ '^[a-z0-9._~:/-]{1,80}$'));
+  (ref_source   is null or ref_source   ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_medium   is null or ref_medium   ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_campaign is null or ref_campaign ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_content  is null or ref_content  ~ '^[a-z0-9._~:/_-]{1,80}$'));
 
 create index if not exists events_ref_campaign_idx
   on public.events (ref_campaign, event_type, created_at) where ref_campaign is not null;
@@ -44,7 +44,7 @@ create schema if not exists outreach;
 create table if not exists outreach.saleshandy_campaign (
   sh_campaign_id text primary key,                       -- Saleshandy's own id, as text
   campaign_key   text not null unique
-                 check (campaign_key ~ '^[a-z0-9._~:/-]{1,80}$'),
+                 check (campaign_key ~ '^[a-z0-9._~:/_-]{1,80}$'),
   name           text not null,
   status         text,
   first_seen_at  timestamptz not null default now(),
