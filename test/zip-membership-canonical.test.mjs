@@ -97,7 +97,8 @@ ok(/sites:\s*HS\.zipModeSites\(rsSites,/.test(LOADZIP) && /HS\.zipReportSites\(r
 ok(/delete zipCounts\.facilities;/.test(LOADZIP) && !/zipCounts\.facilities\s*=/.test(LOADZIP),
   'B8 the engine\'s radius-derived counts.facilities is removed; the tile counts the facilities drawn');
 ok(/var fac = sites\.filter\(function\(s\)\{ return s\.scope==="point" && s\.relevance!=="development"\s*&& !\(HS\.isStateCleanup && HS\.isStateCleanup\(s\)\); \}\);/.test(PAGE)
-   && /: \(\(data\.counts && data\.counts\.facilities\) != null \? data\.counts\.facilities : fac\.length\)/.test(PAGE),
+   && /var _facN = \(data\.counts && data\.counts\.facilities\) != null \? data\.counts\.facilities : fac\.length;/.test(PAGE)
+   && /\$\("cFac"\)\.textContent\s*=\s*FAC_CONFIRMED_ON \? _facN[\s\S]{0,80}: _facN;/.test(PAGE),
   'B9 with counts.facilities absent the tile IS fac.length — the drawn facility set (positive control for B8)');
 
 // ── C. THE DOOR reads the verdict and nothing else ─────────────────────────────────────────

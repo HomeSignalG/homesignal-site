@@ -205,7 +205,7 @@ ok(man.indexable_zips.includes('78769') && !man.indexable_zips.includes('48391')
 // Control: a standard ZIP is untouched.
 {
   const h = page('01001');
-  ok(!h.includes('zcov') && h.includes('/homesignalmap.html?zip=01001') && !h.includes('zip-nearby'), '5q control: a standard ZIP page has no panel and still links its map');
+  ok(!h.includes('zcov') && h.includes('/map/01001/') && !h.includes('zip-nearby'), '5q control: a standard ZIP page has no panel and still links its map');
   ok(/<title>Agawam, MA/.test(h) || /<title>[^<]*01001|<title>[^<]*Agawam/.test(h), '5r control: its title is the usual one');
 }
 // the SSR panel and the shell's panel say the same words

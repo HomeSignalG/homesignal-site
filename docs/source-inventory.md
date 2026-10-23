@@ -280,7 +280,9 @@ tables is a page or row count, not an endpoint, so it is rendered `—` rather t
 
 These are blocked by **infrastructure** (WAF / SSL / DNS / dead host) or **stalled publishing**,
 not by a disqualifier. `source-monitor.yml` re-probes every one nightly at 07:00 UTC and
-auto-wires anything that recovers AND passes the fail-closed gate. Latest run
+auto-wires anything that recovers AND passes the fail-closed gate *(2026-10-22: it now PROPOSES
+such an entry in the run's summary and artifact and fails the run until it is wired by PR; it no
+longer commits anything)*. Latest run
 `2026-08-07T08:13:08Z`: 18 re-probed, 44 catalogs walked, **195 candidates evaluated,
 auto-wired: none**, 141 flagged for connector work.
 

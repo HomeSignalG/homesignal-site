@@ -1,0 +1,34 @@
+name: bing-next-batch
+
+# Read-only helper for the daily Bing URL Submission (quota 100 a day). Reads the LIVE sitemap, so
+# a ZIP page set to noindex is never offered, and skips every ZIP in docs/seo/bing-submitted.txt.
+# It submits nothing: the batch is printed between BEGIN/END markers and in the run summary, and a
+# person pastes it into Bing Webmaster Tools. After pasting, append the ZIPs to the submitted file.
+# Dispatch only; no schedule, no secrets.
+on:
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 'how many URLs (Bing allows 100 a day)'
+        default: '100'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bing-next-batch
+  cancel-in-progress: false
+
+jobs:
+  batch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Next batch from the live sitemap
+        env:
+          COUNT: ${{ inputs.count }}
+        run: python3 scripts/bing_next_batch.py --count "$COUNT"

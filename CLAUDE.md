@@ -101,6 +101,23 @@ stop lists elsewhere in this file still stand: secrets/PII/subscriber data, dest
 non-additive database changes, legal/consent changes, and cross-repo changes. This removes the
 approval step only, not the verification before it.
 
+**Three operating rules (founder, 2026-10-21; same text as homesignal-ingest CLAUDE.md Rule #0b):**
+1. **Merge only after every check has FINISHED, green, on the exact commit being merged.**
+   "Merge" from the founder lifts approval, not this. After any push (a conflict merge included),
+   wait for the new head's checks. Ingest #792 was merged 2 s before its first check started
+   (14:19:07 vs 14:19:09Z). A check that is red by design is named on the PR before merging;
+   every other red check blocks.
+2. **After an outage ends (Actions runners, database, a dead credential), check health and
+   restart what was missed BEFORE reporting status.** Read `public.pipeline_health_check` and
+   `public.ingest_run_heartbeat`, and dispatch each workflow whose scheduled runs failed during
+   the outage. On 2026-10-21 Local News had been dark ~19h and the Oct 20 digest was missed; both
+   were found only when the founder asked "status". A status report also covers GitHub check
+   runs, not only the health table: a daily check failing in GitHub is not "healthy".
+3. **Before dispatching an expensive workflow by hand, check for one already queued or running**
+   (queued / in progress, or started in the last hour). On 2026-10-21 two Local News recovery runs
+   started 14 minutes apart and both ran to completion. Here this also covers the full-corpus
+   verifiers (§5: run them one at a time).
+
 **Autonomous — implement, PR, merge, deploy, then report — when ALL of these hold:**
 
 1. **`jurisdiction-registry.json` only.** No other file.
@@ -1185,6 +1202,8 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     inside the artifact.** The served sitemap is therefore correct, but the committed one is
     not what ships. Retiring the community half of `gen_sitemap.py` is the obvious follow-up
     and is deliberately NOT bundled into the deployment change.
+    *(2026-10-22: nothing regenerates the committed file on a schedule any more; `sitemap.yml`
+    is deleted. See "NO WORKFLOW PUSHES TO `main`" below.)*
   - **`docs/` and `test/` are no longer served publicly** — the artifact excludes them. No
     shipped page ever linked to either (checked: zero `href` references).
 - 🔒 **A workflow push never becomes the head of an open PR (2026-10-19).** A push made with
@@ -1193,6 +1212,29 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   <target>` first (copy of the homesignal-ingest script, #720): 0 = push, 3 = refused (step
   red), 4 = refused on a push-started run (step green, nothing pushed), 1 = could not check.
   Pinned by `test/bot-push-guard.test.mjs`.
+- 🔒 **NO WORKFLOW PUSHES TO `main`, AND NONE HOLDS A DEPLOY KEY (2026-10-22, founder "remove
+  deploy key").** Until then `sitemap.yml` (daily) and `source-monitor.yml` (nightly) pushed
+  straight to `main` with the `DEPLOY_KEY` secret, an SSH deploy key that the "Protect Main"
+  ruleset let bypass (`bypass_actors: DeployKey, always`).
+  - **`sitemap.yml` is deleted.** The build throws away both `?zip=` halves of the committed
+    `sitemap.xml` (`gen_zip_pages.py::reconcile_sitemap`; pages run 39735853225 removed 11,702 +
+    11,657, all of them), so the daily commit changed nothing that is served. The 8 static URLs
+    ARE served as committed: after editing `STATIC` in `scripts/gen_sitemap.py`, run
+    `python3 scripts/gen_sitemap.py --static-only` (offline) and commit `sitemap.xml` in the same
+    PR. `test/sitemap-static-half.test.mjs` fails until they agree.
+  - **`source-monitor.yml` reports instead of committing.** Each run's report is in its job
+    summary and in the `source-monitor-<run id>` artifact (30 days);
+    `docs/source-monitor-report.md` is frozen at the last committed run. A candidate that passes
+    the auto-wire gate is no longer written to the registry: the entry goes into the summary and
+    the artifact (`proposed-registry-entries.json`) and the run fails with the steps to wire it
+    by PR, then dispatch `deploy-edge-functions` (`function=get-address-report`). The job holds
+    only `contents: read`. Measured before the change: 0 auto-wires ever (216 registry commits,
+    none by the monitor; 94 committed runs, all "Auto-wired: none").
+  - `test/no-deploy-key-push.test.mjs` fails on any workflow that references
+    `secrets.DEPLOY_KEY`, passes `ssh-key:` to a checkout, or runs a `git push` that can land on
+    `main`. `fetch-tabs-fixtures.yml` now refuses `main` before its push for the same reason.
+  - **After this merges, the founder deletes the deploy key, the `DEPLOY_KEY` secret and the
+    ruleset's deploy-key bypass.** Nothing in either repo needs any of them.
 - Develop on the assigned feature branch, commit with clear messages, push to that
   branch. Don't open a PR unless asked.
 - ⚠️ **"No test/lint suite" is NO LONGER TRUE — corrected 2026-08-02.** There is a **73-file
@@ -1624,6 +1666,8 @@ legal/framing change not covered by the one-time sign-off.
 - **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
+  *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
+  from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 - **At batch scale the seed is a reproducible pg_net REFRESH SCRIPT, not a literal snapshot.**
   A one-ZIP literal is fine; a whole county (18 ZIPs × ~40-64 sites, mostly the same county
   notices repeated) is ~220 KB of engine output — embedding it as hand-copied JSON is the
@@ -1632,6 +1676,8 @@ legal/framing change not covered by the one-time sign-off.
 - **Development ZIP pages are in the sitemap zero-touch** — `scripts/gen_sitemap.py` emits one
   `homesignalmap.html?zip=<zip>` per `development_reports` row (alongside the community pages), so
   newly-cached ZIPs are indexable with no edit; the daily `sitemap.yml` workflow republishes.
+  *(2026-10-22: `sitemap.yml` is deleted, and the build drops these `homesignalmap.html?zip=` URLs
+  from the served sitemap anyway (`gen_zip_pages.py::reconcile_sitemap`). See §5.)*
 
 ## 7.04a THE MAPS (ALL THEMES) ZIP LIST IS A SECOND, INDEPENDENT LIST (2026-10-15)
 
@@ -5153,6 +5199,16 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
   selector matches even for an empty ZIP.
 
 ---
+
+### ✅ A FACILITY COUNT EPA DID NOT CONFIRM TODAY SHOWS WITH ITS DATE (2026-10-23, Washington audit step 4)
+When `development_reports.facilities_unavailable` is true, Map 1's counter and the ZIP page strip used to show a dash.
+They now show the stored count with the day it was last confirmed ("· last confirmed Sep 10, 2026"), decided once by
+`HS.facilityCount` (`lib/templates.js`). Basis, measured 2026-10-23 over the 2,045 flagged pages: all 1,570 with a stored
+count above zero carry a facility clock (`facilities_refreshed_at`) older than the core refresh, i.e. the day of the last
+real EPA answer; all 475 with a stored zero carry a clock equal to the core refresh, so a zero is never a confirmed zero
+and stays a dash. No clock, or the ZIP has no facility measurement, also stays a dash. The outage note no longer names the
+fixed date "2026-08-09" (false of every page flagged since). Tests: `test/facilities-unavailable-copy.test.mjs`
+(the rule run on the shipped file), `test/map1-facility-count-dated.browser.test.mjs`.
 
 ## 7.2 Government Source Archive (`gov-archive.html`) — the archive lives in the INGEST repo
 

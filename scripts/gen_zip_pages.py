@@ -902,7 +902,7 @@ def render(p, built):
     # ZIP's own development/map page and the site root. Deliberately NOT the legacy
     # community.html?zip= URL — that page canonicalises here, so linking to it from here
     # would re-create the duplicate-identity ambiguity this unit removes.
-    links = (f'<nav class="zsec"><a href="/homesignalmap.html?zip={esc(z)}">'
+    links = (f'<nav class="zsec"><a href="/map/{esc(z)}/">'
              f'Development &amp; permits map for {esc(z)}</a> · '
              f'<a href="/">HomeSignal home</a> · '
              f'<a href="/how-it-works.html">How HomeSignal works</a></nav>')
@@ -1033,7 +1033,7 @@ def render(p, built):
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261021a"></script>\n'
         '<script src="/lib/data.js?v=ae51d15a"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
-        '<script src="/lib/templates.js?v=a01bf2ff"></script>\n<script src="/lib/impact.js"></script>\n'
+        '<script src="/lib/templates.js?v=c408a2cb"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
         # rule as the files around it: both hosts run ONE runtime. lib/map.js stays OFF (§5a).
@@ -1048,9 +1048,9 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=e4216ddb"></script>\n'
+        '<script src="/shell.js?v=0835092b"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=329f7b0f"></script>\n'
+        '<script src="/lib/community-page.js?v=de9f2588"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1345,7 +1345,7 @@ def render_project(pr, pages, built, projects=None):
         f'<section class="zsec"><h2>Where it is</h2>'
         f'<p>On the HomeSignal page for {"these ZIP codes" if len(zips) > 1 else "this ZIP code"}:</p>'
         f'<ul>{zli}</ul>'
-        f'<p><a href="/homesignalmap.html?zip={esc(zips[0])}">See it on the Development map</a></p>'
+        f'<p><a href="/map/{esc(zips[0])}/">See it on the Development map</a></p>'
         f'</section>'
         + _related_section(pr, zips, first, pages, projects)
         + city_nav
@@ -1644,7 +1644,7 @@ SITEMAP_MAX_URLS = 50000        # the sitemaps.org limit for one file
 
 
 def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=(),
-                      lastmod=None):
+                      lastmod=None, map_paths=()):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -1655,6 +1655,11 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     sitemap full of 404s. Rewriting the copy INSIDE the artifact means the sitemap becomes
     correct at exactly the moment the documents it points at start existing, and stays
     untouched if they never do. Same reason the deploy job is gated on main.
+    (2026-10-22: the Pages source was switched to GitHub Actions on 2026-09-04, so this
+    artifact copy IS what production serves. Nothing regenerates the committed file on a
+    schedule any more: sitemap.yml is deleted, because this function discards both ?zip=
+    halves of it. Only its static half reaches production; test/sitemap-static-half.test.mjs
+    keeps that half equal to gen_sitemap.py STATIC.)
 
     The development half (`homesignalmap.html?zip=`) is REMOVED, not carried over.
 
@@ -1678,7 +1683,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     `scripts/gen_sitemap.py` still WRITES those URLs into the committed sitemap.xml. That
     is left alone for the same reason its community half is: nothing serves the committed
     file, the artifact is what ships, and retiring the committed generator's halves is a
-    separate change (its own docstring already logs that follow-up).
+    separate change (its own docstring already logs that follow-up). (2026-10-22: it is no
+    longer run on a schedule; see scripts/gen_sitemap.py.)
     """
     path = os.path.join(out_dir, "sitemap.xml")
     zips = sorted(indexable)
@@ -1698,6 +1704,11 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     gps = sorted(guide_paths)
     if gps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{gp}", lm.get(gp)) for gp in gps)
+    # Map 1 per ZIP (/map/<zip>/, 2026-10-22): the real documents SITEMAP_DEV_RE was waiting for.
+    # Only the ones whose own robots say index.
+    mps = sorted(map_paths)
+    if mps:
+        block += "\n" + "\n".join(_url_el(f"{BASE}{mp}", lm.get(mp)) for mp in mps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1709,7 +1720,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
         return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps),
-                "projects": len(pps), "guides": len(gps)}
+                "projects": len(pps), "guides": len(gps), "maps": len(mps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
@@ -1731,6 +1742,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     ngd = len(re.findall(r"<loc>[^<]*/guides/[a-z0-9-]+/</loc>", txt))
     if ngd != len(gps):
         sys.exit(f"ERROR: sitemap carries {ngd} guide URLs for {len(gps)} guide pages")
+    nmp = len(re.findall(r"<loc>[^<]*/map/\d{5}/</loc>", txt))
+    if nmp != len(mps):
+        sys.exit(f"ERROR: sitemap carries {nmp} map URLs for {len(mps)} indexable map pages")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -1740,7 +1754,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
-            "projects": len(pps), "guides": len(gps)}
+            "projects": len(pps), "guides": len(gps), "maps": len(mps)}
 
 
 # ---------------------------------------------------------------- family sitemaps (plan step 14)
@@ -1749,7 +1763,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 # unchanged; every URL in them is also in sitemap.xml. The two ZIP families overlap on
 # purpose: a ZIP that passes both Rule F and Rule D is in both, so each rule is measured
 # over the whole set of pages it qualifies.
-SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide")
+SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide", "map")
 
 
 def write_family_sitemaps(out_dir, families, lastmod=None):
@@ -1796,38 +1810,125 @@ def build(pages, out_dir, canonical, built, state=None):
             "max": mx, "max_zip": mxz}
 
 
-MAP_PAGE = "/homesignalmap.html"
+MAP_TEMPLATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "homesignalmap.html")
+MAP_ASSET_DIR = "map1"          # the shared runtime of every /map/<zip>/ document, content-addressed
 
 
-def render_map_route(z):
-    """The short map address /map/<zip>/ (founder, 2026-10-21): the link people SEE in posts and
-    e-mails, so it carries no page file name. It forwards to the one Map 1 page for this ZIP and
-    keeps any query the link carried (the campaign tags) and the hash. It is not a second map and
-    not a page of its own: noindex, no content, no canonical claim. Map 1 stays the one page."""
-    if not ZIP_RE.match(z):
-        sys.exit(f"ERROR: non-numeric ZIP refused: {z!r}")
-    dest = f"{MAP_PAGE}?zip={z}"
-    return ("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
-            "<meta name=\"robots\" content=\"noindex, follow\">\n"
-            f"<title>Map for ZIP {z}</title>\n"
-            "<script>(function(){var q=location.search.replace(/^\\?/,'');"
-            f"location.replace('{dest}'+(q?'&'+q:'')+location.hash);}})();</script>\n"
-            f"<meta http-equiv=\"refresh\" content=\"1; url={dest}\">\n"
-            "</head>\n<body>\n"
-            f"<p><a href=\"{dest}\">Open the development map for ZIP {z}</a></p>\n"
-            "</body>\n</html>\n")
+class MapTemplate:
+    """Map 1 as ONE shared implementation, rendered once per ZIP (founder, 2026-10-22: the address
+    people see is /map/<zip>, and it must be a real page a search engine can list).
+
+    homesignalmap.html stays the only source. The build reads it, moves its two large inline
+    blocks (the page <style> and the page runtime <script>) into content-addressed files under
+    /map1/, and gives each ZIP a small document with its own title, description, canonical and
+    robots. The runtime is byte-identical to the inline one; the page reads its ZIP from the path
+    (HS.urlZip, shell.js). Every head replacement must match exactly once, so a change to the
+    template that moves one of them fails the build instead of shipping a page with the wrong head.
+    """
+
+    def __init__(self, path=MAP_TEMPLATE):
+        src = open(path, encoding="utf-8").read()
+        s0 = src.index("<style>\n")
+        s1 = src.index("</style>\n</head>", s0)
+        css = src[s0 + len("<style>\n"):s1]
+        j0 = src.rindex("\n<script>\n")
+        j1 = src.index("\n</script>\n</body>", j0)
+        js = src[j0 + len("\n<script>\n"):j1 + 1]
+        if "</script" in js.lower() or "</style" in css.lower():
+            sys.exit("ERROR: Map 1 template: an extracted block contains its own closing tag")
+        self.css_name = f"page.{hashlib.sha256(css.encode('utf-8')).hexdigest()[:8]}.css"
+        self.js_name = f"page.{hashlib.sha256(js.encode('utf-8')).hexdigest()[:8]}.js"
+        self.css, self.js = css, js
+        doc = (src[:s0] + f'<link rel="stylesheet" href="/{MAP_ASSET_DIR}/{self.css_name}">\n'
+               + src[s1 + len("</style>\n"):j0]
+               + f'\n<script src="/{MAP_ASSET_DIR}/{self.js_name}"></script>\n'
+               + src[j1 + len("\n</script>\n"):])
+        # Comments are documentation for this repo, not content; they are most of the markup's bytes.
+        # The inline scripts left in the head carry none (checked), so a plain strip is safe.
+        for blk in re.findall(r"<script>(.*?)</script>", doc, re.S):
+            if "<!--" in blk:
+                sys.exit("ERROR: Map 1 template: an inline head script carries an HTML comment")
+        self.doc = re.sub(r"<!--.*?-->\n?", "", doc, flags=re.S)
+        for needle in self.HEAD:
+            if self.doc.count(needle) != 1:
+                sys.exit(f"ERROR: Map 1 template: expected exactly one {needle!r}")
+        # The share image is the one other absolute URL; it follows the site origin like the canonical.
+        if self.doc.count(self.OG_IMAGE) != 2 or "https://homesignal.net" in self.doc.replace(self.OG_IMAGE, "").replace(
+                self.HEAD[3], "").replace(self.HEAD[4], ""):
+            sys.exit("ERROR: Map 1 template: expected the og:image and twitter:image URLs to be its only other absolute URLs")
+
+    HEAD = (
+        "<title>HomeSignal — Development around your home</title>",
+        '<meta name="robots" content="noindex, nofollow" id="robots-meta"/>',
+        '<meta name="description" content="See what\'s built and what\'s proposed near your home',
+        '<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>',
+        '<meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>',
+        '<meta property="og:title" content="Development around your home — HomeSignal"/>',
+    )
+
+    OG_IMAGE = "https://homesignal.net/og-default.png"
+
+    def render(self, p):
+        z = p["zip"]
+        if not ZIP_RE.match(z):
+            sys.exit(f"ERROR: non-numeric ZIP refused: {z!r}")
+        name = p.get("name") or f"ZIP {z}"
+        st = p.get("state") or ""
+        label = f"{name}, {st}" if st else name
+        cov = p.get("coverage")
+        # Robots is the rule the page itself applies (app_community_meta.indexable, read again at
+        # run time), so the first bytes and the hydrated page agree. A ZIP with no Census-drawn
+        # area has no ZIP-wide map: noindex, canonical to its /community/ document, as shell.js
+        # does at run time for the same ZIPs.
+        indexable = bool(p.get("dev_indexable")) and not cov
+        robots = "index, follow" if indexable else "noindex, nofollow"
+        canon = f"{BASE}/community/{z}/" if cov else f"{BASE}{map_path(z)}"
+        desc = (f"Development records, permits and regulated facilities on file for ZIP {z} "
+                f"({label}), each linked to its official public record.")
+        out = self.doc
+        for old, new in (
+            (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>"),
+            (self.HEAD[1], f'<meta name="robots" content="{robots}" id="robots-meta"/>'),
+            (self.HEAD[3], f'<link rel="canonical" href="{esc(canon)}"/>'),
+            (self.HEAD[4], f'<meta property="og:url" content="{esc(canon)}"/>'),
+            (self.HEAD[5], f'<meta property="og:title" content="Development around {esc(label)}"/>'),
+        ):
+            out = out.replace(old, new, 1)
+        out = out.replace(self.OG_IMAGE, f"{BASE}/og-default.png")
+        out = re.sub(r'<meta name="description" content="[^"]*"/>',
+                     lambda m: f'<meta name="description" content="{esc(desc)}"/>', out, count=1)
+        return out
+
+    def write_assets(self, out_dir):
+        d = os.path.join(out_dir, MAP_ASSET_DIR)
+        os.makedirs(d, exist_ok=True)
+        open(os.path.join(d, self.css_name), "w", encoding="utf-8").write(self.css)
+        open(os.path.join(d, self.js_name), "w", encoding="utf-8").write(self.js)
+        return len(self.css.encode("utf-8")) + len(self.js.encode("utf-8"))
 
 
-def build_map_routes(zips, out_dir):
-    """One /map/<zip>/index.html per ZIP that has a community document. Returns the count."""
-    n = 0
-    for z in sorted(zips):
+def map_path(z):
+    return f"/map/{z}/"
+
+
+def build_map_pages(pages, out_dir, state=None, template=None):
+    """One /map/<zip>/index.html per ZIP that has a community document. Returns (count, bytes,
+    indexable ZIPs)."""
+    t = template or MapTemplate()
+    n, total, idx = 0, t.write_assets(out_dir), []
+    for z in sorted(pages):
+        doc = t.render(pages[z])
         d = os.path.join(out_dir, "map", z)
         os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "index.html"), "w", encoding="utf-8").write(render_map_route(z))
+        if state is not None:
+            state.add(map_path(z), doc)
+        b = doc.encode("utf-8")
+        open(os.path.join(d, "index.html"), "wb").write(b)
         n += 1
-    return n
+        total += len(b)
+        if ps.is_indexable(doc):
+            idx.append(z)
+    return n, total, idx
 
 
 def load_page_state_baseline(path, reseed):
@@ -1999,7 +2100,7 @@ def main():
     # page-semantics authority (scripts/page_semantics.py), no second pass over the content.
     state = ps.PageState(now_iso[:10])
     stats = build(pages, a.out, zips, now_iso[:10], state)
-    nmap = build_map_routes(pages, a.out)
+    nmap, map_bytes, map_indexable = build_map_pages(pages, a.out, state)
     indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
     ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
@@ -2017,16 +2118,21 @@ def main():
     zip_idx = {p for p, e in page_state.items() if e["i"] and ps.family_of(p) == "zip"}
     if zip_idx != {f"/community/{z}/" for z in indexable}:
         sys.exit("ERROR: robots-derived index-eligible set != the sitemap's indexable set")
+    map_idx = {p for p, e in page_state.items() if e["i"] and ps.family_of(p) == "map"}
+    if map_idx != {map_path(z) for z in map_indexable}:
+        sys.exit("ERROR: robots-derived index-eligible map set != the sitemap's map set")
     for p, e in page_state.items():
         if ps.family_of(p) in ("city", "project", "guide") and not e["i"]:
             sys.exit(f"ERROR: {p} is advertised in the sitemap but its document says noindex")
     lastmod_map = {p: e["l"] for p, e in page_state.items() if e["l"]}
+    map_paths = [map_path(z) for z in map_indexable]
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
-                           lastmod=lastmod_map)
+                           lastmod=lastmod_map, map_paths=map_paths)
     fam = write_family_sitemaps(a.out, {
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
-        "city": city_paths, "project": project_paths, "guide": guide_paths},
+        "city": city_paths, "project": project_paths, "guide": guide_paths,
+        "map": map_paths},
         lastmod=lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
     open(os.path.join(a.out, "sitemaps", "page-state.json"), "w", encoding="utf-8").write(
@@ -2041,7 +2147,8 @@ def main():
     print(f"rule F fail    : {len(pages) - npass}")
     print(f"rule D pass    : {ndpass}")
     print(f"indexable      : {len(indexable)} (Rule F OR Rule D)")
-    print(f"map routes     : {nmap} (/map/<zip>/)")
+    print(f"map pages      : {nmap} (/map/<zip>/; {len(map_indexable)} indexable; "
+          f"{map_bytes/1048576:.1f} MB)")
     print(f"city pages     : {ncity}")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
           f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
@@ -2053,7 +2160,8 @@ def main():
     print(f"sitemap        : -{sm['removed']} legacy community.html?zip= URLs, "
           f"-{sm['removed_dev']} noindex homesignalmap.html?zip= URLs, "
           f"+{sm['added']} /community/<zip>/ URLs, +{sm['cities']} /city/ URLs, "
-          f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs")
+          f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs, "
+          f"+{sm['maps']} /map/ URLs")
     print("family sitemaps : " + ", ".join(f"{k} {v}" for k, v in fam.items()))
     print(f"page state     : {len(page_state)} tracked pages, state_hash {state_doc['state_hash']}, "
           f"{'SEED (' + delta['seed_reason'] + ')' if delta['seed'] else 'vs baseline ' + str(delta['baseline_state_hash'])}")
@@ -2064,8 +2172,8 @@ def main():
     if stats["documents"] != len(zips):
         sys.exit("ERROR: document count != canonical ZIP count")
     if nmap != stats["documents"]:
-        sys.exit("ERROR: /map/<zip>/ routes != community documents")
-    if stats["bytes"] + proj_bytes > 900 * 1024 * 1024:
+        sys.exit("ERROR: /map/<zip>/ pages != community documents")
+    if stats["bytes"] + proj_bytes + map_bytes > 900 * 1024 * 1024:
         sys.exit("ERROR: artifact exceeds the safe GitHub Pages budget")
     # dev_indexable_zips is ADDITIVE and exists so the crawler proof can NAME the current
     # members of a control class when a frozen control drifts out of it. The build already

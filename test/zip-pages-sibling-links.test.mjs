@@ -106,7 +106,7 @@ ok(JSON.stringify(linksOf('01012')) === JSON.stringify(['01001','01002','01003',
 // FIRST match to assert usable internal links. A second zsec nav placed above would steal
 // that match and redden the daily production monitor on every ZIP.
 const firstNav = (a.match(/<nav class="zsec">[\s\S]*?<\/nav>/) || [''])[0];
-ok(/homesignalmap\.html\?zip=/.test(firstNav) && /href="\/"/.test(firstNav),
+ok(/href="\/map\/\d{5}\/"/.test(firstNav) && /href="\/"/.test(firstNav),
    'the FIRST nav.zsec is still the original links nav (what the live monitor reads)');
 ok(!/class="zsec"/.test((a.match(/<nav class="zsib"[\s\S]*?<\/nav>/) || [''])[0]),
    'the sibling nav does not carry the zsec class');

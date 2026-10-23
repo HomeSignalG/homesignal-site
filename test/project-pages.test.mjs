@@ -158,7 +158,7 @@ ok(pg1.includes('<a href="/community/01002/">') && pg1.includes('<a href="/commu
    'the page links to every ZIP page the project is on');
 ok(pg1.includes('<a href="/city/ma/amherst/">Development across Amherst, MA</a>'),
    'the page links to its city page');
-ok(pg1.includes('<a href="/homesignalmap.html?zip=01002">See it on the Development map</a>'),
+ok(pg1.includes('<a href="/map/01002/">See it on the Development map</a>'),
    'the page links to the Development map');
 ok(pg1.includes('<a href="https://permits.example.gov/r/1" rel="nofollow noopener">View the source record</a>'),
    'the page links to the official record');

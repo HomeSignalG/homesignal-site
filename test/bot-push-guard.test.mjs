@@ -80,7 +80,11 @@ for (const f of files) {
   });
   if (hasPush && !/^\s+pull-requests:\s*(read|write)/m.test(lines.join('\n'))) bad.push(`${f}: no pull-requests permission`);
 }
-ok(pushingSteps >= 6, `control: pushing workflow steps were found (${pushingSteps})`);
+// Floor 6 -> 4 on 2026-10-22 (founder, "remove deploy key"): sitemap.yml was deleted and
+// source-monitor.yml stopped pushing, the two pushes to main. The 4 left push to feature or
+// scratch branches (fetch-tabs-fixtures, gen-gov-notice-coverage, verify-dev-tracker,
+// verify-maps-live); test/no-deploy-key-push.test.mjs keeps every one of them off main.
+ok(pushingSteps >= 4, `control: pushing workflow steps were found (${pushingSteps})`);
 ok(bad.length === 0, 'every push is preceded in its step by the guard' + (bad.length ? ': ' + bad.join(', ') : ''));
 
 if (fails) { console.log(`\n${fails} FAILED`); process.exit(1); }

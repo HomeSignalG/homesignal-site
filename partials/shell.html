@@ -146,6 +146,7 @@
           <button class="mbtn" type="button" id="authSubmitBtn" onclick="HS.authSubmit()">Send me a code</button>
         </div>
         <div class="mnote" id="authMsg">New here? Entering your email creates your free account — no password, no spam.</div>
+        <div class="mnote hidden" id="authResendWrap">Didn't get it? Check spam, or <a href="#" id="authResendLink" onclick="HS.authResend();return false;">resend the code</a></div>
         <div class="mnote hidden" id="authBackWrap"><a href="#" onclick="HS.authReset();return false;">Use a different email</a></div>
       </div>
       <div id="authDone" class="success hidden"><div class="ck">✓</div><h4>You're signed in</h4><p>Loading your account…</p></div>

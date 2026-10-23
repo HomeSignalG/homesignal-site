@@ -528,6 +528,47 @@
       "_receipts": "2026-07-15: max applieddate 2026-07-13; 19 statuses VERBATIM (distinct); types Master Use Permit (21,169) + Early Design Guidance (3,320) - both kept, no noise; per-record link.url. Successor of the DEAD uyyd-8gak id (views API 404)."
     },
     {
+      "registry_id": "wa-ecology-sepa-register",
+      "geocode_assemble": true,
+      "platform": "socrata",
+      "domain": "data.wa.gov",
+      "dataset_id": "mmcb-z6jf",
+      "dataset_url": "https://data.wa.gov/Natural-Resources-Environment/State-Environmental-Policy-Act-SEPA-Register/mmcb-z6jf",
+      "jurisdiction": "Washington State Department of Ecology (SEPA Register)",
+      "coverage": [
+        {
+          "state": "WA"
+        }
+      ],
+      "column_map": {
+        "title": "proposalname",
+        "type_source": "proposaltypename",
+        "file_date": "publisheddate",
+        "address": "siteline1address",
+        "lat": "sitelatitudedecimal",
+        "lng": "sitelongitudedecimal",
+        "case_number": "sepanumber",
+        "zip": "sitezipcode",
+        "record_url": "separegisterlink"
+      },
+      "type_map": {
+        "Project": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "status_const": "proposed",
+      "record_url_precision": "record",
+      "file_date_kind": "filed",
+      "extra_where": "proposaltypename = 'Project' AND documenttypecode != 'CANADA' AND (documentsubtypecode IS NULL OR documentsubtypecode != 'WITHDRAWN') AND leadagencyname NOT IN ('WA Department of Natural Resources','Washington State Pollution Liability Insurance Agency') AND (sitelatitudedecimal IS NULL OR (sitelatitudedecimal between 45.5 and 49.1 AND sitelongitudedecimal between -124.9 and -116.8))",
+      "incremental_field": "publisheddate",
+      "recency_days": 365,
+      "_receipts": "2026-10-22 founder-approved (WA audit, step 1). Washington State Department of Ecology's own SEPA Register on data.wa.gov (Socrata mmcb-z6jf, attribution 'Washington State Department of Ecology'), data_updated_at 2026-10-22T14:05Z, 191,687 rows 2014-09-03..2026-10-21. Last 365 days (pg_net, connector scope): 5,206 records; proposaltypename Project 3,806 / Nonproject 953 (plans, regulations: excluded) / Combination 142 / blank 305. documentsubtypecode WITHDRAWN (31 project rows) excluded: a withdrawn SEPA determination is the lead agency's act, not an applicant withdrawal, so it is not mapped to the 'withdrawn' decision bucket. CANADA (transboundary notice, 1 row) excluded. Lead agency WA Department of Natural Resources (322, forest practice applications and timber sales, sampled 30 titles) and Washington State Pollution Liability Insurance Agency (69, tank cleanups) excluded as not development. 32 rows carry coordinates outside Washington (most a missing minus sign on longitude, e.g. 122.9568; two are '4','1'): excluded at source by the bbox clause rather than sign-corrected, which would be a guess. Every row is a SEPA notice under environmental review with a comment period, so status_const proposed; publisheddate is the date Ecology posted it (file_date_kind filed). sitezipcode text, 5-digit on 3,258 / ZIP+4 on 10 (ZIP+4 rows miss the native filter; accepted). separegisterlink is a per-record Ecology page (Record.aspx?SEPANumber=), verified: real 202604463 -> 200, 20,670 bytes, title '202604463 - Medina City of'; made-up 999999999 -> 7,583-byte empty shell. Columns deliberately NOT mapped: applicantname, applicantcontactinfo, leadagencycontactname/email/phone (personal contact details). Connector-scope probe (same extra_where, 365 days): 98226 59 records (56 with coordinates), 98273 18 (17), 99336 11 (6), 98901 10 (10), 98036 7 (5), 98103 6 (6), 98074 3 (2), 99203 0. Over the 362 WA ZIP pages, before the DNR/PLIA/bbox exclusions: 221 pages carry at least one project record in their own ZIP (1,539 records), including 17 of the 37 pages Map 1 drew with no dots."
+    },
+    {
       "registry_id": "chicago-building-permits",
       "geocode_assemble": true,
       "platform": "socrata",
@@ -9189,6 +9230,113 @@
       }
     },
     {
+      "registry_id": "spokane-city-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.spokanegis.org/arcgis/rest/services/Permit/Permit_WM_Dynamic2/MapServer/0",
+      "dataset_url": "https://services.spokanegis.org/arcgis/rest/services/Permit/Permit_WM_Dynamic2/MapServer/0",
+      "jurisdiction": "City of Spokane, Washington",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Spokane"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitTypeAlias",
+          "DetailShortNotes"
+        ],
+        "status_raw": "Status",
+        "type_source": "PermitTypeAlias",
+        "file_date": "OpenDate",
+        "address": "FullAddress",
+        "case_number": "SpokanePermitID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "out_fields": [
+        "SpokanePermitID",
+        "PermitTypeAlias",
+        "DetailShortNotes",
+        "Status",
+        "MapStatus",
+        "OpenDate",
+        "FullAddress"
+      ],
+      "extra_where": "MapStatus <> 'Exclude' AND PermitTypeAlias IN ('Residential Building Permit','Manufactured Structure Permit','Commercial Building New','Commercial Building Addition','Commercial Building Remodel','Commercial Change of Use','Demolition Permit','Private Development','Grading Permit','Parking Lot Permit','Type 2 Preliminary Short Plat','Final Short Plat','Type 3 Preliminary Long Plat','Final Long Plat','Type 2 Conditional Use Permit','Type 3 Conditional Use Permit','Type 3 Rezone','Design Review Board','Type 1 Floodplain Development')",
+      "spatial_zip_radius_mi": 3,
+      "type_map": {
+        "Residential Building Permit": "Residential",
+        "Manufactured Structure Permit": "Residential",
+        "Commercial Building New": "Commercial",
+        "Commercial Building Addition": "Commercial",
+        "Commercial Building Remodel": "Commercial",
+        "Commercial Change of Use": "Commercial",
+        "Demolition Permit": "Development",
+        "Private Development": "Development",
+        "Grading Permit": "Development",
+        "Parking Lot Permit": "Development",
+        "Type 2 Preliminary Short Plat": "Development",
+        "Final Short Plat": "Development",
+        "Type 3 Preliminary Long Plat": "Development",
+        "Final Long Plat": "Development",
+        "Type 2 Conditional Use Permit": "Development",
+        "Type 3 Conditional Use Permit": "Development",
+        "Type 3 Rezone": "Development",
+        "Design Review Board": "Development",
+        "Type 1 Floodplain Development": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Plan Review",
+          "Pending",
+          "Plan Review Approved",
+          "Revisions Required",
+          "Agency Review",
+          "In Progress",
+          "Plan Review Extended",
+          "Plan Review Approved Extended",
+          "Application Submit In Progress",
+          "Revisions Received",
+          "Decision by Planning Director",
+          "Approved for Routing",
+          "Technically Complete - NoA"
+        ],
+        "approved": [
+          "Issued",
+          "Issued Extended",
+          "Approved",
+          "Corrections Required",
+          "CO Pending",
+          "Recorded and Filed"
+        ],
+        "operating": [
+          "Final Inspection Done",
+          "CO Final",
+          "Final"
+        ],
+        "exclude": [
+          "Closed",
+          "Closed - Withdrawn",
+          "Closed - Void",
+          "Closed - Canceled",
+          "Hold"
+        ]
+      },
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "commercial_work_evidence": {
+        "qualifying": [
+          "Commercial Building New",
+          "Commercial Building Addition",
+          "Commercial Building Remodel"
+        ],
+        "note": "Computed from this entry's own type_map by removing non-qualifying work classes: Commercial Change of Use (a change of tenancy or use, not physical work)."
+      },
+      "_receipts": "2026-10-22 WASHINGTON AUDIT STEP 2 (founder: 'go', then 'Yes, last 12 months' and 'Yes, approve' for paid reports). City of Spokane's OWN ArcGIS Server services.spokanegis.org, service Permit/Permit_WM_Dynamic2, layer 0 'Permit', copyright 'City of Spokane GIS', serviceDescription 'Permits extracted nightly from Accela'. esriGeometryPoint, 76,335 rows (returnCountOnly, pg_net 27299). FRESH: OpenDate 2023-10-23..2026-10-21 and LastUpdate 2026-10-21 (pg_net 27314, 27304), so the layer is a rolling 3-year window refreshed nightly. NO ZIP column (Neighborhood/CityCouncil only) -> spatial_zip_radius_mi 3. Coordinates verified WGS84 via outSR=4326 (pg_net 27383: -117.350 / 47.617). WHITELIST (PermitTypeAlias, 73 distinct values enumerated by groupBy, pg_net 27317): 19 construction/land-use types kept, 6,006 rows over 3 years; dropped as trade, maintenance or non-development: electrical (17,066 + 1,754 + 1,328 + 2,517 limited energy), mechanical 15,518, roofing/siding/window 7,636, plumbing 3,686, all sewer/water/street-obstruction/right-of-way, fences, signs, solar, pools, medical gas, safety inspection, short-term rental, liquor, marijuana, sidewalk cafe, boundary line adjustment 224 (a lot-line change), Pre-Development Conference 346 (a meeting, Jackson OR precedent), SEPA Review 43 (the statewide wa-ecology-sepa-register already carries SEPA notices), shoreline exemption. STATUS within the whitelist (pg_net 27415, 25 values, all mapped): Final Inspection Done 2,553 / Issued 1,821 / CO Final 858 / Final 314 / Plan Review 153 / Pending 122 / Plan Review Approved 52 / Revisions Required 44 / Issued Extended 25 / Agency Review 16 / Closed 14 / In Progress 10 / smaller. Issued -> approved (founder ruling 7.12a); 'Closed' EXCLUDED (administrative closure, Minneapolis/Charlotte precedent); the four Closed - * statuses and 'Hold' excluded (a held permit is not moving; test/stalled-status-bucket.test.mjs). extra_where MapStatus <> 'Exclude' follows the city's own map roll-up (341 'Final' rows carry MapStatus 'Exclude' layer-wide). PII FENCED AT out_fields: PermitManager, PlannerAssigned and PlannerEmail (staff names and emails), ParcelNumber and the Accela ids are not fetched. DetailShortNotes is the city's work description (sample of 80 newest whitelisted rows: 'New SFR - One family house detached-<contractor company>', 'Demolition of Commercial Building', 'OT-FIRE-26 - Demolition and cleanup of SFR'); it names contractor companies or 'Owner Builder', not homeowners. record_url DATASET precision on this layer: the city's Accela portal spokanepermits.org timed out on TCP from pg_net (30 s, pg_net 27405), my.spokanecity.org/permits/ answered 403 (27406), and aca-prod.accela.com/SPOKANE is 404 (27399-27401), so no per-record link could be verified (Peoria precedent). HOST RISK: services.spokanegis.org sits behind Imperva/Incapsula (its error pages carry _Incapsula_Resource); pg_net reads it with 200, which is the positive control, but the edge runtime is verified only after deploy. The Esri-hosted copy services.arcgis.com/3PDwyTturHqnGCu0/.../Permit/FeatureServer/3 is NOT wired: 76,710 rows but last edited 2026-04-08, newest OpenDate 2026-04-06 (pg_net 27388-27390). Spokane COUNTY's own BPPublic layer 5 'Pending and Issued Permits' returns count 0 (pg_net 27298), so unincorporated Spokane County still has no current source (the county's daily .xls needs new code). IN SCOPE, with the connector's own filter (OpenDate >= DATE '2025-10-22' AND this extra_where, pg_net 27457/27458): 2,190 rows, and every status is mapped: Issued 1,122 / Final Inspection Done 582 / Plan Review 148 / Final 92 / CO Final 84 / Pending 56 / Plan Review Approved 48 / Revisions Required 44 / In Progress 3 / Closed 3 / Plan Review Extended 3 / Revisions Received 2 / Corrections Required 1 / Issued Extended 1 / Application Submit In Progress 1 = 2,190 exact. The DATE literal is accepted by this server."
+    },
+    {
       "registry_id": "new-castle-county-permits",
       "platform": "arcgis",
       "service_url": "https://gis.nccde.org/agsserver/rest/services/CustomMaps/Permits/FeatureServer/4",
@@ -10011,6 +10159,53 @@
       "recency_days": 730,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-28 PHASE 2 ARCGIS NO-STATUS WIRE PASS (docs/implementation-packets/claude_code_phase2_prompt.md). Vocabularies are VERBATIM live groupBy output \u2014 recon-fetch runs 30380143920 (r1), 30380342906 (r2), 30380564556 (r3), 30380718707 (r4). CRITICAL CONTRACT NOTE: status_const does NOT bypass status_to_bucket \u2014 arcgis.ts:232 applies it as the row's status_raw and l.218's lookup buckets it like any live value, so this entry declares \"operating\" IN the operating bucket (the nvdot-project-boundaries pattern). Omitting status_to_bucket, as the packet instructs, would emit ZERO rows. Map keys are TRIMMED (arcgis.ts:268). TYPE uses BPTYPE_Desc, the readable twin of the BPTYPE codes (SF/MH/MF/DEMOB/DESF...): \"Single-family\" 48540 / \"Manufactured Home\" 9349 / \"Demolition\" 3381 / \"Multifamily\" 2978 / \"Accessory Dwelling\" 288. NATIVE ZIP: ZIP5 is a string column and the connector's exact predicate ZIP5='98501' returns 8,387 (run 30380342906) \u2014 proven, not assumed. The X/Y columns are STATE-PLANE (wkid 102749), NOT lat/lng, so column_map reads the flattened geometry (__lat/__lng) which the connector reprojects to 4326; mapping X/Y would have placed every marker in the wrong hemisphere. || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `ISSUEDATE` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
+    },
+    {
+      "registry_id": "skagit-county-active-permits",
+      "platform": "arcgis",
+      "service_url": "https://geo.skagitcountywa.gov/server/rest/services/Planning/Active_Permits_Last_5_Years/MapServer/7",
+      "dataset_url": "https://geo.skagitcountywa.gov/server/rest/services/Planning/Active_Permits_Last_5_Years/MapServer/7",
+      "jurisdiction": "Skagit County, Washington",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Skagit"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CompDescription",
+          "PermitNumber"
+        ],
+        "type_source": "CompDescription",
+        "file_date": "Issued",
+        "case_number": "PermitNumber",
+        "record_url": "PermitDetails",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "issued",
+      "spatial_zip_radius_mi": 3,
+      "extra_where": "CompDescription IN ('Building (Residential)','Building (Commercial)','Demolition (BLDG)','Manufactured/Modular Structure')",
+      "type_map": {
+        "Building (Residential)": "Residential",
+        "Manufactured/Modular Structure": "Residential",
+        "Building (Commercial)": "Commercial",
+        "Demolition (BLDG)": "Development"
+      },
+      "status_const": "Issued",
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "Issued"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "incremental_field": "Issued",
+      "recency_days": 730,
+      "record_url_precision": "record",
+      "_receipts": "2026-10-22 Skagit WA permit pass (founder: 'wire it'). PROBED via pg_net from Postgres, HTTP 200. LAYER: Skagit County Planning 'Active Permits Last 5 Years' MapServer/7 'Active Permits', esriGeometryPoint (wkid 102100, flattened to __lat/__lng by the connector), maxRecordCount 2000. FIELDS: OBJECTID, PermitNumber, ParcelNumber, CompDescription, Applied, Approved, Issued (esriFieldTypeDate), PermitID, PermitDetails. No address, ZIP, status or description column; ZIP scoping is spatial (3 mi). STATUS: the layer lists ACTIVE permits only and every row carries Issued, so status_const 'Issued' (an issued permit is Approved, section 7.12a). TYPES (CompDescription groupBy, Issued >= 2024-10-22, the connector's 730-day window): Building (Residential) 377, Building (Commercial) 214, Demolition (BLDG) 50, Manufactured/Modular Structure 28 kept (669); dropped at source: Floodplain Permit 264, Public Health | On Site Septic 262, Water System Evaluation 175, Access Permit (Public Works) 97, Mechanical (Residential) 53, Burn Permits 49, Title Elimination 7, Plumbing (Residential) 7, Mechanical (Commercial) 3. Sum 1,586. Newest Issued 2026-10-20. Rows with Issued or PermitDetails null: 0 (whole layer). RECORD URL: PermitDetails is the county's own Tyler EnerGov self-service permit page per PermitID (Ann Arbor STREAMURL / Pierce urlOnlinePermits precedent). Demolition maps to Development (Pierce precedent). NOTE: with no description column, 'Building (Residential)' and 'Manufactured/Modular Structure' carry no construction evidence, so Map 1's Residential gate (lib/residential-qualify.js) judges them UNRESOLVED and does not draw them; that is the shared rule working, not bypassed. No Skagit city permit layers were found."
     },
     {
       "registry_id": "butler-county-ks-permits",

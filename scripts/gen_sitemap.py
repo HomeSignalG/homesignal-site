@@ -10,6 +10,15 @@ and both CI verifiers — no per-reader duplication of the threshold. Empty /
 coverage-coming / thin pages stay real, reachable pages but are noindexed and never
 appear here (a sitemap entry would contradict their robots value).
 
+NO SCHEDULE SINCE 2026-10-22 (founder, "remove deploy key"). `.github/workflows/sitemap.yml`
+ran this daily and pushed the result to main with a deploy key; it is deleted. Both `?zip=`
+halves of the committed file are thrown away by the build (`gen_zip_pages.py::
+reconcile_sitemap`, measured on pages run 39735853225: -11702 / -11657, i.e. all of them), so a
+daily commit changed nothing that is served. The STATIC half IS served as committed, so an edit
+to STATIC must reach sitemap.xml in the same PR: run `python3 scripts/gen_sitemap.py
+--static-only` (offline, no network) and commit the result. test/sitemap-static-half.test.mjs
+fails until the two agree. A full run (no flag) still works by hand where the DB is reachable.
+
 THIN-CONTENT RAMP (PLAN.md §11.3): the daily run adds at most MAX_NEW_URLS_PER_RUN
 not-yet-listed community ZIPs (sorted, so the ramp is deterministic), reading the
 previous sitemap.xml from disk. A future 500-page state batch therefore rolls into the
@@ -29,6 +38,8 @@ reconcile_sitemap` rewrites this file INSIDE the artifact instead, so the advert
 becomes correct at exactly the moment the documents start existing. Once the deployment
 source is switched and the artifact is live, this generator's community half can be
 retired — not before.
+(2026-10-22: the source WAS switched, 2026-09-04, and the artifact is what production serves.
+The retirement above is still not done; it is the follow-up, not a precondition.)
 """
 import json
 import os
@@ -134,7 +145,43 @@ def zip_coverage():
     return retired, limited
 
 
+def static_url_lines():
+    """The STATIC half, exactly as a full run writes it."""
+    return [url_el(BASE + loc, freq, pri) for loc, freq, pri in STATIC]
+
+
+def rewrite_static_only(path="sitemap.xml"):
+    """Rewrite ONLY the static half of the committed sitemap from STATIC. Offline: reads and
+    writes the one file, calls no network. Every `?zip=` block is kept byte for byte and in
+    order (the build replaces them anyway). Refuses, writing nothing, if the file holds anything
+    but <url> blocks inside <urlset>, so nothing is ever dropped silently."""
+    with open(path, encoding="utf-8") as f:
+        txt = f.read()
+    m = re.search(r"<urlset [^>]*>\n", txt)
+    end = txt.rfind("</urlset>")
+    if not m or end < m.end():
+        print(f"ERROR: {path} has no <urlset ...> ... </urlset> - refusing to rewrite it")
+        sys.exit(1)
+    body = txt[m.end():end]
+    blocks = re.findall(r"[ \t]*<url>.*?</url>\n", body, re.S)
+    if "".join(blocks) != body:
+        print(f"ERROR: {path} carries something other than <url> blocks inside <urlset> - refusing to rewrite it")
+        sys.exit(1)
+    kept = [b for b in blocks if "?zip=" in b]
+    head = re.sub(r"\+ \d+ static pages", f"+ {len(STATIC)} static pages", txt[:m.end()], count=1)
+    out = head + "".join(line + "\n" for line in static_url_lines()) + "".join(kept) + txt[end:]
+    if out == txt:
+        print(f"{path}: static half already matches STATIC ({len(STATIC)} pages); unchanged")
+        return
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(out)
+    print(f"{path}: static half rewritten from STATIC ({len(STATIC)} pages); {len(kept)} ?zip= URLs kept as they were")
+
+
 def main():
+    if "--static-only" in sys.argv[1:]:
+        rewrite_static_only()
+        return
     index_zips = fetch_index_zips()
     if not index_zips:
         print("ERROR: fetched 0 indexable ZIPs — refusing to overwrite sitemap.xml")
@@ -158,8 +205,7 @@ def main():
              f' + {len(STATIC)} static pages ({deferred} newcomer(s) deferred by the ramp).',
              '     Regenerated on a schedule. -->',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for loc, freq, pri in STATIC:
-        lines.append(url_el(BASE + loc, freq, pri))
+    lines.extend(static_url_lines())
     for z in comm_zips:
         lines.append(url_el(f"{BASE}/community.html?zip={urllib.parse.quote(z)}", "daily", "0.8"))
     for z in dev_zips:
