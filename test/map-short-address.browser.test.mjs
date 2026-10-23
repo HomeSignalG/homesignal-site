@@ -4,8 +4,8 @@
 //   1. /homesignalmap.html?zip=<zip>&utm_* is shown as /map/<zip>?utm_* , the page still renders the
 //      ZIP's records, and nothing it loads afterwards resolves under /map/ (the <base href="/">);
 //   2. a filter click keeps /map/<zip> and adds its own parameter;
-//   3. RELOADING that address goes /map/<zip> -> 301 /map/<zip>/ -> the generated forward
-//      (scripts/gen_zip_pages.py render_map_route) -> back to the same map, with its filters;
+//   3. RELOADING that address goes /map/<zip> -> 301 /map/<zip>/, which IS the map for that ZIP
+//      (scripts/gen_zip_pages.py MapTemplate, 2026-10-22), with its filters and no second hop;
 //   4. an embed, an address search and a lat/lng point keep their own address;
 //   5. the readers that ask "which ZIP does this URL name" read the path (HS.urlZip etc.).
 // Run: node test/map-short-address.browser.test.mjs
@@ -170,11 +170,12 @@ served.length = 0;
 await page.reload({ waitUntil: 'domcontentloaded' });
 await wait();
 const u3 = new URL(page.url());
-ok(u3.pathname === '/map/20171', '3a a reload comes back to /map/20171', here());
+ok(u3.pathname === '/map/20171/', '3a a reload lands on the map document /map/20171/', here());
 ok(u3.searchParams.get('types') === typesBefore && u3.searchParams.get('utm_source') === 'bluesky' && !u3.searchParams.has('zip'),
   '3b with the same filters and tags, and no ?zip=', here());
-ok(served.includes('/map/20171') && served.includes('/map/20171/') && served.includes('/homesignalmap.html'),
-  '3c through the 301, the generated forward and the map page', served.filter(p => /map/.test(p)).join(','));
+ok(served.includes('/map/20171') && served.includes('/map/20171/') && !served.includes('/homesignalmap.html')
+  && served.some(p => /^\/map1\/page\.[0-9a-f]{8}\.js$/.test(p)),
+  '3c through the 301 to the map document and its shared runtime, never homesignalmap.html', served.filter(p => /map/.test(p)).join(','));
 const off = await page.evaluate(() => { const c = document.querySelector('#mapkeyShapes .typechip[data-cat="industrial"] input'); return c ? !c.checked : null; });
 ok(off === true, '3d the Type filter the visitor set is still off after the reload');
 ok((await pins()) > 0, '3e records still render', await pins());

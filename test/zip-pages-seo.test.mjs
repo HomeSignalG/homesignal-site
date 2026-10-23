@@ -228,7 +228,7 @@ ok(/<meta property="og:title" content="Woods Hole \(02543\), MA/.test(noIdx),
 // ---- 9. INITIAL-HTML CONTRACT extras ----------------------------------------------------
 ok(/Compiled from official public records on <time datetime="2026-09-04">/.test(a),
    'the document is honestly dated with the build day');
-ok(a.includes('href="/homesignalmap.html?zip=01001"') && a.includes('href="/"'),
+ok(a.includes('href="/map/01001/"') && a.includes('href="/"'),
    'the initial HTML carries usable internal links');
 ok(!a.includes('href="/community.html?zip='),
    'the canonical document never links to the legacy URL it canonicalises away from');
