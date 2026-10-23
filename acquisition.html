@@ -212,7 +212,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     </div>
    </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button></nav>
   <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -229,6 +229,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-premium"></div>
     <div class="tab" id="tab-arearequests"></div>
     <div class="tab" id="tab-saleshandy"></div>
+    <div class="tab" id="tab-youtubevideos"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -286,6 +287,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
+<script src="lib/acq-youtube-videos.js?v=fad9274c"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -415,6 +417,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     saleshandy: function () {
       var el = document.getElementById('tab-saleshandy');
       if (el && window.HS && window.HS.acqSaleshandy) window.HS.acqSaleshandy.load(window.hsClient, el, 30);
+    },
+    // Live, gated read (hs_youtube_videos_list): finished videos waiting for the founder's approval. Never baked into the snapshot.
+    youtubevideos: function () {
+      var el = document.getElementById('tab-youtubevideos');
+      if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
     },
     videoproducer: function () {
       var container = document.getElementById('tab-videoproducer');
