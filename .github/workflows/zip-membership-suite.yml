@@ -36,6 +36,8 @@ on:
       - 'test/dc_marker_loss_pg/**'
       - 'docs/dc-resolver-hardening.sql'
       - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-acquisitions-monitor.sql'
+      - 'test/dc_acquisitions_monitor_pg/**'
       - 'docs/dc-epoch-timeline-key-apply.sql'
       - 'docs/dc-epoch-geography-apply.sql'
       - 'test/dc_epoch_timeline_key_pg/**'
@@ -71,6 +73,8 @@ on:
       - 'test/dc_marker_loss_pg/**'
       - 'docs/dc-resolver-hardening.sql'
       - 'test/dc_resolver_hardening_pg/**'
+      - 'docs/dc-acquisitions-monitor.sql'
+      - 'test/dc_acquisitions_monitor_pg/**'
       - 'docs/dc-epoch-timeline-key-apply.sql'
       - 'docs/dc-epoch-geography-apply.sql'
       - 'test/dc_epoch_timeline_key_pg/**'
@@ -280,6 +284,15 @@ jobs:
         run: |
           set -o pipefail
           bash test/dc_resolver_hardening_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/resolverhardening.log
+      - name: Missed data-centre source read (dc_acquisitions health check; splice, 12 scenarios, 9 mutations) passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          set -o pipefail
+          bash test/dc_acquisitions_monitor_pg/run.sh 2>&1 | grep -v NOTICE | tee /tmp/dcacquisitions.log
       - name: Epoch timeline record key (one entity per milestone, leftovers superseded not deleted, steady state) passes
         env:
           PGHOST: localhost

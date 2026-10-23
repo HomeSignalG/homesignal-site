@@ -2659,6 +2659,17 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
     never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
 
+## 7.11b A MISSED ATLAS OR EPOCH READ PAGES — `dc_acquisitions` (2026-10-23)
+
+Both daily data-centre reads (homesignal-ingest `ingest-compute-atlas.yml` 09:40 UTC, `ingest-epoch-ai.yml`
+10:10 UTC) got no GitHub runner on 2026-10-21 and 2026-10-23 and wrote nothing; the hourly monitor read nothing
+about them. `docs/dc-acquisitions-monitor.sql` splices an alertable `dc_acquisitions` check into
+`pipeline_health_tick()` (same splice discipline as ingest's `20261023160000`; it lives here because ingest's
+Step-2A isolation gate forbids that repo naming `dc_*` objects). For every ACTIVE `dc_source` distribution it
+fails when no `SUCCESS_COMPLETE` run completed in 30 h, or the newest run failed or is still open after 2 h.
+Measured first: all 92 runs ever were `SUCCESS_COMPLETE`; the only 48 h gaps in 30 days are the two missed days.
+When it pages, dispatch that source's ingest workflow with `mode=apply`. Test: `test/dc_acquisitions_monitor_pg`.
+
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
 **Every coordinate claim is classified by what the evidence is, and authority follows that
@@ -5412,6 +5423,46 @@ attribute preserved — that event architecture is a separate unit and is not bu
   was proven load-bearing by restoring the pre-change runtime (all fail) and re-applying (all pass).
 - Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
   `#kFac` counter label, both of which also read "Regulated facilities nearby".
+
+## SALESHANDY CAMPAIGN ATTRIBUTION — ONE TOUCH DEFINITION, AGGREGATE CAMPAIGN STATS (2026-10-23, founder-approved design)
+
+Measures how Realtor email campaigns (Saleshandy) turn into website visits, registrations, Development Activity
+Reports and paying customers, **inside the existing Acquisition Dashboard** (new tab "15 · Saleshandy"; no new
+dashboard, no Zapier). SQL of record, **parked, not applied**: `docs/saleshandy-attribution.sql`. Ingest half (the
+daily sync): homesignal-ingest CLAUDE.md "SALESHANDY CAMPAIGN STATS".
+
+- **Email links are plain first-party URLs, no redirect, open/click tracking OFF:**
+  `?utm_source=saleshandy&utm_medium=email&utm_campaign=<campaign_key>[&utm_content=<step>]`. Campaign-level only:
+  never an email, name or recipient id in a URL. Point them at a page that loads `shell.js`
+  (`/development-activity.html`, `/`); the report page itself does not capture.
+- **ONE definition of a touch: `lib/data.js` `HS.referralLib`** (`fromUrl`, `eventFields`). `shell.js::captureReferral`
+  stores the FIRST touch (`hs:referral`, once) and the LAST TAGGED touch (`hs:referral_last`, refreshed by each campaign
+  link). Labels are lowercased and must match `^[a-z0-9._~:/-]{1,80}$` or are dropped, so nothing person-shaped is ever stored.
+  Conversions (signup, MAPS opt-in, area request) are credited to `HS.referralForConversion()` = the last tagged touch,
+  else the first; `users.referral_*` still keeps the first non-null credit at the database level.
+- **Visits:** one `campaign_landing` event per tab session per campaign (`public.events`, now with nullable
+  `ref_source/medium/campaign/content`). **Reports:** `development-activity-reports.html` writes one insert-only
+  `report_created` event, stamped from the same two localStorage keys, only for a saved report; it reads, never writes,
+  browser storage (`test/development-activity-reports.test.mjs` 4d0). `report_snapshot` is untouched (immutable, and
+  it must hold no customer context).
+- **Dashboard:** `public.hs_saleshandy_metrics(p_days)` — `dashboard_admins`-gated, `authenticated` only, aggregates
+  only (campaign label + counts; registrations/paying counted as distinct emails INSIDE the function and returned
+  as numbers). Rendered by `lib/acq-saleshandy.js` (escapes every value; shows no opens/clicks; a rate with no
+  denominator is a dash, not 0%). It reads live; it is not part of the snapshot blob.
+- **APPLY ORDER:** apply `docs/saleshandy-attribution.sql` BEFORE this site change deploys — a client insert naming a
+  missing column is refused and dropped silently. (The client only names `ref_*` when a campaign touch exists.)
+- **Known limits, stated:** visitors before tagged links existed (and other devices; Safari may expire script-written
+  storage after ~7 days) cannot be credited; **email security scanners fetch links even with tracking off**, so
+  `visitors` can include scanner sessions — the count is "distinct browsers that ran our JavaScript on a tagged
+  landing", not email opens. The dashboard's coverage card says how many registrations carry a campaign. The 73
+  existing `users.referral_source` values are test data (`admin_test`, `bluesky/test-manual`).
+- **Possible disclosure change for the founder:** whether `privacy.html` should mention first-party campaign
+  measurement. Not edited here (legal wording).
+- Tests: `test/saleshandy-attribution.test.mjs` (touch definition, event stamp, shell capture, report logger, SQL
+  shape; mutation-checked), plus the SQL run against a disposable Postgres (apply, re-apply, gate, duplicate guard,
+  label constraint, grants).
+
+---
 
 ## SHARED REPORT: "Follow this property" RUNS INLINE, IN HOMESIGNAL'S OWN FLOW (2026-10-11)
 

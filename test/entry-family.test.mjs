@@ -52,7 +52,7 @@ const row = HS.eventRow('property_lookup', { zip_code: '78617' },
 ok(row.entry_family === 'project' && row.entry_path === '/project/a/b/', 'row carries the entry');
 ok(row.zip_code === '78617', 'an explicit ZIP beats the viewed ZIP');
 ok(Object.keys(row).sort().join(',') ===
-   'alert_id,community_id,entry_family,entry_path,event_type,host,page_url,pipeline_type,session_id,topic,visit_session_id,visitor_id,zip_code',
+   'alert_id,community_id,entry_family,entry_path,event_type,page_url,pipeline_type,session_id,topic,zip_code',
    'row has exactly the known columns (no email, address or user id)');
 ok(HS.eventRow('x', {}, { entry: { family: 'nope', path: '/' } }).entry_family === null, 'an unknown family is dropped, not stored');
 ok(HS.eventRow('x', { zip_code: '12' }, {}).zip_code === null, 'a malformed ZIP is dropped');

@@ -114,7 +114,7 @@ for (const [name, opts] of [['an embedded iframe', { embed: true }], ['an automa
   const b = makeBrowser({});
   const r = b.HS.eventRow('page_view', {}, { sessionId: 's', pageUrl: 'https://jodytracks.com/', visitorId: '11111111-1111-4111-8111-000000000001', visitSessionId: 'v' + 'a'.repeat(60), host: 'jodytracks.com' });
   ok(r.visitor_id === '11111111-1111-4111-8111-000000000001' && r.visit_session_id.length === 40 && r.host === 'jodytracks.com', 'the row carries visitor, session and host');
-  ok(b.HS.eventRow('x', {}, { visitorId: 'not-a-uuid' }).visitor_id === null, 'a malformed visitor id is dropped');
+  ok(b.HS.eventRow('x', {}, { visitorId: 'not-a-uuid' }).visitor_id === undefined, 'a malformed visitor id is dropped');
   ok(Object.keys(r).sort().join(',') ===
      'alert_id,community_id,entry_family,entry_path,event_type,host,page_url,pipeline_type,session_id,topic,visit_session_id,visitor_id,zip_code',
      'the row has exactly the known columns (no email, address, user id or query)');
@@ -148,7 +148,7 @@ ok(/HS\.attr\.capture\(\);\s*HS\.attr\.send\(\)/.test(shell) && shell.indexOf('H
 ok(/function recordPageView\(\)\s*\{\s*if \(IS_EMBED\) return;\s*logEvent\('page_view', \{\}\);/.test(shell), 'a page view is logged once per load and never for an embed');
 ok(shell.split('recordPageView();').length - 1 === 2, 'both boot exits (coverage panel and normal page) record the page view');
 ok(/HS\.attr\.claim\(HS\.sb\(\), state\.session\.user/.test(shell), 'a signed-in session is claimed');
-ok(!/attribute_report|hs_vid|localStorage|\.rpc\(/.test(da), 'the report page is UNCHANGED: no extra RPC and no extra storage (its isolation tests 3b/4d stay as they were)');
+ok(!/attribute_report|hs_vid|hs_vpend|record_first_touch|claim_first_touch|\.rpc\(/.test(da), 'the report page carries none of this unit: no visitor id, no first-touch call, no RPC (its campaign event is the separate insert-only report_created)');
 ok(!/classif|channel\s*=/.test(data.slice(data.indexOf('HS.attr = (function'), data.indexOf('HS.logEvent = function'))), 'lib/data.js contains no channel decision');
 ok(/hs_acq_channel_report/.test(acq) && /Not collected \(before tracking\)/.test(acq) && /No source recorded/.test(acq), 'the dashboard shows what was not collected');
 ok(/include internal \/ test/.test(acq) && /Pierce County, WA ZIPs/.test(acq) && /America\/Los_Angeles/.test(acq), 'the dashboard offers the internal toggle, the Pierce ZIP set and Los Angeles time');
