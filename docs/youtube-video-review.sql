@@ -30,13 +30,24 @@ on conflict (id) do update
       allowed_mime_types = excluded.allowed_mime_types;
 
 -- read: dashboard admins only (the same allowlist the dashboard RPCs use)
+-- The policy asks a SECURITY DEFINER helper, never public.dashboard_admins directly: `authenticated` has no
+-- SELECT on that table (RLS on, no grant), so an inline EXISTS sees no rows and the admin's own download is
+-- refused ("Could not read the file", found 2026-10-23 on the first real review). Re-tested after the fix as
+-- admin (4 objects visible), non-admin (0) and anon (0).
+create or replace function public.hs_is_dashboard_admin()
+returns boolean
+language sql stable security definer
+set search_path = public, pg_temp
+as $$
+  select exists (select 1 from public.dashboard_admins da where da.email = (auth.jwt() ->> 'email'));
+$$;
+revoke all on function public.hs_is_dashboard_admin() from public, anon;
+grant execute on function public.hs_is_dashboard_admin() to authenticated;
+
 drop policy if exists jody_videos_admin_read on storage.objects;
 create policy jody_videos_admin_read on storage.objects
   for select to authenticated
-  using (
-    bucket_id = 'jody-videos'
-    and exists (select 1 from public.dashboard_admins da where da.email = (auth.jwt() ->> 'email'))
-  );
+  using (bucket_id = 'jody-videos' and public.hs_is_dashboard_admin());
 
 -- 2. decision record ----------------------------------------------------------------------------
 create table if not exists public.youtube_video_reviews (
