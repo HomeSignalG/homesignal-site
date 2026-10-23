@@ -271,6 +271,21 @@ ok(/MUTATION DID NOT APPLY/.test(suite), 'a mutation must prove it applied befor
     'the proof reads answers through the one function Map 1 reads, and checks the reader still calls it');
   const gw = readFileSync('.github/workflows/n5-generation.yml', 'utf8');
   ok(/actions\/setup-node@v4/.test(gw), 'the generation workflow has node for the browser step');
+  ok(/def mode_prove_negative\(/.test(orch) && /"prove_negative":\s*mode_prove_negative/.test(orch)
+     && /prove_negative/.test(gw),
+    'the read-only negative control is a registered mode and listed in the workflow');
+  const negBody = orch.slice(orch.indexOf('def mode_prove_negative('), orch.indexOf('def mode_activate('));
+  ok(!/heavy\(|record_proof|n5_generation_activate|\binsert\b|\bupdate\b|\bdelete\b/i.test(negBody.replace(/"""[\s\S]*?"""/, '')),
+    'the negative control writes nothing: no heavy(), no record_proof, no activate, no DML');
+  ok(['undeclared_missing_boundary', 'declared_no_boundary_empty', 'declared_no_boundary_not_canonical',
+      'candidate_is_serving'].every((c) => negBody.includes(c)),
+    'the negative control expects each refusal by its own check name');
+  ok(/PROOF_ZIPS = int\(os\.environ\.get\("PROOF_ZIPS", "48"\)\)/.test(orch)
+     && /PROOF_CHANGED_ZIPS = int\(os\.environ\.get\("PROOF_CHANGED_ZIPS", "32"\)\)/.test(orch)
+     && /PROOF_LARGE_ZIPS = int\(os\.environ\.get\("PROOF_LARGE_ZIPS", "2"\)\)/.test(orch),
+    'the browser sample is 48 ZIPs: up to 32 changed ones and 2 large changed ones (was 16 / 8 / none)');
+  ok(/large_skipped/.test(orch) && /browser\["large_skipped"\]/.test(orch),
+    'a large ZIP dropped for an unreadable answer is recorded in the stored proof, never silent');
   ok(/run_map1_generation\.py/.test(wf), 'CI runs the generation-read proof');
   ok(/run_part_h\.py/.test(wf), 'CI runs Part H\'s apply + rollback proof');
 }
