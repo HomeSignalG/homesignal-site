@@ -37,7 +37,9 @@ ok(/hs_youtube_videos_list/.test(js) && /hs_youtube_video_decide/.test(js), '3b:
 
 // 4. SQL of record
 ok(/'jody-videos', 'jody-videos', false/.test(sql), '4a: the bucket is private');
-ok(/for select to authenticated[\s\S]{0,200}dashboard_admins/.test(sql) && !/for (insert|update|delete|all)/i.test(sql.replace(/--.*$/gm, '')), '4b: only a dashboard-admin SELECT policy exists on the bucket');
+const code = sql.replace(/--.*$/gm, '');
+ok(/for select to authenticated[\s\S]{0,200}hs_is_dashboard_admin\(\)/.test(code) && !/for (insert|update|delete|all)/i.test(code), '4b: only a dashboard-admin SELECT policy exists on the bucket');
+ok(/function public\.hs_is_dashboard_admin\(\)[\s\S]{0,200}security definer[\s\S]{0,400}dashboard_admins da where da\.email = \(auth\.jwt\(\) ->> 'email'\)/.test(code) && /revoke all on function public\.hs_is_dashboard_admin\(\) from public, anon/.test(code) && !/jody_videos_admin_read[\s\S]{0,200}from public\.dashboard_admins/.test(code), '4b2: the policy asks a security-definer helper (authenticated has no SELECT on dashboard_admins), anon cannot run it');
 ok(/enable row level security/.test(sql) && /revoke all on public\.youtube_video_reviews from public, anon, authenticated/.test(sql), '4c: the table is RLS-on with no direct grants');
 ok((sql.match(/dashboard_admins da where da\.email = caller_email/g) || []).length === 2, '4d: both functions check dashboard_admins');
 ok(/revoke all on function public\.hs_youtube_videos_list\(\) from public, anon/.test(sql) && /grant execute on function public\.hs_youtube_video_decide\(text, text, text\) to authenticated/.test(sql), '4e: anon cannot run either function');
