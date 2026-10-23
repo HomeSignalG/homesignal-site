@@ -3,10 +3,44 @@
 HomeSignal is a **civic-alerts service**: residents follow their community and get
 alerts about government notices, meetings, permits, and environmental/quality news
 that affect their home. This repo is the **static front-end** (plain HTML + vanilla
-JS, no build step) served from GitHub Pages at **homesignal.net** (see `CNAME`).
+JS, no build step) served from GitHub Pages at **https://jodytracks.com** (the
+canonical production domain since the Jody migration; the `CNAME` file in the repo
+still reads `homesignal.net` and is NOT the live canonical).
 It reads live data from Supabase; the alert *content* is produced by a separate
 engine repo. There is **no bundler, no framework, no `package.json`** — what's in
 the repo is what ships.
+
+---
+
+## PRODUCTION DOMAIN: jodytracks.com IS CANONICAL; homesignal.net ONLY REDIRECTS (founder, 2026-10-23)
+
+**The Jody domain migration is COMPLETE and LIVE.** Every public URL, canonical tag, sitemap
+entry and `robots.txt` Sitemap line is `https://jodytracks.com/...`. `homesignal.net` is retained
+only to redirect to it (and to serve `did:web:homesignal.net`). Any older text in this file that says
+the site is served at homesignal.net, that "HomeSignal remains the only active public identity",
+or that the cutover is pending/inactive is a dated record, superseded by this section.
+
+- **Submit to Google Search Console under the `jodytracks.com` property**, not `homesignal.net`.
+  ZIP pages are `https://jodytracks.com/community/<zip>/`. Sitemap: `https://jodytracks.com/sitemap.xml`
+  (per-family: `/sitemaps/zip-alerts.xml`, `zip-development.xml`, `city.xml`, `project.xml`, `guide.xml`).
+- **The repo's source files still say `homesignal.net`** (`CNAME`, `robots.txt`, `sitemap.xml`,
+  host strings in `scripts/`) by design: the host is a build-time choice. `pages.yml` runs
+  `scripts/brand_stage.py --identity "$(python3 scripts/brand_host.py --identity)"` against
+  `docs/brand/brand-contract.v1.json`, so production bytes are Jody. **Do not hand-edit those source
+  files to "fix" the domain**; change the contract, and read production, not the source, to learn the host.
+- **Measured on production 2026-10-23 (through `pg_net`, since the sandbox cannot reach the site):**
+  - `https://homesignal.net/community/98402/` and `/98397/` answer with the page at
+    `https://jodytracks.com/community/<zip>/` (redirect followed by the fetcher; the hop's status
+    code was not captured, so it is not recorded as 301).
+  - All 65 Pierce County WA ZIP pages: HTTP 200, `<link rel="canonical">` = `https://jodytracks.com/community/<zip>/`
+    on 65/65, robots `index, follow` on 65/65 (98397 included), all 65 present in `/sitemap.xml`
+    and in `/sitemaps/zip-alerts.xml`. Control: `/sitemap.xml` holds 42,166 `<loc>` entries, 0 on the old host,
+    0 `?zip=` URLs; `zip-alerts.xml` holds 9,383, 0 on the old host.
+  - `jodytracks.com/robots.txt` lists the six sitemaps above, all on `jodytracks.com`.
+  - Note: `app_community_meta.indexable` is the Map 1 gate, not the community page's robots decision
+    (Rule F, decided at build). 98397 has `indexable = false` there and `index, follow` on its page.
+- Status document for the migration steps is still `docs/brand/MIGRATION-STATUS.md`; this section
+  records the end state.
 
 ---
 
