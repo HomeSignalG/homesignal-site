@@ -215,3 +215,7 @@ touched. The landing page's price copy is read by a tripwire test and unchanged.
   to it; correcting that header is left for its own change.
 - The edge mutation loops of older suites (`test/national_report_mutants.py` and others) may carry anchors this step moved; they are manual loops
   and CI runs the tests, not the loops.
+
+## Checkout kill switch (founder, 2026-10-22)
+
+While Development Activity is a free evaluation, `supabase/functions/_shared/billing-switch.ts` holds `CHECKOUT_ENABLED = false`. `manage-billing` then answers a checkout request `503 checkout_disabled` and reports `checkout: "disabled"` in its status, whatever the processor's settings are (measured 2026-10-22: the webhook reported `configured: true`). It is a committed constant on purpose: turning checkout back on is a reviewed edit of that file and of the pin `2sw4` in `test/billing-functions.test.mjs`, plus a deploy, never a secret edit. It does not touch the plan status read or the webhook that records events for subscriptions that already exist. The function must be redeployed (`deploy-edge-function.yml`) for the switch to take effect in production.

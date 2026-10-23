@@ -195,7 +195,7 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
   w.billingHandler = BH.makeHandler({
     ...gate,
     usageOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
-    configured: () => w.configured,
+    configured: () => w.configured, checkoutEnabled: () => true,
     createCheckout: async () => { if (w.checkoutFails) throw new BH.CheckoutUnavailable('x'); w.checkoutMade++; return CHECKOUT_URL; },
     // the brokerage's single checkout slot (audit item D): held for ten minutes by whoever claimed it; the address of a checkout is kept nowhere
     checkoutClaim: async () => (w.checkoutBusy ? { outcome: 'BUSY' } : { outcome: 'CLAIMED' }),

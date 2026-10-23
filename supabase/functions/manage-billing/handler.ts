@@ -37,6 +37,8 @@ export type Deps = AdminGateDeps & {
   usageOf: (userId: string) => Promise<BillingUsage | null>;
   /** Whether the processor's settings are all present. A boolean: the values never leave the server. */
   configured: () => boolean;
+  /** The committed kill switch (_shared/billing-switch.ts). False refuses every checkout. */
+  checkoutEnabled: () => boolean;
   createCheckout: (brokerageId: string) => Promise<string>;
   /** The brokerage's single checkout slot (docs/da-owner-safeguards.sql, part C): one open checkout at a time. */
   checkoutClaim: (brokerageId: string) => Promise<CheckoutSlot>;
@@ -59,10 +61,11 @@ const FIELDS: Record<string, string[]> = { status: ['action'], checkout: ['actio
  * only ('test_only', which never grants). Over a subscription that exists and may recover (paid, past due, paused, trialing, an unclear one) it is
  * refused, because a second checkout there would bill the brokerage twice.
  */
-export function checkoutAvailability(u: BillingUsage, configured: boolean): 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'not_set_up' {
+export function checkoutAvailability(u: BillingUsage, configured: boolean, enabled: boolean): 'available' | 'not_owner' | 'already_paid' | 'subscription_exists' | 'disabled' | 'not_set_up' {
   if (u.role !== 'owner') return 'not_owner';
   if (u.state === 'paid') return 'already_paid';
   if (u.state !== 'none' && u.state !== 'canceled' && u.state !== 'test_only') return 'subscription_exists';
+  if (!enabled) return 'disabled';        // the kill switch (_shared/billing-switch.ts): checked before the processor's settings, so it holds whatever they are
   if (!configured) return 'not_set_up';
   return 'available';
 }
@@ -89,13 +92,14 @@ export function makeHandler(deps: Deps): (req: Request) => Promise<Response> {
     try {
       const usage = await deps.usageOf(who.userId);
       if (!usage) return reply(req, { error: 'forbidden' }, 403);     // no brokerage, no billing
-      const availability = checkoutAvailability(usage, deps.configured());
+      const availability = checkoutAvailability(usage, deps.configured(), deps.checkoutEnabled());
       if (action === 'status') return reply(req, { status: 'OK', plan: planSummary(usage), checkout: availability });
 
       // checkout: an owner, not already paid, with the processor set up
       if (availability === 'not_owner') return reply(req, { error: 'forbidden', detail: 'owner_only' }, 403);
       if (availability === 'already_paid') return reply(req, { error: 'already_paid' }, 409);
       if (availability === 'subscription_exists') return reply(req, { error: 'subscription_exists' }, 409);
+      if (availability === 'disabled') return reply(req, { error: 'checkout_disabled' }, 503);
       if (availability === 'not_set_up') return reply(req, { error: 'billing_not_set_up' }, 503);
       // ONE CHECKOUT AT A TIME. The slot is claimed in the database BEFORE the processor is asked, so two presses (or two tabs) cannot make two
       // checkouts: the second is told one was just opened. No slot, no checkout: a failed claim is a 502.
