@@ -5424,6 +5424,46 @@ attribute preserved — that event architecture is a separate unit and is not bu
 - Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
   `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
+## SALESHANDY CAMPAIGN ATTRIBUTION — ONE TOUCH DEFINITION, AGGREGATE CAMPAIGN STATS (2026-10-23, founder-approved design)
+
+Measures how Realtor email campaigns (Saleshandy) turn into website visits, registrations, Development Activity
+Reports and paying customers, **inside the existing Acquisition Dashboard** (new tab "15 · Saleshandy"; no new
+dashboard, no Zapier). SQL of record, **parked, not applied**: `docs/saleshandy-attribution.sql`. Ingest half (the
+daily sync): homesignal-ingest CLAUDE.md "SALESHANDY CAMPAIGN STATS".
+
+- **Email links are plain first-party URLs, no redirect, open/click tracking OFF:**
+  `?utm_source=saleshandy&utm_medium=email&utm_campaign=<campaign_key>[&utm_content=<step>]`. Campaign-level only:
+  never an email, name or recipient id in a URL. Point them at a page that loads `shell.js`
+  (`/development-activity.html`, `/`); the report page itself does not capture.
+- **ONE definition of a touch: `lib/data.js` `HS.referralLib`** (`fromUrl`, `eventFields`). `shell.js::captureReferral`
+  stores the FIRST touch (`hs:referral`, once) and the LAST TAGGED touch (`hs:referral_last`, refreshed by each campaign
+  link). Labels are lowercased and must match `^[a-z0-9._~:/-]{1,80}$` or are dropped, so nothing person-shaped is ever stored.
+  Conversions (signup, MAPS opt-in, area request) are credited to `HS.referralForConversion()` = the last tagged touch,
+  else the first; `users.referral_*` still keeps the first non-null credit at the database level.
+- **Visits:** one `campaign_landing` event per tab session per campaign (`public.events`, now with nullable
+  `ref_source/medium/campaign/content`). **Reports:** `development-activity-reports.html` writes one insert-only
+  `report_created` event, stamped from the same two localStorage keys, only for a saved report; it reads, never writes,
+  browser storage (`test/development-activity-reports.test.mjs` 4d0). `report_snapshot` is untouched (immutable, and
+  it must hold no customer context).
+- **Dashboard:** `public.hs_saleshandy_metrics(p_days)` — `dashboard_admins`-gated, `authenticated` only, aggregates
+  only (campaign label + counts; registrations/paying counted as distinct emails INSIDE the function and returned
+  as numbers). Rendered by `lib/acq-saleshandy.js` (escapes every value; shows no opens/clicks; a rate with no
+  denominator is a dash, not 0%). It reads live; it is not part of the snapshot blob.
+- **APPLY ORDER:** apply `docs/saleshandy-attribution.sql` BEFORE this site change deploys — a client insert naming a
+  missing column is refused and dropped silently. (The client only names `ref_*` when a campaign touch exists.)
+- **Known limits, stated:** visitors before tagged links existed (and other devices; Safari may expire script-written
+  storage after ~7 days) cannot be credited; **email security scanners fetch links even with tracking off**, so
+  `visitors` can include scanner sessions — the count is "distinct browsers that ran our JavaScript on a tagged
+  landing", not email opens. The dashboard's coverage card says how many registrations carry a campaign. The 73
+  existing `users.referral_source` values are test data (`admin_test`, `bluesky/test-manual`).
+- **Possible disclosure change for the founder:** whether `privacy.html` should mention first-party campaign
+  measurement. Not edited here (legal wording).
+- Tests: `test/saleshandy-attribution.test.mjs` (touch definition, event stamp, shell capture, report logger, SQL
+  shape; mutation-checked), plus the SQL run against a disposable Postgres (apply, re-apply, gate, duplicate guard,
+  label constraint, grants).
+
+---
+
 ## SHARED REPORT: "Follow this property" RUNS INLINE, IN HOMESIGNAL'S OWN FLOW (2026-10-11)
 
 `shared-report.html` stays isolated (one request, no shell, no account, no follow or sign-in code). Its top button (beside Download PDF, green primary; Download PDF is the quiet one) and the one in the bottom invitation share ONE state and ONE path. **Nothing opens or loads on page load.** A click moves one panel under the clicked button and creates a same-origin frame, `follow-embed.html#address=<address>` (fragment only, never sent to a server; noindex; disallowed in `robots.txt`; in `stage_site.py`'s named list). The frame is a normal shell page (`html.hs-embed.hs-follow`) that calls `HS.startFollowEmbed`, i.e. the SAME `HS.openHome` -> `HS.findHome` (Census) -> `HS.saveHome` -> `savePlaceRow` (idempotent by `app_properties_user_place_key`) -> `followCommunity` / `ensureAreaSubscribed`. The sign-in modal and address step are restyled inline (app.css untouched; styles live in the frame page). The address step is ONE line: the resolved property with **Confirm** / **Change** (Change returns to the pre-filled address). `HS.followEmbed` makes `saveHome` skip the place card, the reload and onboarding, and nothing else.

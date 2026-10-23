@@ -114,7 +114,7 @@ ok(/if \(!HS\.requireAuth\('maps-zip-email', run\)\) return 'auth';/.test(block)
 const copies = shell.match(/We'll email you when HomeSignal posts about what's changing in this ZIP code\./g) || [];
 ok(copies.length === 1, '§3 the consent sentence exists ONCE in shell.js (shown string = recorded string)');
 ok(/HS\.MAPS_CONSENT_COPY = MAPS_CONSENT_COPY;/.test(block) &&
-   /MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS\.referral\(\)/.test(write),
+   /MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS\.referralForConversion\(\)/.test(write),
   '§3 the page reads HS.MAPS_CONSENT_COPY and the RPC records that same constant');
 
 // ---------------------------------------------------------------- §4 resume safety
