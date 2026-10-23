@@ -24,12 +24,14 @@
 // the required job starts running a browser test without a browser — which is the
 // silent-skip failure this repo already fixed once. Detection is self-maintaining.
 import { readdirSync, readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const testDir = join(root, 'test');
+// UNIT_TEST_DIR exists for ONE reason: test/run-unit-tests-failure-report.test.mjs points the
+// runner at a directory of throwaway suites to prove how it REPORTS a failure. CI never sets it.
+const testDir = process.env.UNIT_TEST_DIR ? process.env.UNIT_TEST_DIR : join(root, 'test');
 const argv = process.argv.slice(2);
 const offlineOnly = argv.includes('--offline');
 const browserOnly = argv.includes('--browser');
@@ -84,21 +86,71 @@ if (files.length < minFiles) {
 // host that a restricted network cannot fetch, so the per-suite output is often
 // unreachable. Identifying the suite then means guessing, or pushing commits to bisect a
 // remote. The names cost one line and are the whole answer.
+//
+// THE NAME WAS NOT THE WHOLE ANSWER. home-index.browser.test.mjs failed in CI on 2026-10-08
+// (twice on main, once on a docs-only PR) and cleared by itself; the job log tool returns only
+// the last 5,000 lines, and the failing suite's own output sits ~15,000 lines earlier, so the
+// reason it failed was never recoverable and the flake could not be root-caused. So each
+// child's output is still streamed live, but its last lines are also kept, and at the very
+// END of the log (the part that survives) every failed file's tail is printed again, and on
+// GitHub Actions each one is also written as an ::error annotation, which the check-runs API
+// serves without the log host.
+const TAIL_CHARS = 6000;        // kept per file, re-printed under "FAILED OUTPUT"
+const ANNOTATION_CHARS = 1500;  // GitHub truncates long annotations; the end is what matters
+
+function runOne(path) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [path], { cwd: root, stdio: ['inherit', 'pipe', 'pipe'] });
+    let tail = '';
+    let done = false;
+    let timer = null;
+    const keep = (d) => { tail = (tail + d.toString()).slice(-TAIL_CHARS); };
+    const finish = (r) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      // A grandchild (a browser a crashed test left running) can hold these pipes open for ever;
+      // the old inherited-stdio runner never waited for one, so neither may this.
+      child.stdout.destroy();
+      child.stderr.destroy();
+      resolve({ ...r, tail });
+    };
+    child.stdout.on('data', (d) => { process.stdout.write(d); keep(d); });
+    child.stderr.on('data', (d) => { process.stderr.write(d); keep(d); });
+    child.on('error', (e) => { keep('\n' + String(e)); finish({ status: 1, signal: null }); });
+    child.on('close', (status, signal) => finish({ status, signal }));
+    // 'exit' comes before the pipes drain; give them a moment, then stop waiting.
+    child.on('exit', (status, signal) => { timer = setTimeout(() => finish({ status, signal }), 2000); });
+  });
+}
+
+const annotate = (title, text) => {
+  // GitHub workflow-command escaping: % \r \n must be percent-encoded in the message.
+  const body = text.slice(-ANNOTATION_CHARS).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const head = title.replace(/[%\r\n:,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  console.log('::error title=' + head + '::' + body);
+};
+
 const failures = [];
 for (const file of files) {
   const path = join(testDir, file);
   console.log('\n=== ' + file + ' ===');
-  const res = spawnSync(process.execPath, [path], { stdio: 'inherit', cwd: root });
+  const res = await runOne(path);
   // status is null when the child was killed by a signal (OOM, timeout) — that is a
   // failure too, and reporting it as one is why this tests `!== 0` rather than truthiness.
   if (res.status !== 0) {
-    failures.push(file + (res.status === null ? ' (signal ' + res.signal + ')' : ''));
+    failures.push({ file, label: file + (res.status === null ? ' (signal ' + res.signal + ')' : ''), tail: res.tail });
   }
 }
 
 if (failures.length) {
   console.error('\n' + failures.length + ' test file(s) failed:');
-  for (const f of failures) console.error('  - ' + f);
+  for (const f of failures) console.error('  - ' + f.label);
+  console.error('\nFAILED OUTPUT (the last ' + TAIL_CHARS + ' characters of each failed file):');
+  for (const f of failures) {
+    console.error('\n----- ' + f.label + ' -----\n' + (f.tail.trim() || '(the file printed nothing)'));
+    if (process.env.GITHUB_ACTIONS === 'true') annotate('Test file failed: ' + f.file, f.tail.trim() || '(the file printed nothing)');
+  }
   process.exit(1);
 }
 console.log('\nAll ' + files.length + ' unit test file(s) passed (mode=' + mode + ').');
