@@ -1158,6 +1158,35 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     return { brokerage: h.brokerage, agent: h.agent };
   }
   // ---- saved reports (build step 6): the brokerage's stored reports, opened as stored ------------------------------------------
+  // CAMPAIGN ATTRIBUTION for a created report (docs/saleshandy-attribution.sql). This page loads no
+  // shell.js and no lib/data.js, so it cannot call HS.logEvent. It does the same thing in the smallest
+  // form: one anonymous, insert-only public.events row ('report_created'), stamped with the campaign
+  // labels shell.js captured (localStorage 'hs:referral_last' = last tagged touch, else 'hs:referral').
+  // The labels are the same lowercase utm_* strings; nothing else is sent: no address, no report id,
+  // no user id, no email. Live hosts only (test and preview hosts record nothing), same list as
+  // lib/data.js HS.EVENT_HOSTS (test/saleshandy-attribution.test.mjs pins that they agree).
+  var EVENT_HOSTS = ['homesignal.net', 'www.homesignal.net'];
+  function logReportCreated(){
+    try {
+      if (EVENT_HOSTS.indexOf(location.hostname) < 0) return;
+      var first = null, last = null, sid = null;
+      try { first = JSON.parse(localStorage.getItem('hs:referral') || 'null'); } catch (e) {}
+      try { last = JSON.parse(localStorage.getItem('hs:referral_last') || 'null'); } catch (e) {}
+      try { sid = localStorage.getItem('hs_sid'); } catch (e) {}
+      var t = (last && last.tagged && last.source) ? last : ((first && first.source) ? first : null);
+      var SAFE = /^[a-z0-9._~:\/-]{1,80}$/;
+      var row = { event_type: 'report_created', session_id: sid || null, page_url: location.origin + location.pathname };
+      if (t) {
+        var lab = function(v){ v = v == null ? '' : String(v).trim().toLowerCase(); return SAFE.test(v) ? v : null; };
+        var src = lab(t.source);
+        if (src) { row.ref_source = src; var m = lab(t.medium), c = lab(t.campaign), n = lab(t.content); if (m) row.ref_medium = m; if (c) row.ref_campaign = c; if (n) row.ref_content = n; }
+      }
+      fetch(SB_URL + '/rest/v1/events', { method: 'POST', keepalive: true,
+        headers: { apikey: SB_ANON, Authorization: 'Bearer ' + SB_ANON, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify([row]) }).then(function(){}, function(){});
+    } catch (e) { /* analytics never reaches the page */ }
+  }
+
   var SAVED_RECENT = 6, savedAll = false;
   // remove from my list (docs/saved-reports-archive.sql): which list is on screen, Manage mode, the one request in flight, the open row menu, the last removal (for Undo)
   var savedView = 'active', savedManage = false, archiveBusy = false, menuFor = null, menuBtn = null, menuReport = null, menuAnchor = null, toastTimer = null, confirmIds = null, undoIds = null;
@@ -1965,7 +1994,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
     else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
-    if (body.stored === true) { savedFresh = false; showSaved(true); } // a report that was just saved joins the list
+    if (body.stored === true) { savedFresh = false; showSaved(true); logReportCreated(); } // a report that was just saved joins the list
   }
 
   document.addEventListener('DOMContentLoaded', function(){

@@ -116,7 +116,11 @@ ok(/location\.hash/.test(readInvite) && (code.match(/location\.search/g) || []).
 ok(/history\.replaceState\(null, '', location\.pathname \+ location\.search\)/.test(readInvite), '4b and removed from the address bar as soon as it is read');
 ok(/var INVITE = \/\^hse1_\[0-9a-f\]\{64\}\$\/;/.test(code) && /INVITE\.test\(fromHash\)/.test(readInvite) && /INVITE\.test\(kept\)/.test(readInvite),
   '4c only a well-formed invite token is kept or sent');
-ok(!/localStorage|indexedDB|document\.cookie/.test(code) && (code.match(/sessionStorage\./g) || []).length === 3 && /var STASH = 'hs-da-invite';/.test(code),
+const attrFn = code.slice(code.indexOf('function logReportCreated()'), code.indexOf('var SAVED_RECENT = 6'));
+const codeNoAttr = code.replace(attrFn, '');
+ok(attrFn.length > 200 && !/localStorage\.(set|remove)Item|indexedDB|document\.cookie|sessionStorage/.test(attrFn) && (attrFn.match(/localStorage\.getItem\('hs:referral'\)|localStorage\.getItem\('hs:referral_last'\)|localStorage\.getItem\('hs_sid'\)/g) || []).length === 3,
+  '4d0 the campaign-attribution logger only READS the three keys shell.js wrote (hs:referral, hs:referral_last, hs_sid); it stores nothing');
+ok(!/localStorage|indexedDB|document\.cookie/.test(codeNoAttr) && (code.match(/sessionStorage\./g) || []).length === 3 && /var STASH = 'hs-da-invite';/.test(code),
   '4d the only browser storage is the per-tab invite slot (set, cleared, read back once): no address, no report, nothing that outlives the tab');
 const loadTrial = fn('loadTrial');
 ok(/if \(r\.status === 0 \|\| r\.status >= 500\) \{ trialUnreadable\(\); return; \}/.test(loadTrial) && /invite = null; store\(null\);/.test(loadTrial)
