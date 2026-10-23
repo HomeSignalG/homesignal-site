@@ -2017,7 +2017,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
   async function refreshFeedInv(){
     try{
-      var r=await window.hsClient.from('feed_inventory_live').select('*').order('sort',{ascending:true});
+      var r=await window.hsClient.rpc('hs_feed_inventory_live');   // founder-gated (dashboard_admins); the view itself is not readable by signed-in users
       if(r.error) return;                 // leave prior content; empty cells mean no live items, not an error
       renderFeedInv(r.data||[]);
     }catch(e){}
