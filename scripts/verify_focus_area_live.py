@@ -56,7 +56,8 @@ def main():
 
     st, _, rtxt = get(f"{origin}/robots.txt")
     rp = urllib.robotparser.RobotFileParser(); rp.parse(rtxt.splitlines())
-    print(f"robots.txt HTTP {st}; Sitemap lines: {re.findall(r'(?im)^sitemap:\\s*(\\S+)', rtxt)}")
+    sm_lines = re.findall(r"(?im)^sitemap:\s*(\S+)", rtxt)
+    print(f"robots.txt HTTP {st}; Sitemap lines: {sm_lines}")
 
     sm_main = set(locs(get(f"{origin}/sitemap.xml")[2]))
     fam = {}
