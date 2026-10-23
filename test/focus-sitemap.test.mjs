@@ -69,6 +69,27 @@ try {
 const wa = cfg.find((a) => a.slug === 'washington-state');
 ok(wa && wa.state === 'WA' && !wa.county && wa.expected_zips === 362, 'config names Washington State with 362 expected ZIPs');
 
+// ---- area hub: one /guides/<slug>/ page per focus area, eligible ZIPs only, none when nothing is eligible
+const py3 = `
+import sys, json, os
+sys.path.insert(0, ${JSON.stringify(join(root, 'scripts'))})
+import gen_zip_pages as g
+pages = {z: dict(state='WA', county='Pierce', name='Town ' + z, rule_f_count=5) for z in ('98401', '98402', '98397')}
+pages['98001'] = dict(state='WA', county='King', name='Auburn 98001', rule_f_count=9)
+areas = [dict(slug='pierce-county-wa', name='Pierce County, WA', state='WA', county='Pierce', expected_zips=3),
+         dict(slug='ohio-none', name='Ohio', state='OH', expected_zips=1)]
+w = g.build_guides({}, {}, pages, sys.argv[1], '2026-10-23', None, areas=areas, indexable=['98401', '98402', '98001'])
+print(json.dumps(w))
+`;
+const d3 = mkdtempSync(join(tmpdir(), 'focus-'));
+try {
+  const w = JSON.parse(execFileSync('python3', ['-I', '-c', py3, d3], { encoding: 'utf8' }).trim().split('\n').pop());
+  ok(w.includes('/guides/pierce-county-wa/') && !w.some((x) => x.includes('ohio-none')), 'hub emitted for an area with eligible ZIPs, none for an area without');
+  const h = readFileSync(join(d3, 'guides', 'pierce-county-wa', 'index.html'), 'utf8');
+  const links = [...h.matchAll(/href="\/community\/(\d{5})\/"/g)].map((m) => m[1]);
+  ok(links.includes('98401') && links.includes('98402') && !links.includes('98397') && !links.includes('98001'), 'hub links only eligible members of its own area');
+} finally { rmSync(d3, { recursive: true, force: true }); }
+
 // ---- wiring
 const wf = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
 ok(/focus_sitemaps/.test(wf) && /lists a noindex page/.test(wf) && /expected_zips/.test(wf), 'pages.yml gate checks the focus sitemap against sitemap.xml, robots and count');

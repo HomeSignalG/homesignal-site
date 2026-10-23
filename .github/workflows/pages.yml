@@ -397,7 +397,8 @@ jobs:
           guides = re.findall(r'<loc>https://[^/<]+(/guides/[a-z0-9-]+/)</loc>', sm)
           assert gwritten == man['guide_pages'], 'guide documents != manifest guide_pages'
           assert sorted(guides) == man['guide_pages'], 'sitemap guide URLs != guide pages written'
-          assert len(gwritten) == 2, f'expected the two guides, found {gwritten}'
+          hubs = sorted(f'/guides/{k}/' for k, r in man['focus_sitemaps'].items() if r['eligible'])
+          assert gwritten == sorted(set(hubs) | {'/guides/what-is-being-built-near-me/', '/guides/check-proposed-development-near-a-house/'}), f'expected the two guides plus the area hubs {hubs}, found {gwritten}'
           print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
           # FAMILY SITEMAPS (plan step 14): each family is exactly its own set, and together
           # they cover exactly the generated URLs sitemap.xml advertises.

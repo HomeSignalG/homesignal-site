@@ -1597,10 +1597,62 @@ def render_guide_check(projects, pages, built):
                  GUIDE_CHECK, body, built)
 
 
-def build_guides(cities, projects, pages, out_dir, built, state=None):
+def area_hub_path(a):
+    return f"/guides/{a['slug']}/"
+
+
+def render_area_hub(a, members, pages, cities, built):
+    """One page per marketing focus area (data/seo-focus-areas.json): every index-eligible ZIP page
+    of the area, grouped by county, and the city pages inside it. It states only what the build
+    knows (which ZIP pages exist); it makes no claim about how much development a ZIP holds."""
+    mset = set(members)
+    by_county = {}
+    for z in members:
+        by_county.setdefault(pages[z].get("county") or "", []).append(z)
+    groups = ""
+    for county, zs in sorted(by_county.items()):
+        head = f"<h3>{esc(county)} County</h3>" if len(by_county) > 1 and county else ""
+        groups += head + "<ul>" + "".join(
+            f'<li><a href="/community/{z}/">{esc(pages[z]["name"])}</a></li>' for z in zs) + "</ul>"
+    cs = sorted((c for c in cities.values() if c["state"].upper() == a["state"].upper()
+                 and mset & set(c["zips"])), key=lambda c: c["place"])
+    city_html = ""
+    if cs:
+        city_html = ('<section class="zsec"><h2>Cities</h2><ul>' + "".join(
+            f'<li><a href="{city_path(c)}">{esc(c["place"])}</a></li>' for c in cs) + '</ul></section>')
+    n = len(members)
+    name = esc(a["name"])
+    body = (
+        f'<main id="hs-ssr"><header><p class="eyebrow"><a href="/">HomeSignal</a> · Guide</p>'
+        f'<h1>Development and public records in {name}</h1>'
+        f'<p>HomeSignal collects official government notices, public meetings, local news and '
+        f'development records for {n} ZIP {"code" if n == 1 else "codes"} in {name}. Choose your '
+        f'ZIP code to see what is on record there. Each item links to the official source it came '
+        f'from.</p></header>'
+        + _zip_form("zipArea")
+        + f'<section class="zsec"><h2>ZIP codes in {name}</h2>{groups}</section>'
+        + city_html
+        + '<section class="zsec"><h2>What a ZIP page does not tell you</h2>'
+          '<p>Coverage depends on what your city or county publishes online, and a page with no '
+          'items does not mean nothing is planned. For anything that matters to a decision, '
+          'confirm with your local planning department.</p></section>'
+        + _guide_nav(area_hub_path(a)))
+    return _page(f"{a['name']}: development, public records and notices by ZIP code | HomeSignal",
+                 f"Government notices, public meetings, local news and development records for "
+                 f"{n} ZIP codes in {a['name']}, from official sources.",
+                 area_hub_path(a), body, built)
+
+
+def build_guides(cities, projects, pages, out_dir, built, state=None, areas=(), indexable=()):
     written = []
-    for path, html_ in ((GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
-                        (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))):
+    idx = set(indexable)
+    docs = [(GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
+            (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))]
+    for a in areas:
+        eligible = [z for z in focus_members(a, pages) if z in idx]
+        if eligible:   # an area with no index-eligible page gets no hub
+            docs.append((area_hub_path(a), render_area_hub(a, eligible, pages, cities, ps.BUILD_DAY_TOKEN)))
+    for path, html_ in docs:
         d = os.path.join(out_dir, *path.strip("/").split("/"))
         os.makedirs(d, exist_ok=True)
         if state is not None:
@@ -1807,14 +1859,19 @@ def load_focus_areas(path=FOCUS_AREAS_FILE):
     return areas
 
 
+def focus_members(a, pages):
+    """ZIPs of a focus area: its state, and its county when the entry names one."""
+    return sorted(z for z, p in pages.items()
+                  if p.get("state") == a["state"] and (not a.get("county") or p.get("county") == a["county"]))
+
+
 def write_focus_sitemaps(out_dir, areas, pages, indexable, lastmod=None):
     """Write sitemaps/<slug>.xml per area; return {slug: report} for the manifest and the gate."""
     d = os.path.join(out_dir, "sitemaps")
     os.makedirs(d, exist_ok=True)
     idx, lm, report = set(indexable), lastmod or {}, {}
     for a in areas:
-        members = sorted(z for z, p in pages.items()
-                         if p.get("state") == a["state"] and (not a.get("county") or p.get("county") == a["county"]))
+        members = focus_members(a, pages)
         eligible = [z for z in members if z in idx]
         excluded = {z: (f"noindex: Rule F fail ({pages[z].get('rule_f_count')} of {RULE_F_MIN} "
                         f"non-weather items) and Rule D fail") for z in members if z not in idx}
@@ -2153,7 +2210,8 @@ def main():
     city_paths = sorted(city_path(c) for c in cities.values())
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
     project_paths = sorted(pr["path"] for pr in projects.values())
-    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state)
+    guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
+                               areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
 
     baseline = load_page_state_baseline(a.baseline, a.reseed)
