@@ -45,6 +45,23 @@ MUTATIONS = {
     'publish_superseded': [("where e.superseded_by is null", "where true", 1)],
     # boundary-inclusive membership with no edge guard: one point, two ZIP pages
     'edge_blind': [("where verdict = 'member' and zcta_hits <= 1", "where verdict = 'member'", 1)],
+    # the same-building rule switched off (both markers again)
+    'same_site_off': [("where a.source_key not in (select osm_key from osm_twin)", "where true", 1)],
+    # distance alone decides (WA12/WA13, SV1/SV5 would merge)
+    'same_site_distance_only': [(
+        "and public.dc_names_same_site(o.project_name, o.developer_or_operator,\n"
+        "                                     c.project_name, c.developer_or_operator)", "", 1)],
+    # a looser radius (189 m pair would merge)
+    'same_site_wider': [("and 150 >= ST_DistanceSphere(", "and 250 >= ST_DistanceSphere(", 1)],
+    # an ambiguous pairing hides a marker
+    'same_site_not_one_to_one': [(
+        "where (select count(*) from same_site s2 where s2.osm_key = s.osm_key) = 1\n"
+        "       and (select count(*) from same_site s3 where s3.canon_key = s.canon_key) = 1", "where true", 1)],
+    # the twin need not be drawn on this page
+    'same_site_before_membership': [(
+        "      from admitted o\n      join admitted c\n", "      from admitted o\n      join judged c\n", 1)],
+    # the brand test dropped: any shared site code merges two operators
+    'same_site_no_brand': [("(s.ta[1] = s.tb[1] or s.oa[1] = s.ob[1])", "true", 1)],
 }
 
 

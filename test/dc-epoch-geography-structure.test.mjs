@@ -53,7 +53,10 @@ const epochReaders = surface.filter((f) => /epoch_for_zip|epoch_ai/i.test(read(f
 ok(epochReaders.length === 0, 'M9: no resident-facing file reads an Epoch-specific object or names the Epoch source', epochReaders.join(','));
 ok(!/epoch_for_zip/i.test(Object.values(SQL).join('\n')), 'M9b: no epoch_for_zip is defined in the DDL of record');
 ok(!/epoch/i.test(MAP), 'M9c: the ONE Map 1 reader names no source -- Epoch publishes through the canonical plane or not at all');
-ok((MAP.match(/create or replace function public\./g) || []).length === 1, 'M9d: the Map 1 reader is still ONE function');
+ok((MAP.match(/create or replace function public\.map1_\w+/g) || []).length === 1
+   && (MAP.match(/create or replace function public\./g) || []).length === 2
+   && /create or replace function public\.dc_names_same_site\(/.test(MAP),
+  'M9d: the Map 1 reader is still ONE function (plus the 2026-10-23 same-site name rule it calls)');
 
 // ── the source rule lives in ONE place, keyed like dc_classify_observation ─────────────────
 // 2026-09-24: the address rule is TWO functions -- per-source SCHEMA extraction, then ONE generic

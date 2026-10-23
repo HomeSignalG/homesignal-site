@@ -167,7 +167,24 @@ def build_rollback():
     return '\n\n'.join(parts) + '\n'
 
 
+# ⛔ FROZEN 2026-10-23: the C3c apply was APPLIED to production (2026-09-27) and the founder's
+# same-building ruling (2026-10-23, docs/dc-osm-dedupe-apply.sql) then moved the Map 1 reader in the
+# DDL of record, so regenerating would rewrite history. --check verifies the FROZEN bytes; the offline
+# proof runs pinned to 4e91e9d2, the last main commit whose reader is the one C3c shipped
+# (.github/workflows/dc-osm-map1-apply.yml).
+FROZEN = {OUT: 'eb1759911d4dcaeea8e1c185924f3c33948543d25887072f35e64dc618a44983',
+          OUT_ROLLBACK: '7be1b88257606cdb51fea2a106c82e3fa2c25eb677332f7b1f627fa7bf39e4ef'}
+
+
 if __name__ == '__main__':
+    if '--check' in sys.argv and '--regenerate-at-applied-commit' not in sys.argv:
+        bad = [o.name for o, want in FROZEN.items()
+               if not o.exists() or hashlib.sha256(o.read_bytes()).hexdigest() != want]
+        print('C3c apply + rollback files are the frozen applied artifacts' if not bad
+              else f'NOT the frozen applied artifacts: {bad}')
+        sys.exit(1 if bad else 0)
+    if '--regenerate-at-applied-commit' not in sys.argv:
+        raise SystemExit('REFUSED: the C3c artifacts are frozen (applied to production); they are never regenerated')
     outs = ((OUT, build()), (OUT_ROLLBACK, build_rollback()))
     if '--check' in sys.argv:
         stale = [o.name for o, t in outs if not (o.exists() and o.read_text() == t)]
