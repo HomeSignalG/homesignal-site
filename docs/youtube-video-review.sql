@@ -1,5 +1,7 @@
 -- Jody — "YouTube Videos" review tab (Acquisition Dashboard): storage + decision record.
--- PARKED (repo convention): review, then apply via db-sql / apply_migration. NOT applied.
+-- APPLIED 2026-10-23 to production (founder approval), in pieces through execute_sql because apply_migration timed out
+-- on the storage.objects policy; verified: bucket private, one SELECT-only policy, table RLS-on with no grants, anon refused,
+-- non-admin authenticated refused (see PR description). The file is the DDL of record.
 --
 -- WHAT THIS IS
 --   1. A PRIVATE storage bucket `jody-videos` holding each finished project's MP4s, Shorts and thumbnail.
