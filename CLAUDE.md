@@ -3,7 +3,9 @@
 HomeSignal is a **civic-alerts service**: residents follow their community and get
 alerts about government notices, meetings, permits, and environmental/quality news
 that affect their home. This repo is the **static front-end** (plain HTML + vanilla
-JS, no build step) served from GitHub Pages at **homesignal.net** (see `CNAME`).
+JS, no build step) served from GitHub Pages at **jodytracks.com** (the brand contract's current identity; `CNAME` and every public URL are
+rewritten to it at deploy time by `scripts/brand_stage.py`, so the committed `homesignal.net` strings are the *pre-migration source form*, not what
+production serves). `homesignal.net` now only redirects. Dated receipts below that quote `homesignal.net` are left as written.
 It reads live data from Supabase; the alert *content* is produced by a separate
 engine repo. There is **no bundler, no framework, no `package.json`** — what's in
 the repo is what ships.
@@ -213,6 +215,27 @@ the exact problem `QUEUE.md` exists to end.
 
 ---
 
+
+## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
+
+Pierce County WA (65 ZIP pages) is the first geographic marketing focus. National SEO is unchanged: `sitemap.xml`, the six family
+sitemaps, every page's robots directive and Rule F / Rule D are exactly as before.
+
+- **`/sitemaps/pierce-county-wa.xml`** (public host `https://jodytracks.com`) is a SUBSET view of `sitemap.xml`, written by
+  `gen_zip_pages.py::write_focus_sitemaps` from `data/seo-focus-areas.json`. Members are derived at build time from each page record's
+  `state` + `county`; a member is listed only if it is in the same `indexable` set (Rule F OR Rule D) that `sitemap.xml` advertises, so it
+  can never disagree with the national sitemap. It is outside `SITEMAP_FAMILIES` on purpose (it overlaps the ZIP families).
+- **`lastmod`** is the page-semantics lastmod only (`page_semantics.finalize`), omitted when unknown. **No `changefreq` and no `priority`**
+  (`_url_el(bare=True)`; the national sitemaps still carry theirs, deliberately untouched).
+- **Deploy gate** (`pages.yml`): the file equals its eligible ZIPs, is a subset of `sitemap.xml` and of the indexable set, every listed page
+  is `index, follow` and self-canonical, member count equals `expected_zips` (65, a tripwire pinned to the committed seed by
+  `test/focus-sitemap.test.mjs`). `robots.txt` lists it beside the national sitemap.
+- **A new focus area is one JSON entry**, not code. Do not list ZIPs by hand.
+- **Live proof:** `verify-focus-area-live.yml` (dispatch, read-only, runner egress) prints per-ZIP HTTP status, redirect, canonical, robots
+  meta + X-Robots-Tag, sitemap membership and inbound internal links. Run it after a deploy, then submit the sitemap in Search Console.
+- **Measured 2026-10-23 (Supabase, control 12,722 registry ZIPs):** 65 Pierce ZIP communities, all 65 in `canonical_zip_registry`, 64 with
+  `app_community_meta.indexable = true`, 98397 Longmire false. ⚠️ That flag is the Map 1 gate, NOT the page's robots decision (Rule F or D, built
+  at deploy), so eligibility for the sitemap comes from the build, never from this flag.
 
 ## Permanent historical intelligence — preserve the longitudinal asset
 
@@ -751,7 +774,7 @@ Then do the runbook end-to-end without pausing. The session already runs in
    `id`. Capture the returned `id`.
 2. **Verify it resolves.** `select id, name, level, zip_codes, government_topics
    from public.communities order by name;` then confirm the page loads at
-   `https://homesignal.net/community.html?zip=<a-covered-zip>` (and `?id=<uuid>`).
+   `https://jodytracks.com/community.html?zip=<a-covered-zip>` (and `?id=<uuid>`).
    No alerts/meetings yet is expected — content comes from step 3.
 3. **Wire the content feeds** in `homesignal-ingest` (separate repo). Add the
    community's government RSS/feed rows to `feeds.csv` keyed by `community_id`, and
@@ -928,7 +951,7 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   **County** government (7 topics) + universal (News/Emerging/Global); **Brigham City /
   Tremonton** → their **own council** + county + universal. Subscriptions anchor to the
   Box Elder County `community_id` (chain root), so they match and deliver.
-  ⚠️ **Not eyeballed live** — the build sandbox can't reach Supabase/`homesignal.net`
+  ⚠️ **Not eyeballed live** — the build sandbox can't reach Supabase/`jodytracks.com`
   (egress blocked → `HTTP 000`); verified by data + deployed code + static render, **not**
   an end-to-end browser signup. Confirm on the real site (`?zip=84312` → pick a topic →
   sign up). Each small town's **own council** is the pending ingest follow-up.
@@ -1244,7 +1267,7 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   "Verify" for a DATA change still means what it always did: apply the SQL, then load the
   affected page (e.g. `community.html?zip=…`) and confirm it renders and reads the right rows —
   the suite covers code, not the contents of the database.
-- **Automated live verification (CI).** The build sandbox can't reach Supabase/`homesignal.net`
+- **Automated live verification (CI).** The build sandbox can't reach Supabase/`jodytracks.com`
   (egress blocked), so `.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs`
   do the live check on a GitHub runner: they read the **live `communities` table** and, for
   every covered ZIP, assert `community.html?zip=<zip>` resolves to the most-specific community
@@ -3197,7 +3220,7 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
     now do, and both fail on the old mapping.
   - `scripts/probe-map1-dc-type-lifecycle.mjs` (`verify-map1-dc-type-lifecycle.yml`) checks the
     real page against the live RPC for the deterministic sample (01040, 01852, 07033, 20187,
-    23150); dispatch it with `site_base=https://homesignal.net` to check what is live.
+    23150); dispatch it with `site_base=https://jodytracks.com` to check what is live.
     ⚠️ **It goes red between a Compute Atlas acquisition and the next identity (:25) and geography
     (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
     2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
@@ -4417,7 +4440,7 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     focus-scroll (scrollTop 0 → 656 at 1280x900). It is benign there (the panel stays in
     view, and a page scroll brings it back at shorter heights) and pre-existing. Not folded
     into this fix.
-  - ⚠️ **The sandbox cannot reach `homesignal.net` or jsDelivr** (egress policy 403), so every
+  - ⚠️ **The sandbox cannot reach `jodytracks.com` or jsDelivr** (egress policy 403), so every
     number here is from the repo's own browser harness against the shipped page with Leaflet
     served locally — not from production. Confirm on the real site.
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A

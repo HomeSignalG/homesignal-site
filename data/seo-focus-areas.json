@@ -1,0 +1,6 @@
+{
+  "_doc": "Geographic marketing focus areas. Each one gets its OWN sitemap, sitemaps/<slug>.xml, so Search Console can submit and measure it separately. It lists ONLY pages that are already in sitemap.xml (the same index-eligible set, Rule F OR Rule D) and changes no page, no robots directive and no national sitemap. Members are derived at build time from the page records' state + county, never listed by hand. expected_zips is a tripwire, not a source: the build gate fails if the derived count differs.",
+  "areas": [
+    {"slug": "pierce-county-wa", "name": "Pierce County, WA", "state": "WA", "county": "Pierce", "expected_zips": 65}
+  ]
+}

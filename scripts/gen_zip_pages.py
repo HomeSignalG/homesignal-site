@@ -1630,12 +1630,14 @@ SITEMAP_DEV_RE = re.compile(
     r"[ \t]*<url>\s*<loc>[^<]*homesignalmap\.html\?zip=\d{5}</loc>.*?</url>\s*", re.S)
 
 
-def _url_el(loc, lastmod=None):
+def _url_el(loc, lastmod=None, bare=False):
     """lastmod is when the page's semantic content last changed (a day, or a UTC instant),
     never the build day: a lastmod that moves every day tells a crawler nothing, and it learns
     to ignore it. None means no truthful time is known, and the element is omitted."""
     lm = (f"    <lastmod>{lastmod}</lastmod>\n"
           if lastmod and (DAY_RE.fullmatch(lastmod) or ps.STAMP_RE.fullmatch(lastmod)) else "")
+    if bare:   # focus-area sitemaps: no invented changefreq or priority, only a real lastmod
+        return f"  <url>\n    <loc>{html.escape(loc)}</loc>\n{lm}  </url>"
     return (f"  <url>\n    <loc>{html.escape(loc)}</loc>\n{lm}"
             f"    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>")
 
@@ -1782,6 +1784,51 @@ def write_family_sitemaps(out_dir, families, lastmod=None):
         open(os.path.join(d, f"{name}.xml"), "w", encoding="utf-8").write(body)
         counts[name] = len(paths)
     return counts
+
+
+# ---------------------------------------------------------------- focus-area sitemaps
+# A marketing focus area (data/seo-focus-areas.json) gets its own sitemap so Search Console can
+# take it as a separate submission. It is a SUBSET view of sitemap.xml: the members are the
+# ZIPs whose page records say state + county, and a member is listed only if it is in the same
+# `indexable` set sitemap.xml advertises (Rule F OR Rule D). It never decides eligibility, so it
+# cannot disagree with the national sitemap, and it is outside SITEMAP_FAMILIES because it
+# overlaps the ZIP families on purpose.
+FOCUS_AREAS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "seo-focus-areas.json")
+SLUG_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+
+
+def load_focus_areas(path=FOCUS_AREAS_FILE):
+    areas = json.load(open(path, encoding="utf-8"))["areas"]
+    for a in areas:
+        if not SLUG_RE.fullmatch(a["slug"]) or a["slug"] in SITEMAP_FAMILIES or a["slug"] == "page-state":
+            sys.exit(f"ERROR: focus area slug refused: {a['slug']!r}")
+    if len({a["slug"] for a in areas}) != len(areas):
+        sys.exit("ERROR: duplicate focus area slug")
+    return areas
+
+
+def write_focus_sitemaps(out_dir, areas, pages, indexable, lastmod=None):
+    """Write sitemaps/<slug>.xml per area; return {slug: report} for the manifest and the gate."""
+    d = os.path.join(out_dir, "sitemaps")
+    os.makedirs(d, exist_ok=True)
+    idx, lm, report = set(indexable), lastmod or {}, {}
+    for a in areas:
+        members = sorted(z for z, p in pages.items()
+                         if p.get("state") == a["state"] and p.get("county") == a["county"])
+        eligible = [z for z in members if z in idx]
+        excluded = {z: (f"noindex: Rule F fail ({pages[z].get('rule_f_count')} of {RULE_F_MIN} "
+                        f"non-weather items) and Rule D fail") for z in members if z not in idx}
+        if len(eligible) > SITEMAP_MAX_URLS:
+            sys.exit(f"ERROR: sitemaps/{a['slug']}.xml would list {len(eligible)} URLs")
+        body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                + "".join(_url_el(f"{BASE}/community/{z}/", lm.get(f"/community/{z}/"), bare=True) + "\n"
+                          for z in eligible)
+                + "</urlset>\n")
+        open(os.path.join(d, f"{a['slug']}.xml"), "w", encoding="utf-8").write(body)
+        report[a["slug"]] = {"name": a["name"], "expected_zips": a["expected_zips"],
+                             "members": members, "eligible": eligible, "excluded": excluded}
+    return report
 
 
 # ---------------------------------------------------------------- build + gates
@@ -2134,6 +2181,7 @@ def main():
         "city": city_paths, "project": project_paths, "guide": guide_paths,
         "map": map_paths},
         lastmod=lastmod_map)
+    focus = write_focus_sitemaps(a.out, load_focus_areas(), pages, indexable, lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
     open(os.path.join(a.out, "sitemaps", "page-state.json"), "w", encoding="utf-8").write(
         json.dumps(state_doc, separators=(",", ":"), sort_keys=True))
@@ -2163,6 +2211,9 @@ def main():
           f"+{sm['projects']} /project/ URLs, +{sm['guides']} /guides/ URLs, "
           f"+{sm['maps']} /map/ URLs")
     print("family sitemaps : " + ", ".join(f"{k} {v}" for k, v in fam.items()))
+    for slug, r in focus.items():
+        print(f"focus sitemap   : {slug} {len(r['eligible'])} listed of {len(r['members'])} members "
+              f"(expected {r['expected_zips']}); excluded {sorted(r['excluded'])}")
     print(f"page state     : {len(page_state)} tracked pages, state_hash {state_doc['state_hash']}, "
           f"{'SEED (' + delta['seed_reason'] + ')' if delta['seed'] else 'vs baseline ' + str(delta['baseline_state_hash'])}")
     print(f"semantic delta : +{len(delta['added'])} added, ~{len(delta['changed'])} changed, "
@@ -2195,6 +2246,7 @@ def main():
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
                "family_sitemaps": fam,
+               "focus_sitemaps": focus,
                "page_state_hash": state_doc["state_hash"], "page_state_pages": len(page_state)},
               open(os.path.join(a.out, "zip-pages-manifest.json"), "w"))
     print("OK")

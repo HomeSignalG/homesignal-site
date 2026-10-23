@@ -1,0 +1,22 @@
+name: verify-focus-area-live
+# Read-only. GETs the public host and prints a per-ZIP table for a marketing focus area
+# (data/seo-focus-areas.json). Writes nothing, holds no secret, notifies nobody.
+on:
+  workflow_dispatch:
+    inputs:
+      slug: {description: 'focus area slug', default: 'pierce-county-wa', required: false}
+      require_sitemap: {description: 'fail if the focus sitemap is not served', default: 'false', required: false}
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify
+        env:
+          SLUG: ${{ inputs.slug }}
+          REQ: ${{ inputs.require_sitemap }}
+        run: |
+          python3 scripts/verify_focus_area_live.py --slug "$SLUG" $([ "$REQ" = "true" ] && echo --require-sitemap) | tee "$GITHUB_STEP_SUMMARY"
