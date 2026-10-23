@@ -304,9 +304,9 @@ const readFooter = (page) => page.evaluate(() => {
     linkHeights: links.map((a) => Math.round(a.getBoundingClientRect().height))
   };
 });
-// Six support links, then the Bluesky and Reddit icons (founder, 2026-10-15): an icon-only link, so its label comes from aria-label.
-const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms of Service', 'Refund Policy', '', ''];
-const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html', 'https://bsky.app/profile/jodytracks.com', 'https://www.reddit.com/user/HomeSignalnet'];
+// Six support links, then the Bluesky icon (Reddit link removed, founder 2026-10-23): an icon-only link, so its label comes from aria-label.
+const EXPECT_LABELS = ['How It Works', 'About', 'Contact', 'Privacy', 'Terms of Service', 'Refund Policy', ''];
+const EXPECT_HREFS = ['how-it-works.html', 'about.html', 'contact.html', 'privacy.html', 'terms.html', 'refund-policy.html', 'https://bsky.app/profile/jodytracks.com'];
 await D.page.goto(base + '/index.html', { waitUntil: 'domcontentloaded' });
 await waitReady(D.page);
 let f = await readFooter(D.page);
