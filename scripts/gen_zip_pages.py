@@ -1080,8 +1080,8 @@ def render_city(c, pages, built):
     place, st, n = c["place"], c["state"], c["count"]
     label = f"{place}, {st}"
     nz = len(c["zips"])
-    # A held ZIP (boundary not yet measured) is named on the page but never counted, so
-    # the sentences say how many ZIP codes the count actually covers.
+    # A held ZIP (no Census boundary, so it can never be measured; Fix 4) is named on the page
+    # but never counted, so the sentences say how many ZIP codes the count actually covers.
     counted = nz - len([z for z in c["held_zips"] if z in c["zips"]])
     across = (f"the {nz} ZIP codes named {place}" if counted == nz else
               f"{counted} of the {nz} ZIP codes named {place}")
@@ -1109,7 +1109,7 @@ def render_city(c, pages, built):
             continue
         note = ""
         if z in c["held_zips"]:
-            note = ' <span class="quiet">not yet measured — not counted</span>'
+            note = ' <span class="quiet">no mapped area — not counted</span>'
         elif pg.get("rule_d"):
             note = f' <span class="quiet">{pg.get("rule_d_count")} projects</span>'
         zli.append(f'<li><a href="/community/{esc(z)}/">{esc(pg["name"])}</a>{note}</li>')
