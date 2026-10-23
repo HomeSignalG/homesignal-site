@@ -50,6 +50,25 @@ try {
   ok(!/priority|changefreq/.test(xml), 'no priority or changefreq');
 } finally { rmSync(d, { recursive: true, force: true }); }
 
+// ---- statewide entry (no county): every WA page is a member, only index-eligible ones are listed
+const py2 = `
+import sys, json, tempfile
+sys.path.insert(0, ${JSON.stringify(join(root, 'scripts'))})
+import gen_zip_pages as g
+pages = {'98401': dict(state='WA', county='Pierce', rule_f_count=5), '98001': dict(state='WA', county='King', rule_f_count=9),
+         '98397': dict(state='WA', county='Pierce', rule_f_count=1), '43001': dict(state='OH', county='Pierce', rule_f_count=9)}
+d = sys.argv[1]
+print(json.dumps(g.write_focus_sitemaps(d, [dict(slug='washington-state', name='WA', state='WA', expected_zips=3)], pages, ['98401', '98001', '43001'])))
+`;
+const d2 = mkdtempSync(join(tmpdir(), 'focus-'));
+try {
+  const rep = JSON.parse(execFileSync('python3', ['-I', '-c', py2, d2], { encoding: 'utf8' }).trim().split('\n').pop())['washington-state'];
+  const locs = [...readFileSync(join(d2, 'sitemaps', 'washington-state.xml'), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  ok(JSON.stringify(rep.members) === '["98001","98397","98401"]' && locs.length === 2 && !locs.some((l) => l.includes('98397')), 'statewide entry: all WA pages are members, only eligible ones listed, other states excluded');
+} finally { rmSync(d2, { recursive: true, force: true }); }
+const wa = cfg.find((a) => a.slug === 'washington-state');
+ok(wa && wa.state === 'WA' && !wa.county && wa.expected_zips === 362, 'config names Washington State with 362 expected ZIPs');
+
 // ---- wiring
 const wf = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
 ok(/focus_sitemaps/.test(wf) && /lists a noindex page/.test(wf) && /expected_zips/.test(wf), 'pages.yml gate checks the focus sitemap against sitemap.xml, robots and count');

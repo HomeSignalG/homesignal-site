@@ -230,6 +230,7 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
 - **Deploy gate** (`pages.yml`): the file equals its eligible ZIPs, is a subset of `sitemap.xml` and of the indexable set, every listed page
   is `index, follow` and self-canonical, member count equals `expected_zips` (65, a tripwire pinned to the committed seed by
   `test/focus-sitemap.test.mjs`). `robots.txt` lists it beside the national sitemap.
+- **`/sitemaps/washington-state.xml`** (founder, 2026-10-23) is the same mechanism with no `county`: every WA ZIP page is a member (362 in the registry on 2026-10-23, Supabase), and only index-eligible ones are listed. It does not force any page to be indexed; Rule F / Rule D still decide that, and the build report names each excluded page.
 - **A new focus area is one JSON entry**, not code. Do not list ZIPs by hand.
 - **Live proof:** `verify-focus-area-live.yml` (dispatch, read-only, runner egress) prints per-ZIP HTTP status, redirect, canonical, robots
   meta + X-Robots-Tag, sitemap membership and inbound internal links. Run it after a deploy, then submit the sitemap in Search Console.

@@ -1814,7 +1814,7 @@ def write_focus_sitemaps(out_dir, areas, pages, indexable, lastmod=None):
     idx, lm, report = set(indexable), lastmod or {}, {}
     for a in areas:
         members = sorted(z for z, p in pages.items()
-                         if p.get("state") == a["state"] and p.get("county") == a["county"])
+                         if p.get("state") == a["state"] and (not a.get("county") or p.get("county") == a["county"]))
         eligible = [z for z in members if z in idx]
         excluded = {z: (f"noindex: Rule F fail ({pages[z].get('rule_f_count')} of {RULE_F_MIN} "
                         f"non-weather items) and Rule D fail") for z in members if z not in idx}
