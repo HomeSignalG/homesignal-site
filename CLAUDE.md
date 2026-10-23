@@ -3198,6 +3198,16 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
   acquisition; then the CTE is deleted. A compatibility row is dropped only when ONE published
   canonical entity sits at IDENTICAL coordinates (≤ 1 m, one-to-one). Anything looser is not a
   match — "Vantage WA12"/"WA13" are 166 m apart, same operator, two buildings.
+  - ⚖️ **WIDENED BY FOUNDER RULING 2026-10-23 ("b"): one marker per building, by NAME, within 150 m.** An OSM
+    pin is also hidden when exactly one canonical pin drawn on the SAME ZIP page lies within 150 m and names
+    the same site: `public.dc_names_same_site` (same brand by the first word of the name or operator, AND the
+    same name without bracketed text OR a shared site code such as IAD55, SV9, CH4). One-to-one, and applied
+    after membership, so a twin on another page never hides a pin. Distance alone never decides: WA12/WA13,
+    Equinix SV1/SV5, NTT CH1/CH2 stay separate (different codes). Measured read-only 2026-10-23: 46
+    name-matched pairs within 150 m, 44 one-to-one, all the same building (2–147 m apart); Stack POR03 (two
+    canonical twins) keeps both. Ships through `dc-osm-dedupe-apply.yml` (offline proof + a gate on a replica
+    of today's production + typed confirm `APPLY-OSM-DEDUPE`; rollback `ROLLBACK-OSM-DEDUPE`). The C3c and C7
+    tools are frozen and their offline proofs pinned to `4e91e9d2`, the last commit with the reader they shipped.
 - **Retired:** `national_dc_for_zip` (the 5-mile centroid radius) and `national_dc_zip_members`
   are service-role only; no resident role may execute either.
 - **Measured 2026-09-22 over all 12,722 pages**, against the reader it replaced: pages with any

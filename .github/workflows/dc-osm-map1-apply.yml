@@ -61,7 +61,12 @@ jobs:
       PGUSER: supabase_admin
       PGPASSWORD: postgres
     steps:
+      # PINNED (2026-10-23) to 4e91e9d2, the last main commit whose Map 1 reader is the one this tool was
+      # applied against (C3c OSM address check on Map 1). The founder's same-building ruling then moved the reader in the DDL of
+      # record, so the proof runs against the DDL it was written for; the artifacts are frozen.
       - uses: actions/checkout@v4
+        with:
+          ref: 4e91e9d2986d32601dd5f40703c003a8f143b18c
       - name: Install psql client
         run: |
           set -euo pipefail

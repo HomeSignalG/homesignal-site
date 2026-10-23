@@ -67,12 +67,60 @@
 --   match: "Vantage WA12" and "Vantage WA13" are 166 m apart with one operator and are two
 --   buildings. An ambiguous pair keeps both markers — dropping existing coverage is the worse
 --   failure during a migration.
+--   ⚖️ WIDENED BY FOUNDER RULING 2026-10-23 ("b"): an OSM pin is ALSO hidden when, on the SAME ZIP
+--   page, exactly one published canonical pin lies within 150 m and names the same site
+--   (public.dc_names_same_site: same brand by the first word of the name or of the operator, AND
+--   either the same name once bracketed text is dropped, or a shared site code such as IAD55, SV9,
+--   CH4, DFW01). One-to-one again: an OSM pin with two such canonical twins, or a canonical pin
+--   with two such OSM twins, keeps every marker. Distance alone never decides it: Vantage WA12 /
+--   WA13 (166 m, one operator) and Equinix SV1 / SV5, NTT CH1 / CH2 stay separate because their
+--   codes differ. It runs AFTER membership, so an OSM pin is hidden only by a twin that is itself
+--   drawn on this page. Measured 2026-10-23 (read-only, production): 46 name-matched pairs within
+--   150 m, 44 one-to-one, every one the same building (2 m to 147 m apart).
 --
 -- This function reads the private dc_* planes as SECURITY DEFINER and exposes only the columns
 -- below. No resident role holds any grant on a dc_* relation.
 -- =====================================================================================
 
 begin;
+
+-- ONE SAME-SITE NAME RULE (founder ruling 2026-10-23). Pure text, no geography: the reader decides
+-- distance and page membership; this decides only whether two published names describe the same site.
+create or replace function public.dc_names_same_site(a_name text, a_operator text,
+                                                     b_name text, b_operator text)
+returns boolean
+language sql
+immutable
+parallel safe
+set search_path to 'pg_catalog'
+as $fn$
+  select coalesce(
+           -- the same brand: the first word of the names, or of the operators, agree
+           (s.ta[1] = s.tb[1] or s.oa[1] = s.ob[1])
+           -- and the same site: the same name once bracketed text is dropped, or a shared site code
+           and ((s.na <> '' and s.na = s.nb)
+                or exists (select 1 from unnest(s.ta) x
+                            where x ~ '^[a-z]{2,5}[0-9]{1,3}[a-z]?$' and x = any (s.tb))),
+           false)
+    from (select
+            array_remove(regexp_split_to_array(lower(coalesce(a_name, '')), '[^a-z0-9]+'), '') as ta,
+            array_remove(regexp_split_to_array(lower(coalesce(b_name, '')), '[^a-z0-9]+'), '') as tb,
+            array_remove(regexp_split_to_array(lower(coalesce(a_operator, '')), '[^a-z0-9]+'), '') as oa,
+            array_remove(regexp_split_to_array(lower(coalesce(b_operator, '')), '[^a-z0-9]+'), '') as ob,
+            array_to_string(array_remove(regexp_split_to_array(
+              lower(regexp_replace(coalesce(a_name, ''), '\([^)]*\)', '', 'g')), '[^a-z0-9]+'), ''), ' ') as na,
+            array_to_string(array_remove(regexp_split_to_array(
+              lower(regexp_replace(coalesce(b_name, ''), '\([^)]*\)', '', 'g')), '[^a-z0-9]+'), ''), ' ') as nb) s
+$fn$;
+
+revoke all on function public.dc_names_same_site(text, text, text, text) from public;
+revoke all on function public.dc_names_same_site(text, text, text, text) from anon, authenticated;
+
+comment on function public.dc_names_same_site(text, text, text, text) is
+  'Same brand (first word of the names or of the operators) AND same site (same name without '
+  'bracketed text, or a shared site code like IAD55). Used only by public.map1_dc_zip_members to '
+  'hide an OSM pin whose one canonical twin on the same ZIP page lies within 150 m. '
+  'docs/map1-dc-publication.sql.';
 
 create or replace function public.map1_dc_zip_members(p_zip text)
 returns table(source_key text, source_name text, source_url text, source_licence text,
@@ -219,9 +267,27 @@ as $function$
                                 p.positional_uncertainty_m))
            end as zcta_hits
       from pool p, bb),
+  admitted as (select * from judged where verdict = 'member' and zcta_hits <= 1),
+  -- SAME BUILDING, NEARBY (founder ruling 2026-10-23, see header): an OSM pin and a canonical pin
+  -- drawn on THIS page, within 150 m, whose names describe the same site.
+  same_site as (
+    select o.source_key as osm_key, c.source_key as canon_key
+      from admitted o
+      join admitted c
+        on o.publication_basis = 'legacy_osm_compat'
+       and c.publication_basis = 'canonical'
+       and 150 >= ST_DistanceSphere(ST_MakePoint(c.lng, c.lat), ST_MakePoint(o.lng, o.lat))
+       and public.dc_names_same_site(o.project_name, o.developer_or_operator,
+                                     c.project_name, c.developer_or_operator)),
+  -- one-to-one only: an ambiguous pairing keeps every marker
+  osm_twin as (
+    select s.osm_key from same_site s
+     where (select count(*) from same_site s2 where s2.osm_key = s.osm_key) = 1
+       and (select count(*) from same_site s3 where s3.canon_key = s.canon_key) = 1),
   members as (
-    select * from judged where verdict = 'member' and zcta_hits <= 1
-     order by source_key collate "C"
+    select a.* from admitted a
+     where a.source_key not in (select osm_key from osm_twin)
+     order by a.source_key collate "C"
      limit (select n + 1 from lim)),
   counted as (select count(*) over () as total, members.* from members)
   select c.source_key, c.source_name, c.source_url, c.source_licence, c.project_name,

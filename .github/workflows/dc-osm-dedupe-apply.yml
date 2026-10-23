@@ -1,0 +1,174 @@
+name: dc-osm-dedupe-apply
+
+# The founder's same-building ruling (2026-10-23, "b"): an OpenStreetMap pin is hidden when exactly one
+# canonical pin drawn on the same ZIP page lies within 150 m and names the same site (same brand AND the same
+# name or a shared site code). docs/dc-osm-dedupe-apply.sql adds public.dc_names_same_site and the new
+# map1_dc_zip_members body. No pin moves; OSM stays a separate layer.
+#
+#   offline  (every PR + dispatch) the gate and the apply script proven on a disposable stand-in: the gate
+#            passes on the real artifact and REFUSES a consistently wrong one; drift, bounded lock wait,
+#            apply, repeat refusal, rollback byte for byte, re-apply (test/map1_dc_publication_pg/dedupe_offline.sh);
+#   gate     (dispatch from main) scripts/dc-osm-dedupe-gate.sh on TODAY's production data, production only
+#            read, the change applied to a replica: removals equal an independent prediction exactly, no pin
+#            moved, no row added, canonical rows untouched;
+#   apply    needs BOTH, in the SAME run, and the typed confirmation APPLY-OSM-DEDUPE;
+#   rollback needs offline and ROLLBACK-OSM-DEDUPE.
+# A dispatch with any other confirm string runs offline + gate only: the rehearsal on production data.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'APPLY-OSM-DEDUPE gates then applies; ROLLBACK-OSM-DEDUPE withdraws it; anything else runs the offline proof + the gate (rehearsal) only'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - 'scripts/dc-osm-dedupe-apply.sh'
+      - 'scripts/dc-osm-dedupe-gate.sh'
+      - 'scripts/dc_osm_dedupe_gate.py'
+      - 'docs/dc-osm-dedupe-apply.sql'
+      - 'docs/dc-osm-dedupe-rollback.sql'
+      - 'docs/dc-step3d-derived-location.sql'
+      - 'docs/dc-step3b-canonical-geography.sql'
+      - 'docs/map1-dc-publication.sql'
+      - 'test/map1_dc_publication_pg/**'
+      - 'test/dc_osm_layer_pg/**'
+      - '.github/workflows/dc-osm-dedupe-apply.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dc-osm-dedupe-apply
+  cancel-in-progress: false
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: The artifact is what its generator emits from the DDL of record
+        run: python3 test/map1_dc_publication_pg/build_osm_dedupe.py --check
+      - name: The gate's independent rule passes its self-test
+        run: python3 scripts/dc_osm_dedupe_gate.py --self-test
+      - name: Offline proof of the gate and the apply script
+        env:
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash test/map1_dc_publication_pg/dedupe_offline.sh
+
+  gate:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm != 'ROLLBACK-OSM-DEDUPE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      # the replica the change is rehearsed on (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: supabase_admin
+      PGPASSWORD: postgres
+    steps:
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - uses: actions/checkout@v4
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: THE GATE on today's production data (production only read; the change applied to a replica)
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGOPTIONS: '-c client_min_messages=warning'
+        run: bash scripts/dc-osm-dedupe-gate.sh
+
+  apply:
+    needs: [offline, gate]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'APPLY-OSM-DEDUPE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: APPLY the same-building rule in production
+        env:
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-osm-dedupe-apply.sh
+
+  rollback:
+    needs: offline
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm == 'ROLLBACK-OSM-DEDUPE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the definition-parity replica (production's own database build)
+      postgis:
+        image: supabase/postgres:17.6.1.127
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres" --health-interval 5s --health-timeout 5s --health-retries 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          [ "${GITHUB_REF}" = "refs/heads/main" ] || { echo "REFUSED: ${GITHUB_REF} is not main"; exit 1; }
+      - name: Install psql client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: ROLL BACK the same-building rule in production
+        env:
+          DCD_MODE: rollback
+          PROD_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/dc-osm-dedupe-apply.sh
