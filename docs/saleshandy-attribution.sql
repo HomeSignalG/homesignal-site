@@ -26,10 +26,10 @@ alter table public.events add column if not exists ref_content  text;
 
 alter table public.events drop constraint if exists events_ref_labels_bounded;
 alter table public.events add constraint events_ref_labels_bounded check (
-  (ref_source   is null or ref_source   ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_medium   is null or ref_medium   ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_campaign is null or ref_campaign ~ '^[a-z0-9._~:/-]{1,80}$') and
-  (ref_content  is null or ref_content  ~ '^[a-z0-9._~:/-]{1,80}$'));
+  (ref_source   is null or ref_source   ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_medium   is null or ref_medium   ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_campaign is null or ref_campaign ~ '^[a-z0-9._~:/_-]{1,80}$') and
+  (ref_content  is null or ref_content  ~ '^[a-z0-9._~:/_-]{1,80}$'));
 
 create index if not exists events_ref_campaign_idx
   on public.events (ref_campaign, event_type, created_at) where ref_campaign is not null;
@@ -44,7 +44,7 @@ create schema if not exists outreach;
 create table if not exists outreach.saleshandy_campaign (
   sh_campaign_id text primary key,                       -- Saleshandy's own id, as text
   campaign_key   text not null unique
-                 check (campaign_key ~ '^[a-z0-9._~:/-]{1,80}$'),
+                 check (campaign_key ~ '^[a-z0-9._~:/_-]{1,80}$'),
   name           text not null,
   status         text,
   first_seen_at  timestamptz not null default now(),
@@ -63,6 +63,21 @@ create table if not exists outreach.saleshandy_campaign_daily (
   synced_at      timestamptz not null default now(),
   primary key (sh_campaign_id, stat_date)
 );
+
+
+-- Lifetime snapshots (Saleshandy's /analytics/stats returns LIFETIME totals, never daily history).
+-- Mirror of homesignal-ingest supabase/migrations/20261023220000_saleshandy_stats_snapshot.sql.
+create table if not exists outreach.saleshandy_stats_snapshot (
+  sh_campaign_id text not null references outreach.saleshandy_campaign (sh_campaign_id),
+  snapshot_date  date not null,
+  scheduled integer not null check (scheduled >= 0), delivered integer not null check (delivered >= 0),
+  bounced integer not null check (bounced >= 0), failed integer not null check (failed >= 0),
+  contacted integer not null check (contacted >= 0), unsubscribed integer not null check (unsubscribed >= 0),
+  replied integer check (replied >= 0), synced_at timestamptz not null default now(),
+  primary key (sh_campaign_id, snapshot_date));
+alter table outreach.saleshandy_stats_snapshot enable row level security;
+revoke all on outreach.saleshandy_stats_snapshot from public, anon, authenticated;
+grant select, insert, update on outreach.saleshandy_stats_snapshot to service_role;
 
 -- One row per sync attempt: the heartbeat and the evidence of what a run read.
 create table if not exists outreach.saleshandy_sync_run (
@@ -112,17 +127,15 @@ begin
   since_ts   := now() - make_interval(days => d);
   since_date := (now() - make_interval(days => d))::date;
 
-  with sh as (
+  with latest as (
+    select distinct on (sh_campaign_id) * from outreach.saleshandy_stats_snapshot order by sh_campaign_id, snapshot_date desc
+  ),
+  sh as (
     select c.campaign_key, c.name, c.status,
-           coalesce(sum(s.sent), 0)::bigint         as sent,
-           coalesce(sum(s.bounced), 0)::bigint      as bounced,
-           coalesce(sum(s.unsubscribed), 0)::bigint as unsubscribed,
-           case when bool_or(s.replied is not null) then sum(s.replied) end as replied,
-           max(s.stat_date)                         as newest_stat_date
+           l.delivered, l.bounced, l.failed, l.unsubscribed, l.scheduled, l.contacted, l.replied,
+           l.snapshot_date as newest_stat_date
     from outreach.saleshandy_campaign c
-    left join outreach.saleshandy_campaign_daily s
-           on s.sh_campaign_id = c.sh_campaign_id and s.stat_date >= since_date
-    group by c.campaign_key, c.name, c.status
+    left join latest l on l.sh_campaign_id = c.sh_campaign_id
   ),
   ev as (
     select e.ref_campaign as k,
@@ -162,9 +175,13 @@ begin
         'campaign',      k.k,
         'name',          sh.name,
         'status',        sh.status,
-        'sent',          coalesce(sh.sent, 0),
-        'bounced',       coalesce(sh.bounced, 0),
-        'unsubscribed',  coalesce(sh.unsubscribed, 0),
+        'scope',         'lifetime',
+        'delivered',     sh.delivered,
+        'bounced',       sh.bounced,
+        'failed',        sh.failed,
+        'unsubscribed',  sh.unsubscribed,
+        'scheduled',     sh.scheduled,
+        'contacted',     sh.contacted,
         'replied',       sh.replied,
         'newest_stat_date', sh.newest_stat_date,
         'visitors',      coalesce(ev.visitors, 0),
@@ -172,7 +189,7 @@ begin
         'reports',       coalesce(ev.reports, 0),
         'registrations', coalesce(us.registrations, 0),
         'paying',        coalesce(paid.paying, 0)
-      ) order by coalesce(sh.sent, 0) desc, k.k collate "C")
+      ) order by coalesce(sh.delivered, 0) desc, k.k collate "C")
       from keys k
       left join sh   on sh.campaign_key = k.k
       left join ev   on ev.k = k.k
