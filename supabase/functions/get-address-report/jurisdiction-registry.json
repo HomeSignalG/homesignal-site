@@ -3562,10 +3562,14 @@
       ],
       "column_map": {
         "title": [
-          "PERMIT_SUBTYPE",
-          "JOB_DESCRIPTION"
+          "JOB_DESCRIPTION",
+          "PERMIT_CATEGORY"
         ],
-        "type_source": "PERMIT_SUBTYPE",
+        "type_source": [
+          "PERMIT_SUBTYPE",
+          "PERMIT_TYPE",
+          "PERMIT_CATEGORY"
+        ],
         "file_date": "ISSUE_DATE",
         "address": "PRIMARY_ADDRESS",
         "lat": "LAT",
@@ -3574,25 +3578,54 @@
         "record_url": "ACCELA_CITIZEN_ACCESS_URL"
       },
       "file_date_kind": "issued",
-      "include_types": [
-        "Building Permits",
-        "Commercial",
-        "Install Permits",
-        "Residential",
-        "Fire Permits"
-      ],
       "type_map": {
-        "Building Permits": "Development",
-        "Commercial": "Commercial",
-        "Install Permits": "Development",
-        "Residential": "Residential",
-        "Fire Permits": "Development"
+        "Building Permits Construction Project Residential Building": "Residential",
+        "Building Permits Construction Project Residential Electrical": "Residential",
+        "Building Permits Construction Project Residential Plumbing": "Residential",
+        "Building Permits Construction Project Residential HVAC": "Residential",
+        "Residential Building Permit New": "Residential",
+        "Residential Building Permit Board-ups": "Residential",
+        "Residential Building Permit HVAC and Refrigeration": "Residential",
+        "Residential Building Permit Plumbing": "Residential",
+        "Residential Building Permit Electrical": "Residential",
+        "Building Permits Construction Project Commercial Building": "Commercial",
+        "Commercial Building Permit New": "Commercial",
+        "Commercial Building Permit Board-ups": "Commercial",
+        "Building Permits Construction Project Commercial Electrical": "other project",
+        "Building Permits Construction Project Commercial HVAC": "other project",
+        "Building Permits Construction Project Commercial Plumbing": "other project",
+        "Commercial Building Permit HVAC and Refrigeration": "other project",
+        "Commercial Building Permit Electrical": "other project",
+        "Commercial Building Permit Plumbing": "other project",
+        "Install Permits Construction Project Elevator Dumbwaiter": "Development",
+        "Install Permits Construction Project Escalator Moving Walk": "Development",
+        "Fire Permits Construction Project Fire Suppression Systems": "Development"
+      },
+      "commercial_work_evidence": {
+        "column": "JOB_DESCRIPTION",
+        "qualifying": [
+          "New Building",
+          "New Construction",
+          "Addition to an existing building",
+          "Addition",
+          "Foundation",
+          "Foundation Only",
+          "Alteration",
+          "Interior Only Remodel",
+          "Exterior only remodel",
+          "Interior/Exterior Remodel",
+          "Add or change existing construction elements",
+          "Site Work Only",
+          "Site Development"
+        ],
+        "note": "PERMIT_CATEGORY carries the building class; JOB_DESCRIPTION is the work. Signs, fences, tents and special events, board-ups, demolitions, correct-violation, change-of-use and establish-use permits with no work are not qualifying commercial work. Commercial trade permits (electrical, HVAC, plumbing) are typed Development, so they never reach this gate."
       },
       "status_const": "Issued",
-      "extra_where": "PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL",
+      "extra_where": "PERMIT_TYPE IN ('Building Permit','Construction Project') AND ISSUE_DATE IS NOT NULL AND PERMIT_SUBTYPE IN ('Building Permits','Commercial','Install Permits','Residential','Fire Permits')",
       "recency_days": 365,
       "spatial_zip_radius_mi": 3,
       "_receipts": [
+        "RETYPED BY BUILDING CLASS 2026-10-22 (the founder's Columbus ruling, 'hide repairs', applied to Cleveland). Measured live in this entry's own scope (the extra_where above, ISSUE_DATE >= 2025-10-22; 15 pg_net pages, 14,301 rows, 14,301 distinct OBJECTIDs; 88 (subtype, type, category, job) groups, md5 044acbe556c1b98f4916148cd8f90703 sorted collate C). The Type comes from PERMIT_SUBTYPE + PERMIT_TYPE + PERMIT_CATEGORY (21 keys): the subtype alone ('Building Permits', 57%) names no class, the category does ('Residential Building', 'Commercial Electrical'). PERMIT_TYPE sits in the middle on purpose: 'Residential New' or 'New Residential' would read to the shared Residential rule as a new-home statement, and the old-style category 'New' is not one (Residential/New is mostly Alteration). Commercial electrical/HVAC/plumbing keys are 'other project' (terminal): typed as the generic Development they fell to the name rules, which read 'Commercial Electrical' in the title and drew 1,626 trade permits as Commercial. The subtype whitelist moved unchanged into extra_where. Result through the shipped rule: 79 new homes drawn as Residential (49 'New Building' + 30 'New Construction'), 739 Commercial, 2,874 Other project, 10,609 repair, trade, board-up and fence permits on homes hidden (before: Residential 40, Commercial 978, Other project 10,787, hidden 2,496). Test: test/cleveland-retype-2026-10-22.test.mjs.",
         "probed",
         "fresh",
         "issuance_ledger",
@@ -3613,8 +3646,7 @@
         ],
         "operating": [],
         "exclude": []
-      },
-      "observed_types_unreviewed": []
+      }
     },
     {
       "registry_id": "nashville-building-permits-issued",

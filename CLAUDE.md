@@ -3525,6 +3525,15 @@ Scope: the 335 existing Ohio ZIP pages, 10 counties. All 335 `boundary_complete`
     the connector's own scope, 15,535 permits: the 1,366 new homes are drawn as Residential, 3,019 pins in
     all stay visible (Commercial 1,201, Other project 452), and 12,516 repair/alteration permits on
     existing homes are hidden. Test: `test/columbus-retype-2026-10-21.test.mjs`. Cleveland is not changed.
+  - ✅ **CLEVELAND DONE 2026-10-22 (same ruling).** Type from the joined key PERMIT_SUBTYPE +
+    PERMIT_TYPE + PERMIT_CATEGORY (21 keys); the subtype whitelist moved verbatim into `extra_where`;
+    Commercial gated on JOB_DESCRIPTION. Measured in the connector's own scope, 14,301 permits (88 groups,
+    md5 `044acbe5…`): Residential 40 → 79 (only real new homes), Commercial 978 → 739, Other project
+    10,787 → 2,874, hidden 2,496 → 10,609. PERMIT_TYPE sits in the middle of the key on purpose: a
+    "Residential New" type_raw alone reads as a new home and would draw every Residential/New alteration.
+    🔑 Commercial electrical/HVAC/plumbing keys are `other project` (terminal), not `Development`: a
+    generic Type falls to the name rules, which read "Commercial Electrical" in the title and drew
+    1,626 trade permits as Commercial. Test: `test/cleveland-retype-2026-10-22.test.mjs`.
 - **Freshness:** Columbus / Cleveland / Cincinnati newest filings 2026-10-17 / 10-17 / 10-16; 330 of 335
   reports refreshed in 72 h; 45107 last written 2026-10-12 (re-attempted 10-19). Summit County Planning
   Commission's 1,825-day window and "Submitted for county review" are the PA Act 247 ruling, unchanged.
