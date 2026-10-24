@@ -38,10 +38,12 @@ ok(state(Object.assign({}, revised, { file_decisions: { short1: Object.assign({}
 // 2. what each state shows
 const h = (p) => Y.render([p]);
 const rejHtml = h(base({ file_decisions: { short1: rej } }));
-ok(rejHtml.includes('Generate Revised Video') && rejHtml.includes('Generate Revised Thumbnail') === false, '2a: a rejected video offers "Generate Revised Video" under the saved note');
+ok(rejHtml.includes('Generate Revised Video') && rejHtml.includes('value="The narrator mispronounces the word &quot;noise&quot;."'), '2a: a rejected video offers "Generate Revised Video" under the saved note');
 ok(rejHtml.includes('value="The narrator mispronounces the word &quot;noise&quot;."') && rejHtml.includes('yv-fsavenote'), '2b: the saved note is shown, editable, and re-savable');
 ok(h(base({ file_decisions: { thumbnail: { status: 'rejected', note: 'text too small' } } })).includes('Generate Revised Thumbnail'), '2c: a rejected thumbnail offers "Generate Revised Thumbnail"');
-ok(!h(base({ file_decisions: { short1: { status: 'rejected' } } })).includes('Generate Revised Video'), '2d: no button without a saved note');
+const allKinds = h(base({ file_decisions: { final: { status: 'approved' }, short2: { status: 'approved' }, thumbnail: { status: 'approved' }, short1: { status: 'rejected' } } }));
+ok((allKinds.match(/yv-revise yv-revise-now/g) || []).length === 4, '2d: the Generate button is visible on EVERY asset, approved or rejected (founder: visible on all assets)');
+ok((h(base({})).match(/yv-revise yv-revise-now/g) || []).length === 4, '2d2: and on every asset still awaiting review');
 const genHtml = h(base({ file_decisions: { short1: rej }, revisions: [rev({ status: 'running' })] }));
 ok(genHtml.includes('Generating Revision') && genHtml.includes('You can leave this page') && genHtml.includes('yv-rcancel'), '2f: generating shows progress, reassurance and Cancel');
 const shortTile = genHtml.slice(genHtml.indexOf('data-key="short1"'), genHtml.indexOf('data-key="short2"'));
