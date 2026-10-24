@@ -2,7 +2,9 @@
 // EXTERNAL ingest heartbeat check — runs in homesignal-site (PUBLIC, free Actions) so it survives
 // whatever stops the private homesignal-ingest repo.
 //
-// Reads public.ingest_run_heartbeat with the PUBLIC ANON KEY. No PAT, no write key, no GitHub API.
+// Reads the newest heartbeat time with the PUBLIC ANON KEY through rpc/ingest_heartbeat_latest
+// (docs/ingest-heartbeat-latest.sql). The anon key cannot read the table itself since the
+// 2026-09-26 lockdown. No PAT, no write key, no GitHub API.
 // Evaluation logic and its self-tests: scripts/lib/ingest-heartbeat.mjs + test/ingest-heartbeat.test.mjs
 //
 // Exit 0 = healthy. Exit 1 = alarm (fails the scheduled workflow, which is the alarm channel).
@@ -19,35 +21,33 @@ if (!SUPABASE_ANON_KEY) {
   process.exit(1);
 }
 
-const url = `${SUPABASE_URL}/rest/v1/ingest_run_heartbeat`
-  + `?workflow=eq.${encodeURIComponent(WORKFLOW)}`
-  + `&select=finished_at,run_id,rows_written`
-  + `&order=finished_at.desc&limit=1`;
+const url = `${SUPABASE_URL}/rest/v1/rpc/ingest_heartbeat_latest`;
 
-let rows;
+let latestFinished;
 try {
   const r = await fetch(url, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    method: 'POST',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+               'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_workflow: WORKFLOW }),
   });
   if (!r.ok) {
     console.error(`FAIL: heartbeat read returned HTTP ${r.status} — ${await r.text()}`);
     process.exit(1);   // unreadable is an alarm, for the same reason as above
   }
-  rows = await r.json();
+  latestFinished = await r.json();   // a timestamp string, or null when no run is recorded
 } catch (e) {
   console.error(`FAIL: heartbeat read threw — ${e.message}`);
   process.exit(1);
 }
 
-const latest = Array.isArray(rows) && rows.length ? rows[0] : null;
 const res = evaluateHeartbeat({
   now: new Date(),
-  latestFinished: latest?.finished_at,
+  latestFinished: typeof latestFinished === 'string' ? latestFinished : null,
   thresholdHours: Number(process.env.HEARTBEAT_THRESHOLD_HOURS) || HEARTBEAT_THRESHOLD_HOURS,
 });
 
 console.log(`workflow=${WORKFLOW} state=${res.state} ${res.reason}`);
-if (latest) console.log(`  newest run_id=${latest.run_id ?? '(none)'} rows_written=${latest.rows_written ?? '(none)'}`);
 
 if (!res.ok) {
   // GitHub renders ::error:: at the top of the run AND in the failure email.
