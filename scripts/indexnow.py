@@ -324,6 +324,15 @@ def unsent_paths(repo, current_run, *, gh=default_gh, now=None):
             except Exception as e:                                  # expired artifact: say so, move on
                 print(f"::warning::run {run['id']}: its IndexNow job failed but its delta cannot be read ({redact(e, '')})")
                 continue
+        # A run HELD as a mass change failed on purpose: it waits for a person to send it with
+        # indexnow-resubmit (allow_mass_change=true). Carrying its URLs made every later build a
+        # mass change too, so one template change held IndexNow indefinitely (2026-10-23/24: the
+        # footer change of run 40009064434 kept every later build held for 20+ hours).
+        if mass_change(delta):
+            print(f"::warning::run {run['id']}: its IndexNow job was held as a mass change "
+                  f"({len(delta.get('submit') or [])} URLs); not carried. Send it with indexnow-resubmit "
+                  f"run_id={run['id']} allow_mass_change=true if it should be announced.")
+            continue
         out.update(p for p in delta.get("submit") or [] if ps.family_of(p))
     return sorted(out)
 

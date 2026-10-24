@@ -328,6 +328,13 @@ const c6 = carry([R(201, 1)], { 201: jb('failure') }, {}).v;
 ok(c6 && c6.got.length === 0, 'B6 an expired delta artifact is skipped with a warning, not a crash');
 const c7 = carry([R(201, 1)], { 201: jb('failure') }, { 201: { submit: ['/community/00001/', '/homesignalmap.html?zip=1', '/x/'] } }).v;
 ok(c7 && JSON.stringify(c7.got) === '["/community/00001/"]', 'B7 only canonical paths survive the carry-over');
+const big = Array.from({ length: 1500 }, (_, i) => `/community/${String(10000 + i)}/`);
+const c7b = carry([R(203, 1), R(202, 2), R(201, 3), R(199, 9)],
+  { 203: jb('failure'), 202: jb('failure'), 201: jb('failure'), 199: jb('success') },
+  { 203: { submit: big, candidate_pages: 2000 }, 202: { submit: ['/community/00002/'], candidate_pages: 2000 },
+    201: { submit: big, candidate_pages: 2000 } }).v;
+ok(c7b && JSON.stringify(c7b.got) === '["/community/00002/"]' && c7b.downloads.join() === '203,202,201',
+   'B7b a run HELD as a mass change is not carried (it waits for indexnow-resubmit), while an ordinary failed run beside it still is');
 const m1 = J(`
 d = {'seed': False, 'submit': ['/community/00003/']}
 print(json.dumps([ix.merge_backlog(dict(d), ['/community/00002/', '/community/00003/', '/nope/'])['submit'],
