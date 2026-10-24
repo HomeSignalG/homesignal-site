@@ -31,6 +31,9 @@ ok(html.includes('Nothing here is published'), '2c: the page says nothing is pub
 ok(Y.render([]).includes('No videos have been uploaded'), '2d: an empty list says so');
 ok(Y.render([Object.assign({}, row, { status: 'approved', decided_by: 'a@b.c', decided_at: '2026-10-23T21:00:00Z' })]).includes('Approved by you'), '2e: an approved project says so');
 
+const thumbTile = (html.match(/<div class="yv-file yv-thumbwrap"[\s\S]*?<\/div><\/div>[\s\S]*?(?=<\/div><details)/) || [''])[0];
+ok(/data-path="port-x\/thumbnail\.png"/.test(thumbTile) && thumbTile.includes('class="yv-dl"'), '2j: the thumbnail tile has its own Download button');
+ok(!Y.render([Object.assign({}, row, { files: Object.assign({}, row.files, { thumbnail: null }) })]).match(/yv-thumbwrap"[^>]*>[\s\S]*?class="yv-dl"[\s\S]*?<details/), '2k: no Download button when no thumbnail is uploaded');
 
 // 2b. per-file review
 const fRow = Object.assign({}, row, { title: 'Blair', file_decisions: { final: { status: 'approved', decided_at: '2026-10-24T13:00:00Z', decided_by: 'a@b.c' }, short1: { status: 'rejected', note: 'mispronounces <b>noise</b>' } } });
