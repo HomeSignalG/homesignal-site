@@ -31,18 +31,29 @@ ok(html.includes('Nothing here is published'), '2c: the page says nothing is pub
 ok(Y.render([]).includes('No videos have been uploaded'), '2d: an empty list says so');
 ok(Y.render([Object.assign({}, row, { status: 'approved', decided_by: 'a@b.c', decided_at: '2026-10-23T21:00:00Z' })]).includes('Approved by you'), '2e: an approved project says so');
 
+
+// 2b. per-file review
+const fRow = Object.assign({}, row, { title: 'Blair', file_decisions: { final: { status: 'approved', decided_at: '2026-10-24T13:00:00Z', decided_by: 'a@b.c' }, short1: { status: 'rejected', note: 'mispronounces <b>noise</b>' } } });
+const fHtml = Y.render([fRow]);
+ok((fHtml.match(/class="yv-fapprove"/g) || []).length === 4 && (fHtml.match(/class="yv-freject"/g) || []).length === 4, '2f: every file (main, both Shorts, thumbnail) has its own Approve and Reject');
+ok(fHtml.includes('mispronounces &lt;b&gt;noise&lt;/b&gt;') && !fHtml.includes('<b>noise</b>'), '2g: a per-file note is shown and escaped');
+ok(fHtml.includes('1 of 4 files approved, 1 rejected'), '2h: the header summarises the per-file decisions');
+ok(!/class="yv-approve"|class="yv-reject"/.test(fHtml), '2i: there is no whole-package Approve / Reject any more');
+
 // 3. no publish capability, no key
 ok(!/googleapis|youtube\.com\/upload|oauth|api[_-]?key|service_role/i.test(js), '3: the tab has no YouTube API call and no key');
-ok(/hs_youtube_videos_list/.test(js) && /hs_youtube_video_decide/.test(js), '3b: it talks to exactly the two gated functions');
+ok(/hs_youtube_videos_list/.test(js) && /hs_youtube_video_file_decide/.test(js) && !/hs_youtube_video_decide/.test(js), '3b: it talks to exactly the two gated functions');
 
 // 4. SQL of record
 ok(/'jody-videos', 'jody-videos', false/.test(sql), '4a: the bucket is private');
 const code = sql.replace(/--.*$/gm, '');
-ok(/for select to authenticated[\s\S]{0,200}hs_is_dashboard_admin\(\)/.test(code) && !/for (insert|update|delete|all)/i.test(code), '4b: only a dashboard-admin SELECT policy exists on the bucket');
+ok(/for select to authenticated[\s\S]{0,200}hs_is_dashboard_admin\(\)/.test(code) && !/create policy[^;]*for (insert|update|delete|all)/i.test(code), '4b: only a dashboard-admin SELECT policy exists on the bucket');
 ok(/function public\.hs_is_dashboard_admin\(\)[\s\S]{0,200}security definer[\s\S]{0,400}dashboard_admins da where da\.email = \(auth\.jwt\(\) ->> 'email'\)/.test(code) && /revoke all on function public\.hs_is_dashboard_admin\(\) from public, anon/.test(code) && !/jody_videos_admin_read[\s\S]{0,200}from public\.dashboard_admins/.test(code), '4b2: the policy asks a security-definer helper (authenticated has no SELECT on dashboard_admins), anon cannot run it');
 ok(/enable row level security/.test(sql) && /revoke all on public\.youtube_video_reviews from public, anon, authenticated/.test(sql), '4c: the table is RLS-on with no direct grants');
 ok((sql.match(/dashboard_admins da where da\.email = caller_email/g) || []).length === 2, '4d: both functions check dashboard_admins');
-ok(/revoke all on function public\.hs_youtube_videos_list\(\) from public, anon/.test(sql) && /grant execute on function public\.hs_youtube_video_decide\(text, text, text\) to authenticated/.test(sql), '4e: anon cannot run either function');
+ok(/revoke all on function public\.hs_youtube_videos_list\(\) from public, anon/.test(sql) && /grant execute on function public\.hs_youtube_video_file_decide\(text, text, text, text\) to authenticated/.test(sql), '4e: anon cannot run either function');
 ok(/status in \('pending', 'approved', 'rejected'\)/.test(sql), '4f: status vocabulary is closed');
+ok(/function public\.hs_youtube_video_file_decide[\s\S]*?p_key not in \('final', 'short1', 'short2', 'thumbnail'\)/.test(sql) && /drop function if exists public\.hs_youtube_video_decide/.test(sql), '4g: one per-file function with a closed key set; the whole-package function is dropped');
+ok(/overall := 'rejected'[\s\S]*overall := 'approved'[\s\S]*overall := 'pending'/.test(sql), '4h: the overall status is derived in the function');
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
