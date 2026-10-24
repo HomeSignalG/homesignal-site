@@ -287,7 +287,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
-<script src="lib/acq-youtube-videos.js?v=c8f26dc6"></script>
+<script src="lib/acq-youtube-videos.js?v=0ad18027"></script>
+<script src="lib/acq-bluesky-videos.js?v=7c3aed88"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -1371,7 +1372,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // BLUESKY POSTS > FAMILY > THEME. A VIEW, never a state change: these two variables
   // decide WHICH rows are listed and nothing else. No row is written, no status moves,
   // and switching filters cannot alter a draft.
-  var _bskyFamily='all';      // 'all' | 'MAPS' | 'ALERTS'
+  var _bskyFamily='all';      // 'all' | 'MAPS' | 'ALERTS' | 'VIDEOS'
+  var _bskyVideos=null;       // hs_video_jobs_list() result, or null when the video queue is not available
   var _bskyTheme=null;        // null = All Maps; otherwise a theme key
   function bskyNavBtn(scope,val,label,count,active){
     return '<button class="bsky-nav-btn" data-scope="'+scope+'" data-val="'+esc(String(val))+'" '+
@@ -1393,6 +1395,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       bskyNavBtn('family','all','All',counts.all,_bskyFamily==='all')+
       bskyNavBtn('family','MAPS','MAPS',counts.maps,_bskyFamily==='MAPS')+
       bskyNavBtn('family','ALERTS','ALERTS',counts.alerts,_bskyFamily==='ALERTS')+
+      (counts.videos==null?'':bskyNavBtn('family','VIDEOS','VIDEOS',counts.videos,_bskyFamily==='VIDEOS'))+
       '</div>';
     // The theme row appears only UNDER MAPS and is indented, so the hierarchy reads as
     // "a theme within MAPS" rather than as a third content family beside it.
@@ -1714,6 +1717,9 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         .in('status',['draft','approved']).order('scheduled_slot',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true});
       if(r.error){ body.innerHTML='<div class="muted">Queue unavailable ('+esc(r.error.message||'')+').</div>'; return; }
       var rows=r.data||[];
+      // VIDEOS: approved Main Video / Shorts, from the video outbox (hs_video_jobs_list). null = not available.
+      _bskyVideos=(window.HS&&HS.acqBlueskyVideos)?await HS.acqBlueskyVideos.fetch(window.hsClient):null;
+      var vCounts=_bskyVideos?HS.acqBlueskyVideos.counts(_bskyVideos):null;
       // Stash full rows so the edit modal can preview embed data (link card /
       // image), which lives outside post_text and isn't in the rendered DOM.
       bskyReleaseBlobs();   // revoke last render's object URLs before re-creating them
@@ -1728,14 +1734,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         liveTile('MAPS · development', nMaps, 'from Map 1 project data')+
         liveTile('ALERTS · community', rows.length-nMaps, 'from notices / meetings')+
         liveTile('Queued today', qToday, 'new drafts')+
-        liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post');
+        liveTile('Approved', rows.filter(function(p){return p.status==='approved';}).length, 'scheduled to post')+
+        (vCounts?HS.acqBlueskyVideos.metrics(_bskyVideos):'');
       // ONE PARTITION drives both the counts and the listed rows (§"count and displayed
       // rows MUST derive from the same queue result so they cannot drift").
       var buckets=(window.HS&&HS.mapsSocialThemeBuckets)
         ? HS.mapsSocialThemeBuckets(rows)
         : { all: rows.filter(function(p){return p.content_family==='MAPS';}), byTheme:{} };
       var counts={ all: rows.length, maps: buckets.all.length,
-                   alerts: rows.length-buckets.all.length, themes:{} };
+                   alerts: rows.length-buckets.all.length, themes:{}, videos: vCounts?vCounts.total:null };
       var tl=(window.HS&&HS.MAPS_SOCIAL_THEMES)||[];
       for(var ti=0;ti<tl.length;ti++){
         counts.themes[tl[ti].key]=(buckets.byTheme[tl[ti].key]||[]).length;
@@ -1747,6 +1754,13 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var zoScope=zipOrderScope();
       if(zoScope && !zoScope.order.loaded) await zipOrderLoad(zoScope);
       zipOrderRender(rows);
+      if(_bskyFamily==='VIDEOS'){
+        // The video monitor replaces the post list; it has no approve button (approval is Tab 16).
+        if(_bskyVideos){ HS.acqBlueskyVideos.mount(window.hsClient, body, _bskyVideos, refreshBluesky); }
+        else body.innerHTML='<div class="muted">The video queue is not available (it has not been set up, or this session is not a dashboard admin).</div>';
+        var stampV=document.getElementById('bsky-stamp'); if(stampV) stampV.textContent='updated '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+        return;
+      }
       var visible;
       if(_bskyFamily==='MAPS'){
         visible=_bskyTheme ? (buckets.byTheme[_bskyTheme]||[]) : buckets.all;

@@ -27,7 +27,7 @@ const row = { slug: 'port-x', title: '<img src=x onerror=alert(1)>Blair', status
 const html = Y.render([row]);
 ok(!html.includes('<img src=x') && !html.includes('<script>') && html.includes('&lt;img src=x') && html.includes('T1 &lt;b&gt;') && html.includes('D &lt;script&gt;'), '2a: titles, description and ledger are escaped');
 ok(html.includes('Waiting for your review') && html.includes('Main video') && html.includes('Short 1') && html.includes('Short 2') && html.includes('Thumbnail'), '2b: a pending project shows all four files and its status');
-ok(html.includes('Nothing here is published'), '2c: the page says nothing is published');
+ok(html.includes('Nothing here is published'), '2c: without the Bluesky queue the page says nothing is published');
 ok(Y.render([]).includes('No videos have been uploaded'), '2d: an empty list says so');
 ok(Y.render([Object.assign({}, row, { status: 'approved', decided_by: 'a@b.c', decided_at: '2026-10-23T21:00:00Z' })]).includes('Approved by you'), '2e: an approved project says so');
 

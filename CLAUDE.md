@@ -5552,3 +5552,13 @@ Every relevant PR must be reviewable against this question:
 > **Does this change preserve one canonical truth path, or does it create a shortcut/second way to decide the same fact?**
 
 If it creates a second way, reject it even if its local tests pass.
+
+---
+
+## VIDEOS -> BLUESKY QUEUE (2026-10-24) - BUILT, SQL PARKED (NOT APPLIED)
+
+Per-item approval (Main Video, Short 1, Short 2; tab 16) now creates one Bluesky job per item in `public.video_bluesky_jobs`
+(`docs/video-bluesky-queue.sql`) inside the approval's own transaction; tab 12 has a **VIDEOS** view (`lib/acq-bluesky-videos.js`) that only monitors,
+cancels and retries. There is no second approval. MAPS/ALERTS (`social_posts`, `hs_approve_social_post`) are untouched. The publisher and the full
+runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-bluesky-queue.test.mjs`, `.browser.test.mjs`, and the SQL state machine on a
+disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
