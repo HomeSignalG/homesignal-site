@@ -35,9 +35,9 @@ ok(Y.render([Object.assign({}, row, { status: 'approved', decided_by: 'a@b.c', d
 // 2b. per-file review
 const fRow = Object.assign({}, row, { title: 'Blair', file_decisions: { final: { status: 'approved', decided_at: '2026-10-24T13:00:00Z', decided_by: 'a@b.c' }, short1: { status: 'rejected', note: 'mispronounces <b>noise</b>' } } });
 const fHtml = Y.render([fRow]);
-ok((fHtml.match(/class="yv-fapprove"/g) || []).length === 4 && (fHtml.match(/class="yv-freject"/g) || []).length === 4, '2f: every file (main, both Shorts, thumbnail) has its own Approve and Reject');
+ok((fHtml.match(/class="yv-fapprove"/g) || []).length === 3 && (fHtml.match(/class="yv-freject"/g) || []).length === 3, '2f: every file still awaiting a decision (a rejected one moves to revision) has its own Approve and Reject');
 ok(fHtml.includes('mispronounces &lt;b&gt;noise&lt;/b&gt;') && !fHtml.includes('<b>noise</b>'), '2g: a per-file note is shown and escaped');
-ok(fHtml.includes('1 of 4 files approved, 1 rejected'), '2h: the header summarises the per-file decisions');
+ok(fHtml.includes('1 Approved · 1 Needs Revision · 2 Awaiting Review'), '2h: the header summarises the per-file decisions');
 ok(!/class="yv-approve"|class="yv-reject"/.test(fHtml), '2i: there is no whole-package Approve / Reject any more');
 
 // 3. no publish capability, no key

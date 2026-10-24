@@ -1,0 +1,65 @@
+name: youtube-revisions-suite
+
+# The YouTube Videos revision engine (docs/youtube-video-revisions.sql) against a DISPOSABLE Postgres: the shipped file is
+# applied twice (idempotency) and test/youtube_revisions_pg/suite.sql must pass every check (job creation, duplicate
+# clicks, dispatch, failure + retry, atomic completion, version history, other approvals untouched, publish contract,
+# sweeper, authorization). Never touches production.
+on:
+  pull_request:
+    paths:
+      - 'docs/youtube-video-revisions.sql'
+      - 'test/youtube_revisions_pg/**'
+      - '.github/workflows/youtube-revisions-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/youtube-video-revisions.sql'
+      - 'test/youtube_revisions_pg/**'
+      - '.github/workflows/youtube-revisions-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: mirror.gcr.io/library/postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: youtube_revisions_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Revision engine SQL passes (applied twice)
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: youtube_revisions_disposable
+        run: |
+          set -o pipefail
+          bash test/youtube_revisions_pg/run.sh 2>&1 | grep -v NOTICE | tee out.txt
+          ! grep -q FAIL out.txt
+          test "$(grep -c PASS out.txt)" -ge 40
