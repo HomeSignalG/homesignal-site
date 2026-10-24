@@ -1,0 +1,44 @@
+name: db-migrate-request
+
+# Step 1 of the migration runner (docs/db-migration-runner.md). Creates the DURABLE REQUEST: a GitHub issue pinned to a file, a
+# commit and a sha256. Nothing waits on it and it never expires. This workflow holds NO production credential: it reads
+# production only through the public read-only function public.migration_state(sha), with the public anon key from config.js.
+# A compromised query here cannot write, because it has nothing that can write.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql_file:
+        description: 'Committed migration, e.g. docs/video-bluesky-queue.sql'
+        required: true
+      commit:
+        description: 'Full 40-character commit that contains the file (the sha256 is pinned at this commit)'
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Make every branch visible
+        run: git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+      - name: Build the request
+        env:
+          SQL_FILE: ${{ inputs.sql_file }}
+          COMMIT: ${{ inputs.commit }}
+          REQUEST_BODY_FILE: request-body.md
+        run: python3 scripts/db_migrate.py request "$SQL_FILE" "$COMMIT"
+      - name: Open the request issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SQL_FILE: ${{ inputs.sql_file }}
+        run: |
+          gh label create migration-request --color BFD4F2 --description "Pending database migration decision" 2>/dev/null || true
+          gh issue create --title "Migration request: ${SQL_FILE}" --label migration-request --body-file request-body.md
