@@ -5518,6 +5518,20 @@ Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`
 - Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
 - `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
+## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff, SQL PARKED (not applied)
+
+A separate emotion-led story workflow: Library -> Intake -> Emotional Angles -> Script & Shorts -> Media -> Distribution ->
+Results. Page `lib/acq-impact-stories.js`; SQL of record `docs/impact-stories.sql`; engine homesignal-ingest `impact/` +
+`impact-story-job.yml`. Tabs 11 and 16 are untouched; the catalog only READS `youtube_video_reviews` slug/title.
+- Every slow action returns a job receipt (`impact_story_jobs`, one active per story, idempotency key = story|kind|version|
+  scope|pack). Versions are immutable rows; saves use an expected-version lock.
+- Approval is per artifact (angle, main, short_a, short_b, packaging) and is effective only while that artifact's md5 is
+  unchanged, the engine passed it on the current version against the current pack, and the pack is <= 30 days old.
+- ⛔ **Media review, rendering, destination approval and metrics are NOT built.** The page says so; there is no render or
+  publish button. Export is text only and unlocks when all editorial approvals are in place.
+- Apply order: merge the ingest PR (workflow on main) BEFORE applying the SQL. Tests: `test/impact_stories_pg/` (62 checks),
+  `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
