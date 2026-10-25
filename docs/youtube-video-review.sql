@@ -106,7 +106,6 @@ declare
   r public.youtube_video_reviews%rowtype;
   fd jsonb;
   overall text;
-  queue_state text;
 begin
   if caller_email is null
      or not exists (select 1 from public.dashboard_admins da where da.email = caller_email) then
@@ -149,13 +148,7 @@ begin
          decided_at = case when p_status = 'pending' then decided_at else now() end,
          decided_by = case when p_status = 'pending' then decided_by else caller_email end
    where slug = p_slug;
-  -- The approval and its Bluesky job are ONE transaction (docs/video-bluesky-queue.sql). The review row is locked above,
-  -- so two clicks or a retried call serialise here and the second finds the job already in place. Before that file is
-  -- applied the function does not exist and an approval behaves exactly as it always has.
-  if p_key in ('final', 'short1', 'short2') and to_regprocedure('public.video_bsky_sync(text,text)') is not null then
-    execute 'select public.video_bsky_sync($1, $2)' into queue_state using p_slug, p_key;
-  end if;
-  return jsonb_build_object('slug', p_slug, 'key', p_key, 'file_status', p_status, 'status', overall, 'bluesky', queue_state);
+  return jsonb_build_object('slug', p_slug, 'key', p_key, 'file_status', p_status, 'status', overall);
 end;
 $fn$;
 

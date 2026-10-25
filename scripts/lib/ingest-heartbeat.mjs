@@ -19,7 +19,8 @@
 // is RUNS, not publisher behaviour. That is what makes it separating.
 //
 // ── WHY NO PAT ───────────────────────────────────────────────────────────────────────────
-// The reader uses the PUBLIC anon key against a table with a public-select RLS policy. The writer
+// The reader uses the PUBLIC anon key through rpc/ingest_heartbeat_latest, which returns one
+// timestamp (anon cannot read the table since the 2026-09-26 lockdown). The writer
 // uses the write key the ingest run already holds. There is no credential in the detection path
 // that can die — which matters, because the account PAT was 401 throughout the outage and a
 // GitHub-API-based watchdog would have been blind exactly when it was needed.

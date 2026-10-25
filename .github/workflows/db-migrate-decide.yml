@@ -1,0 +1,58 @@
+name: db-migrate-decide
+
+# Step 2 of the migration runner (docs/db-migration-runner.md). Runs ONLY when the founder comments on a migration-request issue.
+# The execution is dispatched by the decision, not before it: nothing is waiting, so there is nothing to time out.
+#
+#   /approve <sha256> <commit> <6-digit authenticator code> [unmerged]   -> verified, then executed once
+#   /reject <reason>                                                      -> recorded, nothing runs
+#
+# issue_comment workflows run the code on the DEFAULT branch, so a branch cannot change what this job does. The write token
+# lives only in the protected environment prod-db-write. This session shares the founder's GitHub login, so the comment alone
+# proves nothing: scripts/db_migrate.py also requires a time-based one-time code derived from a seed this session never sees.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: db-migrate-decide
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    if: >-
+      github.event.issue.pull_request == null &&
+      (startsWith(github.event.comment.body, '/approve') || startsWith(github.event.comment.body, '/reject')) &&
+      (github.event.comment.user.login == github.repository_owner ||
+       contains(format(',{0},', vars.MIGRATION_APPROVERS), format(',{0},', github.event.comment.user.login)))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: prod-db-write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Make every branch visible
+        run: git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+      - name: Verify the decision and, if approved, run the migration once
+        id: decide
+        env:
+          SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MIGRATION_TOTP_SECRET: ${{ secrets.MIGRATION_TOTP_SECRET }}
+          MIGRATION_APPROVERS: ${{ vars.MIGRATION_APPROVERS }}
+          RESULT_FILE: result.md
+        run: python3 scripts/db_migrate.py decide
+      - name: Report on the request
+        if: ${{ always() && hashFiles('result.md') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          DECISION: ${{ steps.decide.outputs.decision }}
+        run: |
+          gh issue comment "$ISSUE" --body-file result.md
+          case "$DECISION" in applied|rejected) gh issue close "$ISSUE" ;; esac

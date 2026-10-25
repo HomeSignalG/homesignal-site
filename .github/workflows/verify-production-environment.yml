@@ -1,0 +1,296 @@
+name: verify-production-environment
+
+# Proves that the PROD_ secrets in the GitHub environment `production` work, without
+# printing any of them. Dispatch-only and writes nothing: the database check runs inside
+# BEGIN READ ONLY and asserts transaction_read_only = on in the same select (the production URL
+# goes through a pooler that drops PGOPTIONS, so a startup option cannot make it read-only), then
+# rolls back; every HTTP check is a GET, and no redirect is followed, so no key or token reaches
+# another URL. The database password reaches psql through PGPASSWORD, never its argument list.
+#   From main: every row must PASS, except the database URL rows, which read DEFERRED while
+#   DB_URL_DEFERRED is True and that secret is absent (see below).
+#   From any other branch: the environment must refuse the job before a runner starts (0 steps).
+#
+# The environment `production` exists (founder, 2026-10-23): deployment branches main only, no admin
+# bypass, holding PROD_SUPABASE_SERVICE_ROLE_KEY and PROD_SUPABASE_ACCESS_TOKEN. A job that names a
+# MISSING environment would create it with no protection rules, which is why this file waited for it.
+#
+# PROD_SUPABASE_DB_URL is DEFERRED (founder, 2026-10-23): the database password is not on record and
+# a reset was declined for now, so the URL could not be re-entered. While DB_URL_DEFERRED is True and
+# the secret is absent, its rows read DEFERRED (not PASS, not FAIL). Once the secret is added, the C1
+# checks run in full whatever the flag says, and the run prints a notice to remove the flag: set it to
+# False in the same PR that adds the secret. With the flag False, an absent secret FAILS as before.
+# A secret saved as blank spaces is not DEFERRED: it FAILS as "set but blank". The deferred logic is
+# run, not just read, by test/verify-production-environment-deferred.test.mjs.
+#
+# The environment line and the first step are the canonical boundary text in
+# test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.
+#
+# Every check prints expected vs observed to the log and the job summary. Observed values are only
+# HTTP codes, counts, the port, the project ref and status, the control count and the read-only
+# setting; never a secret, a response body or the database URL. A single FAIL makes the run red.
+# The anon key from config.js is the negative control, so it is first shown to be valid (it reads a
+# table with a public read policy); an invalid key would also be "refused".
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-production-environment
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    environment: { name: production, deployment: false }
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
+      # Only for config.js: the public anon key is the negative control for the service key.
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: /config.js
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Install the psql client if the runner lacks it
+        run: |
+          set -euo pipefail
+          if command -v psql >/dev/null; then psql --version; exit 0; fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql --version
+      - name: Check the PROD_ secrets (values never printed)
+        env:
+          PROD_DB_URL: ${{ secrets.PROD_SUPABASE_DB_URL }}
+          SERVICE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
+          ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 -I - <<'PY'
+          import json, os, re, subprocess, urllib.error, urllib.parse, urllib.request
+
+          REF = os.environ["PROJECT_REF"]
+          REST = "https://%s.supabase.co" % REF
+          API = "https://api.supabase.com/v1/projects/%s" % REF
+          # api.supabase.com sits behind Cloudflare, which refuses Python's default User-Agent with
+          # HTTP 403 (error 1010) before authentication. Sent on every request here.
+          UA = "HomeSignal-verify-prod/1.0 (+https://homesignal.net)"
+          # Stripped: a secret pasted with a trailing newline would otherwise fail as a malformed header.
+          RAW_DB_URL = os.environ.get("PROD_DB_URL", "")
+          DB_URL = RAW_DB_URL.strip()
+          SERVICE = os.environ.get("SERVICE_KEY", "").strip()
+          TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
+          # Founder decision 2026-10-23 (see the header): the database URL is not in the environment yet.
+          DB_URL_DEFERRED = True
+          # Decided on the RAW value: a secret saved as blank spaces is set, so it FAILS rather than
+          # reading DEFERRED.
+          deferred = DB_URL_DEFERRED and not RAW_DB_URL
+          rows = []
+
+
+          def clean(v, n=60):
+              """Observed values are codes, counts and identifiers only: keep a safe charset."""
+              return re.sub(r"[^A-Za-z0-9_.,:()<>=/*+ -]", "?", str(v))[:n]
+
+
+          def row(name, expected, observed, ok):
+              """ok: True PASS, False FAIL, None DEFERRED (only for the deferred database URL)."""
+              result = "DEFERRED" if ok is None else ("PASS" if ok else "FAIL")
+              rows.append((name, clean(expected, 80), clean(observed), result))
+
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              """Never follow a redirect, so no key or token is sent to another URL. A 3xx becomes an
+              HTTPError and its status fails the check."""
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+
+          OPENER = urllib.request.build_opener(NoRedirect)
+
+
+          def get(url, headers=None):
+              """GET. Returns (status, parsed JSON or None). status 0 = no HTTP answer. Never prints."""
+              h = {"User-Agent": UA, "Accept": "application/json"}
+              h.update(headers or {})
+              try:
+                  with OPENER.open(urllib.request.Request(url, headers=h), timeout=30) as r:
+                      status, raw = r.status, r.read()
+              except urllib.error.HTTPError as e:
+                  status, raw = e.code, e.read()
+              except Exception:
+                  return 0, None
+              try:
+                  return status, json.loads(raw.decode("utf-8", "replace"))
+              except ValueError:
+                  return status, None
+
+
+          def key_headers(key):
+              return {"apikey": key, "Authorization": "Bearer " + key}
+
+
+          # C0: the secrets reach this step. The database URL may be DEFERRED (see the header).
+          if deferred:
+              row("C0 PROD_SUPABASE_DB_URL is set", "set, or DEFERRED", "DEFERRED (founder, 2026-10-23)", None)
+          else:
+              row("C0 PROD_SUPABASE_DB_URL is set", "set",
+                  "set" if DB_URL else ("set but blank" if RAW_DB_URL else "MISSING"), bool(DB_URL))
+          for name, value in (("PROD_SUPABASE_SERVICE_ROLE_KEY", SERVICE), ("PROD_SUPABASE_ACCESS_TOKEN", TOKEN)):
+              row("C0 %s is set" % name, "set", "set" if value else "MISSING", bool(value))
+
+          if deferred:
+              row("C1 database URL checks (C1a-C1c)", "run, or DEFERRED", "DEFERRED: PROD_SUPABASE_DB_URL not set", None)
+          else:
+              # C1: the database URL. Parsed here into libpq's PG* variables, so the password reaches psql
+              # through its environment (readable only by this user), never its argument list (/proc/*/cmdline
+              # is world-readable). Nothing from the URL is printed except the port.
+              row("C1a URL names project %s" % REF, "yes", "yes" if REF in DB_URL else "no", REF in DB_URL)
+              pg = None
+              try:
+                  u = urllib.parse.urlsplit(DB_URL)
+                  query = urllib.parse.parse_qs(u.query)
+                  port = u.port or 5432          # libpq's default; the same rule scripts/dc-*-apply.sh use
+                  if "port" in query:
+                      port = int(query["port"][-1])
+                  if u.scheme not in ("postgres", "postgresql"):
+                      port_seen = "not a postgres:// URI"
+                  elif not u.hostname:
+                      port_seen = "no host in the URL"
+                  else:
+                      port_seen = str(port)
+                      pg = {"PGHOST": u.hostname, "PGPORT": str(port),
+                            "PGSSLMODE": query.get("sslmode", ["require"])[-1], "PGCONNECT_TIMEOUT": "15"}
+                      if u.username:
+                          pg["PGUSER"] = urllib.parse.unquote(u.username)
+                      if u.password is not None:
+                          pg["PGPASSWORD"] = urllib.parse.unquote(u.password)
+                      if u.path.lstrip("/"):     # empty: libpq defaults the database name to the user name
+                          pg["PGDATABASE"] = urllib.parse.unquote(u.path.lstrip("/"))
+              except ValueError:
+                  port_seen = "unparseable"
+
+
+              def classify(err):
+                  e = err.lower()
+                  for needle, label in (("password authentication failed", "authentication failed"),
+                                        ("tenant or user not found", "pooler: tenant or user not found"),
+                                        ("network is unreachable", "network unreachable (the direct host is IPv6-only; use the session pooler)"),
+                                        ("timeout expired", "connect timeout"),
+                                        ("could not translate host name", "host name not resolved"),
+                                        ("connection refused", "connection refused"),
+                                        ("does not exist", "relation or database does not exist"),
+                                        ("permission denied", "permission denied"),
+                                        ("ssl", "ssl error")):
+                      if needle in e:
+                          return label
+                  return "other error (text withheld)"
+
+
+              # Read-only is enforced INSIDE the transaction: the production URL goes through a pooler that
+              # drops startup options, so PGOPTIONS (default_transaction_read_only, statement_timeout) never
+              # reaches the server. BEGIN READ ONLY, assert transaction_read_only = on in the same select, roll back.
+              if pg is None:
+                  db_seen = "not run: %s" % port_seen
+              else:
+                  env = {k: v for k, v in os.environ.items()
+                         if k not in ("PROD_DB_URL", "SERVICE_KEY", "ACCESS_TOKEN") and not k.startswith("PG")}
+                  env.update(pg)
+                  try:
+                      p = subprocess.run(["psql", "-XAtq", "-F,", "-v", "ON_ERROR_STOP=1",
+                                          "-c", "begin read only",
+                                          "-c", "set local statement_timeout = '20s'",
+                                          "-c", "select 1, (select count(*) from public.canonical_zip_registry), "
+                                                "current_setting('transaction_read_only')",
+                                          "-c", "rollback"],
+                                         env=env, capture_output=True, text=True, timeout=60)
+                      db_seen = p.stdout.strip() if p.returncode == 0 else "psql exit %d (%s)" % (p.returncode, classify(p.stderr))
+                  except subprocess.TimeoutExpired:
+                      db_seen = "psql timed out"
+                  except OSError:
+                      db_seen = "psql not runnable"
+              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12722,on",
+                  db_seen, db_seen == "1,12722,on")
+              row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
+                  port_seen == "5432")
+
+          # C2: the service-role key. Each positive check is paired with the public anon key on the
+          # same request, so a PASS proves the key can do more than anon can. The anon key is first shown
+          # to be VALID (it reads a table with a public read policy), because an invalid or rotated anon key
+          # would also be "refused" and would make the controls pass without proving anything.
+          m = re.search(r"SUPABASE_ANON_KEY:\s*'([^']+)'", open("config.js", encoding="utf-8").read())
+          anon = m.group(1) if m else ""
+          row("C2 control: anon key found in config.js", "found", "found" if anon else "missing", bool(anon))
+          g, gb = get(REST + "/rest/v1/canonical_zip_registry?select=zip&limit=1", key_headers(anon)) if anon else (0, None)
+          g_n = len(gb) if isinstance(gb, list) else None
+          row("C2 control: anon key is valid (reads canonical_zip_registry, public read policy)", "200, 1 row",
+              "%s, %s row(s)" % (g, g_n), g == 200 and g_n == 1)
+          table = REST + "/rest/v1/app_zip_source_ids?limit=0"
+          s, _ = get(table, key_headers(SERVICE))
+          a, _ = get(table, key_headers(anon)) if anon else (0, None)
+          row("C2a service key reads app_zip_source_ids", "200", s, s == 200)
+          row("C2b control: anon refused on the same read", "401 or 403", a, a in (401, 403))
+          # Storage: storage.buckets has RLS and no policy, so the service role (which bypasses RLS) sees
+          # every bucket and anon gets 200 with an empty list (measured 2026-10-22: 3 buckets, 0 policies).
+          # Any other anon answer fails the control and needs a look.
+          buckets = REST + "/storage/v1/bucket"
+          s, sb = get(buckets, key_headers(SERVICE))
+          a, ab = get(buckets, key_headers(anon)) if anon else (0, None)
+          s_n = len(sb) if isinstance(sb, list) else None
+          a_n = len(ab) if isinstance(ab, list) else None
+          row("C2c service key lists storage buckets", "200, >= 1 bucket", "%s, %s bucket(s)" % (s, s_n),
+              s == 200 and bool(s_n))
+          row("C2d control: anon lists no bucket", "200, 0 buckets", "%s, %s bucket(s)" % (a, a_n),
+              a == 200 and a_n == 0)
+
+          # C3: the Management API token.
+          bearer = {"Authorization": "Bearer " + TOKEN}
+          c, project = get(API, bearer)
+          row("C3a token reads the project", "200", c, c == 200)
+          project = project if isinstance(project, dict) else {}
+          ref = project.get("ref") or project.get("id") or ""
+          status = project.get("status") or ""
+          row("C3b project ref (field ref, else id) and status", "%s ACTIVE_*" % REF, "%s %s" % (ref, status),
+              ref == REF and str(status).startswith("ACTIVE_"))
+          n, _ = get(API)
+          row("C3c control: the same request with no token is refused", "401", n, n == 401)
+          f, functions = get(API + "/functions", bearer)
+          f_n = len(functions) if isinstance(functions, list) else None
+          row("C3d token lists the project's edge functions (function scope)", "200",
+              "%s, %s function(s)" % (f, f_n), f == 200)
+
+          fails = sum(1 for r in rows if r[3] == "FAIL")
+          if deferred:
+              print("::notice::PROD_SUPABASE_DB_URL is DEFERRED (founder, 2026-10-23); its checks did not run")
+          elif DB_URL_DEFERRED:
+              print("::notice::PROD_SUPABASE_DB_URL is now set and its checks ran: set DB_URL_DEFERRED to False")
+          table_md = ["| check | expected | observed | result |", "|---|---|---|---|"]
+          table_md += ["| %s | %s | %s | %s |" % r for r in rows]
+          print("\n".join(table_md))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write("\n".join(table_md) + "\n")
+          print("ref=%s sha=%s checks=%d failures=%d" % (os.environ.get("GITHUB_REF", ""), os.environ.get("GITHUB_SHA", ""),
+                                                        len(rows), fails))
+          if fails:
+              print("::error::%d of %d production-environment checks failed" % (fails, len(rows)))
+              raise SystemExit(1)
+          PY

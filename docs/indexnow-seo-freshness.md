@@ -141,7 +141,9 @@ intended, dispatch `indexnow-resubmit` with `allow_mass_change=true`.
 inside the *next* baseline: they would never differ again. The next build therefore reads the previous
 pages runs' `indexnow` job results (`actions: read`) and carries over every URL from runs whose
 notification did not succeed, stopping at the first run whose notification did (it covered everything
-older). Window: 20 runs / 7 days. A backlog forces the next run to publish. `indexnow-resubmit`
+older). Window: 20 runs / 7 days. A backlog forces the next run to publish. A run HELD as a mass
+change is not carried (2026-10-24): carrying it made every later build a mass change too, and one
+footer change (run `40009064434`) held IndexNow for 20+ hours. It waits for `indexnow-resubmit`. `indexnow-resubmit`
 (dispatch, main only) re-sends one earlier run's stored delta manually.
 
 ## 7. Triggers: when does a public page change get built?

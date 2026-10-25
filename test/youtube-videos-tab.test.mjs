@@ -27,18 +27,38 @@ const row = { slug: 'port-x', title: '<img src=x onerror=alert(1)>Blair', status
 const html = Y.render([row]);
 ok(!html.includes('<img src=x') && !html.includes('<script>') && html.includes('&lt;img src=x') && html.includes('T1 &lt;b&gt;') && html.includes('D &lt;script&gt;'), '2a: titles, description and ledger are escaped');
 ok(html.includes('Waiting for your review') && html.includes('Main video') && html.includes('Short 1') && html.includes('Short 2') && html.includes('Thumbnail'), '2b: a pending project shows all four files and its status');
-ok(html.includes('Nothing here is published'), '2c: without the Bluesky queue the page says nothing is published');
+ok(html.includes('Nothing here is published'), '2c: the page says nothing is published');
 ok(Y.render([]).includes('No videos have been uploaded'), '2d: an empty list says so');
 ok(Y.render([Object.assign({}, row, { status: 'approved', decided_by: 'a@b.c', decided_at: '2026-10-23T21:00:00Z' })]).includes('Approved by you'), '2e: an approved project says so');
 
+const thumbTile = (html.match(/<div class="yv-file yv-thumbwrap"[\s\S]*?<\/div><\/div>[\s\S]*?(?=<\/div><details)/) || [''])[0];
+ok(/data-path="port-x\/thumbnail\.png"/.test(thumbTile) && thumbTile.includes('class="yv-dl"'), '2j: the thumbnail tile has its own Download button');
+ok(!Y.render([Object.assign({}, row, { files: Object.assign({}, row.files, { thumbnail: null }) })]).match(/yv-thumbwrap"[^>]*>[\s\S]*?class="yv-dl"[\s\S]*?<details/), '2k: no Download button when no thumbnail is uploaded');
 
 // 2b. per-file review
 const fRow = Object.assign({}, row, { title: 'Blair', file_decisions: { final: { status: 'approved', decided_at: '2026-10-24T13:00:00Z', decided_by: 'a@b.c' }, short1: { status: 'rejected', note: 'mispronounces <b>noise</b>' } } });
 const fHtml = Y.render([fRow]);
-ok((fHtml.match(/class="yv-fapprove"/g) || []).length === 4 && (fHtml.match(/class="yv-freject"/g) || []).length === 4, '2f: every file (main, both Shorts, thumbnail) has its own Approve and Reject');
+ok((fHtml.match(/class="yv-fapprove"/g) || []).length === 3 && (fHtml.match(/class="yv-freject"/g) || []).length === 3, '2f: every file still awaiting a decision (a rejected one moves to revision) has its own Approve and Reject');
 ok(fHtml.includes('mispronounces &lt;b&gt;noise&lt;/b&gt;') && !fHtml.includes('<b>noise</b>'), '2g: a per-file note is shown and escaped');
-ok(fHtml.includes('1 of 4 files approved, 1 rejected'), '2h: the header summarises the per-file decisions');
+ok(fHtml.includes('1 Approved · 1 Needs Revision · 2 Awaiting Review'), '2h: the header summarises the per-file decisions');
 ok(!/class="yv-approve"|class="yv-reject"/.test(fHtml), '2i: there is no whole-package Approve / Reject any more');
+
+// 2c. the full-quality file for YouTube (meta.master, written by homesignal-ingest's upload workflow)
+{
+  const url = 'https://github.com/HomeSignalG/homesignal-ingest/releases/tag/video-port-x-run40130623567';
+  const mRow = Object.assign({}, row, { meta: Object.assign({}, row.meta, { master: { url, bytes: 83104716, sha256: 'a'.repeat(64) } }) });
+  const mHtml = Y.render([mRow]);
+  const finalTile = (mHtml.match(/data-key="final"[\s\S]*?(?=data-key="short1")/) || [''])[0];
+  ok(finalTile.includes('href="' + url + '"') && finalTile.includes('Full-quality file for YouTube') && finalTile.includes('79.3 MB'), '2l: the main video links to its full-quality release, with its size');
+  ok(!(mHtml.match(/data-key="short1"[\s\S]*/) || [''])[0].includes('Full-quality file'), '2m: only the main video carries the link');
+  ok(/rel="noopener noreferrer"/.test(finalTile) && /target="_blank"/.test(finalTile), '2n: the link opens in a new tab without an opener');
+  ok(!Y.render([row]).includes('Full-quality file'), '2o: no link when no release was recorded');
+  for (const bad of ['https://evil.example/releases/tag/video-port-x-run1', 'javascript:alert(1)', url + '"><script>', 'https://github.com/other/repo/releases/tag/video-port-x-run1']) {
+    ok(Y.masterLink({ url: bad, bytes: 1 }, { ver: 1 }) === '', '2p: refuses a link that is not this repo\'s video release: ' + bad.slice(0, 40));
+  }
+  const rev = Y.masterLink({ url, bytes: 1 }, { ver: 2 });
+  ok(!rev.includes('href') && rev.includes('version 1'), '2q: after a revision, no link; it says the release holds version 1');
+}
 
 // 3. no publish capability, no key
 ok(!/googleapis|youtube\.com\/upload|oauth|api[_-]?key|service_role/i.test(js), '3: the tab has no YouTube API call and no key');

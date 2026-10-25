@@ -70,10 +70,12 @@ ok(!/social_posts[^;]{0,80}(insert|update|delete)\b/i.test(code.replace(/select[
 ok(!/create or replace function public\.hs_approve_social_post|social_posts_publication_guard/.test(code), '4f: hs_approve_social_post and the publication guard are not redefined');
 ok(/jody-videos/.test(code) && !/update storage|public = true|storage\.buckets/.test(code), '4g: the private bucket is only read');
 ok(!/create policy[^;]*storage\.objects/i.test(code), '4h: no storage policy is added');
-// the replacement of file_decide is byte-identical to the one in the review SQL
-const fn = (s) => (s.match(/create or replace function public\.hs_youtube_video_file_decide[\s\S]*?\$fn\$;\n/) || [''])[0];
-ok(fn(review).length > 500 && fn(review) === fn(apply), '4i: the apply file carries the SAME hs_youtube_video_file_decide as youtube-video-review.sql');
-ok(/video_bsky_sync/.test(fn(review)) && /to_regprocedure/.test(fn(review)), '4j: an approval calls the queue in its own transaction, and still works before the queue exists');
+// the apply file is the LIVE hs_youtube_video_file_decide (incl. #2222's revision guard) plus the queue hook, and refuses
+// to run if the live body moved since it was read, so it can never revert another session's change
+const fnA = (apply.match(/AS \$function\$[\s\S]*?\$function\$;/) || [''])[0];
+ok(/_hs_yv_admin\(\)/.test(fnA) && /errcode = '55006'/.test(fnA) && /'version', coalesce/.test(fnA), '4i: the apply file keeps the live revision guard, admin helper and version stamp');
+ok(/video_bsky_sync/.test(fnA) && /to_regprocedure\('public\.video_bsky_sync\(text,text\)'\)/.test(fnA), '4j: an approval calls the queue in its own transaction');
+ok(/is distinct from '2dc922d7324d78e57ceeb4ad21a8bb3e'/.test(apply) && /post-check failed/.test(apply), '4i2: it refuses unless the live body is the one it was built from, and checks its own result');
 ok(/not in \('pending', 'approved', 'rejected'\)|p_status not in \('approved', 'rejected', 'pending'\)/.test(review), '4k: the decision vocabulary is unchanged');
 ok(/grant execute on function public\.hs_video_jobs_list\(\)/.test(code) || /hs_video_jobs_list\(\)[\s\S]{0,200}to authenticated/.test(code), '4l: the list is callable by a signed-in admin only');
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
