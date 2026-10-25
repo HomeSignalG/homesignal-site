@@ -1,0 +1,214 @@
+name: db-read
+
+# Read the production database from a COMMITTED .sql file, as supabase_read_only_user, through the
+# Supabase Management API's READ-ONLY endpoint (POST /v1/projects/{ref}/database/query/read-only).
+#
+# Dispatch with ref=main, always: the workflow and every check in it are then main's copy (the
+# environment refuses any other ref). The SQL file may live on another branch (sql_ref). That
+# branch is fetched as DATA only: one blob, no checkout, nothing from it is executed; its text is
+# sent as the query and the read-only endpoint runs it as the read-only role.
+#
+# This workflow calls no other database endpoint. If the read-only path is wrong or refused, the
+# run fails loudly; it never falls back to the write endpoint (writes go through db-sql.yml).
+#
+# The environment `production` exists (founder, 2026-10-23): deployment branches main only, no admin
+# bypass, holding PROD_SUPABASE_ACCESS_TOKEN (the only secret this job uses). A job that names a
+# MISSING environment would create it with no protection rules, which is why this file waited for it.
+#
+# The environment line and the first step are the canonical boundary text in
+# test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.
+#
+# Output: this repo is PUBLIC, so the job log is world-readable. The result is printed between
+# ----- BEGIN RESULT ----- and ----- END RESULT -----, capped at 20,000 characters, and withheld
+# entirely if it contains an email-, token-, JWT- or password-hash-shaped string. That filter is
+# defence in depth, NOT a boundary, and it does NOT catch live credentials:
+#   - supabase_read_only_user is a member of pg_read_all_data and has BYPASSRLS (catalog, 2026-10-22),
+#     so it can SELECT every table, including auth.refresh_tokens (live login credentials, random
+#     strings no pattern can recognise) and auth.users. A query that selects them prints them here.
+#   - A text filter is bypassed by building the query or the output from fragments
+#     (query_to_xml('select … from au' || 'th.refresh_tokens')), so filtering the SQL cannot close it.
+#   - Vault plaintext is expected to be refused: the role can SELECT vault.decrypted_secrets, but it
+#     has no EXECUTE on vault._crypto_aead_det_decrypt, which that view calls, and PostgreSQL checks a
+#     view's function calls against the querying role (catalog, 2026-10-22; the design's probe P4
+#     measures it live).
+#   It does not catch phone numbers or street addresses either.
+#
+# NOT A NEW EXPOSURE, AND STILL OPEN. The read loop this replaces (dispatching db-sql.yml from a
+# branch) already prints query results to this same public log, and it runs them as `postgres`
+# through the WRITE endpoint, with the access token in branch code's reach. db-read narrows that to
+# the read-only role and main's code. What neither closes: whatever a query selects is printed to a
+# world-readable log. Narrowing the role's grants, or returning results somewhere private, is a
+# separate founder decision (raised 2026-10-22); until then, do not select from auth.*, vault.* or
+# tables holding subscriber data in a query run here.
+#
+# The access token is never sent to a redirected URL: redirects are refused before any request to the
+# new location (a followed POST becomes a GET that still carries the Authorization header).
+#
+# No concurrency group: parallel reads by different sessions must not cancel or queue each other.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql_ref:
+        description: 'Branch holding the SQL file (read as data only; nothing from it runs)'
+        required: false
+        default: main
+        type: string
+      sql_file:
+        description: 'Path of the .sql file on that branch, under docs/ (e.g. docs/adhoc/query.sql)'
+        required: true
+        default: docs/adhoc/query.sql
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    environment: { name: production, deployment: false }
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+      SQL_REF: ${{ inputs.sql_ref }}
+      SQL_FILE: ${{ inputs.sql_file }}
+    steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
+      - name: Validate the branch name and the SQL path
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          # Branch names only: no raw SHA and no refs/pull/* (the repo is public and forkable, and a
+          # fork's commits can be reachable through the parent's object network).
+          [[ "$SQL_REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$ ]] || fail "sql_ref is not a plain branch name"
+          case "$SQL_REF" in refs/*|*..*|*//*|*/|*.|*.lock|*/.*|*/-*) fail "sql_ref is not a plain branch name";; esac
+          git check-ref-format "refs/heads/$SQL_REF" || fail "sql_ref is not a valid branch name"
+          [ "${#SQL_FILE}" -le 200 ] || fail "sql_file is longer than 200 characters"
+          [[ "$SQL_FILE" =~ ^docs/[A-Za-z0-9._/-]+\.sql$ ]] || fail "sql_file must match docs/<path>.sql"
+          case "$SQL_FILE" in -*|*..*|*//*|*/-*|*/./*) fail "sql_file contains '..', '//', '/./' or a segment starting with '-'";; esac
+          echo "sql_ref=$SQL_REF sql_file=$SQL_FILE"
+      - name: Fetch ONLY the SQL file's blob (no checkout; nothing from that branch runs)
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/sqlsrc"
+          git init -q "$src"
+          git -C "$src" remote add origin "https://github.com/$GITHUB_REPOSITORY"   # public repo: no token
+          git -C "$src" fetch -q --no-tags --depth=1 --filter=blob:none origin "refs/heads/$SQL_REF"
+          entry=$(git -C "$src" ls-tree FETCH_HEAD -- "$SQL_FILE")
+          [ -n "$entry" ] || { echo "::error::no file $SQL_FILE on branch $SQL_REF"; exit 1; }
+          read -r mode type oid _ <<<"$entry"
+          if [ "$mode" != 100644 ] || [ "$type" != blob ]; then
+            echo "::error::$SQL_FILE is not a regular file ($mode $type)"; exit 1
+          fi
+          # In a blob:none fetch, -s downloads the whole blob before reporting its size. GitHub's
+          # 100 MB file limit and this job's 10-minute timeout bound that; the limit below is on what
+          # is sent as the query.
+          size=$(git -C "$src" cat-file -s "$oid")
+          [ "$size" -le 262144 ] || { echo "::error::$SQL_FILE is $size bytes; the limit is 262144"; exit 1; }
+          git -C "$src" cat-file blob "$oid" > "$RUNNER_TEMP/query.sql"
+          echo "sql_ref=$SQL_REF commit=$(git -C "$src" rev-parse FETCH_HEAD) blob=$oid sha256=$(sha256sum "$RUNNER_TEMP/query.sql" | cut -d' ' -f1)"
+          # The SQL text came from a branch: stop workflow commands while it is echoed.
+          stop=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+          echo "::stop-commands::$stop"
+          echo "----- BEGIN SQL -----"; cat "$RUNNER_TEMP/query.sql"; echo; echo "----- END SQL -----"
+          echo "::$stop::"
+      - name: Run as supabase_read_only_user (read-only endpoint only)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 -I - "$RUNNER_TEMP/query.sql" <<'PY'
+          import http.client, json, os, re, sys, urllib.error, urllib.request
+
+          REF = os.environ["SUPABASE_PROJECT_REF"]
+          if not re.fullmatch(r"[a-z]{20}", REF):
+              sys.exit("::error::refusing: SUPABASE_PROJECT_REF is not a 20-letter project ref")
+          ENDPOINT = "https://api.supabase.com/v1/projects/%s/database/query/read-only" % REF
+          TOKEN = os.environ["SUPABASE_ACCESS_TOKEN"].strip()
+          if not TOKEN:
+              sys.exit("::error::PROD_SUPABASE_ACCESS_TOKEN is empty in this environment")
+          CAP = 20000
+          # The site repo is PUBLIC: this log is world-readable. Refuse to print what looks like PII, a
+          # credential or a password hash. Defence in depth, NOT a boundary: see the file header.
+          SENSITIVE = re.compile(
+              r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"      # email
+              r"|sbp_[A-Za-z0-9]|sb_secret_[A-Za-z0-9]|whsec_[A-Za-z0-9+/=]"  # Supabase token/key, webhook secret
+              r"|eyJ[A-Za-z0-9_-]{10,}\."                              # JWT
+              r"|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}"  # GitHub tokens
+              r"|\$2[aby]\$\d\d\$|\$argon2(?:id|i|d)\$")               # bcrypt / argon2 password hash
+          STOP = os.urandom(16).hex()
+
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              """Never follow a redirect: a followed POST becomes a GET that still carries the Authorization
+              header to the new location. Returning None makes urllib raise HTTPError(3xx) instead."""
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+
+          OPENER = urllib.request.build_opener(NoRedirect)
+
+
+          def emit(kind, text, cap):
+              """Print text between BEGIN/END markers, capped, with workflow commands stopped."""
+              if SENSITIVE.search(text):
+                  print("%s withheld: it contains an email-, token-, JWT- or password-hash-shaped string (%d characters)" % (kind, len(text)))
+                  return False
+              print("::stop-commands::" + STOP)
+              print("----- BEGIN %s -----" % kind)
+              print(text[:cap])
+              print("----- END %s -----" % kind)
+              print("::" + STOP + "::")
+              if len(text) > cap:
+                  print("(truncated: %d of %d characters shown)" % (cap, len(text)))
+              return True
+
+
+          sql = open(sys.argv[1], encoding="utf-8").read()
+          req = urllib.request.Request(
+              ENDPOINT,
+              data=json.dumps({"query": sql}).encode(),
+              headers={"Authorization": "Bearer " + TOKEN,
+                       "Content-Type": "application/json", "Accept": "application/json",
+                       # Without it Cloudflare answers 403 (error 1010) before authentication.
+                       "User-Agent": "HomeSignal-db-read/1.0 (+https://homesignal.net)"},
+              method="POST")
+          try:
+              with OPENER.open(req, timeout=120) as r:
+                  status, body = r.status, r.read().decode("utf-8", "replace")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode("utf-8", "replace")
+              print("HTTP %s from the read-only endpoint" % e.code)
+              if 300 <= e.code < 400:
+                  print("::error::the read-only endpoint answered with a redirect; it was not followed, so the token went nowhere else.")
+              elif e.code in (404, 405):
+                  print("::error::the read-only endpoint answered HTTP %s. db-read never falls back to the write endpoint." % e.code)
+              emit("ERROR", body, 4000)
+              sys.exit(1)
+          except urllib.error.URLError as e:
+              # e.reason is a socket or TLS error from before any answer; it never carries a header value.
+              print("::error::no HTTP answer from the read-only endpoint: %s" % e.reason)
+              sys.exit(1)
+          except (ValueError, OSError, http.client.HTTPException) as e:
+              # Fixed message: a ValueError from a malformed header would quote the header (the token).
+              print("::error::the request to the read-only endpoint failed (%s; details withheld)" % type(e).__name__)
+              sys.exit(1)
+          print("HTTP %s" % status)
+          if not emit("RESULT", body, CAP):
+              sys.exit(1)
+          PY
