@@ -11,10 +11,9 @@ name: db-read
 # This workflow calls no other database endpoint. If the read-only path is wrong or refused, the
 # run fails loudly; it never falls back to the write endpoint (writes go through db-sql.yml).
 #
-# DRAFT, DO NOT MERGE YET. This job names the environment `production`, which does not exist yet.
-# A job that names a missing environment can create it with no protection rules, so this file
-# must not reach main until the founder says the environment is ready (deployment branches: main
-# only; no admin bypass; holding PROD_SUPABASE_ACCESS_TOKEN).
+# The environment `production` exists (founder, 2026-10-23): deployment branches main only, no admin
+# bypass, holding PROD_SUPABASE_ACCESS_TOKEN (the only secret this job uses). A job that names a
+# MISSING environment would create it with no protection rules, which is why this file waited for it.
 #
 # The environment line and the first step are the canonical boundary text in
 # test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.

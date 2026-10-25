@@ -1,12 +1,13 @@
 name: verify-production-environment
 
-# Proves that the three PROD_ secrets of the GitHub environment `production` work, without
+# Proves that the PROD_ secrets in the GitHub environment `production` work, without
 # printing any of them. Dispatch-only and writes nothing: the database check runs inside
 # BEGIN READ ONLY and asserts transaction_read_only = on in the same select (the production URL
 # goes through a pooler that drops PGOPTIONS, so a startup option cannot make it read-only), then
 # rolls back; every HTTP check is a GET, and no redirect is followed, so no key or token reaches
 # another URL. The database password reaches psql through PGPASSWORD, never its argument list.
-#   From main: every row must PASS.
+#   From main: every row must PASS, except the database URL rows, which read DEFERRED while
+#   DB_URL_DEFERRED is True and that secret is absent (see below).
 #   From any other branch: the environment must refuse the job before a runner starts (0 steps).
 #
 # The environment `production` exists (founder, 2026-10-23): deployment branches main only, no admin
@@ -16,8 +17,10 @@ name: verify-production-environment
 # PROD_SUPABASE_DB_URL is DEFERRED (founder, 2026-10-23): the database password is not on record and
 # a reset was declined for now, so the URL could not be re-entered. While DB_URL_DEFERRED is True and
 # the secret is absent, its rows read DEFERRED (not PASS, not FAIL). Once the secret is added, the C1
-# checks run in full whatever the flag says, and the run prints a notice to remove the flag. With the
-# flag False, an absent secret FAILS as before.
+# checks run in full whatever the flag says, and the run prints a notice to remove the flag: set it to
+# False in the same PR that adds the secret. With the flag False, an absent secret FAILS as before.
+# A secret saved as blank spaces is not DEFERRED: it FAILS as "set but blank". The deferred logic is
+# run, not just read, by test/verify-production-environment-deferred.test.mjs.
 #
 # The environment line and the first step are the canonical boundary text in
 # test/lib/production-boundary.mjs, pinned by test/production-boundary-new-workflows.test.mjs.
@@ -92,12 +95,15 @@ jobs:
           # HTTP 403 (error 1010) before authentication. Sent on every request here.
           UA = "HomeSignal-verify-prod/1.0 (+https://homesignal.net)"
           # Stripped: a secret pasted with a trailing newline would otherwise fail as a malformed header.
-          DB_URL = os.environ.get("PROD_DB_URL", "").strip()
+          RAW_DB_URL = os.environ.get("PROD_DB_URL", "")
+          DB_URL = RAW_DB_URL.strip()
           SERVICE = os.environ.get("SERVICE_KEY", "").strip()
           TOKEN = os.environ.get("ACCESS_TOKEN", "").strip()
           # Founder decision 2026-10-23 (see the header): the database URL is not in the environment yet.
           DB_URL_DEFERRED = True
-          deferred = DB_URL_DEFERRED and not DB_URL
+          # Decided on the RAW value: a secret saved as blank spaces is set, so it FAILS rather than
+          # reading DEFERRED.
+          deferred = DB_URL_DEFERRED and not RAW_DB_URL
           rows = []
 
 
@@ -147,7 +153,8 @@ jobs:
           if deferred:
               row("C0 PROD_SUPABASE_DB_URL is set", "set, or DEFERRED", "DEFERRED (founder, 2026-10-23)", None)
           else:
-              row("C0 PROD_SUPABASE_DB_URL is set", "set", "set" if DB_URL else "MISSING", bool(DB_URL))
+              row("C0 PROD_SUPABASE_DB_URL is set", "set",
+                  "set" if DB_URL else ("set but blank" if RAW_DB_URL else "MISSING"), bool(DB_URL))
           for name, value in (("PROD_SUPABASE_SERVICE_ROLE_KEY", SERVICE), ("PROD_SUPABASE_ACCESS_TOKEN", TOKEN)):
               row("C0 %s is set" % name, "set", "set" if value else "MISSING", bool(value))
 
