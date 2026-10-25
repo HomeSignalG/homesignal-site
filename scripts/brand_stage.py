@@ -79,6 +79,7 @@ ALLOWED_LEFTOVER = [
     re.compile(r"'@homesignal'|@homesignal'"),                    # iCalendar UID suffix (an identifier)
     re.compile(r"window\.HomeSignalVideoProducer(?:\.init)?"),   # JS global identifier
     re.compile(r"https://www\.reddit\.com/user/HomeSignalnet"),  # an external account handle
+    re.compile(r"github\\?\.com\\?/HomeSignalG\\?/"),                # the GitHub organisation (a repo address, not brand text)
     re.compile(r"HomeSignal-detected"),                            # a code comment
     re.compile(r"homesignalphase1_13\.html"),
 ]

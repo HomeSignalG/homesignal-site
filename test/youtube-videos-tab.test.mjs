@@ -43,6 +43,23 @@ ok(fHtml.includes('mispronounces &lt;b&gt;noise&lt;/b&gt;') && !fHtml.includes('
 ok(fHtml.includes('1 Approved · 1 Needs Revision · 2 Awaiting Review'), '2h: the header summarises the per-file decisions');
 ok(!/class="yv-approve"|class="yv-reject"/.test(fHtml), '2i: there is no whole-package Approve / Reject any more');
 
+// 2c. the full-quality file for YouTube (meta.master, written by homesignal-ingest's upload workflow)
+{
+  const url = 'https://github.com/HomeSignalG/homesignal-ingest/releases/tag/video-port-x-run40130623567';
+  const mRow = Object.assign({}, row, { meta: Object.assign({}, row.meta, { master: { url, bytes: 83104716, sha256: 'a'.repeat(64) } }) });
+  const mHtml = Y.render([mRow]);
+  const finalTile = (mHtml.match(/data-key="final"[\s\S]*?(?=data-key="short1")/) || [''])[0];
+  ok(finalTile.includes('href="' + url + '"') && finalTile.includes('Full-quality file for YouTube') && finalTile.includes('79.3 MB'), '2l: the main video links to its full-quality release, with its size');
+  ok(!(mHtml.match(/data-key="short1"[\s\S]*/) || [''])[0].includes('Full-quality file'), '2m: only the main video carries the link');
+  ok(/rel="noopener noreferrer"/.test(finalTile) && /target="_blank"/.test(finalTile), '2n: the link opens in a new tab without an opener');
+  ok(!Y.render([row]).includes('Full-quality file'), '2o: no link when no release was recorded');
+  for (const bad of ['https://evil.example/releases/tag/video-port-x-run1', 'javascript:alert(1)', url + '"><script>', 'https://github.com/other/repo/releases/tag/video-port-x-run1']) {
+    ok(Y.masterLink({ url: bad, bytes: 1 }, { ver: 1 }) === '', '2p: refuses a link that is not this repo\'s video release: ' + bad.slice(0, 40));
+  }
+  const rev = Y.masterLink({ url, bytes: 1 }, { ver: 2 });
+  ok(!rev.includes('href') && rev.includes('version 1'), '2q: after a revision, no link; it says the release holds version 1');
+}
+
 // 3. no publish capability, no key
 ok(!/googleapis|youtube\.com\/upload|oauth|api[_-]?key|service_role/i.test(js), '3: the tab has no YouTube API call and no key');
 ok(/hs_youtube_videos_list/.test(js) && /hs_youtube_video_file_decide/.test(js) && !/hs_youtube_video_decide/.test(js), '3b: it talks to exactly the two gated functions');
