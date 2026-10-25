@@ -397,7 +397,8 @@ jobs:
           guides = re.findall(r'<loc>https://[^/<]+(/guides/[a-z0-9-]+/)</loc>', sm)
           assert gwritten == man['guide_pages'], 'guide documents != manifest guide_pages'
           assert sorted(guides) == man['guide_pages'], 'sitemap guide URLs != guide pages written'
-          assert len(gwritten) == 2, f'expected the two guides, found {gwritten}'
+          hubs = sorted(f'/guides/{k}/' for k, r in man['focus_sitemaps'].items() if r['eligible'])
+          assert gwritten == sorted(set(hubs) | {'/guides/what-is-being-built-near-me/', '/guides/check-proposed-development-near-a-house/'}), f'expected the two guides plus the area hubs {hubs}, found {gwritten}'
           print(f"guide pages reconciled: {len(gwritten)} documents == sitemap {len(guides)}")
           # FAMILY SITEMAPS (plan step 14): each family is exactly its own set, and together
           # they cover exactly the generated URLs sitemap.xml advertises.
@@ -415,6 +416,26 @@ jobs:
               fam_union |= set(locs)
           assert fam_union == main_gen, 'family sitemaps do not cover sitemap.xml exactly'
           print("family sitemaps reconciled:", man['family_sitemaps'])
+          # FOCUS-AREA SITEMAPS (data/seo-focus-areas.json): a subset view of sitemap.xml, listed
+          # separately so Search Console can take it as its own submission.
+          indexable_paths = {f'/community/{z}/' for z in man['indexable_zips']}
+          origin = re.match(r'https://[^/<]+', sm[sm.index('<loc>') + 5:]).group(0)
+          for slug, r in man['focus_sitemaps'].items():
+              fx = open(f'_site/sitemaps/{slug}.xml', encoding='utf-8').read()
+              locs = re.findall(r'<loc>(https://[^/<]+)(/[^<]+)</loc>', fx)
+              paths = [x for _, x in locs]
+              assert all(h == origin for h, _ in locs), f'{slug} host differs from sitemap.xml'
+              assert paths == sorted(set(paths)), f'{slug}: duplicate or unsorted URL'
+              assert paths == [f'/community/{z}/' for z in r['eligible']], f'{slug} != its eligible ZIPs'
+              assert set(paths) <= main_gen, f'{slug} advertises a URL sitemap.xml does not'
+              assert set(paths) <= indexable_paths, f'{slug} lists a noindex page'
+              assert set(r['eligible']) | set(r['excluded']) == set(r['members']), f'{slug}: unaccounted member'
+              assert len(r['members']) == r['expected_zips'], f"{slug}: {len(r['members'])} members, expected {r['expected_zips']}"
+              assert '<priority>' not in fx and '<changefreq>' not in fx, f'{slug}: priority/changefreq are not used'
+              for z in r['eligible']:
+                  d = open(f'_site/community/{z}/index.html', encoding='utf-8').read()
+                  assert 'index, follow' in d and f'href="{origin}/community/{z}/"' in d, f'{slug}: {z} is not index+self-canonical'
+              print(f"focus sitemap {slug}: {len(paths)} listed of {len(r['members'])}; excluded {sorted(r['excluded'])}")
           print(f"sitemap reconciled: {len(zips)} community URLs == indexable "
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY

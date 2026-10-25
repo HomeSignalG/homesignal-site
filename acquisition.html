@@ -212,7 +212,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     </div>
    </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button></nav>
   <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -228,6 +228,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-bluesky"></div>
     <div class="tab" id="tab-premium"></div>
     <div class="tab" id="tab-arearequests"></div>
+    <div class="tab" id="tab-saleshandy"></div>
+    <div class="tab" id="tab-youtubevideos"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -284,6 +286,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <!-- The founder's ordered ZIP list for MAPS · Data Center Theme. Pure CSV parse /
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
+<script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
+<script src="lib/acq-youtube-videos.js?v=701fa7eb"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -409,6 +413,16 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   // JavaScript from hs_acquisition_dashboard / dashboard_snapshots (tab_scripts).
   var tabInitDone = { videoproducer: false };
   var TAB_TRUSTED_INIT = {
+    // Live, gated read (hs_saleshandy_metrics): fetched when the tab is opened, never baked into the snapshot.
+    saleshandy: function () {
+      var el = document.getElementById('tab-saleshandy');
+      if (el && window.HS && window.HS.acqSaleshandy) window.HS.acqSaleshandy.load(window.hsClient, el, 30);
+    },
+    // Live, gated read (hs_youtube_videos_list): finished videos waiting for the founder's approval. Never baked into the snapshot.
+    youtubevideos: function () {
+      var el = document.getElementById('tab-youtubevideos');
+      if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
+    },
     videoproducer: function () {
       var container = document.getElementById('tab-videoproducer');
       if (
@@ -504,6 +518,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireAcqLive();
     wireZipBehavior();
     wireAcqMetrics();
+    wireChannelReport();
     wireBluesky();
     wirePremiumWaitlist();
     wireAreaRequests();
@@ -786,7 +801,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var wk=(d.signups_by_week||[]).map(function(w){ return { day:w.week, followers:w.count }; });
     var emailState=(k.email_error_rate_pct>0)?'persist':'real';
     var kpis=
-      liveTile('Users', k.users_total||0, (k.users_active||0)+' active · '+(k.unsub_rate_pct||0)+'% unsub', (k.unsub_rate_pct>0?'persist':'real'))+
+      liveTile('Registered accounts', (k.registered_external!=null?k.registered_external:(k.users_total||0)), (k.users_total||0)+' incl. admin/test · '+(k.digest_subscribers||0)+' digest rows (one per email + area)', 'real')+
       liveTile('Topic subscriptions', k.subscriptions_total||0, 'across all users')+
       liveTile('Signup intents', k.signup_intents||0, 'clicked subscribe')+
       liveTile('Area requests', k.community_requests||0, 'coverage asks')+
@@ -830,6 +845,83 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       '</div>'+
       '<div class="tile-note" style="margin-top:14px">Paid: '+paidLine+'</div>'+
     '</div>';
+  }
+  // ---- Channel report (gated RPC hs_acq_channel_report, docs/acquisition-attribution.sql). ONE reader counts everything by channel:
+  //      visitors, sessions, registered accounts, digest subscriptions and saved reports, in America/Los_Angeles days or weeks.
+  //      Nothing here classifies or recounts; it displays what the database returned, including what was NOT collected. ----
+  var CH_LABEL={google_organic:'Google organic',bing_organic:'Bing organic',other_search:'Other search',
+    bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_engagement:'Bluesky: engagement / profile',
+    bluesky_other_tagged:'Bluesky: other tagged (drip, etc.)',bluesky_untagged:'Bluesky: untagged link',
+    saleshandy:'Saleshandy email',other_referral:'Other referral',other_tagged:'Other tagged',
+    direct:'Direct (home-page landing)',unknown:'Unknown (no referrer, deep landing)',
+    not_collected:'Not collected (before tracking)',not_attributed:'No source recorded'};
+  var CH_METRICS=[['visitors','Visitors'],['new_visitors','New visitors'],['returning_visitors','Returning visitors'],
+    ['sessions','Sessions'],['registered_users','Registered accounts'],['digest_subscriptions','Digest subscriptions'],
+    ['reports_created','Reports created'],['report_users','Users who made reports']];
+  var chState={days:30,grain:'day',zip:'',internal:false,metric:'visitors'};
+  function chName(c){ return CH_LABEL[c]||c; }
+  function chNum(n){ return (n||0).toLocaleString(); }
+  function chControls(){
+    function opt(v,l,cur){ return '<option value="'+esc(v)+'"'+(String(cur)===String(v)?' selected':'')+'>'+esc(l)+'</option>'; }
+    return '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 12px">'+
+      '<label class="sub">Period <select id="ch-days">'+opt(7,'Last 7 days',chState.days)+opt(14,'Last 14 days',chState.days)+opt(30,'Last 30 days',chState.days)+opt(90,'Last 90 days',chState.days)+'</select></label>'+
+      '<label class="sub">By <select id="ch-grain">'+opt('day','Day',chState.grain)+opt('week','Week (Mon-Sun)',chState.grain)+'</select></label>'+
+      '<label class="sub">Area <select id="ch-zip">'+opt('','All ZIPs',chState.zip)+opt('pierce_wa','Pierce County, WA ZIPs',chState.zip)+'</select></label>'+
+      '<label class="sub">Show <select id="ch-metric">'+CH_METRICS.map(function(m){ return opt(m[0],m[1],chState.metric); }).join('')+'</select></label>'+
+      '<label class="sub"><input type="checkbox" id="ch-int"'+(chState.internal?' checked':'')+'> include internal / test</label></div>';
+  }
+  function chCard(d){
+    var rng=d.range||[], rows=d.rows||[];
+    var chans=[]; rows.concat(rng).forEach(function(r){ if(chans.indexOf(r.channel)<0) chans.push(r.channel); });
+    chans.sort();
+    var rangeRows=rng.map(function(r){
+      var rpu=r.report_users?(Math.round(10*r.reports_created/r.report_users)/10):'—';
+      return '<tr><td>'+esc(chName(r.channel))+'</td>'+
+        [r.visitors,r.new_visitors,r.returning_visitors,r.repeat_visitors,r.sessions,r.registered_users,r.digest_subscriptions,r.reports_created,r.report_users].map(function(n){
+          return '<td style="text-align:right;font-variant-numeric:tabular-nums">'+chNum(n)+'</td>'; }).join('')+
+        '<td style="text-align:right;font-variant-numeric:tabular-nums">'+rpu+'</td></tr>';
+    }).join('');
+    var periods=[]; rows.forEach(function(r){ if(r.period && periods.indexOf(r.period)<0) periods.push(r.period); });
+    periods.sort();
+    var cell={}; rows.forEach(function(r){ if(r.period) cell[r.period+'|'+r.channel]=r[chState.metric]||0; });
+    var head='<th>'+(d.grain==='week'?'Week of':'Day')+'</th>'+chans.map(function(c){ return '<th style="text-align:right">'+esc(chName(c))+'</th>'; }).join('')+'<th style="text-align:right">Total</th>';
+    var body=periods.map(function(pd){
+      var tot=0;
+      var tds=chans.map(function(c){ var v=cell[pd+'|'+c]||0; tot+=v; return '<td style="text-align:right;font-variant-numeric:tabular-nums'+(v?'':';color:var(--muted)')+'">'+chNum(v)+'</td>'; }).join('');
+      return '<tr><td style="font-variant-numeric:tabular-nums">'+esc(pd)+'</td>'+tds+'<td style="text-align:right;font-variant-numeric:tabular-nums"><strong>'+chNum(tot)+'</strong></td></tr>';
+    }).join('');
+    var started=d.tracking_started_at?esc(String(d.tracking_started_at).slice(0,10)):null;
+    var zs=d.zip_set?('<div class="tile-note">Area: '+esc(d.zip_set.key)+' ('+d.zip_set.zips+' ZIPs). County overlap '+(d.zip_set.overlap_evaluated?'is flagged per ZIP.':'has NOT been evaluated: ZIPs shared with other counties are included.')+'</div>'):'';
+    return '<div class="card" id="ch-card"><h3>Channels: visitors to reports <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
+      '<p class="sub">One reader counts every figure by acquisition channel, in '+esc(d.timezone||'America/Los_Angeles')+' time. Channel is the visitor’s first touch.'+
+      (started?' Visitor, session and channel data start '+started+'; nothing earlier is estimated.':' <strong>No page views have been collected yet.</strong>')+'</p>'+
+      chControls()+zs+
+      '<div class="sub" style="margin:10px 0 4px">Totals for the period (unique people per channel)</div>'+
+      (rangeRows?('<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Channel</th><th style="text-align:right">Visitors</th><th style="text-align:right">New</th><th style="text-align:right">Returning</th><th style="text-align:right">Repeat (2+ days)</th><th style="text-align:right">Sessions</th><th style="text-align:right">Registered</th><th style="text-align:right">Digest subs</th><th style="text-align:right">Reports</th><th style="text-align:right">Report users</th><th style="text-align:right">Reports / user</th></tr></thead><tbody>'+rangeRows+'</tbody></table></div>'):'<div class="muted">No activity in this period.</div>')+
+      '<div class="sub" style="margin:16px 0 4px">'+esc((CH_METRICS.filter(function(m){return m[0]===chState.metric;})[0]||[])[1]||'')+' by '+(d.grain==='week'?'week':'day')+' and channel</div>'+
+      (body?('<div style="overflow-x:auto"><table class="tbl"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'):'<div class="muted">No activity in this period.</div>')+
+      '<div class="tile-note" style="margin-top:12px">'+(d.caveats||[]).map(function(c){ return '• '+esc(c); }).join('<br>')+
+      (d.include_internal?'<br>• Internal and test activity is INCLUDED in these figures.':'<br>• Admin and known test activity is excluded.')+'</div></div>';
+  }
+  function iso(dt){ return dt.getFullYear()+'-'+('0'+(dt.getMonth()+1)).slice(-2)+'-'+('0'+dt.getDate()).slice(-2); }
+  async function wireChannelReport(){
+    var host=$('tab-acquisition'); if(!host) return;
+    var box=document.getElementById('ch-wrap');
+    if(!box){ box=document.createElement('div'); box.id='ch-wrap'; host.insertBefore(box, host.firstChild); }
+    try{
+      // Day boundaries are Los Angeles days: ask the server for dates in that zone rather than the viewer's local zone.
+      var la=new Date(new Date().toLocaleString('en-US',{timeZone:'America/Los_Angeles'}));
+      var to=iso(la), fr=new Date(la.getTime()); fr.setDate(fr.getDate()-(chState.days-1));
+      var args={ p_from: iso(fr), p_to: to, p_grain: chState.grain, p_include_internal: chState.internal };
+      if(chState.zip) args.p_zip_set=chState.zip;
+      var r=await window.hsClient.rpc('hs_acq_channel_report', args);
+      if(r.error || !r.data){ box.innerHTML='<div class="card"><h3>Channels</h3><p class="sub">Could not load the channel report just now.</p></div>'; return; }
+      box.innerHTML=chCard(r.data);
+      [['ch-days','days',true],['ch-grain','grain',false],['ch-zip','zip',false],['ch-metric','metric',false]].forEach(function(c){
+        var el=$(c[0]); if(el) el.addEventListener('change', function(){ chState[c[1]]=c[2]?parseInt(el.value,10):el.value; wireChannelReport(); });
+      });
+      var ci=$('ch-int'); if(ci) ci.addEventListener('change', function(){ chState.internal=ci.checked; wireChannelReport(); });
+    }catch(e){ box.innerHTML='<div class="card"><h3>Channels</h3><p class="sub">Could not load the channel report just now.</p></div>'; }
   }
   async function wireAcqMetrics(){
     var host=$('tab-acquisition'); if(!host) return;
@@ -2017,7 +2109,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   }
   async function refreshFeedInv(){
     try{
-      var r=await window.hsClient.from('feed_inventory_live').select('*').order('sort',{ascending:true});
+      var r=await window.hsClient.rpc('hs_feed_inventory_live');   // founder-gated (dashboard_admins); the view itself is not readable by signed-in users
       if(r.error) return;                 // leave prior content; empty cells mean no live items, not an error
       renderFeedInv(r.data||[]);
     }catch(e){}

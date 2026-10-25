@@ -24,7 +24,18 @@ const SQL = stripSql(read('docs/map1-dc-publication.sql'));
 const fnStart = SQL.indexOf('create or replace function public.map1_dc_zip_members(');
 const FN = fnStart > -1 ? SQL.slice(fnStart, SQL.indexOf('$function$;', fnStart)) : '';
 ok(FN.length > 1500 && /geo\.zip_point_membership_in/.test(FN), 'A0 the contract body is located (positive control)');
-ok((SQL.match(/create or replace function public\./g) || []).length === 1, 'A1 the file defines exactly ONE public function');
+// 2026-10-23 (founder, same-building ruling): the file also defines the pure same-site NAME rule the
+// reader calls. It is still ONE reader; the helper decides only whether two names describe one site.
+ok(JSON.stringify((SQL.match(/create or replace function public\.\w+/g) || []).sort())
+     === JSON.stringify(['create or replace function public.dc_names_same_site', 'create or replace function public.map1_dc_zip_members']),
+  'A1 the file defines exactly ONE reader, plus the same-site name rule it calls');
+ok(/immutable/.test((SQL.match(/create or replace function public\.dc_names_same_site[\s\S]*?\$fn\$;/) || [''])[0])
+   && !/ST_|geo\.|from public\./i.test((SQL.match(/create or replace function public\.dc_names_same_site[\s\S]*?\$fn\$;/) || [''])[0]),
+  'A1b the same-site rule is pure text: immutable, no geography, reads no table');
+ok(/150 >= ST_DistanceSphere\(/.test(FN) && /from admitted o\s+join admitted c/.test(FN)
+   && /= 1\s+and \(select count\(\*\) from same_site s3 where s3\.canon_key = s\.canon_key\) = 1/.test(FN)
+   && /public\.dc_names_same_site\(o\.project_name/.test(FN),
+  'A1c the same-building rule: 150 m, the name rule, one-to-one, both pins drawn on THIS page');
 ok(/security definer/.test(FN) && /set search_path to 'public', 'geo', 'pg_temp'/.test(FN),
   'A2 SECURITY DEFINER with a pinned search_path (reads the private planes, exposes only its columns)');
 ok(/grant execute on function public\.map1_dc_zip_members\(text\) to anon, authenticated, service_role;/.test(SQL)
@@ -116,6 +127,9 @@ const GENERATED = {
   'docs/dc-epoch-geography-apply.sql': ['test/dc_epoch_geography_pg/build_apply.py', '--check'],
   'docs/dc-osm-map1-apply.sql': ['test/dc_osm_layer_pg/build_map1.py', '--check'],
   'docs/dc-osm-map1-rollback.sql': ['test/dc_osm_layer_pg/build_map1.py', '--check'],
+  // 2026-10-23: the same-building pair, same rule
+  'docs/dc-osm-dedupe-apply.sql': ['test/map1_dc_publication_pg/build_osm_dedupe.py', '--check'],
+  'docs/dc-osm-dedupe-rollback.sql': ['test/map1_dc_publication_pg/build_osm_dedupe.py', '--check'],
 };
 const genOk = (p) => GENERATED[p] && spawnSync('python3', GENERATED[p], { encoding: 'utf8' }).status === 0;
 const ofRecord = readers.filter((p) => !genOk(p));

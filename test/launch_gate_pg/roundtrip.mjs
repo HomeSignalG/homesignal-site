@@ -135,7 +135,7 @@ async function trialAsk(userId, body, admin = false) {
 }
 async function billingAsk(userId, body, billing = BILLING) {
   const real = BD.makeDeps({ ...SUPABASE, billing }, fetchToSql);
-  const h = BH.makeHandler({ ...real, authenticate: async () => ({ email: emailOf(userId), id: userId }), isAdmin: async () => false });
+  const h = BH.makeHandler({ ...real, checkoutEnabled: () => true, authenticate: async () => ({ email: emailOf(userId), id: userId }), isAdmin: async () => false });
   const res = await h(post(body));
   return { status: res.status, json: await res.json() };
 }

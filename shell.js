@@ -309,27 +309,38 @@
   // separate, schema-gated step stamps it onto the conversion row). No PII.
   function captureReferral() {
     try {
-      if (LS.get('referral', null)) return;           // already have a first touch
-      const q = new URLSearchParams(location.search);
-      const src = q.get('utm_source');
-      // Only record when there's a real signal: an explicit utm_source, or an
-      // off-site referrer. Same-origin navigations are not a new "first touch".
-      let refHost = '';
-      try { refHost = document.referrer ? new URL(document.referrer).host : ''; } catch (e) {}
-      const offsite = refHost && refHost !== location.host;
-      if (!src && !offsite) return;
-      LS.set('referral', {
-        source:   src || (offsite ? refHost : null),
-        medium:   q.get('utm_medium') || (src ? null : 'referral'),
-        campaign: q.get('utm_campaign') || null,
-        referrer: document.referrer || null,
-        landing:  location.pathname + location.search,
-        ts:       new Date().toISOString()
-      });
+      // The touch is built by the one shared definition (lib/data.js HS.referralLib).
+      const t = HS.referralLib.fromUrl(location.search, document.referrer, location.host,
+                                       location.pathname, new Date().toISOString());
+      if (!t) return;
+      // FIRST touch: written once, never overwritten (unchanged behaviour).
+      if (!LS.get('referral', null)) LS.set('referral', t);
+      // LAST TAGGED touch (utm_source present): refreshed by every campaign link click, so
+      // a visitor first seen organically is still credited to the campaign that brought
+      // them back. Never set by an untagged or same-origin visit.
+      if (t.tagged) {
+        LS.set('referral_last', t);
+        // ONE 'campaign_landing' event per tab session per campaign: the server-side record of
+        // a visit through a tagged link (public.events already carries no PII; the row is
+        // stamped with this touch by HS.eventRow). Deferred to HS.onReady so the data client
+        // exists; a reload inside the same tab session does not count a second visit.
+        const key = String(t.source) + '/' + String(t.campaign || '');
+        if (SS.get('landing_logged') !== key) {
+          SS.set('landing_logged', key);
+          HS.onReady(function () { logEvent('campaign_landing'); });
+        }
+      }
     } catch (e) { /* attribution must never break the page */ }
   }
   // Read seam for the (later, schema-gated) conversion-stamp step.
   HS.referral = function () { return LS.get('referral', null); };
+  // The touch a CONVERSION (signup, area request) is credited to: the most recent tagged
+  // campaign touch if there is one, else the first touch. users.referral_* still keeps the
+  // first non-null credit at the database level.
+  HS.referralForConversion = function () {
+    const last = LS.get('referral_last', null);
+    return (last && last.source) ? last : HS.referral();
+  };
   // Which page type this visit entered through (HS.entryFrom, lib/data.js), once per
   // browser tab session. HS.logEvent stamps it on every event, so an address lookup or
   // an alert sign-up can be counted against the page type Search Console reports on.
@@ -350,7 +361,7 @@
   // analytics can tell referral-attributed rows from page-provenance rows at a
   // glance: "ref:bluesky/box-elder-meetings". Null when there's no first touch.
   HS.referralToken = function () {
-    const r = HS.referral(); if (!r || !r.source) return null;
+    const r = HS.referralForConversion(); if (!r || !r.source) return null;
     const tok = 'ref:' + r.source + (r.campaign ? '/' + r.campaign : '');
     return tok.replace(/\s+/g, '_').slice(0, 120);
   };
@@ -1021,6 +1032,8 @@
         state.session = data && data.session ? data.session : null;
       } catch (e) { state.session = null; }
     }
+    // A signed-in account is linked to the visitor's first touch (the database decides whether this visit acquired the account).
+    try { if (state.session && !state.session.demo && HS.attr && !IS_EMBED) HS.attr.claim(HS.sb(), state.session.user && state.session.user.id); } catch (e) {}
     if (!state.session && CFG.DEMO_SESSION) {
       const u = (window.HS_SEED && window.HS_SEED.demoUser) || { id: 'demo', email: 'demo@homesignal.net', name: 'Demo', initials: 'DE' };
       state.session = { user: { id: u.id, email: u.email }, demo: true, name: u.name, initials: u.initials };
@@ -2223,7 +2236,7 @@
     // (3) The selection — the one additive consent writer, alert consent only.
     const r = await HS.sb().rpc('enable_area_email_alerts',
       HS.mapsOptinRpcArgs(state.session.user.email, zc.id, zip,
-        MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS.referral()));
+        MAPS_CONSENT_VERSION, MAPS_CONSENT_COPY, HS.referralForConversion()));
     if (r && r.error) throw new Error(r.error.message || 'Could not save your email sign-up.');
     // (4) Read it back: the control says what DELIVERY will do, never what we hoped.
     const st = await HS.mapsZipEmailState(zip);
@@ -2463,7 +2476,7 @@
     // checkbox is checked right now.
     const licensing = $('tmConsent').checked ||
       Object.keys(state.topicPrefs).some(k => state.topicPrefs[k] && state.topicPrefs[k].share_consent);
-    const ref = HS.referral() || {};
+    const ref = HS.referralForConversion() || {};
     const args = {
       p_email: email, p_community_id: ct.rootId, p_zip_code: zip,
       p_topics: topics, p_consent_version: CONSENT_VERSION, p_subscriptions: subs,
@@ -2860,6 +2873,9 @@
   async function boot() {
     captureReferral();          // first-touch attribution, before anything can fail
     captureEntry();             // which page type this visit entered through
+    // First-party attribution (docs/acquisition-attribution.sql): remember and send the FIRST touch before anything records an
+    // event. The browser reports what it saw; the database classifies the channel. Never blocks or breaks the page.
+    try { if (HS.attr) { HS.attr.capture(); HS.attr.send(); } } catch (e) { /* attribution must never break the page */ }
     await injectShell();
     // A ZIP with no standard page (lib/zip-coverage.json): a map page shows the coverage panel
     // and stops here, so no map or development code runs; the community page draws the same
@@ -2877,7 +2893,7 @@
       viewedZip: kind === 'map' ? null : state.zip,
       onZipPage: kind !== 'map' && HS.isZipPagePath(location.pathname)
     });
-    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); return; }
+    if (covHit && (HS.zipCoverageNoPage(covHit.mode) || (kind === 'map' && !addressSearch))) { renderZipCoverage(covHit); recordPageView(); return; }
     try { await loadOnboardingLib(); wireOnboarding(); } catch (e) { console.warn('onboarding', e); }
     await bootSession();
     await hydrateTopicPrefs();
@@ -2896,7 +2912,14 @@
     } catch (e) {}
     if (!IS_EMBED && HS.needsOnboarding && HS.needsOnboarding()) HS.startOnboarding();
     else if (!IS_EMBED) HS.consumeFollowHandoff();
+    recordPageView();
     _resolveReady(HS);
+  }
+  // One page_view per page load (never for an embedded iframe). Carries the visitor and visit-session ids and the viewed ZIP only:
+  // no URL query, no address, no email. Visitors, sessions and returns on the acquisition dashboard are counted from these.
+  function recordPageView() {
+    if (IS_EMBED) return;
+    logEvent('page_view', {});
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

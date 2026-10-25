@@ -204,4 +204,87 @@ select 'S14 a point on an edge two ZCTAs share publishes on NEITHER page (fails 
    and not exists (select 1 from public.map1_dc_zip_members('99903') m where m.project_name = 'NO shared edge'),
        null;
 
+-- =====================================================================================
+-- SAME BUILDING, NEARBY (founder ruling 2026-10-23): a second synthetic ZIP so S1-S14 are untouched.
+-- 99904 is the square (-90..-89.6, 30..30.4); 99905 is its east neighbour, used only to hold a
+-- canonical twin that is NOT on 99904's page. At 30 N, 0.001 deg lat = 111 m, 0.001 deg lng = 96 m.
+-- =====================================================================================
+delete from geo.zcta_boundary where zcta5 in ('99904', '99905');
+insert into geo.zcta_boundary (zcta5, geom) values
+  ('99904', ST_Multi(ST_GeomFromText('POLYGON((-90 30, -89.6 30, -89.6 30.4, -90 30.4, -90 30))', 4269))),
+  ('99905', ST_Multi(ST_GeomFromText('POLYGON((-89.6 30, -89.2 30, -89.2 30.4, -89.6 30.4, -89.6 30))', 4269)));
+
+select pg_temp.mk('Digital Realty IAD55', 'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.050, -89.90, 'operational', 'https://example.test/s1');
+select pg_temp.mk('Acme Data Center',     'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.060, -89.90, 'operational', 'https://example.test/s2');
+select pg_temp.mk('Vantage WA12',         'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.070, -89.90, 'operational', 'https://example.test/s3');
+select pg_temp.mk('Stack POR03',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.080, -89.90, 'operational', 'https://example.test/s4a');
+select pg_temp.mk('Stack POR03',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.0803, -89.90, 'operational', 'https://example.test/s4b');
+select pg_temp.mk('Far Co FAR1',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.090, -89.90, 'operational', 'https://example.test/s5');
+select pg_temp.mk('Edge Co ED1',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.100, -89.59995, 'operational', 'https://example.test/s6');
+select pg_temp.mk('Dual Co DU1',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.110, -89.90, 'operational', 'https://example.test/s7');
+select pg_temp.mk('Equinix SV1',          'compute_atlas', 'CONFIRMED_DC', 'RESOLVED', 30.120, -89.90, 'operational', 'https://example.test/s8');
+update public.dc_source_observation set source_native_operator = 'Digital Realty' where source_native_name = 'Digital Realty IAD55';
+update public.dc_source_observation set source_native_operator = 'Vantage Data Centers' where source_native_name = 'Vantage WA12';
+update public.dc_source_observation set source_native_operator = 'Equinix' where source_native_name = 'Equinix SV1';
+
+insert into public.national_dc_records
+  (source_key, source_record_id, osm_type, source_url, project_name, developer_or_operator, raw_status,
+   normalized_status, lat, lng, location_precision, map_eligible, map_exclusion_reason)
+values
+  -- a shared site code, brand by the operator, 56 m: hidden
+  ('pbtest:ss-code',  '11', 'way', 'https://example.test/x1', 'IAD55',                        'Digital Realty',       'operational', 'operational', 30.0505, -89.90, 'precise_location', true, null),
+  -- the same name once the bracket is dropped, 100 m: hidden
+  ('pbtest:ss-name',  '12', 'way', 'https://example.test/x2', 'Acme Data Center (Building 1)', null,                   'operational', 'operational', 30.0609, -89.90, 'precise_location', true, null),
+  -- one operator, 56 m, a DIFFERENT code: kept
+  ('pbtest:ss-wa13',  '13', 'way', 'https://example.test/x3', 'Vantage WA13',                  'Vantage Data Centers', 'operational', 'operational', 30.0705, -89.90, 'precise_location', true, null),
+  -- two canonical twins: ambiguous, kept
+  ('pbtest:ss-amb',   '14', 'way', 'https://example.test/x4', 'Stack POR03',                   null,                   'operational', 'operational', 30.0801, -89.90, 'precise_location', true, null),
+  -- the same name 189 m away: kept
+  ('pbtest:ss-far',   '15', 'way', 'https://example.test/x5', 'Far Co FAR1',                   null,                   'operational', 'operational', 30.0917, -89.90, 'precise_location', true, null),
+  -- its twin is 82 m away, inside this page's 1e-4 retrieval margin but drawn on ANOTHER page (99905): kept here
+  ('pbtest:ss-edge',  '16', 'way', 'https://example.test/x6', 'Edge Co ED1',                   null,                   'operational', 'operational', 30.100, -89.6008, 'precise_location', true, null),
+  -- two OSM pins name one canonical pin: ambiguous, both kept
+  ('pbtest:ss-dua',   '17', 'way', 'https://example.test/x7', 'Dual Co DU1',                   null,                   'operational', 'operational', 30.1103, -89.90, 'precise_location', true, null),
+  ('pbtest:ss-dub',   '18', 'way', 'https://example.test/x8', 'Dual Co DU1',                   null,                   'operational', 'operational', 30.1097, -89.90, 'precise_location', true, null),
+  -- one brand, 56 m, a different code: kept (Equinix SV1 / SV5)
+  ('pbtest:ss-sv5',   '19', 'way', 'https://example.test/x9', 'Equinix SV5',                   'Equinix',              'operational', 'operational', 30.1205, -89.90, 'precise_location', true, null);
+
+create temp table _ss_out as select * from public.map1_dc_zip_members('99904');
+
+insert into _pb_result(check_name, pass, detail)
+select 'S15 same building nearby: a shared site code (IAD55) and the same name without its bracket hide the OSM pin',
+       not exists (select 1 from _ss_out where source_key in ('pbtest:ss-code', 'pbtest:ss-name'))
+   and exists (select 1 from _ss_out where project_name = 'Digital Realty IAD55' and publication_basis = 'canonical')
+   and exists (select 1 from _ss_out where project_name = 'Acme Data Center' and publication_basis = 'canonical'),
+       (select string_agg(source_key, ',' order by source_key collate "C") from _ss_out where publication_basis = 'legacy_osm_compat');
+
+insert into _pb_result(check_name, pass, detail)
+select 'S16 distinct buildings of one operator stay separate: Vantage WA12/WA13 and Equinix SV1/SV5 (different codes)',
+       (select count(*) from _ss_out where source_key in ('pbtest:ss-wa13', 'pbtest:ss-sv5')) = 2, null;
+
+insert into _pb_result(check_name, pass, detail)
+select 'S17 ambiguous pairings keep every marker: two canonical twins (Stack POR03) or two OSM twins (Dual Co DU1)',
+       (select count(*) from _ss_out where source_key in ('pbtest:ss-amb', 'pbtest:ss-dua', 'pbtest:ss-dub')) = 3
+   and (select count(*) from _ss_out where project_name = 'Stack POR03' and publication_basis = 'canonical') = 2, null;
+
+insert into _pb_result(check_name, pass, detail)
+select 'S18 the same name beyond 150 m is kept',
+       exists (select 1 from _ss_out where source_key = 'pbtest:ss-far'), null;
+
+insert into _pb_result(check_name, pass, detail)
+select 'S19 a twin drawn on ANOTHER page never hides a pin here (Edge Co ED1: twin on 99905, OSM pin kept on 99904)',
+       exists (select 1 from _ss_out where source_key = 'pbtest:ss-edge')
+   and not exists (select 1 from _ss_out where project_name = 'Edge Co ED1' and publication_basis = 'canonical')
+   and exists (select 1 from public.map1_dc_zip_members('99905') m where m.project_name = 'Edge Co ED1'), null;
+
+insert into _pb_result(check_name, pass, detail)
+select 'S20 the name rule on its own: brand AND (name or code), never distance',
+       public.dc_names_same_site('IAD55', 'Digital Realty', 'Digital Realty IAD55', 'Digital Realty')
+   and public.dc_names_same_site('Acme Data Center (Building 1)', null, 'Acme Data Center', null)
+   and not public.dc_names_same_site('Vantage WA13', 'Vantage', 'Vantage WA12', 'Vantage')
+   and not public.dc_names_same_site('Acme IAD55', null, 'Other IAD55', null)
+   and not public.dc_names_same_site(null, 'Same Op', null, 'Same Op')
+   and not public.dc_names_same_site(null, null, null, null)
+   and not has_function_privilege('anon', 'public.dc_names_same_site(text,text,text,text)', 'execute'), null;
+
 select check_name, coalesce(pass, false) as pass, detail from _pb_result order by n;

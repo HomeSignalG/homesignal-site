@@ -3,7 +3,9 @@
 HomeSignal is a **civic-alerts service**: residents follow their community and get
 alerts about government notices, meetings, permits, and environmental/quality news
 that affect their home. This repo is the **static front-end** (plain HTML + vanilla
-JS, no build step) served from GitHub Pages at **homesignal.net** (see `CNAME`).
+JS, no build step) served from GitHub Pages at **jodytracks.com** (the brand contract's current identity; `CNAME` and every public URL are
+rewritten to it at deploy time by `scripts/brand_stage.py`, so the committed `homesignal.net` strings are the *pre-migration source form*, not what
+production serves). `homesignal.net` now only redirects. Dated receipts below that quote `homesignal.net` are left as written.
 It reads live data from Supabase; the alert *content* is produced by a separate
 engine repo. There is **no bundler, no framework, no `package.json`** — what's in
 the repo is what ships.
@@ -213,6 +215,28 @@ the exact problem `QUEUE.md` exists to end.
 
 ---
 
+
+## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
+
+Pierce County WA (65 ZIP pages) is the first geographic marketing focus. National SEO is unchanged: `sitemap.xml`, the six family
+sitemaps, every page's robots directive and Rule F / Rule D are exactly as before.
+
+- **`/sitemaps/pierce-county-wa.xml`** (public host `https://jodytracks.com`) is a SUBSET view of `sitemap.xml`, written by
+  `gen_zip_pages.py::write_focus_sitemaps` from `data/seo-focus-areas.json`. Members are derived at build time from each page record's
+  `state` + `county`; a member is listed only if it is in the same `indexable` set (Rule F OR Rule D) that `sitemap.xml` advertises, so it
+  can never disagree with the national sitemap. It is outside `SITEMAP_FAMILIES` on purpose (it overlaps the ZIP families).
+- **`lastmod`** is the page-semantics lastmod only (`page_semantics.finalize`), omitted when unknown. **No `changefreq` and no `priority`**
+  (`_url_el(bare=True)`; the national sitemaps still carry theirs, deliberately untouched).
+- **Deploy gate** (`pages.yml`): the file equals its eligible ZIPs, is a subset of `sitemap.xml` and of the indexable set, every listed page
+  is `index, follow` and self-canonical, member count equals `expected_zips` (65, a tripwire pinned to the committed seed by
+  `test/focus-sitemap.test.mjs`). `robots.txt` lists it beside the national sitemap.
+- **`/sitemaps/washington-state.xml`** (founder, 2026-10-23) is the same mechanism with no `county`: every WA ZIP page is a member (362 in the registry on 2026-10-23, Supabase), and only index-eligible ones are listed. It does not force any page to be indexed; Rule F / Rule D still decide that, and the build report names each excluded page.
+- **A new focus area is one JSON entry**, not code. Do not list ZIPs by hand.
+- **Live proof:** `verify-focus-area-live.yml` (dispatch, read-only, runner egress) prints per-ZIP HTTP status, redirect, canonical, robots
+  meta + X-Robots-Tag, sitemap membership and inbound internal links. Run it after a deploy, then submit the sitemap in Search Console.
+- **Measured 2026-10-23 (Supabase, control 12,722 registry ZIPs):** 65 Pierce ZIP communities, all 65 in `canonical_zip_registry`, 64 with
+  `app_community_meta.indexable = true`, 98397 Longmire false. ⚠️ That flag is the Map 1 gate, NOT the page's robots decision (Rule F or D, built
+  at deploy), so eligibility for the sitemap comes from the build, never from this flag.
 
 ## Permanent historical intelligence — preserve the longitudinal asset
 
@@ -751,7 +775,7 @@ Then do the runbook end-to-end without pausing. The session already runs in
    `id`. Capture the returned `id`.
 2. **Verify it resolves.** `select id, name, level, zip_codes, government_topics
    from public.communities order by name;` then confirm the page loads at
-   `https://homesignal.net/community.html?zip=<a-covered-zip>` (and `?id=<uuid>`).
+   `https://jodytracks.com/community.html?zip=<a-covered-zip>` (and `?id=<uuid>`).
    No alerts/meetings yet is expected — content comes from step 3.
 3. **Wire the content feeds** in `homesignal-ingest` (separate repo). Add the
    community's government RSS/feed rows to `feeds.csv` keyed by `community_id`, and
@@ -928,7 +952,7 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   **County** government (7 topics) + universal (News/Emerging/Global); **Brigham City /
   Tremonton** → their **own council** + county + universal. Subscriptions anchor to the
   Box Elder County `community_id` (chain root), so they match and deliver.
-  ⚠️ **Not eyeballed live** — the build sandbox can't reach Supabase/`homesignal.net`
+  ⚠️ **Not eyeballed live** — the build sandbox can't reach Supabase/`jodytracks.com`
   (egress blocked → `HTTP 000`); verified by data + deployed code + static render, **not**
   an end-to-end browser signup. Confirm on the real site (`?zip=84312` → pick a topic →
   sign up). Each small town's **own council** is the pending ingest follow-up.
@@ -1244,7 +1268,7 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
   "Verify" for a DATA change still means what it always did: apply the SQL, then load the
   affected page (e.g. `community.html?zip=…`) and confirm it renders and reads the right rows —
   the suite covers code, not the contents of the database.
-- **Automated live verification (CI).** The build sandbox can't reach Supabase/`homesignal.net`
+- **Automated live verification (CI).** The build sandbox can't reach Supabase/`jodytracks.com`
   (egress blocked), so `.github/workflows/verify-communities.yml` + `scripts/verify-communities.mjs`
   do the live check on a GitHub runner: they read the **live `communities` table** and, for
   every covered ZIP, assert `community.html?zip=<zip>` resolves to the most-specific community
@@ -2635,6 +2659,17 @@ still `legacy-phase1-2026-09-01` (ACTIVE_LEGACY).
   - **Pattern to keep:** a function that reads a `char(5)` key compares it with a `char(5)` value,
     never with a `text` parameter. A plan line reading `(zcta5)::text = …` is this defect.
 
+## 7.11b A MISSED ATLAS OR EPOCH READ PAGES — `dc_acquisitions` (2026-10-23)
+
+Both daily data-centre reads (homesignal-ingest `ingest-compute-atlas.yml` 09:40 UTC, `ingest-epoch-ai.yml`
+10:10 UTC) got no GitHub runner on 2026-10-21 and 2026-10-23 and wrote nothing; the hourly monitor read nothing
+about them. `docs/dc-acquisitions-monitor.sql` splices an alertable `dc_acquisitions` check into
+`pipeline_health_tick()` (same splice discipline as ingest's `20261023160000`; it lives here because ingest's
+Step-2A isolation gate forbids that repo naming `dc_*` objects). For every ACTIVE `dc_source` distribution it
+fails when no `SUCCESS_COMPLETE` run completed in 30 h, or the newest run failed or is still open after 2 h.
+Measured first: all 92 runs ever were `SUCCESS_COMPLETE`; the only 48 h gaps in 30 days are the two missed days.
+When it pages, dispatch that source's ingest workflow with `mode=apply`. Test: `test/dc_acquisitions_monitor_pg`.
+
 ## 7.12 ONE CANONICAL GEOGRAPHY AUTHORITY: A DERIVED GEOCODE CORROBORATES OR CONTRADICTS BY ITS OWN MEASURED ERROR (2026-09-24)
 
 **Every coordinate claim is classified by what the evidence is, and authority follows that
@@ -3163,6 +3198,16 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
   acquisition; then the CTE is deleted. A compatibility row is dropped only when ONE published
   canonical entity sits at IDENTICAL coordinates (≤ 1 m, one-to-one). Anything looser is not a
   match — "Vantage WA12"/"WA13" are 166 m apart, same operator, two buildings.
+  - ⚖️ **WIDENED BY FOUNDER RULING 2026-10-23 ("b"): one marker per building, by NAME, within 150 m.** An OSM
+    pin is also hidden when exactly one canonical pin drawn on the SAME ZIP page lies within 150 m and names
+    the same site: `public.dc_names_same_site` (same brand by the first word of the name or operator, AND the
+    same name without bracketed text OR a shared site code such as IAD55, SV9, CH4). One-to-one, and applied
+    after membership, so a twin on another page never hides a pin. Distance alone never decides: WA12/WA13,
+    Equinix SV1/SV5, NTT CH1/CH2 stay separate (different codes). Measured read-only 2026-10-23: 46
+    name-matched pairs within 150 m, 44 one-to-one, all the same building (2–147 m apart); Stack POR03 (two
+    canonical twins) keeps both. Ships through `dc-osm-dedupe-apply.yml` (offline proof + a gate on a replica
+    of today's production + typed confirm `APPLY-OSM-DEDUPE`; rollback `ROLLBACK-OSM-DEDUPE`). The C3c and C7
+    tools are frozen and their offline proofs pinned to `4e91e9d2`, the last commit with the reader they shipped.
 - **Retired:** `national_dc_for_zip` (the 5-mile centroid radius) and `national_dc_zip_members`
   are service-role only; no resident role may execute either.
 - **Measured 2026-09-22 over all 12,722 pages**, against the reader it replaced: pages with any
@@ -3197,7 +3242,7 @@ lifecycle key only through the shared vocabulary (`HS.canonicalLifecycle`, in `H
     now do, and both fail on the old mapping.
   - `scripts/probe-map1-dc-type-lifecycle.mjs` (`verify-map1-dc-type-lifecycle.yml`) checks the
     real page against the live RPC for the deterministic sample (01040, 01852, 07033, 20187,
-    23150); dispatch it with `site_base=https://homesignal.net` to check what is live.
+    23150); dispatch it with `site_base=https://jodytracks.com` to check what is live.
     ⚠️ **It goes red between a Compute Atlas acquisition and the next identity (:25) and geography
     (:35) runs**, because the canonical layer is empty then (the §7.13 ordering defect). Seen live on
     2026-09-27: acquisition at 14:49:52Z left 2,242 Atlas observations unlinked, and 01040 / 07033
@@ -4417,7 +4462,7 @@ proven load-bearing by mutation). **Units 1 and 3 are untouched; `data_quality`,
     focus-scroll (scrollTop 0 → 656 at 1280x900). It is benign there (the panel stays in
     view, and a page scroll brings it back at shorter heights) and pre-existing. Not folded
     into this fix.
-  - ⚠️ **The sandbox cannot reach `homesignal.net` or jsDelivr** (egress policy 403), so every
+  - ⚠️ **The sandbox cannot reach `jodytracks.com` or jsDelivr** (egress policy 403), so every
     number here is from the repo's own browser harness against the shipped page with Leaflet
     served locally — not from production. Confirm on the real site.
 - 🟢 **MAP 1 RESIDENTIAL — QUALIFICATION IS NOW TOTAL, AND SOURCE PROVENANCE CAN QUALIFY A
@@ -5389,6 +5434,46 @@ attribute preserved — that event architecture is a separate unit and is not bu
 - Out of scope and untouched: `development.html`'s own facility dossier heading and Map 1's
   `#kFac` counter label, both of which also read "Regulated facilities nearby".
 
+## SALESHANDY CAMPAIGN ATTRIBUTION — ONE TOUCH DEFINITION, AGGREGATE CAMPAIGN STATS (2026-10-23, founder-approved design)
+
+Measures how Realtor email campaigns (Saleshandy) turn into website visits, registrations, Development Activity
+Reports and paying customers, **inside the existing Acquisition Dashboard** (new tab "15 · Saleshandy"; no new
+dashboard, no Zapier). SQL of record, **parked, not applied**: `docs/saleshandy-attribution.sql`. Ingest half (the
+daily sync): homesignal-ingest CLAUDE.md "SALESHANDY CAMPAIGN STATS".
+
+- **Email links are plain first-party URLs, no redirect, open/click tracking OFF:**
+  `?utm_source=saleshandy&utm_medium=email&utm_campaign=<campaign_key>[&utm_content=<step>]`. Campaign-level only:
+  never an email, name or recipient id in a URL. Point them at a page that loads `shell.js`
+  (`/development-activity.html`, `/`); the report page itself does not capture.
+- **ONE definition of a touch: `lib/data.js` `HS.referralLib`** (`fromUrl`, `eventFields`). `shell.js::captureReferral`
+  stores the FIRST touch (`hs:referral`, once) and the LAST TAGGED touch (`hs:referral_last`, refreshed by each campaign
+  link). Labels are lowercased and must match `^[a-z0-9._~:/-]{1,80}$` or are dropped, so nothing person-shaped is ever stored.
+  Conversions (signup, MAPS opt-in, area request) are credited to `HS.referralForConversion()` = the last tagged touch,
+  else the first; `users.referral_*` still keeps the first non-null credit at the database level.
+- **Visits:** one `campaign_landing` event per tab session per campaign (`public.events`, now with nullable
+  `ref_source/medium/campaign/content`). **Reports:** `development-activity-reports.html` writes one insert-only
+  `report_created` event, stamped from the same two localStorage keys, only for a saved report; it reads, never writes,
+  browser storage (`test/development-activity-reports.test.mjs` 4d0). `report_snapshot` is untouched (immutable, and
+  it must hold no customer context).
+- **Dashboard:** `public.hs_saleshandy_metrics(p_days)` — `dashboard_admins`-gated, `authenticated` only, aggregates
+  only (campaign label + counts; registrations/paying counted as distinct emails INSIDE the function and returned
+  as numbers). Rendered by `lib/acq-saleshandy.js` (escapes every value; shows no opens/clicks; a rate with no
+  denominator is a dash, not 0%). It reads live; it is not part of the snapshot blob.
+- **APPLY ORDER:** apply `docs/saleshandy-attribution.sql` BEFORE this site change deploys — a client insert naming a
+  missing column is refused and dropped silently. (The client only names `ref_*` when a campaign touch exists.)
+- **Known limits, stated:** visitors before tagged links existed (and other devices; Safari may expire script-written
+  storage after ~7 days) cannot be credited; **email security scanners fetch links even with tracking off**, so
+  `visitors` can include scanner sessions — the count is "distinct browsers that ran our JavaScript on a tagged
+  landing", not email opens. The dashboard's coverage card says how many registrations carry a campaign. The 73
+  existing `users.referral_source` values are test data (`admin_test`, `bluesky/test-manual`).
+- **Possible disclosure change for the founder:** whether `privacy.html` should mention first-party campaign
+  measurement. Not edited here (legal wording).
+- Tests: `test/saleshandy-attribution.test.mjs` (touch definition, event stamp, shell capture, report logger, SQL
+  shape; mutation-checked), plus the SQL run against a disposable Postgres (apply, re-apply, gate, duplicate guard,
+  label constraint, grants).
+
+---
+
 ## SHARED REPORT: "Follow this property" RUNS INLINE, IN HOMESIGNAL'S OWN FLOW (2026-10-11)
 
 `shared-report.html` stays isolated (one request, no shell, no account, no follow or sign-in code). Its top button (beside Download PDF, green primary; Download PDF is the quiet one) and the one in the bottom invitation share ONE state and ONE path. **Nothing opens or loads on page load.** A click moves one panel under the clicked button and creates a same-origin frame, `follow-embed.html#address=<address>` (fragment only, never sent to a server; noindex; disallowed in `robots.txt`; in `stage_site.py`'s named list). The frame is a normal shell page (`html.hs-embed.hs-follow`) that calls `HS.startFollowEmbed`, i.e. the SAME `HS.openHome` -> `HS.findHome` (Census) -> `HS.saveHome` -> `savePlaceRow` (idempotent by `app_properties_user_place_key`) -> `followCommunity` / `ensureAreaSubscribed`. The sign-in modal and address step are restyled inline (app.css untouched; styles live in the frame page). The address step is ONE line: the resolved property with **Confirm** / **Change** (Change returns to the pre-filled address). `HS.followEmbed` makes `saveHome` skip the place card, the reload and onboarding, and nothing else.
@@ -5420,6 +5505,18 @@ live.** Full record: `docs/indexnow-seo-freshness.md`. The rules that must not b
   commit** (`decide()`): a freshness run can replace a pending push-build in the concurrency group.
 - **`lastmod` moves only when the fingerprint moves, and is omitted when unknown** — never the build day.
 - Query-string map URLs (`homesignalmap.html?zip=`) and `community.html?zip=` are never submitted.
+
+## ACQUISITION ATTRIBUTION — ONE CHANNEL DECISION, DERIVED REPORTS (2026-10-23)
+
+The Acquisition Dashboard counts by channel through ONE reader, `public.hs_acq_channel_report` (America/Los_Angeles days and weeks, UTC storage),
+and ONE classifier, `public.classify_channel`. The browser (`lib/data.js` `HS.attr`) only reports utm values, the referring HOST and the landing PATH.
+Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`; SQL of record `docs/acquisition-attribution.sql`.
+- ⛔ **Never classify a channel in the browser or in a second query.** `unknown` is never counted as `direct`; history before tracking is
+  `not_collected` and is never backfilled.
+- ⛔ **The report page is not touched.** It calls no extra RPC and keeps no extra storage (`test/development-activity-reports.test.mjs` 3b/4d).
+  Reports are credited at READ time to their brokerage's single active member's account touch; issuance does not record who made a report.
+- Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
+- `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
