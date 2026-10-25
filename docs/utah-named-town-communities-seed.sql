@@ -8,7 +8,7 @@
 -- Source: every one of the 31 publishes its council on the Utah Public Notice Website (utah.gov/pmn), which the
 -- engine already reads. Each town's council body was found through the site's own entity and public-body lists
 -- and checked through pg_net on 2026-10-25: all 31 have notices dated inside the last 90 days.
--- Feeds: homesignal-ingest feeds.csv gov-<slug>-town-council (notices) + mtg-<slug>-town-catchall (meetings),
+-- Feeds: homesignal-ingest feeds.csv gov-<slug>-council (notices) + mtg-<slug>-council-catchall (meetings),
 -- jurisdiction_slug = the slug below.
 do $$
 declare
