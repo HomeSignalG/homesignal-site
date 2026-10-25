@@ -30,11 +30,28 @@ concurrency:
 
 jobs:
   archive:
-    # Holds SUPABASE_SERVICE_ROLE_KEY: never on pull_request, dispatch from main only.
+    # Holds PROD_SUPABASE_SERVICE_ROLE_KEY (environment `production`, ref main only): never on pull_request, dispatch from main only.
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -44,7 +61,7 @@ jobs:
       - name: Archive
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
           REGISTRY: ${{ inputs.registry }}
           SINCE: ${{ inputs.since }}
           APPLY: ${{ inputs.apply }}

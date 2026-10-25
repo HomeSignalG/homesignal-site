@@ -28,8 +28,10 @@
 //   READ_ONLY   name exactly one API URL (non-comment lines): the canonical ENDPOINT line for
 //               /database/query/read-only, used as the URL of the only Request(.
 //
-// The canonical text and constants live in ONE place, test/lib/production-boundary.mjs. This is not
-// the full rule test (that comes with the switch of the 36 existing jobs). HYGIENE, NOT THE BOUNDARY:
+// The canonical text and constants live in ONE place, test/lib/production-boundary.mjs, and the line
+// scanner in test/lib/production-boundary-scan.mjs. The rules for EVERY workflow (the 19 jobs moved onto
+// the environment on 2026-10-25 among them) are test/production-boundary.test.mjs; this file holds the
+// two workflows built for the environment to stricter rules. HYGIENE, NOT THE BOUNDARY:
 // a PR can edit this test, and a line scanner cannot follow code that builds a URL or an expression
 // from fragments; the environment's main-only branch rule is what enforces.
 //
@@ -53,172 +55,12 @@ const NEW_WORKFLOWS = ['db-read.yml', 'verify-production-environment.yml'];
 let fails = 0;
 const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); if (!c) fails++; };
 
-const indentOf = (l) => l.match(/^ */)[0].length;
-const blank = (l) => l.trim() === '';
-const skippable = (l) => blank(l) || isCommentLine(l);
+import {
+  indentOf, blank, skippable, topBlock, triggerNames, parseJobs, firstStep, dedent, keyBlocks, runBlocks, stepsOf, stepKey, ifExpression, topLevelAnd, BOUNDARY_CONJUNCT, SHELL_ENV_KEY, SECRET_REF, STEP_ENV_SECRET, mut,
+} from './lib/production-boundary-scan.mjs';
 
-// ── the scanner (stdlib line scanner; the repo carries no YAML dependency) ──────────────────────
-
-/** A top-level key's inline value and its indented body. */
-function topBlock(lines, keyRe) {
-  const i = lines.findIndex((l) => keyRe.test(l));
-  if (i < 0) return null;
-  const inline = lines[i].replace(keyRe, '').replace(/\s+#.*$/, '').trim();
-  const body = [];
-  for (let k = i + 1; k < lines.length; k++) {
-    if (/^\S/.test(lines[k]) && !isCommentLine(lines[k])) break;
-    body.push(lines[k]);
-  }
-  return { line: i, inline, body };
-}
-
-function triggerNames(on) {
-  if (on.inline) {
-    const t = on.inline.replace(/^\[|\]$/g, '').replace(/^\{|\}$/g, '');
-    return t.split(',').map((s) => s.split(':')[0].trim()).filter(Boolean);
-  }
-  const keyed = on.body.filter((l) => !skippable(l));
-  if (!keyed.length) return [];
-  const ind = Math.min(...keyed.map(indentOf));
-  const names = [];
-  for (const l of keyed) {
-    if (indentOf(l) !== ind) continue;
-    const m = l.match(/^\s*-\s+([A-Za-z_]+)\s*$/) || l.match(/^\s*([A-Za-z_]+)\s*:/);
-    names.push(m ? m[1] : l.trim());
-  }
-  return names;
-}
-
-function parseJobs(lines) {
-  const j = lines.findIndex((l) => /^jobs\s*:\s*(#.*)?$/.test(l));
-  if (j < 0) return null;
-  const jobs = [];
-  let cur = null;
-  for (let k = j + 1; k < lines.length; k++) {
-    const l = lines[k];
-    if (/^\S/.test(l) && !isCommentLine(l)) break;
-    const m = l.match(/^ {2}([A-Za-z0-9_-]+)\s*:\s*(#.*)?$/);
-    if (m) { cur = { name: m[1], body: [] }; jobs.push(cur); continue; }
-    if (cur) cur.body.push({ n: k, l });
-  }
-  return jobs;
-}
-
-/** The first step's text (lines from its `- ` to the next step), or an error string. */
-function firstStep(job) {
-  const s = job.body.findIndex(({ l }) => /^ {4}steps\s*:\s*(#.*)?$/.test(l));
-  if (s < 0) return { error: 'no steps: block at job indent' };
-  let k = s + 1;
-  while (k < job.body.length && skippable(job.body[k].l)) k++;
-  if (k >= job.body.length || !/^ {6}- /.test(job.body[k].l)) return { error: 'first step not found at 6-space indent' };
-  const start = k;
-  for (k = start + 1; k < job.body.length; k++) {
-    const l = job.body[k].l;
-    if (/^ {6}- /.test(l)) break;
-    if (!skippable(l) && indentOf(l) < 8) break;
-  }
-  return { text: job.body.slice(start, k).map((x) => x.l).join('\n') };
-}
-
-function dedent(text, n) {
-  const pad = ' '.repeat(n);
-  const out = [];
-  for (const l of text.split('\n')) {
-    if (l === '') { out.push(l); continue; }
-    if (!l.startsWith(pad)) return null;
-    out.push(l.slice(n));
-  }
-  return out.join('\n');
-}
-
-/** Every value of a key (inline remainder plus its more-indented continuation lines). Lines inside
- *  a run: value are skipped, so script text such as Python's `with` is never read as a key. */
-function keyBlocks(lines, key, skip = new Set()) {
-  const out = [];
-  const re = new RegExp(`^(\\s*)(- )?${key}\\s*:(.*)$`);
-  for (let i = 0; i < lines.length; i++) {
-    const l = lines[i];
-    if (isCommentLine(l) || skip.has(i)) continue;
-    const m = l.match(re);
-    if (!m) continue;
-    const keyIndent = m[1].length + (m[2] ? 2 : 0);
-    const text = [m[3]];
-    let k = i + 1;
-    for (; k < lines.length; k++) {
-      if (blank(lines[k]) || indentOf(lines[k]) > keyIndent) text.push(lines[k]); else break;
-    }
-    out.push({ line: i + 1, start: i, end: k, text: text.join('\n') });
-    i = k - 1;
-  }
-  return out;
-}
-const runBlocks = (lines) => keyBlocks(lines, 'run');
-
-/** The steps of a job: arrays of {n, l}, each from its `- ` line to the next step. */
-function stepsOf(job) {
-  const s = job.body.findIndex(({ l }) => /^ {4}steps\s*:\s*(#.*)?$/.test(l));
-  if (s < 0) return [];
-  const steps = [];
-  let cur = null;
-  for (let k = s + 1; k < job.body.length; k++) {
-    const { l } = job.body[k];
-    if (/^ {6}- /.test(l)) { cur = [job.body[k]]; steps.push(cur); continue; }
-    if (!skippable(l) && indentOf(l) < 6) break;
-    if (cur) cur.push(job.body[k]);
-  }
-  return steps;
-}
-
-/** A step-level key's value (first line after the colon plus deeper continuation lines), or null. */
-function stepKey(step, key) {
-  const re = new RegExp(`^(?: {6}- | {8})${key}\\s*:(.*)$`);
-  for (let i = 0; i < step.length; i++) {
-    const m = step[i].l.match(re);
-    if (!m) continue;
-    const parts = [m[1]];
-    for (let k = i + 1; k < step.length && (blank(step[k].l) || indentOf(step[k].l) > 8); k++) {
-      if (!isCommentLine(step[k].l)) parts.push(step[k].l);
-    }
-    return parts.join('\n');
-  }
-  return null;
-}
-
-/** An if: value as an expression: block-scalar indicator, quotes and a ${{ }} wrapper removed. */
-function ifExpression(value) {
-  let e = value.trim().replace(/^[|>][+-]?\s*\n/, '').trim();
-  if (e.length >= 2 && (e[0] === '"' || e[0] === "'") && e[e.length - 1] === e[0]) e = e.slice(1, -1).trim();
-  const m = e.match(/^\$\{\{([\s\S]*)\}\}$/);
-  return (m ? m[1] : e).trim();
-}
-
-/** Split an expression on && at parenthesis depth 0, outside '…' strings. */
-function topLevelAnd(e) {
-  const out = [];
-  let depth = 0, quoted = false, cur = '';
-  for (let i = 0; i < e.length; i++) {
-    const c = e[i];
-    if (quoted) { cur += c; if (c === "'") quoted = false; continue; }
-    if (c === "'") { quoted = true; cur += c; continue; }
-    if (c === '(') depth++;
-    else if (c === ')') depth--;
-    if (depth === 0 && e.startsWith('&&', i)) { out.push(cur.trim()); cur = ''; i++; continue; }
-    cur += c;
-  }
-  out.push(cur.trim());
-  return out;
-}
-
-const BOUNDARY_CONJUNCT = "steps.boundary.outcome != 'failure'";
 // The one URL db-read may name, and the forms that must be absent elsewhere (non-comment lines).
 const ENDPOINT_LINE = 'ENDPOINT = "https://api.supabase.com/v1/projects/%s/database/query/read-only" % REF';
-// Env keys that change how bash starts or what its builtins do.
-const SHELL_ENV_KEY = /(^\s*|[{,]\s*)['"]?(BASH_ENV|ENV|BASH_FUNC_[^'"\s:]*|SHELLOPTS|BASHOPTS|PS4)['"]?\s*:/;
-
-// A line that references secrets in any form: ${{ … secrets … }}, secrets.NAME, secrets[...].
-const SECRET_REF = /\$\{\{[^}]*\bsecrets\b|\bsecrets\s*(?:\.\s*[A-Za-z_]|\[)/;
-// The only accepted form: the WHOLE value of a step-level env key.
-const STEP_ENV_SECRET = /^ {10}([A-Za-z_][A-Za-z0-9_]*): \$\{\{ secrets\.([A-Za-z0-9_]+) \}\}$/;
 
 /** Violations of the new-workflow rules, each prefixed with its check code. */
 export function violations(name, text) {
@@ -437,15 +279,6 @@ const BASE = [
   '          req = urllib.request.Request(ENDPOINT, data=b"")',
   '',
 ].join('\n');
-
-/** Apply one edit; throw if it does not apply exactly once (an edit that misses looks like a pass). */
-function mut(text, from, to) {
-  const n = text.split(from).length - 1;
-  if (n !== 1) throw new Error(`fixture edit applies ${n} times, expected 1: ${JSON.stringify(from)}`);
-  const out = text.replace(from, to);
-  if (out === text) throw new Error(`fixture edit changed nothing: ${JSON.stringify(from)}`);
-  return out;
-}
 
 let missed = false;
 try { mut(BASE, 'text that is not in the fixture', 'x'); } catch { missed = true; }

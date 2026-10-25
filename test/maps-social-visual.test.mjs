@@ -177,7 +177,10 @@ ok(/schedule:/.test(WF) && /cron:/.test(WF), 'the capture workflow runs on a sch
 ok(/workflow_dispatch/.test(WF), 'and is still dispatchable on demand');
 ok(/concurrency:/.test(WF) && /cancel-in-progress: false/.test(WF),
   'runs never overlap, so a slow run cannot be stacked by the next fire');
-ok(/--limit "\$\{\{ inputs\.limit \|\| '\d+' \}\}"/.test(WF),
+// Since 2026-10-25 the limit reaches the shell through env (the production-boundary rule: no
+// dispatch input is expanded into a run: script). Same default, same flag.
+ok(/CAPTURE_LIMIT: \$\{\{ inputs\.limit \|\| '\d+' \}\}/.test(WF) && /args=\(--limit "\$CAPTURE_LIMIT"\)/.test(WF) &&
+   /node scripts\/maps-social-image\.mjs "\$\{args\[@\]\}"/.test(WF),
   'every run is hard-capped by --limit, scheduled fires included');
 ok(/ENABLE GATE/.test(WF) && /EXPECTED_ENABLE/.test(WF),
   'and a standing switch can still stop every future run');
