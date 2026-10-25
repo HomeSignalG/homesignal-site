@@ -1,0 +1,38 @@
+name: video-bluesky-queue-suite
+
+# The per-item video approval -> Bluesky queue (docs/video-bluesky-queue.sql) against a DISPOSABLE Postgres with stand-ins for
+# Supabase's auth/storage/social_posts. No Supabase credential is used or reachable here.
+on:
+  pull_request:
+    paths:
+      - 'docs/video-bluesky-queue.sql'
+      - 'docs/youtube-video-review.sql'
+      - 'docs/youtube-video-file-decide-queue-apply.sql'
+      - 'test/video_bluesky_queue_pg/**'
+      - '.github/workflows/video-bluesky-queue-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/video-bluesky-queue.sql'
+      - 'docs/youtube-video-review.sql'
+      - 'docs/youtube-video-file-decide-queue-apply.sql'
+      - 'test/video_bluesky_queue_pg/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "a Supabase credential is present; this suite must not see one"; exit 1
+          fi
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+      - name: Run the queue suite (exit code is the result)
+        run: bash test/video_bluesky_queue_pg/run.sh
