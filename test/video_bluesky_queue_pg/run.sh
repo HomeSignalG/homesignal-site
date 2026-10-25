@@ -17,5 +17,6 @@ $P -f "$HERE/stubs.sql"
 $P -f "$ROOT/docs/youtube-video-review.sql" >/dev/null
 $P -f "$HERE/pre.sql"
 $P -f "$ROOT/docs/video-bluesky-queue.sql" >/dev/null
+$P -f "$HERE/production-decide.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-file-decide-queue-apply.sql" >/dev/null
 $P -f "$HERE/suite.sql"
