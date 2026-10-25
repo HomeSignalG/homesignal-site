@@ -5562,3 +5562,10 @@ Per-item approval (Main Video, Short 1, Short 2; tab 16) now creates one Bluesky
 cancels and retries. There is no second approval. MAPS/ALERTS (`social_posts`, `hs_approve_social_post`) are untouched. The publisher and the full
 runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-bluesky-queue.test.mjs`, `.browser.test.mjs`, and the SQL state machine on a
 disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
+
+**YouTube links found automatically (2026-10-25) - SQL PARKED (NOT APPLIED):** `docs/youtube-channel-sync.sql` adds
+`public.youtube_channel_videos` (one row per channel video, written only by ingest's hourly sync) and fills a project's
+`youtube_url` when its main video is matched and verified public. It never replaces an existing link and never links a
+video from the first import. Tab 16 shows what the sync found; typing a link by hand is now only for an exception. Every
+video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
+`test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
