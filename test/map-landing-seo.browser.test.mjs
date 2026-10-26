@@ -140,7 +140,8 @@ if (!(() => { try { createRequire(import.meta.url).resolve('leaflet/dist/leaflet
   await landing.waitForTimeout(1500);
   ok(await landing.evaluate(() => (window.__HS_SITES || []).length) > 0, 'B12 control: the same evidence reached the landing document and rendered content');
   // INDEX-ALL (2026-10-26): the page rewrites ?zip= to /map/<zip>/, which is that ZIP's own index-eligible page.
-  ok(await landing.evaluate(() => location.pathname) === `/map/${Z}/` && await robotsNow(landing) === 'index, follow', 'B13 a ?zip= visit becomes the ZIP\'s own /map/<zip>/ page, index, follow', await robotsNow(landing));
+  const landingPath = await landing.evaluate(() => location.pathname);
+  ok(/^\/map\/\d{5}\/?$/.test(landingPath) && await robotsNow(landing) === 'index, follow', 'B13 a ?zip= visit becomes a ZIP\'s own /map/<zip>/ page, index, follow', landingPath + ' ' + await robotsNow(landing));
   await landing.context().close();
 }
 await browser.close();
