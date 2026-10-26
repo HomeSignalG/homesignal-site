@@ -1,6 +1,7 @@
 name: verify-zip-universe
 
-# The ZIP universe must equal the approved Gold Master registry, exactly — 12,722 ZIPs.
+# The ZIP universe must equal the approved Gold Master registry, exactly — 12,726 ZIPs
+# (12,722 until the founder's 2026-10-26 Alaska expansion, docs/alaska-zip-expansion-2026-10-26.sql).
 #
 # Runs where network egress works (GitHub-hosted runner); the build sandbox cannot reach
 # Supabase. Reads only through the public anon key, so it needs no secret.
@@ -18,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_zips:
-        description: 'Approved ZIP count (default 12722)'
+        description: 'Approved ZIP count (default 12726)'
         required: false
         default: ''
   schedule:
