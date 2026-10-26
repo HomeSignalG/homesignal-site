@@ -182,6 +182,12 @@ for (const w of [1440, 1024, 390]) {
 await page.evaluate(() => { location.hash = '#impact=s1&step=outline'; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; });
 await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
 ok(await page.locator('#is [data-step=outline][aria-current=step]').count() === 1, 'reload: the deep link reopens the same story and step');
+// an old link from the first build (step=angles) and an unknown step must still draw the workspace, never a blank tab
+for (const [step, want] of [['angles', 'outline'], ['nope', 'script']]) {
+  await page.evaluate((st) => { location.hash = '#impact=s1&step=' + st; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; document.getElementById('is').innerHTML = ''; }, step);
+  await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
+  ok(await page.locator('#is [data-step=' + want + '][aria-current=step]').count() === 1, 'old or unknown step "' + step + '" opens ' + want + ' instead of a blank tab');
+}
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
