@@ -487,11 +487,18 @@
     SS.set('viewZip', null);   // never carry this ZIP onto the next page
     let robots = document.querySelector('meta[name="robots"]');
     if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots); }
-    robots.content = HS.zipCoverageNoPage(hit.mode) ? 'noindex, nofollow' : 'noindex, follow';
+    // INDEX-ALL POLICY (founder, 2026-10-26): the per-ZIP /map/<zip>/ document is a public page of its
+    // own: index, follow, canonical to itself, even where its panel replaces the map. A ZIP with no page
+    // at all and a query-string alias keep the earlier behaviour.
+    const ownMapPage = /^\/map\/\d{5}\/?$/.test(location.pathname) && !HS.zipCoverageNoPage(hit.mode);
+    robots.content = ownMapPage ? 'index, follow'
+      : (HS.zipCoverageNoPage(hit.mode) ? 'noindex, nofollow' : 'noindex, follow');
     document.querySelectorAll('link[rel="canonical"]').forEach(function (l) { l.remove(); });
     if (!HS.zipCoverageNoPage(hit.mode)) {
       const cl = document.createElement('link'); cl.rel = 'canonical';
-      cl.href = '/community/' + encodeURIComponent(hit.zip) + '/'; document.head.appendChild(cl);
+      cl.href = ownMapPage ? '/map/' + encodeURIComponent(hit.zip) + '/'
+                           : '/community/' + encodeURIComponent(hit.zip) + '/';
+      document.head.appendChild(cl);
     }
     document.title = String(hit.copy.page_title).split('{zip}').join(hit.zip);
     const label = HS.zipCoverageLabel(hit);

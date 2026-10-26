@@ -136,8 +136,8 @@ ok(same === ALL.length, `all ${ALL.length} documents are byte-identical across t
 
 // ---- 11. Rule F is untouched ----------------------------------------------------------
 ok(/content="index, follow"/.test(a), '01001 (3 notices) is still index-eligible');
-ok(/content="noindex, follow"/.test(doc(out1, '01003')),
-   'a sibling-linked but content-empty ZIP is still noindex — links never satisfy Rule F');
+ok(/content="index, follow"/.test(doc(out1, '01003')),
+   'a sibling-linked but content-empty ZIP is index-eligible (index-all policy); links still do not change what Rule F counts');
 
 rmSync(dir, { recursive: true, force: true });
 console.log(`\n${pass} passed, ${fail} failed`);

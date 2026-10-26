@@ -264,20 +264,19 @@ const noindexIn = (extra) => alertInputs({ mutate: (d) => {
 const i1 = gen(noindexIn(), { baseline: ALERT_STATE });
 const wasIdx = JSON.parse(ALERT_STATE).pages['/community/01002/'].i;
 ok(wasIdx === 1, 'I0 control: 01002 was indexable in the baseline');
-ok(i1.state.pages['/community/01002/'].i === 0 && i1.delta.indexability_changed.includes('/community/01002/'),
-   'I  a formerly indexable ZIP that becomes noindex is an indexability change');
-ok(i1.delta.submit.includes('/community/01002/'),
-   'I1 and its canonical URL IS notified so the crawler discovers the directive');
+// INDEX-ALL POLICY (founder, 2026-10-26): a ZIP that loses its Rule F / Rule D content stays
+// index-eligible. The old I..I4 cases built a page that FLIPPED to noindex; no generated document can say
+// noindex any more, so the assertions below pin the new behaviour instead of the flip.
+ok(i1.state.pages['/community/01002/'].i === 1 && !i1.delta.indexability_changed.includes('/community/01002/'),
+   'I  a ZIP that loses its Rule F / Rule D content stays index-eligible: no indexability change');
 const noidxDoc = readFileSync(join(i1.out, 'community', '01002', 'index.html'), 'utf8');
-ok(/name="robots" content="noindex/.test(noidxDoc), 'I2 the document itself says noindex (the fingerprint reads the page, not a side channel)');
+ok(/name="robots" content="index, follow"/.test(noidxDoc) && !/noindex/.test(noidxDoc.split('</head>')[0]),
+   'I2 the document itself says index, follow (the fingerprint reads the page, not a side channel)');
+ok(i1.delta.changed.includes('/community/01002/') && i1.delta.submit.includes('/community/01002/'),
+   'I3 the content change is announced, because every page is index-eligible and a changed page is notified');
 const i2 = gen(alertInputs(), { baseline: i1.stateText });
-ok(i2.delta.indexability_changed.includes('/community/01002/') && i2.delta.submit.includes('/community/01002/'),
-   'I3 noindex -> indexable is announced too');
-const nx = gen(noindexIn((d) => d.zips.changes.push(
-  { zip: '01002', community_id: 'c-ln', category: 'Government & civic', title: 'One lone notice',
-    source_ref: 'https://gov.example/lone', occurred_at: '2026-09-27' })), { baseline: i1.stateText });
-ok(nx.delta.changed.includes('/community/01002/') && !nx.delta.submit.includes('/community/01002/'),
-   'I4 a page that stays noindex is a change but is not submitted (crawl budget)');
+ok(!i2.delta.indexability_changed.includes('/community/01002/'),
+   'I4 and recovering its content is not an indexability change either');
 
 // =====================================================================================
 // Y. the baseline contract

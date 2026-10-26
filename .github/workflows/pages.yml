@@ -103,6 +103,7 @@ on:
       - 'test/indexnow-*.test.mjs'
       - 'scripts/annotate-dev-seo-ssr.mjs'
       - 'scripts/prove-zip-pages.mjs'
+      - 'scripts/audit_index_all.py'
       - 'lib/project-type.js'
       - 'test/dev-seo-ssr-type-adapter.test.mjs'
       # The pure control-resolution core the proof runs on, and now also the producer of the
@@ -577,6 +578,12 @@ jobs:
           set -euo pipefail
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           node scripts/prove-zip-pages.mjs
+
+      # INDEX-ALL POLICY (founder, 2026-10-26): every public page may be indexed. Fails on any
+      # public noindex, robots.txt block, non-self canonical, or page missing from a sitemap.
+      - name: Index-all audit
+        if: steps.decide.outputs.proceed == 'true'
+        run: python3 scripts/audit_index_all.py --dir _site
 
       - uses: actions/upload-pages-artifact@v3
         if: steps.decide.outputs.proceed == 'true'

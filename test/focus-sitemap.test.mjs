@@ -44,8 +44,8 @@ try {
   const xml = readFileSync(join(d, 'sitemaps', 'pierce-county-wa.xml'), 'utf8');
   const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   ok(JSON.stringify(rep.members) === '["98397","98401","98402"]', 'members = WA + Pierce only (not King, not Pierce OH, not county-less)');
-  ok(locs.length === 2 && locs.every((l) => /^https:\/\/jodytracks\.com\/community\/\d{5}\/$/.test(l)), 'lists only eligible jodytracks.com /community/<zip>/ URLs');
-  ok(!locs.some((l) => l.includes('98397')) && Object.keys(rep.excluded).join() === '98397' && /noindex/.test(rep.excluded['98397']), 'noindex member is excluded with a reason, not listed');
+  ok(locs.length === 3 && locs.every((l) => /^https:\/\/jodytracks\.com\/community\/\d{5}\/$/.test(l)), 'lists every member as a jodytracks.com /community/<zip>/ URL');
+  ok(locs.some((l) => l.includes('98397')) && Object.keys(rep.excluded).length === 0, 'INDEX-ALL POLICY: a member with little content is listed, nothing is excluded');
   ok(/<loc>[^<]*98401\/<\/loc>\s*<lastmod>2026-10-20<\/lastmod>/.test(xml) && (xml.match(/<lastmod>/g) || []).length === 1, 'lastmod only where a real semantic date exists');
   ok(!/priority|changefreq/.test(xml), 'no priority or changefreq');
 } finally { rmSync(d, { recursive: true, force: true }); }
@@ -64,7 +64,7 @@ const d2 = mkdtempSync(join(tmpdir(), 'focus-'));
 try {
   const rep = JSON.parse(execFileSync('python3', ['-I', '-c', py2, d2], { encoding: 'utf8' }).trim().split('\n').pop())['washington-state'];
   const locs = [...readFileSync(join(d2, 'sitemaps', 'washington-state.xml'), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-  ok(JSON.stringify(rep.members) === '["98001","98397","98401"]' && locs.length === 2 && !locs.some((l) => l.includes('98397')), 'statewide entry: all WA pages are members, only eligible ones listed, other states excluded');
+  ok(JSON.stringify(rep.members) === '["98001","98397","98401"]' && locs.length === 3 && locs.some((l) => l.includes('98397')), 'statewide entry: all WA pages are members, only eligible ones listed, other states excluded');
 } finally { rmSync(d2, { recursive: true, force: true }); }
 const wa = cfg.find((a) => a.slug === 'washington-state');
 ok(wa && wa.state === 'WA' && !wa.county && wa.expected_zips === 362, 'config names Washington State with 362 expected ZIPs');
@@ -87,14 +87,14 @@ try {
   ok(w.includes('/guides/pierce-county-wa/') && !w.some((x) => x.includes('ohio-none')), 'hub emitted for an area with eligible ZIPs, none for an area without');
   const h = readFileSync(join(d3, 'guides', 'pierce-county-wa', 'index.html'), 'utf8');
   const links = [...h.matchAll(/href="\/community\/(\d{5})\/"/g)].map((m) => m[1]);
-  ok(links.includes('98401') && links.includes('98402') && !links.includes('98397') && !links.includes('98001'), 'hub links only eligible members of its own area');
+  ok(links.includes('98401') && links.includes('98402') && links.includes('98397') && !links.includes('98001'), 'hub links every member of its own area');
 } finally { rmSync(d3, { recursive: true, force: true }); }
 
 // ---- wiring
 const wf = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
 ok(/focus_sitemaps/.test(wf) && /lists a noindex page/.test(wf) && /expected_zips/.test(wf), 'pages.yml gate checks the focus sitemap against sitemap.xml, robots and count');
 const gen = readFileSync(join(root, 'scripts', 'gen_zip_pages.py'), 'utf8');
-ok(/SITEMAP_FAMILIES = \("zip-alerts", "zip-development", "city", "project", "guide", "map"\)/.test(gen), 'national family sitemaps unchanged');
+ok(/SITEMAP_FAMILIES = \("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list"\)/.test(gen), 'the national family sitemaps are the declared set (index-all policy adds zip and project-list)');
 ok(/Sitemap: https:\/\/homesignal\.net\/sitemaps\/pierce-county-wa\.xml/.test(readFileSync(join(root, 'robots.txt'), 'utf8')) &&
    /Sitemap: https:\/\/homesignal\.net\/sitemap\.xml/.test(readFileSync(join(root, 'robots.txt'), 'utf8')), 'robots.txt lists the focus sitemap and keeps the national one');
 

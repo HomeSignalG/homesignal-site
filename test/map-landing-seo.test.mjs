@@ -77,7 +77,7 @@ for (const f of mapDocs) {
   else if (c[0] === LANDING) bad.push('canonicalises to the landing page');
   ok(bad.length === 0, `A19 /map/${z}/ keeps its own robots + canonical (${r[0]})`, bad.join('; '));
 }
-ok(idxMaps > 0 && idxMaps < mapDocs.length, 'A20 control: the fixture has both indexable and noindex map pages (the evidence rules still discriminate)', `${idxMaps}/${mapDocs.length}`);
+ok(idxMaps > 0 && idxMaps === mapDocs.length, 'A20 (index-all policy, 2026-10-26) every /map/<zip>/ document in the fixture is index, follow and self-canonical, including a ZIP with no evidence and a coverage-limited ZIP', `${idxMaps}/${mapDocs.length}`);
 
 // no duplicate canonicals among everything a crawler may index, and the landing page is not anyone's canonical target
 const seen = new Map();

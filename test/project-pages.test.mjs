@@ -206,9 +206,9 @@ ok([...pg1.matchAll(/<script[\s>][^>]*>/gi)].map((m) => m[0]).join() === '<scrip
   const list = read(b.out, '/community/01002/projects/');
   ok(list.includes(`<a href="${po}">Nobody Links Here</a>`) && list.includes(`<a href="${p1}">`),
      "the ZIP's project list links every project page on that ZIP, kept or featured");
-  ok(/<meta name="robots" content="noindex, follow">/.test(list) &&
+  ok(/<meta name="robots" content="index, follow">/.test(list) &&
      list.includes('<link rel="canonical" href="https://jodytracks.com/community/01002/projects/">'),
-     'the list is followed but not indexed');
+     'the list is index-eligible (index-all policy) and canonical to itself');
   const smk = readFileSync(join(b.out, 'sitemap.xml'), 'utf8');
   ok(!smk.includes('/projects/') && smk.includes(po), 'the list is in no sitemap; the kept page is');
   const zk = readFileSync(join(b.out, 'community', '01002', 'index.html'), 'utf8');
@@ -440,7 +440,7 @@ print("LOADED")`;
 // ---- 10. family sitemaps (plan step 14) ---------------------------------------------------
 {
   const fam = {};
-  for (const n of ['zip-alerts', 'zip-development', 'city', 'project', 'guide']) {
+  for (const n of ['zip', 'zip-alerts', 'zip-development', 'city', 'project', 'guide', 'project-list']) {
     const f = join(out, 'sitemaps', `${n}.xml`);
     ok(existsSync(f), `sitemaps/${n}.xml is written`);
     fam[n] = [...readFileSync(f, 'utf8').matchAll(/<loc>https:\/\/jodytracks\.com([^<]+)<\/loc>/g)].map((m) => m[1]);
@@ -452,7 +452,10 @@ print("LOADED")`;
   ok(fam['zip-development'].includes('/community/01002/') && !fam['zip-alerts'].includes('/community/01002/'),
      'a Rule-D-only ZIP is in the development family and not the alerts family');
   const mainGen = new Set([...sm.matchAll(/<loc>https:\/\/jodytracks\.com(\/(?:community|city|project|guides)\/[^<]+)<\/loc>/g)].map((m) => m[1]));
-  const union = new Set(Object.values(fam).flat());
+  // project-list is the one family that is NOT in sitemap.xml (the flat master would pass 50,000 URLs).
+  const union = new Set(Object.entries(fam).filter(([k]) => k !== 'project-list').flatMap(([, v]) => v));
+  ok(Array.isArray(fam['project-list']) && fam['project-list'].every((u) => /^\/community\/\d{5}\/projects\/$/.test(u)) &&
+     fam['project-list'].includes('/community/01002/projects/'), 'the project-list family lists every ZIP project list page'); 
   ok(union.size === mainGen.size && [...union].every((u) => mainGen.has(u)),
      `together the families cover exactly sitemap.xml's generated URLs (${union.size})`);
   // robots.txt is a SOURCE file (HomeSignal-branded); the brand overlay (brand_stage.py) rewrites it to the Jody host at build time (cutover-rehearsal 3a/A7).
