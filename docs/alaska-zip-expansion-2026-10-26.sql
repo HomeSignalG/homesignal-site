@@ -20,6 +20,14 @@
 -- Haines is in Haines Borough). Names from geo.zcta_place_overlap: 99704 lies 100% in the
 -- City of Anderson; 99790 is 51.7% Livengood CDP.
 --
+-- APPLIED 2026-10-26 ~17:09Z as migration alaska_zip_expansion_20261026. Read back: registry
+-- 12,726 rows, the other 12,722 still md5 af48c604…; 12,726 ZIP pages; app_community_meta and
+-- development_reports 12,726 each. canonical_zip_guard_selftest() then expected 12,722 and failed
+-- its "registry is populated" case, so it was moved to 12,726 by a fail-closed splice (migration
+-- canonical_zip_guard_selftest_expects_12726; DDL of record docs/canonical-zip-registry-guard.sql);
+-- all 5 cases pass. Reports: 99827 5 facilities + 3 development; 99743 2 development (EPA read
+-- failed, count unknown); 99704 2 facilities; 99790 none yet (EPA read failed, count unknown).
+--
 -- Order: registry rows, then county roots, then ZIP pages (the enforce_canonical_zip
 -- triggers refuse a ZIP not in the registry). Fails closed unless the live registry is
 -- exactly the approved 12,722 set (md5 af48c604…) or already this 12,726 set (re-run = no-op).
