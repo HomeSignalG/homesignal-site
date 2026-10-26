@@ -183,9 +183,78 @@ select pg_temp.chk('9d stale sources block the approval and say so', pg_temp.nst
    and pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'analyze')) like '%out of date%');
 update public.impact_stories set pack = jsonb_set(pack, '{verified_at}', to_jsonb(now())) where id = pg_temp.id('s')::uuid;
 
+-- 12. render and the media gate (gate 2) -------------------------------------------------------------------
+create function pg_temp.files(j uuid, short_a_ok boolean default true) returns jsonb language sql as $$
+  select jsonb_agg(jsonb_build_object('asset', a, 'path', pg_temp.id('s') || '/' || j || '/' || a || '.mp4',
+    'captions_path', pg_temp.id('s') || '/' || j || '/' || a || '.srt', 'bytes', 1000, 'sha256', repeat('a', 64),
+    'width', case when a like 'short%' then 1080 when a = 'thumbnail' then 1280 else 1920 end,
+    'height', case when a like 'short%' then 1920 when a = 'thumbnail' then 720 else 1080 end, 'duration_s', 60,
+    'preset', 'impact-x', 'qc', jsonb_build_object('ok', a <> 'short_a' or short_a_ok), 'stills', '[]'::jsonb, 'shots', '[]'::jsonb))
+  from unnest(array['main', 'short_a', 'short_b', 'thumbnail']) a $$;
+create function pg_temp.fid(a text) returns bigint language sql as $$
+  select (x->>'id')::bigint from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = a $$;
+create function pg_temp.fst(a text) returns text language sql as $$
+  select x->>'state' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = a $$;
+select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');
+select pg_temp.chk('12b render on a stale version is refused', pg_temp.err(format('select public.hs_impact_story_render(%L, 6)', pg_temp.id('s'))) like '40001%');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12c non-admin: render and media decisions refused', pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '42501%'
+   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, 1, %L)', pg_temp.id('s'), 'approved')) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7);
+select pg_temp.chk('12d render is its own job, dispatched to the render workflow', (pg_temp.lastjob()).kind = 'render'
+   and (select url from net.requests order by id desc limit 1) like '%/impact-story-render.yml/dispatches'
+   and (pg_temp.lastjob()).input->>'narrative_hash' = public._hs_is_artifact_state(pg_temp.id('s')::uuid, 'narrative')->>'hash');
+select pg_temp.chk('12e a second click returns the same render', (public.hs_impact_story_render(pg_temp.id('s')::uuid, 7)->>'existing')::boolean
+   and pg_temp.nxt() like 'Rendering the videos%');
+insert into _ids select 'r1', (pg_temp.lastjob()).id;
+select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
+select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
+  (select jsonb_agg(x) from jsonb_array_elements(pg_temp.files(pg_temp.id('r1')::uuid)) x where x->>'asset' <> 'thumbnail')));
+select pg_temp.chk('12g a render with no thumbnail fails and says so', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%no thumbnail%');
+select public.hs_impact_story_job_retry(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
+  jsonb_set(pg_temp.files(pg_temp.id('r1')::uuid), '{0,path}', '"elsewhere/main.mp4"')));
+select pg_temp.chk('12h a file outside the job''s folder is refused', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%outside%'
+   and (select count(*) from public.impact_story_assets) = 0);
+select public.hs_impact_story_job_retry(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets', pg_temp.files(pg_temp.id('r1')::uuid)));
+select pg_temp.chk('12i four files recorded, each pending review', (select count(*) from public.impact_story_assets) = 4
+   and pg_temp.fst('main') = 'pending' and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Review each video and the thumbnail'
+   and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'needs_review'
+   and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'media'->'files') = 4);
+select pg_temp.chk('12j a rejection needs a note; a bad timecode is refused',
+   pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('thumbnail'), 'rejected')) like '%Say what to fix%'
+   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'rejected', 'x', '1:75')) like '23514%');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'rejected', 'Text too small on a phone.', '0:00');
+select pg_temp.chk('12k a rejected file says what to fix', pg_temp.fst('thumbnail') = 'rejected');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid(a), 'approved') from unnest(array['main', 'short_a', 'short_b']) a;
+select pg_temp.chk('12l three of four approved: not ready to export', pg_temp.stage() = 'media');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'approved');
+select pg_temp.chk('12m every file approved: ready to export, nothing published', pg_temp.stage() = 'distribution'
+   and pg_temp.nxt() = 'Ready to export. Publishing is not built yet.' and (public._hs_is_media(pg_temp.id('s')::uuid)->>'complete')::boolean);
+select pg_temp.chk('12n rendered files and media decisions are append-only', pg_temp.err('update public.impact_story_assets set bytes = 1') is not null
+   and pg_temp.err('delete from public.impact_story_media_decisions') is not null);
+select pg_temp.chk('12o the bucket is private and only admins may read it', not (select public from storage.buckets where id = 'impact-media')
+   and exists (select 1 from pg_policies where policyname = 'impact_media_admin_read' and cmd = 'SELECT')
+   and not exists (select 1 from pg_policies where tablename = 'objects' and policyname like 'impact_media%' and cmd <> 'SELECT'));
+select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7, true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets', pg_temp.files((pg_temp.lastjob()).id, false)));
+select pg_temp.chk('12p a new render needs reviewing again; a file that failed its checks cannot be approved', pg_temp.stage() = 'media'
+   and pg_temp.fst('main') = 'pending' and pg_temp.fst('short_a') = 'blocked'
+   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%media checks failed%');
+select pg_temp.chk('12q a file from an older render cannot be decided',
+   pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), (select min(id) from public.impact_story_assets), 'approved')) like '%not part of the current render%');
+
 -- 10. a story written before the outline, and its old approvals --------------------------------------
 select public.hs_impact_story_save(pg_temp.id('s')::uuid, 7, '{"schema":"impact-story/1","angles":[{"id":"motivation"}],"selected_angle":"motivation"}'::jsonb);
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P2'))));
+select pg_temp.chk('10m a changed narrative makes the rendered files stale and undecidable', pg_temp.fst('main') = 'stale'
+   and not (public._hs_is_media(pg_temp.id('s')::uuid)->>'current')::boolean
+   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'approved')) like '%earlier narrative%');
 select pg_temp.chk('10a an angle-card story is asked to Analyze again', pg_temp.stage() = 'outline' and pg_temp.nxt() = 'Analyze again to get the story outline'
    and pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'generate')) like '%no story outline%');
 insert into public.impact_story_approvals (story_id, artifact, version, artifact_hash, decision, actor)

@@ -59,7 +59,7 @@ await page.evaluate(() => {
       hs_impact_story_list: [{ id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', primary_emotion: 'MOTIVATION', updated_at: '2026-10-25T10:00:00Z', verified_at: '2026-10-24T21:43:29Z', archived: false, status: window.db.status() },
         { id: 's2', title: 'Old story', video_slug: 'x', archived: true, updated_at: '2026-10-01T00:00:00Z', status: { library: 'archived', next: 'Archived.' } }],
       hs_impact_story_catalog: [{ slug: 'gig-harbor-fishing-homeport-dock', title: '3003 Gig Harbor' }],
-      hs_impact_story_get: { story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
+      hs_impact_story_get: { media: window.db.media || { render_job: null, files: [] }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
         version: { version: window.db.version, body: JSON.parse(JSON.stringify(body)), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
@@ -75,6 +75,7 @@ await page.evaluate(() => {
     if (n === 'hs_impact_story_save') window.db.version = 8;
     return Promise.resolve({ data: d === undefined ? {} : d, error: null });
   } };
+  window.client.storage = { from: (b) => ({ download: (p) => { window.calls.push(['download', b, p]); return Promise.resolve({ data: new Blob(['x'], { type: 'video/mp4' }), error: null }); } }) };
   window.confirm = () => true;
   window.prompt = () => 'Lead with the date.';
 });
@@ -158,8 +159,36 @@ await page.click('#is [data-act=decide][data-a=narrative][data-d=approved]'); aw
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_decide' && c[1].p_artifact === 'narrative' && c[1].p_decision === 'approved' && c[1].p_expected_version === 8)), 'approve: one call approves the integrated narrative on the current version');
 
 await page.click('#is [data-act=step][data-step=media]');
-ok((await page.locator('#is').innerText()).includes('Not built yet'), 'media: honestly not built; no render button');
-ok(await page.locator('#is button:has-text("Render")').count() === 0, 'media: there is no Render button');
+ok((await page.locator('#is').innerText()).includes('needs the one editorial approval') && await page.locator('#is [data-act=render]').count() === 0,
+   'media: no Render button before the narrative is approved');
+await page.evaluate(() => { window.db.nstate = 'approved'; window.db.nwhy = 'Approved on version 8.'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+await page.click('#is .is-panel [data-act=render]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_render' && c[1].p_expected_version === 8 && c[1].p_new === false)),
+   'media: Render queues one render of the current approved version');
+const qc = (ok) => ({ ok, checks: [{ name: 'dimensions', ok: true, detail: '1920x1080' }, { name: 'loudness', ok, detail: '-14.0 LUFS (target -14)' }] });
+await page.evaluate((qc) => {
+  const f = (id, asset, w, h, state, q, extra) => Object.assign({ id, asset, path: 's1/j9/' + asset + (asset === 'thumbnail' ? '.png' : '.mp4'), width: w, height: h, duration_s: 291,
+    bytes: 4e7, preset: 'impact-16x9-v1', qc: q, state, why: state === 'blocked' ? 'The media checks failed: see the checks below.' : 'Watch it, then approve or reject.',
+    stills: ['s1/j9/qc-' + asset + '-00010.png'], shots: [{ id: 'a1-s1', layout: 'open', kind: 'MAP', start_s: 0 }], captions_path: asset === 'thumbnail' ? null : 's1/j9/' + asset + '.srt' }, extra);
+  window.db.media = { render_job: 'j9', current: true, complete: false, version: 8, renderer: 'impact-render-1', rendered_at: '2026-10-26T20:00:00Z',
+    files: [f(1, 'main', 1920, 1080, 'pending', qc[0]), f(2, 'short_a', 1080, 1920, 'blocked', qc[1]), f(3, 'thumbnail', 1280, 720, 'pending', { ok: true, checks: [] })] };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+}, [qc(true), qc(false)]);
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Main video (16:9)') && txt.includes('Short A (9:16)') && txt.includes('Checks failed') && txt.includes('Render again'), 'media: each file is listed with its own state');
+ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file that failed its checks cannot be approved');
+await page.click('#is [data-act=watch][data-path="s1/j9/main.mp4"]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === 's1/j9/main.mp4'))
+   && /^blob:/.test(await page.locator('#is video').getAttribute('src')), 'media: a video is downloaded with the admin session and played from a blob link');
+await page.click('#is [data-act=mdecide][data-d=approved][data-id="1"]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 1 && c[1].p_decision === 'approved')), 'media: approve sends one file decision');
+await page.evaluate(() => { const a = ['Text too small on a phone.', '0:12']; window.prompt = () => a.shift(); });
+await page.click('#is [data-act=mdecide][data-d=rejected][data-id="3"]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 3 && c[1].p_decision === 'rejected'
+   && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request sends what to fix and the moment');
+await page.evaluate(() => { window.prompt = () => 'Lead with the date.'; });
 await page.click('#is [data-act=step][data-step=distribution]');
 txt = await page.locator('#is').innerText();
 ok(txt.includes('Not published') && txt.includes('Not connected') && txt.includes('Full video URL pending') && txt.includes('unavailable'), 'distribution: not published / not connected / pending URL / publishing unavailable');

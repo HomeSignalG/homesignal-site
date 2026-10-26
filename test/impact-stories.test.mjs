@@ -37,18 +37,24 @@ for (const f of ['hs_impact_story_job_claim', 'hs_impact_story_job_complete', 'h
 }
 
 // 3. data safety
-for (const t of ['impact_stories', 'impact_story_versions', 'impact_story_jobs', 'impact_story_approvals', 'impact_story_events']) {
+for (const t of ['impact_stories', 'impact_story_versions', 'impact_story_jobs', 'impact_story_approvals', 'impact_story_events',
+                 'impact_story_assets', 'impact_story_media_decisions']) {
   ok(sql.includes('alter table public.' + t + ' enable row level security;') && sql.includes('revoke all on public.' + t + ' from public, anon, authenticated;'), t + ': RLS on, no browser grant');
 }
 ok(!/(insert into|update|delete from)\s+public\.(youtube_video_\w+|video_bluesky_jobs|social_posts)/i.test(sql), 'sql: never writes a Tab 11/16 or social table');
 ok(!/\b(drop table|truncate|alter table public\.(youtube|social|video_))/i.test(sql), 'sql: additive only');
-ok(/impact-story-job\.yml\/dispatches/.test(sql) && /'ref', 'main'/.test(sql), 'sql: dispatches the ingest worker on main');
+ok(/'impact-story-render\.yml'/.test(sql) && /'impact-story-job\.yml'/.test(sql) && /actions\/workflows\/' \|\| _wf \|\| '\/dispatches/.test(sql) && /'ref', 'main'/.test(sql),
+   'sql: dispatches the ingest worker (text jobs) or the render workflow, on main');
+ok(/values \('impact-media', 'impact-media', false,/.test(sql) && /for select to authenticated using \(bucket_id = 'impact-media' and public\.hs_is_dashboard_admin\(\)\)/.test(sql)
+   && !/policy[^;]*impact-media[^;]*for (insert|update|delete|all)/i.test(sql), 'sql: the media bucket is private and admin read-only');
 
 // 4. the page cannot publish, upload or hold a secret
 ok(!/googleapis|youtube\.com\/upload|open\.tiktokapis|bsky\.social|com\.atproto/i.test(code), 'page: no platform API');
-ok(!/\.storage\.|service_role|SUPABASE_WRITE_KEY|sk-ant/i.test(code), 'page: no storage write, no secret');
+ok((code.match(/\.storage\./g) || []).length === 1 && /\.storage\.from\(BUCKET\)\.download\(/.test(code)
+   && !/\.(upload|createSignedUrl|getPublicUrl|createSignedUploadUrl)\(/.test(code)
+   && !/service_role|SUPABASE_WRITE_KEY|sk-ant/i.test(code), 'page: storage is read only (download as the admin), no secret');
 ok(!/hs_youtube|hs_video_|social_posts/.test(code), 'page: never calls a Tab 16 / Bluesky queue function');
-ok(/Not built yet/.test(js) && /Not published/.test(js) && /Not connected/.test(js), 'page: honest Media / Distribution states');
+ok(/nothing is published/.test(js) && /Not published/.test(js) && /Not connected/.test(js) && !/Not built yet/.test(js), 'page: honest Media / Distribution states');
 ok(!/innerHTML\s*=\s*[^;]*\+\s*(?!esc\()[a-z]+\.(title|text|error)\b/.test(code), 'page: database text goes through esc()');
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');

@@ -5603,10 +5603,26 @@ Results.
   scope|pack). Versions are immutable rows; saves use an expected-version lock.
 - The one approval is effective only while the narrative's md5 is unchanged, the engine passed it on the current version
   against the current pack, and the pack is <= 30 days old. Any edit inside the narrative needs approving again.
-- ⛔ **Media review, rendering, destination approval and metrics are NOT built.** The page says so; there is no render or
-  publish button. Export is text only and unlocks when all editorial approvals are in place.
+- ✅ **RENDERING AND MEDIA REVIEW ARE BUILT (2026-10-26, handoff v2.4 M3).**
+  - **Render.** `hs_impact_story_render` dispatches one job of kind `render`, keyed by story, version,
+    narrative hash and renderer version, so a double click never renders twice. It needs the narrative approved.
+    The engine is homesignal-ingest `impact/render/` and `impact-story-render.yml`.
+  - **Storage.** Files land in the PRIVATE bucket `impact-media`. The only read policy is admin-only, and the
+    page downloads each file as a blob (the CSP allows only `blob:` media).
+  - **Records.** `job_complete` records one `impact_story_assets` row per file (main, short_a, short_b,
+    thumbnail), each with its checks, QC stills and shot list. The main video and the thumbnail are required.
+  - **Review.** Media Review approves or requests a fix (note plus m:ss) per file, through
+    `hs_impact_story_media_decide`. Decisions are append-only.
+  - **Staleness.** A file made from a different narrative hash than the current approval is stale and cannot be
+    approved.
+  - ⛔ **Destination approval, publishing and metrics are NOT built.** There is no publish button. Export lists
+    the approved files for a manual upload.
+- Apply order (render):
+  1. Merge the ingest render engine first, because the Render button dispatches `impact-story-render.yml` from `main`.
+  2. Apply `docs/impact-stories.sql` (bucket, tables, functions).
+  3. Deploy the page.
 - Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
-  data never disagree. Tests: `test/impact_stories_pg/` (66 checks + the upgrade path),
+  data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
