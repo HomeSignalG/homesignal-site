@@ -1956,18 +1956,29 @@ class MapTemplate:
         for needle in self.HEAD:
             if self.doc.count(needle) != 1:
                 sys.exit(f"ERROR: Map 1 template: expected exactly one {needle!r}")
+        # The landing page's crawlable "About" block belongs to the ZIP-less landing page only. A /map/<zip>/
+        # document must not repeat it (it would be the same boilerplate on every ZIP page).
+        about = re.compile(r'<section class="hs-map-about" id="hs-map-about".*?</section>\n', re.S)
+        if len(about.findall(self.doc)) != 1:
+            sys.exit("ERROR: Map 1 template: expected exactly one #hs-map-about block")
+        self.doc = about.sub("", self.doc, count=1)
+        # The landing source keeps its robots tag at the top of <head>, ahead of the guard script that
+        # reads it. Every /map/<zip>/ document has always carried it right after <title>; that order is part
+        # of the page's semantic fingerprint (scripts/page_semantics.py), so moving it would re-announce
+        # every map page to search engines. Put it back where it was, so the per-ZIP bytes do not move.
+        self.doc = self.doc.replace(self.HEAD[1] + "\n", "", 1)
         # The share image is the one other absolute URL; it follows the site origin like the canonical.
         if self.doc.count(self.OG_IMAGE) != 2 or "https://homesignal.net" in self.doc.replace(self.OG_IMAGE, "").replace(
                 self.HEAD[3], "").replace(self.HEAD[4], ""):
             sys.exit("ERROR: Map 1 template: expected the og:image and twitter:image URLs to be its only other absolute URLs")
 
     HEAD = (
-        "<title>HomeSignal — Development around your home</title>",
-        '<meta name="robots" content="noindex, nofollow" id="robots-meta"/>',
-        '<meta name="description" content="See what\'s built and what\'s proposed near your home',
+        "<title>HomeSignal Development Map — What Is Built, Approved and Proposed Near You</title>",
+        '<meta name="robots" content="index, follow" id="robots-meta"/>',
+        '<meta name="description" content="Search a street address or ZIP code on the HomeSignal Development Map',
         '<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>',
         '<meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>',
-        '<meta property="og:title" content="Development around your home — HomeSignal"/>',
+        '<meta property="og:title" content="HomeSignal Development Map — What Is Built, Approved and Proposed Near You"/>',
     )
 
     OG_IMAGE = "https://homesignal.net/og-default.png"
@@ -1991,8 +2002,8 @@ class MapTemplate:
                 f"({label}), each linked to its official public record.")
         out = self.doc
         for old, new in (
-            (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>"),
-            (self.HEAD[1], f'<meta name="robots" content="{robots}" id="robots-meta"/>'),
+            (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>\n"
+                           f'<meta name="robots" content="{robots}" id="robots-meta"/>'),
             (self.HEAD[3], f'<link rel="canonical" href="{esc(canon)}"/>'),
             (self.HEAD[4], f'<meta property="og:url" content="{esc(canon)}"/>'),
             (self.HEAD[5], f'<meta property="og:title" content="Development around {esc(label)}"/>'),

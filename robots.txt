@@ -9,8 +9,9 @@
 #                      pointing at /community/<zip>/. Deliberately NOT Disallowed: a
 #                      disallowed URL is never fetched, so its canonical and noindex are
 #                      never read and the consolidation never happens.
-#   homesignalmap.html the development/permits page, gated separately on
-#                      app_community_meta.indexable (page-purpose separation).
+#   homesignalmap.html the ZIP-less Development Map landing page. Index-eligible from its first byte
+#                      (founder, 2026-10-26); any ?zip= / ?addr= / lat-lng / embed state of it is noindex.
+#                      /map/<zip>/ are separate generated documents gated on app_community_meta.indexable.
 User-agent: *
 Allow: /
 Disallow: /dashboard.html

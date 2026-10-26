@@ -238,6 +238,31 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
   `app_community_meta.indexable = true`, 98397 Longmire false. ⚠️ That flag is the Map 1 gate, NOT the page's robots decision (Rule F or D, built
   at deploy), so eligibility for the sitemap comes from the build, never from this flag.
 
+## THE ZIP-LESS DEVELOPMENT MAP LANDING PAGE IS INDEX-ELIGIBLE FROM ITS FIRST BYTE (founder, 2026-10-26)
+
+`/homesignalmap.html` (public host jodytracks.com) used to ship `noindex, nofollow` and let its runtime promote itself.
+Google does not render a page whose initial robots says noindex, so a script could never have promoted it. Now:
+- **Default `index, follow`**, one self-referencing canonical (`https://<origin>/homesignalmap.html`), a landing-specific
+  title and description, and a crawlable "About the Development Map" section (`#hs-map-about`) in the INITIAL HTML, outside
+  the `<template>` (template content is inert before JavaScript). The runtime moves it under the map; it is the same text for
+  people and crawlers. It is hidden in embeds and in every non-landing state.
+- **Every non-landing state is `noindex, nofollow`**: a head script (before paint) lowers robots for `?zip=`, `?addr=`,
+  `?address=`, `?lat=`, `?lng=`, `?embed=`, `?preview=`, and the runtime does the same (`leaveLanding()`) for an in-page address
+  search, a lat/lng point, a property record, a ZIP, and the homepage's sessionStorage hand-off. The landing document can never
+  be promoted by a ZIP's own evidence (`setIndexable`): that decision belongs to that ZIP's own `/map/<zip>/` document.
+- **The `/map/<zip>/` documents are unchanged.** `MapTemplate` strips the landing copy from them and keeps the robots tag
+  in its old position, so their semantic fingerprints (and therefore IndexNow notifications and sitemap lastmod) did not move;
+  checked by rendering the same three ZIP cases from the previous source and the new one (identical fingerprints).
+- **Sitemap:** `scripts/gen_sitemap.py` STATIC lists `/homesignalmap.html` once (`--static-only` keeps the committed
+  `sitemap.xml` equal to it). No `homesignalmap.html?…` URL is ever advertised.
+- **Not done, on purpose:** a link from every `/community/<zip>/` document's initial HTML. It changes all ~12,000 community
+  pages' fingerprints, which trips the IndexNow mass-change hold. Those pages reach the landing page through the shell's
+  Development Map nav item (rendered) and through their `/map/<zip>/` link; add the raw link only with an
+  `allow_mass_change` resubmit decision.
+- Tests: `test/map-landing-seo.test.mjs` (the BUILT Jody artifact's files) and `test/map-landing-seo.browser.test.mjs` (the same
+  artifact in Chromium). Production check: dispatch `verify-map-landing-live.yml` after a deploy.
+- Search Console state is not readable from this repo; inspect `https://jodytracks.com/homesignalmap.html` there and request indexing.
+
 ## Permanent historical intelligence — preserve the longitudinal asset
 
 **HomeSignal's longitudinal development history is a core company data asset. Current product
