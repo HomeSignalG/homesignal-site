@@ -104,4 +104,4 @@ if (!/notices\.length\s*\n?\s*\?\s*notices\.slice\(0,2\)/.test(renderer))
   failures.push('wiring: the notices render is not conditional, so the empty state is unreachable');
 
 if (failures.length) { console.error(failures.map((f) => 'FAIL ' + f).join('\n')); process.exit(1); }
-console.log(`ok  gov-notice-copy: ${MAP._counts.configured} configured / ${MAP._counts.unconfigured} unconfigured of 12,722`);
+console.log(`ok  gov-notice-copy: ${MAP._counts.configured} configured / ${MAP._counts.unconfigured} unconfigured of ${MAP._counts.canonical_zip_pages}`);
