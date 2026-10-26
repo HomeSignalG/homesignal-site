@@ -207,7 +207,7 @@ const main = async () => {
       rendered: (document.body.innerText || '').length,
       text: (document.body.innerText || '').slice(0, 4000),
     }));
-    const want = z === F ? 'noindex, follow' : 'index, follow';
+    const want = 'index, follow';   // index-all policy: every control, F-fail included
     ok(after.robots === want, `[${z}] robots is STILL "${want}" after JavaScript executes`);
     ok((after.canonical || '').endsWith(`/community/${z}/`), `[${z}] canonical survives hydration`);
     ok((after.h1 || '').includes(z), `[${z}] ZIP identity survives hydration`);
