@@ -238,6 +238,26 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
   `app_community_meta.indexable = true`, 98397 Longmire false. ⚠️ That flag is the Map 1 gate, NOT the page's robots decision (Rule F or D, built
   at deploy), so eligibility for the sitemap comes from the build, never from this flag.
 
+## THE ZIP UNIVERSE GROWS PAST 12,722 — FIRST FOUR ALASKA ZIPS (founder, 2026-10-26)
+
+The founder ruled that ZIP pages increase from 12,722. The registry still decides which pages exist, and production
+still never creates one by itself. **12,726** after the first batch. Earlier "12,722" figures in this file are dated
+receipts.
+- **Added:** 99827 Haines (new root Haines Borough) · 99743 Healy and 99704 Anderson / Clear (new root Denali Borough)
+  · 99790 Livengood (new root Yukon-Koyukuk Census Area).
+  - Counties come from the ZCTA polygon against TIGERweb county polygons. 99790 is 100% Yukon-Koyukuk; USPS's
+    "Fairbanks" is only its mailing city.
+  - Names come from `geo.zcta_place_overlap`: 99704 lies 100% in the City of Anderson.
+- **Order is fixed:**
+  1. The Gold Master workbook in homesignal-ingest (`scripts/add_gold_master_zips.py`). That PR also moves the SEO plane's
+     `CANONICAL_ZIP_N`.
+  2. `docs/alaska-zip-expansion-2026-10-26.sql`. It refuses unless the other 12,722 still fingerprint `af48c604…`.
+  3. This repo's count checks: `verify-zip-universe` default, production-environment C1b, `gen-gov-notice-coverage`.
+     The coverage artifact is then regenerated from production.
+- **99790's development centre is its ZCTA's own point (65.4280, −148.0882).** The `zipcodes` point is in downtown
+  Fairbanks (inside 99701).
+- **Map 1 status for the four arrives with the next N5 generation.** The serving one predates them.
+
 ## THE ZIP-LESS DEVELOPMENT MAP LANDING PAGE IS INDEX-ELIGIBLE FROM ITS FIRST BYTE (founder, 2026-10-26)
 
 `/homesignalmap.html` (public host jodytracks.com) used to ship `noindex, nofollow` and let its runtime promote itself.
