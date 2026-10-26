@@ -1,0 +1,45 @@
+name: bing-daily-submit
+
+# Replaces the daily hand-paste into Bing URL Submission. Each run sends one slice of 100 URLs
+# (map pages for already-sent ZIPs first, then the rest) through the Bing Webmaster Submission API.
+# Reads the LIVE sitemaps, so a noindex page is never sent. The slice is chosen by date, so nothing
+# is written back to the repo. Needs the repository secret BING_WEBMASTER_API_KEY (Bing Webmaster
+# Tools > Settings > API access); without it the run only prints the slice.
+on:
+  schedule:
+    - cron: '17 15 * * *'
+  workflow_dispatch:
+    inputs:
+      day:
+        description: 'queue day to send (blank = today by date); use to catch up a missed day'
+        default: ''
+      dry_run:
+        description: 'print the slice, send nothing'
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bing-daily-submit
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Send today's slice to Bing
+        env:
+          BING_WEBMASTER_API_KEY: ${{ secrets.BING_WEBMASTER_API_KEY }}
+          DAY: ${{ inputs.day }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=()
+          if [ -n "$DAY" ]; then args+=(--day "$DAY"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          python3 scripts/bing_daily_submit.py "${args[@]}"
