@@ -32,6 +32,11 @@
 -- 99613 is 81.3% Lake and Peninsula / 18.7% Bristol Bay; it is filed under Bristol Bay, where
 -- King Salmon CDP (Census point 58.7229,-156.5389, inside 99613) and its post office are.
 --
+-- APPLIED 2026-10-26 ~19:22Z as migration alaska_zip_expansion_batch2_20261026. Read back: registry and ZIP
+-- pages 12,743 each. canonical_zip_guard_selftest() moved 12,726 -> 12,743 by a fail-closed splice (migration
+-- canonical_zip_guard_selftest_expects_12743); all 5 cases pass. Reports built with the centres below; EPA
+-- answered 429 on the first, concurrent pass for 7 ZIPs and they were re-read one at a time.
+--
 -- Order: registry rows, then county roots, then ZIP pages (the enforce_canonical_zip
 -- triggers refuse a ZIP not in the registry). Fails closed unless the registry outside the
 -- 17 new ZIPs is exactly the 12,726 set after batch 1 (md5 4876fb88…).
