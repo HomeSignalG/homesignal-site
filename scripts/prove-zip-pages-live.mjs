@@ -82,8 +82,8 @@ const main = async () => {
   const man = await getJson('zip-pages-manifest.json');
   const published = await getJson(CONTROLS_FILE);
   const members = membersFromPublished(published);          // fails closed, see the lib
-  const idxSet = new Set(man.indexable_zips || []);
-  if (!idxSet.size) throw new Error('zip-pages-manifest.json carries no indexable_zips');
+  const idxSet = new Set(man.rule_f_zips || man.indexable_zips || []);   // Rule F evidence set (gates nothing)
+  if (!idxSet.size) throw new Error('zip-pages-manifest.json carries no rule_f_zips');
   // ONE build, or the membership describes documents other than the ones being read. That
   // would surface as a scatter of unexplained class failures; this names it in one line.
   ok(published.documents === man.documents && published.rule_f_pass === man.rule_f_pass,
@@ -136,7 +136,7 @@ const main = async () => {
   for (const k of ROBOTS) {
     const z = C[k];
     const s = seo(body[k].body);
-    const wantIdx = idxSet.has(z);
+    const wantIdx = true;   // index-all policy: every page is index, follow
     ok(s.robots === (wantIdx ? 'index, follow' : 'noindex, follow'),
        `[${z}] ${k}: initial HTML is ${wantIdx ? 'index, follow' : 'noindex, follow'} — `
        + `the build's Rule F verdict reached the served bytes`);
@@ -252,7 +252,7 @@ const main = async () => {
     ok(dupes === 0, 'sitemap has no duplicate canonical community URLs');
     ok(bad5.length === 0, 'sitemap has no malformed community URLs');
     ok(canonZips.includes(C.pass_dev_fail), 'a Rule-F-PASS control is advertised');
-    ok(!canonZips.includes(C.fail_dev_pass), 'a Rule-F-FAIL control is NOT advertised');
+    ok(canonZips.includes(C.fail_dev_pass), 'a Rule-F-FAIL control IS advertised (index-all policy)');
     // INVERTED 2026-09-19, in the same change as its pre-deployment twin
     // (scripts/prove-zip-pages.mjs). These two must move together: CLAUDE.md §5 says that if
     // the deployed twin and the build-time proof ever disagree, the DEPLOYMENT is what

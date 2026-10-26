@@ -216,6 +216,20 @@ the exact problem `QUEUE.md` exists to end.
 ---
 
 
+## INDEX-ALL POLICY ⚖️ FOUNDER RULING (2026-10-26) — SUPERSEDES RULE F / RULE D ROBOTS GATING
+
+**Every public page on JODY TRACKS is allowed to be indexed. No automated quality-based indexing exclusions.**
+- `gen_zip_pages.py` emits `index, follow` for every `/community/<zip>/`, `/map/<zip>/` and `/community/<zip>/projects/` document, every one
+  self-canonical, and lists every ZIP page, map page and project-list page in a family sitemap (`zip`, `map`, `project-list` are new families,
+  declared in `robots.txt`). The flat master `sitemap.xml` has a hard cap check at the 50,000-URL limit.
+- Rule F / Rule D, the focus-sitemap eligibility filter and the thresholds are no longer read for robots or sitemap membership. Quality scoring may
+  exist internally but must never gate indexing. `app_community_meta.indexable` still exists in the DB but is unread for SEO.
+- Runtime JS (`homesignalmap.html setIndexable`, `shell.js renderZipCoverage`) no longer lowers robots on a `/map/<zip>/` document.
+- `noindex` remains ONLY on non-public pages (app, auth, admin, redirect aliases, `/404.html`), listed in `scripts/audit_index_all.py` NON_PUBLIC.
+  **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
+- Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
+  Test: `test/index-all-audit.test.mjs`. The older sections below that describe Rule F/D robots gating are the dated record.
+
 ## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
 
 Pierce County WA (65 ZIP pages) is the first geographic marketing focus. National SEO is unchanged: `sitemap.xml`, the six family

@@ -105,7 +105,7 @@ const main = async () => {
       const h = await r.text();
       seen[`${label}:${z}`] = h;
       if (label === 'normal') {
-        const wantIdx = z === P;
+        const wantIdx = true;   // INDEX-ALL POLICY (2026-10-26): every ZIP document is index, follow
         ok(r.status === 200, `[${z}] initial response is HTTP 200`);
         ok(h.includes(`content="${wantIdx ? 'index, follow' : 'noindex, follow'}"`),
            `[${z}] initial HTML carries ${wantIdx ? 'index, follow' : 'noindex, follow'}`);
@@ -139,12 +139,12 @@ const main = async () => {
   }
   ok(body.pass_dev_pass.includes('content="index, follow"'),
      `A [${C.pass_dev_pass}] Alerts PASS + development PASS is index-eligible`);
-  ok(body.fail_dev_fail.includes('content="noindex, follow"'),
-     `D [${C.fail_dev_fail}] Alerts FAIL + development FAIL is noindex, follow`);
+  ok(body.fail_dev_fail.includes('content="index, follow"'),
+     `D [${C.fail_dev_fail}] Alerts FAIL + development FAIL is still index, follow (index-all policy)`);
   ok(/<h2>Local news<\/h2><ul>/.test(body.local_news),
      `E [${C.local_news}] the local news that qualifies this page is IN the page`);
-  ok(body.weather_thin.includes('content="noindex, follow"'),
-     `F [${C.weather_thin}] a weather-only/thin page stays noindex — weather never carries Rule F`);
+  ok(body.weather_thin.includes('content="index, follow"'),
+     `F [${C.weather_thin}] a weather-only/thin page is index-eligible (index-all policy); weather still never carries Rule F`);
   ok(/<h2>Weather alerts<\/h2>/.test(body.weather_thin),
      `F [${C.weather_thin}] ...while weather is still DISPLAYED`);
   ok(body.honest_empty.includes('No government notices on file for this ZIP yet.')
@@ -174,8 +174,8 @@ const main = async () => {
        && smSorted.every((z, i) => z === idxZips[i]),
      `the sitemap advertises exactly the Rule F OR Rule D set (${smZips.length} = ${idxZips.length}; `
      + `rule_f_pass ${man.rule_f_pass}, rule_d_pass ${man.rule_d_pass})`);
-  ok(smZips.includes(C.pass_dev_fail) && !smZips.includes(C.fail_dev_pass),
-     'an index-eligible page is advertised and a noindex page is not');
+  ok(smZips.includes(C.pass_dev_fail) && smZips.includes(C.fail_dev_pass),
+     'every ZIP page is advertised (index-all policy): no document is noindex');
   // INVERTED 2026-09-19 — same rule the two assertions above state: the advertised set must
   // BE the index-eligible set. Page-purpose separation assumed the two halves were two sets
   // of documents; they are not. Measured against production: every homesignalmap.html?zip=
@@ -207,7 +207,7 @@ const main = async () => {
       rendered: (document.body.innerText || '').length,
       text: (document.body.innerText || '').slice(0, 4000),
     }));
-    const want = z === F ? 'noindex, follow' : 'index, follow';
+    const want = 'index, follow';   // index-all policy: every control, F-fail included
     ok(after.robots === want, `[${z}] robots is STILL "${want}" after JavaScript executes`);
     ok((after.canonical || '').endsWith(`/community/${z}/`), `[${z}] canonical survives hydration`);
     ok((after.h1 || '').includes(z), `[${z}] ZIP identity survives hydration`);

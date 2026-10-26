@@ -201,7 +201,7 @@ for (const z of MOD) {
 }
 ok(/name="robots" content="index, follow"/.test(page('78769')) && sm.includes('/community/78769/'),
   '5o 78769 has Rule F evidence: it is indexable and is in the sitemap by the usual rule');
-ok(man.indexable_zips.includes('78769') && !man.indexable_zips.includes('48391'), '5p the others without evidence stay noindex exactly as any ZIP would', man.indexable_zips);
+ok(man.indexable_zips.includes('78769') && man.indexable_zips.includes('48391'), '5p (index-all policy, 2026-10-26) a coverage-limited ZIP without Rule F evidence is index-eligible too, exactly as any ZIP', man.indexable_zips);
 // Control: a standard ZIP is untouched.
 {
   const h = page('01001');

@@ -890,7 +890,10 @@ def render(p, built):
         desc = (f"HomeSignal tracks government notices, public meetings and local news for "
                 f"ZIP {z} ({label}). No qualifying records on file yet — checks repeat "
                 f"automatically.")
-    robots = "index, follow" if (p["rule_f"] or p.get("rule_d")) else "noindex, follow"
+    # INDEX-ALL POLICY (founder, 2026-10-26): every generated ZIP document is index-eligible. Rule F and
+    # Rule D still decide what the page SAYS (title, description, which lens leads) and which
+    # measurement sitemap lists it; they never decide whether it may be indexed.
+    robots = "index, follow"
     canon = f"{BASE}/community/{z}/"
     ln_show = [x for x in p["ln"] if not x["weather"]][:LN_CAP]
     wx = [x for x in p["ln"] if x["weather"]][:3]
@@ -1065,7 +1068,7 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=b0215286"></script>\n'
+        '<script src="/shell.js?v=662b5d19"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/community-page.js?v=327bfb74"></script>\n'
         "</body>\n</html>\n")
@@ -1408,8 +1411,8 @@ def _related_section(pr, zips, first, pages, projects):
 
 def render_project_list(z, keys, projects, pages):
     """Every project page on one ZIP, newest first. It exists so a project that has left
-    the ZIP page's cards keeps a link; it is a list, not content, so it is not indexed
-    (noindex, follow) and is not in any sitemap."""
+    the ZIP page's cards keeps a link. INDEX-ALL POLICY (founder, 2026-10-26): it is a public
+    page, so it is index-eligible and listed in the project-list family sitemap."""
     p = pages[z]
     label = f"{p['name']}, {p['state']}" if p.get("state") else p["name"]
     rows = sorted((projects[k] for k in keys), key=lambda pr: (pr["date"], pr["key"]), reverse=True)
@@ -1436,7 +1439,7 @@ def render_project_list(z, keys, projects, pages):
             f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
             f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
             f'<a href="/">HomeSignal home</a></nav></main>')
-    return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="noindex, follow")
+    return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
 
@@ -1666,8 +1669,8 @@ def build_guides(cities, projects, pages, out_dir, built, state=None, areas=(), 
     docs = [(GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
             (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))]
     for a in areas:
-        eligible = [z for z in focus_members(a, pages) if z in idx]
-        if eligible:   # an area with no index-eligible page gets no hub
+        eligible = focus_members(a, pages)   # INDEX-ALL POLICY: every member ZIP page is index-eligible
+        if eligible:   # an area with no page at all gets no hub
             docs.append((area_hub_path(a), render_area_hub(a, eligible, pages, cities, ps.BUILD_DAY_TOKEN)))
     for path, html_ in docs:
         d = os.path.join(out_dir, *path.strip("/").split("/"))
@@ -1816,6 +1819,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     nmp = len(re.findall(r"<loc>[^<]*/map/\d{5}/</loc>", txt))
     if nmp != len(mps):
         sys.exit(f"ERROR: sitemap carries {nmp} map URLs for {len(mps)} indexable map pages")
+    n_master = len(re.findall(r"<loc>", txt))
+    if n_master > SITEMAP_MAX_URLS:
+        sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -1834,7 +1840,13 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 # unchanged; every URL in them is also in sitemap.xml. The two ZIP families overlap on
 # purpose: a ZIP that passes both Rule F and Rule D is in both, so each rule is measured
 # over the whole set of pages it qualifies.
-SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide", "map")
+# project-list is the ONE family that is not also in sitemap.xml: with every public page indexable the
+# flat master would pass the 50,000-URL limit, so the ZIP project lists are listed here (declared in
+# robots.txt) and reconcile_sitemap fails the build if the master itself ever exceeds the limit.
+# "zip" lists EVERY community document (index-all policy). zip-alerts and zip-development are kept as
+# MEASUREMENT partitions (Search Console already has them submitted); they exclude nothing, because the
+# master and the "zip" family list every ZIP.
+SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list")
 
 
 def write_family_sitemaps(out_dir, families, lastmod=None):
@@ -1889,9 +1901,8 @@ def write_focus_sitemaps(out_dir, areas, pages, indexable, lastmod=None):
     idx, lm, report = set(indexable), lastmod or {}, {}
     for a in areas:
         members = focus_members(a, pages)
-        eligible = [z for z in members if z in idx]
-        excluded = {z: (f"noindex: Rule F fail ({pages[z].get('rule_f_count')} of {RULE_F_MIN} "
-                        f"non-weather items) and Rule D fail") for z in members if z not in idx}
+        eligible = list(members)   # INDEX-ALL POLICY: every member is index-eligible and listed
+        excluded = {}   # INDEX-ALL POLICY: every member is index-eligible, so none is excluded
         if len(eligible) > SITEMAP_MAX_URLS:
             sys.exit(f"ERROR: sitemaps/{a['slug']}.xml would list {len(eligible)} URLs")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -2023,9 +2034,11 @@ class MapTemplate:
         # run time), so the first bytes and the hydrated page agree. A ZIP with no Census-drawn
         # area has no ZIP-wide map: noindex, canonical to its /community/ document, as shell.js
         # does at run time for the same ZIPs.
-        indexable = bool(p.get("dev_indexable")) and not cov
-        robots = "index, follow" if indexable else "noindex, nofollow"
-        canon = f"{BASE}/community/{z}/" if cov else f"{BASE}{map_path(z)}"
+        # INDEX-ALL POLICY (founder, 2026-10-26): every /map/<zip>/ document is index-eligible and
+        # canonical to itself, including a ZIP with no Census-drawn area (its page shows the coverage
+        # panel). app_community_meta.indexable is no longer read for SEO.
+        robots = "index, follow"
+        canon = f"{BASE}{map_path(z)}"
         desc = (f"Development records, permits and regulated facilities on file for ZIP {z} "
                 f"({label}), each linked to its official public record.")
         out = self.doc
@@ -2258,7 +2271,8 @@ def main():
     state = ps.PageState(now_iso[:10])
     stats = build(pages, a.out, zips, now_iso[:10], state)
     nmap, map_bytes, map_indexable = build_map_pages(pages, a.out, state)
-    indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
+    # INDEX-ALL POLICY (founder, 2026-10-26): every document built above is index-eligible and listed.
+    indexable = sorted(pages)
     ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
@@ -2287,10 +2301,12 @@ def main():
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
                            lastmod=lastmod_map, map_paths=map_paths)
     fam = write_family_sitemaps(a.out, {
+        "zip": [f"/community/{z}/" for z in sorted(pages)],
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
         "city": city_paths, "project": project_paths, "guide": guide_paths,
-        "map": map_paths},
+        "map": map_paths,
+        "project-list": [project_list_path(z) for z in sorted(pages) if pages[z].get("project_list")]},
         lastmod=lastmod_map)
     focus = write_focus_sitemaps(a.out, load_focus_areas(), pages, indexable, lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
@@ -2344,6 +2360,10 @@ def main():
     # only be replaced by hand-querying production. It changes no document, no robots
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
+    # rule_f_zips: the Rule F evidence set. Since the index-all policy (2026-10-26) it gates
+    # NOTHING (every page is indexable); it exists so the crawler proof can still name the
+    # evidence-rich and evidence-thin classes as control populations.
+    rule_f_zips = sorted(z for z, p in pages.items() if p["rule_f"])
     json.dump({"documents": stats["documents"], "map_routes": nmap, "rule_f_pass": npass,
                "canonical_registry": registry_n, "retired_zips": sorted(retired),
                "unverified_zips": sorted(unverified),
@@ -2351,6 +2371,7 @@ def main():
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
+               "rule_f_zips": rule_f_zips,
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],

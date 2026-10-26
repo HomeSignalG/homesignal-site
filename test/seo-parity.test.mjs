@@ -46,7 +46,9 @@ const firstZip = (M) => walk(M).find((f) => /community\/\d{5}\/index\.html$/.tes
 const sub = (f, re, to) => { const t = readFileSync(f, 'utf8'); const u = t.replace(re, to); if (t === u) throw new Error('mutation did not apply: ' + name_(re)); writeFileSync(f, u); };
 const name_ = (re) => String(re).slice(0, 40);
 mutate('a page turned noindex', (M) => sub(firstZip(M), /content="index, follow"/, 'content="noindex, follow"'));
-mutate('a page turned from noindex to indexable', (M) => { const f = walk(M).find((p) => p.endsWith('.html') && /noindex/.test(readFileSync(p, 'utf8')) && /community\/\d{5}/.test(p)); sub(f, /noindex, follow/, 'index, follow'); });
+// INDEX-ALL POLICY (2026-10-26): no generated document is noindex any more, so the old "noindex -> indexable"
+// control has nothing to flip. The reverse direction is exercised on a /map/<zip>/ document, a family that used to carry noindex.
+mutate('a map page turned noindex', (M) => { const f = walk(M).find((p) => /map\/\d{5}\/index\.html$/.test(p)); if (!f) throw new Error('no map page in the fixture'); sub(f, /content="index, follow"/, 'content="noindex, follow"'); });
 mutate('a canonical path changed', (M) => sub(firstZip(M), /href="https:\/\/jodytracks\.com\/community\/(\d{5})\/"/, 'href="https://jodytracks.com/community/$1-x/"'));
 mutate('a canonical left on the old host', (M) => sub(firstZip(M), /rel="canonical" href="https:\/\/jodytracks\.com/, 'rel="canonical" href="https://homesignal.net'));
 mutate('an old-origin og:url left behind', (M) => sub(join(M, 'index.html'), /(property="og:url" content=")https:\/\/jodytracks\.com/, '$1https://homesignal.net'));
