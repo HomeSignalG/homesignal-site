@@ -279,5 +279,35 @@ select pg_temp.chk('11f get returns history', jsonb_array_length(public.hs_impac
    and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'events') > 10);
 select pg_temp.chk('11g Tab 16 table untouched', (select count(*) from public.youtube_video_reviews) = 1);
 
+-- 12x. a job GitHub never started is reported at once and can be retried (seen 2026-10-26: HTTP 500 on dispatch) --
+create function pg_temp.djob() returns public.impact_story_jobs language sql as $$
+  select * from public.impact_story_jobs where story_id = pg_temp.id('d')::uuid order by created_at desc, attempts desc limit 1 $$;
+select public.hs_impact_story_request(pg_temp.id('d')::uuid, 'pack') where not exists
+  (select 1 from public.impact_story_jobs where story_id = pg_temp.id('d')::uuid and status in ('queued', 'running'));
+select pg_temp.chk('12x1 a fresh queued job with no answer yet is not reported as failed',
+  (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'not_started')::boolean = false
+  and (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'stuck')::boolean = false);
+insert into net._http_response (id, status_code) values ((pg_temp.djob()).dispatch_request_id, 204);
+select pg_temp.chk('12x2 a dispatch GitHub accepted is not a failure',
+  (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'not_started')::boolean = false);
+update net._http_response set status_code = 500 where id = (pg_temp.djob()).dispatch_request_id;
+select pg_temp.chk('12x3 GitHub refusing the dispatch shows at once, with the code, and offers Retry',
+  (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'not_started')::boolean
+  and (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'stuck')::boolean
+  and public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'error' like '%HTTP 500%'
+  and public._hs_is_status(pg_temp.id('d')::uuid)->>'next' like '%Retry%');
+select public.hs_impact_story_job_retry((pg_temp.djob()).id);
+select pg_temp.chk('12x4 Retry re-dispatches the same job, which is then no longer reported',
+  (pg_temp.djob()).attempts = 2 and (pg_temp.djob()).status = 'queued'
+  and (select max(id) from net.requests) = (pg_temp.djob()).dispatch_request_id
+  and (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'not_started')::boolean = false);
+update public.impact_story_jobs set created_at = now() - interval '20 minutes' where id = (pg_temp.djob()).id;
+select pg_temp.chk('12x5 a job no worker claimed in 15 minutes is retryable',
+  (public._hs_is_status(pg_temp.id('d')::uuid)->'job'->>'not_started')::boolean
+  and pg_temp.err(format('select public.hs_impact_story_job_retry(%L)', (pg_temp.djob()).id)) is null);
+select pg_temp.chk('12x6 the helper is not callable by visitors',
+  not has_function_privilege('anon', 'public._hs_is_not_started(public.impact_story_jobs)', 'execute')
+  and not has_function_privilege('authenticated', 'public._hs_is_not_started(public.impact_story_jobs)', 'execute'));
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;

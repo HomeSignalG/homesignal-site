@@ -13,6 +13,8 @@ create table vault.decrypted_secrets (name text, decrypted_secret text);
 insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
 create schema net;
 create table net.requests (id bigserial primary key, url text, body jsonb);
+create table net._http_response (id bigint primary key, status_code int, content text, error_msg text, timed_out boolean,
+  created timestamptz default now());
 create function net.http_post(url text, body jsonb, headers jsonb, timeout_milliseconds int) returns bigint language sql as $$
   insert into net.requests (url, body) values (url, body) returning id $$;
 grant usage on schema public, auth to anon, authenticated, service_role;

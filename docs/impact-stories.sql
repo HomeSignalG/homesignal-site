@@ -279,6 +279,29 @@ end $$;
 create or replace function public._hs_is_stuck_after(p_kind text)
 returns interval language sql immutable as $$ select case p_kind when 'render' then interval '150 minutes' else interval '40 minutes' end $$;
 
+-- Why a queued job never started, or null. GitHub can refuse the start request (seen 2026-10-26: HTTP 500 on the
+-- first Render), and then the job would sit "queued" until the 150-minute stuck limit. pg_net keeps the answer to
+-- the dispatch for a few hours, so a refusal is read from it at once; a job no worker has claimed 15 minutes after
+-- the request is treated the same way. Both make the job retryable now.
+create or replace function public._hs_is_not_started(j public.impact_story_jobs)
+returns text language plpgsql stable security definer set search_path = public, net as $$
+declare code int; err text; timed boolean; seen boolean := false;
+begin
+  if j.id is null or j.status <> 'queued' or j.started_at is not null then return null; end if;
+  if j.dispatch_request_id is not null then
+    select true, r.status_code, r.error_msg, r.timed_out into seen, code, err, timed
+      from net._http_response r where r.id = j.dispatch_request_id;
+    if seen and (code is null or code < 200 or code > 299) then
+      return 'GitHub did not start the worker' || case when code is not null then ' (HTTP ' || code || ')'
+        when coalesce(timed, false) then ' (the request timed out)' else '' end || '. Nothing ran and nothing was lost. Press Retry.';
+    end if;
+  end if;
+  if j.created_at < now() - interval '15 minutes' then
+    return 'No worker has picked this job up in 15 minutes. Nothing ran and nothing was lost. Press Retry.';
+  end if;
+  return null;
+end $$;
+
 -- Rendered files of a story and their media decisions. The CURRENT set is the newest completed render job's files, and
 -- it counts only while it was rendered from the narrative that is approved right now; otherwise it is listed as stale.
 create or replace function public._hs_is_media(p_story uuid)
@@ -342,15 +365,19 @@ begin
     else stage := 'media'; nxt := 'Render the videos'; lib := 'ready';
     end if;
   end if;
-  if j.status in ('queued', 'running') then
+  if j.status in ('queued', 'running') and public._hs_is_not_started(j) is not null then
+    nxt := 'The job did not start. Press Retry.';
+  elsif j.status in ('queued', 'running') then
     nxt := case j.kind when 'pack' then 'Checking sources…' when 'analyze' then 'Analyzing…' when 'generate' then 'Writing the story…'
                        when 'render' then 'Rendering the videos (about 30 to 60 minutes)…' else 'Running checks…' end;
   end if;
   return jsonb_build_object('stage', stage, 'next', nxt, 'library', lib, 'artifacts', arts,
     'fresh', public._hs_is_fresh(s), 'job', case when j.id is null then null else jsonb_build_object(
-      'id', j.id, 'kind', j.kind, 'status', j.status, 'error', j.error, 'attempts', j.attempts,
+      'id', j.id, 'kind', j.kind, 'status', j.status, 'error', coalesce(j.error, public._hs_is_not_started(j)), 'attempts', j.attempts,
       'created_at', j.created_at, 'started_at', j.started_at, 'completed_at', j.completed_at,
-      'stuck', j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind)) end);
+      'not_started', public._hs_is_not_started(j) is not null,
+      'stuck', (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))
+               or public._hs_is_not_started(j) is not null) end);
 end $$;
 
 create or replace function public._hs_is_event(p_story uuid, p_kind text, p_detail jsonb, p_actor text)
@@ -415,7 +442,8 @@ declare j public.impact_story_jobs%rowtype; other int;
 begin
   select * into j from public.impact_story_jobs where id = p_job for update;
   if not found then raise exception 'no such job' using errcode = 'P0002'; end if;
-  if not (j.status = 'failed' or (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))) then
+  if not (j.status = 'failed' or (j.status in ('queued', 'running') and j.created_at < now() - public._hs_is_stuck_after(j.kind))
+          or public._hs_is_not_started(j) is not null) then
     raise exception 'This job is not failed or stuck, so it cannot be retried.' using errcode = '55000';
   end if;
   if j.attempts >= 5 then raise exception 'This job has been tried 5 times. Check the error and start a new request.' using errcode = '55000'; end if;
@@ -831,7 +859,7 @@ begin
     'public._hs_is_fresh(public.impact_stories)', 'public._hs_is_artifact_state(uuid, text)', 'public._hs_is_status(uuid)',
     'public._hs_is_event(uuid, text, jsonb, text)', 'public._hs_is_dispatch(uuid)', 'public._hs_is_queue(uuid, text, jsonb, text, boolean)',
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
-    'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)'] loop
+    'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
