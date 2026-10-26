@@ -2343,6 +2343,10 @@ def main():
     # only be replaced by hand-querying production. It changes no document, no robots
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
+    # rule_f_zips: the Rule F evidence set. Since the index-all policy (2026-10-26) it gates
+    # NOTHING (every page is indexable); it exists so the crawler proof can still name the
+    # evidence-rich and evidence-thin classes as control populations.
+    rule_f_zips = sorted(z for z, p in pages.items() if p["rule_f"])
     json.dump({"documents": stats["documents"], "map_routes": nmap, "rule_f_pass": npass,
                "canonical_registry": registry_n, "retired_zips": sorted(retired),
                "unverified_zips": sorted(unverified),
@@ -2350,6 +2354,7 @@ def main():
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
+               "rule_f_zips": rule_f_zips,
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],

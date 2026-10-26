@@ -60,7 +60,8 @@ export const PINNED_ONLY = new Set(['point_dense']);
 export async function classifyMembers(SITE, man, deps = {}) {
   const rd = deps.readdir || (await import('node:fs/promises')).readdir;
   const rf = deps.readFile || readFile;
-  const idx = new Set(man.indexable_zips);
+  // Index-all policy: indexable_zips is every ZIP, so the evidence classes key on rule_f_zips.
+  const idx = new Set(man.rule_f_zips || man.indexable_zips);
   const dev = new Set(man.dev_indexable_zips || []);
   if (!dev.size) throw new Error('manifest has no dev_indexable_zips — rebuild with the current generator');
 
