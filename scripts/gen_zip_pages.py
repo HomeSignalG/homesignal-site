@@ -1953,9 +1953,12 @@ class MapTemplate:
             if "<!--" in blk:
                 sys.exit("ERROR: Map 1 template: an inline head script carries an HTML comment")
         self.doc = re.sub(r"<!--.*?-->\n?", "", doc, flags=re.S)
-        for needle in self.HEAD:
+        for needle in self.HEAD + (self.EYEBROW, self.H1):
             if self.doc.count(needle) != 1:
                 sys.exit(f"ERROR: Map 1 template: expected exactly one {needle!r}")
+        for rx in (self.SUB_RE, self.PILOT_CARD_RE):
+            if len(rx.findall(self.doc)) != 1:
+                sys.exit(f"ERROR: Map 1 template: expected exactly one match of {rx.pattern!r}")
         # The share image is the one other absolute URL; it follows the site origin like the canonical.
         if self.doc.count(self.OG_IMAGE) != 2 or "https://homesignal.net" in self.doc.replace(self.OG_IMAGE, "").replace(
                 self.HEAD[3], "").replace(self.HEAD[4], ""):
@@ -1971,6 +1974,14 @@ class MapTemplate:
     )
 
     OG_IMAGE = "https://homesignal.net/og-default.png"
+
+    # The hero and one hidden card carry the Box Elder pilot's county copy. The runtime rewrites the
+    # hero for a ZIP, but a crawler reads the static bytes first, and every user-facing page is a
+    # ZIP page, never a county page. Each needle must match exactly once (checked in __init__).
+    EYEBROW = '<div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>'
+    H1 = "<h1>Development around your home</h1>"
+    SUB_RE = re.compile(r'<div class="sub">Enter a Box Elder County address.*?</div>', re.S)
+    PILOT_CARD_RE = re.compile(r"built from Box Elder County public\s+parcel records")
 
     def render(self, p):
         z = p["zip"]
@@ -1990,6 +2001,20 @@ class MapTemplate:
         desc = (f"Development records, permits and regulated facilities on file for ZIP {z} "
                 f"({label}), each linked to its official public record.")
         out = self.doc
+        # ZIP-framed static hero (what a crawler reads before any script runs). Facts come from the
+        # same page record the community document uses; nothing is inferred.
+        n = p.get("rule_d_count") if p.get("rule_d") else None
+        fact = (f" {n} distinct development projects are on record for this ZIP, compiled from "
+                f"official sources." if isinstance(n, int) and n > 0 else "")
+        sub = ('<div class="sub">Development records, permits and regulated facilities on file for '
+               f'ZIP {esc(z)} ({esc(label)}), each linked to its official public record.{fact} '
+               'Search an address to see what is built and proposed nearby. '
+               f'<a href="/community/{esc(z)}/">Government notices, meetings and local news for '
+               f'ZIP {esc(z)}</a>.</div>')
+        out = out.replace(self.EYEBROW, f'<div class="eyebrow" id="eyebrow">Development map · ZIP {esc(z)}</div>', 1)
+        out = out.replace(self.H1, f"<h1>Development around {esc(name)}</h1>", 1)
+        out = self.SUB_RE.sub(lambda m: sub, out, count=1)
+        out = self.PILOT_CARD_RE.sub("built from public parcel records", out, count=1)
         for old, new in (
             (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>"),
             (self.HEAD[1], f'<meta name="robots" content="{robots}" id="robots-meta"/>'),

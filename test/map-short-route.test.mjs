@@ -63,6 +63,14 @@ ok(T.cov.includes('content="noindex, nofollow" id="robots-meta"'), 'coverage-lim
 ok(T.cov.includes(`<link rel="canonical" href="${T.base}/community/06704/"/>`), 'coverage-limited ZIP -> canonical to its document');
 ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury \(06704\), CT\)/.test(T.plain), 'ZIP description');
 ok(!T.plain.includes('homesignalmap.html"/>'), 'no ZIP-less canonical left');
+{
+  // Every user-facing page is a ZIP page: the static bytes a crawler reads first must not carry the
+  // Box Elder pilot's county copy, and must name this ZIP and link to its community document.
+  const text = T.plain.replace(/<script[\s\S]*?<\/script>/g, '');
+  ok(!/Box Elder/.test(text), 'static HTML carries no Box Elder county copy');
+  ok(text.includes('<h1>Development around Waterbury (06704)</h1>'), 'static H1 names the ZIP place');
+  ok(text.includes('<a href="/community/06704/">'), 'static link to the ZIP community page');
+}
 ok(T.plain.includes(`<meta property="og:image" content="${T.base}/og-default.png"/>`), 'og:image follows the site origin');
 ok(T.plain.includes(`<meta name="twitter:image" content="${T.base}/og-default.png"/>`), 'twitter:image follows the site origin');
 ok(T.base === 'https://homesignal.net' || !T.plain.includes('https://homesignal.net'), 'no old-host URL left when the origin moved');
