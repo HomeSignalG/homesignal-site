@@ -14,11 +14,18 @@
 --   * an approval is stamped with the version and the md5 of the artifact it approved. It stays effective only while
 --     the current version's artifact is byte-identical, the current version passed the engine's checks for that
 --     artifact against the CURRENT source pack, and the pack is fresh. So editing a Short never un-approves the
---     main script, and changing the angle un-approves everything written from it;
+--     main script, and changing the angle un-approves everything written from it (first build; since 2026-10-26
+--     one 'narrative' approval covers the whole story, so any change to it needs approving again);
 --   * one active job per story; an identical request (same story, kind, version, scope, pack) returns the existing
 --     job instead of starting and billing a second run;
 --   * a result computed from a version the founder has since replaced is kept on the job and never becomes a version;
 --   * nothing here renders, uploads or publishes. "Ready to render" is the end of this file's workflow.
+--
+-- ONE INTEGRATED NARRATIVE (founder, 2026-10-26): Fear, Anger and Motivation are not competing choices. Analyze
+-- returns the story arc (all three sections, each with its own evidence and status) and the eight-act outline;
+-- Generate writes one script from it; ONE approval, 'narrative', covers the arc, outline, main script,
+-- Quality-of-Life, both Shorts and the packaging. The per-artifact 'angle' / 'main' / 'short_*' / 'packaging'
+-- approvals of the first build stay readable as history and can no longer be decided.
 begin;
 
 create table if not exists public.impact_stories (
@@ -86,7 +93,7 @@ create table if not exists public.impact_story_approvals (
   id             bigint generated always as identity primary key,
   story_id       uuid not null references public.impact_stories(id),
   gate           text not null default 'editorial' check (gate in ('editorial')),
-  artifact       text not null check (artifact in ('angle', 'main', 'short_a', 'short_b', 'packaging')),
+  artifact       text not null check (artifact in ('angle', 'main', 'short_a', 'short_b', 'packaging', 'narrative')),
   version        integer not null,
   artifact_hash  text not null,
   decision       text not null check (decision in ('approved', 'rejected', 'revoked')),
@@ -95,6 +102,10 @@ create table if not exists public.impact_story_approvals (
   actor          text not null,
   at             timestamptz not null default now()
 );
+-- an existing table (created before 'narrative') widens its list; nothing is removed
+alter table public.impact_story_approvals drop constraint if exists impact_story_approvals_artifact_check;
+alter table public.impact_story_approvals add constraint impact_story_approvals_artifact_check
+  check (artifact in ('angle', 'main', 'short_a', 'short_b', 'packaging', 'narrative'));
 alter table public.impact_story_approvals enable row level security;
 revoke all on public.impact_story_approvals from public, anon, authenticated;
 
@@ -147,6 +158,8 @@ end $$;
 create or replace function public._hs_is_artifact(p_body jsonb, p_artifact text)
 returns jsonb language sql immutable as $$
   select case p_artifact
+    when 'narrative' then jsonb_build_object('arc', p_body->'arc', 'outline', p_body->'outline', 'main', p_body->'main',
+         'qol', p_body->'qol', 'shorts', p_body->'shorts', 'packaging', p_body->'packaging')
     when 'angle' then jsonb_build_object('selected', p_body->'selected_angle',
          'card', (select a from jsonb_array_elements(coalesce(p_body->'angles', '[]'::jsonb)) a
                    where a->>'id' = p_body->>'selected_angle' limit 1))
@@ -209,18 +222,17 @@ begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
   select * into j from public.impact_story_jobs where story_id = p_story order by created_at desc limit 1;
-  foreach k in array array['angle', 'main', 'short_a', 'short_b', 'packaging'] loop
-    arts := arts || jsonb_build_object(k, public._hs_is_artifact_state(p_story, k));
-    if arts->k->>'state' <> 'approved' then all_ok := false; end if;
-  end loop;
+  arts := jsonb_build_object('narrative', public._hs_is_artifact_state(p_story, 'narrative'));
+  all_ok := arts->'narrative'->>'state' = 'approved';
   if s.archived_at is not null then stage := 'archived'; nxt := 'Archived.'; lib := 'archived';
   elsif s.pack is null then stage := 'intake'; nxt := 'Check sources'; lib := 'draft';
   elsif jsonb_array_length(coalesce(s.pack->'claims', '[]')) = 0 then stage := 'sources_needed'; nxt := 'Sources needed'; lib := 'draft';
   elsif not public._hs_is_fresh(s) then stage := 'sources_needed'; nxt := 'Re-check sources'; lib := 'draft';
-  elsif v.version is null or jsonb_array_length(coalesce(v.body->'angles', '[]')) = 0 then stage := 'angles'; nxt := 'Analyze story'; lib := 'draft';
-  elsif arts->'angle'->>'state' <> 'approved' then stage := 'angles'; nxt := 'Choose and approve an angle'; lib := 'needs_review';
-  elsif v.body->'main' is null then stage := 'script'; nxt := 'Generate story'; lib := 'needs_review';
-  elsif not all_ok then stage := 'script'; nxt := 'Review and approve the script, Shorts and packaging'; lib := 'needs_review';
+  elsif v.version is null or v.body->'arc' is null then
+    stage := 'outline'; lib := 'draft';
+    nxt := case when v.body ? 'angles' then 'Analyze again to get the story outline' else 'Analyze story' end;
+  elsif v.body->'main' is null then stage := 'outline'; nxt := 'Review the outline, then Generate story'; lib := 'needs_review';
+  elsif not all_ok then stage := 'script'; nxt := 'Review and approve the integrated narrative'; lib := 'needs_review';
   else stage := 'media'; nxt := 'Ready to render. Rendering for Impact Stories is not built yet.'; lib := 'ready';
   end if;
   if j.status in ('queued', 'running') then
@@ -436,9 +448,9 @@ begin
     end if;
   end if;
   if p_kind = 'generate' then
-    st := public._hs_is_artifact_state(p_story, 'angle');
-    if st->>'state' <> 'approved' then
-      raise exception 'Approve an angle before generating the story. (%)', st->>'why' using errcode = '55000';
+    if not exists (select 1 from public.impact_story_versions x where x.story_id = p_story and x.version = s.current_version
+                   and x.body->'arc' is not null and x.body->'outline' is not null) then
+      raise exception 'Analyze the story first: there is no story outline to write from.' using errcode = '55000';
     end if;
   end if;
   if p_kind = 'validate' and s.current_version = 0 then raise exception 'Nothing to check yet.' using errcode = '55000'; end if;
@@ -469,61 +481,52 @@ begin
   values (p_story, nv, nullif(s.current_version, 0), 'founder_edit', p_body, e);
   update public.impact_stories set current_version = nv, updated_at = now() where id = p_story;
   perform public._hs_is_event(p_story, 'saved', jsonb_build_object('version', nv, 'note', left(p_note, 300),
-    'changed', (select jsonb_agg(k) from unnest(array['angle','main','short_a','short_b','packaging']) k
+    'changed', (select jsonb_agg(k) from unnest(array['narrative']) k
                  where public._hs_is_hash(v.body, k) is distinct from public._hs_is_hash(p_body, k))), e);
   return jsonb_build_object('version', nv, 'unchanged', false, 'job', public._hs_is_followup(p_story, e));
 end $$;
 
--- Choose (or reject) an angle card. Only selected_angle / angle_rejections change, and the engine's checks of the
--- card text carry over (they do not depend on which card is selected), so no new run is needed to approve it.
+-- Choosing one angle was replaced by the integrated story outline (founder, 2026-10-26). Kept so an old page or a
+-- stale tab gets a readable answer instead of a missing function; it changes nothing.
 create or replace function public.hs_impact_story_angle(p_story uuid, p_expected_version integer, p_angle text, p_action text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; v public.impact_story_versions%rowtype;
-        nb jsonb; nval jsonb; nv int; rej jsonb;
 begin
+  perform public._hs_is_admin();
+  raise exception 'Choosing one angle was replaced by the story outline. Reload the page and press Analyze.' using errcode = '55000';
+end $$;
+
+-- A revision note on one part of the outline or script (FEAR, ANGER, MOTIVATION, the outline, the script, a Short,
+-- the packaging). Recorded as a story event on the current version; nothing is rewritten here. A Claude Code
+-- session reads these notes and rewrites the draft, and the founder presses Analyze again.
+create or replace function public.hs_impact_story_section_revision(p_story uuid, p_expected_version integer, p_section text, p_note text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype;
+begin
+  if p_section not in ('fear', 'anger', 'motivation', 'outline', 'script', 'short_a', 'short_b', 'packaging') then
+    raise exception 'bad section' using errcode = '22023';
+  end if;
+  if nullif(btrim(p_note), '') is null then raise exception 'Say what to change.' using errcode = '22023'; end if;
+  if char_length(p_note) > 1000 then raise exception 'Keep the note under 1000 characters.' using errcode = '22023'; end if;
   select * into s from public.impact_stories where id = p_story for update;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
   if s.current_version <> p_expected_version then raise exception 'This story changed since you opened it. Reload.' using errcode = '40001'; end if;
-  select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
-  if not exists (select 1 from jsonb_array_elements(coalesce(v.body->'angles', '[]')) a where a->>'id' = p_angle) then
-    raise exception 'No such angle on this version.' using errcode = '22023';
-  end if;
-  rej := coalesce(v.body->'angle_rejections', '[]'::jsonb);
-  if p_action = 'select' then
-    nb := jsonb_set(v.body, '{selected_angle}', to_jsonb(p_angle));
-    nb := jsonb_set(nb, '{angle_rejections}', coalesce((select jsonb_agg(x) from jsonb_array_elements(rej) x where x #>> '{}' <> p_angle), '[]'::jsonb));
-  elsif p_action = 'reject' then
-    nb := jsonb_set(v.body, '{angle_rejections}', (select coalesce(jsonb_agg(distinct x), '[]') from jsonb_array_elements(rej || to_jsonb(p_angle)) x));
-    if v.body->>'selected_angle' = p_angle then nb := jsonb_set(nb, '{selected_angle}', 'null'::jsonb); end if;
-  else raise exception 'bad action' using errcode = '22023';
-  end if;
-  nval := v.validation;
-  if nval is not null then
-    nval := jsonb_set(nval, '{angle}', coalesce(nval->'angles'->(nb->>'selected_angle'),
-              '{"ok": false, "blocking": ["No angle is selected."], "warnings": []}'::jsonb));
-    if v.validation ? 'pack' and not coalesce((v.validation->'pack'->>'ok')::boolean, false) then
-      nval := jsonb_set(nval, '{angle,ok}', 'false'::jsonb);
-    end if;
-  end if;
-  nv := s.current_version + 1;
-  insert into public.impact_story_versions (story_id, version, parent, origin, body, validation, validated_pack_hash, derived, created_by)
-  values (p_story, nv, s.current_version, case p_action when 'select' then 'select_angle' else 'reject_angle' end,
-          nb, nval, v.validated_pack_hash, v.derived, e);
-  update public.impact_stories set current_version = nv, updated_at = now(),
-         primary_emotion = coalesce((select a->>'emotion' from jsonb_array_elements(nb->'angles') a where a->>'id' = nb->>'selected_angle'), primary_emotion)
-   where id = p_story;
-  perform public._hs_is_event(p_story, 'angle_' || p_action, jsonb_build_object('angle', p_angle, 'version', nv), e);
-  return jsonb_build_object('version', nv);
+  perform public._hs_is_event(p_story, 'section_revision',
+    jsonb_build_object('section', p_section, 'version', s.current_version, 'note', btrim(p_note)), e);
+  update public.impact_stories set updated_at = now() where id = p_story;
+  return jsonb_build_object('recorded', true, 'section', p_section, 'version', s.current_version);
 end $$;
 
--- Gate 1 decisions. Approve needs the artifact to have passed the engine's checks on the current version and pack,
--- and the angle approved first. Reject needs a note. Revoke withdraws an approval and blocks anything after it.
+-- Gate 1 decisions, on the ONE integrated narrative. Approve needs it to have passed the engine's checks on the
+-- current version and pack. Reject needs a note. Revoke withdraws an approval and blocks anything after it.
 create or replace function public.hs_impact_story_decide(p_story uuid, p_artifact text, p_decision text, p_expected_version integer,
                                                          p_note text default null, p_target text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; st jsonb; h text;
 begin
-  if p_artifact not in ('angle', 'main', 'short_a', 'short_b', 'packaging') then raise exception 'bad artifact' using errcode = '22023'; end if;
+  if p_artifact in ('angle', 'main', 'short_a', 'short_b', 'packaging') then
+    raise exception 'One approval now covers the whole story: approve the integrated narrative.' using errcode = '22023';
+  end if;
+  if p_artifact <> 'narrative' then raise exception 'bad artifact' using errcode = '22023'; end if;
   if p_decision not in ('approved', 'rejected', 'revoked') then raise exception 'bad decision' using errcode = '22023'; end if;
   select * into s from public.impact_stories where id = p_story for update;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
@@ -537,9 +540,6 @@ begin
   if p_decision = 'approved' then
     if st->>'state' = 'approved' then return jsonb_build_object('state', 'approved', 'unchanged', true); end if;
     if st->>'state' in ('checking', 'blocked') then raise exception 'Cannot approve yet: %', st->>'why' using errcode = '55000'; end if;
-    if p_artifact <> 'angle' and public._hs_is_artifact_state(p_story, 'angle')->>'state' <> 'approved' then
-      raise exception 'Approve the angle first.' using errcode = '55000';
-    end if;
   elsif p_decision = 'rejected' then
     if nullif(btrim(p_note), '') is null then raise exception 'Say what to change.' using errcode = '22023'; end if;
   elsif p_decision = 'revoked' then
@@ -656,7 +656,8 @@ begin
     'public.hs_impact_story_version(uuid, integer)', 'public.hs_impact_story_create(text, text)', 'public.hs_impact_story_duplicate(uuid)',
     'public.hs_impact_story_archive(uuid, text, boolean)', 'public.hs_impact_story_request(uuid, text, text, boolean)',
     'public.hs_impact_story_job_retry(uuid)', 'public.hs_impact_story_save(uuid, integer, jsonb, text)',
-    'public.hs_impact_story_angle(uuid, integer, text, text)', 'public.hs_impact_story_decide(uuid, text, text, integer, text, text)'] loop
+    'public.hs_impact_story_angle(uuid, integer, text, text)', 'public.hs_impact_story_decide(uuid, text, text, integer, text, text)',
+    'public.hs_impact_story_section_revision(uuid, integer, text, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

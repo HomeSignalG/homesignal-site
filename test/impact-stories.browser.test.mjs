@@ -1,5 +1,6 @@
 // Real Chromium: Tab 17 Impact Stories against a stub Supabase client (no network, no credential).
-// Library -> workspace -> steps; angle cards; script editor dirty/save; per-artifact decisions; source drawer;
+// Library -> workspace -> steps; the story outline (FEAR / ANGER / MOTIVATION + integrated outline); script editor
+// dirty/save; the ONE integrated-narrative decision; per-section revision notes; source drawer;
 // honest Media / Distribution / Results states; deep link; responsive widths; keyboard focus.
 // Run: node test/impact-stories.browser.test.mjs
 import { createRequire } from 'node:module';
@@ -18,11 +19,18 @@ await page.evaluate(() => {
   window.calls = [];
   const L = (t, ...c) => ({ text: t, claims: c });
   const body = {
-    schema: 'impact-story/1', selected_angle: 'motivation', angle_rejections: [], suitability: 'A documented decision and schedule.',
-    angles: [{ id: 'motivation', emotion: 'MOTIVATION', affected: 'Fishers at <Ancich> Park', stake: L('A dock was approved.', 'approved'), hook: L('Who gets the dock?', 'purpose'),
-      counterweight: L('No significant impact found, with mitigation.', 'dns_concl'), next: L('Work runs Aug 2026 to Feb 2027.', 'schedule'), unknowns: ['Why the size changed'], contradictions: [], credibility: 'Quoted.', score: { relevance: 2, distinctiveness: 2, timeliness: 2, visual: 3 } },
-      { id: 'anger', emotion: 'ANGER', affected: 'Gig Harbor', stake: L('Near a home.', 'neighbors'), hook: L('Who decided?', 'neighbors'), counterweight: L('', ''), next: L('', ''), unknowns: [], contradictions: [], credibility: '', score: {} }],
-    main: { acts: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ act: n, name: 'Act ' + n, scenes: [{ purpose: 'p' + n, visual: { kind: 'source_document', desc: 'crop', layout: 'evidence_reveal' }, narration: [L('Line of act ' + n + '.', 'approved')] }] })) },
+    schema: 'impact-story/2', suitability: 'All three threads are usable.',
+    arc: {
+      fear: { status: 'needs_qualification', reason: 'Listed species near the site, each with a safeguard.', reason_claims: ['species'],
+        beat: L('A new dock in water with listed species.', 'species'), supporting: ['species', 'flood'], counter: ['bubble', 'dns_concl'],
+        unknowns: ['The biological studies (not reviewed)'], qualifier: L('The studies behind these safeguards were not reviewed.', 'docs_read'),
+        narration: [{ act: 5, ...L('A bubble curtain will be used.', 'bubble') }, { act: 5, ...L('The studies behind these safeguards were not reviewed.', 'docs_read') }] },
+      anger: { status: 'omitted', reason: 'The records raise no accountability question.', narration: [] },
+      motivation: { status: 'supported', reason: 'The city states the purpose.', beat: L('A working dock for <fishers>.', 'purpose'),
+        supporting: ['purpose', 'approved'], counter: ['cost_none'], unknowns: [], narration: [{ act: 1, ...L('Line of act 1.', 'approved') }] },
+    },
+    outline: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ act: n, name: 'Act ' + n, threads: n === 5 ? ['fear'] : n === 1 ? ['motivation'] : ['context'], summary: 'Summary ' + n, claims: [] })),
+    main: { acts: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ act: n, name: 'Act ' + n, scenes: [{ thread: n === 5 ? 'fear' : 'context', purpose: 'p' + n, visual: { kind: 'source_document', desc: 'crop', layout: 'evidence_reveal' }, narration: [L('Line of act ' + n + '.', 'approved')] }] })) },
     qol: ['Traffic', 'Noise', 'Air', 'Water', 'Soil', 'Light'].map((t) => ({ topic: t, status: t === 'Soil' ? 'not_addressed' : 'addressed', summary: L(t + ' summary.', t === 'Soil' ? undefined : 'roads') })),
     shorts: { a: { question: 'Who?', emotion: 'MOTIVATION', title: 'Who gets it?', description: L('d', 'purpose'), beats: ['hook', 'answer', 'evidence', 'next'].map((b) => ({ beat: b, narration: [L(b + ' line', 'purpose')], visual: { kind: 'illustrative', desc: 'card' } })) },
       b: null, b_exception: 'Only one defensible question.' },
@@ -31,10 +39,8 @@ await page.evaluate(() => {
   const art = (state, why, ld) => ({ state, why, last_decision: ld || null });
   window.db = {
     version: 7,
-    status: () => ({ stage: 'script', next: 'Review and approve the script, Shorts and packaging', library: 'needs_review', fresh: true,
-      artifacts: { angle: art('approved', 'Approved on version 6.', { decision: 'approved', version: 6, actor: 'f@x', at: '2026-10-25T10:00:00Z' }),
-        main: art('pending', 'Changed since you approved version 6. Ready for your decision.', { decision: 'approved', version: 6, actor: 'f@x', at: '2026-10-25T10:00:00Z' }),
-        short_a: art('blocked', 'Short A next line 1: promises a link.'), short_b: art('pending', 'Ready for your decision.'), packaging: art('checking', 'The engine has not checked this version against the current sources yet.') },
+    status: () => ({ stage: 'script', next: 'Review and approve the integrated narrative', library: 'needs_review', fresh: window.db.fresh !== false,
+      artifacts: { narrative: art(window.db.nstate || 'blocked', window.db.nwhy || 'Short A: Short A next line 1: promises a link.', { decision: 'approved', version: 6, actor: 'f@x', at: '2026-10-25T10:00:00Z' }) },
       job: window.db.job }),
     job: { id: 'j1', kind: 'generate', status: 'failed', error: 'The AI drafting key is not configured on the worker.', attempts: 1, created_at: '2026-10-25T10:00:00Z' },
   };
@@ -55,12 +61,16 @@ await page.evaluate(() => {
       hs_impact_story_catalog: [{ slug: 'gig-harbor-fishing-homeport-dock', title: '3003 Gig Harbor' }],
       hs_impact_story_get: { story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
         version: { version: window.db.version, body: JSON.parse(JSON.stringify(body)), checked: true, derived,
-          validation: { angles: { motivation: { ok: true, blocking: [] }, anger: { ok: false, blocking: ['An ANGER angle must rest on a documented decision.'] } }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] } } },
-        versions: [{ version: 7 }, { version: 6 }], approvals: [], jobs: [], events: [{ at: '2026-10-25T10:00:00Z', kind: 'job_failed', actor: 'worker', detail: {} }] },
+          validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
+            outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
+            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] } } },
+        versions: [{ version: 7 }, { version: 6 }], approvals: [], jobs: [], events: [{ at: '2026-10-25T10:00:00Z', kind: 'job_failed', actor: 'worker', detail: {} },
+          { at: '2026-10-25T11:00:00Z', kind: 'section_revision', actor: 'f@x', detail: { section: 'fear', version: 7, note: 'Name the <floodplain> earlier.' } }] },
       hs_impact_story_version: { version: 6, body: v6 },
       hs_impact_story_save: { version: 8, job: { status: 'queued' } },
       hs_impact_story_request: { job_id: 'j2', status: 'queued', existing: false },
       hs_impact_story_create: { story_id: 's1' },
+      hs_impact_story_section_revision: { recorded: true },
     }[n];
     if (n === 'hs_impact_story_save') window.db.version = 8;
     return Promise.resolve({ data: d === undefined ? {} : d, error: null });
@@ -93,16 +103,33 @@ ok(txt.includes('Failed (attempt 1): The AI drafting key is not configured') && 
 ok(txt.includes('no public link') && txt.includes('Documents that disagree') && txt.includes('Not reviewed'), 'intake: missing links, conflicts and unreviewed records are shown');
 ok(await page.locator('#is .is-step').count() === 6, 'stepper: six steps');
 
-await page.click('#is [data-act=step][data-step=angles]');
+await page.click('#is [data-act=step][data-step=outline]');
 txt = await page.locator('#is').innerText();
-ok(txt.includes('Fishers at <Ancich> Park') && txt.includes('Counterweight') && txt.includes('not a truth score'), 'angles: cards show who, stake, counterweight, score label');
-ok(txt.includes('An ANGER angle must rest on a documented decision') && txt.includes('Fails evidence checks'), 'angles: an unsupported ANGER card shows why it fails');
+ok(await page.locator('#is .is-step').nth(1).innerText().then((t) => t.includes('Story Outline')), 'stepper: step 2 is the Story Outline');
+ok(['FEAR', 'ANGER', 'MOTIVATION'].every((x) => txt.includes(x)) && txt.includes('What could affect residents?') && txt.includes('What deserves scrutiny?') && txt.includes('What can residents do?'),
+   'outline: all three sections are always shown, each with its question');
+ok(txt.includes('Needs qualification') && txt.includes('Supported') && txt.includes('Omitted'), 'outline: each section shows its evidence status');
+ok(txt.includes('Proposed hook or story beat') && txt.includes('Supporting source records') && txt.includes('Counterevidence and mitigating facts') && txt.includes('Proposed narration'),
+   'outline: beat, supporting records, counterevidence and proposed narration');
+ok(txt.includes('The studies behind these safeguards were not reviewed.') && txt.includes('Its limit, spoken out loud'), 'outline: a qualified section shows its spoken limit');
+ok(txt.includes('Left out of the script') && txt.includes('raise no accountability question'), 'outline: an omitted section says why, and offers no narration');
+ok(txt.includes('none of its counterevidence (cost_none) is spoken') && txt.includes('Fails evidence checks'), 'outline: a section that fails a check says why');
+ok(txt.includes('Integrated outline') && txt.includes('Total') && (await page.locator('#is .is-thr.fear').count()) >= 1, 'outline: the integrated outline shows threads per act and a running time');
+ok(await page.locator('#is button:has-text("Use this angle")').count() === 0 && await page.locator('#is [data-act=angle]').count() === 0, 'outline: there is no single-angle choice');
+ok(txt.includes('Name the <floodplain> earlier.') && (await page.innerHTML('#is')).includes('Name the &lt;floodplain&gt; earlier.'), 'outline: revision notes are shown, escaped');
+await page.click('#is [data-act=revise][data-sec=anger]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'anger' && c[1].p_note === 'Lead with the date.' && c[1].p_expected_version === 7)),
+   'outline: Request revision sends the section, the note and the version');
+ok((await page.locator('#is').innerText()).includes('Revision note saved'), 'outline: the revision note is confirmed');
 
 await page.click('#is [data-act=step][data-step=script]');
 txt = await page.locator('#is').innerText();
 ok(txt.includes('First 30 seconds') && txt.includes('Act 8'), 'script: eight acts and the first 30 seconds');
+ok(await page.locator('#is [data-act=decide][data-a=narrative][data-d=approved]').count() === 1 && await page.locator('#is [data-act=decide]:not([data-a=narrative])').count() === 0,
+   'script: ONE approval, the integrated narrative, and no per-part approvals');
+ok(await page.locator('#is [data-act=decide][data-a=narrative][data-d=approved]').isDisabled() && txt.includes('promises a link'), 'script: a blocked narrative cannot be approved, and says why');
 ok(txt.includes('changed since approved'), 'script: a line changed since the approved version is marked');
-await page.click('#is [data-act=diff][data-a=main]');
+await page.click('#is [data-act=diff][data-a=narrative]');
 ok((await page.locator('#is .is-drawer').innerText()).includes('Old wording of act 3.'), 'script: compare with the approved version shows the old wording');
 await page.click('#is [data-act=claim][data-id=approved] >> nth=0');
 ok((await page.locator('#is .is-drawer').innerText()).includes('Quote for approved'), 'source drawer: a claim opens its quote and document');
@@ -118,11 +145,17 @@ ok((await page.locator('#is').innerText()).includes('Saved as version 8'), 'save
 
 await page.click('#is [data-act=doc][data-doc=short_a]');
 ok((await page.locator('#is').innerText()).includes('promises a link'), 'Short A: its blocking check is shown');
-ok(await page.locator('#is [data-act=decide][data-a=short_a][data-d=approved]').isDisabled(), 'Short A: a blocked artifact cannot be approved');
 await page.click('#is [data-act=doc][data-doc=short_b]');
 ok((await page.locator('#is').innerText()).includes('Editorial exception — second Short unavailable'), 'Short B: the exception is shown, nothing invented');
-await page.click('#is [data-act=decide][data-a=short_b][data-d=rejected]'); await page.waitForTimeout(50);
-ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_decide' && c[1].p_artifact === 'short_b' && c[1].p_decision === 'rejected' && c[1].p_note === 'Lead with the date.' && c[1].p_target)), 'reject: the note and its target line are sent');
+await page.click('#is [data-act=revise][data-sec=short_b]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'short_b')), 'Short B: a revision note names its part');
+await page.evaluate(() => { window.db.nstate = 'pending'; window.db.nwhy = 'Ready for your decision.'; });
+await page.click('#is [data-act=step][data-step=intake]'); await page.click('#is [data-act=step][data-step=script]');
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
+await page.click('#is [data-act=decide][data-a=narrative][data-d=rejected]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_decide' && c[1].p_artifact === 'narrative' && c[1].p_decision === 'rejected' && c[1].p_note === 'Lead with the date.' && c[1].p_target)), 'reject: the note and its target line are sent');
+await page.click('#is [data-act=decide][data-a=narrative][data-d=approved]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_decide' && c[1].p_artifact === 'narrative' && c[1].p_decision === 'approved' && c[1].p_expected_version === 8)), 'approve: one call approves the integrated narrative on the current version');
 
 await page.click('#is [data-act=step][data-step=media]');
 ok((await page.locator('#is').innerText()).includes('Not built yet'), 'media: honestly not built; no render button');
@@ -146,9 +179,9 @@ for (const w of [1440, 1024, 390]) {
   ok(ov <= 1, 'no horizontal page scroll at ' + w + 'px (overflow ' + ov + ')');
 }
 // deep link reopen
-await page.evaluate(() => { location.hash = '#impact=s1&step=angles'; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; });
+await page.evaluate(() => { location.hash = '#impact=s1&step=outline'; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; });
 await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
-ok(await page.locator('#is [data-step=angles][aria-current=step]').count() === 1, 'reload: the deep link reopens the same story and step');
+ok(await page.locator('#is [data-step=outline][aria-current=step]').count() === 1, 'reload: the deep link reopens the same story and step');
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);

@@ -17,23 +17,29 @@ create function pg_temp.work(res jsonb) returns jsonb language plpgsql as $$ dec
   c := public.hs_impact_story_job_claim(j);
   if not (c->>'claimed')::boolean then raise exception 'not claimable'; end if;
   return public.hs_impact_story_job_complete(j, res); end $$;
-create function pg_temp.ok_val(a boolean, m boolean, sa boolean, sb boolean, pk boolean, ph text) returns jsonb language sql as $$
+create function pg_temp.ok_val(n boolean, ph text) returns jsonb language sql as $$
   select jsonb_build_object('pack', jsonb_build_object('ok', true, 'blocking', '[]'::jsonb),
-    'angles', jsonb_build_object('motivation', jsonb_build_object('ok', a, 'blocking', case when a then '[]'::jsonb else '["Angle motivation: no counterweight."]'::jsonb end),
-                                 'anger', jsonb_build_object('ok', false, 'blocking', '["An ANGER angle must rest on a documented decision."]'::jsonb)),
-    'angle', jsonb_build_object('ok', false, 'blocking', '["No angle is selected."]'::jsonb),
-    'main', jsonb_build_object('ok', m, 'blocking', case when m then '[]'::jsonb else '["Act 3 line 1: the number 4 is not in any cited claim."]'::jsonb end),
-    'short_a', jsonb_build_object('ok', sa, 'blocking', '[]'::jsonb), 'short_b', jsonb_build_object('ok', sb, 'blocking', '[]'::jsonb),
-    'packaging', jsonb_build_object('ok', pk, 'blocking', '[]'::jsonb), 'pack_hash', ph) $$;
+    'arc', jsonb_build_object('fear', jsonb_build_object('ok', true, 'blocking', '[]'::jsonb, 'status', 'needs_qualification'),
+                              'anger', jsonb_build_object('ok', n, 'blocking', case when n then '[]'::jsonb else '["ANGER: the qualifier line is not in its narration."]'::jsonb end, 'status', 'needs_qualification'),
+                              'motivation', jsonb_build_object('ok', true, 'blocking', '[]'::jsonb, 'status', 'supported')),
+    'narrative', jsonb_build_object('ok', n, 'blocking', case when n then '[]'::jsonb else '["Story arc: ANGER: the qualifier line is not in its narration."]'::jsonb end),
+    'pack_hash', ph) $$;
 create function pg_temp.pack(h text, verified timestamptz, nclaims int default 2) returns jsonb language sql as $$
   select jsonb_build_object('hash', h, 'title', 'Gig Harbor dock', 'verified_at', verified, 'fresh_days', 30,
     'claims', (select coalesce(jsonb_agg(jsonb_build_object('id', 'c' || g)), '[]') from generate_series(1, nclaims) g)) $$;
-create function pg_temp.body(sel text, packaging_text text default 'Who gets the dock?', with_main boolean default true) returns jsonb language sql as $$
-  select jsonb_build_object('schema', 'impact-story/1', 'selected_angle', sel,
-    'angles', '[{"id":"motivation","emotion":"MOTIVATION","stake":{"text":"x","claims":["c1"]}},{"id":"anger","emotion":"ANGER"}]'::jsonb)
+-- an integrated story: the arc + outline (Analyze), and with_main adds the script, QOL, Shorts and packaging (Generate)
+create function pg_temp.body(packaging_text text default 'Who gets the dock?', with_main boolean default true, anger_beat text default 'Two records, two docks.') returns jsonb language sql as $$
+  select jsonb_build_object('schema', 'impact-story/2',
+    'arc', jsonb_build_object('fear', '{"status":"needs_qualification","beat":{"text":"Listed species.","claims":["c1"]}}'::jsonb,
+                              'anger', jsonb_build_object('status', 'needs_qualification', 'beat', jsonb_build_object('text', anger_beat, 'claims', '["c2"]'::jsonb)),
+                              'motivation', '{"status":"supported","beat":{"text":"A working dock.","claims":["c1"]}}'::jsonb),
+    'outline', '[{"act":1,"threads":["motivation","fear"]},{"act":6,"threads":["anger"]}]'::jsonb)
   || case when with_main then jsonb_build_object('main', '{"acts":[{"act":1}]}'::jsonb, 'qol', '[{"topic":"Traffic"}]'::jsonb,
     'shorts', '{"a":{"question":"Who?"},"b":{"question":"When?"}}'::jsonb, 'packaging', jsonb_build_object('thumbnail', jsonb_build_object('text', packaging_text)))
     else '{}'::jsonb end $$;
+create function pg_temp.nst() returns text language sql as $$ select pg_temp.st('narrative') $$;
+create function pg_temp.stage() returns text language sql as $$ select public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' $$;
+create function pg_temp.nxt() returns text language sql as $$ select public._hs_is_status(pg_temp.id('s')::uuid)->>'next' $$;
 
 -- 1. access ------------------------------------------------------------------------------------------
 select pg_temp.as_user(null);
@@ -65,85 +71,98 @@ select pg_temp.chk('2g stage is intake, next is check sources', public._hs_is_st
 -- 3. worker completes the pack ------------------------------------------------------------------------
 select pg_temp.chk('3a claim + complete pack', (pg_temp.work(jsonb_build_object('pack', pg_temp.pack('P1', now() - interval '1 day'))))->>'ok' = 'true');
 select pg_temp.chk('3b a finished job cannot be claimed again', (public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->>'claimed')::boolean = false);
-select pg_temp.chk('3c stage moves to angles', public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' = 'angles');
-select pg_temp.chk('3d generate before an angle is refused', pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'generate')) like '%Approve an angle%');
+select pg_temp.chk('3c stage moves to the story outline: Analyze', pg_temp.stage() = 'outline' and pg_temp.nxt() = 'Analyze story');
+select pg_temp.chk('3d generate before an outline is refused', pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'generate')) like '%no story outline%');
 
--- 4. analyze -> angle cards -> select -> approve angle ----------------------------------------------
+-- 4. analyze -> the arc and outline; one approval, nothing decidable yet ---------------------------------
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'analyze');
 select pg_temp.chk('4a analyze is a job receipt, not a result', pg_temp.cur() = 0 and (pg_temp.lastjob()).status = 'queued');
-select pg_temp.work(jsonb_build_object('body', pg_temp.body(null, with_main => false), 'derived', jsonb_build_object('validation', pg_temp.ok_val(true, false, false, false, false, 'P1'))));
-select pg_temp.chk('4b analyze result is version 1', pg_temp.cur() = 1);
-select pg_temp.chk('4c an unsupported ANGER card cannot be selected and approved',
-   pg_temp.err(format('select public.hs_impact_story_angle(%L, 1, %L, %L)', pg_temp.id('s'), 'anger', 'select')) is null
-   and pg_temp.st('angle') = 'blocked'
-   and pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 2)', pg_temp.id('s'), 'angle', 'approved')) like '%documented decision%');
-select public.hs_impact_story_angle(pg_temp.id('s')::uuid, 2, 'anger', 'reject');
-select public.hs_impact_story_angle(pg_temp.id('s')::uuid, 3, 'motivation', 'select');
-select pg_temp.chk('4d selecting carries the card checks: approvable at once', pg_temp.cur() = 4 and pg_temp.st('angle') = 'pending');
-select pg_temp.chk('4e rejection is recorded on the version', (select body->'angle_rejections' from public.impact_story_versions where story_id = pg_temp.id('s')::uuid and version = 4) = '["anger"]');
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'angle', 'approved', 4);
-select pg_temp.chk('4f angle approved', pg_temp.st('angle') = 'approved');
-select pg_temp.chk('4g script approvals need a script first', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 4)', pg_temp.id('s'), 'main', 'approved')) is not null);
+select pg_temp.work(jsonb_build_object('body', pg_temp.body(with_main => false), 'derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P1'))));
+select pg_temp.chk('4b analyze result is version 1, at the outline', pg_temp.cur() = 1 and pg_temp.stage() = 'outline'
+   and pg_temp.nxt() = 'Review the outline, then Generate story');
+select pg_temp.chk('4c the status carries ONE artifact, the integrated narrative',
+   (select array_agg(k order by k) from jsonb_object_keys(public._hs_is_status(pg_temp.id('s')::uuid)->'artifacts') k) = array['narrative']);
+select pg_temp.chk('4d a blocked narrative cannot be approved, and says why', pg_temp.nst() = 'blocked'
+   and pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 1)', pg_temp.id('s'), 'narrative', 'approved')) like '%qualifier line%');
+select pg_temp.chk('4e the old per-part decisions are refused', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 1)', pg_temp.id('s'), 'main', 'approved')) like '%One approval now covers%'
+   and pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 1)', pg_temp.id('s'), 'angle', 'approved')) like '%One approval now covers%'
+   and pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 1)', pg_temp.id('s'), 'whatever', 'approved')) like '%bad artifact%');
+select pg_temp.chk('4f choosing one angle is retired with a readable answer, and changes nothing',
+   pg_temp.err(format('select public.hs_impact_story_angle(%L, 1, %L, %L)', pg_temp.id('s'), 'anger', 'select')) like '%replaced by the story outline%' and pg_temp.cur() = 1);
+select pg_temp.chk('4g a section revision needs a note and a known section',
+   pg_temp.err(format('select public.hs_impact_story_section_revision(%L, 1, %L, %L)', pg_temp.id('s'), 'anger', '  ')) like '%Say what to change%'
+   and pg_temp.err(format('select public.hs_impact_story_section_revision(%L, 1, %L, %L)', pg_temp.id('s'), 'villain', 'x')) like '%bad section%'
+   and pg_temp.err(format('select public.hs_impact_story_section_revision(%L, 0, %L, %L)', pg_temp.id('s'), 'anger', 'x')) like '40001%');
+select public.hs_impact_story_section_revision(pg_temp.id('s')::uuid, 1, 'anger', 'Ask it as a question, not a charge.');
+select pg_temp.chk('4h a section revision is an event on the version, and writes no version', pg_temp.cur() = 1
+   and (select detail from public.impact_story_events where kind = 'section_revision' order by id desc limit 1)
+       = '{"section":"anger","version":1,"note":"Ask it as a question, not a charge."}'::jsonb);
+select pg_temp.chk('4i a non-admin cannot leave a revision note', (select pg_temp.as_user('stranger@example.com')) is null
+   and pg_temp.err(format('select public.hs_impact_story_section_revision(%L, 1, %L, %L)', pg_temp.id('s'), 'anger', 'x')) like '42501%');
+select pg_temp.as_user('founder@example.com');
 
--- 5. generate -> per-artifact approvals ----------------------------------------------------------------
+-- 5. generate -> the one approval ------------------------------------------------------------------------
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'generate');
-select pg_temp.work(jsonb_build_object('body', pg_temp.body('motivation'), 'derived', jsonb_build_object('validation', pg_temp.ok_val(true, false, true, true, true, 'P1') || '{"angle":{"ok":true,"blocking":[]}}')));
-select pg_temp.chk('5a generated version 5; the angle approval survives (card unchanged)', pg_temp.cur() = 5 and pg_temp.st('angle') = 'approved');
-select pg_temp.chk('5b a blocked main script cannot be approved, and says why', pg_temp.st('main') = 'blocked'
-   and pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 5)', pg_temp.id('s'), 'main', 'approved')) like '%number 4%');
-select pg_temp.chk('5c reject needs a note', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 5)', pg_temp.id('s'), 'short_a', 'rejected')) like '%Say what to change%');
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'short_a', 'rejected', 5, 'Lead with the date.', 'hook line 1');
-select pg_temp.chk('5d rejection is tied to its line', pg_temp.st('short_a') = 'rejected' and (select target from public.impact_story_approvals order by id desc limit 1) = 'hook line 1');
+select pg_temp.work(jsonb_build_object('body', pg_temp.body(), 'derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P1'))));
+select pg_temp.chk('5a generated version 2, still blocked: the narrative says why', pg_temp.cur() = 2 and pg_temp.nst() = 'blocked' and pg_temp.stage() = 'script'
+   and pg_temp.nxt() = 'Review and approve the integrated narrative');
+select pg_temp.chk('5b reject needs a note', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 2)', pg_temp.id('s'), 'narrative', 'rejected')) like '%Say what to change%');
+select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'rejected', 2, 'Speak the anger qualifier.', 'Act 6');
+select pg_temp.chk('5c a rejection is tied to its line', (select target from public.impact_story_approvals order by id desc limit 1) = 'Act 6');
 -- the founder fixes the script; re-check passes
-select public.hs_impact_story_save(pg_temp.id('s')::uuid, 5, pg_temp.body('motivation') || '{"main":{"acts":[{"act":1},{"act":2}]}}');
-select pg_temp.chk('5e save creates version 6 and queues a re-check', pg_temp.cur() = 6 and (pg_temp.lastjob()).kind = 'validate');
-select pg_temp.chk('5f until the re-check, nothing new is approvable', pg_temp.st('main') = 'checking');
-select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, true, true, true, true, 'P1') || '{"angle":{"ok":true,"blocking":[]}}')));
-select pg_temp.chk('5g re-check attaches to version 6 (no new version)', pg_temp.cur() = 6 and pg_temp.st('main') = 'pending');
-select pg_temp.chk('5h the earlier rejection still applies to the unchanged Short A', pg_temp.st('short_a') = 'rejected');
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, a, 'approved', 6) from unnest(array['main','short_a','short_b','packaging']) a;
-select pg_temp.chk('5i all approved: ready to render', public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' = 'media'
-   and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'ready');
-select pg_temp.chk('5j approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'main', 'approved', 6))->>'unchanged') = 'true'
-   and (select count(*) from public.impact_story_approvals where artifact = 'main' and decision = 'approved') = 1);
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, 2, pg_temp.body() || '{"main":{"acts":[{"act":1},{"act":6}]}}');
+select pg_temp.chk('5d save creates version 3 and queues a re-check', pg_temp.cur() = 3 and (pg_temp.lastjob()).kind = 'validate');
+select pg_temp.chk('5e until the re-check, nothing is approvable', pg_temp.nst() = 'checking');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
+select pg_temp.chk('5f re-check attaches to version 3 (no new version)', pg_temp.cur() = 3 and pg_temp.nst() = 'pending');
+select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3);
+select pg_temp.chk('5g one approval: ready to render', pg_temp.stage() = 'media' and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'ready');
+select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
+   and (select count(*) from public.impact_story_approvals where artifact = 'narrative' and decision = 'approved') = 1);
 
--- 6. targeted invalidation ------------------------------------------------------------------------------
-select public.hs_impact_story_save(pg_temp.id('s')::uuid, 6, pg_temp.body('motivation', 'Who is the dock for?') || '{"main":{"acts":[{"act":1},{"act":2}]}}');
-select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, true, true, true, true, 'P1') || '{"angle":{"ok":true,"blocking":[]}}')));
-select pg_temp.chk('6a a thumbnail-only edit invalidates packaging only', pg_temp.st('packaging') = 'pending'
-   and pg_temp.st('main') = 'approved' and pg_temp.st('short_a') = 'approved' and pg_temp.st('short_b') = 'approved' and pg_temp.st('angle') = 'approved');
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'packaging', 'approved', 7);
--- revoke blocks
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'main', 'revoked', 7, 'Check the hearing date again.');
-select pg_temp.chk('6b a revoked approval blocks readiness', pg_temp.st('main') = 'revoked' and public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' = 'script');
-select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'main', 'approved', 7);
-select pg_temp.chk('6c re-approval is a new row; history kept', (select count(*) from public.impact_story_approvals where artifact = 'main') = 3);
+-- 6. any change inside the narrative needs approving again; a change outside it does not ----------------
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, 3, pg_temp.body() || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
+select pg_temp.chk('6a an edit outside the narrative keeps the approval', pg_temp.cur() = 4 and pg_temp.nst() = 'approved');
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, 4, pg_temp.body('Who is the dock for?') || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
+select pg_temp.chk('6b a thumbnail-only edit needs the one approval again', pg_temp.cur() = 5 and pg_temp.nst() = 'pending' and pg_temp.stage() = 'script'
+   and (public._hs_is_artifact_state(pg_temp.id('s')::uuid, 'narrative')->>'why') like 'Changed since you approved version 3%');
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, 5, pg_temp.body('Who is the dock for?', anger_beat => 'Edited beat.') || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note"}');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
+select pg_temp.chk('6c so does an edit to one section of the arc', pg_temp.cur() = 6 and pg_temp.nst() = 'pending'
+   and (select detail->'changed' from public.impact_story_events where kind = 'saved' order by id desc limit 1) = '["narrative"]');
+select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 6);
+select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'revoked', 6, 'Check the hearing date again.');
+select pg_temp.chk('6d a revoked approval blocks readiness', pg_temp.nst() = 'revoked' and pg_temp.stage() = 'script');
+select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 6);
+select pg_temp.chk('6e re-approval is a new row; history kept', (select count(*) from public.impact_story_approvals where artifact = 'narrative') = 5);
 
 -- 7. optimistic lock, superseded results ---------------------------------------------------------------
-select pg_temp.chk('7a a stale editor cannot overwrite', pg_temp.err(format('select public.hs_impact_story_save(%L, 5, %L::jsonb)', pg_temp.id('s'), pg_temp.body('motivation'))) like '40001%');
+select pg_temp.chk('7a a stale editor cannot overwrite', pg_temp.err(format('select public.hs_impact_story_save(%L, 5, %L::jsonb)', pg_temp.id('s'), pg_temp.body())) like '40001%');
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'generate', 'short_b');
 insert into _ids select 'g', (pg_temp.lastjob()).id::text;
 select public.hs_impact_story_job_claim(pg_temp.id('g')::uuid);
 select pg_temp.chk('7b only one job at a time per story', pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'pack')) like '%already running%');
--- the founder saves while the AI runs: the save lands, its check waits for the running job
-select pg_temp.chk('7c a save during a running job still lands', (public.hs_impact_story_save(pg_temp.id('s')::uuid, 7, pg_temp.body('motivation', 'Who is the dock for?') || '{"main":{"acts":[{"act":1},{"act":2}]},"notes":"draft"}'))->'job'->>'status' = 'waiting');
-select pg_temp.chk('7d ...as version 8', pg_temp.cur() = 8);
-create temp table _r7 as select public.hs_impact_story_job_complete(pg_temp.id('g')::uuid, jsonb_build_object('body', pg_temp.body('motivation'))) r;
+select pg_temp.chk('7c a save during a running job still lands', (public.hs_impact_story_save(pg_temp.id('s')::uuid, 6, pg_temp.body('Who is the dock for?', anger_beat => 'Edited beat.') || '{"main":{"acts":[{"act":1},{"act":6}]},"suitability":"edited note","notes":"draft"}'))->'job'->>'status' = 'waiting');
+select pg_temp.chk('7d ...as version 7', pg_temp.cur() = 7);
+create temp table _r7 as select public.hs_impact_story_job_complete(pg_temp.id('g')::uuid, jsonb_build_object('body', pg_temp.body())) r;
 select pg_temp.chk('7e a result on a replaced version is kept on the job, not applied', (select r->>'superseded' from _r7) = 'true'
-   and pg_temp.cur() = 8 and (select status from public.impact_story_jobs where id = pg_temp.id('g')::uuid) = 'superseded');
-select pg_temp.chk('7f the waiting check for version 8 starts once the job ends', (pg_temp.lastjob()).kind = 'validate' and (pg_temp.lastjob()).base_version = 8 and (pg_temp.lastjob()).status = 'queued');
-select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, true, true, true, true, 'P1') || '{"angle":{"ok":true,"blocking":[]}}')));
+   and pg_temp.cur() = 7 and (select status from public.impact_story_jobs where id = pg_temp.id('g')::uuid) = 'superseded');
+select pg_temp.chk('7f the waiting check for version 7 starts once the job ends', (pg_temp.lastjob()).kind = 'validate' and (pg_temp.lastjob()).base_version = 7 and (pg_temp.lastjob()).status = 'queued');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
+select pg_temp.chk('7g the approval survives an unchanged narrative', pg_temp.nst() = 'approved');
 
 -- 8. failure, retry, missing credential ---------------------------------------------------------------
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'validate', 'all', true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
-select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'The AI drafting key is not configured on the worker.');
-select pg_temp.chk('8a failure is readable', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%not configured%');
-select pg_temp.chk('8b a running job cannot be retried', pg_temp.err(format('select public.hs_impact_story_job_retry(%L)', (select id from public.impact_story_jobs where status='complete' limit 1))) like '%not failed or stuck%');
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'No story has been written for this project yet. Ask Claude, in a Claude Code session.');
+select pg_temp.chk('8a failure is readable', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%Ask Claude%');
+select pg_temp.chk('8b a finished job cannot be retried', pg_temp.err(format('select public.hs_impact_story_job_retry(%L)', (select id from public.impact_story_jobs where status='complete' limit 1))) like '%not failed or stuck%');
 select public.hs_impact_story_job_retry((pg_temp.lastjob()).id);
 select pg_temp.chk('8c retry re-runs the SAME job', (pg_temp.lastjob()).status = 'queued' and (pg_temp.lastjob()).attempts = 2
-   and (select count(*) from public.impact_story_jobs where kind = 'validate' and base_version = 8) = 2);
-select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, true, true, true, true, 'P1') || '{"angle":{"ok":true,"blocking":[]}}')));
+   and (select count(*) from public.impact_story_jobs where kind = 'validate' and base_version = 7) = 2);
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
 delete from vault.decrypted_secrets;
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'pack');
 select pg_temp.chk('8d no credential: failed with a reason, nothing dispatched', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%no GitHub credential%');
@@ -155,20 +174,25 @@ select pg_temp.chk('8e the identical request after a failure retries the same jo
 select pg_temp.work(jsonb_build_object('pack', pg_temp.pack('P2', now())));
 select pg_temp.chk('9a a changed pack queues a re-check and warns', (pg_temp.lastjob()).kind = 'validate'
    and exists (select 1 from public.impact_story_events where kind = 'freshness_warning'));
-select pg_temp.chk('9b approvals hold until checked against the new pack', pg_temp.st('main') = 'checking' and pg_temp.st('angle') = 'checking' and public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' <> 'media');
-select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, true, true, true, true, 'P2') || '{"angle":{"ok":true,"blocking":[]}}')));
-select pg_temp.chk('9c re-checked against the same text: approvals return', pg_temp.st('main') = 'approved' and public._hs_is_status(pg_temp.id('s')::uuid)->>'stage' = 'media');
+select pg_temp.chk('9b the approval holds until checked against the new pack', pg_temp.nst() = 'checking' and pg_temp.stage() <> 'media');
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P2'))));
+select pg_temp.chk('9c re-checked against the same text: the approval returns', pg_temp.nst() = 'approved' and pg_temp.stage() = 'media');
 update public.impact_stories set pack = jsonb_set(pack, '{verified_at}', to_jsonb(now() - interval '45 days')) where id = pg_temp.id('s')::uuid;
-select pg_temp.chk('9d stale sources block everything and say so', pg_temp.st('main') = 'blocked'
-   and public._hs_is_status(pg_temp.id('s')::uuid)->>'next' = 'Re-check sources'
+select pg_temp.chk('9d stale sources block the approval and say so', pg_temp.nst() = 'blocked'
+   and pg_temp.nxt() = 'Re-check sources'
    and pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'analyze')) like '%out of date%');
 update public.impact_stories set pack = jsonb_set(pack, '{verified_at}', to_jsonb(now())) where id = pg_temp.id('s')::uuid;
 
--- 10. changing the angle invalidates everything written from it -----------------------------------------
-select public.hs_impact_story_angle(pg_temp.id('s')::uuid, 8, 'anger', 'select');
-select pg_temp.chk('10a new angle: main and angle approvals no longer apply', pg_temp.st('main') <> 'approved' and pg_temp.st('angle') <> 'approved');
-select public.hs_impact_story_angle(pg_temp.id('s')::uuid, 9, 'motivation', 'select');
-select pg_temp.chk('10b back to the approved angle: the approved text is approved again', pg_temp.st('angle') = 'approved' and pg_temp.st('main') = 'approved');
+-- 10. a story written before the outline, and its old approvals --------------------------------------
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, 7, '{"schema":"impact-story/1","angles":[{"id":"motivation"}],"selected_angle":"motivation"}'::jsonb);
+select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P2'))));
+select pg_temp.chk('10a an angle-card story is asked to Analyze again', pg_temp.stage() = 'outline' and pg_temp.nxt() = 'Analyze again to get the story outline'
+   and pg_temp.err(format('select public.hs_impact_story_request(%L, %L)', pg_temp.id('s'), 'generate')) like '%no story outline%');
+insert into public.impact_story_approvals (story_id, artifact, version, artifact_hash, decision, actor)
+  values (pg_temp.id('s')::uuid, 'angle', 1, 'x', 'approved', 'history@example.com');
+select pg_temp.chk('10b old per-part approval rows stay storable and readable as history',
+   (select count(*) from public.impact_story_approvals where artifact = 'angle') = 1);
+select pg_temp.chk('10c the artifact list is widened, never narrowed', pg_temp.err($q$insert into public.impact_story_approvals (story_id, artifact, version, artifact_hash, decision, actor) values ('$q$ || pg_temp.id('s') || $q$', 'villain', 1, 'x', 'approved', 'x')$q$) like '23514%');
 
 -- 11. immutability, archive, duplicate -----------------------------------------------------------------
 select pg_temp.chk('11a approvals are append-only', pg_temp.err('update public.impact_story_approvals set decision = $$approved$$') is not null
@@ -182,7 +206,7 @@ select public.hs_impact_story_archive(pg_temp.id('s')::uuid, null, true);
 insert into _ids select 'd', public.hs_impact_story_duplicate(pg_temp.id('s')::uuid)->>'story_id';
 select pg_temp.chk('11e duplicate is a NEW story with no approvals copied', (select duplicated_from::text from public.impact_stories where id = pg_temp.id('d')::uuid) = pg_temp.id('s')
    and (select count(*) from public.impact_story_approvals where story_id = pg_temp.id('d')::uuid) = 0);
-select pg_temp.chk('11f get returns history', jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'versions') = 10
+select pg_temp.chk('11f get returns history', jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'versions') = 8
    and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'events') > 10);
 select pg_temp.chk('11g Tab 16 table untouched', (select count(*) from public.youtube_video_reviews) = 1);
 
