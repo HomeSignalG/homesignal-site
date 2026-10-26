@@ -685,6 +685,21 @@ def assemble(d, now_iso):
                     "rule_d": bool(rec.get("rule_d")),
                     "rule_d_count": rec.get("count") if rec.get("count") is not None else 0,
                     "dev_entities": list(rec.get("entities") or [])}
+        # THE COUNTY-EQUIVALENT IS THE ROOT COMMUNITY, NAMED AS ITSELF. The short `county` field
+        # is a join key, not a name: "Baltimore" is both Baltimore city and Baltimore County (two
+        # governments), Alaska has boroughs and census areas, Louisiana parishes. Appending
+        # " County" to it told Baltimore city residents they live in Baltimore County. Walk the
+        # resolved community up parent_id to its level='county' root and use that row's name;
+        # only a ZIP with no resolvable root falls back to "<county> County".
+        hit = resolved.get(z)
+        up, hops = (hit[1] if hit else None), 0
+        while up and up.get("level") != "county" and up.get("parent_id") and hops < 6:
+            up = by_id.get(up["parent_id"])
+            hops += 1
+        root = up if up and up.get("level") == "county" else None
+        pages[z]["root_id"] = str(root["id"]) if root else ""
+        pages[z]["county_label"] = ((root.get("name") or "").strip() if root else "") or (
+            f"{pages[z]['county']} County" if pages[z]["county"] else "")
     for c in d["changes"]:
         p = pages.get(c.get("zip"))
         if p is None:                                      # off-registry (e.g. removed 80249)
@@ -745,8 +760,10 @@ def link_siblings(pages):
     """
     groups = {}
     for z, p in pages.items():
+        # Grouped by the ROOT community, never by (state, county name): Baltimore city and
+        # Baltimore County share the name "Baltimore" and are different governments.
         if p["county"] and p["state"]:
-            groups.setdefault((p["state"], p["county"]), []).append(z)
+            groups.setdefault((p["state"], p.get("root_id") or p["county"]), []).append(z)
     for zs in groups.values():
         zs.sort()
         n = len(zs)
@@ -883,7 +900,7 @@ def render(p, built):
                  "date": (m.get("meeting_date") or "")[:10],
                  "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
-    county_bit = f" in {esc(p['county'])} County" if p["county"] else ""
+    county_bit = f" in {esc(p['county_label'])}" if p.get("county_label") else ""
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
             "Government notices, public meetings and local news")
@@ -920,7 +937,7 @@ def render(p, built):
     # vacuously, weakening a check rather than adding one.
     sibs = p.get("siblings") or []
     if sibs:
-        where = f"{esc(p['county'])} County, {esc(st)}" if st else f"{esc(p['county'])} County"
+        where = f"{esc(p['county_label'])}, {esc(st)}" if st else esc(p["county_label"])
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
         nearby_id = ' id="zip-nearby"' if cov else ""
@@ -1050,7 +1067,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=b0215286"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=de9f2588"></script>\n'
+        '<script src="/lib/community-page.js?v=327bfb74"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1608,10 +1625,10 @@ def render_area_hub(a, members, pages, cities, built):
     mset = set(members)
     by_county = {}
     for z in members:
-        by_county.setdefault(pages[z].get("county") or "", []).append(z)
+        by_county.setdefault(pages[z].get("county_label") or "", []).append(z)
     groups = ""
     for county, zs in sorted(by_county.items()):
-        head = f"<h3>{esc(county)} County</h3>" if len(by_county) > 1 and county else ""
+        head = f"<h3>{esc(county)}</h3>" if len(by_county) > 1 and county else ""
         groups += head + "<ul>" + "".join(
             f'<li><a href="/community/{z}/">{esc(pages[z]["name"])}</a></li>' for z in zs) + "</ul>"
     cs = sorted((c for c in cities.values() if c["state"].upper() == a["state"].upper()
