@@ -212,7 +212,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     </div>
    </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button><button data-tab="impactstories">17 · Impact Stories</button></nav>
   <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -230,6 +230,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-arearequests"></div>
     <div class="tab" id="tab-saleshandy"></div>
     <div class="tab" id="tab-youtubevideos"></div>
+    <div class="tab" id="tab-impactstories"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -289,6 +290,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
 <script src="lib/acq-youtube-videos.js?v=8cb36ded"></script>
 <script src="lib/acq-bluesky-videos.js?v=7c3aed88"></script>
+<script src="lib/acq-impact-stories.js?v=eb3eeb7a"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -424,6 +426,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var el = document.getElementById('tab-youtubevideos');
       if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
     },
+    // Live, gated (hs_impact_story_*): the Impact Stories workspace. Never baked into the snapshot, and a snapshot refresh
+    // never touches it (render() skips this tab), so an open editor is never overwritten.
+    impactstories: function () {
+      var el = document.getElementById('tab-impactstories');
+      if (el && window.HS && window.HS.acqImpactStories) window.HS.acqImpactStories.load(window.hsClient, el);
+    },
     videoproducer: function () {
       var container = document.getElementById('tab-videoproducer');
       if (
@@ -499,6 +507,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(!el) return;
       // Keep Video Producer DOM + in-memory state when auth refresh re-fetches the snapshot.
       if(id==='videoproducer' && el.getAttribute('data-vp-initialized')==='1') return;
+      if(id==='impactstories') return;
       el.innerHTML=tabs[id];
     });
     var vpEl=$('tab-videoproducer');
@@ -523,6 +532,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireBluesky();
     wirePremiumWaitlist();
     wireAreaRequests();
+    // A deep link (#impact=<story>&step=…) opens Tab 17 directly; reload and back/forward keep the story and step.
+    if(/^#impact/.test(location.hash||'')){ var ib=document.querySelector('nav.tabs button[data-tab="impactstories"]'); if(ib && !ib.classList.contains('active')) ib.click(); }
     stalenessBanner(p.meta);
   }
 
