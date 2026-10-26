@@ -17,3 +17,12 @@ $P -f "$HERE/stubs.sql"
 $P -f "$ROOT/docs/impact-stories.sql" >/dev/null
 $P -f "$ROOT/docs/impact-stories.sql" >/dev/null   # idempotent re-apply
 $P -f "$HERE/suite.sql"
+# upgrade path: a database built from the first file (artifact list without 'narrative') widens on re-apply
+$P -c "alter table public.impact_story_approvals drop constraint impact_story_approvals_artifact_check;
+       alter table public.impact_story_approvals add constraint impact_story_approvals_artifact_check
+         check (artifact in ('angle', 'main', 'short_a', 'short_b', 'packaging')) not valid;"
+$P -f "$ROOT/docs/impact-stories.sql" >/dev/null
+$P -c "do \$\$ begin
+  if not exists (select 1 from pg_constraint where conname = 'impact_story_approvals_artifact_check'
+                 and pg_get_constraintdef(oid) like '%narrative%') then raise exception 'FAIL: upgrade did not widen the artifact list'; end if;
+end \$\$;" && echo "upgrade: artifact list widened on re-apply"

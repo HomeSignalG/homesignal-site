@@ -5543,18 +5543,28 @@ Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`
 - Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
 - `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
-## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff, SQL PARKED (not applied)
+## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
-A separate emotion-led story workflow: Library -> Intake -> Emotional Angles -> Script & Shorts -> Media -> Distribution ->
-Results. Page `lib/acq-impact-stories.js`; SQL of record `docs/impact-stories.sql`; engine homesignal-ingest `impact/` +
+A separate emotion-led story workflow: Library -> Intake -> Story Outline -> Script & Shorts -> Media -> Distribution ->
+Results.
+- ⚖️ **ONE INTEGRATED NARRATIVE (founder, 2026-10-26).** Fear, Anger and Motivation are not competing choices. Step 2,
+  Story Outline, always shows all three sections (FEAR: what could affect residents? ANGER: what deserves scrutiny?
+  MOTIVATION: what can residents do?), each with its beat, supporting records, counterevidence, unknowns, evidence
+  status (Supported / Needs qualification / Omitted) and proposed narration, plus the eight-act integrated outline with
+  running times. ONE approval, `narrative`, covers the arc, outline, main script, QOL, both Shorts and packaging
+  (founder: "single integrative narrative"). `hs_impact_story_angle` is retired (raises a readable message);
+  per-section notes go through `hs_impact_story_section_revision` as story events, and a Claude Code session rewrites
+  the draft from them. Old per-part approval rows stay as history and can no longer be decided.
+- Page `lib/acq-impact-stories.js`; SQL of record `docs/impact-stories.sql`; engine homesignal-ingest `impact/` +
 `impact-story-job.yml`. Tabs 11 and 16 are untouched; the catalog only READS `youtube_video_reviews` slug/title.
 - Every slow action returns a job receipt (`impact_story_jobs`, one active per story, idempotency key = story|kind|version|
   scope|pack). Versions are immutable rows; saves use an expected-version lock.
-- Approval is per artifact (angle, main, short_a, short_b, packaging) and is effective only while that artifact's md5 is
-  unchanged, the engine passed it on the current version against the current pack, and the pack is <= 30 days old.
+- The one approval is effective only while the narrative's md5 is unchanged, the engine passed it on the current version
+  against the current pack, and the pack is <= 30 days old. Any edit inside the narrative needs approving again.
 - ⛔ **Media review, rendering, destination approval and metrics are NOT built.** The page says so; there is no render or
   publish button. Export is text only and unlocks when all editorial approvals are in place.
-- Apply order: merge the ingest PR (workflow on main) BEFORE applying the SQL. Tests: `test/impact_stories_pg/` (62 checks),
+- Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
+  data never disagree. Tests: `test/impact_stories_pg/` (66 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
