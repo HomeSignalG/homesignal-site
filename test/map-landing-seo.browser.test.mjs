@@ -89,7 +89,6 @@ const aboutState = (page) => page.evaluate(() => {
 }
 // B2. every non-landing state is noindex, and the copy is not shown there
 for (const [label, path, opts] of [
-  ['a ZIP route (?zip=)', '/homesignalmap.html?zip=98335'],
   ['a street-address route (?addr=)', '/homesignalmap.html?addr=' + encodeURIComponent('4700 Point Fosdick Dr NW, Gig Harbor, WA 98335')],
   ['a lat/lng point', '/homesignalmap.html?lat=47.3&lng=-122.6'],
   ['an embed', '/homesignalmap.html?embed=1&preview=1&zip=98335'],
@@ -140,7 +139,8 @@ if (!(() => { try { createRequire(import.meta.url).resolve('leaflet/dist/leaflet
   await landing.waitForFunction(() => Array.isArray(window.__HS_SITES) && window.__HS_SITES.length > 0, null, { timeout: 30000 }).catch(() => {});
   await landing.waitForTimeout(1500);
   ok(await landing.evaluate(() => (window.__HS_SITES || []).length) > 0, 'B12 control: the same evidence reached the landing document and rendered content');
-  ok(await robotsNow(landing) === 'noindex, nofollow', 'B13 the same ZIP evidence does NOT promote the landing document (its canonical is the landing page)', await robotsNow(landing));
+  // INDEX-ALL (2026-10-26): the page rewrites ?zip= to /map/<zip>/, which is that ZIP's own index-eligible page.
+  ok(await landing.evaluate(() => location.pathname) === `/map/${Z}/` && await robotsNow(landing) === 'index, follow', 'B13 a ?zip= visit becomes the ZIP\'s own /map/<zip>/ page, index, follow', await robotsNow(landing));
   await landing.context().close();
 }
 await browser.close();
