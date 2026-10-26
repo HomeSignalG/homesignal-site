@@ -241,7 +241,7 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
 ## THE ZIP UNIVERSE GROWS PAST 12,722 — FIRST FOUR ALASKA ZIPS (founder, 2026-10-26)
 
 The founder ruled that ZIP pages increase from 12,722. The registry still decides which pages exist, and production
-still never creates one by itself. **12,726** after the first batch. Earlier "12,722" figures in this file are dated
+still never creates one by itself. **12,743** after the second batch (12,726 after the first). Earlier "12,722" figures in this file are dated
 receipts.
 - **Added:** 99827 Haines (new root Haines Borough) · 99743 Healy and 99704 Anderson / Clear (new root Denali Borough)
   · 99790 Livengood (new root Yukon-Koyukuk Census Area).
@@ -256,6 +256,14 @@ receipts.
      The coverage artifact is then regenerated from production.
 - **99790's development centre is its ZCTA's own point (65.4280, −148.0882).** The `zipcodes` point is in downtown
   Fairbanks (inside 99701).
+- **Second batch, same day: 17 more ZIPs, 12,726 → 12,743** (`docs/alaska-zip-expansion-batch2-2026-10-26.sql`, migrations
+  `alaska_zip_expansion_batch2_20261026` + `canonical_zip_guard_selftest_expects_12743`): Unalaska 99685, Dutch Harbor 99692,
+  Nome 99762, Utqiagvik 99723, Kotzebue 99752, Dillingham 99576, Petersburg 99833, Skagway 99840, Wrangell 99929, Yakutat
+  99689, Prudhoe Bay 99734, Naknek 99633, King Salmon 99613, Craig 99921, Metlakatla 99926, Cold Bay 99571, Sand Point 99661,
+  under 12 new county roots. 99613 is filed under Bristol Bay (where King Salmon is) though 81% of its land is Lake and
+  Peninsula. Development centres are each town's Census place point; most `zipcodes` points for these PO-box ZIPs lie
+  outside their own ZCTA. ⚠️ **The Prudhoe Bay CDP point and the oil-field core lie in ZCTA 99519, not 99734**, so the
+  99734 page is centred on the nearest point of its own ZCTA and does not cover the field's core.
 - **Map 1 status for the four arrives with the next N5 generation.** The serving one predates them.
 
 ## THE ZIP-LESS DEVELOPMENT MAP LANDING PAGE IS INDEX-ELIGIBLE FROM ITS FIRST BYTE (founder, 2026-10-26)

@@ -25,7 +25,7 @@
 //   5. canonical_zip_guard_selftest() returns all-passed — including its own positive
 //      control, so a blanket-deny guard cannot score green here.
 //
-// Env: EXPECTED_ZIPS (default 12726: 12,722 until the founder's 2026-10-26 Alaska expansion), SUPABASE_URL / SUPABASE_ANON_KEY (default: read from
+// Env: EXPECTED_ZIPS (default 12743: 12,722 until the founder's 2026-10-26 Alaska expansions, 12,726 after the first), SUPABASE_URL / SUPABASE_ANON_KEY (default: read from
 // config.js, the one place the app config lives).
 
 import { readFileSync } from 'node:fs';
@@ -41,7 +41,7 @@ const grab = (name) => {
 };
 const SUPABASE_URL = process.env.SUPABASE_URL || grab('SUPABASE_URL');
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || grab('SUPABASE_ANON_KEY');
-const EXPECTED = parseInt(process.env.EXPECTED_ZIPS || '12726', 10);
+const EXPECTED = parseInt(process.env.EXPECTED_ZIPS || '12743', 10);
 
 const HEAD = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
 
