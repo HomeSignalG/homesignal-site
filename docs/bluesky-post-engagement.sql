@@ -13,7 +13,8 @@
 -- DIRECT POSTS (added 2026-10-27): posts made on Bluesky by hand, outside both queues (e.g. videos uploaded in the
 --         Bluesky app), are read from the account's own feed and stored as kind 'direct', post_id = the post's at:// uri,
 --         with label (first line of the text), posted_at (the record's createdAt) and media ('video' | 'image' | 'link' |
---         'none'). Their links carry no post tag, so no visitor can be credited to them.
+--         'none'), plus utm_content: the tag in the post's own link to our site, when it has one (added the same day).
+--         Visitors are credited to a direct post only through that tag (hs_bsky_maps_vs_shorts().shorts_by_content).
 -- NOT AVAILABLE: impressions (Bluesky has no impressions API) and follows gained per post (a follow is not tied to a post).
 --
 -- (applied as ONE transaction by apply_migration; do not add begin/commit)
@@ -35,6 +36,9 @@ alter table public.bsky_post_metrics add constraint bsky_post_metrics_kind_check
 alter table public.bsky_post_metrics add column if not exists label     text;
 alter table public.bsky_post_metrics add column if not exists posted_at timestamptz;
 alter table public.bsky_post_metrics add column if not exists media     text check (media in ('video', 'image', 'link', 'none'));
+-- The tag in a direct post's own link to our site (utm_content, read by the collector; null when untagged). The page
+-- uses it to credit that post with hs_bsky_maps_vs_shorts().shorts_by_content[tag]. A plain label only, never a URL.
+alter table public.bsky_post_metrics add column if not exists utm_content text check (utm_content ~ '^[a-z0-9._~:/-]{1,80}$');
 create index if not exists bsky_post_metrics_post_time_idx on public.bsky_post_metrics (post_id, captured_at desc);
 alter table public.bsky_post_metrics enable row level security;
 revoke all on table public.bsky_post_metrics from public, anon, authenticated;
@@ -51,7 +55,7 @@ begin
   end if;
   with latest as (
     select distinct on (m.post_id) m.kind, m.post_id, m.bsky_uri, m.captured_at, m.likes, m.reposts, m.replies, m.quotes,
-           m.label, m.posted_at, m.media
+           m.label, m.posted_at, m.media, m.utm_content
       from public.bsky_post_metrics m
      order by m.post_id, m.captured_at desc, m.id desc)
   select jsonb_build_object(
@@ -60,11 +64,11 @@ begin
     'posts', (select coalesce(jsonb_object_agg(l.post_id, jsonb_build_object(
         'kind', l.kind, 'bsky_uri', l.bsky_uri, 'measured_at', l.captured_at,
         'likes', l.likes, 'reposts', l.reposts, 'replies', l.replies, 'quotes', l.quotes,
-        'label', l.label, 'posted_at', l.posted_at, 'media', l.media)), '{}'::jsonb) from latest l),
+        'label', l.label, 'posted_at', l.posted_at, 'media', l.media, 'utm_content', l.utm_content)), '{}'::jsonb) from latest l),
     'unavailable', jsonb_build_array(
       'Impressions: Bluesky has no impressions or views API.',
       'Follows gained per post: a follow is not tied to the post that caused it; only the account total is known.',
-      'Visitors from posts made directly on Bluesky: their links carry no post tag, so those visitors are counted only as untagged Bluesky visitors.')) into r;
+      'Visitors from a post made directly on Bluesky: credited only when its link to jodytracks.com carries utm_source=bluesky, utm_campaign=shorts and a utm_content tag; otherwise they count only as untagged Bluesky visitors.')) into r;
   return r;
 end $$;
 revoke all on function public.hs_bsky_post_engagement() from public, anon;

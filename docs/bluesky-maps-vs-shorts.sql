@@ -98,7 +98,17 @@ begin
            (select count(distinct v.visitor_id) from vis v where v.utm_content = p.post_id) visitors,
            (select count(*) from acc a where a.utm_content = p.post_id) registrations,
            (select count(*) from rep x where x.utm_content = p.post_id) reports
-      from posts p)
+      from posts p),
+  -- Video visits per tag (utm_content), whatever the tag names: a queued job's id, or a story tag such as
+  -- 'impact-<story>' in a post made by hand on Bluesky (added 2026-10-27). The page credits a hand-made post with the
+  -- row for the tag the collector read out of that post's own link.
+  by_content as (
+    select c.utm_content,
+           (select count(distinct v.visitor_id) from vis v where v.kind = 'shorts' and v.utm_content = c.utm_content) visitors,
+           (select count(*) from acc a where a.kind = 'shorts' and a.utm_content = c.utm_content) registrations,
+           (select count(*) from rep x where x.kind = 'shorts' and x.utm_content = c.utm_content) reports
+      from (select utm_content from vis where kind = 'shorts' and utm_content is not null
+            union select utm_content from acc where kind = 'shorts' and utm_content is not null) c)
   select jsonb_build_object(
     'generated_at', now(), 'timezone', tz, 'from', v_from, 'to', v_to, 'days', p_days, 'include_internal', p_include_internal,
     'summary', (select jsonb_object_agg(s.kind, jsonb_build_object(
@@ -109,6 +119,8 @@ begin
         'reports_per_registration', case when s.registrations > 0 then round(s.reports::numeric / s.registrations, 2) end))
       from summary s),
     'posts', (select coalesce(jsonb_agg(to_jsonb(pp) order by pp.published_at desc), '[]'::jsonb) from per_post pp),
+    'shorts_by_content', (select coalesce(jsonb_object_agg(bc.utm_content, jsonb_build_object(
+        'visitors', bc.visitors, 'registrations', bc.registrations, 'reports', bc.reports)), '{}'::jsonb) from by_content bc),
     'untagged_bluesky_visitors', (select count(distinct t.visitor_id) from public.acquisition_touch t
        where t.subject_type = 'visitor' and t.channel in ('bluesky_untagged', 'bluesky_other_tagged')
          and t.created_at >= t0 and t.created_at < t1 and (p_include_internal or not t.is_internal)),

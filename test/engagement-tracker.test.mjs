@@ -18,7 +18,10 @@ const E = sb.window.HS.acqEngagement;
 const rpcs = [...new Set([...code.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))].sort();
 ok(JSON.stringify(rpcs) === JSON.stringify(['hs_bsky_maps_vs_shorts', 'hs_bsky_post_engagement']), '1a only the two admin readers: ' + rpcs.join(', '));
 ok(!/\.from\(['"]/.test(code) && !/\.insert\(|\.update\(|\.delete\(|\.upsert\(/.test(code), '1b no direct table read or write');
-ok(!/classify_channel|ref_source|utm_/.test(code), '1c it decides no channel');
+// String literals (display text) are stripped; the page may READ the reader's utm_content value, never parse a link.
+const logic = code.replace(/'(?:[^'\\\n]|\\.)*'/g, "''");
+ok(!/classify_channel|ref_source|utm_source|utm_campaign|utm_medium|searchParams|URLSearchParams|new URL\(/.test(logic), '1c it decides no channel and parses no link');
+ok(/m\.utm_content/.test(logic), '1c2 (control) the stripped code still holds the one field it reads');
 
 // 2. real production shape: nothing measured -> dashes, not zeros
 const rows0 = E.rowsFrom(FX.an, FX.eng);
@@ -78,7 +81,19 @@ ok(E.kindLabel(dv) === 'VIDEO · direct' && E.kindLabel({ direct: false, kind: '
 const fD = E.funnel(anD, rD);
 ok(fD.posts === 2 && fD.direct === 1 && fD.engagement === 1 && fD.visitors === 2, '7d direct posts count as posts and likes, not as visitors');
 const htmlD = E._render(anD, engD);
-ok(/posted directly/.test(htmlD) && /carry no post tag/.test(htmlD), '7e the card says which posts are direct and why they have no visitors');
+ok(/posted directly/.test(htmlD) && /carries our tag/.test(htmlD), '7e the card says which posts are direct and when they get visitors');
+// a direct post whose own link carries a tag is credited through the reader's video visits per tag
+const engT = { posts: {
+  'at://did:plc:me/app.bsky.feed.post/t1': { kind: 'direct', bsky_uri: 'at://did:plc:me/app.bsky.feed.post/t1', media: 'video', label: 'tagged',
+    posted_at: new Date(NOW - 864e5).toISOString(), likes: 2, utm_content: 'impact-abc12345' },
+  'at://did:plc:me/app.bsky.feed.post/t2': { kind: 'direct', bsky_uri: 'at://did:plc:me/app.bsky.feed.post/t2', media: 'video', label: 'tagged, unused',
+    posted_at: new Date(NOW - 864e5).toISOString(), likes: 0, utm_content: 'impact-zzz' } } };
+const anT = Object.assign({}, anD, { shorts_by_content: { 'impact-abc12345': { visitors: 3, registrations: 1, reports: 0 } } });
+const rT = E.rowsFrom(anT, engT, 30, NOW);
+const t1 = rT.find((r) => r.label === 'tagged'), t2 = rT.find((r) => r.label === 'tagged, unused');
+ok(t1.visitors === 3 && t1.registrations === 1 && t1.reports === 0, '7f a tagged direct post shows the visits its tag brought');
+ok(t2.visitors === 0 && t2.registrations === 0, '7g a tag nobody has used yet is a real 0, not a dash');
+ok(E.funnel(anT, rT).visitors === 2, '7h the funnel total still comes from the reader summary (never re-added from rows)');
 
 // 6. the followers card appears once: load() runs on every auth change, and both async wireLive() calls can finish late
 const wl = PAGE.slice(PAGE.indexOf('async function wireLive('), PAGE.indexOf('async function load('));
