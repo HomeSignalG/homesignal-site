@@ -5634,6 +5634,31 @@ Results.
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
+## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
+
+Scheduled scans (08:00 and 14:00 Pacific by default, plus Scan Now) find Bluesky discussions about development, land,
+water and health near homes, rank them out of 100, and show them above the Impact Stories library. SQL of record
+`docs/impact-discovery.sql` (after `docs/impact-stories.sql`); page `lib/acq-impact-discovery.js`; engine homesignal-ingest
+`impact/discovery/` (scanner, research runbook) and three dispatch-only workflows.
+- **Chain:** pg_cron `impact-discovery-tick` (every 10 min) or Scan Now → `impact_discovery_scans` → dispatch of ingest
+  `impact-discovery-scan.yml` → `impact_discovery_scan_claim / _record / _finish`. A research session (scheduled Claude Code
+  routine, `impact/discovery/RESEARCH.md`) builds a source pack in `impact/sources/<slug>` and a V3 draft, merges them, then
+  calls `impact_discovery_research` + `impact_discovery_prepare` through ingest `impact-discovery-research.yml`. The tick then
+  runs Check Sources → Analyze → Generate through `_hs_is_request` (the same checks as the founder's buttons) and marks the
+  topic "Auto-discovered — Ready for Review".
+- **Gates (pinned by `test/impact_discovery_pg`, 77 checks):** nominated only with an independent (non-social) source, a score
+  at or above `nominate_score` (80) and a timely topic; a story only from a `verified` topic with a source slug; at most
+  `max_prepare_per_scan` (1) per scan; never a second story for one topic or source pack (same pack → `duplicate_of`); the
+  experimental track (broader public accountability) is never prepared automatically unless `experimental_auto`; a scan never
+  undoes a founder decision or downgrades research; a failed scan records no candidates and the overview shows the failure.
+- **Never automatic:** approval, render, publishing. Those gates are unchanged.
+- `_hs_is_request(story, kind, scope, new, actor)` is now the one place a pack/analyze/generate/validate job is checked;
+  `hs_impact_story_request` is the admin wrapper around it.
+- Performance per category is first-party only (`acquisition_touch` on `utm_campaign = 'impact-<8>'`, report snapshots, paid
+  credits); YouTube / Shorts / Bluesky engagement are reported as `not_collected`. Learning moves a score by at most ±5 and
+  only after 50 attributed visits and 3 stories in a category.
+- Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.

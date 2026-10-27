@@ -682,6 +682,19 @@ begin
   return jsonb_build_object('ok', true, 'status', (select status from public.impact_discovery_candidates where id = c.id));
 end $$;
 
+-- What the research session works from: the strongest nominated topics and the stories already in the library.
+create or replace function public.impact_discovery_nominations()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'nominated', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category,
+        'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
+        'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id) order by c.score desc)
+      from public.impact_discovery_candidates c
+     where c.status in ('nominated', 'researching') and c.story_id is null), '[]'::jsonb),
+    'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
+      from public.impact_stories s where s.archived_at is null), '[]'::jsonb))
+$$;
+
 create or replace function public.impact_discovery_prepare(p_candidate uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
@@ -755,7 +768,7 @@ begin
   end loop;
   foreach f in array array['public.impact_discovery_scan_claim(uuid)', 'public.impact_discovery_coverage(jsonb)',
     'public.impact_discovery_scan_record(uuid, jsonb)', 'public.impact_discovery_scan_finish(uuid, text, jsonb, jsonb, jsonb)',
-    'public.impact_discovery_research(uuid, jsonb)', 'public.impact_discovery_prepare(uuid)'] loop
+    'public.impact_discovery_research(uuid, jsonb)', 'public.impact_discovery_prepare(uuid)', 'public.impact_discovery_nominations()'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;

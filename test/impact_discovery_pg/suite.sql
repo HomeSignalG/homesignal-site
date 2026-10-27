@@ -238,6 +238,11 @@ select pg_temp.chk('11e verified records the slug and marks the concept verified
 select pg_temp.chk('11f research on a topic the founder closed is refused',
   pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"researching"}')$q$, (pg_temp.cand('viral')).id)) like '%closed%');
 
+select pg_temp.chk('11g the research session sees nominated and in-progress topics, and the library',
+  (select jsonb_array_length(public.impact_discovery_nominations()->'nominated')) >= 1
+  and public.impact_discovery_nominations() ? 'library'
+  and not has_function_privilege('authenticated', 'public.impact_discovery_nominations()', 'execute'));
+
 -- 12. prepare: only verified, at most one per scan, never twice ---------------------------------------------
 select pg_temp.chk('12a an insufficient topic cannot become a story',
   pg_temp.err(format('select public.impact_discovery_prepare(%L)', (pg_temp.cand('rumor')).id)) like '%no verified source pack%');
