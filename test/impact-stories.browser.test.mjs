@@ -189,6 +189,34 @@ await page.evaluate(() => { const a = ['Text too small on a phone.', '0:12']; wi
 await page.click('#is [data-act=mdecide][data-d=rejected][data-id="3"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 3 && c[1].p_decision === 'rejected'
    && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request sends what to fix and the moment');
+// the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
+await page.evaluate(() => {
+  const m = window.db.media;
+  m.files[1].qc.ok = true; m.files[1].state = 'blocked'; m.files[1].why = 'The visual quality gate failed: Too many documents and cards.';
+  m.files[1].qc.quality = { ok: false, failures: [{ code: 'excessive_documents', label: 'Too many documents and cards', asset: 'short_a',
+      detail: 'documents, cards and maps fill 54% <b>', action: 'Show the subject; quote the record over its photo.' }],
+    storyboard: { metrics: { real_share: 0.46, document_share: 0.54 }, targets: { real_min: 0.55, document_max: 0.3 } },
+    frames: { metrics: { frames: 66, real_share: 0.455, page_share: 0.52 }, targets: { real_min: 0.55 } } };
+  m.currency = { state: 'current', checked_at: '2026-10-27', pack_fetched_at: '2026-10-25', events: [], blocking: [] };
+  m.blocked = { job_id: 'jb', at: '2026-10-27T20:00:00Z', error: 'Nothing was rendered',
+    failures: [{ code: 'missing_essential_image', label: 'Missing essential image', detail: 'Oak trees: no licensed photo yet.', action: 'Choose one of the licensed candidates.' }],
+    candidates: [{ subject_id: 'oak-trees', subject: 'Oak trees', queries: ['Oregon white oak'], candidates: [
+      { id: 'oak-1', title: 'File:Oak.jpg', license: 'CC BY-SA 4.0', author: 'A <Person>', page_url: 'https://commons.wikimedia.org/wiki/File:Oak.jpg', near: [] }] }] };
+  m.choices = [];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Visual quality: FAILED') && txt.includes('Too many documents and cards') && txt.includes('Show the subject; quote the record over its photo.')
+   && txt.includes('Real-world pictures') && txt.includes('46%') && txt.includes('checked frame by frame (66 frames)'), 'media: the visual quality report shows failures, actions and metrics against targets');
+ok(txt.includes('stopped before rendering anything') && txt.includes('Missing essential image') && txt.includes('REPRESENTATIVE PHOTO')
+   && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
+ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file the visual gate failed cannot be approved');
+ok(!(await page.locator('#is .is-panel').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+await page.click('#is [data-act=choose][data-id="oak-1"]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jb' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-1')),
+   'media: choosing a photo sends the render, subject and candidate');
 await page.evaluate(() => { window.prompt = () => 'Lead with the date.'; });
 await page.click('#is [data-act=step][data-step=distribution]');
 txt = await page.locator('#is').innerText();

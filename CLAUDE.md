@@ -5639,6 +5639,14 @@ Results.
   (from the engine's check report), missing pictures flagged, and the Shorts timing. `_hs_is_artifact` adds discovery,
   concepts and selection to the one approval ONLY when present, so a v2 body hashes as before (pg checks 13a-13d). Render
   key is `impact-render-2`. Apply order: this SQL first (backward compatible), then the page, then the ingest engine.
+- ⚖️ **QUALITY GATES IN MEDIA REVIEW (2026-10-27; engine homesignal-ingest `impact/visual_gate.py`, `impact/currency.py`,
+  `impact/assets/acquire.py`).** A file whose `qc.quality.ok` is false is `blocked` and cannot be approved; Media Review shows
+  each video's failures, required actions and metrics against targets (planned storyboard and the rendered file frame by
+  frame), the latest-development check, and a render the engine stopped (missing essential photo / outdated status) with
+  licensed Commons candidates. `hs_impact_story_choose_asset` accepts only a candidate that blocked render recorded
+  (`impact_story_asset_choices`, append-only, newest per subject wins); the choices are frozen into the next render job's
+  input and its key (`impact-render-3|<md5 of choices>`). `hs_impact_story_job_fail` gained `p_result` (old callers still
+  work). Files rendered before the gates carry no quality report and are not blocked by it. pg checks 12r1-12r7.
 - Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
