@@ -104,7 +104,8 @@ ROOT_FILES = (
     # runtime data + media
     'topics.canon.json',
     'favicon.svg',
-    'og-default.png',
+    'og-default.png',        # kept: links already shared point here
+    'og-default-v2.png',
     # crawler surface
     'robots.txt',
     'sitemap.xml',
