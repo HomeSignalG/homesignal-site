@@ -5709,3 +5709,17 @@ CLAUDE.md "BLUESKY: ONE SCHEDULE, TWO QUEUES"); that migration also replaced `vi
   `docs/acquisition-attribution.sql`), and `hs_bsky_maps_vs_shorts(p_days)` (admin-only) returns posts, first-visit visitors, registrations and
   reports per kind and per post (by `utm_content` = the post id the worker adds), plus what is NOT measured (YouTube traffic, returning visits,
   posts before 2026-10-27). Suite: `test/bluesky_maps_vs_shorts_pg` (disposable Postgres, `bluesky-maps-vs-shorts-suite.yml`).
+
+## ENGAGEMENT TRACKER (Tab 5) IS A LIVE FUNNEL, NOT THE SNAPSHOT (2026-10-27)
+
+Tab 5 now opens with a live card, `lib/acq-engagement.js`: posts published → impressions (not available: Bluesky has none) →
+likes/reposts/replies → first visits → registrations → reports, then one row per post. It displays two admin-only readers
+and decides nothing: `hs_bsky_maps_vs_shorts` (visits, registrations and reports, channel decided by `classify_channel`)
+and `hs_bsky_post_engagement` (latest likes per post, `docs/bluesky-post-engagement.sql`, applied 2026-10-27), joined by
+post id. A post never measured shows a dash, never 0.
+- **Why:** the snapshot tiles counted 15 posts / 17 likes from the July pilot queue. `social_post_metrics` is FK'd to
+  `social_posts_legacy`, so the 42 published MAPS posts had 0 snapshots (measured 2026-10-27). homesignal-ingest's
+  `collect-social-metrics.js` now writes `public.bsky_post_metrics` for them after every ingest.
+- The ingest-built snapshot HTML (incl. "Box Elder page visits" and the paused-drip banner) stays on the tab, collapsed and
+  labelled not live and not re-verified. It is ingest-owned (`dashboard/build_dashboard.py`); do not edit it here.
+- Test: `test/engagement-tracker.test.mjs` (fixture = the readers' real output).

@@ -1,0 +1,14 @@
+{
+  "_note": "Real output of hs_bsky_maps_vs_shorts(30,false) and hs_bsky_post_engagement() as the dashboard admin, 2026-10-27 18:19Z, trimmed to 4 of 35 posts (summary unchanged). eng.posts was empty in production (nothing collected yet).",
+  "an": {"to":"2026-10-27","days":30,"from":"2026-09-28","timezone":"America/Los_Angeles","include_internal":false,"untagged_bluesky_visitors":3,
+    "posts":[
+      {"kind":"maps","label":"06070","post_id":"ebc396e4-14ec-400b-9a20-f936a1b343cf","reports":0,"visitors":0,"published_at":"2026-10-27T15:00:44.503+00:00","registrations":0},
+      {"kind":"maps","label":"23294","post_id":"bdead7d5-2107-4064-bbf3-53f2d3e504ed","reports":0,"visitors":0,"published_at":"2026-10-26T23:30:39.1+00:00","registrations":0},
+      {"kind":"maps","label":"80209","post_id":"9932dd7c-6749-4f04-a705-c37da9292c4b","reports":0,"visitors":0,"published_at":"2026-10-26T18:30:37.522+00:00","registrations":0},
+      {"kind":"maps","label":"64153 · data center","post_id":"491380a5-259e-4c63-b7a7-96d914eb9c36","reports":0,"visitors":0,"published_at":"2026-10-02T23:30:27.64+00:00","registrations":0}],
+    "summary":{"maps":{"posts":35,"reports":0,"visitors":0,"registrations":0,"visitors_per_post":0,"visitors_with_post_id":0,"reports_per_registration":null,"registrations_per_100_visitors":null},
+               "shorts":{"posts":0,"reports":0,"visitors":0,"registrations":0,"visitors_per_post":null,"visitors_with_post_id":0,"reports_per_registration":null,"registrations_per_100_visitors":null}},
+    "unavailable":["YouTube views and clicks that came from Bluesky: no YouTube Analytics data is collected.","A returning visitor's later visits: only the first visit of each browser is credited.","Posts published before 2026-10-27 carry no post id in their links, so they cannot be credited per post."]},
+  "eng": {"posts":{},"collected_at":null,"generated_at":"2026-10-27T18:19:38.010502+00:00",
+    "unavailable":["Impressions: Bluesky has no impressions or views API.","Follows gained per post: a follow is not tied to the post that caused it; only the account total is known."]}
+}

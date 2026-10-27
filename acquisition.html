@@ -291,6 +291,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-youtube-videos.js?v=f576a8e9"></script>
 <script src="lib/acq-bluesky-videos.js?v=4a99e48f"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
+<script src="lib/acq-engagement.js?v=f1a68e12"></script>
 <script src="lib/acq-impact-stories.js?v=d89fd3bc"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
@@ -524,6 +525,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     $('dash-root').style.display='block';
     wireTabs();
     initGrowth(p.S||[]);
+    // Tab 5: live card first (synchronously), so the followers card that wireLive() adds later sits above it.
+    if(window.HS && window.HS.acqEngagement) window.HS.acqEngagement.mount(window.hsClient, $('tab-engagement'), p.meta && p.meta.snapshot);
     wireLive();
     wireFeedInventory();
     wireAcqLive();
