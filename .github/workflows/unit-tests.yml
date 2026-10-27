@@ -99,7 +99,7 @@ jobs:
   # where they take their silent skip path — is the vacuous-test failure this repo
   # already fixed once. A test that does not run is worse than a test that fails.
   unit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     # ~6 s measured. 10 minutes is ~100x that and still turns a hang into a red
     # check rather than a silent bill on an account previously halted at $0.
     timeout-minutes: 10
@@ -128,7 +128,7 @@ jobs:
   # A non-required check that silently swallows failures would be the same problem
   # in a different place.
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     # 25, not 15: the whole browser suite takes 13 to 16 minutes and has grown with every page. At 15 the job was CANCELLED by the limit with no test failing
     # (run 37796324697, 2026-10-08), which reads as red without being a finding. The limit is a hang guard, not a speed target.
     # 40, not 25 (2026-10-22): the suite now takes 18 to 20 minutes, and two runs that day were cancelled at 25 with no test
