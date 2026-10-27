@@ -127,6 +127,14 @@ await page.waitForFunction(() => /HH:MM/.test(document.getElementById('hot').inn
 ok(true, '5a a bad scan time is refused with the database\'s reason');
 ok(/Attribution tables are not available/.test(await page.evaluate(() => document.getElementById('hot').innerHTML)), '5b unmeasured performance is explained, not zero');
 
+// an automatic refresh (as during a scan) keeps the open settings, an unsaved edit and the cursor
+await page.fill('#hot-window', '96');
+await page.evaluate(() => window.HS.acqImpactDiscovery._render());
+ok(await page.evaluate(() => document.getElementById('hot-set').open
+  && document.getElementById('hot-window').value === '96' && document.getElementById('hot-times').value === '8am'
+  && document.activeElement && document.activeElement.id === 'hot-window'),
+  '5c a refresh keeps the settings open, the unsaved values and the focus');
+
 // phone width: no horizontal scroll
 await page.setViewportSize({ width: 390, height: 900 });
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), '6a no horizontal scroll at 390px');
