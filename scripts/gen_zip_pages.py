@@ -191,6 +191,18 @@ def esc(s):
     return html.escape("" if s is None else str(s), quote=True)
 
 
+def place_label(name, st, z):
+    """The page's place for a sentence that already prints the ZIP. ZIP page names are
+    "<place> (<ZIP>)", so "{z} · {name}, {st}" read "99827 · Haines (99827), AK". Only an exact
+    trailing " (<this ZIP>)" is removed; any other name is kept as it is. Same rule as
+    lib/templates.js HS.placeOnly (test/zip-heading-place.test.mjs runs both on one table)."""
+    n = "" if name is None else str(name)
+    tail = f" ({z})"
+    if n.endswith(tail) and len(n) > len(tail):
+        n = n[:-len(tail)]
+    return f"{n}, {st}" if st else n
+
+
 def safe_url(u):
     """Only http(s) may become an href. A javascript:/data: value is dropped, not escaped -
     escaping a hostile scheme still leaves a working hostile link."""
@@ -685,6 +697,21 @@ def assemble(d, now_iso):
                     "rule_d": bool(rec.get("rule_d")),
                     "rule_d_count": rec.get("count") if rec.get("count") is not None else 0,
                     "dev_entities": list(rec.get("entities") or [])}
+        # THE COUNTY-EQUIVALENT IS THE ROOT COMMUNITY, NAMED AS ITSELF. The short `county` field
+        # is a join key, not a name: "Baltimore" is both Baltimore city and Baltimore County (two
+        # governments), Alaska has boroughs and census areas, Louisiana parishes. Appending
+        # " County" to it told Baltimore city residents they live in Baltimore County. Walk the
+        # resolved community up parent_id to its level='county' root and use that row's name;
+        # only a ZIP with no resolvable root falls back to "<county> County".
+        hit = resolved.get(z)
+        up, hops = (hit[1] if hit else None), 0
+        while up and up.get("level") != "county" and up.get("parent_id") and hops < 6:
+            up = by_id.get(up["parent_id"])
+            hops += 1
+        root = up if up and up.get("level") == "county" else None
+        pages[z]["root_id"] = str(root["id"]) if root else ""
+        pages[z]["county_label"] = ((root.get("name") or "").strip() if root else "") or (
+            f"{pages[z]['county']} County" if pages[z]["county"] else "")
     for c in d["changes"]:
         p = pages.get(c.get("zip"))
         if p is None:                                      # off-registry (e.g. removed 80249)
@@ -745,8 +772,10 @@ def link_siblings(pages):
     """
     groups = {}
     for z, p in pages.items():
+        # Grouped by the ROOT community, never by (state, county name): Baltimore city and
+        # Baltimore County share the name "Baltimore" and are different governments.
         if p["county"] and p["state"]:
-            groups.setdefault((p["state"], p["county"]), []).append(z)
+            groups.setdefault((p["state"], p.get("root_id") or p["county"]), []).append(z)
     for zs in groups.values():
         zs.sort()
         n = len(zs)
@@ -858,22 +887,26 @@ def coverage_panel(p):
 def render(p, built):
     z, name, st = p["zip"], p["name"], p["state"]
     label = f"{name}, {st}" if st else name
+    plabel = place_label(name, st, z)
     if p["rule_f"]:
         title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"Government notices, upcoming public meetings and local news for ZIP {z} "
-                f"({label}): {p['n_gn']} notices, {p['n_um']} upcoming meetings, "
+                f"({plabel}): {p['n_gn']} notices, {p['n_um']} upcoming meetings, "
                 f"{p['n_ln_journalism']} local news items on record.")
     elif p.get("rule_d"):
         title = f"{label} — development records | HomeSignal"
-        desc = (f"Development records on file for ZIP {z} ({label}): "
+        desc = (f"Development records on file for ZIP {z} ({plabel}): "
                 f"{p.get('rule_d_count') or len(p.get('dev_entities') or [])} "
                 f"distinct projects compiled from official sources.")
     else:
         title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"HomeSignal tracks government notices, public meetings and local news for "
-                f"ZIP {z} ({label}). No qualifying records on file yet — checks repeat "
+                f"ZIP {z} ({plabel}). No qualifying records on file yet — checks repeat "
                 f"automatically.")
-    robots = "index, follow" if (p["rule_f"] or p.get("rule_d")) else "noindex, follow"
+    # INDEX-ALL POLICY (founder, 2026-10-26): every generated ZIP document is index-eligible. Rule F and
+    # Rule D still decide what the page SAYS (title, description, which lens leads) and which
+    # measurement sitemap lists it; they never decide whether it may be indexed.
+    robots = "index, follow"
     canon = f"{BASE}/community/{z}/"
     ln_show = [x for x in p["ln"] if not x["weather"]][:LN_CAP]
     wx = [x for x in p["ln"] if x["weather"]][:3]
@@ -883,7 +916,7 @@ def render(p, built):
                  "date": (m.get("meeting_date") or "")[:10],
                  "cancelled": m.get("is_cancelled") is True} for m in um_show]
 
-    county_bit = f" in {esc(p['county'])} County" if p["county"] else ""
+    county_bit = f" in {esc(p['county_label'])}" if p.get("county_label") else ""
     lead = ("Development records, government notices, public meetings and local news"
             if p.get("rule_d") else
             "Government notices, public meetings and local news")
@@ -920,7 +953,7 @@ def render(p, built):
     # vacuously, weakening a check rather than adding one.
     sibs = p.get("siblings") or []
     if sibs:
-        where = f"{esc(p['county'])} County, {esc(st)}" if st else f"{esc(p['county'])} County"
+        where = f"{esc(p['county_label'])}, {esc(st)}" if st else esc(p["county_label"])
         items = "".join(f'<li><a href="/community/{esc(s["zip"])}/">{esc(s["name"])}</a></li>'
                         for s in sibs)
         nearby_id = ' id="zip-nearby"' if cov else ""
@@ -950,7 +983,7 @@ def render(p, built):
                   f'in {esc(z)}</a></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
-        f'<h1>{esc(z)} · {esc(label)}</h1>'
+        f'<h1>{esc(z)} · {esc(plabel)}</h1>'
         + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
            if cov else
            f'<p>{lead} that apply to the whole of '
@@ -1048,9 +1081,9 @@ def render(p, built):
         # one host only.
         '<script src="/lib/premium-waitlist.js?v=3cb9baaf"></script>\n'
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
-        '<script src="/shell.js?v=b0215286"></script>\n'
+        '<script src="/shell.js?v=662b5d19"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=de9f2588"></script>\n'
+        '<script src="/lib/community-page.js?v=efe2597a"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1391,10 +1424,10 @@ def _related_section(pr, zips, first, pages, projects):
 
 def render_project_list(z, keys, projects, pages):
     """Every project page on one ZIP, newest first. It exists so a project that has left
-    the ZIP page's cards keeps a link; it is a list, not content, so it is not indexed
-    (noindex, follow) and is not in any sitemap."""
+    the ZIP page's cards keeps a link. INDEX-ALL POLICY (founder, 2026-10-26): it is a public
+    page, so it is index-eligible and listed in the project-list family sitemap."""
     p = pages[z]
-    label = f"{p['name']}, {p['state']}" if p.get("state") else p["name"]
+    label = place_label(p["name"], p.get("state"), z)
     rows = sorted((projects[k] for k in keys), key=lambda pr: (pr["date"], pr["key"]), reverse=True)
     li = []
     for pr in rows:
@@ -1419,7 +1452,7 @@ def render_project_list(z, keys, projects, pages):
             f'<section class="zsec"><ul>{"".join(li)}</ul></section>'
             f'<nav class="zsec"><a href="/community/{esc(z)}/">Back to {esc(z)} · {esc(label)}</a> · '
             f'<a href="/">HomeSignal home</a></nav></main>')
-    return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="noindex, follow")
+    return (_head(title, desc, f"{BASE}{project_list_path(z)}", robots="index, follow")
             + f'<body data-nav="project-list">\n{body}\n</body>\n</html>\n')
 
 
@@ -1608,10 +1641,10 @@ def render_area_hub(a, members, pages, cities, built):
     mset = set(members)
     by_county = {}
     for z in members:
-        by_county.setdefault(pages[z].get("county") or "", []).append(z)
+        by_county.setdefault(pages[z].get("county_label") or "", []).append(z)
     groups = ""
     for county, zs in sorted(by_county.items()):
-        head = f"<h3>{esc(county)} County</h3>" if len(by_county) > 1 and county else ""
+        head = f"<h3>{esc(county)}</h3>" if len(by_county) > 1 and county else ""
         groups += head + "<ul>" + "".join(
             f'<li><a href="/community/{z}/">{esc(pages[z]["name"])}</a></li>' for z in zs) + "</ul>"
     cs = sorted((c for c in cities.values() if c["state"].upper() == a["state"].upper()
@@ -1649,8 +1682,8 @@ def build_guides(cities, projects, pages, out_dir, built, state=None, areas=(), 
     docs = [(GUIDE_WHAT, render_guide_what(cities, ps.BUILD_DAY_TOKEN)),
             (GUIDE_CHECK, render_guide_check(projects, pages, ps.BUILD_DAY_TOKEN))]
     for a in areas:
-        eligible = [z for z in focus_members(a, pages) if z in idx]
-        if eligible:   # an area with no index-eligible page gets no hub
+        eligible = focus_members(a, pages)   # INDEX-ALL POLICY: every member ZIP page is index-eligible
+        if eligible:   # an area with no page at all gets no hub
             docs.append((area_hub_path(a), render_area_hub(a, eligible, pages, cities, ps.BUILD_DAY_TOKEN)))
     for path, html_ in docs:
         d = os.path.join(out_dir, *path.strip("/").split("/"))
@@ -1799,6 +1832,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     nmp = len(re.findall(r"<loc>[^<]*/map/\d{5}/</loc>", txt))
     if nmp != len(mps):
         sys.exit(f"ERROR: sitemap carries {nmp} map URLs for {len(mps)} indexable map pages")
+    n_master = len(re.findall(r"<loc>", txt))
+    if n_master > SITEMAP_MAX_URLS:
+        sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit")
     if re.search(r"community\.html\?zip=", txt):
         sys.exit("ERROR: the legacy community.html?zip= URL survived in the artifact sitemap")
     # Every advertised URL must agree with its own robots directive. The development URLs
@@ -1817,7 +1853,13 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 # unchanged; every URL in them is also in sitemap.xml. The two ZIP families overlap on
 # purpose: a ZIP that passes both Rule F and Rule D is in both, so each rule is measured
 # over the whole set of pages it qualifies.
-SITEMAP_FAMILIES = ("zip-alerts", "zip-development", "city", "project", "guide", "map")
+# project-list is the ONE family that is not also in sitemap.xml: with every public page indexable the
+# flat master would pass the 50,000-URL limit, so the ZIP project lists are listed here (declared in
+# robots.txt) and reconcile_sitemap fails the build if the master itself ever exceeds the limit.
+# "zip" lists EVERY community document (index-all policy). zip-alerts and zip-development are kept as
+# MEASUREMENT partitions (Search Console already has them submitted); they exclude nothing, because the
+# master and the "zip" family list every ZIP.
+SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list")
 
 
 def write_family_sitemaps(out_dir, families, lastmod=None):
@@ -1872,9 +1914,8 @@ def write_focus_sitemaps(out_dir, areas, pages, indexable, lastmod=None):
     idx, lm, report = set(indexable), lastmod or {}, {}
     for a in areas:
         members = focus_members(a, pages)
-        eligible = [z for z in members if z in idx]
-        excluded = {z: (f"noindex: Rule F fail ({pages[z].get('rule_f_count')} of {RULE_F_MIN} "
-                        f"non-weather items) and Rule D fail") for z in members if z not in idx}
+        eligible = list(members)   # INDEX-ALL POLICY: every member is index-eligible and listed
+        excluded = {}   # INDEX-ALL POLICY: every member is index-eligible, so none is excluded
         if len(eligible) > SITEMAP_MAX_URLS:
             sys.exit(f"ERROR: sitemaps/{a['slug']}.xml would list {len(eligible)} URLs")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1953,24 +1994,46 @@ class MapTemplate:
             if "<!--" in blk:
                 sys.exit("ERROR: Map 1 template: an inline head script carries an HTML comment")
         self.doc = re.sub(r"<!--.*?-->\n?", "", doc, flags=re.S)
-        for needle in self.HEAD:
+        for needle in self.HEAD + (self.EYEBROW, self.H1):
             if self.doc.count(needle) != 1:
                 sys.exit(f"ERROR: Map 1 template: expected exactly one {needle!r}")
+        # The landing page's crawlable "About" block belongs to the ZIP-less landing page only. A /map/<zip>/
+        # document must not repeat it (it would be the same boilerplate on every ZIP page).
+        about = re.compile(r'<section class="hs-map-about" id="hs-map-about".*?</section>\n', re.S)
+        if len(about.findall(self.doc)) != 1:
+            sys.exit("ERROR: Map 1 template: expected exactly one #hs-map-about block")
+        self.doc = about.sub("", self.doc, count=1)
+        # The landing source keeps its robots tag at the top of <head>, ahead of the guard script that
+        # reads it. Every /map/<zip>/ document has always carried it right after <title>; that order is part
+        # of the page's semantic fingerprint (scripts/page_semantics.py), so moving it would re-announce
+        # every map page to search engines. Put it back where it was, so the per-ZIP bytes do not move.
+        self.doc = self.doc.replace(self.HEAD[1] + "\n", "", 1)
+        for rx in (self.SUB_RE, self.PILOT_CARD_RE):
+            if len(rx.findall(self.doc)) != 1:
+                sys.exit(f"ERROR: Map 1 template: expected exactly one match of {rx.pattern!r}")
         # The share image is the one other absolute URL; it follows the site origin like the canonical.
         if self.doc.count(self.OG_IMAGE) != 2 or "https://homesignal.net" in self.doc.replace(self.OG_IMAGE, "").replace(
                 self.HEAD[3], "").replace(self.HEAD[4], ""):
             sys.exit("ERROR: Map 1 template: expected the og:image and twitter:image URLs to be its only other absolute URLs")
 
     HEAD = (
-        "<title>HomeSignal — Development around your home</title>",
-        '<meta name="robots" content="noindex, nofollow" id="robots-meta"/>',
-        '<meta name="description" content="See what\'s built and what\'s proposed near your home',
+        "<title>HomeSignal Development Map — What Is Built, Approved and Proposed Near You</title>",
+        '<meta name="robots" content="index, follow" id="robots-meta"/>',
+        '<meta name="description" content="Search a street address or ZIP code on the HomeSignal Development Map',
         '<link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>',
         '<meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>',
-        '<meta property="og:title" content="Development around your home — HomeSignal"/>',
+        '<meta property="og:title" content="HomeSignal Development Map — What Is Built, Approved and Proposed Near You"/>',
     )
 
     OG_IMAGE = "https://homesignal.net/og-default.png"
+
+    # The hero and one hidden card carry the Box Elder pilot's county copy. The runtime rewrites the
+    # hero for a ZIP, but a crawler reads the static bytes first, and every user-facing page is a
+    # ZIP page, never a county page. Each needle must match exactly once (checked in __init__).
+    EYEBROW = '<div class="eyebrow" id="eyebrow">Box Elder County · Utah</div>'
+    H1 = "<h1>Development around your home</h1>"
+    SUB_RE = re.compile(r'<div class="sub">Enter a Box Elder County address.*?</div>', re.S)
+    PILOT_CARD_RE = re.compile(r"built from Box Elder County public\s+parcel records")
 
     def render(self, p):
         z = p["zip"]
@@ -1979,20 +2042,37 @@ class MapTemplate:
         name = p.get("name") or f"ZIP {z}"
         st = p.get("state") or ""
         label = f"{name}, {st}" if st else name
+        plabel = place_label(name, st, z)
         cov = p.get("coverage")
         # Robots is the rule the page itself applies (app_community_meta.indexable, read again at
         # run time), so the first bytes and the hydrated page agree. A ZIP with no Census-drawn
         # area has no ZIP-wide map: noindex, canonical to its /community/ document, as shell.js
         # does at run time for the same ZIPs.
-        indexable = bool(p.get("dev_indexable")) and not cov
-        robots = "index, follow" if indexable else "noindex, nofollow"
-        canon = f"{BASE}/community/{z}/" if cov else f"{BASE}{map_path(z)}"
+        # INDEX-ALL POLICY (founder, 2026-10-26): every /map/<zip>/ document is index-eligible and
+        # canonical to itself, including a ZIP with no Census-drawn area (its page shows the coverage
+        # panel). app_community_meta.indexable is no longer read for SEO.
+        robots = "index, follow"
+        canon = f"{BASE}{map_path(z)}"
         desc = (f"Development records, permits and regulated facilities on file for ZIP {z} "
-                f"({label}), each linked to its official public record.")
+                f"({plabel}), each linked to its official public record.")
         out = self.doc
+        # ZIP-framed static hero (what a crawler reads before any script runs). Facts come from the
+        # same page record the community document uses; nothing is inferred.
+        n = p.get("rule_d_count") if p.get("rule_d") else None
+        fact = (f" {n} distinct development projects are on record for this ZIP, compiled from "
+                f"official sources." if isinstance(n, int) and n > 0 else "")
+        sub = ('<div class="sub">Development records, permits and regulated facilities on file for '
+               f'ZIP {esc(z)} ({esc(plabel)}), each linked to its official public record.{fact} '
+               'Search an address to see what is built and proposed nearby. '
+               f'<a href="/community/{esc(z)}/">Government notices, meetings and local news for '
+               f'ZIP {esc(z)}</a>.</div>')
+        out = out.replace(self.EYEBROW, f'<div class="eyebrow" id="eyebrow">Development map · ZIP {esc(z)}</div>', 1)
+        out = out.replace(self.H1, f"<h1>Development around {esc(name)}</h1>", 1)
+        out = self.SUB_RE.sub(lambda m: sub, out, count=1)
+        out = self.PILOT_CARD_RE.sub("built from public parcel records", out, count=1)
         for old, new in (
-            (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>"),
-            (self.HEAD[1], f'<meta name="robots" content="{robots}" id="robots-meta"/>'),
+            (self.HEAD[0], f"<title>Development around {esc(name)} — HomeSignal</title>\n"
+                           f'<meta name="robots" content="{robots}" id="robots-meta"/>'),
             (self.HEAD[3], f'<link rel="canonical" href="{esc(canon)}"/>'),
             (self.HEAD[4], f'<meta property="og:url" content="{esc(canon)}"/>'),
             (self.HEAD[5], f'<meta property="og:title" content="Development around {esc(label)}"/>'),
@@ -2205,7 +2285,8 @@ def main():
     state = ps.PageState(now_iso[:10])
     stats = build(pages, a.out, zips, now_iso[:10], state)
     nmap, map_bytes, map_indexable = build_map_pages(pages, a.out, state)
-    indexable = sorted(z for z, p in pages.items() if p["rule_f"] or p.get("rule_d"))
+    # INDEX-ALL POLICY (founder, 2026-10-26): every document built above is index-eligible and listed.
+    indexable = sorted(pages)
     ncity = build_cities(cities, pages, a.out, now_iso[:10], state)
     city_paths = sorted(city_path(c) for c in cities.values())
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
@@ -2234,10 +2315,12 @@ def main():
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
                            lastmod=lastmod_map, map_paths=map_paths)
     fam = write_family_sitemaps(a.out, {
+        "zip": [f"/community/{z}/" for z in sorted(pages)],
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
         "city": city_paths, "project": project_paths, "guide": guide_paths,
-        "map": map_paths},
+        "map": map_paths,
+        "project-list": [project_list_path(z) for z in sorted(pages) if pages[z].get("project_list")]},
         lastmod=lastmod_map)
     focus = write_focus_sitemaps(a.out, load_focus_areas(), pages, indexable, lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
@@ -2291,6 +2374,10 @@ def main():
     # only be replaced by hand-querying production. It changes no document, no robots
     # directive and no sitemap entry — it is a fact about the build, written down.
     dev_idx = sorted(z for z, p in pages.items() if p["dev_indexable"])
+    # rule_f_zips: the Rule F evidence set. Since the index-all policy (2026-10-26) it gates
+    # NOTHING (every page is indexable); it exists so the crawler proof can still name the
+    # evidence-rich and evidence-thin classes as control populations.
+    rule_f_zips = sorted(z for z, p in pages.items() if p["rule_f"])
     json.dump({"documents": stats["documents"], "map_routes": nmap, "rule_f_pass": npass,
                "canonical_registry": registry_n, "retired_zips": sorted(retired),
                "unverified_zips": sorted(unverified),
@@ -2298,6 +2385,7 @@ def main():
                "rule_f_fail": len(pages) - npass,
                "rule_d_pass": ndpass,
                "indexable_zips": indexable, "dev_indexable_zips": dev_idx,
+               "rule_f_zips": rule_f_zips,
                "sitemap_community_urls": sm["added"],
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],

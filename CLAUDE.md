@@ -216,6 +216,20 @@ the exact problem `QUEUE.md` exists to end.
 ---
 
 
+## INDEX-ALL POLICY ⚖️ FOUNDER RULING (2026-10-26) — SUPERSEDES RULE F / RULE D ROBOTS GATING
+
+**Every public page on JODY TRACKS is allowed to be indexed. No automated quality-based indexing exclusions.**
+- `gen_zip_pages.py` emits `index, follow` for every `/community/<zip>/`, `/map/<zip>/` and `/community/<zip>/projects/` document, every one
+  self-canonical, and lists every ZIP page, map page and project-list page in a family sitemap (`zip`, `map`, `project-list` are new families,
+  declared in `robots.txt`). The flat master `sitemap.xml` has a hard cap check at the 50,000-URL limit.
+- Rule F / Rule D, the focus-sitemap eligibility filter and the thresholds are no longer read for robots or sitemap membership. Quality scoring may
+  exist internally but must never gate indexing. `app_community_meta.indexable` still exists in the DB but is unread for SEO.
+- Runtime JS (`homesignalmap.html setIndexable`, `shell.js renderZipCoverage`) no longer lowers robots on a `/map/<zip>/` document.
+- `noindex` remains ONLY on non-public pages (app, auth, admin, redirect aliases, `/404.html`), listed in `scripts/audit_index_all.py` NON_PUBLIC.
+  **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
+- Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
+  Test: `test/index-all-audit.test.mjs`. The older sections below that describe Rule F/D robots gating are the dated record.
+
 ## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
 
 Pierce County WA (65 ZIP pages) is the first geographic marketing focus. National SEO is unchanged: `sitemap.xml`, the six family
@@ -237,6 +251,68 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
 - **Measured 2026-10-23 (Supabase, control 12,722 registry ZIPs):** 65 Pierce ZIP communities, all 65 in `canonical_zip_registry`, 64 with
   `app_community_meta.indexable = true`, 98397 Longmire false. ⚠️ That flag is the Map 1 gate, NOT the page's robots decision (Rule F or D, built
   at deploy), so eligibility for the sitemap comes from the build, never from this flag.
+
+## THE ZIP UNIVERSE GROWS PAST 12,722 — FIRST FOUR ALASKA ZIPS (founder, 2026-10-26)
+
+The founder ruled that ZIP pages increase from 12,722. The registry still decides which pages exist, and production
+still never creates one by itself. **12,744** with 99519 on 2026-10-27 (12,743 after the second batch, 12,726 after the first). Earlier "12,722" figures in this file are dated
+receipts.
+- **Added:** 99827 Haines (new root Haines Borough) · 99743 Healy and 99704 Anderson / Clear (new root Denali Borough)
+  · 99790 Livengood (new root Yukon-Koyukuk Census Area).
+  - Counties come from the ZCTA polygon against TIGERweb county polygons. 99790 is 100% Yukon-Koyukuk; USPS's
+    "Fairbanks" is only its mailing city.
+  - Names come from `geo.zcta_place_overlap`: 99704 lies 100% in the City of Anderson.
+- **Order is fixed:**
+  1. The Gold Master workbook in homesignal-ingest (`scripts/add_gold_master_zips.py`). That PR also moves the SEO plane's
+     `CANONICAL_ZIP_N`.
+  2. `docs/alaska-zip-expansion-2026-10-26.sql`. It refuses unless the other 12,722 still fingerprint `af48c604…`.
+  3. This repo's count checks: `verify-zip-universe` default, production-environment C1b, `gen-gov-notice-coverage`.
+     The coverage artifact is then regenerated from production.
+- **99790's development centre is its ZCTA's own point (65.4280, −148.0882).** The `zipcodes` point is in downtown
+  Fairbanks (inside 99701).
+- **Second batch, same day: 17 more ZIPs, 12,726 → 12,743** (`docs/alaska-zip-expansion-batch2-2026-10-26.sql`, migrations
+  `alaska_zip_expansion_batch2_20261026` + `canonical_zip_guard_selftest_expects_12743`): Unalaska 99685, Dutch Harbor 99692,
+  Nome 99762, Utqiagvik 99723, Kotzebue 99752, Dillingham 99576, Petersburg 99833, Skagway 99840, Wrangell 99929, Yakutat
+  99689, Prudhoe Bay 99734, Naknek 99633, King Salmon 99613, Craig 99921, Metlakatla 99926, Cold Bay 99571, Sand Point 99661,
+  under 12 new county roots. 99613 is filed under Bristol Bay (where King Salmon is) though 81% of its land is Lake and
+  Peninsula. Development centres are each town's Census place point; most `zipcodes` points for these PO-box ZIPs lie
+  outside their own ZCTA. ⚠️ **The Prudhoe Bay CDP point and the oil-field core lie in ZCTA 99519, not 99734**, so the
+  99734 page is centred on the nearest point of its own ZCTA and does not cover the field's core.
+- **Third, 2026-10-27 (founder "yes fix add"): 99519 Prudhoe Bay, 12,743 → 12,744**
+  (`docs/alaska-zip-expansion-prudhoe-2026-10-27.sql`, under the existing North Slope root). Measured: the CDP's Census
+  point (+70.3658576, −148.7498043, pg_net 8925) is in 99519, 12 km outside 99734; the CDP's land splits 469 km² (99519)
+  / 457 km² (99734); 99519 is 100% North Slope Borough (pg_net 8927); USPS calls it an Anchorage PO-box ZIP.
+- **Headings name the ZIP once (founder, 2026-10-27).** ZIP page names are "<place> (<ZIP>)", so "<ZIP> · <name>, <st>"
+  read "99827 · Haines (99827), AK" and "ZIP 99827 (Haines (99827), AK)". `gen_zip_pages.py place_label` and
+  `lib/community-page.js HS.placeOnly` drop only an exact trailing " (<this ZIP>)" (test `zip-heading-place`). Titles and
+  og:title keep the full name. It changes almost every community page, so its first build's IndexNow run is a held mass
+  change; it was released with `indexnow-resubmit allow_mass_change=true`.
+- **Map 1 status for the four arrives with the next N5 generation.** The serving one predates them.
+
+## THE ZIP-LESS DEVELOPMENT MAP LANDING PAGE IS INDEX-ELIGIBLE FROM ITS FIRST BYTE (founder, 2026-10-26)
+
+`/homesignalmap.html` (public host jodytracks.com) used to ship `noindex, nofollow` and let its runtime promote itself.
+Google does not render a page whose initial robots says noindex, so a script could never have promoted it. Now:
+- **Default `index, follow`**, one self-referencing canonical (`https://<origin>/homesignalmap.html`), a landing-specific
+  title and description, and a crawlable "About the Development Map" section (`#hs-map-about`) in the INITIAL HTML, outside
+  the `<template>` (template content is inert before JavaScript). The runtime moves it under the map; it is the same text for
+  people and crawlers. It is hidden in embeds and in every non-landing state.
+- **Every non-landing state is `noindex, nofollow`**: a head script (before paint) lowers robots for `?zip=`, `?addr=`,
+  `?address=`, `?lat=`, `?lng=`, `?embed=`, `?preview=`, and the runtime does the same (`leaveLanding()`) for an in-page address
+  search, a lat/lng point, a property record, a ZIP, and the homepage's sessionStorage hand-off. The landing document can never
+  be promoted by a ZIP's own evidence (`setIndexable`): that decision belongs to that ZIP's own `/map/<zip>/` document.
+- **The `/map/<zip>/` documents are unchanged.** `MapTemplate` strips the landing copy from them and keeps the robots tag
+  in its old position, so their semantic fingerprints (and therefore IndexNow notifications and sitemap lastmod) did not move;
+  checked by rendering the same three ZIP cases from the previous source and the new one (identical fingerprints).
+- **Sitemap:** `scripts/gen_sitemap.py` STATIC lists `/homesignalmap.html` once (`--static-only` keeps the committed
+  `sitemap.xml` equal to it). No `homesignalmap.html?…` URL is ever advertised.
+- **Not done, on purpose:** a link from every `/community/<zip>/` document's initial HTML. It changes all ~12,000 community
+  pages' fingerprints, which trips the IndexNow mass-change hold. Those pages reach the landing page through the shell's
+  Development Map nav item (rendered) and through their `/map/<zip>/` link; add the raw link only with an
+  `allow_mass_change` resubmit decision.
+- Tests: `test/map-landing-seo.test.mjs` (the BUILT Jody artifact's files) and `test/map-landing-seo.browser.test.mjs` (the same
+  artifact in Chromium). Production check: dispatch `verify-map-landing-live.yml` after a deploy.
+- Search Console state is not readable from this repo; inspect `https://jodytracks.com/homesignalmap.html` there and request indexing.
 
 ## Permanent historical intelligence — preserve the longitudinal asset
 
@@ -5518,6 +5594,55 @@ Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`
 - Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
 - `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
+## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
+
+A separate emotion-led story workflow: Library -> Intake -> Story Outline -> Script & Shorts -> Media -> Distribution ->
+Results.
+- ⚖️ **ONE INTEGRATED NARRATIVE (founder, 2026-10-26).** Fear, Anger and Motivation are not competing choices. Step 2,
+  Story Outline, always shows all three sections (FEAR: what could affect residents? ANGER: what deserves scrutiny?
+  MOTIVATION: what can residents do?), each with its beat, supporting records, counterevidence, unknowns, evidence
+  status (Supported / Needs qualification / Omitted) and proposed narration, plus the eight-act integrated outline with
+  running times. ONE approval, `narrative`, covers the arc, outline, main script, QOL, both Shorts and packaging
+  (founder: "single integrative narrative"). `hs_impact_story_angle` is retired (raises a readable message);
+  per-section notes go through `hs_impact_story_section_revision` as story events, and a Claude Code session rewrites
+  the draft from them. Old per-part approval rows stay as history and can no longer be decided.
+- Page `lib/acq-impact-stories.js`; SQL of record `docs/impact-stories.sql`; engine homesignal-ingest `impact/` +
+`impact-story-job.yml`. Tabs 11 and 16 are untouched; the catalog only READS `youtube_video_reviews` slug/title.
+- Every slow action returns a job receipt (`impact_story_jobs`, one active per story, idempotency key = story|kind|version|
+  scope|pack). Versions are immutable rows; saves use an expected-version lock.
+- The one approval is effective only while the narrative's md5 is unchanged, the engine passed it on the current version
+  against the current pack, and the pack is <= 30 days old. Any edit inside the narrative needs approving again.
+- ✅ **RENDERING AND MEDIA REVIEW ARE BUILT (2026-10-26, handoff v2.4 M3).**
+  - **Render.** `hs_impact_story_render` dispatches one job of kind `render`, keyed by story, version,
+    narrative hash and renderer version, so a double click never renders twice. It needs the narrative approved.
+    The engine is homesignal-ingest `impact/render/` and `impact-story-render.yml`.
+  - **Storage.** Files land in the PRIVATE bucket `impact-media`. The only read policy is admin-only, and the
+    page downloads each file as a blob (the CSP allows only `blob:` media).
+  - **Records.** `job_complete` records one `impact_story_assets` row per file (main, short_a, short_b,
+    thumbnail), each with its checks, QC stills and shot list. The main video and the thumbnail are required.
+  - **Review.** Media Review approves or requests a fix (note plus m:ss) per file, through
+    `hs_impact_story_media_decide`. Decisions are append-only.
+  - **Staleness.** A file made from a different narrative hash than the current approval is stale and cannot be
+    approved.
+  - ⛔ **Destination approval, publishing and metrics are NOT built.** There is no publish button. Export lists
+    the approved files for a manual upload.
+- Apply order (render):
+  1. Merge the ingest render engine first, because the Render button dispatches `impact-story-render.yml` from `main`.
+  2. Apply `docs/impact-stories.sql` (bucket, tables, functions).
+  3. Deploy the page.
+- ⚖️ **V3, THE EMOTIONAL DISCOVERY ENGINE (2026-10-27, `impact-story/3`; engine homesignal-ingest `impact/storycraft.py`).**
+  Story Outline shows, for a V3 draft: what residents could lose (findings by area, each with its strength of evidence),
+  the conflict, the protections, whether residents can still take part, the three concepts (concern, accountability,
+  empowerment) with their scores and arcs A-F, the selected one, and the quality gate. "Lead with this concept instead"
+  records a `concepts` revision note (no paid API; a Claude Code session rewrites the draft). Script & Shorts gains a
+  "Visual plan & assets" tab: every shot's picture, its feeling, camera and source, each photo's license and credit
+  (from the engine's check report), missing pictures flagged, and the Shorts timing. `_hs_is_artifact` adds discovery,
+  concepts and selection to the one approval ONLY when present, so a v2 body hashes as before (pg checks 13a-13d). Render
+  key is `impact-render-2`. Apply order: this SQL first (backward compatible), then the page, then the ingest engine.
+- Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
+  data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
+  `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
@@ -5569,3 +5694,18 @@ disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-s
 video from the first import. Tab 16 shows what the sync found; typing a link by hand is now only for an exception. Every
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
 `test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
+
+## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
+
+One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
+The schedule and every posting time are decided in homesignal-ingest (`supabase/migrations/20261027170000_bsky_schedule_two_queues.sql`,
+CLAUDE.md "BLUESKY: ONE SCHEDULE, TWO QUEUES"); that migration also replaced `video_next_slot`, whose DDL of record here
+(`docs/video-bluesky-queue.sql`) carries the same body (it calls `public.bsky_next_slot('video')`).
+- **Tab 12 "Bluesky Publishing Schedule"** (`lib/acq-bluesky-schedule.js`): today's MAPS / VIDEO counts and next post, the 7-day calendar,
+  queue counts, errors and holds, and the weekday / weekend time editor. It only calls `hs_bsky_schedule_overview`, `hs_bsky_schedule_preview`
+  (changes nothing) and `hs_bsky_schedule_save` (sends the previewed move count; the database refuses a mismatch). Tests:
+  `test/bluesky-schedule.test.mjs`, `test/bluesky-schedule.browser.test.mjs` (fixture = real overview output).
+- **MAPS vs Shorts** (`docs/bluesky-maps-vs-shorts.sql`): `classify_channel` gains `utm_campaign=shorts -> bluesky_shorts` (spliced, also in
+  `docs/acquisition-attribution.sql`), and `hs_bsky_maps_vs_shorts(p_days)` (admin-only) returns posts, first-visit visitors, registrations and
+  reports per kind and per post (by `utm_content` = the post id the worker adds), plus what is NOT measured (YouTube traffic, returning visits,
+  posts before 2026-10-27). Suite: `test/bluesky_maps_vs_shorts_pg` (disposable Postgres, `bluesky-maps-vs-shorts-suite.yml`).

@@ -228,8 +228,8 @@ jobs:
                       db_seen = "psql timed out"
                   except OSError:
                       db_seen = "psql not runnable"
-              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12722,on",
-                  db_seen, db_seen == "1,12722,on")
+              row("C1b in BEGIN READ ONLY: select 1, the canonical ZIP count, transaction_read_only", "1,12744,on",
+                  db_seen, db_seen == "1,12744,on")
               row("C1c port: 5432 (session pooler), never 6543 (transaction pooler)", "5432", port_seen,
                   port_seen == "5432")
 

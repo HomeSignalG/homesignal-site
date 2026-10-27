@@ -123,7 +123,7 @@ if (!existsSync(WORKER_PATH)) {
     /verbatim[\s\S]{0,120}auto-detects link\/tag facets/.test(DASH));
 
   ok('publisher takes uri/title/description from p.embed',
-    /uri:\s*p\.embed\.uri/.test(W) && /title:\s*p\.embed\.title/.test(W)
+    /uri:\s*(?:attributedUri\()?p\.embed\.uri/.test(W) && /title:\s*p\.embed\.title/.test(W)
       && /description:\s*p\.embed\.description/.test(W));
 
   // THE TWO GAPS. These assert an ABSENCE in the publisher, so they are also the alarm

@@ -1,5 +1,9 @@
 -- Jody — per-item video approval -> durable Bluesky publishing queue (outbox).
 -- STATUS: PARKED. NOT APPLIED to production. Apply with the founder's go, in this order (see §APPLY at the end).
+-- 2026-10-26: a caption written with the placeholder [YOUTUBE LINK] now gets the project's saved YouTube link in its place
+--   (video_bsky_links_youtube). Applied to production as migration video_bsky_youtube_link_placeholder: the six changed
+--   functions only (video_bsky_links_youtube, video_bsky_text, video_bsky_problems, video_bsky_apply, hs_video_youtube_url_set,
+--   hs_video_jobs_list), extracted from this file; md5(prosrc) of each equals the body here.
 --
 -- WHAT THIS IS
 --   One approval per item (Main Video, Short 1, Short 2), recorded by public.hs_youtube_video_file_decide
@@ -12,8 +16,8 @@
 --   social_posts carries the MAPS/ALERTS claim contract, map gates and payload fingerprint; every one of those
 --   guards reasons about notices and maps. Putting videos there would mean editing hs_approve_social_post and
 --   social_posts_publication_guard, which this change must leave untouched. The video jobs share the
---   publishing CALENDAR (the same weekday/weekend ladder, the same 3/day cap, counted across both tables) and
---   the same worker, not the same row type.
+--   publishing SCHEDULE (since 2026-10-27: one schedule, two queues, public.bsky_next_slot; videos take only the video
+--   slots) and the same worker, not the same row type.
 --
 -- IDENTITY AND IDEMPOTENCY
 --   unique (slug, file_key, platform): a reload, a retried approval RPC or a double-click can never add a
@@ -105,16 +109,33 @@ revoke all on public.video_bluesky_jobs from public, anon, authenticated;
 -- no policies: only security-definer functions and the service role touch it.
 
 -- 3. text, fingerprint, problems ----------------------------------------------------------------------------------
+-- Whether an item's post carries the project's full YouTube link: the generator's link_youtube flag, OR a caption the
+-- founder wrote with the placeholder [YOUTUBE LINK] (2026-10-26: a pasted caption carried the placeholder, no flag was
+-- set, and the saved link never reached the post). The ONE answer, read by the composer, the hold, the job, the link
+-- setter and the dashboard list.
+create or replace function public.video_bsky_links_youtube(b jsonb)
+returns boolean
+language sql immutable
+set search_path = public, pg_temp
+as $fn$
+  select coalesce((b ->> 'link_youtube')::boolean, false) or position('[YOUTUBE LINK]' in coalesce(b ->> 'caption', '')) > 0;
+$fn$;
+
 -- The ONE composer of the post text. Caption body, then the verified full YouTube link when the item links to it,
--- then the hashtags. The dashboard preview and the frozen job text both come from here.
+-- then the hashtags. A caption carrying [YOUTUBE LINK] gets the link IN PLACE of the placeholder (never appended a
+-- second time); until the link is entered the placeholder stays and video_bsky_problems holds the item, so the
+-- placeholder itself can never post. The dashboard preview and the frozen job text both come from here.
 create or replace function public.video_bsky_text(p_slug text, p_key text)
 returns text
 language sql stable security definer
 set search_path = public, pg_temp
 as $fn$
   select case when coalesce(b ->> 'caption', '') = '' then null else
-           (b ->> 'caption')
-           || case when coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> ''
+           case when position('[YOUTUBE LINK]' in (b ->> 'caption')) > 0 and coalesce(r.youtube_url, '') <> ''
+                then replace(b ->> 'caption', '[YOUTUBE LINK]', r.youtube_url)
+                else b ->> 'caption' end
+           || case when position('[YOUTUBE LINK]' in (b ->> 'caption')) = 0
+                    and coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> ''
                    then E'\n' || r.youtube_url else '' end
            || case when jsonb_typeof(b -> 'hashtags') = 'array' and jsonb_array_length(b -> 'hashtags') > 0
                    then E'\n\n' || (select string_agg('#' || t, ' ') from jsonb_array_elements_text(b -> 'hashtags') t) else '' end
@@ -161,7 +182,7 @@ begin
   if t is null then probs := array_append(probs, 'no_caption'::text);
   elsif char_length(t) > 300 then probs := array_append(probs, 'text_too_long'::text); end if;
   if coalesce(b ->> 'alt', '') = '' then probs := array_append(probs, 'no_alt_text'::text); end if;
-  if coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') = '' then
+  if public.video_bsky_links_youtube(b) and coalesce(r.youtube_url, '') = '' then
     probs := array_append(probs, 'missing_youtube_url'::text);
   end if;
   if f is null or coalesce(f ->> 'path', '') = '' then probs := array_append(probs, 'file_missing'::text);
@@ -177,51 +198,20 @@ begin
 end;
 $fn$;
 
--- 4. the shared calendar ---------------------------------------------------------------------------------------------
--- The same ladder as hs_approve_social_post (weekday fill 1/2/3 -> 09:00, 17:30, 12:30; weekend one slot at 10:30; cap
--- 3 per local day; a slot already past rolls to the next day). Differences, all in the SAFE direction: the day's fill
--- counts BOTH tables, so a video can never take a slot past the shared cap, and a candidate within 150 minutes of any
--- existing slot is skipped. hs_approve_social_post is not changed (MAPS/ALERTS untouched) and does not see video slots;
--- the worker's own 3/day cap counts both tables, so an overlap rolls forward instead of over-posting.
-create or replace function public.video_next_slot(p_tz text default 'America/Denver')
+-- 4. the shared schedule -----------------------------------------------------------------------------------------------
+-- ⚖️ ONE SCHEDULE, TWO QUEUES (founder, 2026-10-27): 2 MAPS + 2 video posts a day, America/Los_Angeles, never within 150
+-- minutes. The slot is chosen by public.bsky_next_slot('video'), the one picker MAPS approval uses too (homesignal-ingest
+-- supabase/migrations/20261027170000_bsky_schedule_two_queues.sql, which applied this SAME body in the same transaction
+-- as its guard trigger). Videos take only video slots, so MAPS approvals no longer delay them. p_tz is kept for the
+-- callers' signature and is not used. VOLATILE: the picker takes the schedule's advisory lock.
+-- (Until 2026-10-27 this was the shared Denver ladder: weekdays 09:00 / 17:30 / 12:30, weekends 10:30, 3 a day.)
+create or replace function public.video_next_slot(p_tz text default 'America/Los_Angeles')
 returns timestamptz
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path = public, pg_temp
 as $fn$
-declare
-  ld text[] := array['09:00', '17:30', '12:30'];
-  d date := (now() at time zone p_tz)::date;
-  fill int;
-  slot timestamptz;
-  guard int := 0;
 begin
-  loop
-    guard := guard + 1;
-    if guard > 60 then raise exception 'video_next_slot: no open slot in 60 days'; end if;
-    select count(*) into fill from (
-      select scheduled_slot from public.social_posts
-       where status in ('approved', 'published') and scheduled_slot is not null
-      union all
-      select scheduled_slot from public.video_bluesky_jobs
-       where status in ('scheduled', 'uploading', 'processing', 'publishing', 'published') and scheduled_slot is not null
-    ) s where (s.scheduled_slot at time zone p_tz)::date = d;
-    slot := null;
-    if extract(dow from d) in (0, 6) then
-      if fill < 1 then slot := (d::text || ' 10:30')::timestamp at time zone p_tz; end if;
-    else
-      if fill < 3 then slot := (d::text || ' ' || ld[fill + 1])::timestamp at time zone p_tz; end if;
-    end if;
-    if slot is not null and slot > now() and not exists (
-         select 1 from (
-           select scheduled_slot from public.social_posts where status in ('approved', 'published') and scheduled_slot is not null
-           union all
-           select scheduled_slot from public.video_bluesky_jobs
-            where status in ('scheduled', 'uploading', 'processing', 'publishing', 'published') and scheduled_slot is not null
-         ) g where abs(extract(epoch from (g.scheduled_slot - slot))) < 150 * 60) then
-      return slot;
-    end if;
-    d := d + 1;
-  end loop;
+  return public.bsky_next_slot('video');
 end;
 $fn$;
 
@@ -254,7 +244,7 @@ begin
       file_path = r.files -> j.file_key ->> 'path',
       file_sha256 = r.files -> j.file_key ->> 'sha256',
       file_bytes = nullif(r.files -> j.file_key ->> 'bytes', '')::bigint,
-      youtube_url = case when coalesce((r.bsky_posts -> j.file_key ->> 'link_youtube')::boolean, false) then r.youtube_url end,
+      youtube_url = case when public.video_bsky_links_youtube(r.bsky_posts -> j.file_key) then r.youtube_url end,
       approval_fingerprint = public.video_bsky_fingerprint(j.slug, j.file_key),
       approved_by = r.file_decisions -> j.file_key ->> 'decided_by',
       approved_at = (r.file_decisions -> j.file_key ->> 'decided_at')::timestamptz,
@@ -444,7 +434,7 @@ begin
   moved := r.youtube_url is not null and r.youtube_url is distinct from p_url;
   update public.youtube_video_reviews set youtube_url = p_url where slug = p_slug;
   foreach k in array array['final', 'short1', 'short2'] loop
-    continue when not coalesce((r.bsky_posts -> k ->> 'link_youtube')::boolean, false);
+    continue when not public.video_bsky_links_youtube(r.bsky_posts -> k);
     if moved and coalesce(r.file_decisions -> k ->> 'status', '') = 'approved' then
       perform public.hs_youtube_video_file_decide(p_slug, k, 'pending', 'YouTube link changed: approve again.');
       n := n + 1;
@@ -529,7 +519,7 @@ begin
              coalesce(j.file_path, r.files -> k.key ->> 'path') as file_path,
              j.id as job_id, j.status as job_status, j.hold_reason, j.error, j.attempts, j.scheduled_slot, j.local_tz,
              j.bsky_uri, j.published_at, j.external_uri, j.external_note,
-             (select b -> 'link_youtube' from (select r.bsky_posts -> k.key as b) q) as link_youtube,
+             public.video_bsky_links_youtube(r.bsky_posts -> k.key) as link_youtube,
              coalesce(j.scheduled_slot, j.published_at) as sort_slot
         from public.youtube_video_reviews r
         cross join (values ('final', 1), ('short1', 2), ('short2', 3)) as k(key, ord)
@@ -694,7 +684,7 @@ end;
 $fn$;
 
 -- 8. grants --------------------------------------------------------------------------------------------------------------------
-revoke all on function public.video_bsky_text(text, text), public.video_bsky_fingerprint(text, text), public.video_bsky_problems(text, text),
+revoke all on function public.video_bsky_links_youtube(jsonb), public.video_bsky_text(text, text), public.video_bsky_fingerprint(text, text), public.video_bsky_problems(text, text),
   public.video_next_slot(text), public.video_bsky_apply(uuid), public.video_bsky_sync(text, text),
   public.video_bluesky_jobs_guard(), public.hs_video_assert_admin() from public, anon, authenticated;
 revoke all on function public.hs_video_bluesky_caption_set(text, text, text, text[], text), public.hs_video_youtube_url_set(text, text),

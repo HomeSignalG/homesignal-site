@@ -98,5 +98,10 @@ select pg_temp.chk('10b anon/authenticated cannot write sync data', not has_func
    and not has_function_privilege('authenticated','public.video_youtube_link_attach(text)','execute'));
 select pg_temp.chk('10c the tables have no direct grants', not has_table_privilege('authenticated','public.youtube_channel_videos','select') and not has_table_privilege('anon','public.youtube_sync_runs','select'));
 select pg_temp.chk('10d service_role can write', has_function_privilege('service_role','public.youtube_sync_record(jsonb,text,jsonb)','execute'));
+-- 11. the founder's [YOUTUBE LINK] placeholder still works through this file's composer (main 2026-10-26)
+update public.youtube_video_reviews set bsky_posts = jsonb_set(jsonb_set(bsky_posts, '{short1,caption}', '"Watch: [YOUTUBE LINK]"'), '{short1,link_youtube}', 'false') where slug='p3';
+select pg_temp.chk('11a the placeholder is replaced by the saved link, not appended twice', public.video_bsky_text('p3','short1') = E'Watch: https://youtu.be/UNSURE00001\nhttps://jodytracks.com\n\n#Tacoma #JodyTracks');
+update public.youtube_video_reviews set youtube_url = null where slug='p3';
+select pg_temp.chk('11b a placeholder caption with no saved link is held', 'missing_youtube_url' = any(public.video_bsky_problems('p3','short1')));
 \o
 select 'ALL ' || count(*) || ' CHECKS PASSED' from _res where ok;

@@ -60,7 +60,15 @@ ok(/create unique index if not exists youtube_channel_videos_item_uq[\s\S]{0,120
 ok(/r\.youtube_url is not null then st := 'conflict'/.test(sql), '7c an existing different link is never replaced');
 ok(/c\.historical and coalesce\(c\.match_method, ''\) <> 'manual' then st := 'historical'/.test(sql), '7d historical videos never link by themselves');
 ok(/revoke all on public\.youtube_channel_videos from public, anon, authenticated/.test(sql), '7e the table has no browser access');
-ok(/27dcddee70f4fb08b64e8a5ec25722a1/.test(read('docs/youtube-channel-sync.sql')) && /2f676a37af5f7840be78859648c630f5/.test(read('docs/youtube-channel-sync.sql')), '7f it refuses unless the live composer and problems are the queue versions');
+// The guard pins the md5 of the queue file's CURRENT bodies (computed here, so a change to the queue file fails this test
+// until the guard is updated with it).
+{
+  const crypto = require('node:crypto');
+  const q = read('docs/video-bluesky-queue.sql');
+  const md5 = (n) => crypto.createHash('md5').update(q.match(new RegExp('create or replace function public\\.' + n + '\\(.*?as \\$fn\\$([\\s\\S]*?)\\$fn\\$;', 's'))[1]).digest('hex');
+  const sync = read('docs/youtube-channel-sync.sql');
+  ok(sync.includes("'" + md5('video_bsky_text') + "'") && sync.includes("'" + md5('video_bsky_problems') + "'"), '7f it refuses unless the live composer and problems are the queue versions');
+}
 const wfs = fs.readdirSync(new URL('../.github/workflows/', import.meta.url));
 ok(wfs.some((f) => /youtube-channel-sync/.test(f)), '7g the SQL suite runs in CI');
 

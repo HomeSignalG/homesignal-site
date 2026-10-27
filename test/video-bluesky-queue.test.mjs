@@ -23,7 +23,9 @@ const review = read('docs/youtube-video-review.sql');
 const apply = read('docs/youtube-video-file-decide-queue-apply.sql');
 
 // 1. wiring: no new top-level tab, VIDEOS beside ALL | MAPS | ALERTS
-ok((page.match(/<nav class="tabs">[\s\S]*?<\/nav>/)[0].match(/data-tab=/g) || []).length === 16, '1a: still exactly sixteen tabs');
+// (Tab 17 "Impact Stories" was added later by founder handoff v2.4; VIDEOS still adds no tab of its own.)
+const navTabs = page.match(/<nav class="tabs">[\s\S]*?<\/nav>/)[0];
+ok((navTabs.match(/data-tab=/g) || []).length === 17 && !/>[^<]*\bVIDEOS\b[^<]*<\/button>/.test(navTabs) && /data-tab="impactstories"/.test(navTabs), '1a: VIDEOS adds no top-level tab (17 tabs, the 17th is Impact Stories)');
 ok(/bskyNavBtn\('family','VIDEOS','VIDEOS'/.test(page) && /bskyNavBtn\('family','ALERTS','ALERTS'/.test(page) && /bskyNavBtn\('family','MAPS','MAPS'/.test(page), '1b: ALL | MAPS | ALERTS | VIDEOS');
 ok(/<script src="lib\/acq-bluesky-videos\.js\?v=[0-9a-f]{8}"><\/script>/.test(page), '1c: the monitor script is content-keyed');
 ok(/_bskyFamily==='VIDEOS'[\s\S]{0,400}acqBlueskyVideos\.mount/.test(page), '1d: the VIDEOS view mounts the video monitor');

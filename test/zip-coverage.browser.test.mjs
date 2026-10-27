@@ -177,7 +177,12 @@ for (const path of [`/homesignalmap.html?zip=${SPEC}`, `/development.html?zip=${
   const r = await open(path);
   ok(r.panels === 1 && r.mode === mode && r.panelZip === z, `${path} → the ${mode} panel`, { panels: r.panels, mode: r.mode });
   ok(!r.leaflet && !r.mapFrame, `${path} → no map was drawn`, { leaflet: r.leaflet });
-  ok(/noindex/.test(r.robots || '') && r.canonical === `/community/${z}/`, `${path} → noindex, canonical to the document`, { robots: r.robots, canonical: r.canonical });
+  // INDEX-ALL (2026-10-26): the map page rewrites ?zip= to the ZIP's own /map/<zip>/ page, which is index, follow
+  // and self-canonical; development.html?zip= remains a non-public alias (noindex, canonical to the document).
+  const ownMap = path.startsWith('/homesignalmap.html');
+  ok(ownMap ? (/^index/.test(r.robots || '') && r.canonical === `/map/${z}/`)
+            : (/noindex/.test(r.robots || '') && r.canonical === `/community/${z}/`),
+     `${path} → ${ownMap ? 'its own /map/<zip>/ page: index, self-canonical' : 'noindex, canonical to the document'}`, { robots: r.robots, canonical: r.canonical });
   ok(r.title === MODEL.copy[mode].page_title.replace('{zip}', z), `${path} → the approved page title`, r.title);
   ok(r.sessionZip !== z, `${path} → the ZIP is not carried to the next page`, r.sessionZip);
 }

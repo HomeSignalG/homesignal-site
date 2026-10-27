@@ -25,11 +25,11 @@ begin
   select md5(prosrc) into t from pg_proc where oid = 'public.video_bsky_text(text,text)'::regprocedure;
   select md5(prosrc) into p from pg_proc where oid = 'public.video_bsky_problems(text,text)'::regprocedure;
   -- a re-apply (this file already applied) is recognised by youtube_sync_record existing
-  if t is distinct from '27dcddee70f4fb08b64e8a5ec25722a1'
+  if t is distinct from 'f83c474ba08852f8d2689bb8d747515e'
      and not exists (select 1 from pg_proc where proname = 'youtube_sync_record' and pronamespace = 'public'::regnamespace) then
     raise exception 'video_bsky_text is not the body of docs/video-bluesky-queue.sql (md5 %); refusing', t;
   end if;
-  if p is distinct from '2f676a37af5f7840be78859648c630f5'
+  if p is distinct from '8d7d2f34e3565ca66e3638e15f7c7165'
      and not exists (select 1 from pg_proc where proname = 'youtube_sync_record' and pronamespace = 'public'::regnamespace) then
     raise exception 'video_bsky_problems is not the body of docs/video-bluesky-queue.sql (md5 %); refusing', p;
   end if;
@@ -83,8 +83,11 @@ language sql stable security definer
 set search_path = public, pg_temp
 as $fn$
   select case when coalesce(b ->> 'caption', '') = '' then null else
-           (b ->> 'caption')
-           || case when coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> ''
+           case when position('[YOUTUBE LINK]' in (b ->> 'caption')) > 0 and coalesce(r.youtube_url, '') <> ''
+                then replace(b ->> 'caption', '[YOUTUBE LINK]', r.youtube_url)
+                else b ->> 'caption' end
+           || case when position('[YOUTUBE LINK]' in (b ->> 'caption')) = 0
+                    and coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> ''
                    then E'\n' || r.youtube_url else '' end
            || case when (b ->> 'caption') ~* 'jodytracks\.com' then '' else E'\nhttps://jodytracks.com' end
            || case when jsonb_typeof(b -> 'hashtags') = 'array' and jsonb_array_length(b -> 'hashtags') > 0
@@ -118,11 +121,11 @@ begin
   if t is null then probs := array_append(probs, 'no_caption'::text);
   elsif char_length(t) > 300 then probs := array_append(probs, 'text_too_long'::text); end if;
   if coalesce(b ->> 'alt', '') = '' then probs := array_append(probs, 'no_alt_text'::text); end if;
-  if coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') = '' then
+  if public.video_bsky_links_youtube(b) and coalesce(r.youtube_url, '') = '' then
     probs := array_append(probs, 'missing_youtube_url'::text);
   end if;
   -- a link to one of our own channel videos is only usable once that video is verified public
-  if coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> '' then
+  if public.video_bsky_links_youtube(b) and coalesce(r.youtube_url, '') <> '' then
     vid := substring(r.youtube_url from '([A-Za-z0-9_-]{11})$');
     if exists (select 1 from public.youtube_channel_videos c where c.video_id = vid and c.public_verified_at is null) then
       probs := array_append(probs, 'youtube_not_public'::text);
@@ -173,7 +176,7 @@ begin
   if st in ('linked', 'waiting_public') then
     foreach k in array array['final', 'short1', 'short2'] loop
       perform public.video_bsky_sync(c.slug, k) from public.youtube_video_reviews x
-        where x.slug = c.slug and coalesce((x.bsky_posts -> k ->> 'link_youtube')::boolean, false);
+        where x.slug = c.slug and public.video_bsky_links_youtube(x.bsky_posts -> k);
     end loop;
   end if;
   return st;

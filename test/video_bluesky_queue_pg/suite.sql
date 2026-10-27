@@ -130,14 +130,13 @@ select pg_temp.chk('9g an expired lease is taken over in its in-flight state, rk
 select public.hs_youtube_video_file_decide('p1','short1','rejected');
 select pg_temp.chk('9h revoking an in-flight job requests cancellation', (pg_temp.job('p1','short1')).cancel_requested);
 select pg_temp.chk('9i the next claim after revocation cancels the job and publishes nothing', public.video_job_claim((pg_temp.job('p1','short1')).id,'w2',600,'x') is null and (pg_temp.job('p1','short1')).status='cancelled');
--- 10. the shared daily cap
+-- 10. the shared schedule: video approval asks the one picker (its rules are tested in homesignal-ingest tests/bsky_schedule_pg)
 delete from public.video_bluesky_jobs where status in ('scheduled','held','cancelled','failed') and slug='p1';
-delete from public.social_posts;
 select pg_temp.chk('10a an empty calendar yields a future slot', public.video_next_slot() > now());
-do $$ declare s timestamptz; d date; begin
-  s := public.video_next_slot(); d := (s at time zone 'America/Denver')::date;
-  insert into public.social_posts(status, scheduled_slot) select 'approved', s + (i||' hours')::interval from generate_series(0,2) i;
-  perform pg_temp.chk('10b MAPS/ALERTS posts on a day count toward the shared daily cap', (public.video_next_slot() at time zone 'America/Denver')::date > d or extract(dow from d) in (0,6)); end $$;
+select pg_temp.chk('10b video_next_slot is the schedule''s next video slot (one picker, no ladder of its own)',
+  public.video_next_slot() = public.bsky_next_slot('video')
+  and position('bsky_next_slot(''video'')' in (select prosrc from pg_proc where oid = 'public.video_next_slot(text)'::regprocedure)) > 0
+  and (select provolatile from pg_proc where oid = 'public.video_next_slot(text)'::regprocedure) = 'v');
 -- 11. permissions
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('11a a non-admin cannot approve', pg_temp.throws($q$select public.hs_youtube_video_file_decide('p1','short2','approved')$q$));
@@ -149,5 +148,22 @@ select pg_temp.chk('11e service_role runs the worker functions', has_function_pr
 select pg_temp.chk('11f the table has no direct grants', not has_table_privilege('authenticated','public.video_bluesky_jobs','select') and not has_table_privilege('anon','public.video_bluesky_jobs','select'));
 select pg_temp.as_user('founder@example.com');
 select pg_temp.chk('11g the dashboard list covers every item', jsonb_array_length(public.hs_video_jobs_list()) = 6);
+-- 12. a founder caption with the [YOUTUBE LINK] placeholder and NO link_youtube flag (2026-10-26, project 3004)
+insert into public.youtube_video_reviews (slug, title, files, meta, bsky_posts) values ('p2', 'Project Two',
+ '{"short1":{"path":"p2/short1.mp4","bytes":700,"sha256":"q1"}}', '{}',
+ '{"short1":{"caption":"57 trees were removed.\n\nFull story: [YOUTUBE LINK]\nhttps://jodytracks.com","hashtags":["JODYTracks"],"alt":"Trees"}}');
+insert into storage.objects (bucket_id, name, metadata) values ('jody-videos','p2/short1.mp4','{"size":700}');
+select pg_temp.chk('12a the placeholder counts as linking to YouTube', public.video_bsky_links_youtube((select bsky_posts->'short1' from public.youtube_video_reviews where slug='p2')));
+select pg_temp.chk('12a2 a caption without the placeholder or the flag does not', not public.video_bsky_links_youtube('{"caption":"No link here."}'::jsonb));
+select public.hs_youtube_video_file_decide('p2','short1','approved');
+select pg_temp.chk('12b approved before the link exists -> HELD for the link, the placeholder cannot post', (pg_temp.job('p2','short1')).status='held' and (pg_temp.job('p2','short1')).hold_reason like '%missing_youtube_url%');
+select pg_temp.chk('12c the dashboard list says the item links to YouTube', (select (x->>'link_youtube')::boolean from jsonb_array_elements(public.hs_video_jobs_list()) x where x->>'slug'='p2' and x->>'file_key'='short1'));
+select public.hs_video_youtube_url_set('p2','https://youtu.be/hp3RLwtBkU8');
+select pg_temp.chk('12d entering the link releases the item', (pg_temp.job('p2','short1')).status='scheduled');
+select pg_temp.chk('12e the link replaces the placeholder in place, once, and is not appended again',
+  (pg_temp.job('p2','short1')).post_text = E'57 trees were removed.\n\nFull story: https://youtu.be/hp3RLwtBkU8\nhttps://jodytracks.com\n\n#JODYTracks');
+select pg_temp.chk('12f the job records the link it carries', (pg_temp.job('p2','short1')).youtube_url = 'https://youtu.be/hp3RLwtBkU8');
+select pg_temp.chk('12g changing the link sends the approved item back to waiting', (public.hs_video_youtube_url_set('p2','https://youtu.be/qEv0XlxlvcY')->>'approvals_reset')::int = 1
+  and (pg_temp.job('p2','short1')).status='cancelled');
 \o
 select 'ALL ' || count(*) || ' CHECKS PASSED' from _res where ok;

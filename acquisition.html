@@ -212,7 +212,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     </div>
    </div>
   </header>
-  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button></nav>
+  <nav class="tabs"><button class="active" data-tab="exec">1 · Executive Summary</button><button data-tab="feed">2 · Feed Intelligence</button><button data-tab="projects">3 · Project Pipeline</button><button data-tab="outreach">4 · Outreach Tracker</button><button data-tab="engagement">5 · Engagement Tracker</button><button data-tab="website">6 · Website Behavior</button><button data-tab="tags">7 · Tag Intelligence</button><button data-tab="alertperf">8 · Alert Performance</button><button data-tab="homeowners">9 · Homeowner Intelligence</button><button data-tab="acquisition">10 · Acquisition Metrics</button><button data-tab="videoproducer">11 · Video Producer</button><button data-tab="bluesky">12 · Bluesky Posts</button><button data-tab="premium">13 · Premium Waitlist</button><button data-tab="arearequests">14 · Area requests</button><button data-tab="saleshandy">15 · Saleshandy</button><button data-tab="youtubevideos">16 · YouTube Videos</button><button data-tab="impactstories">17 · Impact Stories</button></nav>
   <main class="hs-container">
     <div class="tab active" id="tab-exec"></div>
     <div class="tab" id="tab-feed"></div>
@@ -230,6 +230,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-arearequests"></div>
     <div class="tab" id="tab-saleshandy"></div>
     <div class="tab" id="tab-youtubevideos"></div>
+    <div class="tab" id="tab-impactstories"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
 </div>
@@ -287,8 +288,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
-<script src="lib/acq-youtube-videos.js?v=1f4caa51"></script>
-<script src="lib/acq-bluesky-videos.js?v=8c047e18"></script>
+<script src="lib/acq-youtube-videos.js?v=f576a8e9"></script>
+<script src="lib/acq-bluesky-videos.js?v=4a99e48f"></script>
+<script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
+<script src="lib/acq-impact-stories.js?v=d89fd3bc"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -424,6 +427,12 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       var el = document.getElementById('tab-youtubevideos');
       if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
     },
+    // Live, gated (hs_impact_story_*): the Impact Stories workspace. Never baked into the snapshot, and a snapshot refresh
+    // never touches it (render() skips this tab), so an open editor is never overwritten.
+    impactstories: function () {
+      var el = document.getElementById('tab-impactstories');
+      if (el && window.HS && window.HS.acqImpactStories) window.HS.acqImpactStories.load(window.hsClient, el);
+    },
     videoproducer: function () {
       var container = document.getElementById('tab-videoproducer');
       if (
@@ -499,6 +508,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(!el) return;
       // Keep Video Producer DOM + in-memory state when auth refresh re-fetches the snapshot.
       if(id==='videoproducer' && el.getAttribute('data-vp-initialized')==='1') return;
+      if(id==='impactstories') return;
       el.innerHTML=tabs[id];
     });
     var vpEl=$('tab-videoproducer');
@@ -523,6 +533,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     wireBluesky();
     wirePremiumWaitlist();
     wireAreaRequests();
+    // A deep link (#impact=<story>&step=…) opens Tab 17 directly; reload and back/forward keep the story and step.
+    if(/^#impact/.test(location.hash||'')){ var ib=document.querySelector('nav.tabs button[data-tab="impactstories"]'); if(ib && !ib.classList.contains('active')) ib.click(); }
     stalenessBanner(p.meta);
   }
 
@@ -851,7 +863,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   //      visitors, sessions, registered accounts, digest subscriptions and saved reports, in America/Los_Angeles days or weeks.
   //      Nothing here classifies or recounts; it displays what the database returned, including what was NOT collected. ----
   var CH_LABEL={google_organic:'Google organic',bing_organic:'Bing organic',other_search:'Other search',
-    bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_engagement:'Bluesky: engagement / profile',
+    bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_shorts:'Bluesky: video posts (shorts)',bluesky_engagement:'Bluesky: engagement / profile',
     bluesky_other_tagged:'Bluesky: other tagged (drip, etc.)',bluesky_untagged:'Bluesky: untagged link',
     saleshandy:'Saleshandy email',other_referral:'Other referral',other_tagged:'Other tagged',
     direct:'Direct (home-page landing)',unknown:'Unknown (no referrer, deep landing)',
@@ -1717,6 +1729,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         .in('status',['draft','approved']).order('scheduled_slot',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true});
       if(r.error){ body.innerHTML='<div class="muted">Queue unavailable ('+esc(r.error.message||'')+').</div>'; return; }
       var rows=r.data||[];
+      // THE PUBLISHING SCHEDULE (2026-10-27): two queues, one database authority. Loads on its own; a failure there
+      // never blocks the post queue below.
+      var schedHost=document.getElementById('bsky-schedule');
+      if(schedHost && window.HS && HS.acqBlueskySchedule) HS.acqBlueskySchedule.mount(window.hsClient, schedHost, null);
       // VIDEOS: approved Main Video / Shorts, from the video outbox (hs_video_jobs_list). null = not available.
       _bskyVideos=(window.HS&&HS.acqBlueskyVideos)?await HS.acqBlueskyVideos.fetch(window.hsClient):null;
       var vCounts=_bskyVideos?HS.acqBlueskyVideos.counts(_bskyVideos):null;
@@ -2046,6 +2062,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<span id="bsky-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
         '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
         '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
+        '<div id="bsky-schedule" style="margin:0 0 14px"></div>'+
         '<div id="bsky-nav" style="margin:0 0 14px"></div>'+
         '<div id="bsky-zip-order" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
