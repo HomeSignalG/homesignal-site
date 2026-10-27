@@ -95,7 +95,7 @@ ok(devFail.includes('<meta name="robots" content="index, follow"'),
    'Alerts PASS + development FAIL is indexable — page-purpose separation');
 ok(!a.includes('RETRACTED'), 'an actively retracted Local News item is excluded');
 ok(a.includes('rel="canonical" href="https://jodytracks.com/community/01001/"'), 'canonical is the ZIP path');
-ok(a.includes('<h1>01001 · Agawam (01001), MA</h1>'), 'ZIP-specific H1 in the initial HTML');
+ok(a.includes('<h1>01001 · Agawam, MA</h1>'), 'ZIP-specific H1 in the initial HTML, naming the ZIP once (test/zip-heading-place.test.mjs)');
 ok(a.includes('<title>Agawam (01001), MA'), 'ZIP-specific title in the initial HTML');
 ok(/<meta name="description" content="[^"]{40,}"/.test(a), 'ZIP-specific meta description');
 ok(a.includes('data-zip="01001"'), 'document declares its ZIP identity for hydration');

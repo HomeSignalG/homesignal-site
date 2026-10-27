@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       expected_zips:
-        description: 'Approved ZIP count (default 12743)'
+        description: 'Approved ZIP count (default 12744)'
         required: false
         default: ''
   schedule:

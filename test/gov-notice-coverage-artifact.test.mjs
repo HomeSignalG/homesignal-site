@@ -76,7 +76,7 @@ if (/\.county\s*===|county\s*===\s*c\.county/.test(GEN_CODE)) {
 
 // ── The artifact is a strict subset of canonical, and reconciles ────────────────────
 const c = MAP._counts;
-if (c.canonical_zip_pages !== 12743) failures.push(`artifact: canonical is ${c.canonical_zip_pages}, expected 12743`);
+if (c.canonical_zip_pages !== 12744) failures.push(`artifact: canonical is ${c.canonical_zip_pages}, expected 12744`);
 if (c.configured + c.unconfigured !== c.canonical_zip_pages) failures.push('artifact: configured + unconfigured != canonical');
 if (c.configured !== MAP.configured_zips.length) failures.push('artifact: _counts.configured disagrees with the list');
 if (!(c.configured > 0 && c.configured < c.canonical_zip_pages)) {

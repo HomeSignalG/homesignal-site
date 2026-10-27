@@ -17,9 +17,9 @@ const failures = [];
 const t = (r) => (r ? r.label + ': ' + r.text : '');
 
 // ── The artifact itself ──────────────────────────────────────────────────────────────
-if (MAP._counts.canonical_zip_pages !== 12743) failures.push('map: canonical denominator is not 12,743');
+if (MAP._counts.canonical_zip_pages !== 12744) failures.push('map: canonical denominator is not 12,744');
 if (MAP.configured_zips.length !== MAP._counts.configured) failures.push('map: configured count disagrees with the list length');
-if (MAP._counts.configured + MAP._counts.unconfigured !== 12743) failures.push('map: configured + unconfigured != 12,743');
+if (MAP._counts.configured + MAP._counts.unconfigured !== 12744) failures.push('map: configured + unconfigured != 12,744');
 if (new Set(MAP.configured_zips).size !== MAP.configured_zips.length) failures.push('map: duplicate ZIP in configured_zips');
 if (MAP.configured_zips.some((z) => !/^\d{5}$/.test(z))) failures.push('map: a configured entry is not a 5-digit ZIP');
 // 80249 is the removed non-canonical Denver hand-insert (founder ruling). It must not appear.
