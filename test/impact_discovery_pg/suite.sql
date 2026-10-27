@@ -344,5 +344,16 @@ select pg_temp.chk('15a coverage counts the ZIP pages a county mention reaches',
   and (public.impact_discovery_coverage('[{"state":"wa","city":"Seattle"}]')->0->>'zip_pages')::int = 1
   and (public.impact_discovery_coverage('[{"state":"NY","county":"Erie"}]')->0->>'zip_pages')::int = 0);
 
+-- 16. the 60-topic limit keeps core topics first: 70 higher-scoring experimental topics cannot push a core topic out
+update public.impact_discovery_settings set experimental_enabled = true where id;
+insert into public.impact_discovery_candidates (cluster_key, category, track, title, lead_uri, lead_url, score, status)
+select 'exp-' || g, 'elections', 'experimental', 'Experimental ' || g, 'at://x/' || g, 'https://bsky.app/profile/x/post/' || g, 99, 'open'
+  from generate_series(1, 70) g;
+select pg_temp.chk('16a core topics survive the 60-topic limit ahead of higher-scoring experimental ones',
+  (select count(*) from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'track' = 'core')
+    = (select count(*) from public.impact_discovery_candidates where track = 'core' and status not in ('rejected', 'dismissed', 'excluded', 'stale'))
+  and (select count(*) from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'track' = 'core') > 0
+  and jsonb_array_length(public.hs_impact_discovery_overview()->'candidates') = 60);
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;
