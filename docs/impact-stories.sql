@@ -220,8 +220,13 @@ end $$;
 create or replace function public._hs_is_artifact(p_body jsonb, p_artifact text)
 returns jsonb language sql immutable as $$
   select case p_artifact
+    -- impact-story/3 adds discovery, concepts and selection, each only when present, so an impact-story/2 body
+    -- hashes exactly as before and an approval given before V3 still stands.
     when 'narrative' then jsonb_build_object('arc', p_body->'arc', 'outline', p_body->'outline', 'main', p_body->'main',
          'qol', p_body->'qol', 'shorts', p_body->'shorts', 'packaging', p_body->'packaging')
+         || case when coalesce(p_body->'discovery', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('discovery', p_body->'discovery') else '{}'::jsonb end
+         || case when coalesce(p_body->'concepts', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('concepts', p_body->'concepts') else '{}'::jsonb end
+         || case when coalesce(p_body->'selection', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('selection', p_body->'selection') else '{}'::jsonb end
     when 'angle' then jsonb_build_object('selected', p_body->'selected_angle',
          'card', (select a from jsonb_array_elements(coalesce(p_body->'angles', '[]'::jsonb)) a
                    where a->>'id' = p_body->>'selected_angle' limit 1))
@@ -619,8 +624,8 @@ begin
   if na->>'state' <> 'approved' then
     raise exception 'Approve the integrated narrative before rendering. %', na->>'why' using errcode = '55000';
   end if;
-  return public._hs_is_queue(p_story, 'render', jsonb_build_object('scope', 'render|' || (na->>'hash') || '|impact-render-1',
-    'narrative_hash', na->>'hash', 'renderer', 'impact-render-1'), e, p_new);
+  return public._hs_is_queue(p_story, 'render', jsonb_build_object('scope', 'render|' || (na->>'hash') || '|impact-render-2',
+    'narrative_hash', na->>'hash', 'renderer', 'impact-render-2'), e, p_new);
 end $$;
 
 -- Gate 2: approve, reject (with what to fix, optionally at m:ss) or revoke ONE rendered file of the current set.
@@ -692,7 +697,8 @@ create or replace function public.hs_impact_story_section_revision(p_story uuid,
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype;
 begin
-  if p_section not in ('fear', 'anger', 'motivation', 'outline', 'script', 'short_a', 'short_b', 'packaging') then
+  if p_section not in ('fear', 'anger', 'motivation', 'outline', 'script', 'short_a', 'short_b', 'packaging',
+                       'discovery', 'concepts', 'visuals') then
     raise exception 'bad section' using errcode = '22023';
   end if;
   if nullif(btrim(p_note), '') is null then raise exception 'Say what to change.' using errcode = '22023'; end if;

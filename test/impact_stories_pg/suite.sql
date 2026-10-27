@@ -314,5 +314,28 @@ select pg_temp.chk('12y1 a render running 200 minutes is not stuck', public._hs_
   and now() - interval '200 minutes' > now() - public._hs_is_stuck_after('render'));
 select pg_temp.chk('12y2 other jobs keep their 40-minute limit', public._hs_is_stuck_after('pack') = interval '40 minutes');
 
+-- 13. impact-story/3 (2026-10-27): the V3 analysis joins the one approval, without moving a v2 hash -------------
+select pg_temp.chk('13a a v2 body hashes exactly as the pre-V3 slice did',
+  public._hs_is_hash(pg_temp.body(), 'narrative') = md5(jsonb_build_object('arc', pg_temp.body()->'arc', 'outline', pg_temp.body()->'outline',
+    'main', pg_temp.body()->'main', 'qol', pg_temp.body()->'qol', 'shorts', pg_temp.body()->'shorts', 'packaging', pg_temp.body()->'packaging')::text));
+select pg_temp.chk('13b a null V3 key is the same as an absent one',
+  public._hs_is_hash(pg_temp.body() || '{"discovery":null,"concepts":null}'::jsonb, 'narrative') = public._hs_is_hash(pg_temp.body(), 'narrative'));
+select pg_temp.chk('13c a V3 body covers discovery, concepts and selection',
+  (select array_agg(k order by k) from jsonb_object_keys(public._hs_is_artifact(pg_temp.body() || '{"discovery":{"findings":[]},"concepts":[{"id":"x"}],"selection":{"concept":"x"}}'::jsonb, 'narrative')) k)
+    = array['arc','concepts','discovery','main','outline','packaging','qol','selection','shorts']);
+select pg_temp.chk('13d choosing another concept changes what the approval covers',
+  public._hs_is_hash(pg_temp.body() || '{"concepts":[{"id":"x"},{"id":"y"}],"selection":{"concept":"x"}}'::jsonb, 'narrative')
+  <> public._hs_is_hash(pg_temp.body() || '{"concepts":[{"id":"x"},{"id":"y"}],"selection":{"concept":"y"}}'::jsonb, 'narrative'));
+select pg_temp.as_user('founder@example.com');
+create temp table _rev as select x, pg_temp.err(format('select public.hs_impact_story_section_revision(%L, %s, %L, %L)', pg_temp.id('s'), pg_temp.cur(), x, 'Lead with the accountability concept.')) e
+  from unnest(array['concepts','discovery','visuals']) x;
+select pg_temp.chk('13f a revision note can ask for another concept, the discovery or the visuals',
+  (select bool_and(e is null) from _rev)
+  and (select count(distinct detail->>'section') from public.impact_story_events where kind = 'section_revision'
+         and detail->>'section' in ('concepts','discovery','visuals')) = 3);
+select pg_temp.chk('13e the render key names impact-render-2',
+  position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
+  and position('impact-render-1' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;
