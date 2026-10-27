@@ -191,6 +191,18 @@ def esc(s):
     return html.escape("" if s is None else str(s), quote=True)
 
 
+def place_label(name, st, z):
+    """The page's place for a sentence that already prints the ZIP. ZIP page names are
+    "<place> (<ZIP>)", so "{z} · {name}, {st}" read "99827 · Haines (99827), AK". Only an exact
+    trailing " (<this ZIP>)" is removed; any other name is kept as it is. Same rule as
+    lib/templates.js HS.placeOnly (test/zip-heading-place.test.mjs runs both on one table)."""
+    n = "" if name is None else str(name)
+    tail = f" ({z})"
+    if n.endswith(tail) and len(n) > len(tail):
+        n = n[:-len(tail)]
+    return f"{n}, {st}" if st else n
+
+
 def safe_url(u):
     """Only http(s) may become an href. A javascript:/data: value is dropped, not escaped -
     escaping a hostile scheme still leaves a working hostile link."""
@@ -875,20 +887,21 @@ def coverage_panel(p):
 def render(p, built):
     z, name, st = p["zip"], p["name"], p["state"]
     label = f"{name}, {st}" if st else name
+    plabel = place_label(name, st, z)
     if p["rule_f"]:
         title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"Government notices, upcoming public meetings and local news for ZIP {z} "
-                f"({label}): {p['n_gn']} notices, {p['n_um']} upcoming meetings, "
+                f"({plabel}): {p['n_gn']} notices, {p['n_um']} upcoming meetings, "
                 f"{p['n_ln_journalism']} local news items on record.")
     elif p.get("rule_d"):
         title = f"{label} — development records | HomeSignal"
-        desc = (f"Development records on file for ZIP {z} ({label}): "
+        desc = (f"Development records on file for ZIP {z} ({plabel}): "
                 f"{p.get('rule_d_count') or len(p.get('dev_entities') or [])} "
                 f"distinct projects compiled from official sources.")
     else:
         title = f"{label} — local government notices, meetings & news | HomeSignal"
         desc = (f"HomeSignal tracks government notices, public meetings and local news for "
-                f"ZIP {z} ({label}). No qualifying records on file yet — checks repeat "
+                f"ZIP {z} ({plabel}). No qualifying records on file yet — checks repeat "
                 f"automatically.")
     # INDEX-ALL POLICY (founder, 2026-10-26): every generated ZIP document is index-eligible. Rule F and
     # Rule D still decide what the page SAYS (title, description, which lens leads) and which
@@ -970,7 +983,7 @@ def render(p, built):
                   f'in {esc(z)}</a></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
-        f'<h1>{esc(z)} · {esc(label)}</h1>'
+        f'<h1>{esc(z)} · {esc(plabel)}</h1>'
         + (f'<p>{lead} ZIP {esc(z)}{county_bit}.</p></header>' + coverage_panel(p)
            if cov else
            f'<p>{lead} that apply to the whole of '
@@ -1052,7 +1065,7 @@ def render(p, built):
         # both hosts run ONE runtime, so a dependency added to community.html alone breaks
         # this one. Fails CLOSED if absent (outcome 'unavailable', no absence claim).
         '<script src="/lib/zip-authoritative.js?v=20261021a"></script>\n'
-        '<script src="/lib/data.js?v=cf9231f2"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
+        '<script src="/lib/data.js?v=4d7e6fb8"></script>\n<script src="/lib/topic-prefs.js?v=fe87d99b"></script>\n'
         '<script src="/lib/templates.js?v=c408a2cb"></script>\n<script src="/lib/impact.js"></script>\n'
         # lib/project-type.js: the canonical Development Type (pure — no DOM, no map runtime).
         # The Development & Growth Type badge reads HS.canonicalProjectType from it. Same parity
@@ -1070,7 +1083,7 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=662b5d19"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=327bfb74"></script>\n'
+        '<script src="/lib/community-page.js?v=efe2597a"></script>\n'
         "</body>\n</html>\n")
 
 
@@ -1414,7 +1427,7 @@ def render_project_list(z, keys, projects, pages):
     the ZIP page's cards keeps a link. INDEX-ALL POLICY (founder, 2026-10-26): it is a public
     page, so it is index-eligible and listed in the project-list family sitemap."""
     p = pages[z]
-    label = f"{p['name']}, {p['state']}" if p.get("state") else p["name"]
+    label = place_label(p["name"], p.get("state"), z)
     rows = sorted((projects[k] for k in keys), key=lambda pr: (pr["date"], pr["key"]), reverse=True)
     li = []
     for pr in rows:
@@ -2029,6 +2042,7 @@ class MapTemplate:
         name = p.get("name") or f"ZIP {z}"
         st = p.get("state") or ""
         label = f"{name}, {st}" if st else name
+        plabel = place_label(name, st, z)
         cov = p.get("coverage")
         # Robots is the rule the page itself applies (app_community_meta.indexable, read again at
         # run time), so the first bytes and the hydrated page agree. A ZIP with no Census-drawn
@@ -2040,7 +2054,7 @@ class MapTemplate:
         robots = "index, follow"
         canon = f"{BASE}{map_path(z)}"
         desc = (f"Development records, permits and regulated facilities on file for ZIP {z} "
-                f"({label}), each linked to its official public record.")
+                f"({plabel}), each linked to its official public record.")
         out = self.doc
         # ZIP-framed static hero (what a crawler reads before any script runs). Facts come from the
         # same page record the community document uses; nothing is inferred.
@@ -2048,7 +2062,7 @@ class MapTemplate:
         fact = (f" {n} distinct development projects are on record for this ZIP, compiled from "
                 f"official sources." if isinstance(n, int) and n > 0 else "")
         sub = ('<div class="sub">Development records, permits and regulated facilities on file for '
-               f'ZIP {esc(z)} ({esc(label)}), each linked to its official public record.{fact} '
+               f'ZIP {esc(z)} ({esc(plabel)}), each linked to its official public record.{fact} '
                'Search an address to see what is built and proposed nearby. '
                f'<a href="/community/{esc(z)}/">Government notices, meetings and local news for '
                f'ZIP {esc(z)}</a>.</div>')

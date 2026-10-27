@@ -134,7 +134,7 @@ check('3z control: mutated build still ships index.html', mutated.has('index.htm
 console.log('\n§4 required public runtime is present');
 const REQUIRED = [
   'index.html', '404.html', 'app.css', 'shell.js', 'config.js', 'share.js',
-  'robots.txt', 'sitemap.xml', 'CNAME', '.nojekyll', 'favicon.svg', 'og-default.png',
+  'robots.txt', 'sitemap.xml', 'CNAME', '.nojekyll', 'favicon.svg', 'og-default.png', 'og-default-v2.png',
   '.well-known/did.json',     // Bluesky feed generator DID document
   'google59e1ae3ef6b75e3a.html', // Google Search Console verification (removing it un-verifies the site)
   'BingSiteAuth.xml',            // Bing Webmaster Tools verification (removing it un-verifies the site)

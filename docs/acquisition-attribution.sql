@@ -152,8 +152,13 @@ declare
   v_cam text := lower(trim(p_utm_campaign)); v_con text := lower(trim(p_utm_content));
   v_ref text := lower(trim(p_ref_host));     v_host text := lower(trim(p_host));
   v_path text; v_zip text; v_chan text; v_internal boolean; v_at timestamptz;
+  v_ua text;
 begin
   if p_visitor_id is null then return; end if;
+  -- A crawler that runs JavaScript is not a visitor (2026-10-27: 1,186 of 1,255 external first touches were single-hit,
+  -- no-referrer landings on 828 ZIP pages, 0 became users). Same pattern as HS.CRAWLER_UA_RE in lib/data.js.
+  begin v_ua := current_setting('request.headers', true)::json ->> 'user-agent'; exception when others then v_ua := null; end;
+  if v_ua ~* 'bot\y|crawl|spider|slurp|headless|lighthouse|pagespeed|google-inspectiontool|googleother|mediapartners-google|facebookexternalhit|embedly|python-requests|curl/|wget/' then return; end if;
   if v_host is null or v_host not in ('jodytracks.com','www.jodytracks.com','homesignal.net','www.homesignal.net') then return; end if;
   if v_src !~ tok then v_src := null; end if;
   if v_med !~ tok then v_med := null; end if;

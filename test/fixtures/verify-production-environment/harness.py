@@ -94,7 +94,7 @@ def fake_run(argv, env=None, capture_output=None, text=None, timeout=None):
     if argv[0] != "psql":
         raise AssertionError("unexpected subprocess " + argv[0])
     psql_calls.append((argv, {k: v for k, v in (env or {}).items() if k.startswith("PG")}))
-    return subprocess.CompletedProcess(argv, 0, "1,12743,on\n", "")
+    return subprocess.CompletedProcess(argv, 0, "1,12744,on\n", "")
 
 
 subprocess.run = fake_run

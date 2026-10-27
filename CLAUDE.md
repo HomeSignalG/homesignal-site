@@ -255,7 +255,7 @@ sitemaps, every page's robots directive and Rule F / Rule D are exactly as befor
 ## THE ZIP UNIVERSE GROWS PAST 12,722 — FIRST FOUR ALASKA ZIPS (founder, 2026-10-26)
 
 The founder ruled that ZIP pages increase from 12,722. The registry still decides which pages exist, and production
-still never creates one by itself. **12,743** after the second batch (12,726 after the first). Earlier "12,722" figures in this file are dated
+still never creates one by itself. **12,744** with 99519 on 2026-10-27 (12,743 after the second batch, 12,726 after the first). Earlier "12,722" figures in this file are dated
 receipts.
 - **Added:** 99827 Haines (new root Haines Borough) · 99743 Healy and 99704 Anderson / Clear (new root Denali Borough)
   · 99790 Livengood (new root Yukon-Koyukuk Census Area).
@@ -278,6 +278,15 @@ receipts.
   Peninsula. Development centres are each town's Census place point; most `zipcodes` points for these PO-box ZIPs lie
   outside their own ZCTA. ⚠️ **The Prudhoe Bay CDP point and the oil-field core lie in ZCTA 99519, not 99734**, so the
   99734 page is centred on the nearest point of its own ZCTA and does not cover the field's core.
+- **Third, 2026-10-27 (founder "yes fix add"): 99519 Prudhoe Bay, 12,743 → 12,744**
+  (`docs/alaska-zip-expansion-prudhoe-2026-10-27.sql`, under the existing North Slope root). Measured: the CDP's Census
+  point (+70.3658576, −148.7498043, pg_net 8925) is in 99519, 12 km outside 99734; the CDP's land splits 469 km² (99519)
+  / 457 km² (99734); 99519 is 100% North Slope Borough (pg_net 8927); USPS calls it an Anchorage PO-box ZIP.
+- **Headings name the ZIP once (founder, 2026-10-27).** ZIP page names are "<place> (<ZIP>)", so "<ZIP> · <name>, <st>"
+  read "99827 · Haines (99827), AK" and "ZIP 99827 (Haines (99827), AK)". `gen_zip_pages.py place_label` and
+  `lib/community-page.js HS.placeOnly` drop only an exact trailing " (<this ZIP>)" (test `zip-heading-place`). Titles and
+  og:title keep the full name. It changes almost every community page, so its first build's IndexNow run is a held mass
+  change; it was released with `indexnow-resubmit allow_mass_change=true`.
 - **Map 1 status for the four arrives with the next N5 generation.** The serving one predates them.
 
 ## THE ZIP-LESS DEVELOPMENT MAP LANDING PAGE IS INDEX-ELIGIBLE FROM ITS FIRST BYTE (founder, 2026-10-26)
@@ -5704,6 +5713,13 @@ cancels and retries. There is no second approval. MAPS/ALERTS (`social_posts`, `
 runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-bluesky-queue.test.mjs`, `.browser.test.mjs`, and the SQL state machine on a
 disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
 
+**YouTube links found automatically (2026-10-25) - SQL PARKED (NOT APPLIED):** `docs/youtube-channel-sync.sql` adds
+`public.youtube_channel_videos` (one row per channel video, written only by ingest's hourly sync) and fills a project's
+`youtube_url` when its main video is matched and verified public. It never replaces an existing link and never links a
+video from the first import. Tab 16 shows what the sync found; typing a link by hand is now only for an exception. Every
+video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
+`test/youtube-channel-sync.test.mjs`. Runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.
+
 ## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
 
 One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
@@ -5718,3 +5734,17 @@ CLAUDE.md "BLUESKY: ONE SCHEDULE, TWO QUEUES"); that migration also replaced `vi
   `docs/acquisition-attribution.sql`), and `hs_bsky_maps_vs_shorts(p_days)` (admin-only) returns posts, first-visit visitors, registrations and
   reports per kind and per post (by `utm_content` = the post id the worker adds), plus what is NOT measured (YouTube traffic, returning visits,
   posts before 2026-10-27). Suite: `test/bluesky_maps_vs_shorts_pg` (disposable Postgres, `bluesky-maps-vs-shorts-suite.yml`).
+
+## ENGAGEMENT TRACKER (Tab 5) IS A LIVE FUNNEL, NOT THE SNAPSHOT (2026-10-27)
+
+Tab 5 now opens with a live card, `lib/acq-engagement.js`: posts published → impressions (not available: Bluesky has none) →
+likes/reposts/replies → first visits → registrations → reports, then one row per post. It displays two admin-only readers
+and decides nothing: `hs_bsky_maps_vs_shorts` (visits, registrations and reports, channel decided by `classify_channel`)
+and `hs_bsky_post_engagement` (latest likes per post, `docs/bluesky-post-engagement.sql`, applied 2026-10-27), joined by
+post id. A post never measured shows a dash, never 0.
+- **Why:** the snapshot tiles counted 15 posts / 17 likes from the July pilot queue. `social_post_metrics` is FK'd to
+  `social_posts_legacy`, so the 42 published MAPS posts had 0 snapshots (measured 2026-10-27). homesignal-ingest's
+  `collect-social-metrics.js` now writes `public.bsky_post_metrics` for them after every ingest.
+- The ingest-built snapshot HTML (incl. "Box Elder page visits" and the paused-drip banner) stays on the tab, collapsed and
+  labelled not live and not re-verified. It is ingest-owned (`dashboard/build_dashboard.py`); do not edit it here.
+- Test: `test/engagement-tracker.test.mjs` (fixture = the readers' real output).

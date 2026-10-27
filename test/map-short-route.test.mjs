@@ -61,7 +61,7 @@ ok(T.plain.includes('content="index, follow" id="robots-meta"'), 'INDEX-ALL POLI
 ok(T.idx.includes('content="index, follow" id="robots-meta"'), 'indexable -> index');
 ok(T.cov.includes('content="index, follow" id="robots-meta"'), 'coverage-limited ZIP -> index, follow');
 ok(T.cov.includes(`<link rel="canonical" href="${T.base}/map/06704/"/>`), 'coverage-limited ZIP -> self-canonical');
-ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury \(06704\), CT\)/.test(T.plain), 'ZIP description');
+ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury, CT\)/.test(T.plain), 'ZIP description names the ZIP once (test/zip-heading-place.test.mjs)');
 ok(!T.plain.includes('homesignalmap.html"/>'), 'no ZIP-less canonical left');
 {
   // Every user-facing page is a ZIP page: the static bytes a crawler reads first must not carry the

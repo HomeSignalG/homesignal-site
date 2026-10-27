@@ -239,13 +239,14 @@ begin
 
   -- 12,722 until the founder's 2026-10-26 Alaska expansion (docs/alaska-zip-expansion-2026-10-26.sql),
   -- applied live as migrations canonical_zip_guard_selftest_expects_12726 and, after the second Alaska batch
-  -- (docs/alaska-zip-expansion-batch2-2026-10-26.sql), canonical_zip_guard_selftest_expects_12743. The seed block above is the
+  -- (docs/alaska-zip-expansion-batch2-2026-10-26.sql), canonical_zip_guard_selftest_expects_12743, and with 99519
+  -- (docs/alaska-zip-expansion-prudhoe-2026-10-27.sql), canonical_zip_guard_selftest_expects_12744. The seed block above is the
   -- dated 2026-08-13 seed and still checks the original 12,722 set; it is not re-run.
-  case_name := 'registry is populated'; expected := '12743';
+  case_name := 'registry is populated'; expected := '12744';
   _detail := (select count(*)::text || ' ZIPs in canonical_zip_registry'
                 from public.canonical_zip_registry);
   blocked := false;
-  passed := ((select count(*) from public.canonical_zip_registry) = 12743);
+  passed := ((select count(*) from public.canonical_zip_registry) = 12744);
   detail := _detail;
   return next;
 end $fn$;
