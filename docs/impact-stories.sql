@@ -504,8 +504,8 @@ begin
   if j.attempts >= 5 then raise exception 'This job has been tried 5 times. Check the error and start a new request.' using errcode = '55000'; end if;
   select count(*) into other from public.impact_story_jobs where story_id = j.story_id and status in ('queued', 'running') and id <> p_job;
   if other > 0 then raise exception 'Another job is already running for this story.' using errcode = '55000'; end if;
-  update public.impact_story_jobs set status = 'queued', error = null, attempts = attempts + 1, created_at = now(),
-         started_at = null, completed_at = null where id = p_job;
+  update public.impact_story_jobs set status = 'queued', error = null, result = null, attempts = attempts + 1,
+         created_at = now(), started_at = null, completed_at = null where id = p_job;
   perform public._hs_is_event(j.story_id, 'job_retried', jsonb_build_object('job_id', p_job, 'attempt', j.attempts + 1), p_actor);
   perform public._hs_is_dispatch(p_job);
   return jsonb_build_object('job_id', p_job, 'status', 'queued', 'existing', true, 'retried', true);
@@ -858,7 +858,7 @@ begin
     p_result := null;
   end if;
   update public.impact_story_jobs set status = 'failed', completed_at = now(), error = left(coalesce(p_error, 'The worker failed.'), 900),
-         result = coalesce(p_result, result)
+         result = p_result    -- this attempt's findings only; an unstructured failure never shows an earlier attempt's
    where id = p_job_id and status = 'running' returning * into j;
   if found then
     perform public._hs_is_event(j.story_id, 'job_failed', jsonb_build_object('job_id', j.id, 'kind', j.kind, 'error', j.error), 'worker');

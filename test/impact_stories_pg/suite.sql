@@ -253,17 +253,30 @@ select pg_temp.chk('12q a file from an older render cannot be decided',
 select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7, true);
 insert into _ids select 'rb', (pg_temp.lastjob()).id;
 select public.hs_impact_story_job_claim(pg_temp.id('rb')::uuid);
-select public.hs_impact_story_job_fail(pg_temp.id('rb')::uuid, 'Nothing was rendered: Missing essential image.',
-  jsonb_build_object('blocked', true,
+create temp table _blk as select jsonb_build_object('blocked', true,
     'failures', jsonb_build_array(jsonb_build_object('code', 'missing_essential_image', 'label', 'Missing essential image',
                                   'detail', 'Oak trees: no licensed photo yet.', 'action', 'Choose one of the licensed candidates.')),
     'candidates', jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'subject', 'Oak trees', 'candidates',
       jsonb_build_array(jsonb_build_object('id', 'oak-photo-1a2b3c4d', 'title', 'File:Oak.jpg', 'license', 'CC BY-SA 4.0',
         'author', 'A. Person', 'page_url', 'https://commons.wikimedia.org/wiki/File:Oak.jpg',
-        'file_url', 'https://upload.wikimedia.org/x/Oak.jpg', 'sha256', repeat('b', 64)))))));
+        'file_url', 'https://upload.wikimedia.org/x/Oak.jpg', 'sha256', repeat('b', 64)))))) as r;
+select public.hs_impact_story_job_fail(pg_temp.id('rb')::uuid, 'Nothing was rendered: Missing essential image.', (select r from _blk));
 select pg_temp.chk('12r1 a blocked render keeps what is missing and the licensed candidates',
   public._hs_is_media(pg_temp.id('s')::uuid)->'blocked'->'failures'->0->>'code' = 'missing_essential_image'
   and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked'->'candidates'->0->'candidates'->0->>'id' = 'oak-photo-1a2b3c4d');
+-- Codex #2314: a retry whose new attempt fails with only an error must not show (or accept choices from) the first
+-- attempt's blocked result.
+select public.hs_impact_story_job_retry(pg_temp.id('rb')::uuid);
+select pg_temp.chk('12r1a a retry clears the previous attempt''s result',
+  (select result from public.impact_story_jobs where id = pg_temp.id('rb')::uuid) is null);
+select public.hs_impact_story_job_claim(pg_temp.id('rb')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('rb')::uuid, 'Remotion crashed.');
+select pg_temp.chk('12r1b an unstructured failure after a blocked attempt shows no blocked result and accepts no choice',
+  coalesce(public._hs_is_media(pg_temp.id('s')::uuid)->'blocked', 'null'::jsonb) = 'null'::jsonb
+  and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('rb'), 'oak-trees', 'oak-photo-1a2b3c4d')) like '%did not stop%');
+select public.hs_impact_story_job_retry(pg_temp.id('rb')::uuid);
+select public.hs_impact_story_job_claim(pg_temp.id('rb')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('rb')::uuid, 'Nothing was rendered: Missing essential image.', (select r from _blk));
 select pg_temp.chk('12r2 only a candidate that render recorded can be chosen',
   pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('rb'), 'oak-trees', 'made-up')) like '%not one of the candidates%'
   and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('r1'), 'oak-trees', 'oak-photo-1a2b3c4d')) like '%did not stop%');
