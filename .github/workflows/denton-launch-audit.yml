@@ -23,7 +23,7 @@ permissions:
 jobs:
   data:
     if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'pages' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' && github.event.inputs.task != 'sources-denton3' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
         with: { name: denton-audit, path: out/audit.json, retention-days: 7 }
   pages:
     if: ${{ github.event.inputs.task != 'investigate' && github.event.inputs.task != 'jurisdictions' && github.event.inputs.task != 'coverage' && github.event.inputs.task != 'sources' && github.event.inputs.task != 'sources-focus' && github.event.inputs.task != 'sources-denton' && github.event.inputs.task != 'sources-denton2' && github.event.inputs.task != 'sources-denton3' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
         with: { name: denton-pages, path: out/pages.json, retention-days: 7 }
   investigate:
     if: ${{ github.event.inputs.task == 'investigate' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +70,7 @@ jobs:
         run: python3 scripts/denton-launch-investigate.py
   jurisdictions:
     if: ${{ github.event.inputs.task == 'jurisdictions' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +80,7 @@ jobs:
         run: python3 scripts/denton-launch-jurisdictions.py
   coverage:
     if: ${{ github.event.inputs.task == 'coverage' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +91,7 @@ jobs:
   sources:
     # Step 6: read-only first-party source probe (scripts/denton-source-probe.mjs). GET only, robots respected.
     if: ${{ startsWith(github.event.inputs.task, 'sources') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -106,7 +106,7 @@ jobs:
     # Final acceptance: needs BOTH halves to have completed. A skipped or failed half means this job does not run, so it can never grade from nothing.
     needs: [data, pages]
     if: ${{ needs.data.result == 'success' && needs.pages.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

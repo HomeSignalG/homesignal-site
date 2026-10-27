@@ -24,7 +24,7 @@ on:
 
 jobs:
   measure:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     # Bounded for the same reason every job here is: an unbounded job inherits GitHub's
     # 6-hour default. Measured shape: 3 ZIPs x 3 reps of both halves, well under 30 min.
     timeout-minutes: 45
