@@ -120,6 +120,7 @@ begin
     if s = 'bluesky' then
       if c = 'pierce-zip' then return 'bluesky_pierce_auto'; end if;
       if c = 'maps' then return 'bluesky_maps_auto'; end if;          -- the live automated MAPS posts (national); Pierce = this + the Pierce ZIP filter
+      if c = 'shorts' then return 'bluesky_shorts'; end if;      -- video posts (2026-10-27, docs/bluesky-maps-vs-shorts.sql)
       if c = 'profile' or c like 'engage%' then return 'bluesky_engagement'; end if;
       return 'bluesky_other_tagged';                 -- legacy 'drip' and anything else tagged bluesky
     end if;

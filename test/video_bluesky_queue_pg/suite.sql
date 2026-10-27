@@ -130,14 +130,13 @@ select pg_temp.chk('9g an expired lease is taken over in its in-flight state, rk
 select public.hs_youtube_video_file_decide('p1','short1','rejected');
 select pg_temp.chk('9h revoking an in-flight job requests cancellation', (pg_temp.job('p1','short1')).cancel_requested);
 select pg_temp.chk('9i the next claim after revocation cancels the job and publishes nothing', public.video_job_claim((pg_temp.job('p1','short1')).id,'w2',600,'x') is null and (pg_temp.job('p1','short1')).status='cancelled');
--- 10. the shared daily cap
+-- 10. the shared schedule: video approval asks the one picker (its rules are tested in homesignal-ingest tests/bsky_schedule_pg)
 delete from public.video_bluesky_jobs where status in ('scheduled','held','cancelled','failed') and slug='p1';
-delete from public.social_posts;
 select pg_temp.chk('10a an empty calendar yields a future slot', public.video_next_slot() > now());
-do $$ declare s timestamptz; d date; begin
-  s := public.video_next_slot(); d := (s at time zone 'America/Denver')::date;
-  insert into public.social_posts(status, scheduled_slot) select 'approved', s + (i||' hours')::interval from generate_series(0,2) i;
-  perform pg_temp.chk('10b MAPS/ALERTS posts on a day count toward the shared daily cap', (public.video_next_slot() at time zone 'America/Denver')::date > d or extract(dow from d) in (0,6)); end $$;
+select pg_temp.chk('10b video_next_slot is the schedule''s next video slot (one picker, no ladder of its own)',
+  public.video_next_slot() = public.bsky_next_slot('video')
+  and position('bsky_next_slot(''video'')' in (select prosrc from pg_proc where oid = 'public.video_next_slot(text)'::regprocedure)) > 0
+  and (select provolatile from pg_proc where oid = 'public.video_next_slot(text)'::regprocedure) = 'v');
 -- 11. permissions
 select pg_temp.as_user('stranger@example.com');
 select pg_temp.chk('11a a non-admin cannot approve', pg_temp.throws($q$select public.hs_youtube_video_file_decide('p1','short2','approved')$q$));

@@ -5678,3 +5678,18 @@ Per-item approval (Main Video, Short 1, Short 2; tab 16) now creates one Bluesky
 cancels and retries. There is no second approval. MAPS/ALERTS (`social_posts`, `hs_approve_social_post`) are untouched. The publisher and the full
 runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-bluesky-queue.test.mjs`, `.browser.test.mjs`, and the SQL state machine on a
 disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
+
+## BLUESKY PUBLISHING SCHEDULE (Tab 12) + MAPS vs SHORTS ⚖️ FOUNDER (2026-10-27)
+
+One schedule, two queues: 2 MAPS + 2 video posts a day, America/Los_Angeles (shown in Central too), never within 150 minutes.
+The schedule and every posting time are decided in homesignal-ingest (`supabase/migrations/20261027170000_bsky_schedule_two_queues.sql`,
+CLAUDE.md "BLUESKY: ONE SCHEDULE, TWO QUEUES"); that migration also replaced `video_next_slot`, whose DDL of record here
+(`docs/video-bluesky-queue.sql`) carries the same body (it calls `public.bsky_next_slot('video')`).
+- **Tab 12 "Bluesky Publishing Schedule"** (`lib/acq-bluesky-schedule.js`): today's MAPS / VIDEO counts and next post, the 7-day calendar,
+  queue counts, errors and holds, and the weekday / weekend time editor. It only calls `hs_bsky_schedule_overview`, `hs_bsky_schedule_preview`
+  (changes nothing) and `hs_bsky_schedule_save` (sends the previewed move count; the database refuses a mismatch). Tests:
+  `test/bluesky-schedule.test.mjs`, `test/bluesky-schedule.browser.test.mjs` (fixture = real overview output).
+- **MAPS vs Shorts** (`docs/bluesky-maps-vs-shorts.sql`): `classify_channel` gains `utm_campaign=shorts -> bluesky_shorts` (spliced, also in
+  `docs/acquisition-attribution.sql`), and `hs_bsky_maps_vs_shorts(p_days)` (admin-only) returns posts, first-visit visitors, registrations and
+  reports per kind and per post (by `utm_content` = the post id the worker adds), plus what is NOT measured (YouTube traffic, returning visits,
+  posts before 2026-10-27). Suite: `test/bluesky_maps_vs_shorts_pg` (disposable Postgres, `bluesky-maps-vs-shorts-suite.yml`).

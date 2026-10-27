@@ -16,8 +16,8 @@
 --   social_posts carries the MAPS/ALERTS claim contract, map gates and payload fingerprint; every one of those
 --   guards reasons about notices and maps. Putting videos there would mean editing hs_approve_social_post and
 --   social_posts_publication_guard, which this change must leave untouched. The video jobs share the
---   publishing CALENDAR (the same weekday/weekend ladder, the same 3/day cap, counted across both tables) and
---   the same worker, not the same row type.
+--   publishing SCHEDULE (since 2026-10-27: one schedule, two queues, public.bsky_next_slot; videos take only the video
+--   slots) and the same worker, not the same row type.
 --
 -- IDENTITY AND IDEMPOTENCY
 --   unique (slug, file_key, platform): a reload, a retried approval RPC or a double-click can never add a
@@ -198,51 +198,20 @@ begin
 end;
 $fn$;
 
--- 4. the shared calendar ---------------------------------------------------------------------------------------------
--- The same ladder as hs_approve_social_post (weekday fill 1/2/3 -> 09:00, 17:30, 12:30; weekend one slot at 10:30; cap
--- 3 per local day; a slot already past rolls to the next day). Differences, all in the SAFE direction: the day's fill
--- counts BOTH tables, so a video can never take a slot past the shared cap, and a candidate within 150 minutes of any
--- existing slot is skipped. hs_approve_social_post is not changed (MAPS/ALERTS untouched) and does not see video slots;
--- the worker's own 3/day cap counts both tables, so an overlap rolls forward instead of over-posting.
-create or replace function public.video_next_slot(p_tz text default 'America/Denver')
+-- 4. the shared schedule -----------------------------------------------------------------------------------------------
+-- ⚖️ ONE SCHEDULE, TWO QUEUES (founder, 2026-10-27): 2 MAPS + 2 video posts a day, America/Los_Angeles, never within 150
+-- minutes. The slot is chosen by public.bsky_next_slot('video'), the one picker MAPS approval uses too (homesignal-ingest
+-- supabase/migrations/20261027170000_bsky_schedule_two_queues.sql, which applied this SAME body in the same transaction
+-- as its guard trigger). Videos take only video slots, so MAPS approvals no longer delay them. p_tz is kept for the
+-- callers' signature and is not used. VOLATILE: the picker takes the schedule's advisory lock.
+-- (Until 2026-10-27 this was the shared Denver ladder: weekdays 09:00 / 17:30 / 12:30, weekends 10:30, 3 a day.)
+create or replace function public.video_next_slot(p_tz text default 'America/Los_Angeles')
 returns timestamptz
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path = public, pg_temp
 as $fn$
-declare
-  ld text[] := array['09:00', '17:30', '12:30'];
-  d date := (now() at time zone p_tz)::date;
-  fill int;
-  slot timestamptz;
-  guard int := 0;
 begin
-  loop
-    guard := guard + 1;
-    if guard > 60 then raise exception 'video_next_slot: no open slot in 60 days'; end if;
-    select count(*) into fill from (
-      select scheduled_slot from public.social_posts
-       where status in ('approved', 'published') and scheduled_slot is not null
-      union all
-      select scheduled_slot from public.video_bluesky_jobs
-       where status in ('scheduled', 'uploading', 'processing', 'publishing', 'published') and scheduled_slot is not null
-    ) s where (s.scheduled_slot at time zone p_tz)::date = d;
-    slot := null;
-    if extract(dow from d) in (0, 6) then
-      if fill < 1 then slot := (d::text || ' 10:30')::timestamp at time zone p_tz; end if;
-    else
-      if fill < 3 then slot := (d::text || ' ' || ld[fill + 1])::timestamp at time zone p_tz; end if;
-    end if;
-    if slot is not null and slot > now() and not exists (
-         select 1 from (
-           select scheduled_slot from public.social_posts where status in ('approved', 'published') and scheduled_slot is not null
-           union all
-           select scheduled_slot from public.video_bluesky_jobs
-            where status in ('scheduled', 'uploading', 'processing', 'publishing', 'published') and scheduled_slot is not null
-         ) g where abs(extract(epoch from (g.scheduled_slot - slot))) < 150 * 60) then
-      return slot;
-    end if;
-    d := d + 1;
-  end loop;
+  return public.bsky_next_slot('video');
 end;
 $fn$;
 
