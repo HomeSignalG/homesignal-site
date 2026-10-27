@@ -51,6 +51,12 @@ create table if not exists public.impact_stories (
 );
 alter table public.impact_stories enable row level security;
 revoke all on public.impact_stories from public, anon, authenticated;
+-- Where a story came from (2026-10-27, Hot Topics): 'manual' (the founder created it) or 'auto_discovery' (prepared from
+-- a Bluesky-discovered topic whose source pack was verified; docs/impact-discovery.sql). Additive; existing rows are manual.
+alter table public.impact_stories add column if not exists origin text not null default 'manual';
+alter table public.impact_stories add column if not exists discovery_candidate_id uuid;
+alter table public.impact_stories drop constraint if exists impact_stories_origin_check;
+alter table public.impact_stories add constraint impact_stories_origin_check check (origin in ('manual', 'auto_discovery'));
 
 create table if not exists public.impact_story_versions (
   story_id     uuid not null references public.impact_stories(id),
@@ -542,7 +548,8 @@ begin
   return coalesce((select jsonb_agg(jsonb_build_object(
       'id', s.id, 'title', s.title, 'place', s.place, 'video_slug', s.video_slug, 'primary_emotion', s.primary_emotion,
       'current_version', s.current_version, 'updated_at', s.updated_at, 'archived', s.archived_at is not null,
-      'verified_at', s.pack->>'verified_at', 'status', public._hs_is_status(s.id)) order by s.updated_at desc)
+      'verified_at', s.pack->>'verified_at', 'status', public._hs_is_status(s.id),
+      'origin', s.origin, 'discovery_candidate_id', s.discovery_candidate_id) order by s.updated_at desc)
     from public.impact_stories s), '[]'::jsonb);
 end $$;
 
@@ -623,9 +630,11 @@ begin
 end $$;
 
 -- Check Sources / Analyze / Generate / Re-check. Returns a job receipt, never a finished result.
-create or replace function public.hs_impact_story_request(p_story uuid, p_kind text, p_scope text default 'all', p_new boolean default false)
+-- The one set of checks before a pack / analyze / generate / validate job. The founder's button and the auto-discovery
+-- tick (docs/impact-discovery.sql) both come through here, so an automatic story meets exactly the same gates.
+create or replace function public._hs_is_request(p_story uuid, p_kind text, p_scope text, p_new boolean, p_actor text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; st jsonb;
+declare s public.impact_stories%rowtype;
 begin
   select * into s from public.impact_stories where id = p_story;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
@@ -647,7 +656,14 @@ begin
     end if;
   end if;
   if p_kind = 'validate' and s.current_version = 0 then raise exception 'Nothing to check yet.' using errcode = '55000'; end if;
-  return public._hs_is_queue(p_story, p_kind, jsonb_build_object('scope', p_scope), e, p_new);
+  return public._hs_is_queue(p_story, p_kind, jsonb_build_object('scope', p_scope), p_actor, p_new);
+end $$;
+
+create or replace function public.hs_impact_story_request(p_story uuid, p_kind text, p_scope text default 'all', p_new boolean default false)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin();
+begin
+  return public._hs_is_request(p_story, p_kind, p_scope, p_new, e);
 end $$;
 
 create or replace function public.hs_impact_story_job_retry(p_job uuid)
@@ -957,7 +973,7 @@ begin
     'public._hs_is_event(uuid, text, jsonb, text)', 'public._hs_is_dispatch(uuid)', 'public._hs_is_queue(uuid, text, jsonb, text, boolean)',
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
-    'public._hs_is_choices(uuid)'] loop
+    'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
