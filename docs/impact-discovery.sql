@@ -351,7 +351,9 @@ begin
         'last_verified_at', c.last_verified_at)
         order by (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
       from (select * from public.impact_discovery_candidates c
-             where p_show_closed or c.status not in ('rejected', 'dismissed', 'excluded', 'stale')
+             where (p_show_closed or c.status not in ('rejected', 'dismissed', 'excluded', 'stale'))
+               -- the founder's experimental-track switch hides existing experimental topics too, not only new ones
+               and (coalesce(st.experimental_enabled, false) or c.track <> 'experimental')
              order by c.score desc limit 60) c), '[]'::jsonb),
     'exclusions', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from public.impact_discovery_exclusions x where x.active), '[]'::jsonb),
     'performance', public._hs_id_performance(),

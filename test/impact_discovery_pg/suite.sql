@@ -249,6 +249,14 @@ select pg_temp.chk('12a an insufficient topic cannot become a story',
 select public.impact_discovery_research((pg_temp.cand('vote')).id, '{"outcome":"verified","source_slug":"county-election-office"}');
 select pg_temp.chk('12b an experimental topic is not prepared automatically',
   pg_temp.err(format('select public.impact_discovery_prepare(%L)', (pg_temp.cand('vote')).id)) like '%not prepared automatically%');
+select pg_temp.chk('12b2 an experimental topic is listed while the track is on',
+  public.hs_impact_discovery_overview()->'candidates' @> jsonb_build_array(jsonb_build_object('id', (pg_temp.cand('vote')).id)));
+update public.impact_discovery_settings set experimental_enabled = false where id;
+select pg_temp.chk('12b3 turning the track off hides existing experimental topics too, closed ones included',
+  not (public.hs_impact_discovery_overview()->'candidates' @> jsonb_build_array(jsonb_build_object('id', (pg_temp.cand('vote')).id)))
+  and not (public.hs_impact_discovery_overview(true)->'candidates' @> jsonb_build_array(jsonb_build_object('id', (pg_temp.cand('vote')).id)))
+  and jsonb_array_length(public.hs_impact_discovery_overview()->'candidates') > 0);
+update public.impact_discovery_settings set experimental_enabled = true where id;
 select pg_temp.put('st', public.impact_discovery_prepare((pg_temp.cand('wny')).id)->>'story_id');
 select pg_temp.chk('12c prepare creates an auto-discovery story from the verified pack and queues Check Sources',
   (select origin = 'auto_discovery' and video_slug = 'wny-data-center' and discovery_candidate_id = (pg_temp.cand('wny')).id

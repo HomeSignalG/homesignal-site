@@ -49,6 +49,8 @@ ok(/_hs_is_request\(s\.id, 'analyze'/.test(sql) && /_hs_is_request\(s\.id, 'gene
 const create = (sql.match(/create or replace function public\._hs_id_create_story[\s\S]*?\$\$;/) || [''])[0];
 ok(create.indexOf('pg_advisory_xact_lock') >= 0 && create.indexOf('pg_advisory_xact_lock') < create.indexOf('select count(*) into n'),
   '5a story creation is serialized before the per-scan count is read');
+ok(/function idleDelay\(\)/.test(js) && /st\.scan_enabled === false\) return null/.test(js) && /next_scan_at/.test(js.slice(js.indexOf('function idleDelay')))
+   && /IDLE_MAX_MS = 30 \* 60000/.test(js), '5c with scheduled scans on, an idle panel looks again after the next scan is due (at most every 30 min)');
 ok(/var PENDING = \['nominated', 'researching', 'preparing'\]/.test(js) && /SLOW_POLL_MS/.test(js), '5b the panel keeps refreshing while topics are nominated, researched or prepared');
 
 console.log(fails ? '\n' + fails + ' failed' : '\nall passed');
