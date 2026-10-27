@@ -292,6 +292,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-bluesky-videos.js?v=4a99e48f"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
+<script src="lib/acq-youtube.js?v=2cd35fff"></script>
 <script src="lib/acq-impact-stories.js?v=d89fd3bc"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
@@ -527,6 +528,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     initGrowth(p.S||[]);
     // Tab 5: live card first (synchronously), so the followers card that wireLive() adds later sits above it.
     if(window.HS && window.HS.acqEngagement) window.HS.acqEngagement.mount(window.hsClient, $('tab-engagement'), p.meta && p.meta.snapshot);
+    if(window.HS && window.HS.acqYouTube) window.HS.acqYouTube.mount(window.hsClient, $('tab-engagement'));
     wireLive();
     wireFeedInventory();
     wireAcqLive();
@@ -868,7 +870,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   var CH_LABEL={google_organic:'Google organic',bing_organic:'Bing organic',other_search:'Other search',
     bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_shorts:'Bluesky: video posts (shorts)',bluesky_engagement:'Bluesky: engagement / profile',
     bluesky_other_tagged:'Bluesky: other tagged (drip, etc.)',bluesky_untagged:'Bluesky: untagged link',
-    saleshandy:'Saleshandy email',other_referral:'Other referral',other_tagged:'Other tagged',
+    saleshandy:'Saleshandy email',youtube:'YouTube',other_referral:'Other referral',other_tagged:'Other tagged',
     direct:'Direct (home-page landing)',unknown:'Unknown (no referrer, deep landing)',
     not_collected:'Not collected (before tracking)',not_attributed:'No source recorded'};
   var CH_METRICS=[['visitors','Visitors'],['new_visitors','New visitors'],['returning_visitors','Returning visitors'],
