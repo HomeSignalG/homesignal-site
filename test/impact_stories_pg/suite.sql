@@ -309,5 +309,10 @@ select pg_temp.chk('12x6 the helper is not callable by visitors',
   not has_function_privilege('anon', 'public._hs_is_not_started(public.impact_story_jobs)', 'execute')
   and not has_function_privilege('authenticated', 'public._hs_is_not_started(public.impact_story_jobs)', 'execute'));
 
+-- 12y. a render the worker may still finish is not offered for Retry (2026-10-27: a 107-minute main video) ------
+select pg_temp.chk('12y1 a render running 200 minutes is not stuck', public._hs_is_stuck_after('render') > interval '330 minutes'
+  and now() - interval '200 minutes' > now() - public._hs_is_stuck_after('render'));
+select pg_temp.chk('12y2 other jobs keep their 40-minute limit', public._hs_is_stuck_after('pack') = interval '40 minutes');
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;
