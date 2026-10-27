@@ -60,10 +60,10 @@ await page.evaluate(() => {
         { id: 's2', title: 'Old story', video_slug: 'x', archived: true, updated_at: '2026-10-01T00:00:00Z', status: { library: 'archived', next: 'Archived.' } }],
       hs_impact_story_catalog: [{ slug: 'gig-harbor-fishing-homeport-dock', title: '3003 Gig Harbor' }],
       hs_impact_story_get: { media: window.db.media || { render_job: null, files: [] }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
-        version: { version: window.db.version, body: JSON.parse(JSON.stringify(body)), checked: true, derived,
+        version: { version: window.db.version, body: Object.assign(JSON.parse(JSON.stringify(body)), (window.db.extra || {}).body || {}), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
-            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] } } },
+            narrative: { ok: false, blocking: ['Short A: Short A next line 1: promises a link.'] }, v3: (window.db.extra || {}).v3 } },
         versions: [{ version: 7 }, { version: 6 }], approvals: [], jobs: [], events: [{ at: '2026-10-25T10:00:00Z', kind: 'job_failed', actor: 'worker', detail: {} },
           { at: '2026-10-25T11:00:00Z', kind: 'section_revision', actor: 'f@x', detail: { section: 'fear', version: 7, note: 'Name the <floodplain> earlier.' } }] },
       hs_impact_story_version: { version: 6, body: v6 },
@@ -116,6 +116,7 @@ ok(txt.includes('The studies behind these safeguards were not reviewed.') && txt
 ok(txt.includes('Left out of the script') && txt.includes('raise no accountability question'), 'outline: an omitted section says why, and offers no narration');
 ok(txt.includes('none of its counterevidence (cost_none) is spoken') && txt.includes('Fails evidence checks'), 'outline: a section that fails a check says why');
 ok(txt.includes('Integrated outline') && txt.includes('Total') && (await page.locator('#is .is-thr.fear').count()) >= 1, 'outline: the integrated outline shows threads per act and a running time');
+ok(!txt.includes('What residents could lose') && !txt.includes('Three story concepts'), 'outline: a v2 story shows no V3 panels');
 ok(await page.locator('#is button:has-text("Use this angle")').count() === 0 && await page.locator('#is [data-act=angle]').count() === 0, 'outline: there is no single-angle choice');
 ok(txt.includes('Name the <floodplain> earlier.') && (await page.innerHTML('#is')).includes('Name the &lt;floodplain&gt; earlier.'), 'outline: revision notes are shown, escaped');
 await page.click('#is [data-act=revise][data-sec=anger]'); await page.waitForTimeout(50);
@@ -197,6 +198,55 @@ ok(!/publish now|schedule post/i.test(txt), 'distribution: no publish or schedul
 await page.click('#is [data-act=step][data-step=results]');
 txt = await page.locator('#is').innerText();
 ok(txt.includes('Not published') && !/\b0\b/.test(txt.replace(/0-3|utm|impact-/g, '')), 'results: nothing is shown as zero');
+
+// impact-story/3: discovery, three scored concepts, the quality gate and the visual plan
+await page.evaluate(() => {
+  const L = (t, ...c) => ({ text: t, claims: c });
+  const pic = (subject, status, extra) => Object.assign({ kind: status === 'registry' ? 'representative_image' : 'illustrative', category: 'wildlife', emotion: 'concern',
+    subject, shot: 'wide', camera: 'slow_push', duration: 7, transition: 'dissolve', why: 'The species on the list' }, { asset: Object.assign({ status }, extra) });
+  const concept = (id, role, title) => ({ id, role, trigger: role, title, confidence: 'medium', fit: 'Fit of ' + id,
+    opening: L('Opening of ' + id + '.', 'purpose'), stakes: L('Stakes of ' + id + '.', 'purpose'), conflict: L('Conflict of ' + id + '.', 'purpose'),
+    arc: { attachment: L('A line.', 'purpose'), disruption: L('B line.', 'purpose'), controversy: L('C line.', 'purpose'), evidence: L('D line.', 'purpose'), turning_point: L('E line.', 'purpose'), action: L('F line.', 'purpose') } });
+  const body = { schema: 'impact-story/3',
+    discovery: { findings: [
+      { dimension: 'wildlife', classification: 'documented_potential', finding: L('Pile driving near <orcas>.', 'purpose'), affected: 'Orcas', could_lose: 'Quiet water' },
+      { dimension: 'financial', classification: 'no_evidence', finding: L('No cost named.'), affected: '', could_lose: '' }],
+      conflict: L('Two records differ.', 'purpose'), protections: [L('A bubble curtain.', 'purpose')],
+      participation: { text: 'The appeal window closed.', claims: ['purpose'], open: false }, approach: { trigger: 'concern', why: 'Species on the record.' } },
+    concepts: [concept('orcas', 'concern', 'A dock in orca water'), concept('two-docks', 'accountability', 'Six floats or 15?'), concept('waterfront', 'empowerment', 'A working waterfront')],
+    selection: { concept: 'orcas', mode: 'emotional', why: 'Highest score.' } };
+  body.main = { acts: [{ act: 1, name: 'The harbor', scenes: [{ thread: 'fear', purpose: 'p', visual: pic('A southern resident killer whale', 'registry', { id: 'southern-resident-orca' }), narration: [L('Line.', 'purpose')] },
+    { thread: 'fear', purpose: 'p', visual: pic('A heron', 'missing', { search: ['great blue heron'] }), narration: [L('Line.', 'purpose')] }] }] };
+  window.db.extra = { body, v3: {
+    scores: { orcas: { total: 86, parts: { 'evidence integrity': 25 } }, 'two-docks': { total: 57, parts: {} }, waterfront: { total: 74, parts: {} } },
+    quality: { criteria: { attachment: 2, 'visual power': 1 }, total: 13, max: 14, reject: [] },
+    missing_assets: [{ scene: 'a1-s2', subject: 'A heron' }], short_timing: { a: [{ beat: 'hook', ends: 3.1 }, { beat: 'care', ends: 6.9 }] },
+    photos: [{ id: 'southern-resident-orca', usable: true, title: 'File:Orca.jpg', license: 'CC BY-SA 3.0', author: 'NOAA <staff>', page_url: 'https://commons.wikimedia.org/wiki/File:Orca.jpg', site_specific: false }] } };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=outline]');
+txt = await page.locator('#is').innerText();
+ok(txt.includes('What residents could lose') && txt.includes('Documented potential') && txt.includes('No evidence') && txt.includes('Wildlife & nature'),
+   'V3 outline: discovery shows each finding with its strength of evidence');
+ok((await page.innerHTML('#is')).includes('Pile driving near &lt;orcas&gt;.'), 'V3 outline: findings are escaped');
+ok(txt.includes('Three story concepts') && txt.includes('A dock in orca water') && txt.includes('Six floats or 15?') && txt.includes('86') && txt.includes('Selected'),
+   'V3 outline: three concepts with their scores, the selected one marked');
+ok(txt.includes('A. Attachment') && txt.includes('F. Motivation and action'), 'V3 outline: each concept shows its arc A-F');
+ok(txt.includes('Quality gate') && txt.includes('13 / 14') && txt.includes('need an editorial decision'), 'V3 outline: the quality gate and the missing pictures are shown');
+ok(await page.locator('#is [data-act=concept]').count() === 2, 'V3 outline: the two other concepts can be chosen instead');
+await page.click('#is [data-act=concept][data-id=two-docks]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'concepts'
+   && c[1].p_note.includes('(two-docks)') && c[1].p_note.includes('instead of orcas') && c[1].p_note.includes('Lead with the date.'))),
+   'V3 outline: choosing another concept records a revision note with the reason');
+await page.click('#is [data-act=step][data-step=script]');
+await page.click('#is [data-act=doc][data-doc=visuals]');
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Licensed photo') && txt.includes('representative, not this site') && txt.includes('CC BY-SA 3.0') && txt.includes('MISSING: needs editorial review'),
+   'V3 visual plan: each picture says where it comes from and its license, and a missing one is flagged');
+ok(txt.includes('hook ends 3.1s') && txt.includes('Hook by 3 s'), 'V3 visual plan: Shorts timing is shown against its rule');
+ok((await page.innerHTML('#is')).includes('NOAA &lt;staff&gt;'), 'V3 visual plan: photo credits are escaped');
+await page.evaluate(() => { window.db.extra = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); }); await page.waitForTimeout(80);
 
 // keyboard + responsive
 await page.focus('#is [data-act=step][data-step=intake]');

@@ -5621,6 +5621,15 @@ Results.
   1. Merge the ingest render engine first, because the Render button dispatches `impact-story-render.yml` from `main`.
   2. Apply `docs/impact-stories.sql` (bucket, tables, functions).
   3. Deploy the page.
+- ⚖️ **V3, THE EMOTIONAL DISCOVERY ENGINE (2026-10-27, `impact-story/3`; engine homesignal-ingest `impact/storycraft.py`).**
+  Story Outline shows, for a V3 draft: what residents could lose (findings by area, each with its strength of evidence),
+  the conflict, the protections, whether residents can still take part, the three concepts (concern, accountability,
+  empowerment) with their scores and arcs A-F, the selected one, and the quality gate. "Lead with this concept instead"
+  records a `concepts` revision note (no paid API; a Claude Code session rewrites the draft). Script & Shorts gains a
+  "Visual plan & assets" tab: every shot's picture, its feeling, camera and source, each photo's license and credit
+  (from the engine's check report), missing pictures flagged, and the Shorts timing. `_hs_is_artifact` adds discovery,
+  concepts and selection to the one approval ONLY when present, so a v2 body hashes as before (pg checks 13a-13d). Render
+  key is `impact-render-2`. Apply order: this SQL first (backward compatible), then the page, then the ingest engine.
 - Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
