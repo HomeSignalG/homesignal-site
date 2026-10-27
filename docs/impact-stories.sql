@@ -167,6 +167,22 @@ create table if not exists public.impact_story_media_decisions (
 alter table public.impact_story_media_decisions enable row level security;
 revoke all on public.impact_story_media_decisions from public, anon, authenticated;
 
+-- A licensed photo a person chose for a subject the render could not show (impact/assets/acquire.py found the
+-- candidates; the blocked render job carries them). Append-only: the newest choice per subject is the one used, and
+-- it is frozen into the next render job's input, so a render always says which photos it was given.
+create table if not exists public.impact_story_asset_choices (
+  id           bigint generated always as identity primary key,
+  story_id     uuid not null references public.impact_stories(id),
+  subject_id   text not null check (subject_id ~ '^[a-z0-9:][a-z0-9:-]{1,60}$'),
+  candidate_id text not null check (char_length(candidate_id) between 1 and 120),
+  job_id       uuid not null references public.impact_story_jobs(id),   -- the blocked render whose candidates it came from
+  entry        jsonb not null,                                          -- the candidate exactly as the engine recorded it
+  actor        text not null,
+  at           timestamptz not null default now()
+);
+alter table public.impact_story_asset_choices enable row level security;
+revoke all on public.impact_story_asset_choices from public, anon, authenticated;
+
 -- The private bucket. Readable only by dashboard admins (the same helper Tab 16's bucket uses); written only by the
 -- worker's service role (no insert/update/delete policy exists, so no browser session can write to it).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -181,6 +197,9 @@ create or replace function public._hs_is_append_only() returns trigger language 
 begin raise exception 'impact story % rows are append-only', tg_table_name using errcode = '42501'; end $$;
 drop trigger if exists impact_story_approvals_append_only on public.impact_story_approvals;
 create trigger impact_story_approvals_append_only before update or delete on public.impact_story_approvals
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_asset_choices_append_only on public.impact_story_asset_choices;
+create trigger impact_story_asset_choices_append_only before update or delete on public.impact_story_asset_choices
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_events_append_only on public.impact_story_events;
 create trigger impact_story_events_append_only before update or delete on public.impact_story_events
@@ -312,16 +331,39 @@ end $$;
 
 -- Rendered files of a story and their media decisions. The CURRENT set is the newest completed render job's files, and
 -- it counts only while it was rendered from the narrative that is approved right now; otherwise it is listed as stale.
+-- The photo chosen for each subject: the newest choice per subject wins.
+create or replace function public._hs_is_choices(p_story uuid)
+returns setof public.impact_story_asset_choices language sql stable security definer set search_path = public as $$
+  select distinct on (subject_id) * from public.impact_story_asset_choices where story_id = p_story
+   order by subject_id, id desc
+$$;
+
 create or replace function public._hs_is_media(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare na jsonb := public._hs_is_artifact_state(p_story, 'narrative'); j public.impact_story_jobs%rowtype;
         files jsonb := '[]'::jsonb; r record; d public.impact_story_media_decisions%rowtype; st text; why text;
-        cur boolean; n int := 0; nok int := 0;
+        cur boolean; n int := 0; nok int := 0; b public.impact_story_jobs%rowtype; blocked jsonb; choices jsonb;
 begin
   select * into j from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'complete'
    order by completed_at desc limit 1;
+  -- a newer render the engine stopped before rendering (a missing essential photo, an outdated status): what is
+  -- missing, the licensed candidates it found, and what a person must do. Shown until a later render completes.
+  select * into b from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'failed'
+     and coalesce((result->>'blocked')::boolean, false)
+     and (j.id is null or completed_at > j.completed_at)
+   order by completed_at desc limit 1;
+  if b.id is not null then
+    blocked := jsonb_build_object('job_id', b.id, 'at', b.completed_at, 'error', b.error,
+      'failures', coalesce(b.result->'failures', '[]'::jsonb), 'candidates', coalesce(b.result->'candidates', '[]'::jsonb),
+      'candidates_error', b.result->'candidates_error', 'currency', b.result->'currency');
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object('subject_id', c.subject_id, 'candidate_id', c.candidate_id, 'job_id', c.job_id,
+           'title', c.entry->>'title', 'license', c.entry->>'license', 'author', c.entry->>'author',
+           'page_url', c.entry->>'page_url', 'actor', c.actor, 'at', c.at) order by c.subject_id), '[]'::jsonb)
+    into choices from public._hs_is_choices(p_story) c;
   if j.id is null then
-    return jsonb_build_object('render_job', null, 'current', false, 'complete', false, 'files', '[]'::jsonb);
+    return jsonb_build_object('render_job', null, 'current', false, 'complete', false, 'files', '[]'::jsonb,
+      'blocked', blocked, 'choices', choices);
   end if;
   cur := na->>'state' = 'approved' and j.input->>'narrative_hash' = na->>'hash';
   for r in select * from public.impact_story_assets where job_id = j.id
@@ -329,6 +371,10 @@ begin
     select * into d from public.impact_story_media_decisions where asset_id = r.id order by id desc limit 1;
     if not cur then st := 'stale'; why := 'Rendered from an earlier narrative. Render again.';
     elsif not coalesce((r.qc->>'ok')::boolean, r.asset = 'thumbnail') then st := 'blocked'; why := 'The media checks failed: see the checks below.';
+    elsif (r.qc->'quality'->>'ok') = 'false' then   -- the storyboard and frame gates (impact/visual_gate.py)
+      st := 'blocked';
+      why := 'The visual quality gate failed: ' || coalesce((select string_agg(distinct f->>'label', '; ')
+               from jsonb_array_elements(coalesce(r.qc->'quality'->'failures', '[]'::jsonb)) f), 'see the checks below') || '.';
     elsif d.id is null then st := 'pending'; why := 'Watch it, then approve or reject.';
     elsif d.decision = 'approved' then st := 'approved'; why := 'Approved by ' || d.actor || '.';
     elsif d.decision = 'rejected' then st := 'rejected'; why := 'Rejected: ' || coalesce(d.note, '') || coalesce(' (at ' || d.timecode || ')', '');
@@ -343,7 +389,8 @@ begin
         'timecode', d.timecode, 'actor', d.actor, 'at', d.at) end);
   end loop;
   return jsonb_build_object('render_job', j.id, 'rendered_at', j.completed_at, 'version', j.base_version,
-    'renderer', j.input->>'renderer', 'current', cur, 'complete', cur and n > 0 and nok = n, 'files', files);
+    'renderer', j.input->>'renderer', 'current', cur, 'complete', cur and n > 0 and nok = n, 'files', files,
+    'quality', j.result->'quality', 'currency', j.result->'currency', 'blocked', blocked, 'choices', choices);
 end $$;
 
 -- Where the story is, and the ONE next action (v2.4 J: one clearly labelled primary action).
@@ -612,7 +659,7 @@ begin return public._hs_is_retry(p_job, public._hs_is_admin()); end $$;
 -- fresh narrative can be rendered; the same narrative + renderer returns the existing render unless p_new.
 create or replace function public.hs_impact_story_render(p_story uuid, p_expected_version integer, p_new boolean default false)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; na jsonb;
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; na jsonb; ch jsonb;
 begin
   select * into s from public.impact_stories where id = p_story;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
@@ -624,8 +671,14 @@ begin
   if na->>'state' <> 'approved' then
     raise exception 'Approve the integrated narrative before rendering. %', na->>'why' using errcode = '55000';
   end if;
-  return public._hs_is_queue(p_story, 'render', jsonb_build_object('scope', 'render|' || (na->>'hash') || '|impact-render-2',
-    'narrative_hash', na->>'hash', 'renderer', 'impact-render-2'), e, p_new);
+  select coalesce(jsonb_agg(jsonb_build_object('subject_id', c.subject_id, 'candidate_id', c.candidate_id, 'entry', c.entry)
+           order by c.subject_id), '[]'::jsonb) into ch from public._hs_is_choices(p_story) c;
+  -- the photos chosen for blocked subjects are frozen into the job, and their ids are part of its key, so choosing a
+  -- photo makes the next Render a new job while the same choices never render twice
+  return public._hs_is_queue(p_story, 'render', jsonb_build_object('scope', 'render|' || (na->>'hash') || '|impact-render-3|'
+    || md5((select coalesce(string_agg(x->>'subject_id' || '=' || (x->>'candidate_id'), ',' order by x->>'subject_id' collate "C"), '')
+            from jsonb_array_elements(ch) x)),
+    'narrative_hash', na->>'hash', 'renderer', 'impact-render-3', 'asset_choices', ch), e, p_new);
 end $$;
 
 -- Gate 2: approve, reject (with what to fix, optionally at m:ss) or revoke ONE rendered file of the current set.
@@ -655,6 +708,33 @@ begin
   perform public._hs_is_event(p_story, 'media_decision', jsonb_build_object('asset', f->>'asset', 'asset_id', p_asset_id,
     'decision', p_decision, 'timecode', nullif(btrim(p_timecode), '')), e);
   return jsonb_build_object('state', p_decision);
+end $$;
+
+-- A missing essential photo: choose one of the licensed candidates the blocked render found. Only a candidate that
+-- render recorded can be chosen (license, author, sha256 and file exactly as the engine checked them); the choice
+-- is used by the next Render, which downloads the file again and refuses it if its bytes differ.
+create or replace function public.hs_impact_story_choose_asset(p_story uuid, p_job uuid, p_subject text, p_candidate text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); j public.impact_story_jobs%rowtype; c jsonb;
+begin
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  select * into j from public.impact_story_jobs where id = p_job and story_id = p_story and kind = 'render'
+     and status = 'failed' and coalesce((result->>'blocked')::boolean, false);
+  if not found then raise exception 'That render did not stop for a missing photo.' using errcode = '55000'; end if;
+  select x into c from jsonb_array_elements(coalesce(j.result->'candidates', '[]'::jsonb)) g,
+                       jsonb_array_elements(coalesce(g->'candidates', '[]'::jsonb)) x
+   where g->>'subject_id' = p_subject and x->>'id' = p_candidate limit 1;
+  if c is null then raise exception 'That photo is not one of the candidates found for this subject.' using errcode = '22023'; end if;
+  if coalesce(c->>'sha256', '') !~ '^[0-9a-f]{64}$' or coalesce(c->>'license', '') = '' or coalesce(c->>'file_url', '') = '' then
+    raise exception 'That candidate is missing its license, file or checksum.' using errcode = '22023';
+  end if;
+  insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, entry, actor)
+  values (p_story, p_subject, p_candidate, p_job, c, e);
+  update public.impact_stories set updated_at = now() where id = p_story;
+  perform public._hs_is_event(p_story, 'asset_chosen', jsonb_build_object('subject', p_subject, 'candidate', p_candidate,
+    'license', c->>'license', 'title', c->>'title'), e);
+  return jsonb_build_object('ok', true, 'subject', p_subject, 'candidate', p_candidate);
 end $$;
 
 create or replace function public.hs_impact_story_save(p_story uuid, p_expected_version integer, p_body jsonb, p_note text default null)
@@ -764,14 +844,21 @@ begin
   select * into v from public.impact_story_versions where story_id = j.story_id and version = j.base_version;
   return jsonb_build_object('claimed', true, 'id', j.id, 'kind', j.kind, 'input', j.input, 'base_version', j.base_version,
     'story', jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'pack', s.pack),
-    'base_body', v.body);
+    'base_body', v.body, 'asset_choices', coalesce(j.input->'asset_choices', '[]'::jsonb));
 end $$;
 
-create or replace function public.hs_impact_story_job_fail(p_job_id uuid, p_error text)
+-- p_result: what the worker found before it stopped (a blocked render: the failed checks, the missing subjects'
+-- licensed candidates, the latest-development check). Kept on the job so Media Review can show it.
+drop function if exists public.hs_impact_story_job_fail(uuid, text);
+create or replace function public.hs_impact_story_job_fail(p_job_id uuid, p_error text, p_result jsonb default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare j public.impact_story_jobs%rowtype;
 begin
-  update public.impact_story_jobs set status = 'failed', completed_at = now(), error = left(coalesce(p_error, 'The worker failed.'), 900)
+  if p_result is not null and (jsonb_typeof(p_result) <> 'object' or octet_length(p_result::text) > 400000) then
+    p_result := null;
+  end if;
+  update public.impact_story_jobs set status = 'failed', completed_at = now(), error = left(coalesce(p_error, 'The worker failed.'), 900),
+         result = coalesce(p_result, result)
    where id = p_job_id and status = 'running' returning * into j;
   if found then
     perform public._hs_is_event(j.story_id, 'job_failed', jsonb_build_object('job_id', j.id, 'kind', j.kind, 'error', j.error), 'worker');
@@ -824,7 +911,8 @@ begin
            coalesce(a->'qc', '{}'::jsonb), coalesce(a->'stills', '[]'::jsonb), coalesce(a->'shots', '[]'::jsonb)
       from jsonb_array_elements(p_result->'assets') a;
     update public.impact_story_jobs set status = 'complete', completed_at = now(),
-           result = jsonb_build_object('files', jsonb_array_length(p_result->'assets'), 'storyboard', p_result->'storyboard')
+           result = jsonb_build_object('files', jsonb_array_length(p_result->'assets'), 'storyboard', p_result->'storyboard',
+                                       'quality', p_result->'quality', 'currency', p_result->'currency')
      where id = p_job_id;
     perform public._hs_is_event(j.story_id, 'rendered', jsonb_build_object('job_id', j.id, 'version', j.base_version,
       'files', (select jsonb_agg(a->>'asset') from jsonb_array_elements(p_result->'assets') a)), 'worker');
@@ -868,7 +956,8 @@ begin
     'public._hs_is_fresh(public.impact_stories)', 'public._hs_is_artifact_state(uuid, text)', 'public._hs_is_status(uuid)',
     'public._hs_is_event(uuid, text, jsonb, text)', 'public._hs_is_dispatch(uuid)', 'public._hs_is_queue(uuid, text, jsonb, text, boolean)',
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
-    'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)'] loop
+    'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
+    'public._hs_is_choices(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
@@ -878,11 +967,11 @@ begin
     'public.hs_impact_story_job_retry(uuid)', 'public.hs_impact_story_save(uuid, integer, jsonb, text)',
     'public.hs_impact_story_angle(uuid, integer, text, text)', 'public.hs_impact_story_decide(uuid, text, text, integer, text, text)',
     'public.hs_impact_story_section_revision(uuid, integer, text, text)', 'public.hs_impact_story_render(uuid, integer, boolean)',
-    'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)'] loop
+    'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;
-  foreach f in array array['public.hs_impact_story_job_claim(uuid)', 'public.hs_impact_story_job_fail(uuid, text)',
+  foreach f in array array['public.hs_impact_story_job_claim(uuid)', 'public.hs_impact_story_job_fail(uuid, text, jsonb)',
                            'public.hs_impact_story_job_complete(uuid, jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';

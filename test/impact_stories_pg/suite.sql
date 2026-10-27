@@ -249,6 +249,49 @@ select pg_temp.chk('12p a new render needs reviewing again; a file that failed i
 select pg_temp.chk('12q a file from an older render cannot be decided',
    pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), (select min(id) from public.impact_story_assets), 'approved')) like '%not part of the current render%');
 
+-- 12r. the quality gates (2026-10-27): a blocked render, choosing a licensed photo, a file the visual gate failed --
+select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7, true);
+insert into _ids select 'rb', (pg_temp.lastjob()).id;
+select public.hs_impact_story_job_claim(pg_temp.id('rb')::uuid);
+select public.hs_impact_story_job_fail(pg_temp.id('rb')::uuid, 'Nothing was rendered: Missing essential image.',
+  jsonb_build_object('blocked', true,
+    'failures', jsonb_build_array(jsonb_build_object('code', 'missing_essential_image', 'label', 'Missing essential image',
+                                  'detail', 'Oak trees: no licensed photo yet.', 'action', 'Choose one of the licensed candidates.')),
+    'candidates', jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'subject', 'Oak trees', 'candidates',
+      jsonb_build_array(jsonb_build_object('id', 'oak-photo-1a2b3c4d', 'title', 'File:Oak.jpg', 'license', 'CC BY-SA 4.0',
+        'author', 'A. Person', 'page_url', 'https://commons.wikimedia.org/wiki/File:Oak.jpg',
+        'file_url', 'https://upload.wikimedia.org/x/Oak.jpg', 'sha256', repeat('b', 64)))))));
+select pg_temp.chk('12r1 a blocked render keeps what is missing and the licensed candidates',
+  public._hs_is_media(pg_temp.id('s')::uuid)->'blocked'->'failures'->0->>'code' = 'missing_essential_image'
+  and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked'->'candidates'->0->'candidates'->0->>'id' = 'oak-photo-1a2b3c4d');
+select pg_temp.chk('12r2 only a candidate that render recorded can be chosen',
+  pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('rb'), 'oak-trees', 'made-up')) like '%not one of the candidates%'
+  and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('r1'), 'oak-trees', 'oak-photo-1a2b3c4d')) like '%did not stop%');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12r3 non-admin cannot choose a photo',
+  pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.id('rb'), 'oak-trees', 'oak-photo-1a2b3c4d')) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, pg_temp.id('rb')::uuid, 'oak-trees', 'oak-photo-1a2b3c4d');
+select pg_temp.chk('12r4 the choice is recorded and append-only',
+  public._hs_is_media(pg_temp.id('s')::uuid)->'choices'->0->>'candidate_id' = 'oak-photo-1a2b3c4d'
+  and pg_temp.err('delete from public.impact_story_asset_choices') is not null);
+select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7);
+select pg_temp.chk('12r5 the next Render is a new job carrying the chosen photo',
+  (pg_temp.lastjob()).id <> pg_temp.id('rb')::uuid and (pg_temp.lastjob()).status = 'queued'
+  and (pg_temp.lastjob()).input->'asset_choices'->0->'entry'->>'sha256' = repeat('b', 64)
+  and (pg_temp.lastjob()).input->>'renderer' = 'impact-render-3'
+  and public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'asset_choices'->0->>'candidate_id' = 'oak-photo-1a2b3c4d');
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets',
+  jsonb_set(pg_temp.files((pg_temp.lastjob()).id), '{1,qc}', jsonb_build_object('ok', true, 'quality', jsonb_build_object('ok', false,
+    'failures', jsonb_build_array(jsonb_build_object('code', 'excessive_documents', 'label', 'Too many documents and cards'))))),
+  'quality', jsonb_build_object('ok', false), 'currency', jsonb_build_object('state', 'current')));
+select pg_temp.chk('12r6 a file the visual quality gate failed is blocked and cannot be approved',
+  pg_temp.fst('short_a') = 'blocked' and pg_temp.fst('main') = 'pending'
+  and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('short_a'), 'approved')) like '%visual quality gate failed: Too many documents and cards%'
+  and public._hs_is_media(pg_temp.id('s')::uuid)->'blocked' = 'null'::jsonb
+  and public._hs_is_media(pg_temp.id('s')::uuid)->'currency'->>'state' = 'current');
+select pg_temp.chk('12r7 a file with no quality report (rendered before the gates) is not blocked by it', pg_temp.fst('main') = 'pending');
+
 -- 10. a story written before the outline, and its old approvals --------------------------------------
 select public.hs_impact_story_save(pg_temp.id('s')::uuid, 7, '{"schema":"impact-story/1","angles":[{"id":"motivation"}],"selected_angle":"motivation"}'::jsonb);
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P2'))));
@@ -333,9 +376,9 @@ select pg_temp.chk('13f a revision note can ask for another concept, the discove
   (select bool_and(e is null) from _rev)
   and (select count(distinct detail->>'section') from public.impact_story_events where kind = 'section_revision'
          and detail->>'section' in ('concepts','discovery','visuals')) = 3);
-select pg_temp.chk('13e the render key names impact-render-2',
-  position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
-  and position('impact-render-1' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);
+select pg_temp.chk('13e the render key names impact-render-3',
+  position('impact-render-3' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
+  and position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);
 
 \o
 select count(*) || ' checks passed' as result from _res where ok;
