@@ -291,7 +291,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/acq-youtube-videos.js?v=f576a8e9"></script>
 <script src="lib/acq-bluesky-videos.js?v=4a99e48f"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
-<script src="lib/acq-engagement.js?v=f1a68e12"></script>
+<script src="lib/acq-engagement.js?v=9b2c08da"></script>
 <script src="lib/acq-impact-stories.js?v=d89fd3bc"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
@@ -2187,7 +2187,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     var delta=cur-first;
     var deltaTxt=delta>0?('▲ +'+delta):(delta<0?('▼ '+delta):'no change');
     var since=daily.length>1?(' since '+fmtDay(daily[0].day)):'';
-    return '<div class="card">'+
+    return '<div class="card" id="acq-followers-card">'+
       '<h3>Bluesky followers <span class="tile-tag t-real" style="margin-left:6px">live</span></h3>'+
       '<p class="sub">Live from social_account_stats · @'+esc(d.handle||'')+' — grows as daily captures accumulate.</p>'+
       '<div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">'+
@@ -2215,7 +2215,11 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
       if(r.error || !r.data) return;       // silently skip if unavailable — never breaks the page
       upgradeFollowerTile(r.data);
       var eng=$('tab-engagement');
-      if(eng){ var wrap=document.createElement('div'); wrap.innerHTML=followerCard(r.data); if(wrap.firstChild) eng.insertBefore(wrap.firstChild, eng.firstChild); }
+      if(eng){
+        // One card: a second load() (auth fires more than once) must replace it, never add another.
+        var old=document.getElementById('acq-followers-card'); if(old) old.remove();
+        var wrap=document.createElement('div'); wrap.innerHTML=followerCard(r.data); if(wrap.firstChild) eng.insertBefore(wrap.firstChild, eng.firstChild);
+      }
     }catch(e){}
   }
 
