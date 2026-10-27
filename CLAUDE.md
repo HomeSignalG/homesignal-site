@@ -5769,3 +5769,16 @@ post id. A post never measured shows a dash, never 0.
 - **The followers card appears once.** `load()` runs on every auth change; `wireLive()` now replaces
   `#acq-followers-card` instead of inserting a second one.
 - Test: `test/engagement-tracker.test.mjs` (fixture = the readers' real output).
+- **YouTube card (2026-10-27, founder: "you tube channel needs to be tracked").** `lib/acq-youtube.js`, under the Bluesky card,
+  displays one admin-only reader, `hs_youtube_engagement(p_days)` (`docs/youtube-engagement.sql`): subscribers and channel views,
+  per-video views / likes / comments (MAIN or SHORT, the reader's `kind`, 3 minutes or less = Short), and first visits,
+  registrations and reports whose channel is `youtube`.
+  - **Counts:** homesignal-ingest's hourly `youtube_channel_sync.py` also asks for `statistics` on the calls it already makes
+    (no extra quota) and appends to `youtube_video_metrics` / `youtube_channel_metrics` (RLS on, no visitor access). A hidden count
+    is null. "In this period" needs a reading from within 2 days before the period started, else it is a dash.
+  - **Visits:** `classify_channel` files `utm_source=youtube` and a youtube.com / youtu.be referrer as `youtube` (from 2026-10-27;
+    older YouTube visits stay other_referral / other_tagged). The video descriptions link to jodytracks.com WITHOUT tags (the
+    founder's exact closing text, ingest `video/build.py` V1_CLOSING), so visits reach the channel total but not one video; a link
+    with `utm_content=<video id or its URL>` is credited to that video.
+  - **Not measured:** watch time, impressions, CTR, traffic sources (YouTube Analytics needs the channel owner's OAuth consent; the
+    sync runs with a public API key). Tests: `test/acq-youtube.test.mjs`, `test/youtube_engagement_pg` (`youtube-engagement-suite.yml`).

@@ -117,6 +117,7 @@ declare
 begin
   if s <> '' then
     if s = 'saleshandy' then return 'saleshandy'; end if;
+    if s = 'youtube' then return 'youtube'; end if;      -- YouTube channel links (2026-10-27, docs/youtube-engagement.sql)
     if s = 'bluesky' then
       if c = 'pierce-zip' then return 'bluesky_pierce_auto'; end if;
       if c = 'maps' then return 'bluesky_maps_auto'; end if;          -- the live automated MAPS posts (national); Pierce = this + the Pierce ZIP filter
@@ -132,6 +133,7 @@ begin
     if h ~ '^(www\.)?bing\.com$' then return 'bing_organic'; end if;
     if h ~ '^(www\.)?(duckduckgo\.com|search\.yahoo\.com|yahoo\.com|ecosia\.org|search\.brave\.com)$' then return 'other_search'; end if;
     if h ~ '(^|\.)bsky\.(app|social)$' then return 'bluesky_untagged'; end if;
+    if h ~ '(^|\.)(youtube\.com|youtu\.be|youtube-nocookie\.com)$' then return 'youtube'; end if;
     if h in ('jodytracks.com', 'www.jodytracks.com', 'homesignal.net', 'www.homesignal.net') then return 'unknown'; end if;
     return 'other_referral';
   end if;
