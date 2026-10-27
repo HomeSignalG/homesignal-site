@@ -5722,4 +5722,17 @@ post id. A post never measured shows a dash, never 0.
   `collect-social-metrics.js` now writes `public.bsky_post_metrics` for them after every ingest.
 - The ingest-built snapshot HTML (incl. "Box Elder page visits" and the paused-drip banner) stays on the tab, collapsed and
   labelled not live and not re-verified. It is ingest-owned (`dashboard/build_dashboard.py`); do not edit it here.
+- **Posts made by hand on Bluesky are listed too (2026-10-27).** Videos uploaded in the Bluesky app never enter
+  `video_bluesky_jobs`, so the queue readers cannot see them. The collector also reads the account's own feed and stores
+  every post no queue (or the July pilot table) knows as `bsky_post_metrics.kind = 'direct'` (post_id = the at:// uri,
+  with `label`, `posted_at`, `media`). The card lists them as e.g. "VIDEO · direct" with likes, and a dash for visitors:
+  their links carry no post tag, so their visitors count only as untagged Bluesky visitors.
+- **A direct post gets visitors only through its own tag.** The collector reads `utm_content` out of the post's own
+  jodytracks.com link (`utm_source=bluesky` only) into `bsky_post_metrics.utm_content`; `hs_bsky_maps_vs_shorts` returns
+  `shorts_by_content` (video visits, registrations and reports per tag) and the card credits the post with its tag's row.
+  No tag: a dash. The Impact Stories export's Bluesky link is `utm_source=bluesky&utm_medium=social&utm_campaign=shorts&
+  utm_content=impact-<story>` (homesignal-ingest `impact/variants.py::bluesky_link`); it used `campaign=impact-…`, which
+  classify_channel files as `bluesky_other_tagged`, credited to no video.
+- **The followers card appears once.** `load()` runs on every auth change; `wireLive()` now replaces
+  `#acq-followers-card` instead of inserting a second one.
 - Test: `test/engagement-tracker.test.mjs` (fixture = the readers' real output).
