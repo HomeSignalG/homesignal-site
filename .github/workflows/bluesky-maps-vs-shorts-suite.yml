@@ -1,0 +1,36 @@
+name: bluesky-maps-vs-shorts-suite
+
+# docs/bluesky-maps-vs-shorts.sql (the shorts channel splice and the MAPS vs Shorts reader) against a DISPOSABLE Postgres
+# with stand-ins for production. No Supabase credential is used or reachable here.
+on:
+  pull_request:
+    paths:
+      - 'docs/bluesky-maps-vs-shorts.sql'
+      - 'docs/acquisition-attribution.sql'
+      - 'test/bluesky_maps_vs_shorts_pg/**'
+      - '.github/workflows/bluesky-maps-vs-shorts-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/bluesky-maps-vs-shorts.sql'
+      - 'docs/acquisition-attribution.sql'
+      - 'test/bluesky_maps_vs_shorts_pg/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "a Supabase credential is present; this suite must not see one"; exit 1
+          fi
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+      - name: Run the suite (exit code is the result)
+        run: bash test/bluesky_maps_vs_shorts_pg/run.sh

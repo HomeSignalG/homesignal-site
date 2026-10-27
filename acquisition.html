@@ -289,7 +289,8 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
 <script src="lib/acq-youtube-videos.js?v=48c7bfa6"></script>
-<script src="lib/acq-bluesky-videos.js?v=7c3aed88"></script>
+<script src="lib/acq-bluesky-videos.js?v=f38a352d"></script>
+<script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <script src="lib/acq-impact-stories.js?v=876c4632"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
@@ -862,7 +863,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
   //      visitors, sessions, registered accounts, digest subscriptions and saved reports, in America/Los_Angeles days or weeks.
   //      Nothing here classifies or recounts; it displays what the database returned, including what was NOT collected. ----
   var CH_LABEL={google_organic:'Google organic',bing_organic:'Bing organic',other_search:'Other search',
-    bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_engagement:'Bluesky: engagement / profile',
+    bluesky_pierce_auto:'Bluesky: Pierce-tagged posts (pierce-zip)',bluesky_maps_auto:'Bluesky: automated map posts (maps)',bluesky_shorts:'Bluesky: video posts (shorts)',bluesky_engagement:'Bluesky: engagement / profile',
     bluesky_other_tagged:'Bluesky: other tagged (drip, etc.)',bluesky_untagged:'Bluesky: untagged link',
     saleshandy:'Saleshandy email',other_referral:'Other referral',other_tagged:'Other tagged',
     direct:'Direct (home-page landing)',unknown:'Unknown (no referrer, deep landing)',
@@ -1728,6 +1729,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         .in('status',['draft','approved']).order('scheduled_slot',{ascending:true,nullsFirst:false}).order('created_at',{ascending:true});
       if(r.error){ body.innerHTML='<div class="muted">Queue unavailable ('+esc(r.error.message||'')+').</div>'; return; }
       var rows=r.data||[];
+      // THE PUBLISHING SCHEDULE (2026-10-27): two queues, one database authority. Loads on its own; a failure there
+      // never blocks the post queue below.
+      var schedHost=document.getElementById('bsky-schedule');
+      if(schedHost && window.HS && HS.acqBlueskySchedule) HS.acqBlueskySchedule.mount(window.hsClient, schedHost, null);
       // VIDEOS: approved Main Video / Shorts, from the video outbox (hs_video_jobs_list). null = not available.
       _bskyVideos=(window.HS&&HS.acqBlueskyVideos)?await HS.acqBlueskyVideos.fetch(window.hsClient):null;
       var vCounts=_bskyVideos?HS.acqBlueskyVideos.counts(_bskyVideos):null;
@@ -2057,6 +2062,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
         '<span id="bsky-stamp" class="muted" style="font-size:11px;font-weight:400;margin-left:8px"></span></h3>'+
         '<p class="sub">Owner-only approval queue for @HomeSignal on Bluesky. Every post is composed from a real government record and carries its source link — approving is a fact-check. Approve schedules it; the server worker posts at the slot. This page never posts and never holds the credential.</p>'+
         '<div class="grid" id="bsky-metrics" style="margin-bottom:16px"></div>'+
+        '<div id="bsky-schedule" style="margin:0 0 14px"></div>'+
         '<div id="bsky-nav" style="margin:0 0 14px"></div>'+
         '<div id="bsky-zip-order" style="margin:0 0 14px"></div>'+
         '<div id="bsky-queue"><div class="muted">Loading queue…</div></div>';
