@@ -270,6 +270,9 @@ select pg_temp.chk('12g the founder cannot reject a topic that already has a sto
 select pg_temp.chk('12h the library lists the story as auto-discovered',
   exists (select 1 from jsonb_array_elements(public.hs_impact_story_list()) x where x->>'origin' = 'auto_discovery'));
 
+select pg_temp.chk('12i story creation takes one shared lock before the cross-topic checks',
+  position('pg_advisory_xact_lock' in pg_get_functiondef('public._hs_id_create_story(uuid,text,boolean)'::regprocedure)) > 0);
+
 -- 13. the tick walks the story to Ready for Review, and stops there ------------------------------------------
 select pg_temp.work(pg_temp.id('st'), jsonb_build_object('pack', jsonb_build_object('hash', 'h1', 'title', 'WNY', 'verified_at', now(),
   'fresh_days', 30, 'claims', '[{"id":"c1"},{"id":"c2"}]'::jsonb)));

@@ -45,5 +45,11 @@ ok(/max_prepare_per_scan/.test(sql) && /already prepared/.test(sql), '4d at most
 ok(!/hs_impact_story_decide|hs_impact_story_render|impact_story_approvals \(/.test(sql), '4e the discovery SQL never approves or renders');
 ok(/_hs_is_request\(s\.id, 'analyze'/.test(sql) && /_hs_is_request\(s\.id, 'generate'/.test(sql), '4f automatic steps go through the same checks as the founder\'s buttons');
 
+// 5. Codex review on #2308
+const create = (sql.match(/create or replace function public\._hs_id_create_story[\s\S]*?\$\$;/) || [''])[0];
+ok(create.indexOf('pg_advisory_xact_lock') >= 0 && create.indexOf('pg_advisory_xact_lock') < create.indexOf('select count(*) into n'),
+  '5a story creation is serialized before the per-scan count is read');
+ok(/var PENDING = \['nominated', 'researching', 'preparing'\]/.test(js) && /SLOW_POLL_MS/.test(js), '5b the panel keeps refreshing while topics are nominated, researched or prepared');
+
 console.log(fails ? '\n' + fails + ' failed' : '\nall passed');
 process.exit(fails ? 1 : 0);

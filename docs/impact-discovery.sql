@@ -452,6 +452,9 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare c public.impact_discovery_candidates%rowtype; s public.impact_stories%rowtype; st public.impact_discovery_settings%rowtype;
         n int; job jsonb; other uuid;
 begin
+  -- One story creation at a time: the per-scan limit and the one-story-per-pack rule are checks across candidates, which a
+  -- lock on this candidate's row alone cannot protect (two topics prepared at once would both see the old count).
+  perform pg_advisory_xact_lock(hashtext('impact_discovery_create_story'));
   select * into c from public.impact_discovery_candidates where id = p_candidate for update;
   if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
   if c.story_id is not null then
