@@ -136,6 +136,11 @@ select pg_temp.chk('6i with scanning off nothing is scheduled and no next time i
   (public.impact_discovery_tick('2026-10-30 15:05+00')->>'scans_started')::int = 0 and public._hs_id_next_scan(now()) is null);
 select public.hs_impact_discovery_settings_save('{"scan_enabled":true,"scan_times":["09:30","08:00"]}');
 select pg_temp.chk('6j saved times are kept in order', (select scan_times = array['08:00','09:30'] from public.impact_discovery_settings));
+select public.hs_impact_discovery_settings_save('{"scan_times":["23:55"]}');
+create temp table _t6k as select public.impact_discovery_tick('2026-10-29 07:00+00') a;   -- 00:00 PDT on the 29th
+select pg_temp.chk('6k a 23:55 slot still starts after local midnight, under its own date',
+  (select (a->>'scans_started')::int from _t6k) = 1
+  and exists (select 1 from public.impact_discovery_scans where slot_key = '2026-10-28|23:55'));
 select public.hs_impact_discovery_settings_save('{"scan_times":["08:00","14:00"]}');
 update public.impact_discovery_scans set status = 'failed', finished_at = now() where status = 'queued';
 
@@ -273,6 +278,10 @@ select pg_temp.chk('12f a topic on the same source pack is marked a duplicate, n
   (public.impact_discovery_prepare((pg_temp.cand('fake')).id)->>'story_id')::uuid = pg_temp.id('st')
   and (pg_temp.cand('fake')).duplicate_of = (pg_temp.cand('wny')).id and (pg_temp.cand('fake')).story_id is null
   and (select count(*) from public.impact_stories) = 1);
+select pg_temp.chk('12f2 the duplicate leaves the research queue (closed as dismissed)',
+  (pg_temp.cand('fake')).status = 'dismissed'
+  and not exists (select 1 from jsonb_array_elements(public.impact_discovery_nominations()->'nominated') x
+                   where (x->>'id')::uuid = (pg_temp.cand('fake')).id));
 select pg_temp.chk('12g the founder cannot reject a topic that already has a story',
   pg_temp.err(format($q$select public.hs_impact_discovery_decide(%L, 'reject')$q$, (pg_temp.cand('wny')).id)) like '%already has an Impact Story%');
 select pg_temp.chk('12h the library lists the story as auto-discovered',

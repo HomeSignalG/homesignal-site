@@ -473,8 +473,9 @@ begin
   if found then   -- the story already exists in the library: never create a second
     select id into other from public.impact_discovery_candidates where story_id = s.id and id <> c.id;
     if other is not null then   -- another topic already owns it: this one is the same event
-      update public.impact_discovery_candidates set duplicate_of = other, status_note = 'Same source pack as another topic.',
-             updated_at = now() where id = c.id;
+      -- leaves the research queue: closed as dismissed (shown with Show closed), never researched again
+      update public.impact_discovery_candidates set duplicate_of = other, status = 'dismissed', decided_by = p_actor, decided_at = now(),
+             status_note = 'Same source pack as another topic.', updated_at = now() where id = c.id;
       perform public._hs_id_event(c.id, null, 'duplicate_of', jsonb_build_object('candidate_id', other, 'story_id', s.id), p_actor);
       return jsonb_build_object('story_id', s.id, 'existing', true, 'duplicate_of', other);
     end if;
@@ -695,7 +696,7 @@ returns jsonb language sql stable security definer set search_path = public as $
         'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
         'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id) order by c.score desc)
       from public.impact_discovery_candidates c
-     where c.status in ('nominated', 'researching') and c.story_id is null), '[]'::jsonb),
+     where c.status in ('nominated', 'researching') and c.story_id is null and c.duplicate_of is null), '[]'::jsonb),
     'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
       from public.impact_stories s where s.archived_at is null), '[]'::jsonb))
 $$;
@@ -716,13 +717,15 @@ begin
   perform public._hs_id_reap();
   select * into st from public.impact_discovery_settings where id;
   if st.scan_enabled then
-    local_d := (p_now at time zone st.scan_tz)::date;
-    foreach t in array st.scan_times loop
-      due := (local_d::timestamp + t::time) at time zone st.scan_tz;
-      -- a slot is started at most once, and only within 3 hours of its time (a long outage never fires a burst)
-      if p_now >= due and p_now < due + interval '3 hours' then
-        if public._hs_id_queue_scan('scheduled', local_d::text || '|' || t, 'schedule') is not null then started := started + 1; end if;
-      end if;
+    -- today's and yesterday's slots, so a late-evening slot (23:55) is still due after local midnight
+    foreach local_d in array array[(p_now at time zone st.scan_tz)::date - 1, (p_now at time zone st.scan_tz)::date] loop
+      foreach t in array st.scan_times loop
+        due := (local_d::timestamp + t::time) at time zone st.scan_tz;
+        -- a slot is started at most once, and only within 3 hours of its time (a long outage never fires a burst)
+        if p_now >= due and p_now < due + interval '3 hours' then
+          if public._hs_id_queue_scan('scheduled', local_d::text || '|' || t, 'schedule') is not null then started := started + 1; end if;
+        end if;
+      end loop;
     end loop;
   end if;
   for s in select x.*, c.id cid from public.impact_stories x join public.impact_discovery_candidates c on c.story_id = x.id
