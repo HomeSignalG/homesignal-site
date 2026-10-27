@@ -277,10 +277,13 @@ end $$;
 
 -- A render takes far longer than a text job, so it is called stuck later (the render workflow times out at 120 minutes).
 create or replace function public._hs_is_stuck_after(p_kind text)
-returns interval language sql immutable as $$ select case p_kind when 'render' then interval '150 minutes' else interval '40 minutes' end $$;
+returns interval language sql immutable as $$ select case p_kind when 'render' then interval '345 minutes' else interval '40 minutes' end $$;
+-- A render's stuck limit stays above the worker's own 330-minute job timeout (impact-story-render.yml), so a render
+-- GitHub is still allowed to finish is never offered for Retry. Measured 2026-10-27 on two ubuntu-latest runners: the
+-- whole Gig Harbor render took 66 minutes on one and its main video alone 107 minutes on the next.
 
 -- Why a queued job never started, or null. GitHub can refuse the start request (seen 2026-10-26: HTTP 500 on the
--- first Render), and then the job would sit "queued" until the 150-minute stuck limit. pg_net keeps the answer to
+-- first Render), and then the job would sit "queued" until the render stuck limit. pg_net keeps the answer to
 -- the dispatch for a few hours, so a refusal is read from it at once; a job no worker has claimed 15 minutes after
 -- the request is treated the same way. Both make the job retryable now.
 create or replace function public._hs_is_not_started(j public.impact_story_jobs)
