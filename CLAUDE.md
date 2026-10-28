@@ -3718,6 +3718,31 @@ drawing them as "Other project" or listing them only on the ZIP page.
   - Tests: the SQL suite has 59 checks and 15 deliberate breaks, each caught; plus
     `test/state-cleanup.test.mjs` E1–E17 and the browser test's shared-point case.
 
+## 7.12j STATE WATER-RIGHTS FILINGS ARE THEIR OWN SECTION ON EVERY ZIP PAGE ⚖️ FOUNDER DECISION (2026-10-28)
+
+**Why:** a water-rights application is filed with a STATE agency, so no permit, planning or notice reader saw one.
+Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) was on no page while three papers reported it.
+- **Data:** `docs/state-water-rights.sql` (cleanup-sites pattern): `water_rights_filings` (one row per point of diversion,
+  history in `water_rights_filing_observations`), one fail-closed loader (`water_rights_fire(source)` + `water_rights_collect()`,
+  pg_cron 11:37 / 11:43 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
+  Loaded: each agency's PENDING applications. Utah DWRi Points of Diversion, `SUMMARY_ST='U'` (6,779 rows); Idaho IDWR
+  AppropriationApplicationPods (1,974, all "Active").
+  **Nevada is held**: its status is undecoded 3-letter codes. The other 47 are `not_checked`.
+- **Reader:** `water_rights_for_zip(zip)` answers every ZIP page: `complete` (polygon members via
+  `geo.zip_point_membership_in`, maybe none), `unavailable` (no complete load in 48 h), `not_measured` (no ZCTA), or
+  `not_covered`. ⛔ `not_covered` is about US: never say a state publishes nothing.
+  A person is never named (`water_rights_display_applicant`; family trusts included). The status word is the agency's own.
+- **Measured 2026-10-28 after the first load:** 12,744 pages answered (403 complete, 18 not_measured, 12,323 not_covered);
+  313 pages carry 2,119 filings. a55167 is on 84336 (Snowville).
+- **Page:** `lib/water-rights.js` renders the answer as its own block after Local news, never a fourth What's Changing group.
+  Undecoded use codes (Utah "OP") are not shown.
+- **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
+  row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
+  link first.
+- **Not yet built:** a Map 1 layer, a health alert for missed loads, the other western states.
+- Tests: `test/state_water_rights_pg` (40 checks, 12 mutations killed; `state-water-rights-suite.yml`),
+  `test/water-rights-section.test.mjs`, `test/water-rights-section.browser.test.mjs`.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
