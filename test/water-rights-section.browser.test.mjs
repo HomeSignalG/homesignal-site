@@ -101,9 +101,13 @@ async function hydrate(zip, data) {
   const r = await page.evaluate(() => {
     const el = document.getElementById('commPage');
     const heads = el ? [].slice.call(el.querySelectorAll('.groupHead')).map(h => h.textContent.replace(/\s+/g, ' ').trim()) : [];
+    const hs = el ? [].slice.call(el.querySelectorAll('.groupHead')) : [];
+    const wr0 = document.getElementById('zip-water-rights');
+    const F = Node.DOCUMENT_POSITION_FOLLOWING;
+    const placed = !!(wr0 && hs.length === 3 && (hs[0].compareDocumentPosition(wr0) & F) && (wr0.compareDocumentPosition(hs[1]) & F));
     const st = document.getElementById('zip-score-strip');
     const wr = document.getElementById('zip-water-rights');
-    return { text: el ? el.textContent : '', html: el ? el.innerHTML : '', heads,
+    return { text: el ? el.textContent : '', html: el ? el.innerHTML : '', heads, placed,
              wrState: wr ? wr.getAttribute('data-water-rights-state') : null, wrText: wr ? wr.textContent.replace(/\s+/g, ' ').trim() : '',
              wrHref: wr && wr.querySelector('a[href]') ? wr.querySelector('a[href]').getAttribute('href') : null,
              strip: st ? st.textContent.replace(/\s+/g, ' ').trim() : '' };
@@ -120,6 +124,7 @@ ok(/a55167/.test(c.wrText) && /BAR H RANCH INC\./.test(c.wrText) && /Agency stat
 ok(c.wrHref === 'https://www.waterrights.utah.gov/search/?q=a55167', 'complete — links the agency record', c.wrHref);
 ok(c.heads.length === 3 && /^Development/.test(c.heads[0]) && /^Government/.test(c.heads[1]) && /^Local news/.test(c.heads[2]),
   'complete — What\u2019s Changing still has exactly its three groups', c.heads);
+ok(c.placed === true, 'complete — the section sits under Development & growth, above Government & civic');
 const n = await hydrate(zip, Object.assign({}, BASE, { wr: WR_NOT_COVERED }));
 ok(n.wrState === 'not_covered' && /does not read Massachusetts\u2019s water-rights records yet/.test(n.wrText), 'not_covered — the sentence is about us', n.wrText);
 const f = await hydrate(zip, BASE);
