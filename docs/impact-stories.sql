@@ -819,7 +819,7 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype;
 begin
   if p_section not in ('fear', 'anger', 'motivation', 'outline', 'script', 'short_a', 'short_b', 'packaging',
-                       'discovery', 'concepts', 'visuals') then
+                       'discovery', 'concepts', 'visuals', 'accountability') then
     raise exception 'bad section' using errcode = '22023';
   end if;
   if nullif(btrim(p_note), '') is null then raise exception 'Say what to change.' using errcode = '22023'; end if;

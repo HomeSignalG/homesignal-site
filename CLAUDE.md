@@ -5651,6 +5651,20 @@ Results.
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
+## IMPACT STORIES, TAB 17: ACCOUNTABILITY RESEARCH (2026-10-28)
+
+Story Outline shows the draft's responsibility map (`discovery.accountability`, engine homesignal-ingest
+`impact/accountability.py`) under "Accountability research" (`viewAccountability` in `lib/acq-impact-stories.js`):
+- the accountability story type, or "None in the records";
+- who did what: party, action from the record, status (Established / Alleged · not a finding / Disputed, plus "Later
+  overturned"), the government finding or penalty with the later rulings checked, and the response or where none was found;
+- the parties with their roles, verified parent and open identity questions;
+- the research checklist, the missing attribution, and names in the records that are not in the map.
+"Request deeper research" and "Request revision of who did what" record a `section_revision` note on section
+`accountability`. `hs_impact_story_section_revision` accepts it (`docs/impact-stories.sql`). The map lives inside
+`discovery`, so the one narrative approval covers it (pg check 13g). Labels C. Accountability and E. Consequences are added
+for the accountability arc. Tests: `test/impact-stories.test.mjs`, `.browser.test.mjs`, `test/impact_stories_pg` (13f, 13g).
+
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 
 Scheduled scans (08:00 and 14:00 Pacific by default, plus Scan Now) find Bluesky discussions about development, land,
