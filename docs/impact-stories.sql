@@ -348,10 +348,34 @@ create or replace function public._hs_is_media(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare na jsonb := public._hs_is_artifact_state(p_story, 'narrative'); j public.impact_story_jobs%rowtype;
         files jsonb := '[]'::jsonb; r record; d public.impact_story_media_decisions%rowtype; st text; why text;
-        cur boolean; n int := 0; nok int := 0; b public.impact_story_jobs%rowtype; blocked jsonb; choices jsonb;
+        cur boolean; n int := 0; nok int := 0; b public.impact_story_jobs%rowtype; blocked jsonb; choices jsonb; fixes jsonb;
 begin
   select * into j from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'complete'
    order by completed_at desc limit 1;
+  -- EVERY fix request ever made on this story's files, newest first, and where each one stands. A file card shows only
+  -- its latest decision; this list never drops one. Status: closed (that file was approved later) · rendering (a render
+  -- started after the request is queued or running) · rerendered (a render finished after it; narrative_changed says
+  -- whether the narrative differs from the one the file was made from) · open (nothing has happened yet).
+  -- Nothing here proves a fix was made: a request is a note until a Claude Code session changes the story and renders again.
+  select coalesce(jsonb_agg(jsonb_build_object('id', md.id, 'asset', ia.asset, 'note', md.note, 'timecode', md.timecode,
+           'actor', md.actor, 'at', md.at,
+           'status', case
+             when exists (select 1 from public.impact_story_media_decisions xd where xd.asset_id = md.asset_id and xd.id > md.id and xd.decision = 'approved') then 'closed'
+             when exists (select 1 from public.impact_story_jobs rj where rj.story_id = p_story and rj.kind = 'render'
+                           and rj.status in ('queued', 'running') and rj.created_at > md.at) then 'rendering'
+             when exists (select 1 from public.impact_story_jobs rj where rj.story_id = p_story and rj.kind = 'render'
+                           and rj.status = 'complete' and rj.completed_at > md.at) then 'rerendered'
+             else 'open' end,
+           'rerendered_at', (select max(rj.completed_at) from public.impact_story_jobs rj where rj.story_id = p_story
+                              and rj.kind = 'render' and rj.status = 'complete' and rj.completed_at > md.at),
+           'narrative_changed', (select rj.input->>'narrative_hash' is distinct from ia.narrative_hash
+                                   from public.impact_story_jobs rj where rj.story_id = p_story and rj.kind = 'render'
+                                    and rj.status = 'complete' and rj.completed_at > md.at
+                                  order by rj.completed_at desc limit 1)
+         ) order by md.id desc), '[]'::jsonb)
+    into fixes
+    from public.impact_story_media_decisions md join public.impact_story_assets ia on ia.id = md.asset_id
+   where md.story_id = p_story and md.decision = 'rejected';
   -- a newer render the engine stopped before rendering (a missing essential photo, an outdated status): what is
   -- missing, the licensed candidates it found, and what a person must do. Shown until a later render completes.
   select * into b from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'failed'
@@ -369,7 +393,7 @@ begin
     into choices from public._hs_is_choices(p_story) c;
   if j.id is null then
     return jsonb_build_object('render_job', null, 'current', false, 'complete', false, 'files', '[]'::jsonb,
-      'blocked', blocked, 'choices', choices);
+      'blocked', blocked, 'choices', choices, 'fix_requests', fixes);
   end if;
   cur := na->>'state' = 'approved' and j.input->>'narrative_hash' = na->>'hash';
   for r in select * from public.impact_story_assets where job_id = j.id
@@ -396,7 +420,8 @@ begin
   end loop;
   return jsonb_build_object('render_job', j.id, 'rendered_at', j.completed_at, 'version', j.base_version,
     'renderer', j.input->>'renderer', 'current', cur, 'complete', cur and n > 0 and nok = n, 'files', files,
-    'quality', j.result->'quality', 'currency', j.result->'currency', 'blocked', blocked, 'choices', choices);
+    'quality', j.result->'quality', 'currency', j.result->'currency', 'blocked', blocked, 'choices', choices,
+    'fix_requests', fixes);
 end $$;
 
 -- Where the story is, and the ONE next action (v2.4 J: one clearly labelled primary action).
