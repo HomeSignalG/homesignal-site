@@ -394,11 +394,14 @@ select pg_temp.chk('13d choosing another concept changes what the approval cover
   <> public._hs_is_hash(pg_temp.body() || '{"concepts":[{"id":"x"},{"id":"y"}],"selection":{"concept":"y"}}'::jsonb, 'narrative'));
 select pg_temp.as_user('founder@example.com');
 create temp table _rev as select x, pg_temp.err(format('select public.hs_impact_story_section_revision(%L, %s, %L, %L)', pg_temp.id('s'), pg_temp.cur(), x, 'Lead with the accountability concept.')) e
-  from unnest(array['concepts','discovery','visuals']) x;
-select pg_temp.chk('13f a revision note can ask for another concept, the discovery or the visuals',
+  from unnest(array['concepts','discovery','visuals','accountability']) x;
+select pg_temp.chk('13f a revision note can ask for another concept, the discovery, the visuals or deeper accountability research',
   (select bool_and(e is null) from _rev)
   and (select count(distinct detail->>'section') from public.impact_story_events where kind = 'section_revision'
-         and detail->>'section' in ('concepts','discovery','visuals')) = 3);
+         and detail->>'section' in ('concepts','discovery','visuals','accountability')) = 4);
+select pg_temp.chk('13g the responsibility map is part of the one approval: changing who did what needs approving again',
+  public._hs_is_hash(pg_temp.body() || '{"discovery":{"accountability":{"attributions":[{"id":"a","status":"alleged"}]}}}'::jsonb, 'narrative')
+  <> public._hs_is_hash(pg_temp.body() || '{"discovery":{"accountability":{"attributions":[{"id":"a","status":"established"}]}}}'::jsonb, 'narrative'));
 select pg_temp.chk('13e the render key names impact-render-3',
   position('impact-render-3' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
   and position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);
