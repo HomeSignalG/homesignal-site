@@ -1,0 +1,40 @@
+name: impact-engagement-suite
+
+# Engage on Bluesky (Tab 17, beside Hot Topics): docs/impact-engagement.sql (after docs/impact-stories.sql and docs/impact-discovery.sql) against a DISPOSABLE Postgres with stand-ins for Supabase's
+# auth/vault/net. No Supabase credential is used or reachable here.
+on:
+  pull_request:
+    paths:
+      - 'docs/impact-stories.sql'
+      - 'docs/impact-discovery.sql'
+      - 'docs/impact-engagement.sql'
+      - 'test/impact_engagement_pg/**'
+      - 'test/impact_stories_pg/stubs.sql'
+      - '.github/workflows/impact-engagement-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/impact-stories.sql'
+      - 'docs/impact-discovery.sql'
+      - 'docs/impact-engagement.sql'
+      - 'test/impact_engagement_pg/**'
+      - 'test/impact_stories_pg/stubs.sql'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "a Supabase credential is present; this suite must not see one"; exit 1
+          fi
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+      - name: Run the suite (exit code is the result)
+        run: bash test/impact_engagement_pg/run.sh

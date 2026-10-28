@@ -5690,6 +5690,28 @@ water and health near homes, rank them out of 100, and show them above the Impac
   only after 50 attributed visits and 3 stories in a category.
 - Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
 
+## ENGAGE ON BLUESKY, TAB 17 (2026-10-28): the strongest posts to answer, drafted, posted BY HAND
+
+Under Hot Topics, a separate section ranks the 3-5 strongest ORIGINAL posts of each discovered topic by an Engagement
+Opportunity Score read from that post's own counts (conversation 30 · recency 20 · velocity 20 · audience relevance 15 · what
+JODY can add 15), recommends REPLY, QUOTE-POST or SKIP, and shows a draft within 300 graphemes. SQL of record
+`docs/impact-engagement.sql` (after `docs/impact-discovery.sql`); page `lib/acq-impact-engagement.js`; engine homesignal-ingest
+`impact/engage/` (run inside the discovery scan, failure-isolated from it).
+- **Nothing posts automatically.** No function calls pg_net, dispatches a workflow or writes a queue; the page calls only
+  `hs_impact_engagement_overview` / `hs_impact_engagement_decide`. Preview, Copy, Open Original, Mark Posted, Skip.
+- **Separate from the video pipeline:** rows reference `impact_discovery_candidates` only, never a story, job or approval.
+- **One row per Bluesky post** (`target_uri` unique, across topics); a second Mark Posted is refused; a scan never resets a
+  posted, skipped or already-engaged row; the scan finds the founder's own reply/quote on the account feed and appends its
+  likes/replies/reposts (`impact_engagement_metrics`). Visits/registrations: `acquisition_touch` with
+  `utm_campaign = 'engage'` and `utm_content = <opp_key>` (the draft's own link).
+- **Drafts state only verified records** (`evidence.facts` / `evidence.responsible_parties` written by research on a
+  verified topic); otherwise they ask a question. A social-only topic gets a question and nothing else, and its score is
+  capped at 55. Quote-posts carry the link and #JODYTracks; replies never the hashtag, and at most one reply per topic per
+  scan carries the link, only where JODY has ZIP pages.
+- The page shows the strongest five first (at most two per topic), the rest behind "Show more".
+- Tests: `test/impact_engagement_pg` (CI `impact-engagement-suite.yml`), `test/impact-engagement.test.mjs`,
+  `test/impact-engagement.browser.test.mjs`.
+
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 
 **Shortcuts, bypasses, shadow pipelines, duplicate business logic, and parallel truth paths are prohibited.** If the product architecture defines a canonical path from source data to a normalized/canonical layer to downstream consumers, every consumer must use that path or a shared contract derived from it. Do not create a second query, table-specific shortcut, fallback decision path, temporary bypass, or feature-local reconstruction merely because the canonical path is harder to use or currently blocked.
