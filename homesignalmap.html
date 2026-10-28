@@ -10,6 +10,29 @@
      fetch on this page must still resolve from the site root, exactly as it did at /homesignalmap.html.
      Not for an embed (an iframe keeps its own address), an address search, or a lat/lng point. -->
 <base href="/"/>
+<!-- ROBOTS (founder, 2026-10-26): the ZIP-less Development Map landing page is index-eligible FROM THE FIRST BYTE.
+     An initial `noindex` keeps Google from rendering the page at all, and a script cannot undo what the
+     crawler never ran, so the default can no longer be noindex. Every state that is not the landing page
+     (a ZIP, a street address, a lat/lng point, an embed) is forced back to noindex by the guard below, which
+     runs here in the head, before the page runtime and before the first paint. It only ever LOWERS the value;
+     it can never promote a page. The per-ZIP /map/<zip>/ documents replace this tag at build time with
+     their own evidence-based decision (scripts/gen_zip_pages.py, MapTemplate.render). -->
+<meta name="robots" content="index, follow" id="robots-meta"/>
+<script>
+(function(){
+  try {
+    var q = new URLSearchParams(window.location.search);
+    var keys = ["zip", "addr", "address", "lat", "lng", "embed", "preview"];
+    for (var i = 0; i < keys.length; i++) {
+      if (q.has(keys[i])) {
+        document.getElementById("robots-meta").setAttribute("content", "noindex, nofollow");
+        document.documentElement.classList.add("hs-map-state");
+        break;
+      }
+    }
+  } catch (e) {}
+})();
+</script>
 <script>
 (function(){
   try {
@@ -27,15 +50,13 @@
 <!-- CSP: self + jsDelivr (leaflet / three.js / maplibre-gl), Supabase (edge fn + REST),
      and the map imagery hosts the three views need. MapLibre spins workers from blob:. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; worker-src blob:; child-src blob:; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co https://server.arcgisonline.com https://elevation-tiles-prod.s3.amazonaws.com; font-src 'self'; form-action 'self'"/>
-<title>HomeSignal — Development around your home</title>
-<!-- Default noindex; the page init flips this to index only for a Utah ZIP that has real, sourced content. -->
-<meta name="robots" content="noindex, nofollow" id="robots-meta"/>
-<meta name="description" content="See what's built and what's proposed near your home — EPA-registered facilities, planning hearings and open comment windows — every item linked to its official public record."/>
+<title>HomeSignal Development Map — What Is Built, Approved and Proposed Near You</title>
+<meta name="description" content="Search a street address or ZIP code on the HomeSignal Development Map to see operating, approved and proposed projects nearby, each linked to its official public record."/>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml"/>
 <link rel="canonical" href="https://homesignal.net/homesignalmap.html"/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://homesignal.net/homesignalmap.html"/>
-<meta property="og:title" content="Development around your home — HomeSignal"/>
+<meta property="og:title" content="HomeSignal Development Map — What Is Built, Approved and Proposed Near You"/>
 <meta property="og:description" content="What's built and what's proposed near your home, every item linked to its official public record."/>
 <meta property="og:image" content="https://homesignal.net/og-default.png"/>
 <meta name="twitter:card" content="summary_large_image"/>
@@ -323,6 +344,14 @@
   .listmore{color:var(--mute);font-size:12.5px;padding:8px 0 2px}
 
   .foot{color:var(--mute);font-size:12px;margin:8px 0 40px;line-height:1.6}
+  /* About block: real, visible, crawlable copy for the landing page. It is the same text for people and
+     crawlers. Hidden only in states where it does not apply (embed, ZIP, address, property). */
+  .hs-map-about{max-width:880px;margin:8px auto 48px;padding:0 16px;color:var(--soft);font-size:14px;line-height:1.6}
+  .hs-map-about h2{font-size:18px;font-weight:700;color:var(--ink);margin:0 0 8px}
+  .hs-map-about h3{font-size:14px;font-weight:700;color:var(--ink);margin:18px 0 4px}
+  .hs-map-about p{margin:0 0 10px}
+  .hs-map-about ul{margin:0 0 10px;padding-left:20px}
+  .hs-embed .hs-map-about,.hs-map-state .hs-map-about{display:none}
 
   /* ── Property page (address dossier — case-study §4.3) ──────────────────────────
      Same visual language as the rest of the page: Inter, var(--green) #1f5130,
@@ -936,6 +965,32 @@
     <div id="property"></div>
   </div>
 </template>
+<section class="hs-map-about" id="hs-map-about" aria-labelledby="hs-map-about-h">
+  <h2 id="hs-map-about-h">About the HomeSignal Development Map</h2>
+  <p>The Development Map shows what is being built, approved and proposed around a street address or ZIP code. Every
+    record is linked to the official public record it came from, such as a city or county permit, a planning or zoning
+    filing, or a state or federal registry entry.</p>
+  <h3>What you can see</h3>
+  <ul>
+    <li><strong>Status:</strong> operating now, approved, or proposed, plus records whose lifecycle the source does not state.</li>
+    <li><strong>Project type:</strong> data centers, industrial, residential, roads and infrastructure, commercial,
+      civic and public, and other projects.</li>
+    <li><strong>Regulatory records:</strong> EPA-registered facilities and similar registry entries, shown as a separate
+      overlay. A facility being registered is not a new project, so these records are never presented as development.</li>
+  </ul>
+  <h3>How to use it</h3>
+  <p>Enter an address in the search box above to see development within a radius you choose, or open the map for a whole
+    ZIP code at <code>/map/{ZIP}/</code>, for example <a href="/map/98335/">ZIP 98335</a>. A ZIP map lists the records
+    that fall inside that ZIP code&rsquo;s boundary. For a plain-language walkthrough, read
+    <a href="/guides/what-is-being-built-near-me/">What is being built near me?</a> and
+    <a href="/guides/check-proposed-development-near-a-house/">How do I check proposed development near a house?</a>
+    See also <a href="/how-it-works.html">how HomeSignal works</a>.</p>
+  <h3>What it does not do</h3>
+  <p>A field the source does not state is left blank, never estimated. A pin means a source lists a record at that
+    location. It is not a prediction that a project will be approved or built, and it is not a verdict on any
+    company. Coverage varies by place, and an empty map means no matching records are on file for that area, not that
+    nothing is happening there.</p>
+</section>
 
 <!-- Shared shell chain — loads config + data libs + shell.js so HS / HS.onReady / HS.data /
      HS_CONFIG exist before this page's own scripts run. shell.js injects partials/shell.html,
@@ -943,7 +998,7 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=cf9231f2"></script>
+<script src="lib/data.js?v=4d7e6fb8"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=c408a2cb"></script>
 <script src="lib/project-type.js?v=108e00a6"></script>
@@ -955,7 +1010,7 @@
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=b0215286"></script>
+<script src="shell.js?v=662b5d19"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -967,6 +1022,12 @@
 // runs after injection. Global function/var definitions live in this closure — no page-content
 // onclick depends on them being global (the only inline onclick, the old top-bar share, is gone).
 HS.onReady(function(){
+  // The crawlable "About" block (#hs-map-about, in the document outside the <template>) moves into the page,
+  // under the map, once the shell has mounted the page content. Per-ZIP /map/<zip>/ documents do not carry it.
+  (function(){
+    var about = document.getElementById("hs-map-about"), results = document.getElementById("results");
+    if(about && results && results.parentNode) results.parentNode.insertBefore(about, results.nextSibling);
+  })();
   // --- config -------------------------------------------------------------
   var ENDPOINT = "https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/get-address-report";
   var APIKEY   = "sb_publishable_ZLf937bYRsWOVeTDVaHI7Q_LKfDmsE-"; // public key, safe in the browser
@@ -1299,7 +1360,27 @@ HS.onReady(function(){
   var ZIP_STATE = null, ZIP_INDEXABLE = false, HAS_CONTENT = false;
   function setIndexable(ok){
     var m = document.getElementById("robots-meta");
+    // INDEX-ALL POLICY (founder, 2026-10-26): a per-ZIP /map/<zip>/ document is a public page and is
+    // always index, follow. Its first bytes already say so (scripts/gen_zip_pages.py); the stamped
+    // substance flag and the rendered content never lower it. Only the query-string and in-page
+    // states below (an address, a point, an embed) are not pages of their own.
+    if(/^\/map\/\d{5}\/?$/.test(window.location.pathname)){
+      if(m) m.setAttribute("content", "index, follow");
+      return;
+    }
+    // The ZIP-less landing document (the only one that carries #hs-map-about) is index-eligible ONLY in its
+    // landing state. Once it has been used for a ZIP, an address or a point it stays noindex whatever the
+    // ZIP's own evidence says: the per-ZIP decision belongs to that ZIP's own /map/<zip>/ document.
+    if(ok && document.getElementById("hs-map-about") && document.documentElement.classList.contains("hs-map-state")) ok = false;
     if(m) m.setAttribute("content", ok ? "index, follow" : "noindex, nofollow");
+  }
+  // The ZIP-less landing page is index-eligible; EVERY other state of this page is not. Anything that
+  // leaves the landing state (a street address, a lat/lng point, a property record, a ZIP) calls this, so a
+  // private or address-specific result can never sit under an `index` directive, whichever route got it here
+  // (the head guard covers the URL routes, this covers the in-page and sessionStorage ones).
+  function leaveLanding(){
+    setIndexable(false);
+    document.documentElement.classList.add("hs-map-state");
   }
   // HomeSignal house logo, reused as the saved-place marker across all three maps.
   var HOME_SVG = "<svg width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='#fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19z'/><path d='M9.5 20.5v-6h5v6'/></svg>";
@@ -2146,6 +2227,7 @@ HS.onReady(function(){
   }
 
   function run(address){
+    leaveLanding();
     // A real address search leaves ZIP mode: now we DO drop the "this address" pin.
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
     // ...and it leaves the ZIP PLACE with it. This is the only in-page Place transition in
@@ -2375,7 +2457,7 @@ HS.onReady(function(){
     // resolves below this is the bare ZIP - honest, and never the saved home.
     if(window.HS && HS.setViewLabel) HS.setViewLabel("ZIP " + zip);
     FACILITIES_ONLY = false; ZIP_COUNTY = null;
-    ZIP_STATE = null; ZIP_INDEXABLE = false; HAS_CONTENT = false; setIndexable(false);   // start noindex; flip on only via the stamped substance flag
+    ZIP_STATE = null; ZIP_INDEXABLE = false; HAS_CONTENT = false; leaveLanding();   // start noindex; flip on only via the stamped substance flag
     // NATIONWIDE SUBSTANCE GATE: read the materializer-stamped flag for this ZIP.
     // Non-blocking, last-wins with render() (same pattern as the communities lookup below).
     fetch(SUPABASE_URL + "/rest/v1/app_community_meta?select=indexable&zip=eq." + encodeURIComponent(zip),
@@ -4605,6 +4687,7 @@ HS.onReady(function(){
   }
 
   function loadProperty(addr){
+    leaveLanding();
     PROP_MODE = true;
     document.title = addr + " — property record — HomeSignal";
     var head = document.querySelector(".head"); if(head) head.style.display = "none";
@@ -5222,6 +5305,7 @@ HS.onReady(function(){
   }
 
   function runEmbedPoint(home, radius){
+    leaveLanding();
     // Address mode, minus the geocode and minus the report engine (see below).
     ZIP_MODE = false; HOME_ANCHOR = false; ZIP_FRAME = null;
     CUR_ADDRESS = "";

@@ -1,0 +1,21 @@
+name: verify-map-landing-live
+# Read-only. GETs the public host and prints what a crawler is given for the Development Map landing page
+# (/homesignalmap.html) and for the states that must stay out of the index. Writes nothing, holds no secret,
+# notifies nobody. Dispatch it after a deploy. It is dispatch-only on purpose: it checks PRODUCTION, so on a pull
+# request it would be red until the change is live.
+on:
+  workflow_dispatch:
+    inputs:
+      zip: {description: 'a ZIP whose /map/<zip>/ page is shown for comparison', default: '98335', required: false}
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the public landing page
+        env:
+          ZIP: ${{ inputs.zip || '98335' }}
+        run: python3 scripts/verify_map_landing_live.py --zip "$ZIP" | tee "$GITHUB_STEP_SUMMARY"

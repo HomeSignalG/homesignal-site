@@ -95,7 +95,7 @@ ok(devFail.includes('<meta name="robots" content="index, follow"'),
    'Alerts PASS + development FAIL is indexable — page-purpose separation');
 ok(!a.includes('RETRACTED'), 'an actively retracted Local News item is excluded');
 ok(a.includes('rel="canonical" href="https://jodytracks.com/community/01001/"'), 'canonical is the ZIP path');
-ok(a.includes('<h1>01001 · Agawam (01001), MA</h1>'), 'ZIP-specific H1 in the initial HTML');
+ok(a.includes('<h1>01001 · Agawam, MA</h1>'), 'ZIP-specific H1 in the initial HTML, naming the ZIP once (test/zip-heading-place.test.mjs)');
 ok(a.includes('<title>Agawam (01001), MA'), 'ZIP-specific title in the initial HTML');
 ok(/<meta name="description" content="[^"]{40,}"/.test(a), 'ZIP-specific meta description');
 ok(a.includes('data-zip="01001"'), 'document declares its ZIP identity for hydration');
@@ -147,8 +147,8 @@ const st = (zip) => read(out1, zip).includes('content="index, follow"');
 ok(st('01001') === true,  'A  Alerts PASS + development flag PASS  -> index, follow');
 ok(st('07010') === true,  'B  Alerts PASS + development flag FAIL  -> index, follow (Alerts alone qualifies)');
 ok(st('01002') === true,  'C  Alerts FAIL + Rule D PASS  -> index (Development qualifies)');
-ok(st('02543') === false, 'D  Alerts FAIL + Rule D FAIL  -> noindex');
-ok(read(out1, '02543').includes('content="noindex, follow"'), 'a failing page is noindex, FOLLOW');
+ok(st('02543') === true,  'D  (index-all policy, 2026-10-26) Alerts FAIL + Rule D FAIL  -> still index, follow');
+ok(!/noindex/.test(read(out1, '02543').split('</head>')[0]), 'a page that fails both rules carries no noindex directive');
 ok(/<h2>Development<\/h2>/.test(wxOnly), 'Rule D page renders Development in the initial HTML');
 ok(wxOnly.includes('Traffic safety improvements on Route 9 at Old Farm Road'),
    '...carrying a real official Development name');
@@ -184,10 +184,10 @@ const smZips = [...sm.matchAll(/<loc>[^<]*\/community\/(\d{5})\/<\/loc>/g)].map(
 ok(!/community\.html\?zip=/.test(sm), 'the legacy community.html?zip= URL is gone from the artifact sitemap');
 ok(JSON.stringify(smZips) === JSON.stringify(man.indexable_zips),
    'the sitemap advertises EXACTLY the index-eligible set (Rule F OR Rule D)');
-ok(man.sitemap_community_urls === man.rule_f_pass + man.rule_d_pass,
-   'manifest reconciles sitemap count with Rule F ∪ Rule D');
+ok(man.sitemap_community_urls === man.documents,
+   'manifest reconciles the sitemap count with the document count: every ZIP document is listed');
 ok(smZips.includes('01002'), 'a Rule-D-only ZIP is advertised');
-ok(!smZips.includes('02543'), 'a ZIP that fails both rules is not advertised');
+ok(smZips.includes('02543'), 'a ZIP that fails both rules is advertised too (index-all policy)');
 // REVERSED 2026-09-19, deliberately. This used to assert the development half was
 // "untouched (page-purpose separation)". Measured against production that day: every
 // homesignalmap.html?zip= URL serves a byte-identical document (Pages ignores the query
@@ -246,8 +246,8 @@ ok(read(out1, '02543').includes('No government notices on file for this ZIP yet.
     '--allow-missing-dev-plane',
   ], { encoding: 'utf8' });
   const wxNo = read(outNo, '01002');
-  ok(wxNo.includes('content="noindex, follow"'),
-     'fixture may explicitly exercise no-plane: Alerts-fail ZIP returns to noindex');
+  ok(wxNo.includes('content="index, follow"'),
+     'fixture may explicitly exercise no-plane: an Alerts-fail ZIP is still index-eligible (index-all policy)');
   ok(!/<h2>Development<\/h2>/.test(wxNo),
      '...and invents no Development section');
   rmSync(outNo, { recursive: true, force: true });

@@ -57,12 +57,20 @@ for (const d of [T.plain, T.idx, T.cov]) {
 ok(T.plain.includes('<title>Development around Waterbury (06704) — HomeSignal</title>'), 'title = the one the runtime sets');
 ok(T.plain.includes(`<link rel="canonical" href="${T.base}/map/06704/"/>`), 'self-canonical');
 ok(T.plain.includes(`<meta property="og:url" content="${T.base}/map/06704/"/>`), 'og:url');
-ok(T.plain.includes('content="noindex, nofollow" id="robots-meta"'), 'not indexable -> noindex');
+ok(T.plain.includes('content="index, follow" id="robots-meta"'), 'INDEX-ALL POLICY: a ZIP with no evidence is index, follow');
 ok(T.idx.includes('content="index, follow" id="robots-meta"'), 'indexable -> index');
-ok(T.cov.includes('content="noindex, nofollow" id="robots-meta"'), 'coverage-limited ZIP -> noindex');
-ok(T.cov.includes(`<link rel="canonical" href="${T.base}/community/06704/"/>`), 'coverage-limited ZIP -> canonical to its document');
-ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury \(06704\), CT\)/.test(T.plain), 'ZIP description');
+ok(T.cov.includes('content="index, follow" id="robots-meta"'), 'coverage-limited ZIP -> index, follow');
+ok(T.cov.includes(`<link rel="canonical" href="${T.base}/map/06704/"/>`), 'coverage-limited ZIP -> self-canonical');
+ok(/<meta name="description" content="Development records, permits and regulated facilities on file for ZIP 06704 \(Waterbury, CT\)/.test(T.plain), 'ZIP description names the ZIP once (test/zip-heading-place.test.mjs)');
 ok(!T.plain.includes('homesignalmap.html"/>'), 'no ZIP-less canonical left');
+{
+  // Every user-facing page is a ZIP page: the static bytes a crawler reads first must not carry the
+  // Box Elder pilot's county copy, and must name this ZIP and link to its community document.
+  const text = T.plain.replace(/<script[\s\S]*?<\/script>/g, '');
+  ok(!/Box Elder/.test(text), 'static HTML carries no Box Elder county copy');
+  ok(text.includes('<h1>Development around Waterbury (06704)</h1>'), 'static H1 names the ZIP place');
+  ok(text.includes('<a href="/community/06704/">'), 'static link to the ZIP community page');
+}
 ok(T.plain.includes(`<meta property="og:image" content="${T.base}/og-default.png"/>`), 'og:image follows the site origin');
 ok(T.plain.includes(`<meta name="twitter:image" content="${T.base}/og-default.png"/>`), 'twitter:image follows the site origin');
 ok(T.base === 'https://homesignal.net' || !T.plain.includes('https://homesignal.net'), 'no old-host URL left when the origin moved');
@@ -88,7 +96,7 @@ const zips = readdirSync(join(out, 'community')).sort();
 ok(JSON.stringify(readdirSync(join(out, 'map')).sort()) === JSON.stringify(zips), 'one /map/<zip>/ per community document');
 ok(JSON.stringify(readdirSync(join(out, 'map1')).sort()) === JSON.stringify([T.css_name, T.js_name].sort()), 'exactly the two shared files');
 const idx = zips.filter((z) => /content="index, follow" id="robots-meta"/.test(readFileSync(join(out, 'map', z, 'index.html'), 'utf8')));
-ok(idx.length > 0 && idx.length < zips.length, `fixture has both indexable (${idx.length}) and noindex map pages`);
+ok(idx.length > 0 && idx.length === zips.length, `INDEX-ALL POLICY: every /map/<zip>/ page is index, follow (${idx.length} of ${zips.length})`);
 const sm = readFileSync(join(out, 'sitemap.xml'), 'utf8');
 const smMaps = [...sm.matchAll(/<loc>[^<]*\/map\/(\d{5})\/<\/loc>/g)].map((m) => m[1]).sort();
 ok(JSON.stringify(smMaps) === JSON.stringify(idx), 'sitemap lists exactly the indexable map pages');

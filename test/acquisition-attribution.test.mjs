@@ -19,7 +19,7 @@ const read = (f) => fs.readFileSync(new URL('../' + f, import.meta.url), 'utf8')
 
 // ---- a tiny browser -------------------------------------------------------------------------------------------------------
 function makeBrowser({ host = 'homesignal.net',  // the SOURCE host list; the Pages build rewrites it to the active domain (scripts/brand_stage.py)
-   pathname = '/', search = '', referrer = '', embed = false, webdriver = false, store = {} } = {}) {
+   pathname = '/', search = '', referrer = '', embed = false, webdriver = false, userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', store = {} } = {}) {
   const ls = { ...store };
   const calls = [];
   const client = {
@@ -35,7 +35,7 @@ function makeBrowser({ host = 'homesignal.net',  // the SOURCE host list; the Pa
   g.window = win;
   g.location = { hostname: host, host, pathname, search, origin: 'https://' + host };
   g.document = { referrer, documentElement: { classList: { contains: (c) => embed && c === 'hs-embed' } } };
-  Object.defineProperty(g, 'navigator', { value: { webdriver }, configurable: true, writable: true });
+  Object.defineProperty(g, 'navigator', { value: { webdriver, userAgent }, configurable: true, writable: true });
   g.localStorage = { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } };
   g.sessionStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   g.URL = URL; g.URLSearchParams = URLSearchParams;
@@ -85,7 +85,9 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 }
 
 // 4. nothing is recorded for embeds, automation or a foreign host -------------------------------------------------------------------
-for (const [name, opts] of [['an embedded iframe', { embed: true }], ['an automated browser', { webdriver: true }], ['a foreign host', { host: 'example.com' }]]) {
+for (const [name, opts] of [['an embedded iframe', { embed: true }], ['an automated browser', { webdriver: true }], ['a foreign host', { host: 'example.com' }],
+  ['a rendering crawler (Googlebot)', { userAgent: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/130.0.6723.69 Safari/537.36' }],
+  ['headless Chrome', { userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/130.0.0.0 Safari/537.36' }]]) {
   const b = makeBrowser(opts);
   b.HS.attr.capture(); b.HS.attr.send(); await tick();
   ok(b.calls.length === 0 && !b.ls.hs_vid, name + ' records nothing and mints no id');

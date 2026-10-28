@@ -422,7 +422,11 @@ function withFile(f, text) {
 const C = (f) => corpus[f];
 const MUTATIONS = [
   ['ENV', 'n5-generation.yml', 'delete the environment line', (t) => mut(t, '    ' + ENV_LINE + '\n', '')],
-  ['ENV', 'maps-social-image.yml', 'move the environment line below runs-on', (t) => mut(t, '    ' + ENV_LINE + '\n    runs-on: ubuntu-latest\n', '    runs-on: ubuntu-latest\n    ' + ENV_LINE + '\n')],
+  ['ENV', 'maps-social-image.yml', 'move the environment line below runs-on', (t) => {
+    const m = t.match(new RegExp('    ' + ENV_LINE.replace(/[{}]/g, '\\$&') + '\\n( {4}runs-on:[^\\n]*\\n)'));
+    if (!m) throw new Error('environment line before runs-on not found');
+    return mut(t, '    ' + ENV_LINE + '\n' + m[1], m[1] + '    ' + ENV_LINE + '\n');
+  }],
   ['BOUNDARY', 'source-monitor.yml', 'prefix the boundary if: with false &&', (t) => mut(t, IF_LINE, IF_LINE.replace('if: ', 'if: false && '))],
   ['BOUNDARY', 'deploy-edge-functions.yml', 'delete the boundary step', (t) => mut(t, BSTEP, '')],
   ['BOUNDARY', 'denton-launch-audit.yml', 'drop triggering_actor from one job\'s boundary step', (t) => t.replace(IF_LINE, "        if: github.event_name == 'workflow_dispatch' && github.actor != 'HomeSignalG'")],

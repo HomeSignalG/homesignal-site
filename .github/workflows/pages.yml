@@ -103,6 +103,7 @@ on:
       - 'test/indexnow-*.test.mjs'
       - 'scripts/annotate-dev-seo-ssr.mjs'
       - 'scripts/prove-zip-pages.mjs'
+      - 'scripts/audit_index_all.py'
       - 'lib/project-type.js'
       - 'test/dev-seo-ssr-type-adapter.test.mjs'
       # The pure control-resolution core the proof runs on, and now also the producer of the
@@ -146,7 +147,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 30
     permissions:
       contents: read
@@ -404,7 +405,7 @@ jobs:
           # they cover exactly the generated URLs sitemap.xml advertises.
           main_gen = set(re.findall(r'<loc>https://[^/<]+(/(?:community|city|project|guides)/[^<]+)</loc>', sm))
           fam_union = set()
-          expect = {'zip-alerts': None, 'zip-development': None, 'city': man['city_pages'],
+          expect = {'zip': None, 'zip-alerts': None, 'zip-development': None, 'city': man['city_pages'],
                     'project': man['project_pages'], 'guide': man['guide_pages']}
           for name, want in expect.items():
               fx = open(f'_site/sitemaps/{name}.xml', encoding='utf-8').read()
@@ -578,6 +579,12 @@ jobs:
           exec > >(tee -a "$RUNNER_TEMP/receipts.txt") 2>&1
           node scripts/prove-zip-pages.mjs
 
+      # INDEX-ALL POLICY (founder, 2026-10-26): every public page may be indexed. Fails on any
+      # public noindex, robots.txt block, non-self canonical, or page missing from a sitemap.
+      - name: Index-all audit
+        if: steps.decide.outputs.proceed == 'true'
+        run: python3 scripts/audit_index_all.py --dir _site
+
       - uses: actions/upload-pages-artifact@v3
         if: steps.decide.outputs.proceed == 'true'
         with:
@@ -625,7 +632,7 @@ jobs:
     # with nothing to publish does not deploy (needs.build.outputs.proceed).
     if: github.ref == 'refs/heads/main' && needs.build.outputs.proceed == 'true'
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     permissions:
       pages: write
       id-token: write
@@ -643,7 +650,7 @@ jobs:
   indexnow:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.deploy.result == 'success' && needs.build.outputs.submit_count != '0'
     needs: [build, deploy]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 25
     permissions:
       contents: read

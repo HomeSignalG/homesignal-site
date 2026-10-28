@@ -71,6 +71,9 @@ export const PRIVILEGED_PENDING = {
     reason: 'fine-grained PAT, Actions: write on homesignal-ingest: dispatches any ingest workflow on main with chosen inputs' },
   EPA_RECOVERY_TOKEN: { jobs: ['epa-recovery-watch.yml#recover'],
     reason: 'unlocks epa_recovery_* RPCs; DB keeps only its sha256; harm bounded by the RPCs\' own gates' },
+  BING_WEBMASTER_API_KEY: { jobs: ['bing-daily-submit.yml#submit'],
+    reason: 'Bing Webmaster Tools API key (added 2026-10-27): account-wide for that Bing account, not limited to the URL ' +
+            'submission this job does; a dispatch from a branch can read it. A candidate for an environment of its own' },
   NETLIFY_AUTH_TOKEN: { jobs: ['jody-redirect-verify.yml#verify'],
     reason: 'account-wide Netlify token; possibly unset (MIGRATION-STATUS: "secret missing, inferred"); Netlify replaced by Render: delete' },
 };

@@ -47,7 +47,7 @@ permissions:
 jobs:
   measure:
     if: ${{ github.event.inputs.zips == '' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 120
     outputs:
       affected: ${{ steps.census.outputs.zips }}
@@ -72,7 +72,7 @@ jobs:
     # Runs on the census's affected ZIPs even when the census itself failed (a failure there is
     # exactly when the browser receipt matters), and on its own when `zips` is given.
     if: ${{ always() && (github.event.inputs.zips != '' || needs.measure.outputs.affected != '') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4

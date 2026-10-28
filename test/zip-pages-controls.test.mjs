@@ -195,8 +195,8 @@ const main = async () => {
       !/for \(const k of \['pass_dev_pass'[\s\S]{0,400}?CONTROLS is missing/.test(live));
     ok('...and it still requires the four that are genuinely not derivable',
       /'point_dense', 'meetings_same_a', 'meetings_same_b', 'meetings_other'[\s\S]{0,120}CONTROLS is missing/.test(live));
-    ok('the LIVE twin takes each control\'s expected robots from the Rule F pass set, not a hardcoded class list',
-      /idxSet\.has\(z\)/.test(live) && !/const nidx = \[/.test(live));
+    ok('the LIVE twin derives its classes from the published Rule F evidence set (index-all: robots are index for every control), not a hardcoded class list',
+      /idxSet\.has\(C\[k\]\)/.test(live) && /rule_f_zips/.test(live) && !/const nidx = \[/.test(live));
 
     const wf = readFileSync(join(root, '.github/workflows/verify-zip-pages-live.yml'), 'utf8');
     const pins = JSON.parse(/DEFAULT_CONTROLS: >-\n([\s\S]*?)\n\s*run:/.exec(wf)[1]

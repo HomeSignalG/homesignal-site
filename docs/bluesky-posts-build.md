@@ -34,3 +34,9 @@ never postable — enforced at the schema (`source_url NOT NULL`), in the compos
 - **Superseded legacy** (flagged): the `social-approve` edge function + the prior
   generator target the old schema and must be disabled/updated.
 - **Phase 2 (local news), evergreen, video candy**: wired in the model, selection off.
+
+## Videos (added 2026-10-24)
+Approved Main Video / Short items become native Bluesky video posts through a separate outbox, `public.video_bluesky_jobs`
+(`docs/video-bluesky-queue.sql`, PARKED, not applied), shown in tab 12 under **VIDEOS** (ALL | MAPS | ALERTS | VIDEOS). The same worker,
+credential, slot ladder and 3/day cap; MAPS/ALERTS handling and `hs_approve_social_post` are unchanged. Approval is once per item in tab 16.
+Full description and runbook: homesignal-ingest `docs/VIDEO_BLUESKY.md`.

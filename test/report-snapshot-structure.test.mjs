@@ -115,8 +115,14 @@ const BILLING_SQL = 'docs/brokerage-billing.sql';
 const ARCHIVE_SQL = 'docs/saved-reports-archive.sql';
 // 2026-10-23: docs/acquisition-attribution.sql reads the table READ-ONLY (a count by generated_at, and a join to attribute a report to an account). Pinned by 3h.
 const ACQ_SQL = 'docs/acquisition-attribution.sql';
+// 2026-10-27: docs/bluesky-maps-vs-shorts.sql reads the table READ-ONLY (reports credited to MAPS or Shorts through the account's first touch). Pinned by 3i.
+const BMS_SQL = 'docs/bluesky-maps-vs-shorts.sql';
+// 2026-10-27: docs/impact-discovery.sql reads the table READ-ONLY (reports from an auto-discovered story's own campaign, per category). Pinned by 3j.
+const ID_SQL = 'docs/impact-discovery.sql';
+// 2026-10-27: docs/youtube-engagement.sql reads the table READ-ONLY (reports credited to YouTube through the account's first touch). Pinned by 3k.
+const YT_SQL = 'docs/youtube-engagement.sql';
 const billingSrc = codeOf(BILLING_SQL);
-ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL || f === ARCHIVE_SQL || f === ACQ_SQL)
+ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA || f === SHARE_SQL || f === EVALUATION_SQL || f === REPORT_DATA || f === SAVED_SQL || f === DELIVERY_SQL || f === WATCH_SQL || f === BILLING_SQL || f === ARCHIVE_SQL || f === ACQ_SQL || f === BMS_SQL || f === ID_SQL || f === YT_SQL)
    && namesTable.includes(BILLING_SQL) && (billingSrc.match(/\breport_snapshot\b/g) || []).length === 4 && (billingSrc.match(/references public\.report_snapshot \(report_id\)/g) || []).length === 1 && (billingSrc.match(/from public\.report_snapshot s\b/g) || []).length === 2
    && /to_regclass\('public\.report_snapshot'\)/.test(billingSrc) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(billingSrc) && !/grant[^;]*report_snapshot\b(?!_issue)/i.test(billingSrc)
    && (watchSrc.match(/\breport_snapshot\b/g) || []).length === 5 && /references public\.report_snapshot \(report_id\)/.test(watchSrc) && (watchSrc.match(/(?:from|join) public\.report_snapshot s\b/g) || []).length === 3 && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(watchSrc) && !/grant[^;]*report_snapshot/i.test(watchSrc),
@@ -138,6 +144,24 @@ ok(namesTable.every((f) => f === 'docs/report-snapshot.sql' || f === FOLLOW_DATA
   const t = codeOf(ACQ_SQL);
   ok(namesTable.includes(ACQ_SQL) && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(t) && !/grant[^;]*report_snapshot/i.test(t) && !/\b(alter|drop)\s+table\s+(public\.)?report_snapshot\b/i.test(t),
     '3h: the acquisition SQL names the table only to read it (control: it does name it)', ACQ_SQL);
+}
+{
+  const t = codeOf(BMS_SQL);
+  ok(namesTable.includes(BMS_SQL) && (t.match(/\breport_snapshot\b/g) || []).length === 1 && /from public\.report_snapshot s\b/.test(t)
+    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(t) && !/grant[^;]*report_snapshot/i.test(t) && !/\b(alter|drop)\s+table\s+(public\.)?report_snapshot\b/i.test(t),
+    '3i: the MAPS vs Shorts SQL names the table once, to read it (control: it does name it)', BMS_SQL);
+}
+{
+  const t = codeOf(ID_SQL);
+  ok(namesTable.includes(ID_SQL) && (t.match(/\breport_snapshot\b/g) || []).length === 1 && /join public\.report_snapshot rs\b/.test(t)
+     && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(t) && !/grant[^;]*report_snapshot/i.test(t),
+    '3j: the Impact Stories discovery SQL names the table once, to read it (control: it does name it)', ID_SQL);
+}
+{
+  const t = codeOf(YT_SQL);
+  ok(namesTable.includes(YT_SQL) && (t.match(/\breport_snapshot\b/g) || []).length === 1 && /from public\.report_snapshot s\b/.test(t)
+    && !/\b(insert\s+into|update|delete\s+from|truncate)\s+(public\.)?report_snapshot\b/i.test(t) && !/grant[^;]*report_snapshot/i.test(t) && !/\b(alter|drop)\s+table\s+(public\.)?report_snapshot\b/i.test(t),
+    '3k: the YouTube engagement SQL names the table once, to read it (control: it does name it)', YT_SQL);
 }
 {
   const t = codeOf(DELIVERY_SQL).replace(/'(?:[^']|'')*'/g, "''");

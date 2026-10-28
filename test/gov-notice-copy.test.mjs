@@ -17,9 +17,9 @@ const failures = [];
 const t = (r) => (r ? r.label + ': ' + r.text : '');
 
 // ── The artifact itself ──────────────────────────────────────────────────────────────
-if (MAP._counts.canonical_zip_pages !== 12722) failures.push('map: canonical denominator is not 12,722');
+if (MAP._counts.canonical_zip_pages !== 12744) failures.push('map: canonical denominator is not 12,744');
 if (MAP.configured_zips.length !== MAP._counts.configured) failures.push('map: configured count disagrees with the list length');
-if (MAP._counts.configured + MAP._counts.unconfigured !== 12722) failures.push('map: configured + unconfigured != 12,722');
+if (MAP._counts.configured + MAP._counts.unconfigured !== 12744) failures.push('map: configured + unconfigured != 12,744');
 if (new Set(MAP.configured_zips).size !== MAP.configured_zips.length) failures.push('map: duplicate ZIP in configured_zips');
 if (MAP.configured_zips.some((z) => !/^\d{5}$/.test(z))) failures.push('map: a configured entry is not a 5-digit ZIP');
 // 80249 is the removed non-canonical Denver hand-insert (founder ruling). It must not appear.
@@ -104,4 +104,4 @@ if (!/notices\.length\s*\n?\s*\?\s*notices\.slice\(0,2\)/.test(renderer))
   failures.push('wiring: the notices render is not conditional, so the empty state is unreachable');
 
 if (failures.length) { console.error(failures.map((f) => 'FAIL ' + f).join('\n')); process.exit(1); }
-console.log(`ok  gov-notice-copy: ${MAP._counts.configured} configured / ${MAP._counts.unconfigured} unconfigured of 12,722`);
+console.log(`ok  gov-notice-copy: ${MAP._counts.configured} configured / ${MAP._counts.unconfigured} unconfigured of ${MAP._counts.canonical_zip_pages}`);

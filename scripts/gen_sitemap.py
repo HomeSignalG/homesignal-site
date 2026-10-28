@@ -56,7 +56,12 @@ ANON = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6In
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import brand_host  # noqa: E402
 BASE = brand_host.source_origin()   # the SOURCE identity's origin: this file is committed, and brand_stage.py applies the public brand at build time (founder, 2026-10-15)
-STATIC = [("/", "weekly", "1.0"), ("/how-it-works.html", "monthly", "0.7"),
+STATIC = [("/", "weekly", "1.0"),
+          # The ZIP-less Development Map landing page (founder, 2026-10-26): index-eligible from its first byte, so it is
+          # advertised once. Its per-ZIP /map/<zip>/ pages are advertised by the build only where their own robots say index;
+          # its ?zip= / ?addr= URLs are never advertised (test/map-landing-seo.test.mjs).
+          ("/homesignalmap.html", "weekly", "0.8"),
+          ("/how-it-works.html", "monthly", "0.7"),
           ("/about.html", "monthly", "0.6"), ("/contact.html", "monthly", "0.5"),
           ("/privacy.html", "yearly", "0.3"),
           ("/terms.html", "yearly", "0.3"), ("/refund-policy.html", "yearly", "0.3"),
