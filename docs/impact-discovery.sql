@@ -132,6 +132,22 @@ create index if not exists impact_discovery_candidates_rank on public.impact_dis
 create index if not exists impact_discovery_candidates_posts on public.impact_discovery_candidates using gin (post_uris);
 create index if not exists impact_discovery_candidates_links on public.impact_discovery_candidates using gin (link_keys);
 create unique index if not exists impact_discovery_candidates_one_story on public.impact_discovery_candidates (story_id) where story_id is not null;
+-- Founder-suggested topics (2026-10-28): a topic the founder picked by hand, from the "Suggest a topic" form. It has no
+-- Bluesky lead post; the links the founder pasted are leads to check, never evidence, and it goes through the same research,
+-- the same verified-source-pack rule and the same story checks as a scanned topic. A scan never matches or rewrites it.
+alter table public.impact_discovery_candidates add column if not exists origin text not null default 'scan';
+alter table public.impact_discovery_candidates add column if not exists submitted_by text;
+alter table public.impact_discovery_candidates add column if not exists submitted_note text;
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_origin_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_origin_check check (origin in ('scan', 'founder'));
+alter table public.impact_discovery_candidates alter column lead_uri drop not null;
+alter table public.impact_discovery_candidates alter column lead_url drop not null;
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_lead_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_lead_check
+  check (origin = 'founder' or (lead_uri is not null and lead_url is not null));
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_note_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_note_check
+  check (submitted_note is null or char_length(submitted_note) <= 2000);
 alter table public.impact_discovery_candidates enable row level security;
 revoke all on public.impact_discovery_candidates from public, anon, authenticated;
 
@@ -274,7 +290,7 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 declare r jsonb;
 begin
   with st as (
-    select s.id story_id, c.category, c.track, 'impact-' || left(s.id::text, 8) campaign
+    select s.id story_id, c.category, c.track, c.origin, 'impact-' || left(s.id::text, 8) campaign
       from public.impact_stories s join public.impact_discovery_candidates c on c.id = s.discovery_candidate_id),
   v as (select st.story_id, count(distinct t.visitor_id) visits from st join public.acquisition_touch t
           on t.subject_type = 'visitor' and not t.is_internal and t.utm_campaign = st.campaign group by 1),
@@ -285,18 +301,18 @@ begin
            from a join public.report_snapshot rs on (select ra.user_id from public._report_account(rs.report_id, rs.generated_at) ra) = a.user_id
           group by 1),
   per as (
-    select st.category, st.track, count(*) stories,
+    select st.category, st.track, st.origin, count(*) stories,
            count(*) filter (where coalesce(v.visits, 0) > 0) stories_with_visits,
            coalesce(sum(v.visits), 0) visits,
            (select count(*) from a where a.story_id = any(array_agg(st.story_id))) registrations,
            coalesce(sum(rp.reports), 0) reports, coalesce(sum(rp.paid), 0) paid_reports
       from st left join v on v.story_id = st.story_id left join rp on rp.story_id = st.story_id
-     group by st.category, st.track)
-  select coalesce(jsonb_agg(jsonb_build_object('category', category, 'track', track, 'stories', stories,
+     group by st.category, st.track, st.origin)
+  select coalesce(jsonb_agg(jsonb_build_object('category', category, 'track', track, 'origin', origin, 'stories', stories,
            'stories_with_visits', stories_with_visits, 'visits', visits, 'registrations', registrations,
            'reports', reports, 'paid_reports', paid_reports,
            'youtube_retention', 'not_collected', 'shorts_stayed_to_watch', 'not_collected', 'bluesky_engagement', 'not_collected')
-           order by category), '[]'::jsonb) into r from per;
+           order by category, origin), '[]'::jsonb) into r from per;
   return r;
 exception when undefined_table or undefined_function then
   return jsonb_build_array(jsonb_build_object('error', 'Attribution tables are not available, so performance is not measured.'));
@@ -348,13 +364,13 @@ begin
         'evidence_status', c.evidence_status, 'evidence', c.evidence, 'concept', c.concept, 'coverage', c.coverage,
         'related_candidates', c.related_candidates, 'duplicate_of', c.duplicate_of, 'status', c.status, 'status_note', c.status_note,
         'source_slug', c.source_slug, 'story_id', c.story_id, 'discovered_at', c.discovered_at, 'last_seen_at', c.last_seen_at,
-        'last_verified_at', c.last_verified_at)
-        order by (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
+        'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note)
+        order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
       from (select * from public.impact_discovery_candidates c
              where (p_show_closed or c.status not in ('rejected', 'dismissed', 'excluded', 'stale'))
                -- the founder's experimental-track switch hides existing experimental topics too, not only new ones
                and (coalesce(st.experimental_enabled, false) or c.track <> 'experimental')
-             order by (c.track = 'core') desc, c.score desc, c.last_seen_at desc limit 60) c), '[]'::jsonb),   -- same order as above
+             order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc limit 60) c), '[]'::jsonb),   -- same order as above
     'exclusions', coalesce((select jsonb_agg(to_jsonb(x) order by x.created_at desc) from public.impact_discovery_exclusions x where x.active), '[]'::jsonb),
     'performance', public._hs_id_performance(),
     'learning', public._hs_id_learning());
@@ -386,7 +402,8 @@ begin
   select * into c from public.impact_discovery_candidates where id = p_candidate for update;
   if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
   if p_action = 'restore' then
-    update public.impact_discovery_candidates set status = case when story_id is not null then 'preparing' else 'open' end,
+    update public.impact_discovery_candidates set status = case when story_id is not null then 'preparing'
+                                                                when origin = 'founder' then 'nominated' else 'open' end,
            status_note = null, decided_by = e, decided_at = now(), updated_at = now() where id = c.id;
     update public.impact_discovery_exclusions set active = false where value->>'candidate_id' = c.id::text;
   else
@@ -413,6 +430,44 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin();
 begin
   return public._hs_id_create_story(p_candidate, e, false);
+end $$;
+
+-- "Suggest a topic" (founder, 2026-10-28): a topic the founder wants made into a story. It goes straight to the research
+-- queue (status 'nominated', origin 'founder'). Links are leads to check, never evidence; a story is still created only from
+-- a verified source pack. One open suggestion per title.
+create or replace function public.hs_impact_discovery_suggest(p_topic jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'title', ''));
+        pl text := nullif(btrim(coalesce(p_topic->>'place', '')), ''); cat text := coalesce(nullif(btrim(coalesce(p_topic->>'category', '')), ''), 'other');
+        note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); leads jsonb := '[]'::jsonb; u text; c public.impact_discovery_candidates%rowtype;
+begin
+  if char_length(t) < 5 or char_length(t) > 300 then
+    raise exception 'Give the topic a title of 5 to 300 characters.' using errcode = '22023';
+  end if;
+  if cat !~ '^[a-z_]{2,40}$' then raise exception 'Unknown category.' using errcode = '22023'; end if;
+  if pl is not null and char_length(pl) > 200 then raise exception 'The place is longer than 200 characters.' using errcode = '22023'; end if;
+  if note is not null and char_length(note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
+  if p_topic ? 'links' and jsonb_typeof(p_topic->'links') <> 'array' then raise exception 'Links must be a list.' using errcode = '22023'; end if;
+  for u in select distinct btrim(x) from jsonb_array_elements_text(coalesce(p_topic->'links', '[]'::jsonb)) x where btrim(x) <> '' loop
+    if u !~* '^https?://[^\s/?#]+\.[^\s/?#]+(/\S*)?$' or char_length(u) > 1000 then
+      raise exception 'This is not a web link (it must start with http:// or https://): %', left(u, 120) using errcode = '22023';
+    end if;
+    leads := leads || jsonb_build_array(jsonb_build_object('url', u, 'kind', 'founder',
+      'domain', lower(substring(u from '^[A-Za-z]+://(?:www\.)?([^/:?#]+)'))));
+  end loop;
+  if jsonb_array_length(leads) > 20 then raise exception 'At most 20 links per topic.' using errcode = '22023'; end if;
+  if exists (select 1 from public.impact_discovery_candidates where origin = 'founder' and lower(title) = lower(t)
+              and status not in ('rejected', 'dismissed', 'excluded')) then
+    raise exception 'You already suggested a topic with this title. It is in the list below.' using errcode = '23505';
+  end if;
+  insert into public.impact_discovery_candidates (cluster_key, origin, category, track, title, place, score, reasons, evidence_status,
+    evidence, status, submitted_by, submitted_note, discovered_at, last_seen_at)
+  values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0, '["You suggested this topic."]'::jsonb,
+    case when jsonb_array_length(leads) > 0 then 'leads_found' else 'social_only' end,
+    jsonb_build_object('leads', leads), 'nominated', e, note, now(), now())
+  returning * into c;
+  perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads)), e);
+  return jsonb_build_object('id', c.id, 'status', c.status);
 end $$;
 
 create or replace function public.hs_impact_discovery_settings_save(p_settings jsonb)
@@ -490,10 +545,15 @@ begin
     if c.track = 'experimental' and not st.experimental_auto then
       raise exception 'Broader public accountability topics are not prepared automatically.' using errcode = '55000';
     end if;
-    select count(*) into n from public.impact_discovery_candidates x
-     where x.nominated_scan_id is not distinct from c.nominated_scan_id and x.story_id is not null and x.id <> c.id
-       and exists (select 1 from public.impact_stories y where y.id = x.story_id and y.origin = 'auto_discovery');
-    if n >= st.max_prepare_per_scan then
+    -- the per-scan limit is about scanned topics; a founder pick has no scan (all would share a null scan and block each other)
+    n := 0;
+    if c.origin = 'scan' then
+      select count(*) into n from public.impact_discovery_candidates x
+       where x.nominated_scan_id is not distinct from c.nominated_scan_id and x.story_id is not null and x.id <> c.id
+         and x.origin = 'scan'
+         and exists (select 1 from public.impact_stories y where y.id = x.story_id and y.origin = 'auto_discovery');
+    end if;
+    if c.origin = 'scan' and n >= st.max_prepare_per_scan then
       raise exception 'This scan already prepared % stor%(limit %).', n, case when n = 1 then 'y ' else 'ies ' end, st.max_prepare_per_scan using errcode = '55000';
     end if;
   end if;
@@ -524,7 +584,7 @@ begin
     'open', coalesce((select jsonb_agg(jsonb_build_object('id', id, 'cluster_key', cluster_key, 'category', category, 'title', title, 'place', place,
               'lead_uri', lead_uri, 'post_uris', post_uris, 'link_keys', link_keys, 'status', status, 'key_terms', score_parts->'key_terms',
               'last_seen_at', last_seen_at))
-              from public.impact_discovery_candidates where last_seen_at > now() - interval '14 days'), '[]'::jsonb),
+              from public.impact_discovery_candidates where origin = 'scan' and last_seen_at > now() - interval '14 days'), '[]'::jsonb),
     'learning', public._hs_id_learning());
 end $$;
 
@@ -568,7 +628,7 @@ begin
     nominate := (x->>'score')::int >= st.nominate_score and ev = 'leads_found' and coalesce((x->>'timely')::boolean, false)
                 and (x->>'track' = 'core' or st.experimental_auto);
     select * into c from public.impact_discovery_candidates
-     where cluster_key = x->>'cluster_key' or post_uris && uris or (cardinality(links) > 0 and link_keys && links)
+     where origin = 'scan' and (cluster_key = x->>'cluster_key' or post_uris && uris or (cardinality(links) > 0 and link_keys && links))
      order by (cluster_key = x->>'cluster_key') desc, discovered_at limit 1 for update;
     if not found then
       insert into public.impact_discovery_candidates (cluster_key, category, track, title, place, subject, lead_uri, lead_url, lead_author,
@@ -694,7 +754,8 @@ returns jsonb language sql stable security definer set search_path = public as $
   select jsonb_build_object(
     'nominated', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category,
         'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
-        'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id) order by c.score desc)
+        'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id,
+        'origin', c.origin, 'submitted_note', c.submitted_note) order by (c.origin = 'founder') desc, c.score desc)
       from public.impact_discovery_candidates c
      where c.status in ('nominated', 'researching') and c.story_id is null and c.duplicate_of is null), '[]'::jsonb),
     'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
@@ -770,7 +831,7 @@ begin
   foreach f in array array[
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
-    'public.hs_impact_discovery_settings_save(jsonb)'] loop
+    'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

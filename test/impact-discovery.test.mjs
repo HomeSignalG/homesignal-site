@@ -18,7 +18,7 @@ ok(/Auto-discovered — Ready for Review/.test(stories), '1d the library labels 
 
 // 2. every RPC the page calls is admin-gated and granted to authenticated only
 const called = [...new Set([...js.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))];
-ok(called.length === 5, '2a the page calls exactly the five founder functions (' + called.join(', ') + ')');
+ok(called.length === 6, '2a the page calls exactly the six founder functions (' + called.join(', ') + ')');
 for (const f of called) {
   const body = (sql.match(new RegExp('create or replace function public\\.' + f + '\\([\\s\\S]*?\\$\\$;', 'm')) || [''])[0];
   ok(/public\._hs_is_admin\(\)/.test(body), '2b ' + f + ' checks the dashboard allowlist');
@@ -52,6 +52,24 @@ ok(create.indexOf('pg_advisory_xact_lock') >= 0 && create.indexOf('pg_advisory_x
 ok(/function idleDelay\(\)/.test(js) && /st\.scan_enabled === false\) return null/.test(js) && /next_scan_at/.test(js.slice(js.indexOf('function idleDelay')))
    && /IDLE_MAX_MS = 30 \* 60000/.test(js), '5c with scheduled scans on, an idle panel looks again after the next scan is due (at most every 30 min)');
 ok(/var PENDING = \['nominated', 'researching', 'preparing'\]/.test(js) && /SLOW_POLL_MS/.test(js), '5b the panel keeps refreshing while topics are nominated, researched or prepared');
+
+// 6. Suggest a topic (founder, 2026-10-28)
+const yv = read('lib/acq-youtube-videos.js');
+ok(/rpc\('hs_impact_discovery_suggest'/.test(js) && /id="hot-suggest"/.test(js), '6a Hot Topics carries the Suggest a topic form and calls the suggest function');
+ok(/class="yv-suggest/.test(yv) && /data-tab="impactstories"/.test(yv) && /HS\.acqImpactDiscovery\.suggest\(\)/.test(yv),
+  '6b Tab 16 has a Suggest a topic button that opens Tab 17 and the form');
+ok(yv.indexOf('tab17.click()') >= 0 && yv.indexOf('tab17.click()') < yv.indexOf('acqImpactDiscovery.suggest()'),
+  '6c the button shows Tab 17 before opening the form, so the form is scrolled to while visible');
+ok(/Your pick/.test(js) && /function founderCard\(c\)/.test(js) && /if \(founder\(c\)\) return founderCard\(c\)/.test(js),
+  '6d a founder topic is drawn as Your pick (no score, no Bluesky lead line)');
+ok(/leads to check, not yet evidence/.test(js) && /Your links are leads to check, not evidence/.test(js), '6e founder links are labelled leads, not evidence');
+const fc = js.slice(js.indexOf('function founderCard'), js.indexOf('function card(c)'));
+ok(!/exclude_similar|data-k="score"/.test(fc), '6f a founder topic has no Score and no Exclude Similar Topics');
+ok(/SUGGEST_FIELDS\.forEach/.test(js.slice(js.indexOf('function snapshot'))), '6g an automatic refresh keeps what was typed in the form');
+const sug = (sql.match(/create or replace function public\.hs_impact_discovery_suggest[\s\S]*?\$\$;/) || [''])[0];
+ok(/_hs_is_admin\(\)/.test(sug) && /'founder:' \|\| gen_random_uuid\(\)/.test(sug) && /'nominated'/.test(sug), '6h the suggestion is admin-only and goes straight to research');
+ok(/where origin = 'scan' and \(cluster_key/.test(sql) && /where origin = 'scan' and last_seen_at/.test(sql), '6i a scan never matches or is handed a founder topic');
+ok(/if c\.origin = 'scan' and n >= st\.max_prepare_per_scan/.test(sql), '6j the per-scan limit is for scanned topics only');
 
 console.log(fails ? '\n' + fails + ' failed' : '\nall passed');
 process.exit(fails ? 1 : 0);

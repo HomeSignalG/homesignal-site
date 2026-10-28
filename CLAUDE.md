@@ -5689,6 +5689,11 @@ water and health near homes, rank them out of 100, and show them above the Impac
   credits); YouTube / Shorts / Bluesky engagement are reported as `not_collected`. Learning moves a score by at most ±5 and
   only after 50 attributed visits and 3 stories in a category.
 - Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
+- **Suggest a topic (founder, 2026-10-28).** A form in Hot Topics (and a "Suggest a topic" button on Tab 16 that opens it) calls
+  `hs_impact_discovery_suggest`: a candidate with `origin = 'founder'`, no Bluesky lead (the lead columns are nullable only for
+  that origin), status `nominated`, shown first as "Your pick". Pasted links are leads, never evidence; the verified-source-pack
+  rule and every story check are unchanged. Scans never match or hand out founder topics; the per-scan prepare limit is for
+  scanned topics; performance is split by origin. Suite: `test/impact_discovery_pg` §17.
 
 ## ENGAGE ON BLUESKY, TAB 17 (2026-10-28): the strongest posts to answer, drafted, posted BY HAND
 
