@@ -362,7 +362,7 @@ $fn$;
 
 -- ── readers ───────────────────────────────────────────────────────────────────────────────
 -- An applicant is named only when the name is an organisation. Whole-word tokens; a family
--- trust ("Dorothy M Revocable Trust") is a person's name and is NOT matched.
+-- trust ("Dorothy M Revocable Trust", "Ross Denzil Ballard Farm Trust") is a person's name.
 create or replace function public.water_rights_display_applicant(p_name text)
 returns text
 language sql
@@ -371,7 +371,12 @@ set search_path to 'pg_temp'
 as $fn$
   select case
     when p_name is null or btrim(p_name) = '' then null
-    when p_name ~* '\m(llc|l\.l\.c|inc|incorporated|corp|corporation|company|co|ltd|lp|llp|pllc|partnership|association|assn|district|irrigation|canal|ditch|reservoir|water users|water company|ranch|ranches|farms?|dairy|cattle|livestock|land|properties|holdings|investments|enterprises|development|developers|builders|homes|mining|minerals|energy|power|resources|church|university|college|school|city|town|county|state|united states|bureau|department|authority|service|forest|federal)\M'
+    -- a trust is a person's or a family's ("ROSS DENZIL BALLARD FARM TRUST"), unless a
+    -- company or public body holds it
+    when p_name ~* '\mtrust\M'
+     and p_name !~* '\m(llc|l\.l\.c|inc|incorporated|corp|corporation|company|bank|district|city|town|county|state|united states)\M'
+      then 'Individual applicant'
+    when p_name ~* '\m(llc|l\.l\.c|inc|incorporated|corp|corporation|company|co|ltd|lp|llp|pllc|partnership|association|assn|district|irrigation|canal|ditch|reservoir|water users|water company|ranch|ranches|farms?|dairy|cattle|livestock|land|properties|holdings|investments|enterprises|development|developers|builders|homes|mining|minerals|energy|power|resources|bank|church|university|college|school|city|town|county|state|united states|bureau|department|authority|service|forest|federal)\M'
       then p_name
     else 'Individual applicant'
   end

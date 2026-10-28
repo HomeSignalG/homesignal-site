@@ -121,6 +121,8 @@ select pg_temp.ck('idaho: epoch PriorityDate, per-application report link',
 
 -- 9. names
 select pg_temp.ck('names: a family trust is a person', public.water_rights_display_applicant('DOROTHY M REVOCABLE TRUST') = 'Individual applicant');
+select pg_temp.ck('names: a farm trust is a person (real 84336 row)', public.water_rights_display_applicant('ROSS DENZIL BALLARD FARM TRUST') = 'Individual applicant');
+select pg_temp.ck('names: a company-held trust is named', public.water_rights_display_applicant('FIRST SECURITY BANK TRUST') = 'FIRST SECURITY BANK TRUST');
 select pg_temp.ck('names: a person is a person', public.water_rights_display_applicant('JULIA BUTLER') = 'Individual applicant');
 select pg_temp.ck('names: LLC / district / city are named',
   public.water_rights_display_applicant('QUALITY DEVELOPMENT LLC') = 'QUALITY DEVELOPMENT LLC'
