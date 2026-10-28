@@ -477,7 +477,11 @@ def auto_open():
                  read_only=True)
     if newest:
         n = newest[0]
-        if n["state"] == "FAILED":
+        # A FAILED build blocks the next one until a human has discarded its rows. Discard
+        # leaves the state FAILED (the record of what happened), so the test is its rows,
+        # read by the same probe the keep-two retirement uses.
+        if n["state"] == "FAILED" and sql(_has_rows_sql(n["generation_id"]),
+                                          "failed probe rows", read_only=True)[0]["ok"]:
             say("auto open", f"skipped - newest generation {n['generation_id']} is FAILED; "
                              f"discard it before another build opens")
             return None
@@ -1050,8 +1054,11 @@ def mode_fail():
 
 def mode_discard():
     gen = require_generation()
-    r = sql(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard")[0]["r"]
-    say("discarded", r)
+    # The same call, timeout and proof as the keep-two retirement: a national build's rows
+    # take longer than the plain 120 s limit to delete (2026-10-28, a 57014 at 120 s).
+    heavy(f"select geo.n5_generation_discard({lit(gen)}) r;", "discard",
+          verify=_verify_discarded(gen))
+    say("discarded", gen)
     return 0
 
 
