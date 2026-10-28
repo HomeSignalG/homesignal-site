@@ -52,6 +52,13 @@ await page.evaluate(() => {
       return Promise.resolve({ data: { scan_id: 'sc3', status: 'queued', existing: false }, error: null }); }
     if (n === 'hs_impact_discovery_decide') { const c = window.db.candidates.find((x) => x.id === a.p_candidate); c.status = { reject: 'rejected', dismiss: 'dismissed', exclude_similar: 'excluded' }[a.p_action];
       window.db.candidates = window.db.candidates.filter((x) => x.status !== c.status); return Promise.resolve({ data: { ok: true }, error: null }); }
+    if (n === 'hs_impact_discovery_suggest') {
+      if (a.p_topic.links.some((u) => !/^https?:\/\//.test(u))) return Promise.resolve({ data: null, error: { message: 'This is not a web link (it must start with http:// or https://): ' + a.p_topic.links[0] } });
+      window.db.candidates.unshift({ id: 'f1', origin: 'founder', title: a.p_topic.title, place: a.p_topic.place, category: a.p_topic.category, track: 'core',
+        status: 'nominated', evidence_status: a.p_topic.links.length ? 'leads_found' : 'social_only', score: 0, submitted_note: a.p_topic.note,
+        evidence: { leads: a.p_topic.links.map((u) => ({ url: u, kind: 'founder' })) }, concept: {}, related: [], metrics: {},
+        discovered_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), reasons: ['You suggested this topic.'] });
+      return Promise.resolve({ data: { id: 'f1', status: 'nominated' }, error: null }); }
     if (n === 'hs_impact_discovery_open_story') return Promise.resolve({ data: { story_id: 'new-story', existing: false }, error: null });
     if (n === 'hs_impact_discovery_settings_save') return a.p_settings.scan_times.every((t) => /^\d\d:\d\d$/.test(t))
       ? Promise.resolve({ data: {}, error: null }) : Promise.resolve({ data: null, error: { message: 'Scan times are HH:MM (24-hour): 8am' } });
@@ -134,6 +141,38 @@ ok(await page.evaluate(() => document.getElementById('hot-set').open
   && document.getElementById('hot-window').value === '96' && document.getElementById('hot-times').value === '8am'
   && document.activeElement && document.activeElement.id === 'hot-window'),
   '5c a refresh keeps the settings open, the unsaved values and the focus');
+
+
+// Suggest a topic (founder, 2026-10-28)
+await page.evaluate(() => window.HS.acqImpactDiscovery.suggest());
+ok(await page.evaluate(() => document.getElementById('hot-suggest').open && document.activeElement.id === 'hot-sg-title'),
+  '7a suggest() opens the form and puts the cursor in Topic');
+await page.fill('#hot-sg-title', 'Van Tramp <fill> project');
+await page.fill('#hot-sg-links', 'javascript:alert(1)');
+await page.evaluate(() => window.HS.acqImpactDiscovery._render());
+ok(await page.evaluate(() => document.getElementById('hot-suggest').open && document.getElementById('hot-sg-title').value === 'Van Tramp <fill> project'),
+  '7b a refresh keeps the form open and what was typed');
+await page.click('button:has-text("Add topic")');
+await page.waitForFunction(() => /not a web link/.test(document.getElementById('hot').innerText));
+ok(await page.evaluate(() => document.getElementById('hot-sg-title').value === 'Van Tramp <fill> project'), '7c a refused link keeps the form filled and shows the reason');
+await page.fill('#hot-sg-links', 'https://www.cityofpuyallup.org/permit/123\nhttps://news.example.com/x');
+await page.fill('#hot-sg-place', 'Puyallup, WA');
+await page.selectOption('#hot-sg-cat', 'zoning_development');
+await page.fill('#hot-sg-note', 'Up to 95 trucks a day next to a park.');
+await page.click('button:has-text("Add topic")');
+await page.waitForFunction(() => /Topic added/.test(document.getElementById('hot').innerText));
+const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_discovery_suggest').pop()[1].p_topic);
+ok(sent.title === 'Van Tramp <fill> project' && sent.place === 'Puyallup, WA' && sent.category === 'zoning_development'
+  && sent.links.length === 2 && sent.note === 'Up to 95 trucks a day next to a park.', '7d Add topic sends the title, place, category, links (one per line) and note');
+const first = page.locator('.is-card').first();
+const ft = await first.innerText();
+ok(/Van Tramp <fill> project/.test(ft) && /Your pick/.test(ft) && /waiting for research/.test(ft) && /Why it matters: Up to 95 trucks/.test(ft),
+  '7e the new topic is first, tagged Your pick, waiting for research, with the note (escaped)');
+ok(!/of 100/.test(ft) && !/Lead post/.test(ft) && await first.locator('button:has-text("Score")').count() === 0
+  && await first.locator('button:has-text("Exclude Similar")').count() === 0, '7f no score, no Bluesky lead, no Score or Exclude Similar buttons');
+await first.locator('button:has-text("Open Sources")').click();
+ok(/Links you added/.test(await first.innerText()) && /cityofpuyallup\.org/.test(await first.innerText()), '7g Open Sources lists the links you added as leads');
+ok(await page.evaluate(() => !document.getElementById('hot-suggest').open && document.getElementById('hot-sg-title').value === ''), '7h after adding, the form is closed and cleared');
 
 // phone width: no horizontal scroll
 await page.setViewportSize({ width: 390, height: 900 });
