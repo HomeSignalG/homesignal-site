@@ -192,7 +192,7 @@ await page.click('#is [data-act=fixsend][data-id="3"]'); await page.waitForTimeo
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 3 && c[1].p_decision === 'rejected'
    && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request is written in a form under the video and sends what to fix and the moment');
 await page.evaluate(() => { window.prompt = () => 'Lead with the date.'; });
-// Start fixes (2026-10-28): every request stays listed with what happened to it; the button sends the open ones
+// Fix (2026-10-28): every request stays listed with what happened to it; the button sends the open ones and starts the job
 await page.evaluate(() => {
   const m = window.db.media;
   m.fix_requests = [
@@ -212,13 +212,17 @@ ok(txt.includes('Fix requests (3)') && txt.includes('End card: full <investigati
    'fixes: every request is listed with its own status, the batch says what is next');
 ok(await page.locator('#is .is-badge.warn', { hasText: 'Re-rendered, but nothing' }).count() === 1, 'fixes: a re-render with no story change is amber');
 await page.click('#is [data-act=fixstart]'); await page.waitForTimeout(50);
-ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_start' && c[1].p_story === 's1')), 'fixes: Start fixes sends the story');
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_start' && c[1].p_story === 's1')), 'fixes: Fix sends the story');
 await page.evaluate(() => { window.db.media.fix_batch = { status: 'queued', requests: 1, requested_at: '2026-10-28T16:00:00Z' };
   window.db.media.fix_requests[0].batch = { status: 'queued' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
 txt = await page.locator('#is').innerText();
-ok(txt.includes('Queued: the fixer checks about once an hour') && await page.locator('#is [data-act=fixstart]').count() === 0,
+ok(txt.includes('Starting: the fixer begins within a minute') && await page.locator('#is [data-act=fixstart]').count() === 0,
    'fixes: while a batch is queued the status shows and the button is gone');
+await page.evaluate(() => { window.db.media.fix_batch = { status: 'stalled', requests: 1, requested_at: '2026-10-28T12:00:00Z', claimed_at: '2026-10-28T12:01:00Z' };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+ok(await page.locator('#is [data-act=fixstart]', { hasText: 'Fix again' }).count() === 1, 'fixes: a stalled batch offers Fix again');
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
   const m = window.db.media;

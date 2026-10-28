@@ -60,7 +60,11 @@ ok(!/innerHTML\s*=\s*[^;]*\+\s*(?!esc\()[a-z]+\.(title|text|error)\b/.test(code)
 ok(/m\.fix_requests/.test(js) && /Every request stays here/.test(js) && /fixRequests\(m\)/.test(js) && /'fix_requests', fixes/.test(sql),
    'page+sql: every fix request stays listed with a status (the file cards show only the latest)');
 ok(/data-act="fixstart"/.test(js) && /rpc\('hs_impact_story_fix_start'/.test(js) && /'fix_batch', public\._hs_is_fix_batch\(p_story\)/.test(sql)
-   && /'public\.hs_impact_story_fix_start\(uuid\)'\] loop/.test(sql), 'page+sql: Start fixes sends the open requests as one batch and shows its progress');
+   && /'public\.hs_impact_story_fix_start\(uuid\)'\] loop/.test(sql), 'page+sql: Fix sends the open requests as one batch and shows its progress');
+ok(/>Fix \(' \+ waiting/.test(js) && !/Start fixes|once an hour/.test(js)
+   && /impact-fix-run\.yml\/dispatches/.test(sql) && /perform public\._hs_is_fix_dispatch\(b\.id\);\n  return jsonb_build_object\('existing', false/.test(sql)
+   && /'public\._hs_is_fix_dispatch\(uuid\)'\] loop/.test(sql) && !/claude_code_oauth|sk-ant/i.test(sql),
+   'page+sql: the button reads Fix and starts the Fix job at once (no schedule), the starter is not callable from the page');
 ok(/Re-rendered, but nothing in the story changed/.test(js) && /\['warn', 'Re-rendered, but nothing/.test(js),
    'page: a re-render from the same story is amber, never green');
 ok(!/prompt\('What should be fixed/.test(js) && /data-act="fixsend"/.test(js), 'page: a fix request is written in a form under the video, not a pop-up');
