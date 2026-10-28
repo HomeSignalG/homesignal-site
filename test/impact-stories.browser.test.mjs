@@ -240,7 +240,19 @@ await page.evaluate(() => {
       { dimension: 'wildlife', classification: 'documented_potential', finding: L('Pile driving near <orcas>.', 'purpose'), affected: 'Orcas', could_lose: 'Quiet water' },
       { dimension: 'financial', classification: 'no_evidence', finding: L('No cost named.'), affected: '', could_lose: '' }],
       conflict: L('Two records differ.', 'purpose'), protections: [L('A bubble curtain.', 'purpose')],
-      participation: { text: 'The appeal window closed.', claims: ['purpose'], open: false }, approach: { trigger: 'concern', why: 'Species on the record.' } },
+      participation: { text: 'The appeal window closed.', claims: ['purpose'], open: false }, approach: { trigger: 'concern', why: 'Species on the record.' },
+      accountability: {
+        researched: { owner: { result: 'not_found', looked_in: 'The assessor record was not fetched.' }, applicant: { result: 'found', claims: ['purpose'] } },
+        parties: [{ id: 'applicant', name: null, label: 'the applicant', type: 'unknown', roles: ['applicant'], claims: ['purpose'],
+                    identity_questions: ['Legal name <not> in the records.'] },
+                  { id: 'city', name: 'City of Gig Harbor', type: 'public_agency', roles: ['agency', 'decision_maker'], claims: ['purpose'] }],
+        attributions: [{ id: 'cut', party: 'applicant', kind: 'violation', basis: 'finding', status: 'established', confidence: 'high',
+                         action: L('The city found the applicant removed trees.', 'purpose'),
+                         enforcement: { type: 'administrative', state: 'overturned', claims: ['purpose'] },
+                         response_none: 'No response in the records.', later_rulings: 'Hearing Examiner reversed it.' },
+                       { id: 'cmp', party: 'city', kind: 'other', basis: 'allegation', status: 'alleged', confidence: 'low',
+                         action: L('A complaint says the city waited.', 'purpose'), response: L('The city disputes it.', 'purpose') }],
+        opportunity: { type: 'violation', why: 'A finding against the applicant.' } } },
     concepts: [concept('orcas', 'concern', 'A dock in orca water'), concept('two-docks', 'accountability', 'Six floats or 15?'), concept('waterfront', 'empowerment', 'A working waterfront')],
     selection: { concept: 'orcas', mode: 'emotional', why: 'Highest score.' } };
   body.main = { acts: [{ act: 1, name: 'The harbor', scenes: [{ thread: 'fear', purpose: 'p', visual: pic('A southern resident killer whale', 'registry', { id: 'southern-resident-orca' }), narration: [L('Line.', 'purpose')] },
@@ -248,6 +260,7 @@ await page.evaluate(() => {
   window.db.extra = { body, v3: {
     scores: { orcas: { total: 86, parts: { 'evidence integrity': 25 } }, 'two-docks': { total: 57, parts: {} }, waterfront: { total: 74, parts: {} } },
     quality: { criteria: { attachment: 2, 'visual power': 1 }, total: 13, max: 14, reject: [] },
+    accountability: { verified: false, missing: ['Property owner and ownership entity'], leads: { names: [{ name: 'City of Gig Harbor' }, { name: 'Harbor Holdings LLC' }] } },
     missing_assets: [{ scene: 'a1-s2', subject: 'A heron' }], short_timing: { a: [{ beat: 'hook', ends: 3.1 }, { beat: 'care', ends: 6.9 }] },
     photos: [{ id: 'southern-resident-orca', usable: true, title: 'File:Orca.jpg', license: 'CC BY-SA 3.0', author: 'NOAA <staff>', page_url: 'https://commons.wikimedia.org/wiki/File:Orca.jpg', site_specific: false }] } };
   window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
@@ -262,6 +275,17 @@ ok(txt.includes('Three story concepts') && txt.includes('A dock in orca water') 
    'V3 outline: three concepts with their scores, the selected one marked');
 ok(txt.includes('A. Attachment') && txt.includes('F. Motivation and action'), 'V3 outline: each concept shows its arc A-F');
 ok(txt.includes('Quality gate') && txt.includes('13 / 14') && txt.includes('need an editorial decision'), 'V3 outline: the quality gate and the missing pictures are shown');
+ok(txt.includes('Accountability research') && txt.includes('The city found the applicant removed trees.') && txt.includes('Name not in the records')
+   && txt.includes('Alleged · not a finding') && txt.includes('Later overturned') && txt.includes('The city disputes it.') && txt.includes('No response in the records.'),
+   'accountability: who did what, its status, any reversal and the response are shown');
+ok(txt.includes('Missing attribution') && txt.includes('Property owner and ownership entity') && txt.includes('Harbor Holdings LLC')
+   && !/not in the map\) \(check each\): [^\n]*City of Gig Harbor/.test(txt),
+   'accountability: missing roles and names in the records that are not in the map are flagged');
+ok((await page.innerHTML('#is')).includes('Legal name &lt;not&gt; in the records.'), 'accountability: identity questions are escaped');
+await page.click('#is [data-act=research]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'accountability'
+   && c[1].p_note.startsWith('Deeper research: '))), 'accountability: the founder can request deeper research');
+ok(await page.locator('#is [data-act=revise][data-sec=accountability]').count() === 1, 'accountability: and request a correction');
 ok(await page.locator('#is [data-act=concept]').count() === 2, 'V3 outline: the two other concepts can be chosen instead');
 await page.click('#is [data-act=concept][data-id=two-docks]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'concepts'

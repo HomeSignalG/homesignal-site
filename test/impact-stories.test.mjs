@@ -60,5 +60,10 @@ ok(!/innerHTML\s*=\s*[^;]*\+\s*(?!esc\()[a-z]+\.(title|text|error)\b/.test(code)
 ok(/m\.fix_requests/.test(js) && /Every request stays here/.test(js) && /not yet done/.test(js) && /fixRequests\(m\)/.test(js) && /'fix_requests', fixes/.test(sql),
    'page+sql: every fix request stays listed with a status (the file cards show only the latest)');
 
+ok(/function viewAccountability\(m, r\)/.test(js) && /viewAccountability\(d\.accountability, r\.accountability\)/.test(js)
+   && /p_section: 'accountability'/.test(js) && /'visuals', 'accountability'\) then/.test(sql),
+   'page+sql: the Accountability research section reads the responsibility map, and deeper research is a revision note');
+ok(/accountability: 'C\. Accountability'/.test(js) && /consequences: 'E\. Consequences'/.test(js), 'page: the accountability arc beats have labels');
+
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
