@@ -5676,6 +5676,15 @@ Results.
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
+## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
+
+Media review lists every fix request; **Fix** (`hs_impact_story_fix_start`) sends the open ones as one batch and, through
+`_hs_is_fix_dispatch`, starts homesignal-ingest `impact-fix-run.yml` on main at once (same `github_actions_pat` dispatch as the
+worker). That job runs Claude Code on the founder's plan (`CLAUDE_CODE_OAUTH_TOKEN`, no paid API) in a step that holds no database
+key, checks the change, lands it on ingest main and records Done / Needs you / failed. No schedule; the earlier hourly routine is
+disabled. A missing credential fails the batch with a readable reason. Apply order: merge the ingest workflow first (a dispatch to a
+workflow not on main is refused), then apply `docs/impact-stories.sql`, then deploy the page. pg checks 12f4b, 12f4c.
+
 ## IMPACT STORIES, TAB 17: ACCOUNTABILITY RESEARCH (2026-10-28)
 
 Story Outline shows the draft's responsibility map (`discovery.accountability`, engine homesignal-ingest

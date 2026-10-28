@@ -173,9 +173,9 @@ create table if not exists public.impact_story_media_decisions (
 alter table public.impact_story_media_decisions enable row level security;
 revoke all on public.impact_story_media_decisions from public, anon, authenticated;
 
--- "Start fixes" (founder, 2026-10-28). One batch = the open fix requests of one story, sent together. A scheduled Claude
--- Code session (homesignal-ingest impact/fixes/FIXES.md, no paid API) claims it through impact-fix-batch.yml, changes the story
--- or the renderer, and records per request what it did. The batch is the visible state: queued -> working -> done |
+-- "Fix" (founder, 2026-10-28). One batch = the open fix requests of one story, sent together. The button starts
+-- homesignal-ingest impact-fix-run.yml for the batch at once (no schedule): Claude Code on the founder's plan, no paid API
+-- (impact/fixes/FIXES.md). It claims the batch, changes the story or the renderer, and records per request what it did. The batch is the visible state: queued -> working -> done |
 -- needs_you | failed. One active batch per story. Not append-only (its status moves); every move is a story event.
 create table if not exists public.impact_story_fix_batches (
   id            uuid primary key default gen_random_uuid(),
@@ -1021,9 +1021,9 @@ begin
   return jsonb_build_object('ok', true, 'version', nv);
 end $$;
 
--- ── "Start fixes" ─────────────────────────────────────────────────────────────────────────────────────
+-- ── "Fix" (was "Start fixes") ─────────────────────────────────────────────────────────────────────────────────────
 -- The newest batch of a story, as the page shows it. A batch claimed more than 3 hours ago and not finished is
--- reported 'stalled' (the session died); the next scheduled run may claim it again.
+-- reported 'stalled' (the run died); pressing Fix again starts a run that may claim it.
 create or replace function public._hs_is_fix_batch(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object('id', b.id, 'status', case when b.status = 'working' and b.claimed_at < now() - interval '3 hours' then 'stalled' else b.status end,
@@ -1048,8 +1048,31 @@ returns jsonb language sql stable security definer set search_path = public as $
                                         where (o->>'decision_id')::bigint = (x->>'id')::bigint and o->>'outcome' = 'fixed')))
 $$;
 
--- The founder's button. Sends every eligible fix request of the story as one batch; a second press while one is
--- queued or working returns that batch.
+-- Starts the Fix job for a batch (homesignal-ingest impact-fix-run.yml, on main). Never raises on a missing credential:
+-- the batch is recorded failed with a readable reason, so the page shows it instead of a batch that never moves.
+create or replace function public._hs_is_fix_dispatch(p_batch uuid)
+returns void language plpgsql security definer
+set search_path to 'public', 'extensions', 'net', 'vault', 'pg_temp' as $$
+declare _pat text;
+begin
+  select decrypted_secret into _pat from vault.decrypted_secrets where name = 'github_actions_pat';
+  if _pat is null or btrim(_pat) = '' then
+    update public.impact_story_fix_batches set status = 'failed', completed_at = now(),
+      summary = 'The fix could not start because no GitHub credential is stored. Nothing was lost. Press Fix again once it is restored.'
+     where id = p_batch and status = 'queued';
+    return;
+  end if;
+  perform net.http_post(
+    url := 'https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/impact-fix-run.yml/dispatches',
+    body := jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', p_batch::text)),
+    headers := jsonb_build_object('Authorization', 'Bearer ' || _pat, 'Accept', 'application/vnd.github+json',
+              'X-GitHub-Api-Version', '2022-11-28', 'User-Agent', 'homesignal-impact-stories', 'Content-Type', 'application/json'),
+    timeout_milliseconds := 15000);
+end $$;
+
+-- The founder's Fix button. Sends every eligible fix request of the story as one batch and starts the Fix job. A second
+-- press while the batch is still queued, or stalled (claimed over 3 hours ago), starts the job again (the first start may
+-- have been lost; a second run cannot claim a batch the first already took); while it is working, it returns that batch.
 create or replace function public.hs_impact_story_fix_start(p_story uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; reqs jsonb; b public.impact_story_fix_batches%rowtype;
@@ -1058,17 +1081,21 @@ begin
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
   if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
   select * into b from public.impact_story_fix_batches where story_id = p_story and status in ('queued', 'working');
-  if found then return jsonb_build_object('existing', true, 'batch', public._hs_is_fix_batch(p_story)); end if;
+  if found then
+    if b.status = 'queued' or b.claimed_at < now() - interval '3 hours' then perform public._hs_is_fix_dispatch(b.id); end if;
+    return jsonb_build_object('existing', true, 'batch', public._hs_is_fix_batch(p_story));
+  end if;
   reqs := public._hs_is_fix_eligible(p_story);
   if jsonb_array_length(reqs) = 0 then
     raise exception 'There are no open fix requests to send.' using errcode = '55000';
   end if;
   insert into public.impact_story_fix_batches (story_id, requests, requested_by) values (p_story, reqs, e) returning * into b;
   perform public._hs_is_event(p_story, 'fix_batch_queued', jsonb_build_object('batch', b.id, 'requests', jsonb_array_length(reqs)), e);
+  perform public._hs_is_fix_dispatch(b.id);
   return jsonb_build_object('existing', false, 'batch', public._hs_is_fix_batch(p_story));
 end $$;
 
--- The fixer session's door (service role only, through homesignal-ingest impact-fix-batch.yml).
+-- The Fix job's door (service role only, through homesignal-ingest impact-fix-run.yml / impact-fix-batch.yml).
 create or replace function public.impact_fix_batches_list()
 returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'story_id', b.story_id, 'title', s.title, 'video_slug', s.video_slug,
@@ -1089,7 +1116,7 @@ begin
   end if;
   if b.attempts >= 3 then
     update public.impact_story_fix_batches set status = 'failed', completed_at = now(),
-           summary = 'Three attempts did not finish. Press Start fixes to try again.' where id = b.id;
+           summary = 'Three attempts did not finish. Press Fix to try again.' where id = b.id;
     perform public._hs_is_event(b.story_id, 'fix_batch_failed', jsonb_build_object('batch', b.id, 'reason', 'attempts'), 'fixer');
     raise exception 'batch failed after 3 attempts' using errcode = '55000';
   end if;
@@ -1147,7 +1174,7 @@ begin
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
-    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)'] loop
+    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[

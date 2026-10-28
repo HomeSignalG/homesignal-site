@@ -254,6 +254,19 @@ select pg_temp.chk('12f3 Start fixes queues one batch carrying both open request
    and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'status' <> 'queued'));
 select pg_temp.chk('12f4 a second press returns the same batch', (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
    and (select count(*) from public.impact_story_fix_batches) = 1);
+select pg_temp.chk('12f4b the Fix button starts the Fix job on main for this batch, and a second press while queued starts it again',
+   (select url from net.requests order by id desc limit 1) like '%/homesignal-ingest/actions/workflows/impact-fix-run.yml/dispatches'
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb')))
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2);
+delete from vault.decrypted_secrets;
+select public._hs_is_fix_dispatch(pg_temp.id('fb')::uuid);
+select pg_temp.chk('12f4c no GitHub credential: the batch is failed with a readable reason, nothing is sent',
+   (select status from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 'failed'
+   and (select summary from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) like '%no GitHub credential%'
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2
+   and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid)', 'execute'));
+insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
+update public.impact_story_fix_batches set status = 'queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
 select pg_temp.chk('12f5 the fixer lists it, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
    and public.impact_fix_batches_list()->0->>'video_slug' is not null);
 select public.impact_fix_batch_claim(pg_temp.id('fb')::uuid);
