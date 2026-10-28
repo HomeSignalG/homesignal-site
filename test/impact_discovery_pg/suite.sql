@@ -60,7 +60,7 @@ select pg_temp.chk('1h the internal helpers are callable by no browser role',
   and not has_function_privilege('authenticated', 'public._hs_is_request(uuid, text, text, boolean, text)', 'execute'));
 select pg_temp.chk('1i every discovery table has RLS on and no browser grant',
   (select bool_and(relrowsecurity) from pg_class where relname like 'impact_discovery%' and relkind = 'r')
-  and (select count(*) from pg_class where relname like 'impact_discovery%' and relkind = 'r') = 7
+  and (select count(*) from pg_class where relname like 'impact_discovery%' and relkind = 'r') = 8
   and not has_table_privilege('authenticated', 'public.impact_discovery_candidates', 'select')
   and not has_table_privilege('anon', 'public.impact_discovery_scans', 'select'));
 select pg_temp.chk('1j settings are one row with the founder defaults (8:00 and 14:00 Pacific, 72h, 80, 1 per scan)',
@@ -418,6 +418,69 @@ select pg_temp.chk('17o a restored founder topic goes back to research, not to t
   (select status from public.impact_discovery_candidates where id = pg_temp.id('f3')) = 'nominated');
 select pg_temp.chk('17p each suggestion is recorded in the event log',
   (select count(*) from public.impact_discovery_events where kind = 'suggested') = 3);
+
+
+-- 18. Start research and Create video (founder, 2026-10-28) ----------------------------------------------
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('18a a non-admin cannot start research',
+  pg_temp.err(format('select public.hs_impact_discovery_research_start(%L)', pg_temp.id('f3'))) like '42501%');
+select pg_temp.chk('18b the research job functions are service-role only',
+  not has_function_privilege('authenticated', 'public.impact_discovery_research_claim(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.impact_discovery_research_complete(uuid, jsonb)', 'execute')
+  and has_function_privilege('service_role', 'public.impact_discovery_research_claim(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_discovery_research_start(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_impact_discovery_research_start(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public._hs_id_research_dispatch(uuid)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('n0', (select count(*) from net.requests)::text);
+select pg_temp.put('r1', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.chk('18c Start research queues one run and starts the research workflow on main for it',
+  (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'queued'
+  and (select count(*) from net.requests where url like '%/impact-research-run.yml/dispatches'
+         and body->>'ref' = 'main' and body->'inputs'->>'run' = pg_temp.id('r1')::text) = 1);
+select pg_temp.put('r1b', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.chk('18d pressing again while queued returns the same run and starts it again (a lost start is retried)',
+  pg_temp.id('r1b') = pg_temp.id('r1')
+  and (select count(*) from public.impact_discovery_research_runs where candidate_id = pg_temp.id('f3')) = 1
+  and (select count(*) from net.requests where body->'inputs'->>'run' = pg_temp.id('r1')::text) = 2);
+select pg_temp.chk('18e the overview shows the run on its topic',
+  (select x->'research'->>'status' from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x
+    where x->>'id' = pg_temp.id('f3')::text) = 'queued');
+select pg_temp.chk('18f a closed topic, or one that already has a story, cannot be researched',
+  pg_temp.err(format('select public.hs_impact_discovery_research_start(%L)', pg_temp.id('f1'))) like '%already has an Impact Story%');
+select pg_temp.as_user(null);
+create temp table _claim as select public.impact_discovery_research_claim(pg_temp.id('r1')) j;
+select pg_temp.chk('18g claiming marks the topic as being researched and hands over the topic and the library',
+  (select j->'candidate'->>'title' from _claim) = 'Third founder topic' and jsonb_typeof((select j->'library' from _claim)) = 'array'
+  and (select status = 'researching' and evidence_status = 'researching' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'working');
+select pg_temp.chk('18h a working run cannot be claimed twice',
+  pg_temp.err(format('select public.impact_discovery_research_claim(%L)', pg_temp.id('r1'))) like '55000%');
+select pg_temp.chk('18i a run cannot be closed as verified before the verified outcome is recorded',
+  pg_temp.err(format($q$select public.impact_discovery_research_complete(%L, '{"status":"verified","summary":"x","source_slug":"third-pack"}')$q$, pg_temp.id('r1'))) like '%record the verified outcome%');
+select public.impact_discovery_research_complete(pg_temp.id('r1'), '{"status":"failed","summary":"The runner stopped."}');
+select pg_temp.chk('18j a failed run puts the topic back where it was (a founder pick waiting for research)',
+  (select status = 'nominated' and evidence_status = 'social_only' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'failed');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('r2', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.as_user(null);
+select public.impact_discovery_research_claim(pg_temp.id('r2'));
+select public.impact_discovery_research(pg_temp.id('f3'), '{"outcome":"verified","source_slug":"third-pack","evidence":{"sources":[{"url":"https://example.gov/a"}]}}');
+select pg_temp.put('rc', public.impact_discovery_research_complete(pg_temp.id('r2'), '{"status":"verified","summary":"Checked 4 records.","source_slug":"third-pack"}')::text);
+select pg_temp.chk('18k a verified run creates the Impact Story for the founder who pressed the button, with its Check Sources job',
+  (select story_id is not null and status = 'preparing' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select created_by from public.impact_stories s join public.impact_discovery_candidates c on c.story_id = s.id where c.id = pg_temp.id('f3')) = 'founder@example.com'
+  and (select story_id from public.impact_discovery_research_runs where id = pg_temp.id('r2'))
+      = (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (pg_temp.lastjob((select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))).kind = 'pack');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('18l the overview shows the story is not ready for a video yet (no approved script)',
+  (select x->'video'->>'narrative' <> 'approved' and (x->'video'->>'script_ready')::boolean = false
+     from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'id' = pg_temp.id('f3')::text));
+select pg_temp.chk('18m Create video (Render) is refused until the script is approved',
+  pg_temp.err(format('select public.hs_impact_story_render(%L, 0, false)',
+    (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))) like '%Approve the integrated narrative%');
 
 \o
 select count(*) || ' checks passed' as result from _res where ok;
