@@ -230,7 +230,17 @@ select pg_temp.chk('12j a rejection needs a note; a bad timecode is refused',
    and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'rejected', 'x', '1:75')) like '23514%');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'rejected', 'Text too small on a phone.', '0:00');
 select pg_temp.chk('12k a rejected file says what to fix', pg_temp.fst('thumbnail') = 'rejected');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('main'), 'rejected', 'Rename the checklist.', '1:05');
+select pg_temp.chk('12k2 a second fix request does not remove the first: both listed, newest first, both open',
+   jsonb_array_length(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') = 2
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->0->>'asset' = 'main'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->1->>'asset' = 'thumbnail'
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'status' <> 'open'));
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid(a), 'approved') from unnest(array['main', 'short_a', 'short_b']) a;
+select pg_temp.chk('12k3 approving a file later closes only its own request, and the request stays listed',
+   (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'main') = 'closed'
+   and (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'thumbnail') = 'open'
+   and jsonb_array_length(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') = 2);
 select pg_temp.chk('12l three of four approved: not ready to export', pg_temp.stage() = 'media');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'approved');
 select pg_temp.chk('12m every file approved: ready to export, nothing published', pg_temp.stage() = 'distribution'
