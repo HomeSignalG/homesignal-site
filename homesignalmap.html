@@ -561,6 +561,12 @@
      store carries (zip_basis, off_target_zip straddle, unresolved status tracks, unconfirmed
      bridges) renders here verbatim — never flattened, never faked. */
   .devtracker{margin-top:22px}
+  /* Tracked project sits in the lifecycle band row (founder, 2026-10-28): no top gap there, the
+     card fills its column, and a status row wraps rather than squeezing in a narrow column. */
+  .grid.band>.devtracker{margin-top:0}
+  .grid.band>.devtracker .dt-anchor{margin-bottom:0}
+  .grid.band .dt-track{flex-wrap:wrap}
+  .grid.band .dt-track .v{text-align:left}
   .dt-anchor{margin-bottom:16px}
   .dt-hd{font-weight:700;font-size:16px;color:#fff;background:#4b3f8f;
     margin:-18px -18px 0;padding:12px 18px;border-radius:16px 16px 0 0}
@@ -625,6 +631,7 @@
   .hs-embed .results>.grid.band,
   .hs-embed .results>.card.read.band,
   .hs-embed .results>.devtracker,
+  .hs-embed .results .devtracker,
   .hs-embed .results>.foot,
   .hs-embed #property{display:none !important}
   /* 3D is out of scope for a Place embed, so its controls AND its two canvases go: with
@@ -943,22 +950,21 @@
           <div class="band-s">Cases on the state's cleanup-site list that are not closed</div>
           <div id="cleanupList"></div>
         </div>
-      </div>
+        <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
+             Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
+             v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
+             loadDevTracker(). Each sub-block hides itself when it has no real data (honest empty),
+             never fills with placeholder. -->
+        <div class="devtracker" id="devTracker" style="display:none">
+          <div class="card read dt-anchor" id="dtAnchor" style="display:none">
+            <div class="dt-hd">Tracked project in this area</div>
+            <div class="dt-sub">A verified land-assembly anchor built from Box Elder County public
+              parcel records. Every parcel below is tied to its owner of record; honesty labels are
+              shown exactly as the record store carries them.</div>
+            <div id="dtAnchorBody"></div>
+          </div>
 
-      <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
-           Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
-           v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
-           loadDevTracker(). Each sub-block hides itself when it has no real data (honest empty),
-           never fills with placeholder. -->
-      <div class="devtracker" id="devTracker" style="display:none">
-        <div class="card read dt-anchor" id="dtAnchor" style="display:none">
-          <div class="dt-hd">Tracked project in this area</div>
-          <div class="dt-sub">A verified land-assembly anchor built from Box Elder County public
-            parcel records. Every parcel below is tied to its owner of record; honesty labels are
-            shown exactly as the record store carries them.</div>
-          <div id="dtAnchorBody"></div>
         </div>
-
       </div>
 
       <div class="foot" id="foot"></div>
