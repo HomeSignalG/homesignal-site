@@ -57,5 +57,8 @@ ok(!/hs_youtube|hs_video_|social_posts/.test(code), 'page: never calls a Tab 16 
 ok(/nothing is published/.test(js) && /Not published/.test(js) && /Not connected/.test(js) && !/Not built yet/.test(js), 'page: honest Media / Distribution states');
 ok(!/innerHTML\s*=\s*[^;]*\+\s*(?!esc\()[a-z]+\.(title|text|error)\b/.test(code), 'page: database text goes through esc()');
 
+ok(/m\.fix_requests/.test(js) && /Every request stays here/.test(js) && /not yet done/.test(js) && /fixRequests\(m\)/.test(js) && /'fix_requests', fixes/.test(sql),
+   'page+sql: every fix request stays listed with a status (the file cards show only the latest)');
+
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
