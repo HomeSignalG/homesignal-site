@@ -1,0 +1,70 @@
+name: state-water-rights-suite
+
+# STATE WATER-RIGHTS FILINGS (docs/state-water-rights.sql): each state's pending water-rights
+# applications, their own section on every ZIP page. Runs the SHIPPED SQL against a DISPOSABLE
+# PostGIS with pg_net / pg_cron stand-ins: loader completeness (a short or error-carrying run
+# writes nothing), history kept on removal, ZIP membership by the canonical polygon predicate,
+# the per-state answer every page gets, people not named, and who may run what. Every prohibited
+# mutation in test/state_water_rights_pg/mutations MUST fail the suite.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/state-water-rights.sql'
+      - 'test/state_water_rights_pg/**'
+      - '.github/workflows/state-water-rights-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/state-water-rights.sql'
+      - 'test/state_water_rights_pg/**'
+      - '.github/workflows/state-water-rights-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  state-water-rights:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: state_water_rights_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped SQL passes; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: state_water_rights_disposable
+        run: |
+          set -o pipefail
+          bash test/state_water_rights_pg/run.sh 2>&1 | grep -v -E 'NOTICE|DETAIL|drop cascades' | tee /tmp/wr.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## State water-rights filings'; echo '```'; grep -E 'SHIPPED|KILLED|SURVIVED|NO-OP|\|f\|' /tmp/wr.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
