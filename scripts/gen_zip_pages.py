@@ -1047,14 +1047,25 @@ def render(p, built):
         # only before). lib/map.js and the Esri/jsDelivr widening PCM-4 added are both gone.
         'frame-src \'self\'; child-src \'self\'; '
         'form-action \'self\'">\n'
-        + APP_CSS_LINK + '</head>\n'
+        + APP_CSS_LINK
+        # LOADING STATE. #hs-ssr is the crawlable copy of the page and carries no styling, so it
+        # showed as a plain text page for the seconds lib/community-page.js spends reading the
+        # data, then switched to the real page (founder report, 84336, 2026-10-28). With script,
+        # it is hidden until the runtime removes or keeps it; without script (and to any crawler
+        # that reads the HTML) it is shown as before. The timeout shows it if the runtime never
+        # finishes (a blocked CDN, an error), so the page can never stay empty. Head-only and the
+        # <template> are outside the semantic fingerprint, so no page counts as changed.
+        + '<style>html.hs-loading #hs-ssr{display:none}</style>\n'
+        + '<script>document.documentElement.classList.add("hs-loading");'
+          'setTimeout(function(){document.documentElement.classList.remove("hs-loading")},15000);</script>\n'
+        + '</head>\n'
         # data-nav="explore": this document loads the shared shell, and the public ZIP page
         # is an Explore child (founder navigation plan v3), the same identity community.html
         # declares. The city/project/project-list/guide families below carry no shell.
         # data-explore="activity": it is the Activity page in the Explore dropdown, as
         # community.html is (founder, 2026-10-02).
         f'<body data-nav="explore" data-zip="{esc(z)}" data-explore="activity">\n{body}\n'
-        '<template id="hs-content"><div class="page" id="commPage"></div></template>\n'
+        f'<template id="hs-content"><div class="page" id="commPage"><p class="quiet">Loading ZIP {esc(z)}…</p></div></template>\n'
         '<script src="/config.js"></script>\n<script src="/seed/delvalle.js"></script>\n'
         '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>\n'
         # zip-authoritative.js is the CANONICAL OWNER of ZIP geography semantics and this
@@ -1084,7 +1095,7 @@ def render(p, built):
         '<script src="/shell.js?v=662b5d19"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
         '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
-        '<script src="/lib/community-page.js?v=fb585b04"></script>\n'
+        '<script src="/lib/community-page.js?v=c7a1e2d0"></script>\n'
         "</body>\n</html>\n")
 
 
