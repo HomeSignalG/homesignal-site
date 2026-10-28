@@ -181,12 +181,16 @@
 
   .results{display:none;margin:8px 0 40px}
   .grid{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start}
-  .grid.band{grid-template-columns:1fr 1fr 1fr}
+  /* Lifecycle bands (Operating now · Approved · Proposed · Lifecycle unknown · State cleanup sites):
+     ONE ROW on desktop (founder, 2026-10-28). Column flow sizes the row to the bands actually shown,
+     so a hidden cleanup band leaves no empty column. Narrower screens wrap, phones stack. */
+  .grid.band{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:12px}
+  @media(max-width:1100px){.grid.band{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}}
   /* Development summary/map grid: stack so the counts summary sits ABOVE a full-width map. */
   .grid.stacked{grid-template-columns:1fr}
   .grid.stacked .read{order:-1}                          /* counts summary above the map */
   .grid.stacked .counts{grid-template-columns:repeat(4,1fr)}  /* wide count strip on top */
-  @media(max-width:820px){.grid,.grid.band,.grid.stacked .counts{grid-template-columns:1fr}}
+  @media(max-width:820px){.grid,.grid.band,.grid.stacked .counts{grid-template-columns:1fr}.grid.band{grid-auto-flow:row}}
   @media(max-width:640px){.grid.stacked .counts{grid-template-columns:1fr 1fr}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
     box-shadow:0 14px 34px -26px rgba(8,30,28,.5)}
