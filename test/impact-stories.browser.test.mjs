@@ -217,7 +217,7 @@ await page.evaluate(() => { window.db.media.fix_batch = { status: 'queued', requ
   window.db.media.fix_requests[0].batch = { status: 'queued' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
 txt = await page.locator('#is').innerText();
-ok(txt.includes('Queued: the fixer checks about once an hour') && await page.locator('#is [data-act=fixstart]').count() === 0,
+ok(txt.includes('Queued: the fixer checks once a day, at 5:43 PM Pacific') && await page.locator('#is [data-act=fixstart]').count() === 0,
    'fixes: while a batch is queued the status shows and the button is gone');
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
