@@ -56,10 +56,8 @@ ok(/var PENDING = \['nominated', 'researching', 'preparing'\]/.test(js) && /SLOW
 // 6. Suggest a topic (founder, 2026-10-28)
 const yv = read('lib/acq-youtube-videos.js');
 ok(/rpc\('hs_impact_discovery_suggest'/.test(js) && /id="hot-suggest"/.test(js), '6a Hot Topics carries the Suggest a topic form and calls the suggest function');
-ok(/class="yv-suggest/.test(yv) && /data-tab="impactstories"/.test(yv) && /HS\.acqImpactDiscovery\.suggest\(\)/.test(yv),
-  '6b Tab 16 has a Suggest a topic button that opens Tab 17 and the form');
-ok(yv.indexOf('tab17.click()') >= 0 && yv.indexOf('tab17.click()') < yv.indexOf('acqImpactDiscovery.suggest()'),
-  '6c the button shows Tab 17 before opening the form, so the form is scrolled to while visible');
+ok(!/yv-suggest|acqImpactDiscovery/.test(yv),
+  '6b Tab 16 no longer jumps to Tab 17: it has its own Suggest a video box (lib/acq-video-suggest.js, founder 2026-10-28)');
 ok(/Your pick/.test(js) && /function founderCard\(c\)/.test(js) && /if \(founder\(c\)\) return founderCard\(c\)/.test(js),
   '6d a founder topic is drawn as Your pick (no score, no Bluesky lead line)');
 ok(/leads to check, not yet evidence/.test(js) && /Your links are leads to check, not evidence/.test(js), '6e founder links are labelled leads, not evidence');

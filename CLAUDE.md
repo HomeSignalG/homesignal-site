@@ -5690,6 +5690,20 @@ Story Outline shows the draft's responsibility map (`discovery.accountability`, 
 `discovery`, so the one narrative approval covers it (pg check 13g). Labels C. Accountability and E. Consequences are added
 for the accountability arc. Tests: `test/impact-stories.test.mjs`, `.browser.test.mjs`, `test/impact_stories_pg` (13f, 13g).
 
+## TAB 16 "SUGGEST A VIDEO" (2026-10-28): its own queue, because Tab 16 and Tab 17 make different videos
+
+Founder: *"both 16 and 17 need a suggest tab because they both render different style videos"*. Tab 16 is the Public Records
+format (homesignal-ingest `video/`: one development record told from its own documents); Tab 17 is Impact Stories (Hot Topics).
+- Tab 16's box is `lib/acq-video-suggest.js`, mounted into `#yv-suggest-host` beside the video list (`#yv-list-host`), so the
+  list's automatic refresh never wipes typing. It no longer jumps to Tab 17.
+- SQL of record `docs/youtube-video-suggestions.sql` (after `docs/impact-stories.sql`, for `_hs_is_admin`): table
+  `youtube_video_suggestions` (RLS on, no visitor grants; status waiting → picked → made | declined | withdrawn; `made` needs
+  `project_slug`; one open suggestion per title) and admin-only `hs_youtube_video_suggest` / `_suggestion_withdraw` /
+  `_suggestions_list`. The page only adds and withdraws; a video session sets the status (service role).
+- Links are where to start, never evidence: the video still uses only the record's fetched documents and `video/validate.py`.
+- Tests: `test/video-suggest.test.mjs`, `test/video-suggest.browser.test.mjs`, `test/youtube_video_suggestions_pg`
+  (`youtube-video-suggestions-suite.yml`).
+
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 
 Scheduled scans (08:00 and 14:00 Pacific by default, plus Scan Now) find Bluesky discussions about development, land,
@@ -5714,7 +5728,7 @@ water and health near homes, rank them out of 100, and show them above the Impac
   credits); YouTube / Shorts / Bluesky engagement are reported as `not_collected`. Learning moves a score by at most ±5 and
   only after 50 attributed visits and 3 stories in a category.
 - Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
-- **Suggest a topic (founder, 2026-10-28).** A form in Hot Topics (and a "Suggest a topic" button on Tab 16 that opens it) calls
+- **Suggest a topic (founder, 2026-10-28).** A form in Hot Topics calls
   `hs_impact_discovery_suggest`: a candidate with `origin = 'founder'`, no Bluesky lead (the lead columns are nullable only for
   that origin), status `nominated`, shown first as "Your pick". Pasted links are leads, never evidence; the verified-source-pack
   rule and every story check are unchanged. Scans never match or hand out founder topics; the per-scan prepare limit is for
