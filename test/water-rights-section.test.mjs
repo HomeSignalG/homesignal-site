@@ -71,9 +71,9 @@ ok(!/No pending/.test(t1), 'C2: no absence sentence beside filings');
 // D
 const page = read('lib/community-page.js');
 const iSec = page.indexOf('HS.waterRights.sectionHTML(waterRights)');
-const iNews = page.indexOf('No qualifying local news on file for this ZIP yet.');
-const iRight = page.indexOf("+ '</div><div>'", iNews);
-ok(iSec > iNews && iSec < iRight, 'D1: the section renders after Local news, in the same column');
+const iDev = page.indexOf('No permit or planning records on file for this ZIP yet.');
+const iGov = page.indexOf('Government &amp; civic <span class="gc">— \' + meetings.length');
+ok(iDev > 0 && iSec > iDev && iSec < iGov, 'D1: the section renders directly under Development & growth, before Government & civic');
 ok(!/groupHead/.test(read('lib/water-rights.js')), 'D2: it is its own block, never a fourth What’s Changing group');
 ok(/HS\.waterRights\.load\(zip\)/.test(page), 'D3: the page reads the one reader');
 ['community.html', 'scripts/gen_zip_pages.py'].forEach((f) => {

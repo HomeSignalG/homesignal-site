@@ -3734,7 +3734,7 @@ Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) wa
   A person is never named (`water_rights_display_applicant`; family trusts included). The status word is the agency's own.
 - **Measured 2026-10-28 after the first load:** 12,744 pages answered (403 complete, 18 not_measured, 12,323 not_covered);
   313 pages carry 2,119 filings. a55167 is on 84336 (Snowville).
-- **Page:** `lib/water-rights.js` renders the answer as its own block after Local news, never a fourth What's Changing group.
+- **Page:** `lib/water-rights.js` renders the answer as its own block directly under Development & growth (founder, 2026-10-28: "water rights should sit under development and growth"), never a fourth What's Changing group.
   Undecoded use codes (Utah "OP") are not shown.
 - **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
   row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
