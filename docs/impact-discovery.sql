@@ -364,7 +364,9 @@ begin
         'evidence_status', c.evidence_status, 'evidence', c.evidence, 'concept', c.concept, 'coverage', c.coverage,
         'related_candidates', c.related_candidates, 'duplicate_of', c.duplicate_of, 'status', c.status, 'status_note', c.status_note,
         'source_slug', c.source_slug, 'story_id', c.story_id, 'discovered_at', c.discovered_at, 'last_seen_at', c.last_seen_at,
-        'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note)
+        'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note,
+        'research', public._hs_id_research_run(c.id),
+        'video', case when c.story_id is null then null else public._hs_id_video_state(c.story_id) end)
         order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
       from (select * from public.impact_discovery_candidates c
              where (p_show_closed or c.status not in ('rejected', 'dismissed', 'excluded', 'stale'))
@@ -818,6 +820,185 @@ begin
   return jsonb_build_object('scans_started', started, 'stories_advanced', adv);
 end $$;
 
+-- ── "Start research" and "Create video" (founder, 2026-10-28) ────────────────────────────────────────
+-- "i need buttons to be able to start research and create video" / "i do not want to have to move to a claude window to get
+-- research done". Start research queues ONE run per topic and starts homesignal-ingest impact-research-run.yml at once: Claude
+-- Code on the founder's Claude plan (CLAUDE_CODE_OAUTH_TOKEN, no paid API) follows impact/discovery/RESEARCH.md on a runner,
+-- the run checks the source pack and the draft with untouched code, lands them on main, and records the outcome here. A
+-- verified topic then gets its Impact Story, which the 10-minute tick walks through Check Sources -> Analyze -> Generate.
+-- Create video is the story's own Render button, called from the page: it needs the founder's approval of the script, as always.
+-- Nothing here approves, renders on its own or publishes.
+create table if not exists public.impact_discovery_research_runs (
+  id            uuid primary key default gen_random_uuid(),
+  candidate_id  uuid not null references public.impact_discovery_candidates(id),
+  status        text not null default 'queued' check (status in ('queued', 'working', 'verified', 'insufficient', 'failed')),
+  requested_by  text not null,
+  requested_at  timestamptz not null default now(),
+  attempts      integer not null default 0,
+  claimed_at    timestamptz,
+  completed_at  timestamptz,
+  prev_status   text,                     -- the topic's status and evidence before the run, restored if it fails
+  prev_evidence text,
+  summary       text check (summary is null or char_length(summary) <= 2000),
+  next_step     text check (next_step is null or char_length(next_step) <= 300),
+  source_slug   text check (source_slug is null or source_slug ~ '^[a-z0-9][a-z0-9-]{0,80}$'),
+  story_id      uuid references public.impact_stories(id)
+);
+create unique index if not exists impact_discovery_research_runs_one_active
+  on public.impact_discovery_research_runs (candidate_id) where status in ('queued', 'working');
+alter table public.impact_discovery_research_runs enable row level security;
+revoke all on public.impact_discovery_research_runs from public, anon, authenticated;
+
+-- The newest run of a topic, as the page shows it. A run claimed more than 3 hours ago and not finished is 'stalled' (the
+-- runner died); pressing Start research again starts a run that may claim it.
+create or replace function public._hs_id_research_run(p_candidate uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('id', r.id, 'status', case when r.status = 'working' and r.claimed_at < now() - interval '3 hours' then 'stalled' else r.status end,
+           'requested_by', r.requested_by, 'requested_at', r.requested_at, 'claimed_at', r.claimed_at, 'completed_at', r.completed_at,
+           'attempts', r.attempts, 'summary', r.summary, 'next_step', r.next_step, 'source_slug', r.source_slug, 'story_id', r.story_id)
+    from public.impact_discovery_research_runs r where r.candidate_id = p_candidate order by r.requested_at desc limit 1
+$$;
+
+-- Where the topic's story is on the way to a video: its version, whether the script is approved, the newest render job.
+create or replace function public._hs_id_video_state(p_story uuid)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare s public.impact_stories%rowtype; na jsonb; rj public.impact_story_jobs%rowtype; busy boolean;
+begin
+  select * into s from public.impact_stories where id = p_story;
+  if not found then return null; end if;
+  select * into rj from public.impact_story_jobs where story_id = p_story and kind = 'render' order by created_at desc limit 1;
+  busy := exists (select 1 from public.impact_story_jobs where story_id = p_story and status in ('queued', 'running'));
+  if s.current_version > 0 then na := public._hs_is_artifact_state(p_story, 'narrative'); end if;
+  return jsonb_build_object('story_id', s.id, 'version', s.current_version, 'archived', s.archived_at is not null,
+    'script_ready', s.current_version > 0 and exists (select 1 from public.impact_story_versions v
+                      where v.story_id = s.id and v.version = s.current_version and v.body->'main' is not null),
+    'narrative', coalesce(na->>'state', 'missing'), 'narrative_why', na->>'why', 'job_running', busy,
+    'render', case when rj.id is null then null else jsonb_build_object('status', rj.status, 'created_at', rj.created_at,
+      'completed_at', rj.completed_at, 'error', rj.error, 'current', rj.input->>'narrative_hash' = na->>'hash') end);
+end $$;
+
+-- Starts the research job for a run (homesignal-ingest impact-research-run.yml, on main). Never raises on a missing
+-- credential: the run is recorded failed with a readable reason, so the page shows it instead of a run that never moves.
+create or replace function public._hs_id_research_dispatch(p_run uuid)
+returns void language plpgsql security definer
+set search_path to 'public', 'extensions', 'net', 'vault', 'pg_temp' as $$
+declare _pat text;
+begin
+  select decrypted_secret into _pat from vault.decrypted_secrets where name = 'github_actions_pat';
+  if _pat is null or btrim(_pat) = '' then
+    update public.impact_discovery_research_runs set status = 'failed', completed_at = now(),
+      summary = 'The research could not start because no GitHub credential is stored. Nothing was lost. Press Start research again once it is restored.'
+     where id = p_run and status = 'queued';
+    return;
+  end if;
+  perform net.http_post(
+    url := 'https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/impact-research-run.yml/dispatches',
+    body := jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('run', p_run::text)),
+    headers := jsonb_build_object('Authorization', 'Bearer ' || _pat, 'Accept', 'application/vnd.github+json',
+              'X-GitHub-Api-Version', '2022-11-28', 'User-Agent', 'homesignal-impact-stories', 'Content-Type', 'application/json'),
+    timeout_milliseconds := 15000);
+end $$;
+
+-- The founder's Start research button. A second press while the run is queued, or stalled, starts the job again (the first
+-- start may have been lost; a second job cannot claim a run the first already took); while it is working, it returns that run.
+create or replace function public.hs_impact_discovery_research_start(p_candidate uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); c public.impact_discovery_candidates%rowtype; r public.impact_discovery_research_runs%rowtype;
+begin
+  select * into c from public.impact_discovery_candidates where id = p_candidate for update;
+  if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
+  if c.status in ('rejected', 'dismissed', 'excluded') then
+    raise exception 'This topic was %. Restore it first.', c.status using errcode = '55000';
+  end if;
+  if c.story_id is not null then raise exception 'This topic already has an Impact Story. Open it instead.' using errcode = '55000'; end if;
+  if c.duplicate_of is not null then raise exception 'This topic is the same event as another topic.' using errcode = '55000'; end if;
+  if c.evidence_status = 'verified' and c.source_slug is not null then
+    raise exception 'Its records are already verified. Press Create Impact Story.' using errcode = '55000';
+  end if;
+  select * into r from public.impact_discovery_research_runs where candidate_id = p_candidate and status in ('queued', 'working');
+  if found then
+    if r.status = 'queued' or r.claimed_at < now() - interval '3 hours' then perform public._hs_id_research_dispatch(r.id); end if;
+    return jsonb_build_object('existing', true, 'research', public._hs_id_research_run(p_candidate));
+  end if;
+  insert into public.impact_discovery_research_runs (candidate_id, requested_by) values (p_candidate, e) returning * into r;
+  perform public._hs_id_event(c.id, null, 'research_requested', jsonb_build_object('run', r.id), e);
+  perform public._hs_id_research_dispatch(r.id);
+  return jsonb_build_object('existing', false, 'research', public._hs_id_research_run(p_candidate));
+end $$;
+
+-- The research job's door (service role only, through homesignal-ingest impact-research-run.yml).
+create or replace function public.impact_discovery_research_claim(p_run uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare r public.impact_discovery_research_runs%rowtype; c public.impact_discovery_candidates%rowtype;
+begin
+  select * into r from public.impact_discovery_research_runs where id = p_run for update;
+  if not found then raise exception 'no such run' using errcode = 'P0002'; end if;
+  if not (r.status = 'queued' or (r.status = 'working' and r.claimed_at < now() - interval '3 hours')) then
+    raise exception 'run is % and cannot be claimed', r.status using errcode = '55000';
+  end if;
+  select * into c from public.impact_discovery_candidates where id = r.candidate_id for update;
+  if r.attempts >= 3 or c.status in ('rejected', 'dismissed', 'excluded') or c.story_id is not null then
+    update public.impact_discovery_research_runs set status = 'failed', completed_at = now(),
+           summary = case when r.attempts >= 3 then 'Three attempts did not finish. Press Start research to try again.'
+                          else 'The topic changed (it was closed or already has a story), so the research stopped.' end
+     where id = r.id;
+    perform public._hs_id_event(c.id, null, 'research_failed', jsonb_build_object('run', r.id, 'reason', 'claim'), 'research');
+    raise exception 'run cannot be worked' using errcode = '55000';
+  end if;
+  update public.impact_discovery_research_runs set status = 'working', claimed_at = now(), attempts = attempts + 1,
+         prev_status = coalesce(prev_status, c.status), prev_evidence = coalesce(prev_evidence, c.evidence_status)
+   where id = r.id;
+  update public.impact_discovery_candidates set status = 'researching', evidence_status = 'researching', updated_at = now()
+   where id = c.id;
+  perform public._hs_id_event(c.id, null, 'research_working', jsonb_build_object('run', r.id, 'attempt', r.attempts + 1), 'research');
+  return jsonb_build_object('ok', true, 'run', r.id,
+    'candidate', jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category, 'track', c.track,
+      'origin', c.origin, 'submitted_note', c.submitted_note, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
+      'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage),
+    'library', coalesce((select jsonb_agg(jsonb_build_object('video_slug', s.video_slug, 'title', s.title))
+      from public.impact_stories s where s.archived_at is null), '[]'::jsonb));
+end $$;
+
+-- Finish a run. p_payload: {status: verified|insufficient|failed, summary, next_step, source_slug}. The topic's outcome is
+-- recorded first through impact_discovery_research (verified needs the pack and draft on main); this only closes the run.
+-- A verified run creates the Impact Story for the founder who pressed the button (as Create Impact Story would); a failed run
+-- puts the topic back where it was.
+create or replace function public.impact_discovery_research_complete(p_run uuid, p_payload jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare r public.impact_discovery_research_runs%rowtype; c public.impact_discovery_candidates%rowtype; st text := p_payload->>'status';
+        story jsonb; nxt text := left(nullif(btrim(p_payload->>'next_step'), ''), 300);
+begin
+  select * into r from public.impact_discovery_research_runs where id = p_run for update;
+  if not found then raise exception 'no such run' using errcode = 'P0002'; end if;
+  if r.status <> 'working' then raise exception 'run is %, not working', r.status using errcode = '55000'; end if;
+  if st not in ('verified', 'insufficient', 'failed') then raise exception 'bad status' using errcode = '22023'; end if;
+  if nullif(btrim(p_payload->>'summary'), '') is null then raise exception 'say what was done' using errcode = '22023'; end if;
+  select * into c from public.impact_discovery_candidates where id = r.candidate_id for update;
+  if st = 'verified' and (c.evidence_status <> 'verified' or c.source_slug is null or c.source_slug <> coalesce(p_payload->>'source_slug', '')) then
+    raise exception 'record the verified outcome for this source pack first' using errcode = '55000';
+  end if;
+  if st = 'insufficient' and c.evidence_status <> 'insufficient' then
+    raise exception 'record the insufficient outcome (with what is missing) first' using errcode = '55000';
+  end if;
+  if st = 'failed' and c.evidence_status = 'researching' then
+    update public.impact_discovery_candidates set status = coalesce(r.prev_status, status),
+           evidence_status = coalesce(r.prev_evidence, 'social_only'), updated_at = now() where id = c.id;
+  end if;
+  if st = 'verified' then
+    begin
+      story := public._hs_id_create_story(c.id, r.requested_by, false);
+    exception when others then
+      nxt := left('The records are verified, but the story could not be created: ' || sqlerrm, 300);
+    end;
+  end if;
+  update public.impact_discovery_research_runs set status = st, completed_at = now(), summary = left(p_payload->>'summary', 2000),
+         next_step = nxt, source_slug = case when st = 'verified' then c.source_slug end,
+         story_id = (story->>'story_id')::uuid
+   where id = r.id;
+  perform public._hs_id_event(c.id, null, 'research_run_' || st, jsonb_build_object('run', r.id, 'story_id', story->>'story_id'), 'research');
+  return jsonb_build_object('ok', true, 'status', st, 'story', story);
+end $$;
+
 -- ── grants ───────────────────────────────────────────────────────────────────────────────────────────
 do $$
 declare f text;
@@ -825,19 +1006,22 @@ begin
   foreach f in array array[
     'public._hs_id_event(uuid, uuid, text, jsonb, text)', 'public._hs_id_next_scan(timestamptz)', 'public._hs_id_dispatch(uuid)',
     'public._hs_id_reap()', 'public._hs_id_queue_scan(text, text, text)', 'public._hs_id_performance()', 'public._hs_id_learning()',
-    'public._hs_id_create_story(uuid, text, boolean)', 'public.impact_discovery_tick(timestamptz)'] loop
+    'public._hs_id_create_story(uuid, text, boolean)', 'public.impact_discovery_tick(timestamptz)',
+    'public._hs_id_research_run(uuid)', 'public._hs_id_video_state(uuid)', 'public._hs_id_research_dispatch(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
-    'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)'] loop
+    'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)',
+    'public.hs_impact_discovery_research_start(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;
   foreach f in array array['public.impact_discovery_scan_claim(uuid)', 'public.impact_discovery_coverage(jsonb)',
     'public.impact_discovery_scan_record(uuid, jsonb)', 'public.impact_discovery_scan_finish(uuid, text, jsonb, jsonb, jsonb)',
-    'public.impact_discovery_research(uuid, jsonb)', 'public.impact_discovery_prepare(uuid)', 'public.impact_discovery_nominations()'] loop
+    'public.impact_discovery_research(uuid, jsonb)', 'public.impact_discovery_prepare(uuid)', 'public.impact_discovery_nominations()',
+    'public.impact_discovery_research_claim(uuid)', 'public.impact_discovery_research_complete(uuid, jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;

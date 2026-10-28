@@ -5737,6 +5737,14 @@ water and health near homes, rank them out of 100, and show them above the Impac
   credits); YouTube / Shorts / Bluesky engagement are reported as `not_collected`. Learning moves a score by at most ±5 and
   only after 50 attributed visits and 3 stories in a category.
 - Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
+- **Start research and Create video (founder, 2026-10-28: no Claude window needed).** Each unresearched topic has **Start
+  research** (`hs_impact_discovery_research_start` → `impact_discovery_research_runs`, one active per topic → dispatches ingest
+  `impact-research-run.yml`, Claude on the founder's plan). The run claims, researches, checks, lands the pack on main and
+  calls `impact_discovery_research_complete`; a verified run creates the story for the founder who pressed it, and the tick
+  prepares it. Once the script is approved in the story, the card's **Create video** calls the story's own
+  `hs_impact_story_render` (the database refuses an unapproved script, pg 18m). Apply order: ingest workflow merged first
+  (a dispatch to a missing workflow is lost), then this SQL, then the page. Tests: pg 18a-18m, `impact-discovery` 3f2/3i,
+  browser 8a-8g.
 - **Suggest a topic (founder, 2026-10-28).** A form in Hot Topics calls
   `hs_impact_discovery_suggest`: a candidate with `origin = 'founder'`, no Bluesky lead (the lead columns are nullable only for
   that origin), status `nominated`, shown first as "Your pick". Pasted links are leads, never evidence; the verified-source-pack
