@@ -174,7 +174,7 @@ alter table public.impact_story_media_decisions enable row level security;
 revoke all on public.impact_story_media_decisions from public, anon, authenticated;
 
 -- "Start fixes" (founder, 2026-10-28). One batch = the open fix requests of one story, sent together. A scheduled Claude
--- Code session (homesignal-ingest impact/FIXES.md, no paid API) claims it through impact-fix-batch.yml, changes the story
+-- Code session (homesignal-ingest impact/fixes/FIXES.md, no paid API) claims it through impact-fix-batch.yml, changes the story
 -- or the renderer, and records per request what it did. The batch is the visible state: queued -> working -> done |
 -- needs_you | failed. One active batch per story. Not append-only (its status moves); every move is a story event.
 create table if not exists public.impact_story_fix_batches (
