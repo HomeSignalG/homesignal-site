@@ -281,6 +281,12 @@ begin
     return jsonb_build_object('video_id', p_video_id, 'match_state', 'not_ours');
   end if;
   if p_key not in ('final', 'short1', 'short2') then raise exception 'bad file' using errcode = '22023'; end if;
+  -- A Short (3 minutes or less, the sync's SHORT_MAX_S) is never a project's main video (founder, 2026-10-28). The automatic
+  -- match already refused this; the hand match did not, and a 36-second Short was saved as 3004's main video.
+  if p_key = 'final' and exists (select 1 from public.youtube_channel_videos
+        where video_id = p_video_id and duration_s is not null and duration_s <= 180) then
+    raise exception 'This video is a Short (3 minutes or less). Only a main video can be linked to a project.' using errcode = '22023';
+  end if;
   if not exists (select 1 from public.youtube_video_reviews where slug = p_slug) then raise exception 'unknown project' using errcode = 'P0002'; end if;
   if exists (select 1 from public.youtube_channel_videos where slug = p_slug and file_key = p_key and match_state = 'matched' and video_id <> p_video_id) then
     raise exception 'another video is already matched to this item' using errcode = 'P0001';

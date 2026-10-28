@@ -24,6 +24,8 @@ const channel = { last_ok: '2026-10-25T20:00:00Z', last_run: { ok: true, public_
   v({ video_id: 'SCHED000001', title: 'Coming soon', slug: 'p1', file_key: 'short1', publish_at: '2026-10-30T15:00:00Z', privacy_status: 'private' }),
   v({ video_id: 'UNKNOWN0001', title: 'Mystery upload', match_state: 'unmatched', match_note: 'no project description found' }),
   v({ video_id: 'OLDVIDEO001', title: 'Old video', match_state: 'unmatched', historical: true }),
+  v({ video_id: 'SHORTCONFL1', title: 'A Short wrongly saved as main', slug: 'p1', file_key: 'final', duration_s: 36, link_state: 'conflict' }),
+  v({ video_id: 'SHORTUNMAT1', title: 'An unmatched Short', match_state: 'unmatched', duration_s: 35 }),
 ] };
 
 // 1. states, in the founder's words
@@ -44,6 +46,9 @@ ok(/YouTube channel<\/h3>[\s\S]*Checked automatically every hour/.test(html), '3
 ok((html.match(/class="yv-msel"/g) || []).length === 1 && /data-vid="UNKNOWN0001"/.test(html), '3b only the unmatched new video gets a match control');
 ok(!/data-vid="OLDVIDEO001"/.test(html), '3c a historical video is not put in front of the founder');
 ok(/value="\|none">Not a project video/.test(html) && /value="p1\|final">/.test(html), '3d choices are project items or "not a project video"');
+ok(!/data-vid="SHORTCONFL1"/.test(html) && !/data-vid="SHORTUNMAT1"/.test(html), '3g a Short is never put in front of the founder for a match');
+ok(!/value="p1\|short1"/.test(html) && !/value="p1\|short2"/.test(html), '3h only a main video can be chosen');
+ok(/p_key = 'final' and exists \(select 1 from public\.youtube_channel_videos[\s\S]{0,120}duration_s <= 180\)/.test(sql), '3i the database refuses a Short saved as a main video');
 ok(/The last check failed/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: false, detail: { error: 'quotaExceeded' } } }))), '3e a failed check is shown');
 ok(/Public videos only/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: true, public_only: true } }))) && !/Public videos only/.test(html), '3f public-only reading is said, owner reading is not');
 // 4. without the sync applied the tab is unchanged

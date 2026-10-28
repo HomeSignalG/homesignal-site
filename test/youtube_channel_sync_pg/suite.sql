@@ -88,6 +88,16 @@ select public.hs_youtube_channel_video_match('UNKNOWN0001', null, null);
 select public.youtube_sync_record(jsonb_build_array(pg_temp.row('UNKNOWN0001','p2','short1','matched',true)), 'oauth');
 select pg_temp.chk('9c "not ours" sticks', (pg_temp.vid('UNKNOWN0001')).match_state='not_ours');
 select pg_temp.chk('9d two videos cannot be matched to one item by hand', pg_temp.throws($q$select public.hs_youtube_channel_video_match('REUPLOAD001','p1','final')$q$));
+select public.youtube_sync_record(jsonb_build_array(jsonb_set(pg_temp.row('SHORTVIDEO1',null,null,'unmatched',true),'{duration_s}','36')), 'oauth');
+insert into public.youtube_video_reviews (slug, title, files, meta, bsky_posts, reconcile_required)
+  select 'p4', 'Project p4', files, meta, '{}', false from public.youtube_video_reviews where slug = 'p2';
+select pg_temp.chk('9g a Short cannot be matched as a main video by hand', pg_temp.throws($q$select public.hs_youtube_channel_video_match('SHORTVIDEO1','p4','final')$q$)
+   and (pg_temp.vid('SHORTVIDEO1')).match_state='unmatched' and pg_temp.url('p4') is null);
+select public.youtube_sync_record(jsonb_build_array(pg_temp.row('LONGVIDEO01',null,null,'unmatched',true)), 'oauth');
+select public.hs_youtube_channel_video_match('LONGVIDEO01','p4','final');
+select pg_temp.chk('9g2 control: a 5-minute video is matched as the main video', (pg_temp.vid('LONGVIDEO01')).match_state='matched' and pg_temp.url('p4') = 'https://youtu.be/LONGVIDEO01');
+select public.hs_youtube_channel_video_match('SHORTVIDEO1', null, null);
+select pg_temp.chk('9h a Short can still be marked not a project video', (pg_temp.vid('SHORTVIDEO1')).match_state='not_ours');
 select pg_temp.chk('9f the list says public-only, never the credential mode', not (public.hs_youtube_channel_videos_list()->'last_run' ? 'mode') and (public.hs_youtube_channel_videos_list()->'last_run'->>'public_only') = 'false');
 select pg_temp.chk('9e the founder sees the list', jsonb_array_length(public.hs_youtube_channel_videos_list()->'videos') >= 6);
 -- 10. permissions
