@@ -83,5 +83,21 @@ const rpc = sql.slice(sql.indexOf('create or replace function public.hs_saleshan
 ok(!/'email'|'zip|'address|u\.email\s+as/.test(rpc.replace(/auth\.jwt\(\) ->> 'email'/, '').replace(/lower\(u?\.?email\)|lower\(sb\.email\)|lower\(email\)/g, '')), 'the reader returns no e-mail, ZIP or address key');
 ok(!/saleshandy_(campaign|sync)\w* *\(.*(email|prospect|first_name|last_name)/i.test(sql.split('-- 3. The gated reader')[0].replace(/--.*$/gm, '')), 'Saleshandy tables hold no prospect personal data');
 
+// The Saleshandy tab counts Saleshandy campaigns only (2026-10-29: the tile read "Registrations 2"
+// while both were a Bluesky "maps" test and an admin test; the Saleshandy sequence had 0).
+{
+  const vm = await import('node:vm');
+  const ctx = { window: {} }; vm.createContext(ctx);
+  vm.runInContext(read('lib/acq-saleshandy.js'), ctx);
+  const html = ctx.window.HS.acqSaleshandy.render({ window_days: 30, coverage: {}, campaigns: [
+    { campaign: 'pierce_agents_oct2026', name: 'New Sequence - Wed 21st Oct', status: 'active', delivered: 49, registrations: 0, visitors: 0 },
+    { campaign: 'maps', registrations: 1 },
+    { campaign: 'pierce_wa_launch_quality_2026-10-18', registrations: 1, visitors: 3 } ] });
+  const tileVal = (label) => (html.match(new RegExp('tile-val">([^<]*)</div><div class="tile-label">' + label)) || [])[1];
+  ok(tileVal('Registrations') === '0', 'registrations tile counts Saleshandy campaigns only');
+  ok(tileVal('Website visitors') === '0', 'visitors tile counts Saleshandy campaigns only');
+  ok(!/<td>maps</.test(html) && /Not counted above \(not Saleshandy\): maps/.test(html), 'other labels are named, not put in the table');
+}
+
 if (fails) { console.error('\n' + fails + ' check(s) failed'); process.exit(1); }
 console.log('\nall saleshandy-attribution checks passed');
