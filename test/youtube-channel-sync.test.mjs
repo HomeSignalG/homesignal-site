@@ -26,6 +26,14 @@ const channel = { last_ok: '2026-10-25T20:00:00Z', last_run: { ok: true, public_
   v({ video_id: 'OLDVIDEO001', title: 'Old video', match_state: 'unmatched', historical: true }),
 ] };
 
+// 0. each file shows its video code, from the series number in front of the Tab 16 title
+{
+  const h = Y.render([Object.assign({}, row, { title: '3006 Proctor 4 Mixed-Use (Tacoma)' })], {}, true, channel);
+  ok(h.includes('<code>JODY-3006-V</code>') && h.includes('<code>JODY-3006-S1</code>'), '0a main video and Short 1 show their codes');
+  ok(!h.includes('JODY-3006-S2'), '0b a file not uploaded shows no code');
+  ok(!Y.render([row], {}, true, channel).includes('JODY-'), '0c a title with no number shows no code');
+}
+
 // 1. states, in the founder's words
 ok(Y.ytState(channel.videos[0]).label === 'Published on YouTube', '1a public verified -> Published on YouTube');
 ok(/^Scheduled for /.test(Y.ytState(channel.videos[1]).label), '1b scheduled -> Scheduled for <date>');
