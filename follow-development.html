@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Follow this development</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://qwnnmljucajnexpxdgxr.supabase.co wss://qwnnmljucajnexpxdgxr.supabase.co; form-action 'none'">
+<link rel="stylesheet" href="layout.css?v=c3f3f5d5">
+<link rel="stylesheet" href="app.css?v=aad7c2d4">
+<style>
+#fdRoot{max-width:640px;margin:32px auto;padding:0 16px}
+#fdRoot .fd-msg{display:block;font-size:14px;margin-top:8px}
+</style>
+</head>
+<body data-nav="" data-page-type="follow-development">
+<!-- Follow Development (2026-10-29). The dossier pages ship no script, so their Follow link opens this
+     page. It uses the shell's own sign-in and follow write (HS.requireAuth, HS.toggleFollow:
+     app_follows target_type='development', target_id=<project_key>); nothing here is a second follow
+     system. It reads the account's row only to say "you already follow this". -->
+<template id="hs-content"><div id="fdRoot">
+  <p class="eyebrow">Development</p>
+  <h1 id="fdName">Follow this development</h1>
+  <p id="fdBack"></p>
+  <p><button type="button" class="btn" id="fdBtn" disabled>Follow this development</button></p>
+  <p class="quiet" id="fdNote">Saved to your HomeSignal account. Follows of developments are not yet listed in My Places.</p>
+</div></template>
+<noscript><p>Following a development needs JavaScript.</p></noscript>
+<script src="config.js"></script>
+<script src="seed/delvalle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
+<script src="lib/data.js?v=4d7e6fb8"></script>
+<script src="lib/topic-prefs.js?v=fe87d99b"></script>
+<script src="lib/templates.js?v=c408a2cb"></script>
+<script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
+<script src="lib/community-request.js?v=e1d9c7d7"></script>
+<script src="shell.js?v=96cfbb3e"></script>
+<script>
+(function(){
+  'use strict';
+  var m = /[?&]d=([a-z]{2})\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:&|$)/.exec(location.search || '');
+  function boot(HS){
+    var btn = document.getElementById('fdBtn'), back = document.getElementById('fdBack');
+    var name = document.getElementById('fdName'), note = document.getElementById('fdNote');
+    if (!m) { name.textContent = 'This development link is not valid.'; btn.style.display = 'none'; return; }
+    var key = m[2], path = '/development/' + m[1] + '/' + key + '/';
+    var a = document.createElement('a'); a.href = path; a.textContent = 'Back to the development page'; back.appendChild(a);
+    // The name is the dossier page's own H1 (same origin); the key is shown until it loads.
+    name.textContent = 'Follow ' + key;
+    fetch(path, { credentials: 'omit' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+      var h = /<h1>([^<]{1,200})<\/h1>/.exec(t || '');
+      if (h) { var d = document.createElement('div'); d.innerHTML = h[1]; name.textContent = 'Follow ' + d.textContent; }
+    }).catch(function () {});
+    btn.disabled = false;
+    function run(){ HS.toggleFollow(btn, 'development', key); }
+    btn.addEventListener('click', function () {
+      if (!HS.requireAuth('follow-development', run)) return;
+      run();
+    });
+    try {
+      if (HS.sb) {   // RLS returns only the signed-in account's own rows; signed out, none
+        HS.sb().from('app_follows').select('target_id').eq('target_type', 'development').eq('target_id', key)
+          .then(function (res) {
+            if (res && !res.error && res.data && res.data.length) note.textContent = 'You already follow this development.';
+          }, function () {});
+      }
+    } catch (e) {}
+  }
+  var HSg = window.HS;
+  if (HSg && HSg.onReady) HSg.onReady(boot);
+})();
+</script>
+</body>
+</html>

@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 # on sys.path; the sibling module is the page-semantics authority and is imported by name.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import page_semantics as ps  # noqa: E402
+import development_pages as dvp  # noqa: E402
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = ps.BASE   # one origin, from the brand contract
@@ -981,6 +982,11 @@ def render(p, built):
         links += (f'<nav class="zproj" aria-label="Projects on record"><a href="'
                   f'{project_list_path(z)}">All {npl} project{"s" if npl != 1 else ""} on record '
                   f'in {esc(z)}</a></nav>')
+    # Development dossiers that touch this ZIP (reviewed, published; scripts/development_pages.py).
+    dvs = p.get("dossiers") or []
+    if dvs:
+        links += ('<nav class="zdev" aria-label="Developments"><h2>Developments HomeSignal follows here</h2><ul>'
+                  + "".join(f'<li><a href="{esc(u)}">{esc(n)}</a></li>' for n, u in dvs) + '</ul></nav>')
     body = (
         f'<main id="hs-ssr"><header><p class="eyebrow">Activity</p>'
         f'<h1>{esc(z)} · {esc(plabel)}</h1>'
@@ -1354,6 +1360,8 @@ def render_project(pr, pages, built, projects=None):
                  + '</nav>')
     status_line = f'<p>{esc(kind)} · {esc(pr["lifecycle"])}' + (
         f' <span class="quiet">as of {as_of_el}</span>' if (as_of_el and pr["tracked"]) else "") + '</p>'
+    # A reviewed development dossier that links this record (scripts/development_pages.py).
+    status_line += "".join(f'<p>Part of <a href="{esc(u)}">{esc(n)}</a></p>' for n, u in (pr.get("part_of") or []))
     notice = ""
     if not pr["tracked"]:
         # Inline style: app.css is shared and frozen ("do not restyle"); the page CSP allows
@@ -1732,7 +1740,7 @@ SITEMAP_MAX_URLS = 50000        # the sitemaps.org limit for one file
 
 
 def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=(),
-                      lastmod=None, map_paths=()):
+                      lastmod=None, map_paths=(), dev_paths=()):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -1797,6 +1805,10 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     mps = sorted(map_paths)
     if mps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{mp}", lm.get(mp)) for mp in mps)
+    # Development dossiers (/development/<st>/<key>/, 2026-10-29): published, reviewed, indexable.
+    dps = sorted(dev_paths)
+    if dps:
+        block += "\n" + "\n".join(_url_el(f"{BASE}{dp_}", lm.get(dp_)) for dp_ in dps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1808,7 +1820,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
         return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps),
-                "projects": len(pps), "guides": len(gps), "maps": len(mps)}
+                "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
@@ -1833,6 +1845,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     nmp = len(re.findall(r"<loc>[^<]*/map/\d{5}/</loc>", txt))
     if nmp != len(mps):
         sys.exit(f"ERROR: sitemap carries {nmp} map URLs for {len(mps)} indexable map pages")
+    ndv = len(re.findall(r"<loc>[^<]*/development/[a-z]{2}/[a-z0-9-]+/</loc>", txt))
+    if ndv != len(dps):
+        sys.exit(f"ERROR: sitemap carries {ndv} development URLs for {len(dps)} development pages")
     n_master = len(re.findall(r"<loc>", txt))
     if n_master > SITEMAP_MAX_URLS:
         sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit")
@@ -1845,7 +1860,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
-            "projects": len(pps), "guides": len(gps), "maps": len(mps)}
+            "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps)}
 
 
 # ---------------------------------------------------------------- family sitemaps (plan step 14)
@@ -1860,7 +1875,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 # "zip" lists EVERY community document (index-all policy). zip-alerts and zip-development are kept as
 # MEASUREMENT partitions (Search Console already has them submitted); they exclude nothing, because the
 # master and the "zip" family list every ZIP.
-SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list")
+SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list",
+                    "development")
 
 
 def write_family_sitemaps(out_dir, families, lastmod=None):
@@ -2145,6 +2161,9 @@ def main():
                     help="project pages' data JSON published beside the plane "
                          "(default: data/development_seo_projects.json). Production: missing, "
                          "or from a different run than the plane, is a hard error.")
+    ap.add_argument("--dev-dossiers", default=None,
+                    help="published development dossiers (default: data/development_dossiers.json; "
+                         "a fixture reads a sibling development_dossiers.json when present)")
     ap.add_argument("--zip-coverage", default=COVERAGE_PATH,
                     help="ZIP coverage model JSON (default: lib/zip-coverage.json). Tests point "
                          "this at a fixture model; production always uses the committed one.")
@@ -2216,8 +2235,18 @@ def main():
                                      cities_path=cities_path, projects_out=projects,
                                      projects_path=projects_path, max_age_hours=a.plane_max_age_hours)
 
+    dossiers_path = a.dev_dossiers
+    if dossiers_path is None and a.fixture:
+        sibling = os.path.join(os.path.dirname(os.path.abspath(a.fixture)), "development_dossiers.json")
+        dossiers_path = sibling if os.path.isfile(sibling) else None
+    if dossiers_path is None and not a.fixture:
+        dossiers_path = os.path.join(os.path.dirname(__file__), "..", "data", "development_dossiers.json")
+    # Production: pages.yml writes this file (an empty list when the object does not exist yet);
+    # its absence here means that step did not run, which is an error, not "no dossiers".
+    dossiers = dvp.load(dossiers_path, required=not a.fixture)
+
     ps.assert_token_absent(json.dumps(d, default=str) + json.dumps(cities, default=str)
-                           + json.dumps(projects, default=str))
+                           + json.dumps(projects, default=str) + json.dumps(dossiers, default=str))
     zips = d["zips"]
     if len(zips) != len(set(zips)):
         sys.exit(f"ERROR: duplicate ZIPs in canonical registry: {len(zips)} rows, {len(set(zips))} distinct")
@@ -2279,6 +2308,8 @@ def main():
         pages[z]["rule_d"], pages[z]["rule_d_count"], pages[z]["dev_entities"] = False, 0, []
     link_cities(pages, cities)
     linked = link_projects(pages, cities, projects)
+    dvp.annotate(dossiers, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    dvp.link_pages(dossiers, pages, projects)
     npass = sum(1 for p in pages.values() if p["rule_f"])
     ndpass = sum(1 for p in pages.values() if p.get("rule_d"))
     # The semantic state is collected by the SAME render calls that write the documents: one
@@ -2292,6 +2323,7 @@ def main():
     city_paths = sorted(city_path(c) for c in cities.values())
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
     project_paths = sorted(pr["path"] for pr in projects.values())
+    dev_paths = dvp.build(dossiers, pages, a.out, now_iso[:10], _head, state, base=BASE)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
     project_lastmod = {pr["path"]: pr["changed_on"] for pr in projects.values()}
@@ -2309,19 +2341,20 @@ def main():
     if map_idx != {map_path(z) for z in map_indexable}:
         sys.exit("ERROR: robots-derived index-eligible map set != the sitemap's map set")
     for p, e in page_state.items():
-        if ps.family_of(p) in ("city", "project", "guide") and not e["i"]:
+        if ps.family_of(p) in ("city", "project", "guide", "development") and not e["i"]:
             sys.exit(f"ERROR: {p} is advertised in the sitemap but its document says noindex")
     lastmod_map = {p: e["l"] for p, e in page_state.items() if e["l"]}
     map_paths = [map_path(z) for z in map_indexable]
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
-                           lastmod=lastmod_map, map_paths=map_paths)
+                           lastmod=lastmod_map, map_paths=map_paths, dev_paths=dev_paths)
     fam = write_family_sitemaps(a.out, {
         "zip": [f"/community/{z}/" for z in sorted(pages)],
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
         "zip-development": [f"/community/{z}/" for z, p in pages.items() if p.get("rule_d")],
         "city": city_paths, "project": project_paths, "guide": guide_paths,
         "map": map_paths,
-        "project-list": [project_list_path(z) for z in sorted(pages) if pages[z].get("project_list")]},
+        "project-list": [project_list_path(z) for z in sorted(pages) if pages[z].get("project_list")],
+        "development": dev_paths},
         lastmod=lastmod_map)
     focus = write_focus_sitemaps(a.out, load_focus_areas(), pages, indexable, lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
@@ -2340,6 +2373,8 @@ def main():
     print(f"map pages      : {nmap} (/map/<zip>/; {len(map_indexable)} indexable; "
           f"{map_bytes/1048576:.1f} MB)")
     print(f"city pages     : {ncity}")
+    print(f"development    : {len(dev_paths)} dossier pages "
+          f"({sum(len(dv.get('withheld') or []) for dv in dossiers.values())} links withheld by the snapshot)")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
           f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
           f"{sum(1 for p in projects.values() if not p['tracked'])} no longer tracked; "
@@ -2391,6 +2426,7 @@ def main():
                "sitemap_dev_urls_removed": sm["removed_dev"],
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
+               "development_pages": dev_paths, "sitemap_development_urls": sm["developments"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
                "family_sitemaps": fam,
                "focus_sitemaps": focus,

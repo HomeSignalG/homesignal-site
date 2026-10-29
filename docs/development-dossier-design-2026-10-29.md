@@ -279,3 +279,24 @@ others.
 - Data: revoke links; history stays.
 - Tables: drop after the renderer is reverted (no other readers).
 - Follow: the new `target_type` rows stay readable; nothing deletes legacy follows.
+
+## 13. What the implementation adds to this proposal (2026-10-29, after approval in principle)
+
+Built in `docs/development-dossier.sql`, `scripts/development_pages.py` and homesignal-ingest
+`scripts/publish_development_dossiers.mjs`. Three additions, each needed to build the approved page:
+
+1. **Reviewer statements** (`development_project_statement`): the summary, "what changed", "what's next", what is
+   known, what is not known yet, and possible effects. These are reviewer-written sentences, not data from an owning
+   table, so they need their own rows. The rows are append-only, reviewers only, never automated. A fact-stating kind
+   (summary, latest, known, impact) must carry an https source.
+2. **One name.** `development_project.display_name` is nullable. A project that links an approved land assembly takes
+   `resolved_projects.display_name` (founder, 2026-10-29: no competing authoritative names). A second, different name is
+   refused when it is written and again at snapshot time. `name_basis` carries `descriptive`, so the page can say
+   "Descriptive label by HomeSignal. No public record names this project."
+3. **Follow without a schema change.** `app_follows` has no `target_type` check (measured 2026-10-29), so a development
+   follow is `target_type='development'`, `target_id=<project_key>`, written by `HS.toggleFollow` from
+   `follow-development.html`. The dossier pages ship no script.
+
+**Not built here:** listing development follows in My Places, alerts for followed developments, `news_report` links on
+the page (grade c cannot be approved), following `dc_canonical_entity.superseded_by` (a superseded entity's link is
+withheld and counted), and the reviewer UI (reviewers call the `development_*` functions).
