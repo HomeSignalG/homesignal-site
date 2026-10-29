@@ -5841,7 +5841,7 @@ runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-blu
 disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
 
 **YouTube links found automatically (2026-10-25) - SQL PARKED (NOT APPLIED):** `docs/youtube-channel-sync.sql` adds
-`public.youtube_channel_videos` (one row per channel video, written only by ingest's daily sync) and fills a project's
+`public.youtube_channel_videos` (one row per channel video, written only by ingest's twice-daily sync) and fills a project's
 `youtube_url` when its main video is matched and verified public. It never replaces an existing link and never links a
 video from the first import. Tab 16 shows what the sync found; typing a link by hand is now only for an exception. Every
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
@@ -5892,7 +5892,7 @@ post id. A post never measured shows a dash, never 0.
   displays one admin-only reader, `hs_youtube_engagement(p_days)` (`docs/youtube-engagement.sql`): subscribers and channel views,
   per-video views / likes / comments (MAIN or SHORT, the reader's `kind`, 3 minutes or less = Short), and first visits,
   registrations and reports whose channel is `youtube`.
-  - **Counts:** homesignal-ingest's daily `youtube_channel_sync.py` also asks for `statistics` on the calls it already makes
+  - **Counts:** homesignal-ingest's twice-daily `youtube_channel_sync.py` also asks for `statistics` on the calls it already makes
     (no extra quota) and appends to `youtube_video_metrics` / `youtube_channel_metrics` (RLS on, no visitor access). A hidden count
     is null. "In this period" needs a reading from within 2 days before the period started, else it is a dash.
   - **Visits:** `classify_channel` files `utm_source=youtube` and a youtube.com / youtu.be referrer as `youtube` (from 2026-10-27;
