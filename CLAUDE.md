@@ -3750,7 +3750,14 @@ Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) wa
 - **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
   row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
   link first.
-- **Not yet built:** a Map 1 layer, a health alert for missed loads, the other western states.
+- **Map 1 layer (2026-10-29):** its own layer and switch, "Water rights filings" (blue circle "W", `?water=0/1`),
+  `lib/water-rights-map.js`. ZIP mode reuses `water_rights_for_zip`, whose points now carry the `'member'` verdict, through
+  `HS.zipModeSites`. Address mode reads `map1_water_rights_near(lat,lng,radius_mi)` (every loaded state, the circle decides,
+  radius capped at 20 mi). Both readers build filings with one helper, `water_rights_filings_json`. Pins are never counted as
+  EPA facilities or projects. Filings at one point are one pin. Lists count filings, not points.
+  Tests: `test/water-rights-map.test.mjs`, `test/map1-water-rights.browser.test.mjs`.
+- **Missed loads page:** homesignal-ingest `water_rights_loads` in `pipeline_health_tick()` (#957, applied 2026-10-29).
+- **Not yet built:** the other western states.
 - Tests: `test/state_water_rights_pg` (40 checks, 12 mutations killed; `state-water-rights-suite.yml`),
   `test/water-rights-section.test.mjs`, `test/water-rights-section.browser.test.mjs`.
 

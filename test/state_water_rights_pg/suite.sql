@@ -64,6 +64,27 @@ select pg_temp.ck('reader 84336: the agency record link and status are the agenc
   (:'z1'::jsonb #>> '{filings,0,record_url}') = 'https://www.waterrights.utah.gov/search/?q=a55167'
   and (:'z1'::jsonb #>> '{filings,0,status}') = 'Unapproved'
   and (:'z1'::jsonb ->> 'agency') = 'Utah Division of Water Rights');
+select pg_temp.ck('reader 84336: every point carries the polygon verdict (Map 1 admits on it)',
+  (select bool_and(p ->> 'zip_membership' = 'member') from jsonb_array_elements(:'z1'::jsonb #> '{filings,0,points}') p));
+-- Map 1 address mode: the circle reader
+select public.map1_water_rights_near(41.745, -112.68, 3) as n1 \gset
+select pg_temp.ck('near: a55167 within 3 mi, both points, no ZIP verdict',
+  (select count(*) = 1 from jsonb_array_elements(:'n1'::jsonb -> 'filings') f where f ->> 'filing_no' = 'a55167'
+     and jsonb_array_length(f -> 'points') = 2 and not (f #> '{points,0}' ? 'zip_membership')), :'n1');
+select pg_temp.ck('near: each filing names its source and state',
+  (:'n1'::jsonb #>> '{filings,0,source}') = 'ut_dwr_pending' and (:'n1'::jsonb #>> '{filings,0,state}') = 'UT');
+select pg_temp.ck('near: the loaded sources are listed with their load state',
+  (select count(*) = 2 and count(*) filter (where s ->> 'source' = 'ut_dwr_pending' and s ->> 'status' = 'complete') = 1
+     from jsonb_array_elements(:'n1'::jsonb -> 'sources') s));
+select pg_temp.ck('near: a point outside the circle is not returned',
+  jsonb_array_length(public.map1_water_rights_near(41.745, -112.68, 0.5) -> 'filings') = 0
+  and jsonb_array_length(public.map1_water_rights_near(38.0, -110.0, 1) -> 'filings') = 1);
+-- a point inside the square around the circle but 1.27 mi from its centre (radius 1) is outside it
+select pg_temp.ck('near: the circle, not its bounding square, decides',
+  jsonb_array_length(public.map1_water_rights_near(41.7464, -112.6828, 1) -> 'filings') = 0
+  and jsonb_array_length(public.map1_water_rights_near(41.7464, -112.6828, 1.4) -> 'filings') = 1);
+do $$ begin perform public.map1_water_rights_near(41.7, -112.6, 50); perform pg_temp.ck('near: a radius over 20 mi is refused', false);
+exception when others then perform pg_temp.ck('near: a radius over 20 mi is refused', sqlstate = '22023'); end $$;
 select public.water_rights_for_zip('84302') as z2 \gset
 select pg_temp.ck('reader 84302: a person is not named',
   (:'z2'::jsonb #>> '{filings,0,applicant}') = 'Individual applicant' and (:'z2'::jsonb #>> '{filings,0,applicant_withheld}') = 'true', :'z2');
@@ -106,6 +127,8 @@ select pg_temp.ck('removal: run complete', (select outcome = 'complete' from pub
 select pg_temp.ck('removal: rows kept, marked removed',
   (select count(*) = 2 and bool_and(removed_from_source_at is not null) from public.water_rights_filings where filing_no = 'a55167'));
 select pg_temp.ck('removal: observations recorded', (select count(*) = 2 from public.water_rights_filing_observations where event = 'removed_from_source'));
+select pg_temp.ck('removal: the circle no longer lists it',
+  not exists (select 1 from jsonb_array_elements(public.map1_water_rights_near(41.745, -112.68, 3) -> 'filings') f where f ->> 'filing_no' = 'a55167'));
 select pg_temp.ck('removal: the page no longer lists it', jsonb_array_length(public.water_rights_for_zip('84336') -> 'filings') = 0
   and (public.water_rights_for_zip('84336') ->> 'status') = 'complete');
 
@@ -131,6 +154,9 @@ select pg_temp.ck('names: LLC / district / city are named',
 
 -- 10. who may run what
 select pg_temp.ck('grants: anon may read a page', has_function_privilege('anon', 'public.water_rights_for_zip(text)', 'execute'));
+select pg_temp.ck('grants: anon may read the circle, not the shape helper',
+  has_function_privilege('anon', 'public.map1_water_rights_near(double precision, double precision, double precision)', 'execute')
+  and not has_function_privilege('anon', 'public.water_rights_filings_json(public.water_rights_filings[], boolean)', 'execute'));
 select pg_temp.ck('grants: anon may not fire or collect',
   not has_function_privilege('anon', 'public.water_rights_fire(text)', 'execute')
   and not has_function_privilege('anon', 'public.water_rights_collect()', 'execute')

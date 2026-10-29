@@ -382,6 +382,34 @@ as $fn$
   end
 $fn$;
 
+-- ONE shape for a list of filings, used by both readers (the ZIP page / Map 1 ZIP mode, and Map 1's
+-- address circle). Points are grouped back into filings per source. p_zip_member stamps each point
+-- with the ZIP reader's polygon verdict ('member'), which Map 1 ZIP mode admits on; the circle
+-- reader sends no verdict, because it makes no ZIP claim.
+create or replace function public.water_rights_filings_json(p_points public.water_rights_filings[], p_zip_member boolean)
+returns jsonb
+language sql
+stable
+set search_path to 'public', 'pg_temp'
+as $fn$
+  select coalesce(jsonb_agg(f order by f ->> 'filed_on' desc nulls last, f ->> 'filing_no' collate "C"), '[]'::jsonb)
+    from (select jsonb_strip_nulls(jsonb_build_object(
+                   'source', w.source, 'state', min(w.state),
+                   'filing_no', w.filing_no,
+                   'right_no', case when w.right_no is distinct from w.filing_no then w.right_no end,
+                   'filing_type', min(w.filing_type), 'status', min(w.status),
+                   'uses', min(w.uses), 'diversion', min(w.diversion),
+                   'applicant', public.water_rights_display_applicant(min(w.applicant)),
+                   'applicant_withheld', case when public.water_rights_display_applicant(min(w.applicant)) = 'Individual applicant' then true end,
+                   'filed_on', min(w.filed_on), 'date_label', min(w.date_label),
+                   'record_url', min(w.record_url),
+                   'points', jsonb_agg(jsonb_build_object('lat', w.lat, 'lng', w.lng)
+                                       || case when p_zip_member then jsonb_build_object('zip_membership', 'member') else '{}'::jsonb end
+                                       order by w.point_key collate "C"))) f
+            from unnest(p_points) w
+           group by w.source, w.filing_no, w.right_no) x
+$fn$;
+
 create or replace function public.water_rights_for_zip(p_zip text)
 returns jsonb
 language plpgsql
@@ -392,6 +420,7 @@ as $fn$
 declare
   v_state text; st public.water_rights_states; src public.water_rights_sources;
   v_last timestamptz; v_geom geometry; v_box box2d; v_filings jsonb; v_status text;
+  v_pts public.water_rights_filings[];
 begin
   if p_zip is null or p_zip !~ '^[0-9]{5}$' then
     raise exception 'invalid zip' using errcode = '22023';
@@ -416,26 +445,57 @@ begin
   end if;
   v_status := case when v_last is null or v_last < now() - interval '48 hours' then 'unavailable' else 'complete' end;
   v_box := box2d(v_geom);
-  select coalesce(jsonb_agg(f order by f ->> 'filed_on' desc nulls last, f ->> 'filing_no' collate "C"), '[]'::jsonb)
-    into v_filings
-    from (select jsonb_strip_nulls(jsonb_build_object(
-                   'filing_no', w.filing_no,
-                   'right_no', case when w.right_no is distinct from w.filing_no then w.right_no end,
-                   'filing_type', min(w.filing_type), 'status', min(w.status),
-                   'uses', min(w.uses), 'diversion', min(w.diversion),
-                   'applicant', public.water_rights_display_applicant(min(w.applicant)),
-                   'applicant_withheld', case when public.water_rights_display_applicant(min(w.applicant)) = 'Individual applicant' then true end,
-                   'filed_on', min(w.filed_on), 'date_label', min(w.date_label),
-                   'record_url', min(w.record_url),
-                   'points', jsonb_agg(jsonb_build_object('lat', w.lat, 'lng', w.lng) order by w.point_key collate "C"))) f
-            from public.water_rights_filings w
-           where w.source = src.source and w.removed_from_source_at is null and w.record_url is not null
-             and w.lat between st_ymin(v_box) and st_ymax(v_box)
-             and w.lng between st_xmin(v_box) and st_xmax(v_box)
-             and geo.zip_point_membership_in(v_geom, w.lat, w.lng) = 'member'
-           group by w.filing_no, w.right_no) x;
+  select array_agg(w) into v_pts
+    from public.water_rights_filings w
+   where w.source = src.source and w.removed_from_source_at is null and w.record_url is not null
+     and w.lat between st_ymin(v_box) and st_ymax(v_box)
+     and w.lng between st_xmin(v_box) and st_xmax(v_box)
+     and geo.zip_point_membership_in(v_geom, w.lat, w.lng) = 'member';
+  v_filings := public.water_rights_filings_json(v_pts, true);
   return jsonb_build_object('zip', p_zip, 'state', v_state, 'state_name', st.name, 'agency', src.agency,
                             'status', v_status, 'checked_at', v_last, 'filings', v_filings);
+end
+$fn$;
+
+-- Map 1 ADDRESS MODE: the pending filings whose point lies within the resident's circle, from
+-- every loaded state (a circle can cross a state line). Each source says when it was last
+-- loaded and whether that is older than 48 hours; its filings are still returned, and the page
+-- says they were last confirmed then. A bad point or radius is refused, never answered "none".
+create or replace function public.map1_water_rights_near(p_lat double precision, p_lng double precision, p_radius_mi double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path to 'public', 'extensions', 'pg_temp'
+as $fn$
+declare
+  v_pts public.water_rights_filings[]; v_sources jsonb;
+begin
+  if p_lat is null or p_lng is null or p_radius_mi is null
+     or p_lat not between -90 and 90 or p_lng not between -180 and 180
+     or p_radius_mi <= 0 or p_radius_mi > 20 then
+    raise exception 'invalid point or radius' using errcode = '22023';
+  end if;
+  select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+           'source', s.source, 'state', st.state, 'state_name', st.name, 'agency', s.agency,
+           'checked_at', r.last,
+           'status', case when r.last is null or r.last < now() - interval '48 hours' then 'unavailable' else 'complete' end))
+           order by s.source collate "C"), '[]'::jsonb)
+    into v_sources
+    from public.water_rights_states st
+    join public.water_rights_sources s on s.source = st.source
+    left join lateral (select max(x.finished_at) as last from public.water_rights_runs x
+                        where x.source = s.source and x.outcome = 'complete') r on true
+   where st.status = 'loaded';
+  select array_agg(w) into v_pts
+    from public.water_rights_filings w
+    join public.water_rights_states st on st.source = w.source and st.status = 'loaded'
+   where w.removed_from_source_at is null and w.record_url is not null
+     and w.lat between p_lat - p_radius_mi / 69.0 and p_lat + p_radius_mi / 69.0
+     and w.lng between p_lng - p_radius_mi / (69.0 * cos(radians(p_lat))) and p_lng + p_radius_mi / (69.0 * cos(radians(p_lat)))
+     and ST_DistanceSphere(ST_MakePoint(p_lng, p_lat), ST_MakePoint(w.lng, w.lat)) <= p_radius_mi * 1609.344;
+  return jsonb_build_object('status', 'complete', 'sources', v_sources,
+                            'filings', public.water_rights_filings_json(v_pts, false));
 end
 $fn$;
 
@@ -445,8 +505,11 @@ revoke all on function public.water_rights_collect() from public, anon, authenti
 revoke all on function public.water_rights_map_feature(text, jsonb, timestamptz) from public, anon, authenticated;
 revoke all on function public.water_rights_date(jsonb) from public, anon, authenticated;
 revoke all on function public.water_rights_display_applicant(text) from public, anon, authenticated;
+revoke all on function public.water_rights_filings_json(public.water_rights_filings[], boolean) from public, anon, authenticated;
 revoke all on function public.water_rights_for_zip(text) from public;
+revoke all on function public.map1_water_rights_near(double precision, double precision, double precision) from public;
 grant execute on function public.water_rights_for_zip(text) to anon, authenticated, service_role;
+grant execute on function public.map1_water_rights_near(double precision, double precision, double precision) to anon, authenticated, service_role;
 
 -- ── schedule: daily ───────────────────────────────────────────────────────────────────────
 do $$
