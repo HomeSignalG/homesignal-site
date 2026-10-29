@@ -3735,10 +3735,14 @@ drawing them as "Other project" or listing them only on the ZIP page.
 Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) was on no page while three papers reported it.
 - **Data:** `docs/state-water-rights.sql` (cleanup-sites pattern): `water_rights_filings` (one row per point of diversion,
   history in `water_rights_filing_observations`), one fail-closed loader (`water_rights_fire(source)` + `water_rights_collect()`,
-  pg_cron 11:37 / 11:43 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
+  pg_cron 11:37 / 11:43 / 11:49 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
   Loaded: each agency's PENDING applications. Utah DWRi Points of Diversion, `SUMMARY_ST='U'` (6,779 rows); Idaho IDWR
   AppropriationApplicationPods (1,974, all "Active").
-  **Nevada is held**: its status is undecoded 3-letter codes. The other 47 are `not_checked`.
+  **Nevada (2026-10-29):** NDWR's layer stores status as undecoded 3-letter codes, so Nevada was held. The codes were
+  then read off NDWR's own permit pages (`tools.water.nv.gov/permitinformation.aspx?app=…`, one real record per code,
+  all 24 codes). Loaded: APP "APPLICATION", RFA "READY FOR ACTION", RFP "READY FOR ACTION (PROTESTED)" (2,309 points),
+  stored in NDWR's words, dated by `file_date`. The use and source columns are codes too and are not stored. The layer
+  has no applicant column. The other 47 states are `not_checked`.
 - **Reader:** `water_rights_for_zip(zip)` answers every ZIP page: `complete` (polygon members via
   `geo.zip_point_membership_in`, maybe none), `unavailable` (no complete load in 48 h), `not_measured` (no ZCTA), or
   `not_covered`. ⛔ `not_covered` is about US: never say a state publishes nothing.
@@ -3750,7 +3754,14 @@ Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) wa
 - **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
   row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
   link first.
-- **Not yet built:** a Map 1 layer, a health alert for missed loads, the other western states.
+- **Map 1 layer (2026-10-29):** its own layer and switch, "Water rights filings" (blue circle "W", `?water=0/1`),
+  `lib/water-rights-map.js`. ZIP mode reuses `water_rights_for_zip`, whose points now carry the `'member'` verdict, through
+  `HS.zipModeSites`. Address mode reads `map1_water_rights_near(lat,lng,radius_mi)` (every loaded state, the circle decides,
+  radius capped at 20 mi). Both readers build filings with one helper, `water_rights_filings_json`. Pins are never counted as
+  EPA facilities or projects. Filings at one point are one pin. Lists count filings, not points.
+  Tests: `test/water-rights-map.test.mjs`, `test/map1-water-rights.browser.test.mjs`.
+- **Missed loads page:** homesignal-ingest `water_rights_loads` in `pipeline_health_tick()` (#957, applied 2026-10-29).
+- **Not yet built:** the other western states.
 - Tests: `test/state_water_rights_pg` (40 checks, 12 mutations killed; `state-water-rights-suite.yml`),
   `test/water-rights-section.test.mjs`, `test/water-rights-section.browser.test.mjs`.
 

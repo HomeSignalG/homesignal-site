@@ -60,7 +60,7 @@ const CONTENT_KEYED = ['lib/project-type.js', 'lib/map.js', 'lib/maps-social-the
   'lib/maps-capture-binding.js', 'lib/templates.js', 'shell.js', 'lib/premium-waitlist.js', 'lib/community-request.js', 'lib/community-page.js', 'lib/dashboard-aggregate.js', 'lib/share-text.js',
   'lib/nyc-v1-report.js', 'lib/nyc-v1-soda.js', 'lib/fsr-scale.js', 'lib/da-report-view.js', 'lib/da-report-compare.js',
   'lib/data.js', 'lib/topic-prefs.js', 'lib/acq-saleshandy.js', 'lib/acq-youtube-videos.js', 'lib/acq-bluesky-videos.js', 'lib/acq-bluesky-schedule.js',
-  'lib/water-rights.js'];
+  'lib/water-rights.js', 'lib/water-rights-map.js'];
 const pages = readdirSync(root).filter((f) => f.endsWith('.html'))
   .concat(readdirSync(join(root, 'partials')).filter((f) => f.endsWith('.html')).map((f) => 'partials/' + f));
 

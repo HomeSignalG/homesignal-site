@@ -94,7 +94,7 @@ ok(/var fac = sites\.filter\(function\(s\)\{ return s\.scope==="point" && s\.rel
   'D7 cleanup sites never enter the EPA facility set (count, rails, facilities-only)');
 ok(/setIndexable\(ZIP_MODE && ZIP_INDEXABLE && contentCount > 0\)/.test(R) && !/setIndexable\(ZIP_MODE && ZIP_INDEXABLE && sites\.length > 0\)/.test(R),
   'D8 cleanup sites never make a page indexable');
-ok(/map1_state_cleanup_zip_members/.test(fn('loadZip')) && /zipModeSites\(rsSites, auth, natlSites, cleanupSites\)/.test(fn('loadZip')),
+ok(/map1_state_cleanup_zip_members/.test(fn('loadZip')) && /zipModeSites\(rsSites, auth, natlSites, cleanupSites(, waterSites)?\)/.test(fn('loadZip')),
   'D9 ZIP mode reads the member reader through the one door');
 ok(/map1_state_cleanup_near/.test(PAGE), 'D10 address mode reads the near reader');
 ok(/id="cleanupBand" hidden/.test(PAGE), 'D11 the band starts hidden');
