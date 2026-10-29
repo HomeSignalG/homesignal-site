@@ -41,11 +41,21 @@ ok(!html.includes('vs-withdraw'), '2c a made suggestion has no Withdraw button')
 await page.click('#vs-form summary');
 await page.fill('#vs-title', 'Blair Waterway dredging');
 await page.fill('#vs-place', '98421');
-await page.fill('#vs-links', 'notalink');
+// 2d: words typed in the Links box (the founder's "Apollo Global Management,") are kept as a note,
+// a bare domain gets https://, and the suggestion is added instead of failing silently.
+await page.fill('#vs-links', 'Apollo Global Management,\nwww.waterrights.utah.gov/x');
 await page.click('.vs-add');
-await page.waitForFunction(() => /not a web link/.test(document.querySelector('.vs-msg').textContent));
-ok((await page.inputValue('#vs-title')) === 'Blair Waterway dredging', '2d a refused suggestion keeps what was typed and shows the reason');
-
+await page.waitForFunction(() => /Added/.test(document.querySelector('.vs-msg').textContent));
+const sentD = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggest').pop()[1].p_topic);
+ok(sentD.links.length === 1 && sentD.links[0] === 'https://www.waterrights.utah.gov/x' && /Apollo Global Management/.test(sentD.note),
+  '2d words in the Links box become the note; a bare domain becomes an https link');
+const sp = await page.evaluate(() => window.HS.acqVideoSuggest.splitLinks('see https://a.gov/x), and b.org'));
+ok(sp.links.join('|') === 'https://a.gov/x|https://b.org' && sp.words === 'see and', '2d2 splitLinks strips trailing punctuation and keeps words');
+// put the form back for 2e
+await page.click('#vs-form summary').catch(() => {});
+if (!(await page.isVisible('#vs-title'))) await page.click('#vs-form summary');
+await page.fill('#vs-title', 'Blair Waterway dredging');
+await page.fill('#vs-place', '98421');
 await page.fill('#vs-links', 'https://apps.ecology.wa.gov/x\nhttps://pierce.gov/y');
 await page.fill('#vs-note', 'Biggest change in the port');
 await page.click('.vs-add');
