@@ -58,8 +58,10 @@ ok(/HS\.followedProjectIds = function/.test(shell),
   'followedProjectIds enumerates project: keys from the same Set');
 ok(/persistFollow\('project', id, false\)/.test(shell),
   'unfollowProject deletes through persistFollow, not a second writer');
-ok(/if \(on\) await HS\.sb\(\)\.from\('app_follows'\)\.insert/.test(shell)
-  && /else await HS\.sb\(\)\.from\('app_follows'\)\.delete\(\)\.match/.test(shell),
+// The write is awaited and its { error } inspected (test/follow-confirmed-write.test.mjs
+// proves the behaviour); this pin only keeps it on the one table.
+ok(/if \(on\) res = await HS\.sb\(\)\.from\('app_follows'\)\.insert/.test(shell)
+  && /else res = await HS\.sb\(\)\.from\('app_follows'\)\.delete\(\)\.match/.test(shell),
   'persistFollow is still insert-or-delete on app_follows (no new source of truth)');
 ok(/unique \(user_id, target_type, target_id\)/.test(read('docs/phase1-app-schema.sql')),
   'app_follows unique (user_id, target_type, target_id) still blocks duplicate rows');
