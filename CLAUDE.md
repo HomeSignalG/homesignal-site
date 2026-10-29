@@ -3735,10 +3735,14 @@ drawing them as "Other project" or listing them only on the ZIP page.
 Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) was on no page while three papers reported it.
 - **Data:** `docs/state-water-rights.sql` (cleanup-sites pattern): `water_rights_filings` (one row per point of diversion,
   history in `water_rights_filing_observations`), one fail-closed loader (`water_rights_fire(source)` + `water_rights_collect()`,
-  pg_cron 11:37 / 11:43 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
+  pg_cron 11:37 / 11:43 / 11:49 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
   Loaded: each agency's PENDING applications. Utah DWRi Points of Diversion, `SUMMARY_ST='U'` (6,779 rows); Idaho IDWR
   AppropriationApplicationPods (1,974, all "Active").
-  **Nevada is held**: its status is undecoded 3-letter codes. The other 47 are `not_checked`.
+  **Nevada (2026-10-29):** NDWR's layer stores status as undecoded 3-letter codes, so Nevada was held. The codes were
+  then read off NDWR's own permit pages (`tools.water.nv.gov/permitinformation.aspx?app=…`, one real record per code,
+  all 24 codes). Loaded: APP "APPLICATION", RFA "READY FOR ACTION", RFP "READY FOR ACTION (PROTESTED)" (2,309 points),
+  stored in NDWR's words, dated by `file_date`. The use and source columns are codes too and are not stored. The layer
+  has no applicant column. The other 47 states are `not_checked`.
 - **Reader:** `water_rights_for_zip(zip)` answers every ZIP page: `complete` (polygon members via
   `geo.zip_point_membership_in`, maybe none), `unavailable` (no complete load in 48 h), `not_measured` (no ZCTA), or
   `not_covered`. ⛔ `not_covered` is about US: never say a state publishes nothing.

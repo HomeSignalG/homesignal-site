@@ -48,13 +48,14 @@ returns text language sql immutable as $$
   end;
 $$;
 -- 84336 Snowville UT stand-in (holds a55167's two points), 84302 Brigham City UT stand-in,
--- 83706 Boise ID stand-in. 84999 is a UT page with no Census area. 33301 is a Florida page.
+-- 83706 Boise ID stand-in, 89501 Reno NV stand-in. 84999 is a UT page with no Census area. 33301 is a Florida page.
 insert into geo.zcta_boundary values
   ('84336', ST_SetSRID(ST_GeomFromText('POLYGON((-112.80 41.68,-112.60 41.68,-112.60 41.80,-112.80 41.80,-112.80 41.68))'), 4269)),
   -- 84302 is a TRIANGLE, so a point inside its bounding box can still be outside the ZIP
   ('84302', ST_SetSRID(ST_GeomFromText('POLYGON((-112.10 41.48,-111.98 41.48,-112.10 41.56,-112.10 41.48))'), 4269)),
   ('83706', ST_SetSRID(ST_GeomFromText('POLYGON((-116.75 43.60,-116.40 43.60,-116.40 43.90,-116.75 43.90,-116.75 43.60))'), 4269)),
-  ('33301', ST_SetSRID(ST_GeomFromText('POLYGON((-80.16 26.10,-80.11 26.10,-80.11 26.14,-80.16 26.14,-80.16 26.10))'), 4269));
+  ('33301', ST_SetSRID(ST_GeomFromText('POLYGON((-80.16 26.10,-80.11 26.10,-80.11 26.14,-80.16 26.14,-80.16 26.10))'), 4269)),
+  ('89501', ST_SetSRID(ST_GeomFromText('POLYGON((-119.85 39.50,-119.78 39.50,-119.78 39.55,-119.85 39.55,-119.85 39.50))'), 4269));
 
 create table public.communities (id bigserial primary key, level text, zip_codes text[], state text, name text);
 insert into public.communities (level, zip_codes, state, name) values

@@ -25,9 +25,20 @@
 --   Idaho Department of Water Resources, "AppropriationApplicationPods": every row is a pending
 --   application (Status "Active" on all 1,974 rows, measured 2026-10-28), with PriorityDate and a
 --   per-application report link (WRReport).
--- CHECKED AND HELD: Nevada NDWR "Water Rights Points of Diversion" (110,389 rows) publishes its
--- status as 3-letter codes (APP, RFA, PER, …) with no decode in the layer. Showing an undecoded
--- code would be an opaque claim, so Nevada is recorded 'held' until the codes are sourced.
+--   Nevada Division of Water Resources, "Water Rights Points of Diversion" (MapServer layer 0).
+--   The layer stores status as a 3-letter code with no decode, so Nevada was held on 2026-10-28.
+--   DECODED 2026-10-29 from NDWR's OWN permit pages: for each of the layer's 24 codes, one real
+--   record's permit_record page (tools.water.nv.gov/permitinformation.aspx?app=…) was read via
+--   pg_net, and its "Status:" line is the decode. The three pending ones are loaded, stored in
+--   NDWR's own words:
+--     APP  "APPLICATION"                    (app 95526;  119 points)
+--     RFA  "READY FOR ACTION"               (app 94917; 1,322 points)
+--     RFP  "READY FOR ACTION (PROTESTED)"   (app 63993;   868 points)
+--   (the other codes read PERMIT, CERTIFICATE, DENIED, WITHDRAWN, CANCELLED, VESTED RIGHT, …:
+--   decided or historical, not loaded). Count for the three: 2,309. file_date is the filing date
+--   (epoch ms). The use (mou) and source codes are also undecoded and are NOT stored; source_desc
+--   is free text and is. The layer carries no applicant (owners are a separate table), so none
+--   is shown.
 --
 -- A PERSON IS NOT NAMED (same rule as private homes on the cleanup layer). Applicants are shown
 -- by name only when the name is an organisation (water_rights_display_applicant); otherwise the
@@ -129,7 +140,11 @@ values
   ('id_idwr_applications', 'ID', 'Idaho Department of Water Resources',
    'https://gis.idwr.idaho.gov/hosting/rest/services/Allocation/AppropriationApplicationPods/FeatureServer/0/query',
    '1%3D1',
-   'WaterRightNumber,Status,PriorityDate,Applicant,Source,Uses,DiversionType,WRReport,PointOfDiversionID,OBJECTID', 1000, 6)
+   'WaterRightNumber,Status,PriorityDate,Applicant,Source,Uses,DiversionType,WRReport,PointOfDiversionID,OBJECTID', 1000, 6),
+  ('nv_ndwr_pending', 'NV', 'Nevada Division of Water Resources',
+   'https://arcgis.water.nv.gov/arcgis/rest/services/NDWR/Water_Rights_Points_of_Diversion/MapServer/0/query',
+   'app_status+in+(%27APP%27,%27RFA%27,%27RFP%27)',
+   'app,app_status,site_name,source_desc,file_date,permit_record,OBJECTID', 2000, 3)
 on conflict (source) do update set state = excluded.state, agency = excluded.agency,
   query_url = excluded.query_url, where_sql = excluded.where_sql, out_fields = excluded.out_fields,
   page_size = excluded.page_size, max_pages = excluded.max_pages;
@@ -149,7 +164,7 @@ insert into public.water_rights_states (state, name, status, source, note) value
   ('MN','Minnesota','not_checked',null,null), ('MS','Mississippi','not_checked',null,null),
   ('MO','Missouri','not_checked',null,null), ('MT','Montana','not_checked',null,null),
   ('NE','Nebraska','not_checked',null,null),
-  ('NV','Nevada','held',null,'NDWR publishes application status as undecoded 3-letter codes (APP, RFA, PER, …); held until the codes are sourced (2026-10-28).'),
+  ('NV','Nevada','loaded','nv_ndwr_pending',null),
   ('NH','New Hampshire','not_checked',null,null), ('NJ','New Jersey','not_checked',null,null),
   ('NM','New Mexico','not_checked',null,null), ('NY','New York','not_checked',null,null),
   ('NC','North Carolina','not_checked',null,null), ('ND','North Dakota','not_checked',null,null),
@@ -162,6 +177,11 @@ insert into public.water_rights_states (state, name, status, source, note) value
   ('WA','Washington','not_checked',null,null), ('WV','West Virginia','not_checked',null,null),
   ('WI','Wisconsin','not_checked',null,null), ('WY','Wyoming','not_checked',null,null)
 on conflict (state) do nothing;   -- a later decision about a state is never overwritten by a replay
+
+-- 2026-10-29: Nevada's codes are decoded from NDWR's own pages (header), so its 2026-10-28 hold
+-- is lifted. Only that exact hold is changed; any other later decision about Nevada stands.
+update public.water_rights_states set status = 'loaded', source = 'nv_ndwr_pending', note = null
+ where state = 'NV' and status = 'held' and source is null;
 
 -- ── loader: fire ──────────────────────────────────────────────────────────────────────────
 create or replace function public.water_rights_fire(p_source text)
@@ -253,6 +273,25 @@ begin
     w.location := null;
     w.state := 'ID';
     w.record_url := case when a ->> 'WRReport' ~ '^https://research\.idwr\.idaho\.gov/' then a ->> 'WRReport' end;
+    w.content_md5 := md5((a - 'OBJECTID')::text || coalesce(g::text, ''));
+  elsif p_source = 'nv_ndwr_pending' then
+    w.filing_no := nullif(btrim(a ->> 'app'), '');
+    w.right_no := null;
+    w.filing_type := null;
+    w.diversion := nullif(btrim(a ->> 'source_desc'), '');
+    -- NDWR's own words for the three loaded codes (header); any other code stores no status
+    w.status := case btrim(a ->> 'app_status')
+                  when 'APP' then 'APPLICATION'
+                  when 'RFA' then 'READY FOR ACTION'
+                  when 'RFP' then 'READY FOR ACTION (PROTESTED)' end;
+    w.uses := null;
+    w.applicant := null;
+    w.filed_on := public.water_rights_date(a -> 'file_date');
+    w.date_label := 'Filing date';
+    w.location := nullif(regexp_replace(btrim(a ->> 'site_name'), '\s+', ' ', 'g'), '');
+    w.state := 'NV';
+    w.record_url := case when a ->> 'permit_record' ~ '^https://tools\.water\.nv\.gov/permitinformation\.aspx\?app=[A-Za-z0-9]+$'
+                         then a ->> 'permit_record' end;
     w.content_md5 := md5((a - 'OBJECTID')::text || coalesce(g::text, ''));
   else
     raise exception 'no mapping for water rights source %', p_source;
@@ -515,12 +554,13 @@ grant execute on function public.map1_water_rights_near(double precision, double
 do $$
 begin
   perform cron.unschedule(j.jobid) from cron.job j
-   where j.jobname in ('water-rights-ut-fire', 'water-rights-id-fire', 'water-rights-collect');
+   where j.jobname in ('water-rights-ut-fire', 'water-rights-id-fire', 'water-rights-nv-fire', 'water-rights-collect');
   perform cron.schedule('water-rights-ut-fire', '37 11 * * *', $c$select public.water_rights_fire('ut_dwr_pending')$c$);
   perform cron.schedule('water-rights-id-fire', '43 11 * * *', $c$select public.water_rights_fire('id_idwr_applications')$c$);
+  perform cron.schedule('water-rights-nv-fire', '49 11 * * *', $c$select public.water_rights_fire('nv_ndwr_pending')$c$);
   perform cron.schedule('water-rights-collect', '*/5 11-12 * * *', $c$select public.water_rights_collect()$c$);
 end $$;
 
 -- ── ROLLBACK (run by hand; keeps the tables and their history) ─────────────────────────────
--- select cron.unschedule(jobid) from cron.job where jobname in ('water-rights-ut-fire','water-rights-id-fire','water-rights-collect');
+-- select cron.unschedule(jobid) from cron.job where jobname in ('water-rights-ut-fire','water-rights-id-fire','water-rights-nv-fire','water-rights-collect');
 -- revoke execute on function public.water_rights_for_zip(text) from anon, authenticated;
