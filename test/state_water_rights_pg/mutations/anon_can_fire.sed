@@ -1,0 +1,1 @@
+s/grant execute on function public.water_rights_for_zip(text) to anon, authenticated, service_role;/grant execute on function public.water_rights_for_zip(text) to anon, authenticated, service_role; grant execute on function public.water_rights_fire(text) to anon;/

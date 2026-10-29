@@ -30,7 +30,8 @@ def check(name, cond):
 
 
 def world(ready=(), building=(), newest=None, exists=False, free=10000.0, complete=False,
-          ready_raises=False, auto=True, generation="", requeue=False, prove_raises=False):
+          ready_raises=False, auto=True, generation="", requeue=False, prove_raises=False,
+          failed_rows=True):
     """Stub every database read the auto path makes; record every lifecycle call."""
     log = []
 
@@ -41,6 +42,8 @@ def world(ready=(), building=(), newest=None, exists=False, free=10000.0, comple
             return [{"generation_id": g} for g in building]
         if tag == "newest":
             return [newest] if newest else []
+        if tag == "failed probe rows":
+            return [{"ok": failed_rows}]
         if tag == "exists":
             return [{"?column?": 1}] if exists else []
         if tag == "generation snapshot":
@@ -119,6 +122,20 @@ for name, kw in [("newest build younger than 20 h", dict(newest=old(5.0))),
     log = world(**kw)
     rc = o.mode_work()
     check(f"no open: {name}", rc == 0 and log == [("retire",)])
+
+# 3a. a FAILED newest build whose rows were discarded no longer blocks the next build
+log = world(newest=old(50.0, "FAILED"), failed_rows=False)
+o.mode_work()
+check("FAILED newest build, rows discarded -> today's build opens", ("open", TODAY) in log)
+log = world(newest=old(5.0, "FAILED"), failed_rows=False)
+o.mode_work()
+check("FAILED and discarded, but younger than 20 h -> still no open", ("open", TODAY) not in log)
+
+# 3a2. discard runs on the long-statement path with its proof, not the 120 s call
+import inspect  # noqa: E402
+src = inspect.getsource(o.mode_discard)
+check("mode_discard uses heavy() with _verify_discarded", "heavy(" in src and "_verify_discarded(" in src
+      and 'sql(f"select geo.n5_generation_discard' not in src)
 
 # 3b. boundaries: exactly 20 h and exactly floor + reserve both open
 log = world(newest=old(o.AUTO_OPEN_MIN_HOURS), free=2048.0 + o.BUILD_RESERVE_MB)

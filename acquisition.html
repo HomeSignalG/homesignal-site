@@ -229,7 +229,7 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     <div class="tab" id="tab-premium"></div>
     <div class="tab" id="tab-arearequests"></div>
     <div class="tab" id="tab-saleshandy"></div>
-    <div class="tab" id="tab-youtubevideos"></div>
+    <div class="tab" id="tab-youtubevideos"><div id="yv-suggest-host"></div><div id="yv-list-host"></div></div>
     <div class="tab" id="tab-impactstories"></div>
   </main>
   <footer class="hs-container">Internal · staff &amp; investors. Numbers are a point-in-time snapshot (<span id="dash-foot-date">—</span>), served only to allowlisted accounts through a gated read-only function — no data ships in this page. Regenerated from the HomeSignal ingest pipeline.</footer>
@@ -288,13 +288,15 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
      serialize; it touches no post, no queue state and no approval. -->
 <script src="lib/maps-dc-zip-order.js?v=1"></script>
 <script src="lib/acq-saleshandy.js?v=4ad499c1"></script>
-<script src="lib/acq-youtube-videos.js?v=f576a8e9"></script>
+<script src="lib/acq-youtube-videos.js?v=8e157e82"></script>
+<script src="lib/acq-video-suggest.js?v=eb97cada"></script>
 <script src="lib/acq-bluesky-videos.js?v=4a99e48f"></script>
 <script src="lib/acq-bluesky-schedule.js?v=d543ca4c"></script>
 <script src="lib/acq-engagement.js?v=d81c8179"></script>
 <script src="lib/acq-youtube.js?v=2cd35fff"></script>
-<script src="lib/acq-impact-discovery.js?v=1cfd3104"></script>
-<script src="lib/acq-impact-stories.js?v=a8c6fc90"></script>
+<script src="lib/acq-impact-discovery.js?v=3d30cd02"></script>
+<script src="lib/acq-impact-engagement.js?v=d36b6629"></script>
+<script src="lib/acq-impact-stories.js?v=2a2277a4"></script>
 <script src="assets/acquisition-video-producer.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
@@ -427,7 +429,10 @@ width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink
     },
     // Live, gated read (hs_youtube_videos_list): finished videos waiting for the founder's approval. Never baked into the snapshot.
     youtubevideos: function () {
-      var el = document.getElementById('tab-youtubevideos');
+      // Suggest a video: its own box, so the list refresh never wipes typing.
+      var sg = document.getElementById('yv-suggest-host');
+      if (sg && window.HS && window.HS.acqVideoSuggest) window.HS.acqVideoSuggest.mount(window.hsClient, sg);
+      var el = document.getElementById('yv-list-host');
       if (el && window.HS && window.HS.acqYoutubeVideos) window.HS.acqYoutubeVideos.load(window.hsClient, el);
     },
     // Live, gated (hs_impact_story_*): the Impact Stories workspace. Never baked into the snapshot, and a snapshot refresh

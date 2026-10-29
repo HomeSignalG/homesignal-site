@@ -18,14 +18,16 @@ ok(/Auto-discovered — Ready for Review/.test(stories), '1d the library labels 
 
 // 2. every RPC the page calls is admin-gated and granted to authenticated only
 const called = [...new Set([...js.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))];
-ok(called.length === 5, '2a the page calls exactly the five founder functions (' + called.join(', ') + ')');
+ok(called.length === 8, '2a the page calls exactly the eight founder functions (' + called.join(', ') + ')');
+const storiesSql = read('docs/impact-stories.sql');
 for (const f of called) {
-  const body = (sql.match(new RegExp('create or replace function public\\.' + f + '\\([\\s\\S]*?\\$\\$;', 'm')) || [''])[0];
+  const src = f.startsWith('hs_impact_story_') ? storiesSql : sql;
+  const body = (src.match(new RegExp('create or replace function public\\.' + f + '\\([\\s\\S]*?\\$\\$;', 'm')) || [''])[0];
   ok(/public\._hs_is_admin\(\)/.test(body), '2b ' + f + ' checks the dashboard allowlist');
-  ok(new RegExp("'public\\." + f + "\\([^']*\\)'").test(sql.slice(sql.indexOf("revoke all on function ' || f || ' from public, anon';") - 400)), '2c ' + f + ' is in the authenticated grant list');
+  ok(new RegExp("'public\\." + f + "\\([^']*\\)'").test(src.slice(src.indexOf("revoke all on function ' || f || ' from public, anon';") - 900)), '2c ' + f + ' is in the authenticated grant list');
 }
 ok(!/\.from\(['"]impact_discovery/.test(js), '2d the page never reads a discovery table directly');
-ok(!/impact_discovery_(scan_record|scan_finish|research|prepare|scan_claim|tick|nominations)/.test(js), '2e the page never calls a scanner, research or tick function');
+ok(!/(^|[^_a-z])impact_discovery_(scan_record|scan_finish|research|prepare|scan_claim|tick|nominations)/.test(js.replace(/hs_impact_discovery_research_start/g, '')), '2e the page never calls a scanner, research or tick function');
 
 // 3. safety and honesty in the page
 ok(/function url\(u\) \{ return \/\^https\?:\\\/\\\//.test(js), '3a a link is rendered only when it is http(s)');
@@ -33,7 +35,11 @@ ok(/rel="noopener noreferrer"/.test(js), '3b outside links open with noopener');
 ok(/The latest scan failed/.test(js) && /Nothing it saw was recorded/.test(js), '3c a failed scan is shown as a failure, not an empty list');
 ok(/not evidence/.test(js) && /Provisional — written from the posts, unverified/.test(js), '3d posts and the provisional concept are labelled unverified');
 ok(/disabled title="A story is created only after its records are verified"/.test(js), '3e Create Impact Story is disabled until the records are verified');
-ok(!/approve|render|publish/i.test((js.match(/rpc\('[^']+'/g) || []).join(' ')), '3f no call approves, renders or publishes');
+ok(!/approve|publish/i.test((js.match(/rpc\('[^']+'/g) || []).join(' ')), '3f no call approves or publishes');
+const renderCalls = (js.match(/rpc\('[^']*render[^']*'/g) || []);
+ok(renderCalls.length === 1 && renderCalls[0] === "rpc('hs_impact_story_render'" && /v\.narrative === 'approved'/.test(js.slice(js.indexOf('function videoButton'))),
+  '3f2 the one render call is the story\'s own Render, offered only once the script is approved (the database refuses otherwise, pg 18m)');
+ok(/data-hot="research"/.test(js) && /rpc\('hs_impact_discovery_research_start'/.test(js) && /'Start research'/.test(js), '3i Start research is a button on the topic');
 ok(/Likes and followers are not counted as results/.test(js), '3g performance is first-party results, not likes or followers');
 ok(/not collected yet/.test(js), '3h unmeasured outcomes say so instead of showing zero');
 
@@ -52,6 +58,22 @@ ok(create.indexOf('pg_advisory_xact_lock') >= 0 && create.indexOf('pg_advisory_x
 ok(/function idleDelay\(\)/.test(js) && /st\.scan_enabled === false\) return null/.test(js) && /next_scan_at/.test(js.slice(js.indexOf('function idleDelay')))
    && /IDLE_MAX_MS = 30 \* 60000/.test(js), '5c with scheduled scans on, an idle panel looks again after the next scan is due (at most every 30 min)');
 ok(/var PENDING = \['nominated', 'researching', 'preparing'\]/.test(js) && /SLOW_POLL_MS/.test(js), '5b the panel keeps refreshing while topics are nominated, researched or prepared');
+
+// 6. Suggest a topic (founder, 2026-10-28)
+const yv = read('lib/acq-youtube-videos.js');
+ok(/rpc\('hs_impact_discovery_suggest'/.test(js) && /id="hot-suggest"/.test(js), '6a Hot Topics carries the Suggest a topic form and calls the suggest function');
+ok(!/yv-suggest|acqImpactDiscovery/.test(yv),
+  '6b Tab 16 no longer jumps to Tab 17: it has its own Suggest a video box (lib/acq-video-suggest.js, founder 2026-10-28)');
+ok(/Your pick/.test(js) && /function founderCard\(c\)/.test(js) && /if \(founder\(c\)\) return founderCard\(c\)/.test(js),
+  '6d a founder topic is drawn as Your pick (no score, no Bluesky lead line)');
+ok(/leads to check, not yet evidence/.test(js) && /Your links are leads to check, not evidence/.test(js), '6e founder links are labelled leads, not evidence');
+const fc = js.slice(js.indexOf('function founderCard'), js.indexOf('function card(c)'));
+ok(!/exclude_similar|data-k="score"/.test(fc), '6f a founder topic has no Score and no Exclude Similar Topics');
+ok(/SUGGEST_FIELDS\.forEach/.test(js.slice(js.indexOf('function snapshot'))), '6g an automatic refresh keeps what was typed in the form');
+const sug = (sql.match(/create or replace function public\.hs_impact_discovery_suggest[\s\S]*?\$\$;/) || [''])[0];
+ok(/_hs_is_admin\(\)/.test(sug) && /'founder:' \|\| gen_random_uuid\(\)/.test(sug) && /'nominated'/.test(sug), '6h the suggestion is admin-only and goes straight to research');
+ok(/where origin = 'scan' and \(cluster_key/.test(sql) && /where origin = 'scan' and last_seen_at/.test(sql), '6i a scan never matches or is handed a founder topic');
+ok(/if c\.origin = 'scan' and n >= st\.max_prepare_per_scan/.test(sql), '6j the per-scan limit is for scanned topics only');
 
 console.log(fails ? '\n' + fails + ' failed' : '\nall passed');
 process.exit(fails ? 1 : 0);

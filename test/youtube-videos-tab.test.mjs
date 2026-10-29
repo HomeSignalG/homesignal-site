@@ -17,7 +17,7 @@ const sql = read('docs/youtube-video-review.sql');
 // 1. wiring
 ok(/data-tab="youtubevideos">16 · YouTube Videos<\/button>/.test(page), '1a: the tab button is named "YouTube Videos"');
 ok(page.includes('id="tab-youtubevideos"'), '1b: the tab container exists');
-ok(/youtubevideos: function \(\)[\s\S]{0,300}acqYoutubeVideos\.load\(window\.hsClient/.test(page), '1c: the trusted initialiser loads the tab live');
+ok(/youtubevideos: function \(\)[\s\S]{0,600}getElementById\('yv-list-host'\)[\s\S]{0,120}acqYoutubeVideos\.load\(window\.hsClient/.test(page), '1c: the trusted initialiser loads the video list live, into its own box');
 ok(/<script src="lib\/acq-youtube-videos\.js\?v=[0-9a-f]{8}"><\/script>/.test(page), '1d: the script is content-keyed');
 
 // 2. render

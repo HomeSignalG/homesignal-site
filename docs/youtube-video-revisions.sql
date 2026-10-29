@@ -131,7 +131,7 @@ declare
   who text := public._hs_yv_admin();
   r public.youtube_video_reviews%rowtype;
   d jsonb; note text; cur integer; active public.youtube_video_revisions%rowtype;
-  st jsonb; new_id uuid; failed_n integer;
+  st jsonb; new_id uuid; failed_n integer; broken_n integer;
 begin
   if p_key not in ('final', 'short1', 'short2', 'thumbnail') then
     raise exception 'bad file' using errcode = '22023';
@@ -159,11 +159,20 @@ begin
   perform public._hs_yv_ensure_v1(p_slug, p_key);
   cur := public._hs_yv_current_version(p_slug, p_key);
 
-  -- runaway limit: three failed/unsupported attempts on the same version, then the founder must change the note.
-  select count(*) into failed_n from public.youtube_video_revisions
-   where slug = p_slug and file_key = p_key and parent_version = cur and instruction = note and status in ('failed', 'unsupported');
+  -- Runaway limits. Only a note the reviser could NOT understand ('unsupported') counts against the note: three of
+  -- those and the founder must reword it. A 'failed' revision is our system breaking (render, upload, a dead runner),
+  -- not the note, so it never uses up the note's tries (2026-10-29: three render failures caused by a workflow bug
+  -- blocked two correct notes). Those are capped separately, 10 in 24 hours per file, so a broken pipeline cannot
+  -- be clicked into an endless loop of runs.
+  select count(*) filter (where status = 'unsupported' and parent_version = cur and instruction = note),
+         count(*) filter (where status = 'failed' and created_at > now() - interval '24 hours')
+    into failed_n, broken_n
+    from public.youtube_video_revisions where slug = p_slug and file_key = p_key;
   if failed_n >= 3 then
-    raise exception 'this note has already failed 3 times; change the note or fix the cause, then try again' using errcode = '55000';
+    raise exception 'this note could not be understood 3 times; reword the note, then try again' using errcode = '55000';
+  end if;
+  if broken_n >= 10 then
+    raise exception 'revisions of this file failed 10 times in the last 24 hours because of a system problem; ask Claude to look at it' using errcode = '55000';
   end if;
 
   select settings into st from public.youtube_video_versions where slug = p_slug and file_key = p_key and version = cur;

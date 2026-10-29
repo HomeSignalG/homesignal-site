@@ -230,7 +230,70 @@ select pg_temp.chk('12j a rejection needs a note; a bad timecode is refused',
    and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'rejected', 'x', '1:75')) like '23514%');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'rejected', 'Text too small on a phone.', '0:00');
 select pg_temp.chk('12k a rejected file says what to fix', pg_temp.fst('thumbnail') = 'rejected');
+select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('main'), 'rejected', 'Rename the checklist.', '1:05');
+select pg_temp.chk('12k2 a second fix request does not remove the first: both listed, newest first, both open',
+   jsonb_array_length(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') = 2
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->0->>'asset' = 'main'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests'->1->>'asset' = 'thumbnail'
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'status' <> 'open'));
+-- Start fixes: the two open requests go out as one batch, the fixer claims it and records what it did.
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12f1 non-admin cannot start fixes', pg_temp.err(format('select public.hs_impact_story_fix_start(%L)', pg_temp.id('s'))) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12f2 the fixer door is service-role only, Start fixes is for signed-in admins',
+   not has_function_privilege('authenticated', 'public.impact_fix_batch_claim(uuid)', 'execute')
+   and not has_function_privilege('authenticated', 'public.impact_fix_batch_complete(uuid, jsonb)', 'execute')
+   and not has_function_privilege('authenticated', 'public.impact_fix_batches_list()', 'execute')
+   and has_function_privilege('service_role', 'public.impact_fix_batch_complete(uuid, jsonb)', 'execute')
+   and has_function_privilege('authenticated', 'public.hs_impact_story_fix_start(uuid)', 'execute')
+   and not has_function_privilege('anon', 'public.hs_impact_story_fix_start(uuid)', 'execute'));
+insert into _ids select 'fb', public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->'batch'->>'id';
+select pg_temp.chk('12f3 Start fixes queues one batch carrying both open requests, and the page sees it',
+   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'queued'
+   and (public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'requests')::int = 2
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'status' <> 'queued'));
+select pg_temp.chk('12f4 a second press returns the same batch', (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
+   and (select count(*) from public.impact_story_fix_batches) = 1);
+select pg_temp.chk('12f4b the Fix button starts the Fix job on main for this batch, and a second press while queued starts it again',
+   (select url from net.requests order by id desc limit 1) like '%/homesignal-ingest/actions/workflows/impact-fix-run.yml/dispatches'
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb')))
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2);
+delete from vault.decrypted_secrets;
+select public._hs_is_fix_dispatch(pg_temp.id('fb')::uuid);
+select pg_temp.chk('12f4c no GitHub credential: the batch is failed with a readable reason, nothing is sent',
+   (select status from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 'failed'
+   and (select summary from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) like '%no GitHub credential%'
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2
+   and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid)', 'execute'));
+insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
+update public.impact_story_fix_batches set status = 'queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12f5 the fixer lists it, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
+   and public.impact_fix_batches_list()->0->>'video_slug' is not null);
+select public.impact_fix_batch_claim(pg_temp.id('fb')::uuid);
+select pg_temp.chk('12f6 claimed: working, out of the list, cannot be claimed twice',
+   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'working'
+   and jsonb_array_length(public.impact_fix_batches_list()) = 0
+   and pg_temp.err(format('select public.impact_fix_batch_claim(%L)', pg_temp.id('fb'))) like '55000%');
+select pg_temp.chk('12f7 completion is checked: a summary, every request accounted for, no stray ids, a needs_you request is not done',
+   pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","outcomes":[]}')) like '%say what was done%'
+   and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","outcomes":[]}')) like '%every request needs an outcome%'
+   and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","outcomes":[{"decision_id":999999,"outcome":"fixed"}]}')) like '%outcomes must name%'
+   and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L::jsonb)', pg_temp.id('fb'),
+         (select jsonb_build_object('status','done','summary','x','outcomes', jsonb_agg(jsonb_build_object('decision_id', r->'id', 'outcome', 'needs_you'))) from jsonb_array_elements((select requests from public.impact_story_fix_batches)) r)::text)) like '%makes the batch needs_you%'
+   and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","regenerate":"render"}')) like '%bad regenerate%');
+select public.impact_fix_batch_complete(pg_temp.id('fb')::uuid, (select jsonb_build_object('status','done','summary','Renamed the checklist; new tree photo.',
+   'next_step','Press Render again.', 'outcomes', jsonb_agg(jsonb_build_object('decision_id', r->'id', 'outcome', 'fixed', 'note', 'done in renderer'))) from jsonb_array_elements((select requests from public.impact_story_fix_batches)) r));
+select pg_temp.chk('12f8 done: each request shows its outcome, the batch says the next step, nothing is left to send',
+   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'done'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'next_step' = 'Press Render again.'
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'outcome' <> 'fixed')
+   and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 0
+   and pg_temp.err(format('select public.hs_impact_story_fix_start(%L)', pg_temp.id('s'))) like '%no open fix requests%');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid(a), 'approved') from unnest(array['main', 'short_a', 'short_b']) a;
+select pg_temp.chk('12k3 approving a file later closes only its own request, and the request stays listed',
+   (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'main') = 'closed'
+   and (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'thumbnail') = 'open'
+   and jsonb_array_length(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') = 2);
 select pg_temp.chk('12l three of four approved: not ready to export', pg_temp.stage() = 'media');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid('thumbnail'), 'approved');
 select pg_temp.chk('12m every file approved: ready to export, nothing published', pg_temp.stage() = 'distribution'
@@ -384,11 +447,14 @@ select pg_temp.chk('13d choosing another concept changes what the approval cover
   <> public._hs_is_hash(pg_temp.body() || '{"concepts":[{"id":"x"},{"id":"y"}],"selection":{"concept":"y"}}'::jsonb, 'narrative'));
 select pg_temp.as_user('founder@example.com');
 create temp table _rev as select x, pg_temp.err(format('select public.hs_impact_story_section_revision(%L, %s, %L, %L)', pg_temp.id('s'), pg_temp.cur(), x, 'Lead with the accountability concept.')) e
-  from unnest(array['concepts','discovery','visuals']) x;
-select pg_temp.chk('13f a revision note can ask for another concept, the discovery or the visuals',
+  from unnest(array['concepts','discovery','visuals','accountability']) x;
+select pg_temp.chk('13f a revision note can ask for another concept, the discovery, the visuals or deeper accountability research',
   (select bool_and(e is null) from _rev)
   and (select count(distinct detail->>'section') from public.impact_story_events where kind = 'section_revision'
-         and detail->>'section' in ('concepts','discovery','visuals')) = 3);
+         and detail->>'section' in ('concepts','discovery','visuals','accountability')) = 4);
+select pg_temp.chk('13g the responsibility map is part of the one approval: changing who did what needs approving again',
+  public._hs_is_hash(pg_temp.body() || '{"discovery":{"accountability":{"attributions":[{"id":"a","status":"alleged"}]}}}'::jsonb, 'narrative')
+  <> public._hs_is_hash(pg_temp.body() || '{"discovery":{"accountability":{"attributions":[{"id":"a","status":"established"}]}}}'::jsonb, 'narrative'));
 select pg_temp.chk('13e the render key names impact-render-3',
   position('impact-render-3' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
   and position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);

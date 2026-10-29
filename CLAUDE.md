@@ -228,6 +228,17 @@ the exact problem `QUEUE.md` exists to end.
 - `noindex` remains ONLY on non-public pages (app, auth, admin, redirect aliases, `/404.html`), listed in `scripts/audit_index_all.py` NON_PUBLIC.
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
+
+### GOOGLE SEARCH CONSOLE: GIVE THE FOUNDER FULL https://jodytracks.com URLS (founder, 2026-10-29)
+**The founder's Search Console box does not accept a bare path.** Every sitemap or page address given to the founder for
+Search Console is the full URL on the live host, one per copy block, e.g. `https://jodytracks.com/sitemaps/map.xml`. Never
+`sitemaps/map.xml`, and never `homesignal.net` (it only redirects; `robots.txt` names it in the repo, but the deploy rewrites it).
+- Sitemaps the build writes: `https://jodytracks.com/sitemap.xml` and `https://jodytracks.com/sitemaps/<family>.xml` for
+  zip, zip-alerts, zip-development, city, project, guide, map, project-list, plus the focus files pierce-county-wa and
+  washington-state.
+- Measured 2026-10-29 from the founder's screenshot: only `sitemap.xml` (last read Oct 20, 29,551 pages, before `/map/<zip>/`
+  pages were listed), pierce-county-wa and washington-state were submitted. `map.xml` and `project-list.xml` were not, so Google
+  had not been given the map pages in any sitemap it had read.
   Test: `test/index-all-audit.test.mjs`. The older sections below that describe Rule F/D robots gating are the dated record.
 
 ## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
@@ -3763,6 +3774,31 @@ drawing them as "Other project" or listing them only on the ZIP page.
   - Tests: the SQL suite has 59 checks and 15 deliberate breaks, each caught; plus
     `test/state-cleanup.test.mjs` E1–E17 and the browser test's shared-point case.
 
+## 7.12j STATE WATER-RIGHTS FILINGS ARE THEIR OWN SECTION ON EVERY ZIP PAGE ⚖️ FOUNDER DECISION (2026-10-28)
+
+**Why:** a water-rights application is filed with a STATE agency, so no permit, planning or notice reader saw one.
+Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) was on no page while three papers reported it.
+- **Data:** `docs/state-water-rights.sql` (cleanup-sites pattern): `water_rights_filings` (one row per point of diversion,
+  history in `water_rights_filing_observations`), one fail-closed loader (`water_rights_fire(source)` + `water_rights_collect()`,
+  pg_cron 11:37 / 11:43 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
+  Loaded: each agency's PENDING applications. Utah DWRi Points of Diversion, `SUMMARY_ST='U'` (6,779 rows); Idaho IDWR
+  AppropriationApplicationPods (1,974, all "Active").
+  **Nevada is held**: its status is undecoded 3-letter codes. The other 47 are `not_checked`.
+- **Reader:** `water_rights_for_zip(zip)` answers every ZIP page: `complete` (polygon members via
+  `geo.zip_point_membership_in`, maybe none), `unavailable` (no complete load in 48 h), `not_measured` (no ZCTA), or
+  `not_covered`. ⛔ `not_covered` is about US: never say a state publishes nothing.
+  A person is never named (`water_rights_display_applicant`; family trusts included). The status word is the agency's own.
+- **Measured 2026-10-28 after the first load:** 12,744 pages answered (403 complete, 18 not_measured, 12,323 not_covered);
+  313 pages carry 2,119 filings. a55167 is on 84336 (Snowville).
+- **Page:** `lib/water-rights.js` renders the answer as its own block directly under Development & growth (founder, 2026-10-28: "water rights should sit under development and growth"), never a fourth What's Changing group.
+  Undecoded use codes (Utah "OP") are not shown.
+- **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
+  row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
+  link first.
+- **Not yet built:** a Map 1 layer, a health alert for missed loads, the other western states.
+- Tests: `test/state_water_rights_pg` (40 checks, 12 mutations killed; `state-water-rights-suite.yml`),
+  `test/water-rights-section.test.mjs`, `test/water-rights-section.browser.test.mjs`.
+
 ## 7.13 AN EPA REGISTRATION IS NOT OPERATION — FACILITY LIFECYCLE IS `unknown` UNLESS A SOURCE STATES IT ⚖️ FOUNDER GATE (2026-09-24)
 
 **NO SOURCE-SUPPORTED PHYSICAL LIFECYCLE → CANONICAL LIFECYCLE `unknown`.** Never → another
@@ -5696,6 +5732,43 @@ Results.
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
 
+## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
+
+Media review lists every fix request; **Fix** (`hs_impact_story_fix_start`) sends the open ones as one batch and, through
+`_hs_is_fix_dispatch`, starts homesignal-ingest `impact-fix-run.yml` on main at once (same `github_actions_pat` dispatch as the
+worker). That job runs Claude Code on the founder's plan (`CLAUDE_CODE_OAUTH_TOKEN`, no paid API) in a step that holds no database
+key, checks the change, lands it on ingest main and records Done / Needs you / failed. No schedule; the earlier hourly routine is
+disabled. A missing credential fails the batch with a readable reason. Apply order: merge the ingest workflow first (a dispatch to a
+workflow not on main is refused), then apply `docs/impact-stories.sql`, then deploy the page. pg checks 12f4b, 12f4c.
+
+## IMPACT STORIES, TAB 17: ACCOUNTABILITY RESEARCH (2026-10-28)
+
+Story Outline shows the draft's responsibility map (`discovery.accountability`, engine homesignal-ingest
+`impact/accountability.py`) under "Accountability research" (`viewAccountability` in `lib/acq-impact-stories.js`):
+- the accountability story type, or "None in the records";
+- who did what: party, action from the record, status (Established / Alleged · not a finding / Disputed, plus "Later
+  overturned"), the government finding or penalty with the later rulings checked, and the response or where none was found;
+- the parties with their roles, verified parent and open identity questions;
+- the research checklist, the missing attribution, and names in the records that are not in the map.
+"Request deeper research" and "Request revision of who did what" record a `section_revision` note on section
+`accountability`. `hs_impact_story_section_revision` accepts it (`docs/impact-stories.sql`). The map lives inside
+`discovery`, so the one narrative approval covers it (pg check 13g). Labels C. Accountability and E. Consequences are added
+for the accountability arc. Tests: `test/impact-stories.test.mjs`, `.browser.test.mjs`, `test/impact_stories_pg` (13f, 13g).
+
+## TAB 16 "SUGGEST A VIDEO" (2026-10-28): its own queue, because Tab 16 and Tab 17 make different videos
+
+Founder: *"both 16 and 17 need a suggest tab because they both render different style videos"*. Tab 16 is the Public Records
+format (homesignal-ingest `video/`: one development record told from its own documents); Tab 17 is Impact Stories (Hot Topics).
+- Tab 16's box is `lib/acq-video-suggest.js`, mounted into `#yv-suggest-host` beside the video list (`#yv-list-host`), so the
+  list's automatic refresh never wipes typing. It no longer jumps to Tab 17.
+- SQL of record `docs/youtube-video-suggestions.sql` (after `docs/impact-stories.sql`, for `_hs_is_admin`): table
+  `youtube_video_suggestions` (RLS on, no visitor grants; status waiting → picked → made | declined | withdrawn; `made` needs
+  `project_slug`; one open suggestion per title) and admin-only `hs_youtube_video_suggest` / `_suggestion_withdraw` /
+  `_suggestions_list`. The page only adds and withdraws; a video session sets the status (service role).
+- Links are where to start, never evidence: the video still uses only the record's fetched documents and `video/validate.py`.
+- Tests: `test/video-suggest.test.mjs`, `test/video-suggest.browser.test.mjs`, `test/youtube_video_suggestions_pg`
+  (`youtube-video-suggestions-suite.yml`).
+
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 
 Scheduled scans (08:00 and 14:00 Pacific by default, plus Scan Now) find Bluesky discussions about development, land,
@@ -5720,6 +5793,41 @@ water and health near homes, rank them out of 100, and show them above the Impac
   credits); YouTube / Shorts / Bluesky engagement are reported as `not_collected`. Learning moves a score by at most ±5 and
   only after 50 attributed visits and 3 stories in a category.
 - Apply order: this SQL, then the page, then the ingest workflows (the dispatch targets `impact-discovery-scan.yml` on main).
+- **Start research and Create video (founder, 2026-10-28: no Claude window needed).** Each unresearched topic has **Start
+  research** (`hs_impact_discovery_research_start` → `impact_discovery_research_runs`, one active per topic → dispatches ingest
+  `impact-research-run.yml`, Claude on the founder's plan). The run claims, researches, checks, lands the pack on main and
+  calls `impact_discovery_research_complete`; a verified run creates the story for the founder who pressed it, and the tick
+  prepares it. Once the script is approved in the story, the card's **Create video** calls the story's own
+  `hs_impact_story_render` (the database refuses an unapproved script, pg 18m). Apply order: ingest workflow merged first
+  (a dispatch to a missing workflow is lost), then this SQL, then the page. Tests: pg 18a-18m, `impact-discovery` 3f2/3i,
+  browser 8a-8g.
+- **Suggest a topic (founder, 2026-10-28).** A form in Hot Topics calls
+  `hs_impact_discovery_suggest`: a candidate with `origin = 'founder'`, no Bluesky lead (the lead columns are nullable only for
+  that origin), status `nominated`, shown first as "Your pick". Pasted links are leads, never evidence; the verified-source-pack
+  rule and every story check are unchanged. Scans never match or hand out founder topics; the per-scan prepare limit is for
+  scanned topics; performance is split by origin. Suite: `test/impact_discovery_pg` §17.
+
+## ENGAGE ON BLUESKY, TAB 17 (2026-10-28): the strongest posts to answer, drafted, posted BY HAND
+
+Under Hot Topics, a separate section ranks the 3-5 strongest ORIGINAL posts of each discovered topic by an Engagement
+Opportunity Score read from that post's own counts (conversation 30 · recency 20 · velocity 20 · audience relevance 15 · what
+JODY can add 15), recommends REPLY, QUOTE-POST or SKIP, and shows a draft within 300 graphemes. SQL of record
+`docs/impact-engagement.sql` (after `docs/impact-discovery.sql`); page `lib/acq-impact-engagement.js`; engine homesignal-ingest
+`impact/engage/` (run inside the discovery scan, failure-isolated from it).
+- **Nothing posts automatically.** No function calls pg_net, dispatches a workflow or writes a queue; the page calls only
+  `hs_impact_engagement_overview` / `hs_impact_engagement_decide`. Preview, Copy, Open Original, Mark Posted, Skip.
+- **Separate from the video pipeline:** rows reference `impact_discovery_candidates` only, never a story, job or approval.
+- **One row per Bluesky post** (`target_uri` unique, across topics); a second Mark Posted is refused; a scan never resets a
+  posted, skipped or already-engaged row; the scan finds the founder's own reply/quote on the account feed and appends its
+  likes/replies/reposts (`impact_engagement_metrics`). Visits/registrations: `acquisition_touch` with
+  `utm_campaign = 'engage'` and `utm_content = <opp_key>` (the draft's own link).
+- **Drafts state only verified records** (`evidence.facts` / `evidence.responsible_parties` written by research on a
+  verified topic); otherwise they ask a question. A social-only topic gets a question and nothing else, and its score is
+  capped at 55. Quote-posts carry the link and #JODYTracks; replies never the hashtag, and at most one reply per topic per
+  scan carries the link, only where JODY has ZIP pages.
+- The page shows the strongest five first (at most two per topic), the rest behind "Show more".
+- Tests: `test/impact_engagement_pg` (CI `impact-engagement-suite.yml`), `test/impact-engagement.test.mjs`,
+  `test/impact-engagement.browser.test.mjs`.
 
 ## NO SHORTCUTS / ONE CANONICAL TRUTH PATH — FOUNDER RULE (2026-09-21)
 

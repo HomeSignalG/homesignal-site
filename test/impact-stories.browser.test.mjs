@@ -185,10 +185,44 @@ ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[1
    && /^blob:/.test(await page.locator('#is video').getAttribute('src')), 'media: a video is downloaded with the admin session and played from a blob link');
 await page.click('#is [data-act=mdecide][data-d=approved][data-id="1"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 1 && c[1].p_decision === 'approved')), 'media: approve sends one file decision');
-await page.evaluate(() => { const a = ['Text too small on a phone.', '0:12']; window.prompt = () => a.shift(); });
-await page.click('#is [data-act=mdecide][data-d=rejected][data-id="3"]'); await page.waitForTimeout(50);
+await page.evaluate(() => { window.prompt = () => { throw new Error('no pop-up for a fix request'); }; });
+await page.click('#is [data-act=fixform][data-id="3"]'); await page.waitForTimeout(50);
+await page.fill('#fx-note-3', 'Text too small on a phone.'); await page.fill('#fx-tc-3', '0:12');
+await page.click('#is [data-act=fixsend][data-id="3"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_media_decide' && c[1].p_asset_id === 3 && c[1].p_decision === 'rejected'
-   && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request sends what to fix and the moment');
+   && c[1].p_note === 'Text too small on a phone.' && c[1].p_timecode === '0:12')), 'media: a fix request is written in a form under the video and sends what to fix and the moment');
+await page.evaluate(() => { window.prompt = () => 'Lead with the date.'; });
+// Fix (2026-10-28): every request stays listed with what happened to it; the button sends the open ones and starts the job
+await page.evaluate(() => {
+  const m = window.db.media;
+  m.fix_requests = [
+    { id: 4, asset: 'short_b', note: 'End card: full <investigation> on YouTube', at: '2026-10-28T13:38:06Z', status: 'open', batch: null },
+    { id: 3, asset: 'main', note: 'Rename the checklist', timecode: '1:05', at: '2026-10-28T13:32:49Z', status: 'rerendered', narrative_changed: false,
+      rerendered_at: '2026-10-28T15:00:00Z', batch: null },
+    { id: 2, asset: 'main', note: 'Tree photo', at: '2026-10-28T13:31:20Z', status: 'open',
+      batch: { status: 'done', outcome: 'needs_you', note: 'Choose a licensed photo', completed_at: '2026-10-28T14:00:00Z' } }];
+  m.fix_batch = { status: 'needs_you', requests: 1, requested_at: '2026-10-28T13:40:00Z', completed_at: '2026-10-28T14:00:00Z',
+    summary: 'Photo needed', next_step: 'Choose a photo in Media review.' };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Fix requests (3)') && txt.includes('End card: full <investigation> on YouTube') && txt.includes('Not sent yet')
+   && txt.includes('Re-rendered, but nothing in the story changed') && txt.includes('Needs you') && txt.includes('Next: Choose a photo in Media review.'),
+   'fixes: every request is listed with its own status, the batch says what is next');
+ok(await page.locator('#is .is-badge.warn', { hasText: 'Re-rendered, but nothing' }).count() === 1, 'fixes: a re-render with no story change is amber');
+await page.click('#is [data-act=fixstart]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_start' && c[1].p_story === 's1')), 'fixes: Fix sends the story');
+await page.evaluate(() => { window.db.media.fix_batch = { status: 'queued', requests: 1, requested_at: '2026-10-28T16:00:00Z' };
+  window.db.media.fix_requests[0].batch = { status: 'queued' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Starting: the fixer begins within a minute') && await page.locator('#is [data-act=fixstart]').count() === 0,
+   'fixes: while a batch is queued the status shows and the button is gone');
+await page.evaluate(() => { window.db.media.fix_batch = { status: 'stalled', requests: 1, requested_at: '2026-10-28T12:00:00Z', claimed_at: '2026-10-28T12:01:00Z' };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+ok(await page.locator('#is [data-act=fixstart]', { hasText: 'Fix again' }).count() === 1, 'fixes: a stalled batch offers Fix again');
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
   const m = window.db.media;
@@ -213,7 +247,7 @@ ok(txt.includes('Visual quality: FAILED') && txt.includes('Too many documents an
 ok(txt.includes('stopped before rendering anything') && txt.includes('Missing essential image') && txt.includes('REPRESENTATIVE PHOTO')
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
 ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file the visual gate failed cannot be approved');
-ok(!(await page.locator('#is .is-panel').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
 await page.click('#is [data-act=choose][data-id="oak-1"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jb' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-1')),
    'media: choosing a photo sends the render, subject and candidate');
@@ -240,7 +274,19 @@ await page.evaluate(() => {
       { dimension: 'wildlife', classification: 'documented_potential', finding: L('Pile driving near <orcas>.', 'purpose'), affected: 'Orcas', could_lose: 'Quiet water' },
       { dimension: 'financial', classification: 'no_evidence', finding: L('No cost named.'), affected: '', could_lose: '' }],
       conflict: L('Two records differ.', 'purpose'), protections: [L('A bubble curtain.', 'purpose')],
-      participation: { text: 'The appeal window closed.', claims: ['purpose'], open: false }, approach: { trigger: 'concern', why: 'Species on the record.' } },
+      participation: { text: 'The appeal window closed.', claims: ['purpose'], open: false }, approach: { trigger: 'concern', why: 'Species on the record.' },
+      accountability: {
+        researched: { owner: { result: 'not_found', looked_in: 'The assessor record was not fetched.' }, applicant: { result: 'found', claims: ['purpose'] } },
+        parties: [{ id: 'applicant', name: null, label: 'the applicant', type: 'unknown', roles: ['applicant'], claims: ['purpose'],
+                    identity_questions: ['Legal name <not> in the records.'] },
+                  { id: 'city', name: 'City of Gig Harbor', type: 'public_agency', roles: ['agency', 'decision_maker'], claims: ['purpose'] }],
+        attributions: [{ id: 'cut', party: 'applicant', kind: 'violation', basis: 'finding', status: 'established', confidence: 'high',
+                         action: L('The city found the applicant removed trees.', 'purpose'),
+                         enforcement: { type: 'administrative', state: 'overturned', claims: ['purpose'] },
+                         response_none: 'No response in the records.', later_rulings: 'Hearing Examiner reversed it.' },
+                       { id: 'cmp', party: 'city', kind: 'other', basis: 'allegation', status: 'alleged', confidence: 'low',
+                         action: L('A complaint says the city waited.', 'purpose'), response: L('The city disputes it.', 'purpose') }],
+        opportunity: { type: 'violation', why: 'A finding against the applicant.' } } },
     concepts: [concept('orcas', 'concern', 'A dock in orca water'), concept('two-docks', 'accountability', 'Six floats or 15?'), concept('waterfront', 'empowerment', 'A working waterfront')],
     selection: { concept: 'orcas', mode: 'emotional', why: 'Highest score.' } };
   body.main = { acts: [{ act: 1, name: 'The harbor', scenes: [{ thread: 'fear', purpose: 'p', visual: pic('A southern resident killer whale', 'registry', { id: 'southern-resident-orca' }), narration: [L('Line.', 'purpose')] },
@@ -248,6 +294,7 @@ await page.evaluate(() => {
   window.db.extra = { body, v3: {
     scores: { orcas: { total: 86, parts: { 'evidence integrity': 25 } }, 'two-docks': { total: 57, parts: {} }, waterfront: { total: 74, parts: {} } },
     quality: { criteria: { attachment: 2, 'visual power': 1 }, total: 13, max: 14, reject: [] },
+    accountability: { verified: false, missing: ['Property owner and ownership entity'], leads: { names: [{ name: 'City of Gig Harbor' }, { name: 'Harbor Holdings LLC' }] } },
     missing_assets: [{ scene: 'a1-s2', subject: 'A heron' }], short_timing: { a: [{ beat: 'hook', ends: 3.1 }, { beat: 'care', ends: 6.9 }] },
     photos: [{ id: 'southern-resident-orca', usable: true, title: 'File:Orca.jpg', license: 'CC BY-SA 3.0', author: 'NOAA <staff>', page_url: 'https://commons.wikimedia.org/wiki/File:Orca.jpg', site_specific: false }] } };
   window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
@@ -262,6 +309,17 @@ ok(txt.includes('Three story concepts') && txt.includes('A dock in orca water') 
    'V3 outline: three concepts with their scores, the selected one marked');
 ok(txt.includes('A. Attachment') && txt.includes('F. Motivation and action'), 'V3 outline: each concept shows its arc A-F');
 ok(txt.includes('Quality gate') && txt.includes('13 / 14') && txt.includes('need an editorial decision'), 'V3 outline: the quality gate and the missing pictures are shown');
+ok(txt.includes('Accountability research') && txt.includes('The city found the applicant removed trees.') && txt.includes('Name not in the records')
+   && txt.includes('Alleged · not a finding') && txt.includes('Later overturned') && txt.includes('The city disputes it.') && txt.includes('No response in the records.'),
+   'accountability: who did what, its status, any reversal and the response are shown');
+ok(txt.includes('Missing attribution') && txt.includes('Property owner and ownership entity') && txt.includes('Harbor Holdings LLC')
+   && !/not in the map\) \(check each\): [^\n]*City of Gig Harbor/.test(txt),
+   'accountability: missing roles and names in the records that are not in the map are flagged');
+ok((await page.innerHTML('#is')).includes('Legal name &lt;not&gt; in the records.'), 'accountability: identity questions are escaped');
+await page.click('#is [data-act=research]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'accountability'
+   && c[1].p_note.startsWith('Deeper research: '))), 'accountability: the founder can request deeper research');
+ok(await page.locator('#is [data-act=revise][data-sec=accountability]').count() === 1, 'accountability: and request a correction');
 ok(await page.locator('#is [data-act=concept]').count() === 2, 'V3 outline: the two other concepts can be chosen instead');
 await page.click('#is [data-act=concept][data-id=two-docks]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_section_revision' && c[1].p_section === 'concepts'

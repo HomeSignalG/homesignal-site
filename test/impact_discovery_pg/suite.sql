@@ -60,7 +60,7 @@ select pg_temp.chk('1h the internal helpers are callable by no browser role',
   and not has_function_privilege('authenticated', 'public._hs_is_request(uuid, text, text, boolean, text)', 'execute'));
 select pg_temp.chk('1i every discovery table has RLS on and no browser grant',
   (select bool_and(relrowsecurity) from pg_class where relname like 'impact_discovery%' and relkind = 'r')
-  and (select count(*) from pg_class where relname like 'impact_discovery%' and relkind = 'r') = 7
+  and (select count(*) from pg_class where relname like 'impact_discovery%' and relkind = 'r') = 8
   and not has_table_privilege('authenticated', 'public.impact_discovery_candidates', 'select')
   and not has_table_privilege('anon', 'public.impact_discovery_scans', 'select'));
 select pg_temp.chk('1j settings are one row with the founder defaults (8:00 and 14:00 Pacific, 72h, 80, 1 per scan)',
@@ -354,6 +354,133 @@ select pg_temp.chk('16a core topics survive the 60-topic limit ahead of higher-s
     = (select count(*) from public.impact_discovery_candidates where track = 'core' and status not in ('rejected', 'dismissed', 'excluded', 'stale'))
   and (select count(*) from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'track' = 'core') > 0
   and jsonb_array_length(public.hs_impact_discovery_overview()->'candidates') = 60);
+
+
+-- 17. founder-suggested topics ("Suggest a topic", 2026-10-28) --------------------------------------------
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('17a a non-admin cannot suggest a topic',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Fill project next to a park"}')$q$) like '42501%');
+select pg_temp.chk('17a2 anon cannot execute it; authenticated can (it checks the allowlist)',
+  not has_function_privilege('anon', 'public.hs_impact_discovery_suggest(jsonb)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_discovery_suggest(jsonb)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('17b a too-short title is refused', pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"abc"}')$q$) like '%5 to 300%');
+select pg_temp.chk('17c a link that is not http(s) is refused',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Van Tramp fill project","links":["javascript:alert(1)"]}')$q$) like '%not a web link%');
+select pg_temp.chk('17c2 a bad category is refused',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Van Tramp fill project","category":"Bad Cat!"}')$q$) like '%Unknown category%');
+select pg_temp.put('f1', public.hs_impact_discovery_suggest(jsonb_build_object('title', 'Van Tramp fill project next to Wildwood Park',
+  'place', 'Puyallup, WA', 'category', 'zoning_development', 'note', 'Up to 95 trucks a day.',
+  'links', jsonb_build_array('https://www.cityofpuyallup.org/permit/123', ' https://www.cityofpuyallup.org/permit/123 ', 'https://news.example.com/story'))) ->> 'id');
+select pg_temp.chk('17d the suggestion goes straight to research as a founder topic, with its links as leads and no Bluesky post',
+  (select origin = 'founder' and status = 'nominated' and evidence_status = 'leads_found' and lead_url is null and lead_uri is null
+     and submitted_by = 'founder@example.com' and submitted_note = 'Up to 95 trucks a day.' and track = 'core'
+     and jsonb_array_length(evidence->'leads') = 2 and evidence->'leads'->0->>'kind' = 'founder' and post_uris = '{}' and link_keys = '{}'
+     from public.impact_discovery_candidates where id = pg_temp.id('f1')));
+select pg_temp.chk('17e the same title twice is refused while the first is open',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"VAN TRAMP FILL PROJECT NEXT TO WILDWOOD PARK"}')$q$) like '%already suggested%');
+select pg_temp.put('f2', public.hs_impact_discovery_suggest('{"title":"Second founder topic, no links"}') ->> 'id');
+select pg_temp.chk('17f a suggestion with no links is still queued, marked as having no sources yet',
+  (select status = 'nominated' and evidence_status = 'social_only' from public.impact_discovery_candidates where id = pg_temp.id('f2')));
+select pg_temp.chk('17g a scanned topic still needs its Bluesky lead',
+  pg_temp.err($q$insert into public.impact_discovery_candidates (cluster_key, category, track, title) values ('x-nolead', 'other', 'core', 'No lead')$q$) like '%lead_check%');
+select pg_temp.chk('17h founder topics are listed first in the overview, with their origin and note',
+  public.hs_impact_discovery_overview()->'candidates'->0->>'origin' = 'founder'
+  and public.hs_impact_discovery_overview()->'candidates' @> jsonb_build_array(jsonb_build_object('id', pg_temp.id('f1'), 'submitted_note', 'Up to 95 trucks a day.')));
+select pg_temp.chk('17i the research session sees founder topics first, with the note',
+  public.impact_discovery_nominations()->'nominated'->0->>'origin' = 'founder'
+  and public.impact_discovery_nominations()->'nominated' @> jsonb_build_array(jsonb_build_object('id', pg_temp.id('f1'), 'submitted_note', 'Up to 95 trucks a day.')));
+select pg_temp.chk('17j a scan is never handed a founder topic to match against',
+  not exists (select 1 from jsonb_array_elements(public.impact_discovery_scan_claim(pg_temp.newscan_unclaimed())->'open') x where x->>'id' = pg_temp.id('f1')::text));
+select pg_temp.put('s17', pg_temp.scan()::text);
+select pg_temp.chk('17k a scan can never take over a founder topic: a scan record carrying its key is refused, and the topic is unchanged',
+  pg_temp.err(format('select public.impact_discovery_scan_record(%L, %L)', pg_temp.id('s17'),
+    jsonb_build_array(pg_temp.c('founder-clash', 95, 'leads_found', true) || jsonb_build_object('cluster_key',
+      (select cluster_key from public.impact_discovery_candidates where id = pg_temp.id('f1')))))) like '23505%'
+  and (select title = 'Van Tramp fill project next to Wildwood Park' and lead_url is null and status = 'nominated' and score = 0
+     from public.impact_discovery_candidates where id = pg_temp.id('f1')));
+select pg_temp.chk('17l an unverified founder topic cannot become a story',
+  pg_temp.err(format('select public.impact_discovery_prepare(%L)', pg_temp.id('f1'))) like '%no verified source pack%');
+select public.impact_discovery_research(pg_temp.id('f1'), '{"outcome":"verified","source_slug":"van-tramp-fill-founder"}');
+select public.impact_discovery_research(pg_temp.id('f2'), '{"outcome":"verified","source_slug":"second-founder-pack"}');
+select pg_temp.put('fs1', public.impact_discovery_prepare(pg_temp.id('f1'))->>'story_id');
+select pg_temp.put('fs2', public.impact_discovery_prepare(pg_temp.id('f2'))->>'story_id');
+select pg_temp.chk('17m two founder topics can each be prepared (the per-scan limit is for scanned topics)',
+  pg_temp.id('fs1') is not null and pg_temp.id('fs2') is not null and pg_temp.id('fs1') <> pg_temp.id('fs2')
+  and (select count(*) from public.impact_stories where discovery_candidate_id in (pg_temp.id('f1'), pg_temp.id('f2'))) = 2
+  and (select origin from public.impact_stories where id = pg_temp.id('fs1')) = 'auto_discovery');
+select pg_temp.chk('17n preparing a founder topic again returns the same story',
+  (public.impact_discovery_prepare(pg_temp.id('f1'))->>'story_id')::uuid = pg_temp.id('fs1'));
+select pg_temp.put('f3', public.hs_impact_discovery_suggest('{"title":"Third founder topic"}') ->> 'id');
+select public.hs_impact_discovery_decide(pg_temp.id('f3'), 'dismiss', 'not now');
+select public.hs_impact_discovery_decide(pg_temp.id('f3'), 'restore', null);
+select pg_temp.chk('17o a restored founder topic goes back to research, not to the candidate pile',
+  (select status from public.impact_discovery_candidates where id = pg_temp.id('f3')) = 'nominated');
+select pg_temp.chk('17p each suggestion is recorded in the event log',
+  (select count(*) from public.impact_discovery_events where kind = 'suggested') = 3);
+
+
+-- 18. Start research and Create video (founder, 2026-10-28) ----------------------------------------------
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('18a a non-admin cannot start research',
+  pg_temp.err(format('select public.hs_impact_discovery_research_start(%L)', pg_temp.id('f3'))) like '42501%');
+select pg_temp.chk('18b the research job functions are service-role only',
+  not has_function_privilege('authenticated', 'public.impact_discovery_research_claim(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.impact_discovery_research_complete(uuid, jsonb)', 'execute')
+  and has_function_privilege('service_role', 'public.impact_discovery_research_claim(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_discovery_research_start(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.hs_impact_discovery_research_start(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public._hs_id_research_dispatch(uuid)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('n0', (select count(*) from net.requests)::text);
+select pg_temp.put('r1', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.chk('18c Start research queues one run and starts the research workflow on main for it',
+  (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'queued'
+  and (select count(*) from net.requests where url like '%/impact-research-run.yml/dispatches'
+         and body->>'ref' = 'main' and body->'inputs'->>'run' = pg_temp.id('r1')::text) = 1);
+select pg_temp.put('r1b', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.chk('18d pressing again while queued returns the same run and starts it again (a lost start is retried)',
+  pg_temp.id('r1b') = pg_temp.id('r1')
+  and (select count(*) from public.impact_discovery_research_runs where candidate_id = pg_temp.id('f3')) = 1
+  and (select count(*) from net.requests where body->'inputs'->>'run' = pg_temp.id('r1')::text) = 2);
+select pg_temp.chk('18e the overview shows the run on its topic',
+  (select x->'research'->>'status' from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x
+    where x->>'id' = pg_temp.id('f3')::text) = 'queued');
+select pg_temp.chk('18f a closed topic, or one that already has a story, cannot be researched',
+  pg_temp.err(format('select public.hs_impact_discovery_research_start(%L)', pg_temp.id('f1'))) like '%already has an Impact Story%');
+select pg_temp.as_user(null);
+create temp table _claim as select public.impact_discovery_research_claim(pg_temp.id('r1')) j;
+select pg_temp.chk('18g claiming marks the topic as being researched and hands over the topic and the library',
+  (select j->'candidate'->>'title' from _claim) = 'Third founder topic' and jsonb_typeof((select j->'library' from _claim)) = 'array'
+  and (select status = 'researching' and evidence_status = 'researching' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'working');
+select pg_temp.chk('18h a working run cannot be claimed twice',
+  pg_temp.err(format('select public.impact_discovery_research_claim(%L)', pg_temp.id('r1'))) like '55000%');
+select pg_temp.chk('18i a run cannot be closed as verified before the verified outcome is recorded',
+  pg_temp.err(format($q$select public.impact_discovery_research_complete(%L, '{"status":"verified","summary":"x","source_slug":"third-pack"}')$q$, pg_temp.id('r1'))) like '%record the verified outcome%');
+select public.impact_discovery_research_complete(pg_temp.id('r1'), '{"status":"failed","summary":"The runner stopped."}');
+select pg_temp.chk('18j a failed run puts the topic back where it was (a founder pick waiting for research)',
+  (select status = 'nominated' and evidence_status = 'social_only' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select status from public.impact_discovery_research_runs where id = pg_temp.id('r1')) = 'failed');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.put('r2', public.hs_impact_discovery_research_start(pg_temp.id('f3'))->'research'->>'id');
+select pg_temp.as_user(null);
+select public.impact_discovery_research_claim(pg_temp.id('r2'));
+select public.impact_discovery_research(pg_temp.id('f3'), '{"outcome":"verified","source_slug":"third-pack","evidence":{"sources":[{"url":"https://example.gov/a"}]}}');
+select pg_temp.put('rc', public.impact_discovery_research_complete(pg_temp.id('r2'), '{"status":"verified","summary":"Checked 4 records.","source_slug":"third-pack"}')::text);
+select pg_temp.chk('18k a verified run creates the Impact Story for the founder who pressed the button, with its Check Sources job',
+  (select story_id is not null and status = 'preparing' from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (select created_by from public.impact_stories s join public.impact_discovery_candidates c on c.story_id = s.id where c.id = pg_temp.id('f3')) = 'founder@example.com'
+  and (select story_id from public.impact_discovery_research_runs where id = pg_temp.id('r2'))
+      = (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3'))
+  and (pg_temp.lastjob((select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))).kind = 'pack');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('18l the overview shows the story is not ready for a video yet (no approved script)',
+  (select x->'video'->>'narrative' <> 'approved' and (x->'video'->>'script_ready')::boolean = false
+     from jsonb_array_elements(public.hs_impact_discovery_overview()->'candidates') x where x->>'id' = pg_temp.id('f3')::text));
+select pg_temp.chk('18m Create video (Render) is refused until the script is approved',
+  pg_temp.err(format('select public.hs_impact_story_render(%L, 0, false)',
+    (select story_id from public.impact_discovery_candidates where id = pg_temp.id('f3')))) like '%Approve the integrated narrative%');
 
 \o
 select count(*) || ' checks passed' as result from _res where ok;

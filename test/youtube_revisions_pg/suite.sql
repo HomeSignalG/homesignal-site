@@ -146,8 +146,19 @@ update public.youtube_video_revisions set status='failed' where status='queued';
 insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
   select slug,file_key,parent_version,instruction,'failed','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
 insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
+  select slug,file_key,parent_version,instruction,'failed','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
+create temp table c41a as select public.hs_youtube_video_revise('tacoma','short1') as r;
+select pg_temp.ck('41a system failures (status failed) never use up the note''s tries',
+  (select (r->>'already_active')::boolean is false from c41a));
+update public.youtube_video_revisions set status='failed' where status='queued';
+insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
   select slug,file_key,parent_version,instruction,'unsupported','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
-select pg_temp.ck('41 the same note cannot fail forever (limit 3)', pg_temp.fails($$select public.hs_youtube_video_revise('tacoma','short1')$$,'55000'));
+insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
+  select slug,file_key,parent_version,instruction,'unsupported','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
+create temp table c41b as select public.hs_youtube_video_revise('tacoma','short1') as r;
+select pg_temp.ck('41b two notes the reviser could not understand still allow a third try', (select (r->>'already_active')::boolean is false from c41b));
+update public.youtube_video_revisions set status='unsupported' where status='queued';
+select pg_temp.ck('41 the same note cannot be misunderstood forever (limit 3)', pg_temp.fails($$select public.hs_youtube_video_revise('tacoma','short1')$$,'55000'));
 -- missing credential
 delete from vault.decrypted_secrets;
 select public.hs_youtube_video_file_decide('tacoma','short1','rejected','a different note');
@@ -186,6 +197,21 @@ set role service_role;
 select pg_temp.ck('46 an approval of version 1 does not make version 2 publishable',
   (select count(*)=0 from public.hs_youtube_publishable_files('b2') where file_key='final'));
 reset role;
+-- a broken pipeline cannot be clicked into an endless loop: 10 system failures in 24 hours stop new runs
+insert into public.youtube_video_reviews (slug, title, files, file_decisions) values ('b3', 'B3',
+  jsonb_build_object('short2', jsonb_build_object('path','b3/short2.mp4','bytes',1,'sha256','s2')),
+  jsonb_build_object('short2', jsonb_build_object('status','rejected','note','remove the hum','version',1)));
+insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
+  select 'b3','short2',1,'note '||g,'failed','x' from generate_series(1,9) g;
+select pg_temp.as_user('founder@example.com');
+create temp table c47 as select public.hs_youtube_video_revise('b3','short2') as r;
+select pg_temp.ck('47 nine system failures still allow a run', (select (r->>'already_active')::boolean is false from c47));
+update public.youtube_video_revisions set status='failed' where slug='b3' and status='queued';
+select pg_temp.ck('48 ten system failures in 24 hours stop new runs', pg_temp.fails($$select public.hs_youtube_video_revise('b3','short2')$$,'55000'));
+update public.youtube_video_revisions set created_at = now() - interval '25 hours' where slug='b3';
+create temp table c49 as select public.hs_youtube_video_revise('b3','short2') as r;
+select pg_temp.ck('49 system failures older than 24 hours no longer count', (select (r->>'already_active')::boolean is false from c49));
+select pg_temp.as_user(null);
 \o
 select n, case when ok then 'PASS' else 'FAIL' end as r, detail from public.zz_results order by n;
 do $$ declare f int; begin select count(*) into f from public.zz_results where not ok; if f > 0 then raise exception '% checks FAILED', f; end if; end $$;

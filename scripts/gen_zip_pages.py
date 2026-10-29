@@ -1083,7 +1083,8 @@ def render(p, built):
         '<script src="/lib/community-request.js?v=e1d9c7d7"></script>\n'
         '<script src="/shell.js?v=662b5d19"></script>\n'
         '<script src="/lib/gov-notice-copy.js"></script>\n'
-        '<script src="/lib/community-page.js?v=efe2597a"></script>\n'
+        '<script src="/lib/water-rights.js?v=add4200a"></script>\n'
+        '<script src="/lib/community-page.js?v=ad50f15f"></script>\n'
         "</body>\n</html>\n")
 
 

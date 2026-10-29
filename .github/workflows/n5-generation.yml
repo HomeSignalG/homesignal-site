@@ -69,7 +69,7 @@ concurrency:
 jobs:
   orchestrate:
     environment: { name: production, deployment: false }
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     # Bounded so a wedged shard cannot hold the lane. The lease in n5_claim_shard is what
     # releases the shard afterwards; this only bounds the runner.
     # MAX_SECONDS (3000 s) stops new work from STARTING; a publish that starts just before it
