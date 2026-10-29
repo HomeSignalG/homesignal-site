@@ -159,8 +159,9 @@ begin
   perform public._hs_yv_ensure_v1(p_slug, p_key);
   cur := public._hs_yv_current_version(p_slug, p_key);
 
-  -- Runaway limits. Only a note the reviser could NOT understand ('unsupported') counts against the note: three of
-  -- those and the founder must reword it. A 'failed' revision is our system breaking (render, upload, a dead runner),
+  -- Runaway limits. Only a note the reviser could NOT understand ('unsupported') counts against the note: once one
+  -- exact note came back 'unsupported' on this version, the same words would only fail the same way, so they are
+  -- refused until the founder rewords them (2026-10-29: the same note was sent up to 3 times, every time unsupported). A 'failed' revision is our system breaking (render, upload, a dead runner),
   -- not the note, so it never uses up the note's tries (2026-10-29: three render failures caused by a workflow bug
   -- blocked two correct notes). Those are capped separately, 10 in 24 hours per file, so a broken pipeline cannot
   -- be clicked into an endless loop of runs.
@@ -168,8 +169,8 @@ begin
          count(*) filter (where status = 'failed' and created_at > now() - interval '24 hours')
     into failed_n, broken_n
     from public.youtube_video_revisions where slug = p_slug and file_key = p_key;
-  if failed_n >= 3 then
-    raise exception 'this note could not be understood 3 times; reword the note, then try again' using errcode = '55000';
+  if failed_n >= 1 then
+    raise exception 'this exact note was already tried on this version and could not be applied; change the wording, then try again' using errcode = '55000';
   end if;
   if broken_n >= 10 then
     raise exception 'revisions of this file failed 10 times in the last 24 hours because of a system problem; ask Claude to look at it' using errcode = '55000';
@@ -181,6 +182,33 @@ begin
   returning id into new_id;
   perform public._hs_yv_dispatch(new_id);
   return jsonb_build_object('revision_id', new_id, 'status', (select status from public.youtube_video_revisions where id = new_id), 'already_active', false);
+end $fn$;
+
+-- ── THE BUTTON, FROM ANY STATE: save the note as the rejection AND start the revision, as ONE transaction ───────
+-- (2026-10-29). The page used to save the rejection, then start the revision, as two calls. When the second call was
+-- refused (a refused note, the failure limit), the first had already replaced an approval and cancelled its Bluesky
+-- post. Here either both happen or neither does: any refusal inside hs_youtube_video_revise rolls back the rejection.
+-- A revision already running is returned as it is, and the saved decision is left alone.
+create or replace function public.hs_youtube_video_reject_and_revise(p_slug text, p_key text, p_note text)
+returns jsonb language plpgsql security definer set search_path = public as $fn$
+declare
+  who text := public._hs_yv_admin();
+  active public.youtube_video_revisions%rowtype;
+  note text := nullif(btrim(left(coalesce(p_note, ''), 500)), '');
+begin
+  if p_key not in ('final', 'short1', 'short2', 'thumbnail') then
+    raise exception 'bad file' using errcode = '22023';
+  end if;
+  if note is null then
+    raise exception 'write what to change in the note box first' using errcode = '22023';
+  end if;
+  select * into active from public.youtube_video_revisions
+   where slug = p_slug and file_key = p_key and status in ('queued', 'running', 'validating');
+  if found then
+    return jsonb_build_object('revision_id', active.id, 'status', active.status, 'already_active', true);
+  end if;
+  perform public.hs_youtube_video_file_decide(p_slug, p_key, 'rejected', note);
+  return public.hs_youtube_video_revise(p_slug, p_key);
 end $fn$;
 
 create or replace function public.hs_youtube_video_revision_retry(p_revision_id uuid)
@@ -390,6 +418,8 @@ end $fn$;
 -- ── GRANTS ───────────────────────────────────────────────────────────────────────────────────────────
 revoke all on function public._hs_yv_current_version(text, text), public._hs_yv_ensure_v1(text, text),
   public._hs_yv_dispatch(uuid), public._hs_yv_admin() from public, anon, authenticated;
+revoke all on function public.hs_youtube_video_reject_and_revise(text, text, text) from public, anon;
+grant execute on function public.hs_youtube_video_reject_and_revise(text, text, text) to authenticated;
 revoke all on function public.hs_youtube_video_revise(text, text), public.hs_youtube_video_revision_retry(uuid),
   public.hs_youtube_video_revision_cancel(uuid), public.hs_youtube_videos_list(),
   public.hs_youtube_video_file_decide(text, text, text, text) from public, anon;

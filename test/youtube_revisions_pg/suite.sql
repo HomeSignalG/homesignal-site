@@ -152,13 +152,11 @@ select pg_temp.ck('41a system failures (status failed) never use up the note''s 
   (select (r->>'already_active')::boolean is false from c41a));
 update public.youtube_video_revisions set status='failed' where status='queued';
 insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
-  select slug,file_key,parent_version,instruction,'unsupported','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
-insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by)
-  select slug,file_key,parent_version,instruction,'unsupported','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
+  select slug,file_key,parent_version,instruction||' (older wording)','unsupported','x' from public.youtube_video_revisions where error like '%GitHub answered 404%' limit 1;
 create temp table c41b as select public.hs_youtube_video_revise('tacoma','short1') as r;
-select pg_temp.ck('41b two notes the reviser could not understand still allow a third try', (select (r->>'already_active')::boolean is false from c41b));
+select pg_temp.ck('41b a DIFFERENT note that could not be applied does not block this one', (select (r->>'already_active')::boolean is false from c41b));
 update public.youtube_video_revisions set status='unsupported' where status='queued';
-select pg_temp.ck('41 the same note cannot be misunderstood forever (limit 3)', pg_temp.fails($$select public.hs_youtube_video_revise('tacoma','short1')$$,'55000'));
+select pg_temp.ck('41 the same note is refused after ONE result that could not apply it', pg_temp.fails($$select public.hs_youtube_video_revise('tacoma','short1')$$,'55000'));
 -- missing credential
 delete from vault.decrypted_secrets;
 select public.hs_youtube_video_file_decide('tacoma','short1','rejected','a different note');
@@ -211,6 +209,32 @@ select pg_temp.ck('48 ten system failures in 24 hours stop new runs', pg_temp.fa
 update public.youtube_video_revisions set created_at = now() - interval '25 hours' where slug='b3';
 create temp table c49 as select public.hs_youtube_video_revise('b3','short2') as r;
 select pg_temp.ck('49 system failures older than 24 hours no longer count', (select (r->>'already_active')::boolean is false from c49));
+-- ── reject-and-revise is ONE transaction (2026-10-29) ──
+insert into public.youtube_video_reviews (slug, title, files) values ('b4', 'B4', jsonb_build_object(
+  'final', jsonb_build_object('path','b4/final.mp4','bytes',1,'sha256','f4'), 'short1', jsonb_build_object('path','b4/short1.mp4','bytes',1,'sha256','s4')));
+select pg_temp.as_user('founder@example.com');
+select public.hs_youtube_video_file_decide('b4','final','approved');
+insert into public.youtube_video_revisions (slug,file_key,parent_version,instruction,status,requested_by,completed_at)
+  values ('b4','final',1,'make it shorter','unsupported','x',now());
+select pg_temp.ck('50 a refused reject-and-revise leaves the approval in place',
+  pg_temp.fails($$select public.hs_youtube_video_reject_and_revise('b4','final','make it shorter')$$,'55000')
+  and (select file_decisions->'final'->>'status'='approved' from public.youtube_video_reviews where slug='b4')
+  and (select count(*)=1 from public.youtube_video_revisions where slug='b4'));
+create temp table c51 as select public.hs_youtube_video_reject_and_revise('b4','final','  remove the background hum  ') as r;
+select pg_temp.ck('51 reject-and-revise saves the note as the rejection and starts one revision',
+  (select (r->>'already_active')::boolean is false from c51)
+  and (select file_decisions->'final'->>'status'='rejected' and file_decisions->'final'->>'note'='remove the background hum' from public.youtube_video_reviews where slug='b4')
+  and (select count(*)=1 from public.youtube_video_revisions where slug='b4' and status='queued' and instruction='remove the background hum'));
+create temp table c52 as select public.hs_youtube_video_reject_and_revise('b4','final','a different note') as r;
+select pg_temp.ck('52 a second click while it runs returns the running revision and leaves the saved note alone',
+  (select (r->>'already_active')::boolean from c52)
+  and (select file_decisions->'final'->>'note'='remove the background hum' from public.youtube_video_reviews where slug='b4'));
+select pg_temp.ck('53 an empty note is refused', pg_temp.fails($$select public.hs_youtube_video_reject_and_revise('b4','short1','   ')$$,'22023'));
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.ck('54 a non-admin cannot reject-and-revise', pg_temp.fails($$select public.hs_youtube_video_reject_and_revise('b4','short1','x')$$,'42501'));
+select pg_temp.ck('55 browser grants: authenticated may call it, anon may not',
+  has_function_privilege('authenticated','public.hs_youtube_video_reject_and_revise(text,text,text)','execute')
+  and not has_function_privilege('anon','public.hs_youtube_video_reject_and_revise(text,text,text)','execute'));
 select pg_temp.as_user(null);
 \o
 select n, case when ok then 'PASS' else 'FAIL' end as r, detail from public.zz_results order by n;
