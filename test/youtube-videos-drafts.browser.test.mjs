@@ -133,6 +133,10 @@ await page.fill(note2, 'make the music louder');
 ok(!(await page.locator(g2).isDisabled()), '20 a reworded note turns Generate back on');
 await page.fill(note2, '  make it pop more ');
 ok(await page.locator(g2).isDisabled(), '21 typing the refused note again turns it off again');
+// A reworded note survives the 10 s reload AND Generate stays on (the restore fires no input event).
+await page.fill(note2, 'make the music louder');
+await load();
+ok(await page.inputValue(note2) === 'make the music louder' && !(await page.locator(g2).isDisabled()), '21b after a reload a reworded note keeps Generate on');
 
 // A revision that worked but skipped part of the note says what it skipped.
 await page.evaluate(() => {

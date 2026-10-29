@@ -202,6 +202,10 @@ begin
   if note is null then
     raise exception 'write what to change in the note box first' using errcode = '22023';
   end if;
+  -- Lock the review row FIRST, so two clicks at once are served one after the other: the second then sees the first's
+  -- running revision and leaves the saved note alone, instead of overwriting it after the check.
+  perform 1 from public.youtube_video_reviews where slug = p_slug for update;
+  if not found then raise exception 'unknown video' using errcode = 'P0002'; end if;
   select * into active from public.youtube_video_revisions
    where slug = p_slug and file_key = p_key and status in ('queued', 'running', 'validating');
   if found then
