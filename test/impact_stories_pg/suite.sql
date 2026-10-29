@@ -116,7 +116,7 @@ select pg_temp.chk('5e until the re-check, nothing is approvable', pg_temp.nst()
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
 select pg_temp.chk('5f re-check attaches to version 3 (no new version)', pg_temp.cur() = 3 and pg_temp.nst() = 'pending');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3);
-select pg_temp.chk('5g one approval: ready to render', pg_temp.stage() = 'media' and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'ready');
+select pg_temp.chk('5g one approval: on to the Visuals step', pg_temp.stage() = 'visuals' and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'needs_review');
 select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
    and (select count(*) from public.impact_story_approvals where artifact = 'narrative' and decision = 'approved') = 1);
 
@@ -176,7 +176,7 @@ select pg_temp.chk('9a a changed pack queues a re-check and warns', (pg_temp.las
    and exists (select 1 from public.impact_story_events where kind = 'freshness_warning'));
 select pg_temp.chk('9b the approval holds until checked against the new pack', pg_temp.nst() = 'checking' and pg_temp.stage() <> 'media');
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P2'))));
-select pg_temp.chk('9c re-checked against the same text: the approval returns', pg_temp.nst() = 'approved' and pg_temp.stage() = 'media');
+select pg_temp.chk('9c re-checked against the same text: the approval returns', pg_temp.nst() = 'approved' and pg_temp.stage() = 'visuals');
 update public.impact_stories set pack = jsonb_set(pack, '{verified_at}', to_jsonb(now() - interval '45 days')) where id = pg_temp.id('s')::uuid;
 select pg_temp.chk('9d stale sources block the approval and say so', pg_temp.nst() = 'blocked'
    and pg_temp.nxt() = 'Re-check sources'
@@ -195,6 +195,101 @@ create function pg_temp.fid(a text) returns bigint language sql as $$
   select (x->>'id')::bigint from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = a $$;
 create function pg_temp.fst(a text) returns text language sql as $$
   select x->>'state' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = a $$;
+-- 12V. visuals (2026-10-29): every shot previewed and approved in ONE action before anything is rendered -------------
+create function pg_temp.vman(j uuid, shot_status text default 'clear', same boolean default true, pfx_ok boolean default true,
+                             license text default 'CC BY 4.0') returns jsonb language sql as $$
+  select jsonb_build_object('hash', md5(j::text || shot_status || same::text || license) || md5(j::text),
+    'pack_hash', (select pack_hash from public.impact_stories where id = pg_temp.id('s')::uuid),
+    'renderer', 'impact-render-3', 'opts', '{"overlay":1}'::jsonb, 'timing', '{"total_s":600}'::jsonb,
+    'counts', jsonb_build_object('clear', case when shot_status = 'clear' then 2 else 1 end, 'flagged', case when shot_status = 'flagged' then 1 else 0 end,
+                                 'blocked', case when shot_status = 'blocked' then 1 else 0 end),
+    'approvable', shot_status <> 'blocked', 'identity', jsonb_build_object('same', same),
+    'assets', jsonb_build_object(
+      'main', jsonb_build_object('shots', jsonb_build_array(jsonb_build_object('id', 'a1-s1', 'status', shot_status,
+        'preview', jsonb_build_object('path', case when pfx_ok then pg_temp.id('s') || '/visuals/' || j || '/preview-main-000.jpg' else 'elsewhere/x.jpg' end),
+        'photo', jsonb_build_object('id', 'oak', 'record', jsonb_build_object('license', license, 'sha256', repeat('c', 64),
+                                    'file_url', 'https://upload.wikimedia.org/x.jpg'))))),
+      'thumbnail', jsonb_build_object('shots', jsonb_build_array(jsonb_build_object('id', 'thumbnail', 'status', 'clear',
+        'preview', jsonb_build_object('path', pg_temp.id('s') || '/visuals/' || j || '/preview-thumbnail-000.jpg'))))),
+    'alternatives', jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'candidates', jsonb_build_array(
+      jsonb_build_object('id', 'oak-alt-1', 'title', 'File:Oak2.jpg', 'license', 'CC BY 4.0', 'author', 'B. Person',
+        'page_url', 'https://commons.wikimedia.org/wiki/File:Oak2.jpg', 'file_url', 'https://upload.wikimedia.org/y.jpg',
+        'sha256', repeat('d', 64), 'preview', jsonb_build_object('path', pg_temp.id('s') || '/visuals/' || j || '/cand-d.jpg')))))) $$;
+create function pg_temp.vis() returns jsonb language sql as $$ select public._hs_is_visuals(pg_temp.id('s')::uuid) $$;
+create function pg_temp.prep_visuals(shot_status text default 'clear', same boolean default true, pfx_ok boolean default true,
+                                     license text default 'CC BY 4.0') returns uuid language plpgsql as $$ declare j uuid; begin
+  perform public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+  j := (pg_temp.lastjob()).id;
+  perform public.hs_impact_story_job_claim(j);
+  perform public.hs_impact_story_job_complete(j, jsonb_build_object('manifest', pg_temp.vman(j, shot_status, same, pfx_ok, license)));
+  return j; end $$;
+create function pg_temp.approve_visuals() returns void language plpgsql as $$ begin
+  perform pg_temp.prep_visuals();
+  perform public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
+end $$;
+select pg_temp.chk('12V1 an approved narrative goes to the Visuals step first; Render is refused until the visuals are approved',
+  pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Prepare the visuals' and pg_temp.vis()->>'state' = 'none'
+  and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '%Approve the visuals before rendering%');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12V2 non-admin cannot prepare, approve or revoke visuals',
+  pg_temp.err(format('select public.hs_impact_story_visuals_prepare(%L, 7)', pg_temp.id('s'))) like '42501%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, 1, %L)', pg_temp.id('s'), 'x')) like '42501%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_revoke(%L, 1)', pg_temp.id('s'))) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12V3 a stale version is refused', pg_temp.err(format('select public.hs_impact_story_visuals_prepare(%L, 6)', pg_temp.id('s'))) like '40001%');
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, 7);
+insert into _ids select 'v1', (pg_temp.lastjob()).id;
+select pg_temp.chk('12V4 Prepare is its own job, dispatched to the render workflow, carrying the narrative and the photo choices',
+  (pg_temp.lastjob()).kind = 'visuals' and (select url from net.requests order by id desc limit 1) like '%/impact-story-render.yml/dispatches'
+  and (pg_temp.lastjob()).input->>'narrative_hash' = public._hs_is_artifact_state(pg_temp.id('s')::uuid, 'narrative')->>'hash'
+  and (pg_temp.lastjob()).input->>'choices_key' = md5('') and pg_temp.vis()->>'state' = 'preparing'
+  and pg_temp.nxt() like 'Preparing the preview stills%'
+  and (public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, 7)->>'existing')::boolean);
+select public.hs_impact_story_job_claim(pg_temp.id('v1')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('v1')::uuid, jsonb_build_object('manifest', pg_temp.vman(pg_temp.id('v1')::uuid, 'clear', true, false)));
+select pg_temp.chk('12V5 a preview outside the job''s folder is refused', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%outside%'
+  and (select count(*) from public.impact_story_visual_manifests) = 0 and pg_temp.vis()->>'state' = 'failed');
+select public.hs_impact_story_job_retry(pg_temp.id('v1')::uuid);
+select public.hs_impact_story_job_claim(pg_temp.id('v1')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('v1')::uuid, jsonb_build_object('manifest', '{"hash":"nope"}'::jsonb));
+select pg_temp.chk('12V6 a result with no proper manifest is refused', (pg_temp.lastjob()).status = 'failed' and (pg_temp.lastjob()).error like '%no manifest%');
+select pg_temp.prep_visuals('blocked');
+select pg_temp.chk('12V7 a blocked shot: the set needs fixes and cannot be approved',
+  pg_temp.vis()->>'state' = 'needs_fixes' and pg_temp.nxt() like 'Replace the blocked pictures%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash')) like '%cannot be approved%');
+select pg_temp.prep_visuals('clear', false);
+select pg_temp.chk('12V8 previews that did not match the render are not approvable', pg_temp.vis()->>'state' = 'needs_fixes'
+  and not (pg_temp.vis()->>'approvable')::boolean);
+select pg_temp.prep_visuals('clear', true, true, '');
+select pg_temp.chk('12V9 the server re-checks every photo: one without its license is refused even when the engine said clear',
+  pg_temp.vis()->>'state' = 'ready'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash')) like '%failed the server check%');
+select pg_temp.prep_visuals('flagged');
+select pg_temp.chk('12V10 a clean set (flags are only for looking) is ready, and the page is told so',
+  pg_temp.vis()->>'state' = 'ready' and pg_temp.stage() = 'visuals' and pg_temp.nxt() = 'Review the visuals, then Approve all visuals'
+  and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'visuals'->'manifest'->'assets'->'main'->'shots') = 1);
+select pg_temp.chk('12V11 approve needs the previews the page showed: an older set or a changed hash is refused',
+  pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), (pg_temp.vis()->>'manifest_id')::bigint - 1, pg_temp.vis()->>'manifest_hash')) like '40001%Newer previews%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', repeat('0', 64))) like '40001%changed%');
+select public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
+select pg_temp.chk('12V12 ONE action approves the whole set; the story moves on to Render',
+  pg_temp.vis()->>'state' = 'approved' and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos'
+  and (public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash')->>'existing')::boolean
+  and (select count(*) from public.impact_story_visual_events where decision = 'approved') = 1
+  and exists (select 1 from public.impact_story_events where kind = 'visuals_approved'));
+select pg_temp.chk('12V13 manifests and visual decisions are append-only',
+  pg_temp.err('update public.impact_story_visual_manifests set approvable = true') is not null
+  and pg_temp.err('delete from public.impact_story_visual_events') is not null);
+select public.hs_impact_story_visuals_revoke(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, 'Look again.');
+select pg_temp.chk('12V14 revoking the approval sends the story back to the Visuals step',
+  pg_temp.vis()->>'state' = 'ready' and pg_temp.stage() = 'visuals');
+select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()->'job'->>'id')::uuid, 'oak-trees', 'oak-alt-1');
+select pg_temp.chk('12V15 an alternative the visuals offered can be chosen; the previews are then stale',
+  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%another photo%'
+  and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->'job'->>'id', 'oak-trees', 'made-up')) like '%not one of the candidates%');
+select pg_temp.approve_visuals();
+select pg_temp.chk('12V16 the bucket accepts the JPEG previews', (select 'image/jpeg' = any (allowed_mime_types) from storage.buckets where id = 'impact-media'));
 select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');
 select pg_temp.chk('12b render on a stale version is refused', pg_temp.err(format('select public.hs_impact_story_render(%L, 6)', pg_temp.id('s'))) like '40001%');
 select pg_temp.as_user('stranger@example.com');
@@ -204,6 +299,9 @@ select pg_temp.as_user('founder@example.com');
 select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7);
 select pg_temp.chk('12d render is its own job, dispatched to the render workflow', (pg_temp.lastjob()).kind = 'render'
    and (select url from net.requests order by id desc limit 1) like '%/impact-story-render.yml/dispatches'
+   and (pg_temp.lastjob()).input->'visual_manifest'->>'hash' = pg_temp.vis()->>'manifest_hash'
+   and (pg_temp.lastjob()).input->'visual_manifest'->'opts' = '{"overlay":1}'::jsonb
+   and (pg_temp.lastjob()).input->'asset_choices'->0->>'candidate_id' = 'oak-alt-1'
    and (pg_temp.lastjob()).input->>'narrative_hash' = public._hs_is_artifact_state(pg_temp.id('s')::uuid, 'narrative')->>'hash');
 select pg_temp.chk('12e a second click returns the same render', (public.hs_impact_story_render(pg_temp.id('s')::uuid, 7)->>'existing')::boolean
    and pg_temp.nxt() like 'Rendering the videos%');
@@ -351,12 +449,16 @@ select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, pg_temp.id('rb
 select pg_temp.chk('12r4 the choice is recorded and append-only',
   public._hs_is_media(pg_temp.id('s')::uuid)->'choices'->0->>'candidate_id' = 'oak-photo-1a2b3c4d'
   and pg_temp.err('delete from public.impact_story_asset_choices') is not null);
+select pg_temp.chk('12r4b a new photo choice makes the approved visuals stale: Render is refused until they are approved again',
+  pg_temp.vis()->>'state' = 'stale'
+  and pg_temp.err(format('select public.hs_impact_story_render(%L, 7)', pg_temp.id('s'))) like '%Approve the visuals before rendering%');
+select pg_temp.approve_visuals();
 select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7);
 select pg_temp.chk('12r5 the next Render is a new job carrying the chosen photo',
   (pg_temp.lastjob()).id <> pg_temp.id('rb')::uuid and (pg_temp.lastjob()).status = 'queued'
-  and (pg_temp.lastjob()).input->'asset_choices'->0->'entry'->>'sha256' = repeat('b', 64)
+  and (select x->'entry'->>'sha256' from jsonb_array_elements((pg_temp.lastjob()).input->'asset_choices') x where x->>'subject_id' = 'oak-trees') = repeat('b', 64)
   and (pg_temp.lastjob()).input->>'renderer' = 'impact-render-3'
-  and public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'asset_choices'->0->>'candidate_id' = 'oak-photo-1a2b3c4d');
+  and (select x->>'candidate_id' from jsonb_array_elements(public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'asset_choices') x where x->>'subject_id' = 'oak-trees') = 'oak-photo-1a2b3c4d');
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets',
   jsonb_set(pg_temp.files((pg_temp.lastjob()).id), '{1,qc}', jsonb_build_object('ok', true, 'quality', jsonb_build_object('ok', false,
     'failures', jsonb_build_array(jsonb_build_object('code', 'excessive_documents', 'label', 'Too many documents and cards'))))),

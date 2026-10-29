@@ -5697,6 +5697,32 @@ Results.
 - Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
+- ⚖️ **VISUALS STEP: ONE APPROVAL FOR EVERY PICTURE BEFORE RENDER (2026-10-29; plan homesignal-ingest
+  `docs/impact-visuals/PLAN-v3-2026-10-29.md`, P2).** The workflow is Script & Shorts → **Visuals** → Media Review.
+  - **Prepare:** `hs_impact_story_visuals_prepare` queues a job of kind `visuals` on the render workflow. It renders one
+    still per shot with the video's own compositor (no video) and writes JPEG previews to
+    `impact-media/<story>/visuals/<job>/`. The bucket now also allows `image/jpeg`.
+  - **The set:** `job_complete` records an immutable `impact_story_visual_manifests` row. Every shot is `clear`,
+    `flagged` (worth a look) or `blocked`.
+  - **When the set is out of date:** `_hs_is_visuals` reads it as `stale` when the narrative, the sources, the photo
+    choices or the renderer moved.
+  - **Approve all visuals:** `hs_impact_story_visuals_approve` is ONE action, append-only in
+    `impact_story_visual_events`. It re-checks on the server:
+    - it is the current set and the hash the page showed;
+    - no shot is blocked;
+    - every photo has its license, file, checksum and cleared rights;
+    - every preview is inside the job's folder;
+    - the engine's preview-equals-render self-check passed.
+  - **Render** now requires approved visuals. It freezes `visual_manifest {hash, opts}` into the job and its key, and the
+    engine refuses a plan that hashes to anything else.
+  - **Other photos:** `hs_impact_story_choose_asset` also takes the alternatives a finished visuals job offered. A new
+    choice makes the set stale.
+  - **The page:** the contact sheet lists shots that need you first, has a Main / Short A / Short B / Thumbnail switch, and
+    loads previews as blobs, only those on screen.
+  - **Not built yet** (P2 follow-ups): manual upload and crop.
+  - Hot Topics' "Create video" now says to approve the visuals first.
+  - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
+  - pg checks 12V1-12V16 plus 12r4b, 8 mutations caught.
 
 ## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
 
