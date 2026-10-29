@@ -1,4 +1,5 @@
 {
+  "_note": "2026-10-29: title, status_tracks, unresolved_count, land_cards, titles and status_not_reviewed were edited BY HAND to the output expected after the land-card change (branch claude/map1-land-card-from-data), assuming docs/resolved-projects-display-name.sql has been applied. They are NOT re-measured. Every other field is still the 2026-07-06 recording. Regenerate with verify-dev-tracker.yml after deploy.",
   "zip": "84307",
   "url": "http://localhost:8080/homesignalmap.html?zip=84307",
   "at": "2026-07-06T02:04:53.869Z",
@@ -26,27 +27,17 @@
       "SUN RAY DAIRY"
     ],
     "anchor_visible": true,
-    "title": "Stratos data center project — land assembly",
+    "title": "Stratos data center project",
     "straddle": "Part of a project centered in ZIP 84336 — 4 parcels in your ZIP.",
-    "status_tracks": [
-      {
-        "k": "MIDA / county approval",
-        "v": "No verified public record yet — unresolved"
-      },
-      {
-        "k": "DEQ air permit",
-        "v": "No verified public record yet — unresolved"
-      },
-      {
-        "k": "Water rights",
-        "v": "No verified public record yet — unresolved"
-      },
-      {
-        "k": "Legal / referendum",
-        "v": "No verified public record yet — unresolved"
-      }
+    "status_tracks": [],
+    "unresolved_count": 0,
+    "land_cards": 1,
+    "titles": [
+      "Stratos data center project"
     ],
-    "unresolved_count": 4,
+    "status_not_reviewed": [
+      "Government actions for this land have not been reviewed on this map yet. Check the county and state records linked below."
+    ],
     "aliases": [
       "BAR H RANCH INC",
       "BAR H LAND LLC",
