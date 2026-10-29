@@ -2626,27 +2626,71 @@
     });
     return ids;
   };
-  HS.unfollowProject = function (id) {
-    if (id == null || id === '') return Promise.resolve();
-    state.follows.delete('project:' + id);
-    LS.set('follows', [...state.follows]);
-    return persistFollow('project', id, false);
+  // The follow state changes ONLY after the database confirms the write. supabase-js reports a
+  // rejected insert/delete by RESOLVING with { error }, not by throwing, so the old optimistic
+  // flip showed "Following" even when nothing was saved. persistFollow now returns { ok } and
+  // every caller branches on it; a failure leaves the previous state and says so.
+  HS.FOLLOW_SAVING = 'Saving…';
+  HS.FOLLOW_REMOVING = 'Removing…';
+  HS.PROJECT_FOLLOW_SAVE_ERROR = 'Couldn’t save to My Places. Try again.';
+  HS.PROJECT_FOLLOW_REMOVE_ERROR = 'Couldn’t remove from My Places. Try again.';
+  function followMsgEl(btn) {
+    if (!btn || !btn.parentNode) return null;
+    const next = btn.nextElementSibling;
+    if (next && next.classList && next.classList.contains('hs-follow-msg')) return next;
+    const el = document.createElement('span');
+    el.className = 'hs-follow-msg';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.style.cssText = 'display:block;font-size:13px;color:var(--red)';
+    btn.parentNode.insertBefore(el, btn.nextSibling);
+    return el;
+  }
+  HS.unfollowProject = async function (id) {
+    if (id == null || id === '') return { ok: true };
+    const res = await persistFollow('project', id, false);
+    if (res.ok) {
+      state.follows.delete('project:' + id);
+      LS.set('follows', [...state.follows]);
+    }
+    return res;
   };
-  HS.toggleFollow = function (btn, type, id) {
+  HS.toggleFollow = async function (btn, type, id) {
     if (!HS.requireAuth('follow')) return;
+    if (btn.getAttribute('aria-busy') === 'true') return;   // one write per button at a time
     const key = type + ':' + id;
-    if (state.follows.has(key)) {
-      state.follows.delete(key);
-      btn.textContent = btn.dataset.follow || (type === 'project' ? HS.PROJECT_FOLLOW_ADD : 'Follow');
-    } else {
+    const on = !state.follows.has(key);
+    const prevLabel = btn.textContent;
+    const msg = followMsgEl(btn);
+    if (msg) msg.textContent = '';
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.textContent = on ? HS.FOLLOW_SAVING : HS.FOLLOW_REMOVING;
+    const res = await persistFollow(type, id, on);
+    btn.disabled = false;
+    btn.removeAttribute('aria-busy');
+    if (!res.ok) {
+      btn.textContent = prevLabel;
+      if (msg) {
+        msg.textContent = type === 'project'
+          ? (on ? HS.PROJECT_FOLLOW_SAVE_ERROR : HS.PROJECT_FOLLOW_REMOVE_ERROR)
+          : (on ? 'Couldn’t save that. Try again.' : 'Couldn’t remove that. Try again.');
+      }
+      return res;
+    }
+    if (on) {
       state.follows.add(key);
-      btn.dataset.follow = btn.textContent;
+      btn.dataset.follow = prevLabel;
       btn.textContent = (type === 'property') ? 'Watching ✓'
         : (type === 'project') ? HS.PROJECT_FOLLOW_ON
         : 'Following ✓';
+    } else {
+      state.follows.delete(key);
+      btn.textContent = btn.dataset.follow || (type === 'project' ? HS.PROJECT_FOLLOW_ADD : 'Follow');
     }
+    btn.classList.toggle('following', on);
     LS.set('follows', [...state.follows]);
-    persistFollow(type, id, state.follows.has(key));
+    return res;
   };
 
   // -------------------------------------------------- share -------------------
@@ -2718,12 +2762,30 @@
       return { ok: true };
     } catch (e) { console.warn('persist', table, e); return { ok: false, error: e }; }
   }
+  // Postgres unique_violation. app_follows is unique (user_id, target_type, target_id), so a
+  // duplicate insert means the row is already saved: that is a confirmed follow, not a failure.
+  function isDuplicateKeyError(err) {
+    const code = err && (err.code || (err.error && err.error.code));
+    return String(code) === '23505';
+  }
+  // Returns { ok } — and callers MUST branch on it (see persistEmail above for why a bare
+  // try/catch is not enough). Seed/preview mode and a demo session have no database, so the
+  // local state is the whole store and the write is ok by construction.
   async function persistFollow(type, id, on) {
-    if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
+    if (CFG.DATA_SOURCE !== 'supabase' || !state.session || state.session.demo || !HS.sb) return { ok: true, local: true };
+    const row = { user_id: state.session.user.id, target_type: type, target_id: id };
     try {
-      if (on) await HS.sb().from('app_follows').insert({ user_id: state.session.user.id, target_type: type, target_id: id });
-      else await HS.sb().from('app_follows').delete().match({ user_id: state.session.user.id, target_type: type, target_id: id });
-    } catch (e) { console.warn('follow', e); }
+      let res;
+      if (on) res = await HS.sb().from('app_follows').insert(row);
+      else res = await HS.sb().from('app_follows').delete().match(row);
+      if (!res || typeof res !== 'object') { console.warn('follow', type, 'no result'); return { ok: false }; }
+      if (res.error) {
+        if (on && isDuplicateKeyError(res.error)) return { ok: true, duplicate: true };
+        console.warn('follow', type, res.error.message || res.error);
+        return { ok: false, error: res.error };
+      }
+      return { ok: true };
+    } catch (e) { console.warn('follow', type, e); return { ok: false, error: e }; }
   }
   async function persistTopics(category, topics, consent) {
     if (CFG.DATA_SOURCE !== 'supabase' || !state.session) return;
@@ -2868,11 +2930,16 @@
     LS.set('follows', [...state.follows]);
     for (const id of local) {
       if (!acct.has(id)) {
+        // A failed push is reported, never treated as synced, and never removes the local
+        // save: the next sign-in retries it. A duplicate means the row is already there.
         try {
-          await HS.sb().from('app_follows').insert({
+          const res = await HS.sb().from('app_follows').insert({
             user_id: state.session.user.id, target_type: 'project', target_id: id
           });
-        } catch (e) {}
+          if (res && res.error && !isDuplicateKeyError(res.error)) {
+            console.warn('project follow sync', id, res.error.message || res.error);
+          }
+        } catch (e) { console.warn('project follow sync', id, e); }
       }
     }
   }
