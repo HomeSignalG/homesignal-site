@@ -21,8 +21,11 @@ await page.evaluate(() => {
     versions: [], revisions: [{ id: 'r1', file_key: 'short1', parent_version: 1, instruction: 'calling it a ranch is odd', status: 'running', attempts: 1, plan: null, result: null }] };
   window.lists = 0;
   window.client = {
-    rpc: (n) => {
+    rpc: (n, a) => {
       if (n === 'hs_youtube_videos_list') { window.lists++; return Promise.resolve({ data: [JSON.parse(JSON.stringify(window.row))], error: null }); }
+      (window.calls = window.calls || []).push([n, a]);
+      if (n === 'hs_youtube_video_file_decide') return Promise.resolve({ data: null, error: null });
+      if (n === 'hs_youtube_video_revise' && window.reviseErr) return Promise.resolve({ data: null, error: window.reviseErr });
       return Promise.resolve({ data: null, error: { code: 'x' } });
     },
     storage: { from: () => ({ download: () => new Promise(() => {}) }) }
@@ -86,6 +89,29 @@ ok(/waiting for a build computer/.test(prog.queued) && /12 min ago/.test(prog.qu
 ok(/building the corrected version/.test(prog.running) && /10 min so far/.test(prog.running) && /Attempt 2 of 3/.test(prog.running), '11 a running job says it is building, for how long, and which attempt');
 ok(/checking the corrected version/.test(prog.checking), '12 a validating job says it is checking');
 ok(/Step 1 of 3: waiting/.test(prog.tile) && /Last checked/.test(prog.tile), '13 the generating tile shows the step and when the page last checked');
+
+// 2026-10-29: Generate sends the note in the box, even when it was typed before a reload (the founder's edits
+// "did not stick"), and a refusal from the server stays on the tile through the next reloads.
+await page.evaluate(() => { window.calls = []; window.reviseErr = { code: '55000', message: 'this note could not be understood 3 times; reword the note, then try again' }; });
+await page.fill(note2, 'remove the background hum');
+await load();
+await page.click('.yv-file[data-key="short2"] .yv-revise-now');
+await page.waitForFunction(() => /reword the note/.test(document.querySelector('.yv-file[data-key="short2"] .yv-fmsg').textContent));
+const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_file_decide').map((c) => c[1].p_note));
+ok(sent.length === 1 && sent[0] === 'remove the background hum', '14 Generate saves the note typed before the reload, not the old one');
+await load(); await load();
+ok(/reword the note/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '15 the refusal stays on the tile after two reloads');
+ok(!/reword the note/.test(await page.textContent('.yv-file[data-key="final"] .yv-fmsg')), '16 the refusal shows only on its own file');
+await page.evaluate(() => { window.reviseErr = null; });
+await page.click('.yv-file[data-key="short2"] .yv-fsavenote');
+await load();
+ok(!/reword the note/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '17 pressing a button on that file clears the old refusal');
+
+// A revision that failed 3 times because of our system says so, and points at Generate (which still works).
+await page.evaluate(() => { window.row.revisions = [{ id: 'r9', file_key: 'short1', parent_version: 1, instruction: 'x', status: 'failed', attempts: 3, error: 'Generation failed.', created_at: '2026-10-29T00:00:00Z' }]; });
+await load();
+const sys = await page.textContent('.yv-file[data-key="short1"]');
+ok(/problem on our side, not your note/.test(sys) && !/Three attempts/.test(sys) && await page.locator('.yv-file[data-key="short1"] .yv-revise-now').count() === 1, '18 a system failure after 3 tries says it was not the note and keeps Generate');
 
 await browser.close();
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }
