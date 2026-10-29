@@ -56,7 +56,7 @@ create table if not exists public.water_rights_filings (
   point_key              text not null,              -- filing number | point (see the mapping)
   filing_no              text not null,              -- the application number the agency uses
   right_no               text,                       -- the underlying water right, when stated
-  filing_type            text,                       -- verbatim (e.g. "Application To Appropriate")
+  filing_type            text,                       -- Utah: from the filing's own number (water_rights_ut_filing_type)
   diversion              text,                       -- verbatim point type / source
   status                 text,                       -- verbatim
   uses                   text,                       -- verbatim
@@ -227,6 +227,37 @@ as $fn$
   end
 $fn$;
 
+-- ── Utah: what kind of filing a pending row is (2026-10-29) ──────────────────────────────
+-- TYPE_OF_RIGHT on a change row describes the BASE water right being changed, not the change
+-- filing: a55167 (Bar H Ranch's change of right 13-2) read "Application To Appropriate".
+-- A change or exchange filing is classified by its own number, the way DWRi's own record pages
+-- do it (getWrChExTypeJs on chPrintAction.asp, read 2026-10-29): "##-" is a water right; E or X
+-- is an exchange; a lowercase letter is a change application. Case is significant: only a
+-- LOWERCASE first letter is a change. The change letters are DWRi's own kinds of change
+-- application (DWRi glossary: a change application is permanent or temporary; fixed-time):
+--   a  permanent change application   (0 of 6 recent a-records mention a temporary change)
+--   t  temporary change application   (t55206: "This temporary change will expire October 31, 2027")
+--   f  fixed-time change application  (f52296: "This is a fixed-time change application")
+-- E: f52296's own text calls E3100 / E3101 "exchange applications"; DWRi's code agrees.
+-- A row with no CHEXNUM is the right itself, and keeps TYPE_OF_RIGHT verbatim.
+-- An unrecognised change number gets no type rather than the base right's type.
+create or replace function public.water_rights_ut_filing_type(p_chexnum text, p_type_of_right text)
+returns text
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+  select case
+    when nullif(btrim(p_chexnum), '') is null then nullif(btrim(p_type_of_right), '')
+    when substr(btrim(p_chexnum), 3, 1) = '-' then nullif(btrim(p_type_of_right), '')
+    when left(btrim(p_chexnum), 1) in ('E', 'X') then 'Exchange application'
+    when left(btrim(p_chexnum), 1) = 'a' then 'Permanent change application'
+    when left(btrim(p_chexnum), 1) = 't' then 'Temporary change application'
+    when left(btrim(p_chexnum), 1) = 'f' then 'Fixed-time change application'
+    when left(btrim(p_chexnum), 1) ~ '^[a-z]$' then 'Change application'
+  end
+$fn$;
+
 -- ── per-source mapping: the only place field names live ───────────────────────────────────
 create or replace function public.water_rights_map_feature(p_source text, f jsonb, p_now timestamptz)
 returns public.water_rights_filings
@@ -248,7 +279,7 @@ begin
     -- changes (WRNUM); a new appropriation is known by its WRNUM.
     w.right_no := nullif(btrim(a ->> 'WRNUM'), '');
     w.filing_no := coalesce(nullif(btrim(a ->> 'CHEXNUM'), ''), w.right_no);
-    w.filing_type := nullif(btrim(a ->> 'TYPE_OF_RIGHT'), '');
+    w.filing_type := public.water_rights_ut_filing_type(a ->> 'CHEXNUM', a ->> 'TYPE_OF_RIGHT');
     w.diversion := nullif(btrim(concat_ws(' · ', nullif(btrim(a ->> 'TYPE'), ''), nullif(btrim(a ->> 'SOURCE'), ''))), '');
     w.status := nullif(btrim(a ->> 'STATUS'), '');
     w.uses := nullif(btrim(a ->> 'USES'), '');
@@ -543,6 +574,7 @@ revoke all on function public.water_rights_fire(text) from public, anon, authent
 revoke all on function public.water_rights_collect() from public, anon, authenticated;
 revoke all on function public.water_rights_map_feature(text, jsonb, timestamptz) from public, anon, authenticated;
 revoke all on function public.water_rights_date(jsonb) from public, anon, authenticated;
+revoke all on function public.water_rights_ut_filing_type(text, text) from public, anon, authenticated;
 revoke all on function public.water_rights_display_applicant(text) from public, anon, authenticated;
 revoke all on function public.water_rights_filings_json(public.water_rights_filings[], boolean) from public, anon, authenticated;
 revoke all on function public.water_rights_for_zip(text) from public;

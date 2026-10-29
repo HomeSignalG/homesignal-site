@@ -48,7 +48,7 @@ const WR_COMPLETE = { zip: '__ZIP__', state: 'UT', state_name: 'Utah', agency: '
   filings: [{ uses: 'OP', points: [{ lat: 41.733397354101, lng: -112.700301266394 }, { lat: 41.7534187416931, lng: -112.660197642405 }],
     status: 'Unapproved', filed_on: '2026-10-15', right_no: '13-2', applicant: 'BAR H RANCH INC.',
     diversion: 'Point of Return · Salt Wells Spring Stream', filing_no: 'a55167', date_label: 'Priority date',
-    record_url: 'https://www.waterrights.utah.gov/search/?q=a55167', filing_type: 'Application To Appropriate' }] };
+    record_url: 'https://www.waterrights.utah.gov/search/?q=a55167', filing_type: 'Permanent change application' }] };
 const WR_NOT_COVERED = { zip: '__ZIP__', state: 'MA', state_name: 'Massachusetts', status: 'not_covered', filings: [] };
 const BASE = { app_changes: [], communities: [], meetings: [], rpc_development: [], rpc_facility: [] };
 
