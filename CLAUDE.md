@@ -228,6 +228,17 @@ the exact problem `QUEUE.md` exists to end.
 - `noindex` remains ONLY on non-public pages (app, auth, admin, redirect aliases, `/404.html`), listed in `scripts/audit_index_all.py` NON_PUBLIC.
   **Do not add a noindex rule or an exclusion criterion without explicit founder approval.**
 - Gate: `scripts/audit_index_all.py` runs in `pages.yml` against `_site` (public noindex, robots block, non-self canonical, missing from sitemap).
+
+### GOOGLE SEARCH CONSOLE: GIVE THE FOUNDER FULL https://jodytracks.com URLS (founder, 2026-10-29)
+**The founder's Search Console box does not accept a bare path.** Every sitemap or page address given to the founder for
+Search Console is the full URL on the live host, one per copy block, e.g. `https://jodytracks.com/sitemaps/map.xml`. Never
+`sitemaps/map.xml`, and never `homesignal.net` (it only redirects; `robots.txt` names it in the repo, but the deploy rewrites it).
+- Sitemaps the build writes: `https://jodytracks.com/sitemap.xml` and `https://jodytracks.com/sitemaps/<family>.xml` for
+  zip, zip-alerts, zip-development, city, project, guide, map, project-list, plus the focus files pierce-county-wa and
+  washington-state.
+- Measured 2026-10-29 from the founder's screenshot: only `sitemap.xml` (last read Oct 20, 29,551 pages, before `/map/<zip>/`
+  pages were listed), pierce-county-wa and washington-state were submitted. `map.xml` and `project-list.xml` were not, so Google
+  had not been given the map pages in any sitemap it had read.
   Test: `test/index-all-audit.test.mjs`. The older sections below that describe Rule F/D robots gating are the dated record.
 
 ## GEOGRAPHIC SEARCH FOCUS: PIERCE COUNTY, WA HAS ITS OWN SITEMAP (founder, 2026-10-23)
