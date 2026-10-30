@@ -329,6 +329,41 @@ select pg_temp.chk('12V24 a rejection can be undone, once; with none left the ke
   and pg_temp.err(format('select public.hs_impact_story_photo_restore(%L, %L)', pg_temp.id('s'), 'oak')) like '%not rejected%'
   and pg_temp.err('update public.impact_story_photo_rejections set note = null') is not null
   and pg_temp.err('delete from public.impact_story_photo_rejections') is not null);
+-- 12V25-12V29: Approve / Reject / Need new photo under every shot
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest',
+  jsonb_set(jsonb_set(pg_temp.vman((pg_temp.lastjob()).id), '{assets,main,shots,0,subject_ref}', '"oak-trees"'),
+            '{assets,thumbnail,shots,0,map}', 'true')));
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12V25 non-admin cannot decide a shot',
+  pg_temp.err(format('select public.hs_impact_story_shot_decide(%L, 1, %L, %L, %L, %L)', pg_temp.id('s'), 'x', 'main', 'a1-s1', 'approved')) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12V26 a decision needs the newest previews and their hash, a real shot, and a note to reject a shot with no photo',
+  pg_temp.err(format('select public.hs_impact_story_shot_decide(%L, %s, %L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', repeat('0', 64), 'main', 'a1-s1', 'approved')) like '40001%changed%'
+  and pg_temp.err(format('select public.hs_impact_story_shot_decide(%L, %s, %L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash', 'main', 'nope', 'approved')) like '%not in these previews%'
+  and pg_temp.err(format('select public.hs_impact_story_shot_decide(%L, %s, %L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'rejected')) like '%Say what is wrong%'
+  and pg_temp.err(format('select public.hs_impact_story_shot_decide(%L, %s, %L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'new_photo')) like '%not about a subject%');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'rejected', 'Wrong headline.');
+select pg_temp.chk('12V27 a rejected shot (no photo) blocks Approve all',
+  pg_temp.vis()->>'state' = 'needs_fixes' and pg_temp.vis()->>'why' like 'You rejected 1 shot%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash')) like '%cannot be approved%');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
+select pg_temp.chk('12V27b approving the rejected shot clears the block', pg_temp.vis()->>'state' = 'ready');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo');
+select pg_temp.chk('12V28 Need new photo asks the next Prepare to search for that shot''s subject',
+  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'ready');
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', jsonb_set(pg_temp.vman((pg_temp.lastjob()).id), '{assets,main,shots,0,subject_ref}', '"oak-trees"')));
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'rejected');
+select pg_temp.chk('12V29 rejecting a shot that shows a photo rejects the photo; decisions are append-only',
+  pg_temp.vis()->'rejected'->0->>'id' = 'oak' and pg_temp.vis()->>'state' = 'stale'
+  and jsonb_array_length(pg_temp.vis()->'more_photos_for') = 0
+  and pg_temp.err('update public.impact_story_shot_decisions set note = null') is not null
+  and pg_temp.err('delete from public.impact_story_shot_decisions') is not null);
+select public.hs_impact_story_photo_restore(pg_temp.id('s')::uuid, 'oak');
 select pg_temp.approve_visuals();
 select pg_temp.chk('12V16 the bucket accepts the JPEG previews', (select 'image/jpeg' = any (allowed_mime_types) from storage.buckets where id = 'impact-media'));
 select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');

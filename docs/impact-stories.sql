@@ -310,6 +310,28 @@ create table if not exists public.impact_story_photo_rejections (
 alter table public.impact_story_photo_rejections enable row level security;
 revoke all on public.impact_story_photo_rejections from public, anon, authenticated;
 
+-- The founder's decision on ONE shot of one set of previews (2026-10-30, "an approve, reject, need new photo, under
+-- every picture"). Append-only and tied to the manifest and its hash, like the media decisions; the newest row per
+-- shot of the current previews is the one that counts. approved: accepted. rejected: not acceptable (a shot showing a
+-- photo also rejects that photo for the story; any other shot blocks Approve all until the previews are prepared
+-- again). new_photo: search new licensed photos for the shot's subject on the next Prepare.
+create table if not exists public.impact_story_shot_decisions (
+  id             bigint generated always as identity primary key,
+  story_id       uuid not null references public.impact_stories(id),
+  manifest_id    bigint not null references public.impact_story_visual_manifests(id),
+  manifest_hash  text not null,
+  asset          text not null check (asset in ('main', 'short_a', 'short_b', 'thumbnail')),
+  shot_id        text not null check (char_length(shot_id) between 1 and 80),
+  decision       text not null check (decision in ('approved', 'rejected', 'new_photo')),
+  subject_id     text,
+  photo_id       text,
+  note           text check (note is null or char_length(note) <= 1000),
+  actor          text not null,
+  at             timestamptz not null default now()
+);
+alter table public.impact_story_shot_decisions enable row level security;
+revoke all on public.impact_story_shot_decisions from public, anon, authenticated;
+
 -- The private bucket. Readable only by dashboard admins (the same helper Tab 16's bucket uses); written only by the
 -- worker's service role, apart from a dashboard admin's photo uploads (impact_media_admin_upload below).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -334,6 +356,9 @@ create trigger impact_story_approvals_append_only before update or delete on pub
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_uploads_append_only on public.impact_story_uploads;
 create trigger impact_story_uploads_append_only before update or delete on public.impact_story_uploads
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_shot_decisions_append_only on public.impact_story_shot_decisions;
+create trigger impact_story_shot_decisions_append_only before update or delete on public.impact_story_shot_decisions
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_photo_rejections_append_only on public.impact_story_photo_rejections;
 create trigger impact_story_photo_rejections_append_only before update or delete on public.impact_story_photo_rejections
@@ -876,6 +901,13 @@ returns jsonb language sql stable security definer set search_path = public as $
                            from public._hs_is_rejections(p_story) r), '')))
 $$;
 
+-- The newest decision per shot of one set of previews.
+create or replace function public._hs_is_shot_decisions(p_manifest bigint)
+returns setof public.impact_story_shot_decisions language sql stable security definer set search_path = public as $$
+  select distinct on (asset, shot_id) * from public.impact_story_shot_decisions where manifest_id = p_manifest
+   order by asset, shot_id, id desc
+$$;
+
 -- Where the story's visuals stand: none | preparing | blocked | failed | stale | needs_fixes | ready | approved.
 -- The CURRENT manifest is the newest one, and it counts only while the narrative it was made from is the approved one,
 -- the sources are the same, the photo choices are the same and the renderer is the same.
@@ -884,7 +916,7 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_state(p_story, 'narrative');
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
-        nblk int := 0; blocked jsonb;
+        nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into vj from public.impact_story_jobs where story_id = p_story and kind = 'visuals' order by created_at desc limit 1;
@@ -894,6 +926,11 @@ begin
            and m.choices_key = ck->>'key' and m.renderer = 'impact-render-3';
     select * into ev from public.impact_story_visual_events where manifest_id = m.id order by id desc limit 1;
     nblk := coalesce((m.counts->>'blocked')::int, 0);
+    select coalesce(jsonb_agg(jsonb_build_object('asset', d.asset, 'shot_id', d.shot_id, 'decision', d.decision,
+             'subject_id', d.subject_id, 'photo_id', d.photo_id, 'note', d.note, 'actor', d.actor, 'at', d.at) order by d.asset, d.shot_id), '[]'::jsonb),
+           count(*) filter (where d.decision = 'rejected' and d.photo_id is null and d.manifest_hash = m.manifest_hash),
+           coalesce(jsonb_agg(distinct d.subject_id) filter (where d.decision = 'new_photo' and d.subject_id is not null), '[]'::jsonb)
+      into sd, nrej, more from public._hs_is_shot_decisions(m.id) d;
   end if;
   if vj.id is not null and vj.status = 'failed' and (m.id is null or vj.created_at > m.created_at) then
     blocked := jsonb_build_object('job_id', vj.id, 'at', vj.completed_at, 'error', vj.error,
@@ -915,9 +952,10 @@ begin
                 else 'The renderer changed since these previews were made. Prepare the visuals again.' end;
   elsif ev.id is not null and ev.decision = 'approved' and ev.manifest_hash = m.manifest_hash then
     st := 'approved'; why := 'Approved by ' || ev.actor || '.';
-  elsif nblk > 0 or not m.approvable then
+  elsif nblk > 0 or nrej > 0 or not m.approvable then
     st := 'needs_fixes';
     why := case when nblk > 0 then nblk || ' shot(s) cannot be shown as planned. Replace those pictures, then prepare the visuals again.'
+                when nrej > 0 then 'You rejected ' || nrej || ' shot(s). Prepare the visuals again after the change, or approve them one by one.'
                 else 'The previews could not be confirmed to match the render. Prepare the visuals again.' end;
   else
     st := 'ready'; why := 'Every shot passed the checks. Look them over, then Approve all visuals.';
@@ -926,7 +964,7 @@ begin
     'created_at', m.created_at, 'version', m.version, 'counts', m.counts, 'approvable', m.approvable, 'manifest', m.manifest,
     'job', case when vj.id is null then null else jsonb_build_object('id', vj.id, 'status', vj.status, 'created_at', vj.created_at,
       'completed_at', vj.completed_at, 'error', vj.error) end,
-    'blocked', blocked, 'rejected', ck->'rejected',
+    'blocked', blocked, 'rejected', ck->'rejected', 'shot_decisions', sd, 'more_photos_for', more,
     'last_decision', case when ev.id is null then null else jsonb_build_object('decision', ev.decision, 'actor', ev.actor,
       'at', ev.at, 'note', ev.note) end);
 end $$;
@@ -950,7 +988,8 @@ begin
   ck := public._hs_is_choice_key(p_story);
   return public._hs_is_queue(p_story, 'visuals', jsonb_build_object('scope', 'visuals|' || (na->>'hash') || '|impact-render-3|' || (ck->>'key'),
     'narrative_hash', na->>'hash', 'renderer', 'impact-render-3', 'asset_choices', ck->'choices', 'choices_key', ck->>'key',
-    'rejected_photos', ck->'rejected'), e, p_new);
+    'rejected_photos', ck->'rejected',
+    'more_photos_for', coalesce(public._hs_is_visuals(p_story)->'more_photos_for', '[]'::jsonb)), e, p_new);
 end $$;
 
 -- Approve all visuals: ONE action for the whole set. Re-checks on the server what the page showed: the manifest is the
@@ -1136,6 +1175,46 @@ begin
   update public.impact_stories set updated_at = now() where id = p_story;
   perform public._hs_is_event(p_story, 'photo_rejected', jsonb_build_object('photo', p_photo, 'title', rec->>'title'), e);
   return jsonb_build_object('ok', true, 'photo', p_photo);
+end $$;
+
+-- Approve, reject or ask for a new photo for ONE shot of the newest previews (the page sends the hash it showed).
+-- Rejecting a shot that shows a photo rejects that photo for the story (it leaves every shot that uses it); rejecting
+-- any other shot needs a note and blocks Approve all until the previews are prepared again or that shot is approved.
+create or replace function public.hs_impact_story_shot_decide(p_story uuid, p_manifest_id bigint, p_expected_hash text,
+                                                              p_asset text, p_shot text, p_decision text, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); m public.impact_story_visual_manifests%rowtype; sh jsonb; pid text; subj text;
+        note text := nullif(left(btrim(coalesce(p_note, '')), 1000), '');
+begin
+  if p_decision not in ('approved', 'rejected', 'new_photo') then raise exception 'bad decision' using errcode = '22023'; end if;
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  select * into m from public.impact_story_visual_manifests where story_id = p_story order by id desc limit 1;
+  if m.id is distinct from p_manifest_id then
+    raise exception 'Newer previews exist for this story. Reload and look at those.' using errcode = '40001';
+  end if;
+  if m.manifest_hash is distinct from p_expected_hash then
+    raise exception 'These previews changed since you opened them. Reload first.' using errcode = '40001';
+  end if;
+  select x into sh from jsonb_array_elements(coalesce(m.manifest->'assets'->p_asset->'shots', '[]'::jsonb)) x where x->>'id' = p_shot limit 1;
+  if sh is null then raise exception 'That shot is not in these previews.' using errcode = '22023'; end if;
+  pid := case when jsonb_typeof(sh->'photo') = 'object' then sh->'photo'->>'id' end;
+  subj := nullif(sh->>'subject_ref', '');
+  if p_decision = 'new_photo' and subj is null then
+    raise exception 'This shot is not about a subject a photo can show (it is a map, a record or a card). Use Reject with a note instead.' using errcode = '22023';
+  end if;
+  if p_decision = 'rejected' and pid is null and note is null then
+    raise exception 'Say what is wrong with this shot.' using errcode = '22023';
+  end if;
+  if p_decision = 'rejected' and pid is not null then
+    perform public.hs_impact_story_photo_reject(p_story, m.id, pid, note);
+  end if;
+  insert into public.impact_story_shot_decisions (story_id, manifest_id, manifest_hash, asset, shot_id, decision, subject_id, photo_id, note, actor)
+  values (p_story, m.id, m.manifest_hash, p_asset, p_shot, p_decision, subj, case when p_decision = 'rejected' then pid end, note, e);
+  update public.impact_stories set updated_at = now() where id = p_story;
+  perform public._hs_is_event(p_story, 'shot_decision', jsonb_build_object('asset', p_asset, 'shot', p_shot, 'decision', p_decision,
+    'photo', pid, 'subject', subj), e);
+  return jsonb_build_object('ok', true, 'decision', p_decision, 'photo_rejected', p_decision = 'rejected' and pid is not null);
 end $$;
 
 -- Undo a rejection: the photo may be shown again after the next Prepare.
@@ -1598,7 +1677,7 @@ begin
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
     'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)',
-    'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)'] loop
+    'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
@@ -1612,7 +1691,8 @@ begin
     'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
     'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',
-    'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'public.hs_impact_story_photo_restore(uuid, text)'] loop
+    'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'public.hs_impact_story_photo_restore(uuid, text)',
+    'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

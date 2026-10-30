@@ -5764,7 +5764,16 @@ Results.
       It searches new licensed candidates for the photo's subjects, leaves the rejected file out, and offers them under
       "Other licensed photos".
     - A rejection removes the photo from every shot that uses it, in every video.
-    - pg checks 12V19-12V24.
+    - **Approve / Reject / Need new photo under every shot** (founder, same day: "i need an approve, reject, need new
+      photo, under every picture"). `hs_impact_story_shot_decide` writes to `impact_story_shot_decisions`, which is
+      append-only and tied to the manifest id and hash; the newest decision per shot counts.
+      - Reject on a shot with a photo also rejects that photo.
+      - Reject on any other shot needs a note, and it blocks "Approve all visuals" (state `needs_fixes`) until that shot
+        is approved or the previews are prepared again.
+      - Need new photo adds the shot's subject to `more_photos_for`, which the next Prepare carries to the engine as a
+        new search.
+      - Not built: alternatives shown already composed into the shot. They are shown as photos.
+    - pg checks 12V19-12V29.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
