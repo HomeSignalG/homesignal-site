@@ -1,0 +1,38 @@
+name: youtube-video-revision-plans-suite
+
+# The note-box plans (docs/youtube-video-revision-plans.sql) against a DISPOSABLE Postgres with stand-ins for
+# Supabase's auth/vault/net. No Supabase credential is used or reachable here.
+on:
+  pull_request:
+    paths:
+      - 'docs/youtube-video-revision-plans.sql'
+      - 'docs/youtube-video-review.sql'
+      - 'docs/youtube-video-revisions.sql'
+      - 'test/youtube_video_revision_plans_pg/**'
+      - '.github/workflows/youtube-video-revision-plans-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/youtube-video-revision-plans.sql'
+      - 'docs/youtube-video-review.sql'
+      - 'docs/youtube-video-revisions.sql'
+      - 'test/youtube_video_revision_plans_pg/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "a Supabase credential is present; this suite must not see one"; exit 1
+          fi
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql
+      - name: Run the plans suite (exit code is the result)
+        run: bash test/youtube_video_revision_plans_pg/run.sh
