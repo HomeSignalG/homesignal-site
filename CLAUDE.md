@@ -5979,3 +5979,11 @@ post id. A post never measured shows a dash, never 0.
 - **Apply order:** homesignal-ingest #973 (the new workflow inputs) first, then the SQL, then the page.
 - Tests: `test/youtube_video_revision_plans_pg` (CI `youtube-video-revision-plans-suite.yml`), `test/youtube-video-plans.test.mjs`,
   `test/youtube-video-plans.browser.test.mjs`.
+- **Step 7, one fix for every video that says the word** (`docs/youtube-video-revision-plans-also.sql`, applied after the
+  step-6 file). Plan start records the other video files' current version and settings on the plan row (`others`); the
+  worker plans the same PRONUNCIATION steps for each file that says the word (`plan.also`, homesignal-ingest
+  `note_plan.also_plans`). The plan shows "Also fix this in:" with those files ticked; `hs_youtube_video_plan_confirm(plan,
+  md5, also)` creates one revision per ticked file, rejected with the same note and built from its own plan and version
+  (a ticked file with a newer version makes the plan stale; one being rebuilt refuses). Only pronunciation is shared.
+  ⚠️ Replaying the step-6 file after this one brings back the two-argument confirm and the old plan start; re-apply this
+  file after it.

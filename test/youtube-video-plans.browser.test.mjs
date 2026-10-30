@@ -78,6 +78,32 @@ await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_youtube_v
 await load();
 ok(await page.locator(T + '.yv-revise-now').count() === 1 && !(await page.locator(T).textContent()).includes('Claude is reading'), '8 Cancel brings the note box back');
 
+// 5. step 7: the main video's pronunciation fix, also for the Shorts that say the word; Short 1 is approved
+const M = '.yv-file[data-key="final"] ';
+await page.evaluate(() => {
+  window.calls = []; window.confirmed = 0;
+  window.confirm = (m) => { window.confirmed++; window.lastConfirm = m; return true; };
+  const pron = (lvl) => ({ kind: 'pronunciation', summary: 'Pronunciation of "tacoma", treatment ' + lvl + ' of 3.', delta: { word: 'tacoma', level: lvl } });
+  window.plans = [{ id: 'p3', slug: 's', file_key: 'final', status: 'ready', note: 'Tacoma is wrong', plan_md5: 'md5-3', created_at: '2026-10-30T13:00:00Z',
+    plan: { steps: [{ from_note: 'Tacoma is wrong', instruction: '"Tacoma" is mispronounced', changes: [pron(1).summary] }], not_done: [], corrections: [pron(1)],
+            also: { short1: { parent_version: 1, plan: { asset: 'short1', corrections: [pron(2)] } },
+                    short2: { parent_version: 1, plan: { asset: 'short2', corrections: [pron(1)] } } } } }];
+});
+await load();
+ok(await page.locator(M + '.yv-palso:checked').count() === 2, '9 both Shorts that say the word are offered, ticked');
+await page.click(M + '.yv-pconfirm');
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_youtube_video_plan_confirm'));
+let c3 = await page.evaluate(() => window.calls.find((c) => c[0] === 'hs_youtube_video_plan_confirm'));
+ok(JSON.stringify(c3[1].p_also) === '["short1","short2"]' && c3[1].p_plan_md5 === 'md5-3', '10 Confirm sends the ticked files with the plan md5');
+ok(await page.evaluate(() => window.confirmed === 1 && /Short 1 is approved/.test(window.lastConfirm)), '11 a ticked file that is approved is named in the warning');
+await page.evaluate(() => { window.calls = []; window.confirmed = 0; window.plans[0].status = 'ready'; });
+await load();
+await page.uncheck(M + '.yv-palso[value="short1"]');
+await page.click(M + '.yv-pconfirm');
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_youtube_video_plan_confirm'));
+c3 = await page.evaluate(() => window.calls.find((c) => c[0] === 'hs_youtube_video_plan_confirm'));
+ok(JSON.stringify(c3[1].p_also) === '["short2"]' && await page.evaluate(() => window.confirmed === 0), '12 an unticked file is left alone, and no warning is needed');
+
 await browser.close();
 console.log(fails ? fails + ' FAILURE(S)' : 'ALL PASS');
 process.exit(fails ? 1 : 0);

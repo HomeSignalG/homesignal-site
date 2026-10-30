@@ -26,4 +26,14 @@ $P -f "$ROOT/docs/youtube-video-revisions.sql" >/dev/null   # put the real dispa
 $P -f "$ROOT/docs/youtube-video-revision-plans.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-revision-plans.sql" >/dev/null   # a re-run is accepted
 echo "ok applies twice"
+# step 7 refuses a plan_start it was not written against, then applies (twice)
+if $P -c "create or replace function public.hs_youtube_video_plan_start(p_slug text, p_key text, p_note text) returns jsonb language plpgsql as \$\$ begin return null; end \$\$" >/dev/null \
+   && $P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null 2>&1; then
+  echo "FAIL guard: the step-7 SQL applied over an unknown plan_start"; exit 1
+fi
+echo "ok step-7 guard refuses an unknown plan_start"
+$P -f "$ROOT/docs/youtube-video-revision-plans.sql" >/dev/null   # put the step-6 functions back
+$P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
+echo "ok step-7 applies twice"
 $P -f "$HERE/suite.sql"
