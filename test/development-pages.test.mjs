@@ -138,7 +138,8 @@ const pa = read(out, A), pb = read(out, B);
 for (const [p, h] of [[A, pa], [B, pb]]) {
   ok(/<meta name="robots" content="index, follow">/.test(h), `${p} is indexable`);
   ok(h.includes(`<link rel="canonical" href="https://jodytracks.com${p}">`), `${p} is self-canonical`);
-  ok((h.match(/<h1>/g) || []).length === 1, `${p} has one H1`);
+  ok((h.match(/<h1[ >]/g) || []).length === 1, `${p} has one H1`);
+  ok(!/href="\/(layout|app)\.css/.test(h) && /<style>[^<]*\.wrap\{/.test(h), `${p} carries its own layout, not the app shell's stylesheets`);
   ok(!/<script(?![^>]*application\/ld\+json)/.test(h), `${p} ships no script but structured data`);
   ok(/script-src 'none'/.test(h), `${p} forbids scripts in its CSP`);
 }
@@ -149,17 +150,17 @@ vm.runInContext(readFileSync(join(root, 'lib', 'project-type.js'), 'utf8'), ctx)
 const HS = ctx.window.HS;
 const tB = HS.canonicalProjectType({ name: 'Olympia Apartments', type: 'Residential', status: 'Approved' });
 const lB = HS.canonicalLifecycle({ name: 'Olympia Apartments', type: 'Residential', status: 'Approved' });
-ok(pb.includes(`<p>${tB.label} · ${lB.label}`), `the non-DC page shows ${tB.label} · ${lB.label} from lib/project-type.js`);
+ok(pb.includes(`<span class="pill type">${tB.label}</span><span class="pill life">${lB.label}</span>`), `the non-DC page shows ${tB.label} · ${lB.label} from lib/project-type.js`);
 const tA = HS.canonicalProjectType({ name: 'x', type: 'Data center' });
-ok(pa.includes(`<p>${tA.label} · Lifecycle unknown`), 'the DC page shows Data center · Lifecycle unknown (no lifecycle claimed without a source)');
+ok(pa.includes(`<span class="pill type">${tA.label}</span><span class="pill life">Lifecycle unknown</span>`), 'the DC page shows Data center · Lifecycle unknown (no lifecycle claimed without a source)');
 
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
-ok(pa.includes('<strong>Example Ranch, Inc.</strong> — Landowner of record'), 'the organization and its role');
+ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the organization and its role');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
-ok(/<h3>Videos<\/h3><ul><li><a href="https:\/\/www\.youtube\.com\/watch\?v=q-phnTGrMRQ"/.test(pa), 'the main video under Videos');
-ok(/<h3>Shorts<\/h3><ul><li><a href="https:\/\/www\.youtube\.com\/shorts\/shortAAAAAA"/.test(pa), 'the Short under Shorts');
+ok(/<h3>Videos<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/watch\?v=q-phnTGrMRQ"/.test(pa), 'the main video under Videos');
+ok(/<h3>Shorts<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/shorts\/shortAAAAAA"/.test(pa), 'the Short under Shorts');
 ok(pa.includes('A filing to move ranch water to a data center') && pa.includes('href="https://bsky.app/profile/x/post/aaa"'), 'the Bluesky post');
 ok(!pa.includes('privateAAAA'), 'a withheld video is not on the page');
 ok(pa.includes('href="/map/01002/"') && pa.includes('12 associated parcels'), 'map links with the associated parcels');
