@@ -5786,6 +5786,21 @@ Results.
     yet: showing the record. Choose a photo below." No page text may offer or describe a drawing (browser test).
     A picture set that still carries a drawn shot (made before the engine change) reads `stale` and is refused by
     approval (`_hs_is_visuals`, `hs_impact_story_visuals_approve`; applied 2026-10-30; pg check 12V30).
+  - **One status bar, kept approvals, duplicate-photo warning (founder, 2026-10-30: "the ui design is bad").**
+    - The top of the Visuals step (`#is-visbar`, `visStatusBar`) always says where things stand and the one next step,
+      with the action buttons in it. While a Prepare runs it says when it started, that it usually takes 8 to 15 minutes,
+      and that the pictures below are the previous set.
+    - `_hs_is_visuals` returns `carried_decisions`: an Approve on the previous previews is shown again ("Approved earlier
+      (same picture)") on a shot whose picture did not change. "Same picture" is `_hs_is_shot_print(shot)`: photo
+      checksum (else id), layout, on-screen text, map, label, cited records, drawing and missing-photo note. Narration and
+      timing are left out. Only Approve carries; a decision on the new previews replaces it. It is shown only: the one
+      "Approve all visuals" is unchanged. pg checks 12V31a-c.
+    - ⚠️ In that query, name every `jsonb_array_elements` output column (`e1(v)`, `e2(v)`). With two laterals each
+      aliased `sh`, the second lookup's unqualified `sh` resolved to the FIRST lateral's column, so it compared a shot
+      with itself.
+    - When one photo is used for two subjects (choices or planned shots), the bar names the photo and both subjects.
+      The engine half (homesignal-ingest #981) keeps such a photo for both subjects; before it, the second choice
+      replaced the first and Stratos's Prepare stopped on "no licensed photo yet" for the Great Salt Lake.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
