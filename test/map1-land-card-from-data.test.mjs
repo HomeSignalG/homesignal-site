@@ -45,7 +45,7 @@ function extractVar(name) {
 }
 const stripComments = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '');
 
-const NAMES = ['hasTrackValue', 'renderTrack', 'landCardTitle', 'landCardHTML', 'renderAnchors', 'loadDevTracker', 'drawParcels'];
+const NAMES = ['hasTrackValue', 'renderTrack', 'landCardTitle', 'landCardTitleIsDescriptive', 'landCardHTML', 'renderAnchors', 'loadDevTracker', 'drawParcels'];
 const SRC = {};
 for (const n of NAMES) SRC[n] = extract(n);
 const GOV = extractVar('GOV_TRACKS');
@@ -67,7 +67,7 @@ const ctx = vm.createContext({
   esc: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
   console,
 });
-vm.runInContext([GOV, SRC.hasTrackValue, SRC.renderTrack, SRC.landCardTitle, SRC.landCardHTML, SRC.renderAnchors].join('\n'), ctx);
+vm.runInContext([GOV, SRC.hasTrackValue, SRC.renderTrack, SRC.landCardTitle, SRC.landCardTitleIsDescriptive, SRC.landCardHTML, SRC.renderAnchors].join('\n'), ctx);
 
 const SENT = 'Government actions for this land have not been reviewed on this map yet.';
 // Fixtures shaped like the production rows (2026-10-29): every government track NULL.
@@ -98,6 +98,14 @@ ok(!/unresolved|approved|pending/i.test(emNo), 'b4 the card claims nothing appro
 
 const emNamed = ctx.landCardHTML(emZr, { ...emParent, display_name: 'Eagle Mountain land assembly' }, emParcels, '84005');
 ok(titleOf(emNamed) === 'Eagle Mountain land assembly', 'b5 display_name is used verbatim', titleOf(emNamed));
+const NOTE = 'Descriptive label by JODY. No public record names this project.';
+ok(!emNamed.includes(NOTE), 'b5a no basis stated → no descriptive note');
+const emDesc = ctx.landCardHTML(emZr, { ...emParent, display_name: 'Eagle Mountain land assembly', display_name_basis: 'descriptive' }, emParcels, '84005');
+ok(titleOf(emDesc) === 'Eagle Mountain land assembly' && emDesc.includes(NOTE), 'b5b a descriptive label says it is JODY\'s, not a record name', emDesc);
+const stRec = ctx.landCardHTML(stZr, { ...stParent, display_name: 'Stratos data center project', display_name_basis: 'record' }, stParcels, '84307');
+ok(!stRec.includes(NOTE), 'b5c a record-named project carries no descriptive note');
+ok(!ctx.landCardHTML(emZr, { ...emParent, display_name_basis: 'descriptive' }, emParcels, '84005').includes(NOTE),
+  'b5d no title, no note (the neutral title is not a JODY project name)');
 
 const stNamed = ctx.landCardHTML(stZr, { ...stParent, display_name: 'Stratos data center project' }, stParcels, '84307');
 ok(titleOf(stNamed) === 'Stratos data center project', 'b6 Stratos title comes from its own row', titleOf(stNamed));
