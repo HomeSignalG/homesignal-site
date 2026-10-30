@@ -22,7 +22,7 @@ console.log('MAPS preview/publisher parity');
 
 // ---------------------------------------------------------------- root cause is fixed
 ok('CSP allows blob: as an image source',
-  /img-src 'self' data: blob:;/.test(DASH));
+  /img-src 'self' data: blob:[ ;]/.test(DASH));
 ok('CSP still does NOT list the Supabase host as an image source (narrower fix held)',
   !/img-src[^;]*supabase\.co/.test(DASH));
 ok('CSP still allows the Supabase host for connect-src (the download path)',

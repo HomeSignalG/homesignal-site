@@ -94,7 +94,7 @@ try {
 const wf = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
 ok(/focus_sitemaps/.test(wf) && /lists a noindex page/.test(wf) && /expected_zips/.test(wf), 'pages.yml gate checks the focus sitemap against sitemap.xml, robots and count');
 const gen = readFileSync(join(root, 'scripts', 'gen_zip_pages.py'), 'utf8');
-ok(/SITEMAP_FAMILIES = \("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list",\s+"development"\)/.test(gen), 'the national family sitemaps are the declared set (index-all policy adds zip and project-list; development dossiers 2026-10-29)');
+ok(/SITEMAP_FAMILIES = \("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list",\s+"development", "fact-check"\)/.test(gen), 'the national family sitemaps are the declared set (index-all policy adds zip and project-list; development dossiers 2026-10-29)');
 ok(/Sitemap: https:\/\/homesignal\.net\/sitemaps\/pierce-county-wa\.xml/.test(readFileSync(join(root, 'robots.txt'), 'utf8')) &&
    /Sitemap: https:\/\/homesignal\.net\/sitemap\.xml/.test(readFileSync(join(root, 'robots.txt'), 'utf8')), 'robots.txt lists the focus sitemap and keeps the national one');
 

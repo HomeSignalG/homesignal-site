@@ -6029,3 +6029,31 @@ post id. A post never measured shows a dash, never 0.
   (`meta.code_commit`), `run:<id>` of a first version's build run (from `meta.master.url`), or empty. Engine:
   homesignal-ingest #977, which must be on main before this SQL is applied (an undeclared dispatch input is refused).
   ⚠️ Replaying `youtube-video-revision-plans.sql` after this file is refused by its own guard; re-apply this one after it.
+
+## TAB 19 · DATA CENTER CLAIM CHECK (2026-10-30) — BUILT; SQL APPLY ORDER BELOW
+
+What people say about data centers, against what documented evidence shows. SQL of record `docs/claim-check.sql` (after
+`docs/impact-stories.sql`, for `_hs_is_admin`); page `lib/acq-claim-check.js`; public pages `scripts/fact_check_pages.py`
+(`/fact-checks/<slug>/` + `/fact-checks/`, family sitemap `fact-check`); engine homesignal-ingest `claimcheck/`.
+- **Chain:** pg_cron `claim-check-tick` (every 15 min; slots 07:30 / 16:30 Pacific) or Scan Now → `claim_check_scans` →
+  dispatch of ingest `claim-check-scan.yml` (YouTube Data API for the broadcaster channels in `claimcheck/config.py` and a
+  search per watched person, plus Bluesky search) → `claim_check_scan_record`. "Request research" → `claim_check_research_runs`
+  → ingest `claim-check-research-run.yml` (Claude on the founder's plan, no database key in that job) → `research.py check`
+  (quote re-found verbatim at its source, every evidence URL fetched) → `claim_check_research_record`.
+- **Guarantees (pinned by `test/claim_check_pg`, 59 checks):** a scan cannot set a verdict, quote or evidence; a verdict
+  only comes from research that passed `_cc_research_problems`; False/Misleading need a contradicting source AND a verified
+  quote; approval re-checks it; an edit after approval needs approval again; decisions and research versions are
+  append-only; `claim_check_public_export()` (anon) returns approved claim checks only; corrections/retractions stay public.
+- **No geography is a ranking input** (founder brief). Places are metadata.
+- ⚖️ **Bluesky: Claim Check posts SHARE the MAPS and video times (founder, 2026-10-30, "share maps and video times").**
+  Still 2 MAPS + 2 video times a day, at most 4 posts, 150 minutes apart; no time is added. Schedule takes the next free
+  time of either kind (`bsky_next_slot_any`), which MAPS and video then cannot use. `schedule` is refused until
+  homesignal-ingest migration `20261030180000` (which books claims in the schedule) sets `bsky_slots_enabled`. The posting
+  is homesignal-ingest `publish-worker.mjs` (waits until the claim's page answers 200; links tagged `claim-check`). An edit
+  is refused once the post is publishing/published and releases a scheduled time.
+- **Not read (adapter rows say `not_built`):** transcripts/captions (owner-only on YouTube), X, TikTok, Reddit, local TV
+  sites. Thumbnails are the platform's own image (CSP `img-src` adds `i.ytimg.com`, `cdn.bsky.app`) or a labelled
+  placeholder; video plays only in the `youtube-nocookie` player and only when the source is embeddable.
+- **Apply order:** merge the ingest PR first (a dispatch to a missing workflow is lost), then apply `docs/claim-check.sql`,
+  then the ingest migration `20261030180000`, then deploy this page. `pages.yml` treats a missing export function (404 PGRST202) as "none yet".
+- Tests: `test/claim_check_pg` (`claim-check-suite.yml`), `test/claim-check.test.mjs`, `test/fact-check-pages.test.mjs`.

@@ -14,7 +14,7 @@ const code = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 // 1. the shell
 const nav = html.match(/<nav class="tabs">([\s\S]*?)<\/nav>/)[1];
 const labels = [...nav.matchAll(/data-tab="([^"]+)">([^<]+)</g)].map((m) => [m[1], m[2]]);
-ok(labels.length === 18 && labels[17][0] === 'dossiers' && labels[17][1] === '18 · Development Dossiers', '1a tab 18 is "18 · Development Dossiers"');
+ok(labels.length >= 18 && labels[17][0] === 'dossiers' && labels[17][1] === '18 · Development Dossiers', '1a tab 18 is "18 · Development Dossiers"');
 ok(html.includes('<div class="tab" id="tab-dossiers"></div>'), '1b the tab container exists');
 ok(/dossiers: function \(\) \{[\s\S]*?HS\.acqDevelopmentReview\.load\(window\.hsClient, el\)/.test(html), '1c a trusted initializer loads the module');
 ok(/if\(id==='dossiers'\) return;/.test(html), '1d a snapshot refresh never overwrites the tab');
