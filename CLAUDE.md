@@ -5784,6 +5784,8 @@ Results.
   - ⚖️ **NO ILLUSTRATIONS (founder, 2026-10-30).** The engine never draws a picture (homesignal-ingest CLAUDE.md, V3
     "NO ILLUSTRATIONS, EVER"). A shot with no photo carries `photo_needed`, shows its record, and the page says "No photo
     yet: showing the record. Choose a photo below." No page text may offer or describe a drawing (browser test).
+    A picture set that still carries a drawn shot (made before the engine change) reads `stale` and is refused by
+    approval (`_hs_is_visuals`, `hs_impact_story_visuals_approve`; applied 2026-10-30; pg check 12V30).
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.

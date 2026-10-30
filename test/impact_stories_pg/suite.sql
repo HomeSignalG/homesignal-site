@@ -370,6 +370,16 @@ select pg_temp.chk('12V29 rejecting a shot that shows a photo rejects the photo;
   and pg_temp.err('update public.impact_story_shot_decisions set note = null') is not null
   and pg_temp.err('delete from public.impact_story_shot_decisions') is not null);
 select public.hs_impact_story_photo_restore(pg_temp.id('s')::uuid, 'oak');
+-- 12V30 (founder, 2026-10-30: no drawings): previews that still carry a drawn shot are out of date and never approvable
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest',
+  jsonb_set(jsonb_set(pg_temp.vman((pg_temp.lastjob()).id, 'flagged'), '{assets,main,shots,0,illustration}', '{"category":"wildlife"}'),
+            '{assets,main,shots,0,photo}', 'null')));
+select pg_temp.chk('12V30 previews with a drawn shot read stale and cannot be approved',
+  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%before drawings were removed%'
+  and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'),
+        pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash')) like '55000%');
 select pg_temp.approve_visuals();
 select pg_temp.chk('12V16 the bucket accepts the JPEG previews', (select 'image/jpeg' = any (allowed_mime_types) from storage.buckets where id = 'impact-media'));
 select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');

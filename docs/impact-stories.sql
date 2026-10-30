@@ -916,7 +916,7 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_state(p_story, 'narrative');
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
-        nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb;
+        nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb; ndrawn int := 0;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into vj from public.impact_story_jobs where story_id = p_story and kind = 'visuals' order by created_at desc limit 1;
@@ -924,6 +924,12 @@ begin
   if m.id is not null then
     cur := na->>'state' = 'approved' and m.narrative_hash = na->>'hash' and m.pack_hash is not distinct from s.pack_hash
            and m.choices_key = ck->>'key' and m.renderer = 'impact-render-3';
+    -- No drawings, ever (founder, 2026-10-30): previews that still carry a drawn shot were made before the engine stopped
+    -- drawing, so they are out of date and must be prepared again. Never approvable, whatever their stored status says.
+    select count(*) into ndrawn from jsonb_each(coalesce(m.manifest->'assets', '{}'::jsonb)) a,
+           jsonb_array_elements(coalesce(a.value->'shots', '[]'::jsonb)) sh
+     where coalesce(sh->'illustration', 'null'::jsonb) <> 'null'::jsonb;
+    cur := cur and ndrawn = 0;
     select * into ev from public.impact_story_visual_events where manifest_id = m.id order by id desc limit 1;
     nblk := coalesce((m.counts->>'blocked')::int, 0);
     select coalesce(jsonb_agg(jsonb_build_object('asset', d.asset, 'shot_id', d.shot_id, 'decision', d.decision,
@@ -949,6 +955,7 @@ begin
                 when m.narrative_hash <> na->>'hash' then 'The narrative changed since these previews were made. Prepare the visuals again.'
                 when m.pack_hash is distinct from s.pack_hash then 'The sources changed since these previews were made. Prepare the visuals again.'
                 when m.choices_key <> ck->>'key' then 'You chose or rejected a photo since these previews were made. Prepare the visuals again.'
+                when ndrawn > 0 then 'These previews were made before drawings were removed (' || ndrawn || ' drawn shot(s)). Prepare the visuals again.'
                 else 'The renderer changed since these previews were made. Prepare the visuals again.' end;
   elsif nblk > 0 or nrej > 0 or not m.approvable then
     st := 'needs_fixes';
@@ -1015,6 +1022,7 @@ begin
   pfx := p_story::text || '/visuals/' || m.job_id::text || '/';
   select count(*) into bad from jsonb_each(m.manifest->'assets') a, jsonb_array_elements(a.value->'shots') sh
    where sh->>'status' not in ('clear', 'flagged')
+      or coalesce(sh->'illustration', 'null'::jsonb) <> 'null'::jsonb
       or left(coalesce(sh->'preview'->>'path', ''), length(pfx)) <> pfx
       or (sh->'photo' is not null and jsonb_typeof(sh->'photo') = 'object' and (
             coalesce(sh->'photo'->'record'->>'license', '') = ''
