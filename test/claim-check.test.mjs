@@ -79,5 +79,19 @@ const noThumb = T.row({ id: 'x', status: 'candidate', topic: 'T', sources: [{ pl
 ok(noThumb.includes('No thumbnail available') && !noThumb.includes('evil.example'), '4i an unknown thumbnail host shows the labelled placeholder');
 ok(T.graphemes('👍🏽ab') === 3, '4j the post counter counts graphemes');
 
+// 5. research state comes from the saved runs, so it survives leaving the tab and coming back
+const base = Object.assign({}, claim, { status: 'researching', verdict: null, quote: null, research_version: 0 });
+const queued = T.detailView(Object.assign({}, base, { research_active: 'queued', runs: [{ status: 'queued', created_at: '2026-10-30T21:22:49Z' }] }));
+ok(queued.includes('Research queued') && !queued.includes('data-act="request_research"'), '5a a queued run is shown and research cannot be asked twice');
+const running = T.detailView(Object.assign({}, base, { research_active: 'running', runs: [{ status: 'running', created_at: '2026-10-30T21:22:49Z' }] }));
+ok(running.includes('Research running') && running.includes('updates by itself'), '5b a running run is shown');
+const failed = T.detailView(Object.assign({}, base, { status: 'needs_research', research_active: null,
+  runs: [{ status: 'failed', error: 'quote is required <b>', created_at: '2026-10-30T20:18:00Z', finished_at: '2026-10-30T20:19:40Z' }] }));
+ok(failed.includes('Last research did not finish') && failed.includes('quote is required &lt;b&gt;') && failed.includes('data-act="request_research"'), '5c a failed run shows its reason, escaped, and research can be asked again');
+const doneOld = T.detailView(Object.assign({}, claim, { runs: [{ status: 'failed', error: 'old', created_at: '2026-10-30T20:18:00Z' }] }));
+ok(!doneOld.includes('Last research did not finish'), '5d a researched claim does not show an old failure');
+ok(T.researchLine(Object.assign({}, base, { research_active: null, runs: [] })) === '', '5e no runs, no line');
+ok(/setTimeout\(function \(\) \{[\s\S]*?hs_claim_check_claim[\s\S]*?\}, POLL_MS\)/.test(code) && /var POLL_MS = 30000;/.test(code), '5f an active run is read again every 30 s');
+
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);
