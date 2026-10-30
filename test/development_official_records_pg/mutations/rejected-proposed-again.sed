@@ -1,0 +1,1 @@
+s/^    live as (select \* from cur where link_state in ('approved', 'candidate')),/    live as (select * from cur where link_state in ('approved', 'candidate')), cur2 as (select * from cur where link_state <> 'rejected'),/;s/        from cur, lateral unnest(public.development_entity_keys/        from cur2 cur, lateral unnest(public.development_entity_keys/

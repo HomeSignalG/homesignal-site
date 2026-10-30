@@ -5670,6 +5670,25 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
   Map 1 already drew the Stratos parcels (82, ZIPs 84336 and 84307) before this; the Compute Atlas point
   for the same project is 45 miles from them, which is why it is not pinned.
 
+## DEVELOPMENT DOSSIERS: OFFICIAL RECORDS AND NEW ENTITIES ARE PROPOSED DAILY (2026-10-30)
+
+Founder: *"the code needs to account for integrating new entities that pop up"* and *"build ingest of all
+official records so you do not miss things like change and amendments"*. SQL of record
+`docs/development-official-records.sql` (after `docs/development-dossier.sql`); fetcher homesignal-ingest
+`scripts/ingest_official_records.py` (`ingest-official-records.yml`, daily 12:23 UTC).
+- **`official_record` / `_observation` (append-only) / `_party`**: the records a dossier's links point at (today
+  the Utah change record and the base water right's document folder), every changed reading, and the
+  ORGANIZATIONS each names with the record's words. People, family trusts and owner addresses are never stored
+  (`development_entity_is_organization`, checked by the write function and the table).
+- **`official_records_ingest(payload)`** is the one write path (service_role). Something that leaves the source is
+  marked removed, never deleted.
+- **`development_propose_from_records(job)`** proposes CANDIDATE links only: parties of linked change records,
+  anchor-parcel owners, verified governing bodies, action documents in a linked right's folder (a year before the
+  filing onward, or new since first read; never protests, letters of concern or correspondence), and new filings by
+  an entity the project already links. Anything linked in any state, rejected included, is skipped. Names match
+  through `development_entity_keys` ("Inc." = "Incorporated", "(MIDA)" = "MIDA"). Review on tab 18.
+- Tests: `test/development_official_records_pg` (`development-official-records-suite.yml`; 21 checks, 12 mutations).
+
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
 A separate emotion-led story workflow: Library -> Intake -> Story Outline -> Script & Shorts -> Media -> Distribution ->
