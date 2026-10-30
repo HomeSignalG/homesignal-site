@@ -478,7 +478,7 @@ jobs:
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps|development)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
