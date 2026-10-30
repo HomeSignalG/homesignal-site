@@ -305,6 +305,20 @@ const up3 = await page.evaluate(() => window.calls.find((c) => c[0] === 'upload'
 const rec3 = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
 ok(up3 && up3[2].startsWith('s1/uploads/') && rec3 && rec3.p_story === 's1',
    'upload: a story switch during the upload still records the photo on the story it was uploaded for');
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))),
+   'upload: after a story switch the finished upload does not reload the page');
+// and leaving for the library while it uploads leaves the library on screen (Codex #2400)
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = 's1'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+await page.evaluate(() => { window.calls.length = 0; });
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(150);
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = null; window.__release(); });
+await page.waitForTimeout(200);
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))) && !(await page.locator('#is').innerText()).includes('could not load'),
+   'upload: going back to the library during an upload does not replace the library with an error');
 await page.evaluate(() => { window.__restoreStorage(); window.HS.acqImpactStories._state.open = 's1'; });
 await page.evaluate(() => { window.client.storage = window.prevStorage2; window.db.extra = null; });
 await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visuals, { state: 'needs_fixes', why: '1 shot(s) cannot be shown as planned.', counts: { clear: 3, flagged: 0, blocked: 1 } });
