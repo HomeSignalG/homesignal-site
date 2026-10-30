@@ -26,6 +26,7 @@ await page.evaluate(() => {
       (window.calls = window.calls || []).push([n, a]);
       if (n === 'hs_youtube_video_file_decide') return Promise.resolve({ data: null, error: null });
       if (n === 'hs_youtube_video_revise' && window.reviseErr) return Promise.resolve({ data: null, error: window.reviseErr });
+      if (n === 'hs_youtube_video_reject_and_revise') return Promise.resolve(window.reviseErr ? { data: null, error: window.reviseErr } : { data: { revision_id: 'rx' }, error: null });
       return Promise.resolve({ data: null, error: { code: 'x' } });
     },
     storage: { from: () => ({ download: () => new Promise(() => {}) }) }
@@ -92,26 +93,88 @@ ok(/Step 1 of 3: waiting/.test(prog.tile) && /Last checked/.test(prog.tile), '13
 
 // 2026-10-29: Generate sends the note in the box, even when it was typed before a reload (the founder's edits
 // "did not stick"), and a refusal from the server stays on the tile through the next reloads.
-await page.evaluate(() => { window.calls = []; window.reviseErr = { code: '55000', message: 'this note could not be understood 3 times; reword the note, then try again' }; });
+await page.evaluate(() => { window.calls = []; window.reviseErr = { code: '55000', message: 'this exact note was already tried on this version and could not be applied; change the wording, then try again' }; });
 await page.fill(note2, 'remove the background hum');
 await load();
 await page.click('.yv-file[data-key="short2"] .yv-revise-now');
-await page.waitForFunction(() => /reword the note/.test(document.querySelector('.yv-file[data-key="short2"] .yv-fmsg').textContent));
-const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_file_decide').map((c) => c[1].p_note));
+await page.waitForFunction(() => /change the wording/.test(document.querySelector('.yv-file[data-key="short2"] .yv-fmsg').textContent));
+const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_reject_and_revise').map((c) => c[1].p_note));
+const twoCalls = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_file_decide' || c[0] === 'hs_youtube_video_revise').length);
 ok(sent.length === 1 && sent[0] === 'remove the background hum', '14 Generate saves the note typed before the reload, not the old one');
+ok(twoCalls === 0, '14b Generate is ONE call (reject-and-revise), so a refusal cannot cost an approval');
+ok(await page.locator('.yv-file[data-key="short2"] .yv-revise-now').isDisabled(), '14c after a refusal, Generate stays off for the same note');
+await page.fill(note2, 'remove the background hum please');
+ok(!(await page.locator('.yv-file[data-key="short2"] .yv-revise-now').isDisabled()), '14d changing the note turns Generate back on');
 await load(); await load();
-ok(/reword the note/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '15 the refusal stays on the tile after two reloads');
-ok(!/reword the note/.test(await page.textContent('.yv-file[data-key="final"] .yv-fmsg')), '16 the refusal shows only on its own file');
+ok(/change the wording/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '15 the refusal stays on the tile after two reloads');
+ok(!/change the wording/.test(await page.textContent('.yv-file[data-key="final"] .yv-fmsg')), '16 the refusal shows only on its own file');
 await page.evaluate(() => { window.reviseErr = null; });
 await page.click('.yv-file[data-key="short2"] .yv-fsavenote');
 await load();
-ok(!/reword the note/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '17 pressing a button on that file clears the old refusal');
+ok(!/change the wording/.test(await page.textContent('.yv-file[data-key="short2"] .yv-fmsg')), '17 pressing a button on that file clears the old refusal');
 
 // A revision that failed 3 times because of our system says so, and points at Generate (which still works).
 await page.evaluate(() => { window.row.revisions = [{ id: 'r9', file_key: 'short1', parent_version: 1, instruction: 'x', status: 'failed', attempts: 3, error: 'Generation failed.', created_at: '2026-10-29T00:00:00Z' }]; });
 await load();
 const sys = await page.textContent('.yv-file[data-key="short1"]');
 ok(/problem on our side, not your note/.test(sys) && !/Three attempts/.test(sys) && await page.locator('.yv-file[data-key="short1"] .yv-revise-now').count() === 1, '18 a system failure after 3 tries says it was not the note and keeps Generate');
+
+
+// A note that came back "could not apply" on this version: Generate is off until the wording changes (no wasted runs).
+await page.evaluate(() => {
+  window.row.file_decisions.short2 = { status: 'rejected', note: 'make it pop more', version: 1 };
+  window.row.revisions = [{ id: 'u1', file_key: 'short2', parent_version: 1, instruction: 'make it pop more', status: 'unsupported', attempts: 1,
+    error: 'No automatic correction could be made.', plan: { unsupported: [{ text: 'make it pop more', reason: 'I could not match this request.' }] }, created_at: '2026-10-29T00:00:00Z' }];
+});
+await load();
+const g2 = '.yv-file[data-key="short2"] .yv-revise-now';
+ok(await page.locator(g2).isDisabled() && /Change the wording to try again/.test(await page.textContent('.yv-file[data-key="short2"]')), '19 a refused note keeps Generate off and says why');
+await page.fill(note2, 'make the music louder');
+ok(!(await page.locator(g2).isDisabled()), '20 a reworded note turns Generate back on');
+await page.fill(note2, '  make it pop more ');
+ok(await page.locator(g2).isDisabled(), '21 typing the refused note again turns it off again');
+// A reworded note survives the 10 s reload AND Generate stays on (the restore fires no input event).
+await page.fill(note2, 'make the music louder');
+await load();
+ok(await page.inputValue(note2) === 'make the music louder' && !(await page.locator(g2).isDisabled()), '21b after a reload a reworded note keeps Generate on');
+
+// A revision that worked but skipped part of the note says what it skipped.
+await page.evaluate(() => {
+  window.row.file_decisions.short2 = undefined;
+  window.row.files.short2 = { path: 's/versions/short2/v2-aa.mp4', version: 2 };
+  window.row.revisions = [{ id: 'g1', file_key: 'short2', parent_version: 1, instruction: 'fix Apollo; also add a map', status: 'succeeded', attempts: 1,
+    result: { summary: 'Pronunciation of Apollo fixed', unsupported: [{ text: 'also add a map', reason: 'Adding new pictures is not something this system does.', suggestion: 'Ask Claude.' }] },
+    created_at: '2026-10-29T00:00:00Z' }];
+});
+await load();
+const t22 = await page.textContent('.yv-file[data-key="short2"]');
+ok(/Not done from your note/.test(t22) && /also add a map/.test(t22) && /Adding new pictures/.test(t22), '22 a revised file lists the parts of the note that were not done');
+await page.evaluate(() => { window.row.file_decisions.short2 = { status: 'approved', version: 2 }; });
+await load();
+ok(/Not done from your note/.test(await page.textContent('.yv-file[data-key="short2"]')), '23 the list stays after the file is approved');
+
+// A failure shows its cause, and the error does not repeat the button's words.
+await page.evaluate(() => {
+  window.row.file_decisions.short1 = { status: 'rejected', note: 'x', version: 1 };
+  window.row.revisions = [{ id: 'f1', file_key: 'short1', parent_version: 1, instruction: 'x', status: 'failed', attempts: 1,
+    error: 'Revision failed because narration generation could not complete. Your original video is safe. Retry Generation.',
+    result: { cause: 'RuntimeError: Kokoro returned no audio for sentence 4' }, created_at: '2026-10-29T00:00:00Z' }];
+});
+await load();
+const t24 = await page.textContent('.yv-file[data-key="short1"] .yv-fdec');
+ok(/What went wrong: RuntimeError: Kokoro returned no audio for sentence 4/.test(t24), '24 a failure shows the real cause');
+ok(!/safe\. Retry Generation/.test(t24) && (await page.locator('.yv-file[data-key="short1"] .yv-rretry').count()) === 1, '25 the error text no longer ends in "Retry Generation"; the button does that');
+
+// Every description shown carries its own video code, so the pasted text matches on YouTube (0 of 18 had matched).
+await page.evaluate(() => {
+  window.row.title = '3009 Test';
+  window.row.meta = { description: 'Main text\nSOURCES', short_descriptions: { short1: 'Short one text\n\nVideo code: JODY-3009-S1\n', short2: 'Short two text' } };
+});
+await load();
+const pres = await page.$$eval('#host pre.yv-pre', (els) => els.map((e) => e.textContent));
+const main = pres.find((t) => /^Main text/.test(t)), s1 = pres.find((t) => /^Short one/.test(t)), s2 = pres.find((t) => /^Short two/.test(t));
+ok(main && /Video code: JODY-3009-V\n?$/.test(main), '26 the main description ends with its video code');
+ok(s1 && (s1.match(/JODY-3009-S1/g) || []).length === 1 && s2 && /Video code: JODY-3009-S2/.test(s2), '27 each Short description has its own code, once');
 
 await browser.close();
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }
