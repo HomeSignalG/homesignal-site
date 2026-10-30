@@ -28,6 +28,8 @@ await page.evaluate(() => {
         status: 'waiting', created_at: new Date().toISOString() });
       return Promise.resolve({ data: window.rows[0], error: null });
     }
+    if (n === 'hs_youtube_video_suggestion_make') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'picked';
+      r.run = { status: 'queued' }; return Promise.resolve({ data: { existing: false, run: r.run }, error: null }); }
     if (n === 'hs_youtube_video_suggestion_withdraw') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'withdrawn'; return Promise.resolve({ data: r, error: null }); }
     return Promise.resolve({ data: null, error: { code: 'x' } });
   } };
@@ -64,9 +66,19 @@ const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_y
 ok(sent.title === 'Blair Waterway dredging' && sent.place === '98421' && sent.links.length === 2 && sent.note === 'Biggest change in the port',
   '2e the suggestion sends title, place, both links and the note');
 html = await page.innerHTML('#host');
-ok(html.includes('Blair Waterway dredging') && html.includes('Waiting: the next video session takes it first') && html.includes('vs-withdraw'),
-  '2f the new suggestion is listed as waiting, with Withdraw');
+ok(html.includes('Blair Waterway dredging') && html.includes('Waiting') && html.includes('vs-withdraw') && html.includes('vs-make'),
+  '2f the new suggestion is listed as waiting, with Make video and Withdraw');
 ok((await page.inputValue('#vs-title')) === '', '2g the form is cleared after adding');
+
+await page.click('.vs-item[data-id="n2"] .vs-make');
+await page.waitForFunction(() => /Starting the video run/.test(document.querySelector('.vs-item[data-id="n2"]').textContent));
+const mk = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_make').pop()[1]);
+html = await page.innerHTML('.vs-item[data-id="n2"]');
+ok(mk.p_id === 'n2' && !html.includes('vs-make') && html.includes('vs-withdraw'), '2g2 Make video starts a run; while it runs the button is gone');
+await page.evaluate(() => { const r = window.rows.find((x) => x.id === 'm1'); r.run = { status: 'made', summary: 'Made from <16> documents.', project_slug: 'port-x' }; });
+await page.evaluate(() => window.HS.acqVideoSuggest.mount(window.client, document.getElementById('host')));
+html = await page.innerHTML('.vs-item[data-id="m1"]');
+ok(html.includes('Video made') && html.includes('Made from &lt;16&gt; documents.'), '2g3 a finished run shows its escaped summary');
 
 await page.click('.vs-item[data-id="n1"] .vs-withdraw');
 await page.waitForFunction(() => /Withdrawn/.test(document.querySelector('.vs-item[data-id="n1"]').textContent));
