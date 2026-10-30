@@ -325,6 +325,11 @@
   .band-h.t-proposed{background:#E2772F}
   /* Lifecycle unknown — the legend's own neutral (HS.LIFECYCLE_HEX.unknown / statusHex.onfile). */
   .band-h.t-unknown{background:#706468}
+  /* State cleanup sites and water rights filings are not lifecycle stages; each header takes its
+     own pin colour (lib/state-cleanup.js, lib/water-rights-map.js). Without a class the header
+     was white text on a white card, so the column read as having no title. */
+  .band-h.t-cleanup{background:#8a5a00}
+  .band-h.t-water{background:#1c6ea4}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
   .rec{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
@@ -950,7 +955,7 @@
         <!-- STATE CLEANUP SITES (founder decision, 2026-10-21): their own band, hidden when this
              view holds none. Not projects and not EPA facilities (lib/state-cleanup.js). -->
         <div class="card read" id="cleanupBand" hidden>
-          <div class="band-h">State cleanup sites</div>
+          <div class="band-h t-cleanup">State cleanup sites</div>
           <div class="band-s">Cases on the state's cleanup-site list that are not closed</div>
           <div id="cleanupList"></div>
         </div>
@@ -958,7 +963,7 @@
              Pending applications on a state agency's list; not projects and not EPA facilities
              (lib/water-rights-map.js). -->
         <div class="card read" id="waterBand" hidden>
-          <div class="band-h">Water rights filings</div>
+          <div class="band-h t-water">Water rights filings</div>
           <div class="band-s">Pending applications on the state agency's list, not yet decided</div>
           <div id="waterList"></div>
         </div>
