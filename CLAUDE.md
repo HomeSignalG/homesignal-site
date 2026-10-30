@@ -6118,3 +6118,6 @@ What people say about data centers, against what documented evidence shows. SQL 
   `speaker_name` or `person_id` and never replaces one already stored (suite 2f2/2f3). ⚖️ Founder: a reporter's post that
   quotes the speaker word for word with the clip (Aaron Rupar) is a usable quote source; research credits the reporter in
   `context`, which the public page prints.
+- **A Bluesky video plays in the detail view (2026-10-30)** in Bluesky's own embed, `embed.bsky.app/embed/<did>/app.bsky.feed.post/<rkey>`,
+  built from the source's `source_key` (now in `_cc_claim_json`). It is the platform's player, like YouTube's; CSP `frame-src` adds
+  `embed.bsky.app`. Video previews also need `img-src https://video.cdn.bsky.app`: `video.bsky.app` answers with a redirect there.

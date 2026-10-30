@@ -101,7 +101,15 @@ ok(bd.includes('Bluesky post by Aaron Rupar (@atrupar.com)'), '6a a Bluesky card
 ok(bd.includes('video.bsky.app/watch') && /<a href="https:\/\/bsky\.app\/profile\/atrupar\.com\/post\/3mynwycgzla2p"[^>]*title="Play on the original post"><img/.test(bd), '6b its video preview links to the post');
 ok(T.srcLabel({ platform: 'bluesky', author: 'a.bsky.social' }) === 'Bluesky post by @a.bsky.social' && T.srcLabel({ platform: 'youtube', publisher: 'Fox Business' }) === 'Fox Business', '6c no display name: the handle; YouTube keeps the channel');
 ok(T.thumbUrl('https://video.bsky.app/watch/x/thumbnail.jpg') && !T.thumbUrl('https://video.bsky.app.evil.example/x.jpg'), '6d only Bluesky\'s own video host is added');
+ok(/img-src[^;]*https:\/\/video\.cdn\.bsky\.app[ ;]/.test(csp + ';'), '6f the CSP allows video.cdn.bsky.app, where video.bsky.app forwards each preview');
 ok(/img-src [^;]*https:\/\/video\.bsky\.app/.test(csp), '6e the CSP allows Bluesky video previews');
+
+// 7. a Bluesky post plays in Bluesky's own embed, built from its stored key (only a well-formed key, only that host)
+const bkey = 'bsky:did:plc:4llrhdclvdlmmynkwsmg5tdc/app.bsky.feed.post/3mynwycgzla2p';
+const bp = T.detailView(Object.assign({}, claim, { status: 'candidate', verdict: null, quote: null, research_version: 0, sources: [Object.assign({}, bsky, { source_key: bkey })] }));
+ok(/<iframe class="cc-embed cc-bsky"[^>]*src="https:\/\/embed\.bsky\.app\/embed\/did:plc:4llrhdclvdlmmynkwsmg5tdc\/app\.bsky\.feed\.post\/3mynwycgzla2p"/.test(bp), '7a a Bluesky post with a key plays in its embed');
+ok(T.bskyEmbed({ platform: 'bluesky', source_key: 'bsky:did:plc:x"onload=1/app.bsky.feed.post/abcdef' }) === '' && T.bskyEmbed({ platform: 'youtube', source_key: bkey }) === '' && T.bskyEmbed({ platform: 'bluesky' }) === '', '7b no embed for a bad key, another platform, or no key');
+ok(/frame-src[^;]*https:\/\/embed\.bsky\.app[ ;]/.test(csp + ';'), '7c the CSP allows Bluesky\'s embed');
 
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);
