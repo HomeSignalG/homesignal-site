@@ -350,9 +350,15 @@ select pg_temp.chk('12V27 a rejected shot (no photo) blocks Approve all',
   and pg_temp.err(format('select public.hs_impact_story_visuals_approve(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', pg_temp.vis()->>'manifest_hash')) like '%cannot be approved%');
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
 select pg_temp.chk('12V27b approving the rejected shot clears the block', pg_temp.vis()->>'state' = 'ready');
+select public.hs_impact_story_visuals_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'rejected', 'Changed my mind.');
+select pg_temp.chk('12V27c rejecting a shot after Approve all undoes the approval, so Render is refused',
+  pg_temp.vis()->>'state' = 'needs_fixes'
+  and pg_temp.err(format('select public.hs_impact_story_render(%L, %s)', pg_temp.id('s'), pg_temp.cur())) like '%Approve the visuals before rendering%');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'new_photo');
 select pg_temp.chk('12V28 Need new photo asks the next Prepare to search for that shot''s subject',
-  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'ready');
+  pg_temp.vis()->'more_photos_for' = '["oak-trees"]'::jsonb and pg_temp.vis()->>'state' = 'approved');
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select pg_temp.chk('12V28b the Prepare job carries it', (pg_temp.lastjob()).input->'more_photos_for' = '["oak-trees"]'::jsonb);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);

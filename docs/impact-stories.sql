@@ -950,13 +950,14 @@ begin
                 when m.pack_hash is distinct from s.pack_hash then 'The sources changed since these previews were made. Prepare the visuals again.'
                 when m.choices_key <> ck->>'key' then 'You chose or rejected a photo since these previews were made. Prepare the visuals again.'
                 else 'The renderer changed since these previews were made. Prepare the visuals again.' end;
-  elsif ev.id is not null and ev.decision = 'approved' and ev.manifest_hash = m.manifest_hash then
-    st := 'approved'; why := 'Approved by ' || ev.actor || '.';
   elsif nblk > 0 or nrej > 0 or not m.approvable then
     st := 'needs_fixes';
     why := case when nblk > 0 then nblk || ' shot(s) cannot be shown as planned. Replace those pictures, then prepare the visuals again.'
                 when nrej > 0 then 'You rejected ' || nrej || ' shot(s). Prepare the visuals again after the change, or approve them one by one.'
                 else 'The previews could not be confirmed to match the render. Prepare the visuals again.' end;
+  -- an approval counts only while no shot of these previews is rejected (a rejection after approving undoes it)
+  elsif ev.id is not null and ev.decision = 'approved' and ev.manifest_hash = m.manifest_hash then
+    st := 'approved'; why := 'Approved by ' || ev.actor || '.';
   else
     st := 'ready'; why := 'Every shot passed the checks. Look them over, then Approve all visuals.';
   end if;
