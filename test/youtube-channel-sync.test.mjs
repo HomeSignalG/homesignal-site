@@ -48,7 +48,7 @@ ok(/On YouTube<\/b> \(found automatically\): <a href="https:\/\/youtu\.be\/NEWVI
 ok(/Full investigation[\s\S]{0,200}Published on YouTube/.test(html) && /Coming soon[\s\S]{0,200}Scheduled for/.test(html), '2b each found video with its status');
 ok(/<details><summary class="sub">Fix the link by hand[\s\S]*?class="yv-yturl"/.test(html), '2c the hand-typed link is only an exception, inside a closed details');
 // 3. the channel card lists only the videos that need a person, with the one manual control
-ok(/YouTube channel<\/h3>[\s\S]*Checked automatically every hour/.test(html), '3a channel card says it is automatic');
+ok(/YouTube channel<\/h3>[\s\S]*Checked automatically twice a day/.test(html), '3a channel card says it is automatic');
 ok((html.match(/class="yv-msel"/g) || []).length === 1 && /data-vid="UNKNOWN0001"/.test(html), '3b only the unmatched new video gets a match control');
 ok(!/data-vid="OLDVIDEO001"/.test(html), '3c a historical video is not put in front of the founder');
 ok(/value="\|none">Not a project video/.test(html) && /value="p1\|final">/.test(html), '3d choices are project items or "not a project video"');

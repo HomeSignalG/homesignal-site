@@ -83,7 +83,8 @@ const fetches = LOADZIP.match(/(?:fetch\(|rest\/v1\/)[^\n]{0,90}/g) || [];
 // place labels, indexability and county source metadata carry no points
 // map1_state_cleanup_zip_members (2026-10-21) is a membership read too: polygon members only, each
 // with the canonical verdict, admitted by HS.zipModeSites (docs/state-cleanup-sites.sql).
-const allowed = /development_reports|zip_mode_report_sites|ZIP_AUTH_RPC_URL|HS\.MAP1_DC_RPC|map1_state_cleanup_zip_members|communities|app_community_meta|county-sources\.json|fetch\(url/;
+// water_rights_for_zip (2026-10-29) likewise: polygon members, each stamped 'member' (docs/state-water-rights.sql).
+const allowed = /development_reports|zip_mode_report_sites|ZIP_AUTH_RPC_URL|HS\.MAP1_DC_RPC|map1_state_cleanup_zip_members|water_rights_for_zip|communities|app_community_meta|county-sources\.json|fetch\(url/;
 ok(fetches.every((f) => allowed.test(f)),
   'B4 ZIP mode fetches only the report, the authoritative markers, the national membership read and point-free metadata',
   fetches.filter((f) => !allowed.test(f)));
@@ -96,7 +97,7 @@ ok(/sites:\s*HS\.zipModeSites\(rsSites,/.test(LOADZIP) && /HS\.zipReportSites\(r
   'B7 the report plane handed to the door is the facility read\'s output');
 ok(/delete zipCounts\.facilities;/.test(LOADZIP) && !/zipCounts\.facilities\s*=/.test(LOADZIP),
   'B8 the engine\'s radius-derived counts.facilities is removed; the tile counts the facilities drawn');
-ok(/var fac = sites\.filter\(function\(s\)\{ return s\.scope==="point" && s\.relevance!=="development"\s*&& !\(HS\.isStateCleanup && HS\.isStateCleanup\(s\)\); \}\);/.test(PAGE)
+ok(/var fac = sites\.filter\(function\(s\)\{ return s\.scope==="point" && s\.relevance!=="development"\s*&& !\(HS\.isStateCleanup && HS\.isStateCleanup\(s\)\)(?: && !\(HS\.isWaterRight && HS\.isWaterRight\(s\)\))?; \}\);/.test(PAGE)
    && /var _facN = \(data\.counts && data\.counts\.facilities\) != null \? data\.counts\.facilities : fac\.length;/.test(PAGE)
    && /\$\("cFac"\)\.textContent\s*=\s*FAC_CONFIRMED_ON \? _facN[\s\S]{0,80}: _facN;/.test(PAGE),
   'B9 with counts.facilities absent the tile IS fac.length — the drawn facility set (positive control for B8)');

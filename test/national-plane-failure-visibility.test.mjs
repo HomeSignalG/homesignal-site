@@ -254,7 +254,7 @@ console.log('\n11. The local connector pipeline and default filters are untouche
   // local planes first and appends only national records carrying a 'member' verdict.
   // 2026-09-22 (facility plane): the report plane now arrives through zip_mode_report_sites,
   // already member-only, as rsSites — never as the raw cached row.sites.
-  ok(/HS\.zipModeSites\(rsSites, auth, natlSites(, cleanupSites)?\)/.test(mapExec),
+  ok(/HS\.zipModeSites\(rsSites, auth, natlSites(, cleanupSites(, waterSites)?)?\)/.test(mapExec),
     '11b local merge still runs first; national is concatenated, never substituted');
   ok(/app_projects_for_zip/.test(readFileSync(join(root, 'lib/data.js'), 'utf8')),
     '11c projects()/facilities() still read app_projects — local pipeline untouched');

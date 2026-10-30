@@ -1,0 +1,61 @@
+name: resolved-projects-display-name-suite
+
+# resolved_projects.display_name (docs/resolved-projects-display-name.sql) against a DISPOSABLE
+# Postgres: the decided names and bases, nothing else moved, the basis constraint, the
+# post-condition guard, and the rollback. Never touches production.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/resolved-projects-display-name.sql'
+      - 'test/resolved_projects_display_name_pg/**'
+      - '.github/workflows/resolved-projects-display-name-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/resolved-projects-display-name.sql'
+      - 'test/resolved_projects_display_name_pg/**'
+      - '.github/workflows/resolved-projects-display-name-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  display-name:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: display_name_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped SQL passes
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: display_name_disposable
+        run: bash test/resolved_projects_display_name_pg/run.sh

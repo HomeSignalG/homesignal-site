@@ -23,7 +23,7 @@
      app_projects_for_zip's {unavailable, zip_geography_status} envelope through
      HS.zipAuthOutcome, and this page renders HS.zipAuthUnmeasuredFact instead of a
      verified-absence claim. Fails CLOSED if absent (outcome 'unavailable', no claim). -->
-<script src="lib/zip-authoritative.js?v=20261021a"></script>
+<script src="lib/zip-authoritative.js?v=20261029a"></script>
 <script src="lib/data.js?v=4d7e6fb8"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=c408a2cb"></script>
@@ -33,7 +33,7 @@
 <script src="lib/why.js"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=662b5d19"></script>
+<script src="shell.js?v=96cfbb3e"></script>
 <script>
 HS.onReady(async function () {
   // Gate 2: the URL is authoritative at the moment of the fetch (shared helper —
@@ -454,7 +454,11 @@ HS.onReady(async function () {
     var label = following
       ? (HS.PROJECT_FOLLOW_ON || '✓ Following in My Places')
       : (HS.PROJECT_FOLLOW_ADD || 'Add to My Places to follow');
-    return '<button class="btn ghost' + (following ? ' following' : '') + '" type="button" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">' + HS.esc(label) + '</button>';
+    // The status line sits right after the button: HS.toggleFollow writes "Couldn't save…" into it
+    // when the database refuses the write, so the failure is announced where the click happened.
+    return '<button class="btn ghost' + (following ? ' following' : '') + '" type="button" onclick="HS.toggleFollow(this,\'project\',\'' + p.id + '\')">' + HS.esc(label) + '</button>'
+      + '<span class="hs-follow-msg" role="status" aria-live="polite" style="display:block;font-size:13px;color:var(--red)"></span>'
+      + '<span class="hs-follow-note" style="display:block;font-size:12px;color:var(--ink-2)">Saving to My Places does not turn on email alerts.</span>';
   }
   function specRow(k,v){ return '<div class="row"><span>' + HS.esc(k) + '</span><b>' + HS.esc(v||'—') + '</b></div>'; }
 });

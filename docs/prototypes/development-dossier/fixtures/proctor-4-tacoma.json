@@ -1,0 +1,98 @@
+{
+  "_about": "PROTOTYPE FIXTURE. Evidence reviewed 2026-10-29 from production (read-only app_projects rows) and the Ecology SEPA documents fetched for JODY video 3006. Grades: a = official direct. The person named as applicant in the MDNS is not shown.",
+  "project_key": "proctor-4-tacoma",
+  "state": "WA",
+  "path": "/development/wa/proctor-4-tacoma/",
+  "display_name": "Proctor 4 mixed-use development",
+  "place": "3917 N 26th St, Tacoma, Washington",
+  "breadcrumb": [["Home", "/"], ["Washington", null], ["Pierce County", null], ["Tacoma", null]],
+  "map_links": [["ZIP 98407", "/map/98407/"]],
+  "zip_pages": [["98407", "/community/98407/"]],
+  "defining_record": {
+    "label": "Washington Department of Ecology SEPA register, record 202603632",
+    "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Record.aspx?SEPANumber=202603632",
+    "classifier_input": {"name": "Proctor 4 - Mixed-Use Development", "type": "Development", "type_raw": "Project", "status": "Proposed"}
+  },
+  "summary": [
+    "A six-story building with 98 apartments and 1,932 square feet of retail, at the corner of N 26th Street and N Madison Street in Tacoma.",
+    "It replaces a vacant former bank building. The City of Tacoma found no significant environmental impacts, on one condition: soil testing before demolition."
+  ],
+  "summary_sources": [["City of Tacoma MDNS, LU25-0180", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"]],
+  "latest": {
+    "date": "2026-09-09", "date_label": "Filed",
+    "title": "Shoring permits filed with the City of Tacoma",
+    "agency": "City of Tacoma",
+    "body": "A site development permit (SDEV26-0272) and a building permit for retaining walls (BLDCA26-0284). Tacoma's permit system shows the retaining-wall permit as Ready to Issue and the site permit as needing a pre-construction meeting.",
+    "changes_status": "Does not change the project's lifecycle. These permits cover shoring, not the building.",
+    "source": ["Tacoma permit BLDCA26-0284", "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00J79&agencyCode=TACOMA"],
+    "observed": "Statuses as read from Tacoma's permit data on Oct 29, 2026."
+  },
+  "next": {
+    "text": "The comment period on the city's environmental determination closed Sept 10, 2026. The city says appeals go to Pierce County Superior Court within 21 days after the building permit is issued.",
+    "scope": "No permit for the main building appears in the Tacoma permit records we track.",
+    "checked": "2026-10-29",
+    "opportunity": {"title": "Public comment on the environmental determination", "state": "closed", "closed_on": "2026-09-10", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"}
+  },
+  "known": [
+    ["The city issued a Mitigated Determination of Non-Significance (LU25-0180) on Aug 27, 2026.", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"],
+    ["The project is a permitted use in its zone and needs no discretionary land use permit.", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"],
+    ["The site is inside the former Asarco smelter plume. The city requires soil testing before demolition.", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"],
+    ["A demolition permit (DEMOC26-0014) shows Permit Issued in Tacoma's permit system.", "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00G7Q&agencyCode=TACOMA"]
+  ],
+  "unknown": [
+    "When the demolition permit was issued. JODY's records show its status, not the date.",
+    "Who owns the land. It is not stated in the documents reviewed.",
+    "The site plan, Phase I environmental assessment and soil management plan. They are listed but not read.",
+    "Whether the city's MDNS calls the site \"undeveloped\" by mistake; the checklist and traffic study describe a paved former bank."
+  ],
+  "impacts": [
+    {"aspect": "Traffic", "text": "The traffic study expects 675 weekday trips, 34 in the morning peak hour and 54 in the evening peak hour, and concludes no significant impact.", "grade": "a", "who": "Traffic impact analysis (Heath & Associates)", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224768"},
+    {"aspect": "Soil", "text": "Arsenic in the 40 to 100 ppm range is mapped for the site, and an old diesel tank was closed in place in 1996.", "grade": "a", "who": "City MDNS and environmental checklist", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224764"},
+    {"aspect": "Housing", "text": "98 apartments, about 20% designated for low income, and 0.68 parking stalls per unit.", "grade": "a", "who": "Environmental checklist and traffic study", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224764"}
+  ],
+  "map": {
+    "kind": "point",
+    "caption": "Location from the address on the permit records. No project footprint has been published.",
+    "points": [{"label": "3917 N 26th St", "lat": 47.271359, "lng": -122.489775}]
+  },
+  "organizations": [
+    {"name": "Rush Development, Inc.", "role": "Applicant", "grade": "a", "source": ["City of Tacoma MDNS", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"]},
+    {"name": "City of Tacoma", "role": "Lead agency for environmental review; issues the permits", "grade": "a", "source": ["City of Tacoma MDNS", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"]},
+    {"name": "Washington State Department of Ecology", "role": "Keeps the SEPA register; commented on Sept 9, 2026", "grade": "a", "source": ["Ecology comment letter", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=225446"]},
+    {"name": "Heath & Associates", "role": "Prepared the traffic impact analysis", "grade": "a", "source": ["Traffic impact analysis", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224768"]},
+    {"name": "GeoResources, LLC", "role": "Prepared the geotechnical report", "grade": "a", "source": ["Geotechnical report", "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224765"]}
+  ],
+  "not_confirmed": ["Owner of the land"],
+  "documents": [
+    {"title": "SEPA register record 202603632", "agency": "Washington Department of Ecology", "date": "2026-08-27", "date_label": "Listed", "kind": "Agency record", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Record.aspx?SEPANumber=202603632", "relation": "Defining record for this project"},
+    {"title": "Mitigated Determination of Non-Significance, LU25-0180", "agency": "City of Tacoma", "date": "2026-08-27", "date_label": "Issued", "kind": "Decision", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766", "relation": "The city's environmental determination"},
+    {"title": "SEPA environmental checklist", "agency": "Rush Development, Inc.", "date": "2025-08-08", "date_label": "Prepared", "kind": "Application", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224764", "relation": "Applicant's description of the project"},
+    {"title": "Traffic impact analysis", "agency": "Heath & Associates", "date": "2026-07-21", "date_label": "Updated", "kind": "Study", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224768", "relation": "Approved by the city's traffic engineers"},
+    {"title": "Geotechnical report", "agency": "GeoResources, LLC", "date": "2024-07-12", "date_label": "Dated", "kind": "Study", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224765", "relation": "Soils and groundwater"},
+    {"title": "Ecology comment letter", "agency": "Washington Department of Ecology", "date": "2026-09-09", "date_label": "Sent", "kind": "Letter", "state": "read", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=225446", "relation": "Demolition hazards and a nearby contaminated site"},
+    {"title": "Site plan drawings", "agency": "Washington Department of Ecology (SEPA register)", "date": null, "date_label": "", "kind": "Drawings", "state": "listed", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Record.aspx?SEPANumber=202603632", "relation": "Listed on the register; not read"},
+    {"title": "Demolition permit DEMOC26-0014", "agency": "City of Tacoma", "date": "2026-08-03", "date_label": "Filed", "kind": "Permit", "state": "read", "url": "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00G7Q&agencyCode=TACOMA", "relation": "Status: Permit Issued"},
+    {"title": "Site development permit SDEV26-0272 (shoring)", "agency": "City of Tacoma", "date": "2026-09-09", "date_label": "Filed", "kind": "Permit", "state": "read", "url": "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00J5Z&agencyCode=TACOMA", "relation": "Status: Precon Meeting Required"},
+    {"title": "Building permit BLDCA26-0284 (retaining walls for shoring)", "agency": "City of Tacoma", "date": "2026-09-09", "date_label": "Filed", "kind": "Permit", "state": "read", "url": "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00J79&agencyCode=TACOMA", "relation": "Status: Ready to Issue"}
+  ],
+  "timeline": [
+    {"date": "2026-09-10", "date_label": "Comment period closed", "aspect": "Public participation", "title": "Comment period on the environmental determination closes", "agency": "City of Tacoma", "body": "Unless the city withdraws or changes it, the determination is final after this date.", "grade": "a", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766"},
+    {"date": "2026-09-09", "date_label": "Filed", "aspect": "Construction", "title": "Shoring permits filed (SDEV26-0272, BLDCA26-0284)", "agency": "City of Tacoma", "body": "Retaining-wall permit: Ready to Issue. Site permit: pre-construction meeting required.", "grade": "a", "url": "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00J79&agencyCode=TACOMA", "explained_by": null},
+    {"date": "2026-09-09", "date_label": "Letter sent", "aspect": "Environment", "title": "Department of Ecology comments on the proposal", "agency": "Washington Department of Ecology", "body": "Asks that hazardous materials in the old building be handled before demolition, and notes a contaminated site within a quarter mile.", "grade": "a", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=225446"},
+    {"date": "2026-08-27", "date_label": "Issued", "aspect": "Approval", "title": "City issues environmental determination (MDNS, LU25-0180)", "agency": "City of Tacoma", "body": "No significant adverse impacts, with one condition: soil testing before demolition. Not final project approval.", "grade": "a", "url": "https://apps.ecology.wa.gov/separ/Main/SEPA/Document/DocumentOpenHandler.ashx?DocumentId=224766", "explained_by": "hfJQbLLiXHs"},
+    {"date": "2026-08-03", "date_label": "Filed", "aspect": "Construction", "title": "Demolition permit filed for the former bank (DEMOC26-0014)", "agency": "City of Tacoma", "body": "Tacoma's permit system now shows Permit Issued. The issue date is not in JODY's records.", "grade": "a", "url": "https://aca-prod.accela.com/TACOMA/urlrouting.ashx?type=1000&Module=Permits&capID1=DUB26&capID2=00000&capID3=00G7Q&agencyCode=TACOMA"}
+  ],
+  "coverage": {
+    "main": {"id": "hfJQbLLiXHs", "title": "Tacoma's Proctor 98-apartment mixed-use development", "url": "https://www.youtube.com/watch?v=hfJQbLLiXHs", "verified": "2026-10-28", "explains": "The city's environmental determination"},
+    "shorts": [],
+    "bluesky": [],
+    "reviewer_notes": [
+      "Two Shorts are scheduled for Bluesky on Oct 30, 2026; they appear here only after they are published.",
+      "Other linked source records give different Types (Residential for the demolition permit, Other project for the retaining walls). The page shows the defining record's Type."
+    ]
+  },
+  "sources_checked": [
+    ["City of Tacoma permit data", "2026-10-29"],
+    ["Washington Department of Ecology SEPA register", "2026-10-24"]
+  ]
+}

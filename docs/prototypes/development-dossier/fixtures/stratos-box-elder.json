@@ -1,0 +1,403 @@
+{
+  "_about": "PROTOTYPE FIXTURE. Evidence reviewed 2026-10-29 from production (read-only) and the documents named in each item. Grades: a = official direct, b = supported inference, c = third-party reporting. In production these rows would come from approved development_project_link rows; nothing here is in a database.",
+  "project_key": "stratos-box-elder",
+  "state": "UT",
+  "path": "/development/ut/stratos-box-elder/",
+  "display_name": "Stratos data center project",
+  "place": "Hansel Valley, western Box Elder County, Utah",
+  "breadcrumb": [
+    [
+      "Home",
+      "/"
+    ],
+    [
+      "Utah",
+      null
+    ],
+    [
+      "Box Elder County",
+      null
+    ]
+  ],
+  "map_links": [
+    [
+      "ZIP 84336 (Snowville)",
+      "/map/84336/"
+    ],
+    [
+      "ZIP 84307 (Corinne)",
+      "/map/84307/"
+    ]
+  ],
+  "zip_pages": [
+    [
+      "84336",
+      "/community/84336/"
+    ],
+    [
+      "84307",
+      "/community/84307/"
+    ]
+  ],
+  "defining_record": {
+    "label": "Compute Atlas data-center listing \"Stratos AI Data Center Campus\" (JODY data-center entity)",
+    "url": "https://www.compute-atlas.com",
+    "classifier_input": {
+      "name": "Stratos AI Data Center Campus",
+      "type": "data_center",
+      "status": "proposed"
+    }
+  },
+  "summary": [
+    "A data center campus proposed for ranch land in Hansel Valley, in western Box Elder County.",
+    "In October 2026, Bar H Ranch, Inc. asked the Utah Division of Water Rights to move water now used to irrigate the ranch to the project. The filing names O'Leary Digital Utah DC Sub I, LLC as the developer.",
+    "The state has not decided the filing, and it has been protested."
+  ],
+  "summary_sources": [
+    [
+      "Utah Division of Water Rights: Change Details for a55167",
+      "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    ]
+  ],
+  "latest": {
+    "date": "2026-10-15",
+    "date_label": "Filed",
+    "title": "Change application a55167 filed on water right 13-2",
+    "agency": "Utah Division of Water Rights",
+    "body": "Bar H Ranch, Inc. asks to change where, how and for what the water of right 13-2 is used: up to 1,712 acre-feet a year (4 cubic feet per second) from Salt Wells Spring Stream, moving from ranch irrigation to power generation and data-center uses. The Division lists it as Unapproved and Protested.",
+    "changes_status": "Does not change the project's lifecycle. It is an application, not an approval.",
+    "source": [
+      "Change Details for a55167 (Division of Water Rights)",
+      "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    ],
+    "observed": "JODY first saw this filing on the state's pending list on Oct 28, 2026."
+  },
+  "next": {
+    "text": "The Division's record shows no hearing and no State Engineer decision on a55167. It is marked Protested.",
+    "scope": "No upcoming official hearing or deadline has been confirmed in the sources we track.",
+    "checked": "2026-10-28",
+    "opportunity": null
+  },
+  "known": [
+    [
+      "Bar H Ranch, Inc. filed change application a55167 on Oct 15, 2026. The Division lists it Unapproved and Protested.",
+      "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    ],
+    [
+      "The filing says the water would supply a data center project to be developed by O'Leary Digital Utah DC Sub I, LLC, which is under contract to buy the water right.",
+      "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    ],
+    [
+      "{parcels} parcels, about {acres} acres, held by four companies, surround the filing's diversion points.",
+      "https://erecord.boxeldercountyut.gov/eaglesoftware/taxweb/"
+    ],
+    [
+      "MIDA and the Box Elder County Commission put Stratos items on their Apr 24 and May 4, 2026 agendas.",
+      "https://www.utah.gov/pmn/sitemap/notice/1075195.html"
+    ]
+  ],
+  "unknown": [
+    "Whether MIDA and the County adopted the items on those agendas. JODY has the agendas, not the minutes.",
+    "Which company MIDA's development agreement names as master developer.",
+    "Where buildings would go. The land assembly is not a site plan.",
+    "The text of the County Attorney's referendum decision. Its outcome so far comes from news reports.",
+    "Any state air permit. None was found in the sources we track.",
+    "The water-use and depletion figures, which are the applicant's own analysis."
+  ],
+  "impacts": [
+    {
+      "aspect": "Water",
+      "text": "Up to 1,712 acre-feet a year from Salt Wells Spring Stream. The applicant says the project would consume no more than 1,009 acre-feet, against 1,009 to 1,291.6 acre-feet consumed by irrigation today.",
+      "grade": "a",
+      "who": "Applicant's statement in the state filing",
+      "url": "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    },
+    {
+      "aspect": "Power",
+      "text": "The filing lists a power use: \"Wonder Valley Power ... Steam Generation Power Plant, Rated at 7500 MW\".",
+      "grade": "a",
+      "who": "State filing",
+      "url": "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+    },
+    {
+      "aspect": "Air and health",
+      "text": "A study reported by Utah News Dispatch and KSL projects health effects from the project's emissions. The developer's team disputes it.",
+      "grade": "c",
+      "who": "Reported by news outlets, not verified by JODY",
+      "url": "https://utahnewsdispatch.com/2026/10/27/report-stratos-projects-emissions-could-cause-up-to-45-premature-deaths-illnesses-each-year/"
+    }
+  ],
+  "map": {
+    "kind": "parcels",
+    "csv": "stratos_anchor_parcels.csv",
+    "caption": "Associated land: parcels owned by the companies above, around the water filing's diversion points. This is not a confirmed project footprint.",
+    "points": [
+      {
+        "label": "a55167 diversion point",
+        "lat": 41.733397354101,
+        "lng": -112.700301266394
+      },
+      {
+        "label": "a55167 diversion point",
+        "lat": 41.7534187416931,
+        "lng": -112.660197642405
+      }
+    ],
+    "zip_note": "{adj} of the parcels lie where the Census draws no ZIP area. JODY lists them under ZIP 84336, the nearest one."
+  },
+  "organizations": [
+    {
+      "name": "O'Leary Digital Utah DC Sub I, LLC",
+      "role": "Named in the water filing as developer of the data center project, and under contract to buy water right 13-2",
+      "grade": "a",
+      "source": [
+        "Change Details for a55167",
+        "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+      ]
+    },
+    {
+      "name": "Bar H Ranch, Inc.",
+      "role": "Owns water right 13-2 and filed change application a55167. Owns {n:BAR H RANCH INC} parcels in the land assembly",
+      "grade": "a",
+      "source": [
+        "Change Details for a55167; Box Elder County parcel records",
+        "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+      ]
+    },
+    {
+      "name": "Bar H Land LLC",
+      "role": "Owns {n:BAR H LAND LLC} parcels in the land assembly",
+      "grade": "a",
+      "source": [
+        "Box Elder County parcel records",
+        "https://erecord.boxeldercountyut.gov/eaglesoftware/taxweb/"
+      ]
+    },
+    {
+      "name": "Murray Hollow LC",
+      "role": "Owns {n:MURRAY HOLLOW LC} parcels in the land assembly",
+      "grade": "a",
+      "source": [
+        "Box Elder County parcel records",
+        "https://erecord.boxeldercountyut.gov/eaglesoftware/taxweb/"
+      ]
+    },
+    {
+      "name": "Bull Pass Ranch LLC",
+      "role": "Owns {n:BULL PASS RANCH LLC} parcels in the land assembly",
+      "grade": "a",
+      "source": [
+        "Box Elder County parcel records",
+        "https://erecord.boxeldercountyut.gov/eaglesoftware/taxweb/"
+      ]
+    },
+    {
+      "name": "Military Installation Development Authority (MIDA)",
+      "role": "State development authority. Put the Stratos Project Area plan and a development agreement on its Apr 24, 2026 agenda",
+      "grade": "a",
+      "source": [
+        "MIDA Board agenda, Utah Public Notice Website 1075195",
+        "https://www.utah.gov/pmn/sitemap/notice/1075195.html"
+      ]
+    },
+    {
+      "name": "Box Elder County Commission",
+      "role": "Put an agreement with MIDA, and consent to include private land in the Stratos Project Area, on its May 4, 2026 agenda",
+      "grade": "a",
+      "source": [
+        "County special meeting agenda, Utah Public Notice Website 1076001",
+        "https://www.utah.gov/pmn/sitemap/notice/1076001.html"
+      ]
+    },
+    {
+      "name": "Utah Division of Water Rights",
+      "role": "Receives and decides the water filing",
+      "grade": "a",
+      "source": [
+        "Change Details for a55167",
+        "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167"
+      ]
+    }
+  ],
+  "not_confirmed": [
+    "Master developer named in MIDA's development agreement",
+    "Design and engineering firms (a data-center listing names a design firm; not verified)"
+  ],
+  "documents": [
+    {
+      "title": "Change Details for a55167",
+      "agency": "Utah Division of Water Rights",
+      "date": "2026-10-28",
+      "date_label": "Read",
+      "kind": "Agency record",
+      "state": "read",
+      "url": "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167",
+      "relation": "The water filing for this project"
+    },
+    {
+      "title": "Permanent change application a55167, with explanatory and Exhibits A to C",
+      "agency": "Utah Division of Water Rights",
+      "date": "2026-10-15",
+      "date_label": "Filed",
+      "kind": "Application",
+      "state": "partly",
+      "url": "https://waterrights.utah.gov/docImport/0689/06893380.pdf",
+      "relation": "Facts quoted from pages 7, 10, 12 and 140; the exhibits were not read in full"
+    },
+    {
+      "title": "Document folder for water right 13-2",
+      "agency": "Utah Division of Water Rights",
+      "date": "2026-10-28",
+      "date_label": "Listing read",
+      "kind": "Document list",
+      "state": "listed",
+      "url": "https://waterrights.utah.gov/cgi-bin/docview.exe?Folder=13-2",
+      "relation": "Includes letters of concern and correspondence dated Oct 16 to 26, 2026, and protest letters. Not read"
+    },
+    {
+      "title": "MIDA Board meeting agenda",
+      "agency": "Military Installation Development Authority",
+      "date": "2026-04-24",
+      "date_label": "Meeting",
+      "kind": "Agenda",
+      "state": "read",
+      "url": "https://www.utah.gov/pmn/sitemap/notice/1075195.html",
+      "relation": "Items 7 to 11 concern the Stratos Project Area"
+    },
+    {
+      "title": "Box Elder County special commission meeting agenda",
+      "agency": "Box Elder County",
+      "date": "2026-05-04",
+      "date_label": "Meeting",
+      "kind": "Agenda",
+      "state": "read",
+      "url": "https://www.utah.gov/pmn/sitemap/notice/1076001.html",
+      "relation": "Resolutions 26-11 and 26-12"
+    },
+    {
+      "title": "County Attorney legal decision on referendum applications",
+      "agency": "Box Elder County",
+      "date": "2026-05-30",
+      "date_label": "Posted",
+      "kind": "Notice",
+      "state": "title",
+      "url": "https://www.boxeldercountyut.gov/stratosproject",
+      "relation": "Referendum on Resolutions 26-11 and 26-12. Decision text not read"
+    },
+    {
+      "title": "Temporary 180-day land use regulation for data centers",
+      "agency": "Box Elder County",
+      "date": "2026-06-11",
+      "date_label": "Posted",
+      "kind": "Notice",
+      "state": "title",
+      "url": "https://www.boxeldercountyut.gov/CivicAlerts.aspx?aid=89",
+      "relation": "Countywide rule. News reports say it does not apply to Stratos"
+    },
+    {
+      "title": "Stratos Project fact sheet",
+      "agency": "Box Elder County",
+      "date": null,
+      "date_label": "",
+      "kind": "County web page",
+      "state": "listed",
+      "url": "https://www.boxeldercountyut.gov/647/Stratos-Project-Fact-Sheet",
+      "relation": "Cited by the data-center listing. Not read"
+    }
+  ],
+  "timeline": [
+    {
+      "date": "2026-10-15",
+      "date_label": "Filed",
+      "aspect": "Water",
+      "title": "Change application a55167 filed on water right 13-2",
+      "agency": "Utah Division of Water Rights",
+      "body": "Asks to move up to 1,712 acre-feet a year from ranch irrigation to power and data-center uses. Status: Unapproved. Protested.",
+      "grade": "a",
+      "url": "https://www.waterrights.utah.gov/asp_apps/chprint/chprint.asp?chnum=a55167",
+      "explained_by": "q-phnTGrMRQ",
+      "observed": "JODY first saw it on the state's pending list Oct 28, 2026"
+    },
+    {
+      "date": "2026-06-10",
+      "date_label": "Adopted",
+      "aspect": "Approval",
+      "title": "County adopts a temporary 180-day land use regulation for data centers",
+      "agency": "Box Elder County Commission",
+      "body": "A countywide rule. News reports say it does not apply to Stratos; JODY has not read the regulation.",
+      "grade": "a",
+      "url": "https://www.boxeldercountyut.gov/CivicAlerts.aspx?aid=89",
+      "reported": [
+        "KSL TV",
+        "https://ksltv.com/local-news/box-elder-county-commissioners-approve-data-center-moratorium-that-does-not-impact-stratos-project/917206/"
+      ]
+    },
+    {
+      "date": "2026-05-30",
+      "date_label": "Decision posted",
+      "aspect": "Legal",
+      "title": "County Attorney issues a legal decision on the referendum applications",
+      "agency": "Box Elder County",
+      "body": "The applications sought a public vote on Resolutions 26-11 and 26-12. News reports say they were ruled not referable. JODY has not read the decision.",
+      "grade": "a",
+      "url": "https://www.boxeldercountyut.gov/stratosproject",
+      "reported": [
+        "FOX 13",
+        "https://www.fox13now.com/news/local-news/box-elder-county/group-files-appeal-after-box-elder-county-data-center-referendum-applications-denied"
+      ]
+    },
+    {
+      "date": "2026-05-04",
+      "date_label": "On the agenda",
+      "aspect": "Approval",
+      "title": "County agenda: agreement with MIDA, and consent to include private land in the Stratos Project Area",
+      "agency": "Box Elder County Commission",
+      "body": "Resolutions 26-12 and 26-11. The outcome is not in the records JODY has reviewed.",
+      "grade": "a",
+      "url": "https://www.utah.gov/pmn/sitemap/notice/1076001.html"
+    },
+    {
+      "date": "2026-04-24",
+      "date_label": "On the agenda",
+      "aspect": "Approval",
+      "title": "MIDA agenda: Stratos Project Area plan, development standards, development agreement, energy tax and county agreement",
+      "agency": "Military Installation Development Authority",
+      "body": "Resolutions 2026-06 to 2026-09 and Ordinance 2026-01. The outcome is not in the records JODY has reviewed.",
+      "grade": "a",
+      "url": "https://www.utah.gov/pmn/sitemap/notice/1075195.html"
+    }
+  ],
+  "coverage": {
+    "main": {
+      "id": "q-phnTGrMRQ",
+      "title": "Kevin O'Leary's Stratos Data Center: What Utah's Water Filing Reveals",
+      "url": "https://www.youtube.com/watch?v=q-phnTGrMRQ",
+      "verified": "2026-10-28",
+      "explains": "Change application a55167"
+    },
+    "shorts": [],
+    "bluesky": [],
+    "reviewer_notes": [
+      "4 JODY Bluesky posts mention Stratos. They have no reviewed link to this project, so they are not shown.",
+      "One Short is approved in review and scheduled for Bluesky; it appears here only after it is published."
+    ]
+  },
+  "sources_checked": [
+    [
+      "Utah Division of Water Rights",
+      "2026-10-28"
+    ],
+    [
+      "Utah Public Notice Website (MIDA, Box Elder County)",
+      "2026-06-16"
+    ],
+    [
+      "Box Elder County news notices",
+      "2026-06-19"
+    ],
+    [
+      "Box Elder County parcel records (July 2025 tax parcels)",
+      "2026-07-05"
+    ]
+  ]
+}

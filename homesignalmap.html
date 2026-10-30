@@ -572,6 +572,7 @@
     margin:-18px -18px 0;padding:12px 18px;border-radius:16px 16px 0 0}
   .dt-sub{font-size:12.5px;color:var(--mute);margin:10px 0 2px}
   .dt-title{font-weight:700;font-size:17px;color:var(--ink);margin-top:12px}
+  .dt-name-note{font-size:12px;color:var(--soft);margin-top:2px;font-style:italic}
   .dt-straddle{font-size:13px;color:var(--soft);margin:5px 0 4px;line-height:1.5}
   .dt-lbl{font-weight:700;font-size:11.5px;color:var(--soft);text-transform:uppercase;
     letter-spacing:.04em;margin:18px 0 4px}
@@ -581,6 +582,8 @@
   .dt-track .k{font-weight:600;color:var(--ink)}
   .dt-track .v{text-align:right}
   .dt-unresolved{color:var(--mute);font-style:italic}
+  .dt-status-none{color:var(--mute);font-size:13.5px;margin-top:6px}
+  .dt-card + .dt-card{border-top:1px solid var(--line, #E7ECEA);margin-top:22px;padding-top:6px}
   .dt-alias{padding:8px 0;border-top:1px solid var(--line);font-size:13px}
   .dt-alias .nm{font-weight:600;color:var(--ink)}
   .dt-alias .src{color:var(--mute);font-size:11.5px;margin-top:2px}
@@ -950,6 +953,14 @@
           <div class="band-s">Cases on the state's cleanup-site list that are not closed</div>
           <div id="cleanupList"></div>
         </div>
+        <!-- WATER RIGHTS FILINGS (2026-10-29): their own band, hidden when this view holds none.
+             Pending applications on a state agency's list; not projects and not EPA facilities
+             (lib/water-rights-map.js). -->
+        <div class="card read" id="waterBand" hidden>
+          <div class="band-h">Water rights filings</div>
+          <div class="band-s">Pending applications on the state agency's list, not yet decided</div>
+          <div id="waterList"></div>
+        </div>
         <!-- ===== Development tracker: resolved-project anchor (a) + ZIP/county notices (b/c) =====
              Data comes verbatim from the homesignal-ingest resolved store (v_resolved_project_zip,
              v_resolved_project_parcels, resolved_projects) + geocoded alerts/meetings. Rendered by
@@ -1012,15 +1023,17 @@
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
 <script src="lib/templates.js?v=c408a2cb"></script>
 <script src="lib/project-type.js?v=108e00a6"></script>
-<script src="lib/map.js?v=8c153656"></script>
+<script src="lib/map.js?v=c2fa4469"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
 <script src="lib/n5-radius.js?v=f26fcf4f"></script>
-<script src="lib/zip-authoritative.js?v=20261021a"></script>
+<script src="lib/zip-authoritative.js?v=20261029a"></script>
 <script src="lib/state-cleanup.js?v=20261022a"></script>
+<script src="lib/water-rights.js?v=add4200a"></script>
+<script src="lib/water-rights-map.js?v=f867f0d7"></script>
 <script src="lib/commercial-coverage.js?v=20260905"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
-<script src="shell.js?v=662b5d19"></script>
+<script src="shell.js?v=96cfbb3e"></script>
 
 <!-- Leaflet loads up front (2D is the default view). three.js + maplibre-gl are injected
      on demand the first time the resident opens the 3D aerial / 3D satellite view (see loadLib). -->
@@ -1302,6 +1315,10 @@ HS.onReady(function(){
     var want = HS.stateCleanupFromUrl ? HS.stateCleanupFromUrl(window.location.href) : null;
     if(want !== null) HS.setStateCleanupVisible(want);
   })();
+  (function applyWaterRightsFromUrl(){
+    var want = HS.waterRightsFromUrl ? HS.waterRightsFromUrl(window.location.href) : null;
+    if(want !== null) HS.setWaterRightsVisible(want);
+  })();
   (function applyRegulatoryFromUrl(){
     var want = readRegulatoryFromUrl();
     if(want === null) return;             // absent or unparseable -> keep the fail-open default
@@ -1328,7 +1345,9 @@ HS.onReady(function(){
     if(wantReg !== null) HS.setCategoryFilter(HS.REGULATORY_LEGEND.key, wantReg);
     var wantCleanup = HS.stateCleanupFromUrl ? HS.stateCleanupFromUrl(window.location.href) : null;
     if(wantCleanup !== null) HS.setStateCleanupVisible(wantCleanup);
-    syncStageControls(); syncTypeControls(); syncRegulatoryChip(); syncStateCleanupChip();
+    var wantWater = HS.waterRightsFromUrl ? HS.waterRightsFromUrl(window.location.href) : null;
+    if(wantWater !== null) HS.setWaterRightsVisible(wantWater);
+    syncStageControls(); syncTypeControls(); syncRegulatoryChip(); syncStateCleanupChip(); syncWaterRightsChip();
     applyFilter();
   });
   var siteMarkers = [];
@@ -1527,6 +1546,7 @@ HS.onReady(function(){
                              operating:"Operating", built:"Operating" };
   function markerTitle(s, mk){
     if(HS.isStateCleanup && HS.isStateCleanup(s)) return HS.stateCleanupTitle(s);
+    if(HS.isWaterRight && HS.isWaterRight(s)) return HS.waterRightTitle(s);
     var type = (mk && mk.legendLabel) ? String(mk.legendLabel).toLowerCase() : "project";
     var stage = MARKER_TITLE_STAGE[stageOf(s)];
     // An unknown lifecycle says so in words rather than borrowing a stage it does not have —
@@ -1912,6 +1932,7 @@ HS.onReady(function(){
   // shared envTag helper), honest lifecycle + jurisdiction-wide framing for area notices.
   function kind3(s){
     if(HS.isStateCleanup && HS.isStateCleanup(s)) return "State cleanup site · " + HS.stateCleanupTypeLine(s);
+    if(HS.isWaterRight && HS.isWaterRight(s)) return "Water-rights filing · " + HS.waterRightTypeLine(s);
     return s.scope==="point" ? (facilityType(s) + envTag(s))
       : (stageWord(s) + " · jurisdiction-wide");
   }
@@ -1922,6 +1943,9 @@ HS.onReady(function(){
     var d = (s.scope==="point" && !ZIP_MODE) ? siteDistMi(s) : null;
     if(HS.isStateCleanup && HS.isStateCleanup(s)){
       return "<button class='cl' id='mk3close' aria-label='Close'>×</button>" + HS.stateCleanupCardHTML(s, esc);
+    }
+    if(HS.isWaterRight && HS.isWaterRight(s)){
+      return "<button class='cl' id='mk3close' aria-label='Close'>×</button>" + HS.waterRightCardHTML(s, esc);
     }
     var dist = d==null ? "" : (d<0.1 ? "at this address" : (Math.round(d*10)/10)+" mi from this address");
     var link = s.url || s.record_url || "";
@@ -1953,7 +1977,7 @@ HS.onReady(function(){
   // The anchor + notices load on a SEPARATE async path from the EPA/planning report, so they
   // render even on a ZIP with no cached development_reports row. parcelLayer holds the resolved
   // parcel polygons; RESOLVED_PARCELS is cached so drawParcels() can (re)draw once the map exists.
-  var parcelLayer = null, RESOLVED_PARCELS = null, CURRENT_DEV_ZIP = null;
+  var parcelLayer = null, RESOLVED_PARCELS = null, CURRENT_DEV_ZIP = null, CURRENT_LAND_CARDS = 0;
   var $ = function(id){ return document.getElementById(id); };
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   // esc() is a TEXT-NODE escape and leaves quotes alone, which is correct there and unsafe
@@ -2331,7 +2355,14 @@ HS.onReady(function(){
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_lat: home.lat, p_lng: home.lng, p_radius_mi: radius })
       }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
-      return Promise.all([report, canonical, cleanup]).then(function(both){
+      // WATER RIGHTS FILINGS within the same circle (docs/state-water-rights.sql). Same rule: a
+      // failed read draws none and never fails the page.
+      var water = fetch(SUPABASE_URL + "/rest/v1/rpc/map1_water_rights_near", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_lat: home.lat, p_lng: home.lng, p_radius_mi: radius })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+      return Promise.all([report, canonical, cleanup, water]).then(function(both){
         if(!currentReq(token)) return;      // a newer search landed while these were in flight
         var res = both[0], n5 = both[1];
         $("go").disabled = false;
@@ -2345,6 +2376,7 @@ HS.onReady(function(){
         data.address = data.address || (m.matchedAddress || address);
         data.sites = HS.n5MergeSites(data.sites || [], n5.sites);
         if(HS.stateCleanupSitesFrom) data.sites = data.sites.concat(HS.stateCleanupSitesFrom(both[2]));
+        if(HS.waterRightsSitesFrom) data.sites = data.sites.concat(HS.waterRightsSitesFrom(both[3]));
         // The engine's development counters described ITS development set, which no longer
         // renders in address mode. Drop them so render() recomputes from what is actually on
         // screen; the facilities count is still the engine's and is still accurate.
@@ -2611,6 +2643,13 @@ HS.onReady(function(){
         method:"POST",
         headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
         body: JSON.stringify({ p_zip: zip })
+      }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; }),
+      // WATER RIGHTS FILINGS (docs/state-water-rights.sql): the same answer the ZIP page renders,
+      // every point carrying the reader's polygon verdict. A failed read draws none.
+      fetch(SUPABASE_URL + "/rest/v1/rpc/water_rights_for_zip", {
+        method:"POST",
+        headers:{ apikey:APIKEY, Authorization:"Bearer "+APIKEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ p_zip: zip })
       }).then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; })
     ])
       .then(function(both){
@@ -2620,6 +2659,11 @@ HS.onReady(function(){
         window.__HS_STATE_CLEANUP = { status: HS.stateCleanupOutcome ? HS.stateCleanupOutcome(cleanupBody) : "unavailable",
                                       sites: HS.stateCleanupMembers ? HS.stateCleanupMembers(cleanupSites).length : cleanupSites.length,
                                       pins: cleanupSites.length };
+        var waterBody = both[5];
+        var waterSites = HS.waterRightsSitesFrom ? HS.waterRightsSitesFrom(waterBody) : [];
+        window.__HS_WATER_RIGHTS = { status: HS.waterRightsOutcome ? HS.waterRightsOutcome(waterBody) : "unavailable",
+                                     filings: HS.waterRightFilings ? HS.waterRightFilings(waterSites).length : waterSites.length,
+                                     pins: waterSites.length };
         var rsSites = HS.zipReportSites(rs);
         var facMembers = HS.zipFacilityMemberCount(rs);
         // Published for the verifiers: the tile, the drawn facilities and this count must agree.
@@ -2712,7 +2756,7 @@ HS.onReady(function(){
                    counts:zipCounts,
                    // THE ONE ZIP-MODE DOOR (lib/zip-authoritative.js): every point plane passes on
                    // canonical membership evidence.
-                   sites: HS.zipModeSites(rsSites, auth, natlSites, cleanupSites),
+                   sites: HS.zipModeSites(rsSites, auth, natlSites, cleanupSites, waterSites),
                    facUnmeasured: facMembers == null,
                    paywall:!!row.paywall, updated:row.refreshed_at,
                    facUnavailable:!!row.facilities_unavailable,
@@ -2722,7 +2766,7 @@ HS.onReady(function(){
           // established - render it. The national half is what lets a county with NO local
           // permit/planning connector still show real data-center projects.
           render({ address:"ZIP "+zip, home:{ lat:null, lng:null }, counts:{},
-                   sites: HS.zipModeSites([], auth, natlSites, cleanupSites), paywall:false, updated:null, facUnavailable:false });
+                   sites: HS.zipModeSites([], auth, natlSites, cleanupSites, waterSites), paywall:false, updated:null, facUnavailable:false });
         } else {
           // Nothing to draw. WHICH nothing matters, and the two must never be conflated:
           // a ZIP whose whole-ZIP geography IS established and holds no qualifying development
@@ -2815,7 +2859,9 @@ HS.onReady(function(){
     // State cleanup sites are context, not content, for indexing (founder, 2026-10-21): they
     // never make an otherwise empty page indexable.
     var cleanupSites = sites.filter(function(s){ return HS.isStateCleanup && HS.isStateCleanup(s); });
-    var contentCount = sites.length - cleanupSites.length;
+    // Water-rights filings are context too (2026-10-29), exactly like cleanup sites.
+    var waterSites = sites.filter(function(s){ return HS.isWaterRight && HS.isWaterRight(s); });
+    var contentCount = sites.length - cleanupSites.length - waterSites.length;
     HAS_CONTENT = ZIP_MODE && contentCount > 0;
     setIndexable(ZIP_MODE && ZIP_INDEXABLE && contentCount > 0);
     // Expose the label backbone so the verifier can assert, live, that the resident-facing label
@@ -2842,7 +2888,7 @@ HS.onReady(function(){
     var isDevPoint = function(s){ return s.scope==="point" && s.relevance==="development"; };
     var permits = sites.filter(isDevPoint);
     var fac = sites.filter(function(s){ return s.scope==="point" && s.relevance!=="development"
-      && !(HS.isStateCleanup && HS.isStateCleanup(s)); });
+      && !(HS.isStateCleanup && HS.isStateCleanup(s)) && !(HS.isWaterRight && HS.isWaterRight(s)); });
     var dev = sites.filter(function(s){ return s.scope==="area" && !isCivic(s); });
     var civic = sites.filter(function(s){ return s.scope==="area" && isCivic(s); });
     var appr = permits.filter(function(s){ return bucketOf(s.type)==="approved"; })
@@ -2974,6 +3020,12 @@ HS.onReady(function(){
     if(cuBand && cuList){
       cuBand.hidden = !cleanupSites.length;
       cuList.innerHTML = cleanupSites.length ? HS.stateCleanupListHTML(cleanupSites, esc, LIST_CAP) : "";
+    }
+    // WATER RIGHTS FILINGS — their own band, shown only when this view holds one.
+    var wrBand = $("waterBand"), wrList = $("waterList");
+    if(wrBand && wrList){
+      wrBand.hidden = !waterSites.length;
+      wrList.innerHTML = waterSites.length ? HS.waterRightsListHTML(waterSites, esc, LIST_CAP) : "";
     }
     // showCurrentStatus is scoped to the PROPOSED rail alone. It is the rail whose
     // heading a reader takes as a statement about now, and the only one that can hold a
@@ -3282,6 +3334,7 @@ HS.onReady(function(){
     // STATE CLEANUP SITES (founder, 2026-10-21) answer to their OWN switch only — never to the
     // Status or Type chips, which describe projects (lib/state-cleanup.js).
     if(HS.isStateCleanup && HS.isStateCleanup(p)) return HS.stateCleanupVisible();
+    if(HS.isWaterRight && HS.isWaterRight(p)) return HS.waterRightsVisible();
     if(!FILTER[bucketOf(p.type, p)]) return false;
     return HS.categoryVisible ? HS.categoryVisible(HS.resolveTrackerMarker(p, frsRid)) : true;
   }
@@ -3294,6 +3347,7 @@ HS.onReady(function(){
   // Neither filter can change what the record IS: the symbol was resolved before this ran.
   function markerVisible(x){
     if(HS.isStateCleanup && HS.isStateCleanup(x.s)) return HS.stateCleanupVisible();
+    if(HS.isWaterRight && HS.isWaterRight(x.s)) return HS.waterRightsVisible();
     return !!FILTER[x.bucket] && (HS.categoryVisible ? HS.categoryVisible(x.mk || x.s) : true);
   }
   // ONE icon builder for the 2D layer, so the marker drawn at load and the marker
@@ -3528,6 +3582,7 @@ HS.onReady(function(){
     host.appendChild(chip);
     syncRegulatoryChip();
     buildStateCleanupChip(host);
+    buildWaterRightsChip(host);
   }
 
   // ── STATE CLEANUP SITES — their own chip in the same row (founder, 2026-10-21) ──────────
@@ -3572,6 +3627,47 @@ HS.onReady(function(){
     syncStateCleanupChip();
   }
 
+  // ── WATER RIGHTS FILINGS — their own chip in the same row (2026-10-29) ─────────────────
+  // Writes only HS.setWaterRightsVisible; no other switch reads or changes it.
+  var waterChip = null, waterBox = null;
+  function syncWaterRightsChip(){
+    var on = HS.waterRightsVisible ? HS.waterRightsVisible() : true;
+    if(waterBox) waterBox.checked = on;
+    if(waterChip) waterChip.classList.toggle("on", on);
+    if(waterBox) waterBox.setAttribute("aria-label", "Water rights filings, " + (on ? "shown on map" : "hidden from map"));
+  }
+  function setWaterRights(on){
+    HS.setWaterRightsVisible(!!on);
+    syncWaterRightsChip();
+    if(window.history && window.history.replaceState){
+      try {
+        var u = new URL(window.location.href);
+        u.searchParams.set("water", on ? "1" : "0");
+        window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+      } catch(e){}
+    }
+    applyFilter();
+  }
+  function buildWaterRightsChip(host){
+    var L = HS.WATER_RIGHTS_LEGEND;
+    if(!L || !HS.setWaterRightsVisible) return;
+    var chip = document.createElement("label");
+    chip.className = "regchip";
+    chip.id = "waterToggle";
+    chip.setAttribute("data-cat", L.key);
+    var box = document.createElement("input");
+    box.type = "checkbox"; box.className = "chipbox"; box.id = "waterToggleBox";
+    box.checked = HS.waterRightsVisible();
+    chip.innerHTML = "<span class='ck' aria-hidden='true'></span>"
+      + "<span class='ic' aria-hidden='true'>" + HS.markerSVG(L.symbol, L.color, L.letter, 15) + "</span>"
+      + "<span class='t'>" + esc(L.chipLabel) + "</span>";
+    chip.insertBefore(box, chip.firstChild);
+    waterChip = chip; waterBox = box;
+    box.addEventListener("change", function(){ setWaterRights(box.checked); });
+    host.appendChild(chip);
+    syncWaterRightsChip();
+  }
+
   // The class of official document the record link opens, so the label states it up
   // front ("EPA facility record ▸", "Meeting agenda ▸") instead of a bare "record ▸"
   // that gives no hint whether it's an EPA registry entry, a state permit filing, or a
@@ -3603,6 +3699,7 @@ HS.onReady(function(){
 
   function popupHTML(s){
     if(HS.isStateCleanup && HS.isStateCleanup(s)) return HS.stateCleanupPopupHTML(s, esc, false);
+    if(HS.isWaterRight && HS.isWaterRight(s)) return HS.waterRightPopupHTML(s, esc, false);
     var link = s.url || s.record_url || "";
     // For an environmental facility the record_url IS its ECHO report (shown in the env block
     // below), so don't also render a duplicate "EPA facility record" link here; a non-env point
@@ -5100,48 +5197,79 @@ HS.onReady(function(){
       .catch(function(){ return []; });
   }
 
-  // A government status track: NULL/empty → honest "unresolved" (never fabricated). A populated
-  // jsonb track shows its status + record link. Currently every track is NULL (unresolved).
+  // Government status tracks. A track is shown ONLY when the resolved store carries a value for it
+  // (status + record link). A NULL track means HomeSignal has not reviewed it on this map, which is
+  // not the same as "no record exists", so it is never printed as "unresolved".
+  var GOV_TRACKS = [["mida_county","MIDA / county approval"],["deq_air_permit","DEQ air permit"],
+    ["water_rights","Water rights"],["legal_referendum","Legal / referendum"]];
+  function hasTrackValue(v){
+    if(v==null) return false;
+    if(typeof v==="string") return v.trim()!=="";
+    if(Array.isArray(v)) return v.length>0;
+    if(typeof v==="object") return Object.keys(v).length>0;
+    return true;
+  }
   function renderTrack(v){
-    if(v==null || (typeof v==="object" && !Array.isArray(v) && Object.keys(v).length===0))
-      return "<span class='dt-unresolved'>No verified public record yet — unresolved</span>";
     var st = (v && (v.status||v.state||v.decision)) || "";
     var url = (v && (v.source_url||v.url)) || "";
-    var txt = st ? esc(String(st)) : esc(JSON.stringify(v));
+    var txt = st ? esc(String(st)) : esc(typeof v==="string" ? v : JSON.stringify(v));
     if(url) txt += " · <a href='"+esc(url)+"' target='_blank' rel='noopener'>record ▸</a>";
     return txt;
   }
 
-  function renderAnchor(zr, parent, parcels, zip){
+  // The card title comes from the resolved store, never from a literal in this page. A row with no
+  // display_name gets a neutral title that names no project.
+  function landCardTitle(parent){
+    var n = (parent && typeof parent.display_name==="string") ? parent.display_name.trim() : "";
+    return n || "Land assembly on record";
+  }
+  // display_name_basis: 'record' (a public record names the project) or 'descriptive' (JODY's own
+  // label for where the land is). Only an explicit 'descriptive' adds the note.
+  function landCardTitleIsDescriptive(parent){
+    return !!(parent && typeof parent.display_name==="string" && parent.display_name.trim() &&
+              parent.display_name_basis === "descriptive");
+  }
+
+  // One land-assembly card. Pure: returns HTML, touches no DOM, so it can be tested offline.
+  function landCardHTML(zr, parent, parcels, zip){
+    parcels = parcels || [];
     var total = zr.parcels_in_anchor_total, inZipN = zr.parcels_in_this_zip;
     var others = zr.other_zips || [];
     var straddle;
     if(zr.is_primary_zip){
-      straddle = "Primary in ZIP " + esc(zip) + " · " + inZipN + " of " + total + " parcels here.";
+      straddle = "Primary in ZIP " + esc(zip) + " · " + esc(inZipN) + " of " + esc(total) + " parcels here.";
       if(others.length){ straddle += " This assembly also extends into ZIP " + esc(others.join(", ")) +
-        " (" + (total-inZipN) + " parcel" + ((total-inZipN)===1?"":"s") + " there, same ownership)."; }
+        " (" + esc(total-inZipN) + " parcel" + ((total-inZipN)===1?"":"s") + " there, same ownership)."; }
     } else {
-      straddle = "Part of a project centered in ZIP " + esc(zr.primary_zip||"") + " — " + inZipN +
+      straddle = "Part of a project centered in ZIP " + esc(zr.primary_zip||"") + " — " + esc(inZipN) +
         " parcel" + (inZipN===1?"":"s") + " in your ZIP.";
     }
-    var h = "";
-    h += "<div class='dt-title'>Stratos data center project — land assembly</div>";
+    var h = "<div class='dt-card'>";
+    h += "<div class='dt-title'>" + esc(landCardTitle(parent)) + "</div>";
+    // A title JODY wrote to describe the land (no public record names the project) says so.
+    if(landCardTitleIsDescriptive(parent)){
+      h += "<div class='dt-name-note'>Descriptive label by JODY. No public record names this project.</div>";
+    }
     h += "<div class='dt-straddle'>" + straddle + "</div>";
 
-    // Government status tracks — NULL renders as "unresolved", never invented.
-    h += "<div class='dt-lbl'>Government status <span class='dt-lbl-note'>— a track with no verified " +
-         "record shows “unresolved”</span></div>";
-    [["mida_county","MIDA / county approval"],["deq_air_permit","DEQ air permit"],
-     ["water_rights","Water rights"],["legal_referendum","Legal / referendum"]].forEach(function(t){
-      h += "<div class='dt-track'><span class='k'>" + t[1] + "</span><span class='v'>" +
-           renderTrack(parent ? parent[t[0]] : null) + "</span></div>";
-    });
+    // Government status — only tracks the store carries a value for. None → one plain sentence.
+    h += "<div class='dt-lbl'>Government status</div>";
+    var shown = GOV_TRACKS.filter(function(t){ return parent && hasTrackValue(parent[t[0]]); });
+    if(shown.length){
+      shown.forEach(function(t){
+        h += "<div class='dt-track'><span class='k'>" + esc(t[1]) + "</span><span class='v'>" +
+             renderTrack(parent[t[0]]) + "</span></div>";
+      });
+    } else {
+      h += "<div class='dt-status-none'>Government actions for this land have not been reviewed on this " +
+           "map yet. Check the county and state records linked below.</div>";
+    }
 
     // Landowner entities of record — verbatim owner strings, never merged.
     var aliases = (parent && parent.aliases) || [];
     if(aliases.length){
-      h += "<div class='dt-lbl'>Landowner entities of record <span class='dt-lbl-note'>— from Box " +
-           "Elder County tax parcels, verbatim</span></div>";
+      h += "<div class='dt-lbl'>Landowner entities of record <span class='dt-lbl-note'>— from county " +
+           "tax parcel records, verbatim</span></div>";
       aliases.forEach(function(a){
         var verified = (a.confidence==="verified" || a.status==="confirmed");
         var chip = verified ? "<span class='dt-chip'>verified</span>"
@@ -5202,7 +5330,15 @@ HS.onReady(function(){
       elsewhere.forEach(function(p){ h += parcelRow(p); });
     }
     h += "</div>";
-    $("dtAnchorBody").innerHTML = h;
+    h += "</div>";
+    return h;
+  }
+
+  // Render every land assembly the ZIP has, each from its own store row and its own parcels.
+  function renderAnchors(cards, zip){
+    $("dtAnchorBody").innerHTML = cards.map(function(c){
+      return landCardHTML(c.zr, c.parent, c.parcels, zip);
+    }).join("");
   }
 
   // Create the Leaflet map for the parcel footprint when the ZIP has no cached development_reports
@@ -5242,7 +5378,8 @@ HS.onReady(function(){
         ? { color:"#E2772F", weight:1.5, opacity:.95, fillColor:"#E2772F", fillOpacity:.16, dashArray:"5 4" }
         : { color:"#4b3f8f", weight:1.2, opacity:.95, fillColor:"#6d5fc0", fillOpacity:.20 };
       var gj = L.geoJSON({ type:"Feature", geometry:geom, properties:{} }, { style:style });
-      var pop = "<div class='pt'>" + esc(p.owner_of_record||"") + "</div>" +
+      var pop = (p.land_card_title ? "<div class='pk'>" + esc(p.land_card_title) + "</div>" : "") +
+        "<div class='pt'>" + esc(p.owner_of_record||"") + "</div>" +
         "<div class='pk'>APN " + esc(p.apn||"") + (p.acres ? " · "+esc(p.acres)+" acres" : "") + "</div>" +
         (elsewhere ? "<div style='margin-top:4px;color:#a85a1f'>In ZIP "+esc(p.zip||"")+" — part of the same assembly</div>" : "") +
         (p.off_target_zip ? "<div style='margin-top:4px;color:#a85a1f'>Straddles the ZIP boundary (kept in the assembly by common ownership)</div>" : "") +
@@ -5259,8 +5396,8 @@ HS.onReady(function(){
     if(cap){
       var inN = RESOLVED_PARCELS.filter(function(p){ return String(p.zip)===String(CURRENT_DEV_ZIP); }).length;
       var elseN = RESOLVED_PARCELS.length - inN;
-      cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in this land " +
-        "assembly (real Box Elder County parcel geometry)." +
+      cap.innerHTML = "Outlined above are the " + RESOLVED_PARCELS.length + " parcels of record in " +
+        "the land assembl" + (CURRENT_LAND_CARDS>1 ? "ies" : "y") + " listed below (real county parcel geometry)." +
         "<span class='sw' style='background:#6d5fc0'></span>" + inN + " in ZIP " + esc(CURRENT_DEV_ZIP) +
         "<span class='sw' style='background:#E2772F'></span>" + elseN + " elsewhere in the assembly (neighboring ZIP)";
       cap.style.display = "";
@@ -5269,20 +5406,32 @@ HS.onReady(function(){
 
   function loadDevTracker(zip){
     CURRENT_DEV_ZIP = zip;
-    // (a) resolved-project anchor for this ZIP.
+    // (a) every resolved project this ZIP belongs to. Each row reads its OWN resolved_projects row
+    // and its OWN parcels; nothing is keyed to a particular project in this page.
     sbFetch("v_resolved_project_zip", { zip:"eq."+zip, select:"*" }).then(function(zrows){
       if(!zrows || !zrows.length) return; // no resolved project here → anchor stays hidden (honest empty)
-      var zr = zrows[0];
-      Promise.all([
-        sbFetch("resolved_projects", { project_key:"eq."+zr.project_key,
-          select:"project_key,aliases,unconfirmed,not_drawn,mida_county,deq_air_permit,water_rights,legal_referendum,last_resolved_at" }),
-        sbFetch("v_resolved_project_parcels", { project_key:"eq."+zr.project_key, in_anchor:"eq.true",
-          select:"apn,parcel_num,landowner_label,owner_of_record,acres,zip,zip_basis,off_target_zip,note,account,erecord_url,centroid_lat,centroid_lng,geom_geojson",
-          order:"acres.desc.nullslast" })
-      ]).then(function(res){
-        var parent = (res[0] && res[0][0]) || null;
-        RESOLVED_PARCELS = res[1] || [];
-        renderAnchor(zr, parent, RESOLVED_PARCELS, zip);
+      var seen = {}, rows = zrows.filter(function(r){
+        if(!r || !r.project_key || seen[r.project_key]) return false;
+        seen[r.project_key] = true; return true;
+      });
+      return Promise.all(rows.map(function(zr){
+        return Promise.all([
+          // select=* so a future column (e.g. display_name) is read without a page change.
+          sbFetch("resolved_projects", { project_key:"eq."+zr.project_key, select:"*" }),
+          sbFetch("v_resolved_project_parcels", { project_key:"eq."+zr.project_key, in_anchor:"eq.true",
+            select:"apn,parcel_num,landowner_label,owner_of_record,acres,zip,zip_basis,off_target_zip,note,account,erecord_url,centroid_lat,centroid_lng,geom_geojson",
+            order:"acres.desc.nullslast" })
+        ]).then(function(res){
+          var parent = (res[0] && res[0][0]) || null;
+          var title = landCardTitle(parent);
+          var parcels = (res[1] || []).map(function(p){ p.land_card_title = title; return p; });
+          return { zr:zr, parent:parent, parcels:parcels };
+        });
+      })).then(function(cards){
+        if(CURRENT_DEV_ZIP !== zip) return; // a newer ZIP load owns the page now
+        CURRENT_LAND_CARDS = cards.length;
+        RESOLVED_PARCELS = [].concat.apply([], cards.map(function(c){ return c.parcels; }));
+        renderAnchors(cards, zip);
         $("dtAnchor").style.display = ""; $("devTracker").style.display = "";
         drawParcels();
       });

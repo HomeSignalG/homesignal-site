@@ -25,9 +25,20 @@
 --   Idaho Department of Water Resources, "AppropriationApplicationPods": every row is a pending
 --   application (Status "Active" on all 1,974 rows, measured 2026-10-28), with PriorityDate and a
 --   per-application report link (WRReport).
--- CHECKED AND HELD: Nevada NDWR "Water Rights Points of Diversion" (110,389 rows) publishes its
--- status as 3-letter codes (APP, RFA, PER, …) with no decode in the layer. Showing an undecoded
--- code would be an opaque claim, so Nevada is recorded 'held' until the codes are sourced.
+--   Nevada Division of Water Resources, "Water Rights Points of Diversion" (MapServer layer 0).
+--   The layer stores status as a 3-letter code with no decode, so Nevada was held on 2026-10-28.
+--   DECODED 2026-10-29 from NDWR's OWN permit pages: for each of the layer's 24 codes, one real
+--   record's permit_record page (tools.water.nv.gov/permitinformation.aspx?app=…) was read via
+--   pg_net, and its "Status:" line is the decode. The three pending ones are loaded, stored in
+--   NDWR's own words:
+--     APP  "APPLICATION"                    (app 95526;  119 points)
+--     RFA  "READY FOR ACTION"               (app 94917; 1,322 points)
+--     RFP  "READY FOR ACTION (PROTESTED)"   (app 63993;   868 points)
+--   (the other codes read PERMIT, CERTIFICATE, DENIED, WITHDRAWN, CANCELLED, VESTED RIGHT, …:
+--   decided or historical, not loaded). Count for the three: 2,309. file_date is the filing date
+--   (epoch ms). The use (mou) and source codes are also undecoded and are NOT stored; source_desc
+--   is free text and is. The layer carries no applicant (owners are a separate table), so none
+--   is shown.
 --
 -- A PERSON IS NOT NAMED (same rule as private homes on the cleanup layer). Applicants are shown
 -- by name only when the name is an organisation (water_rights_display_applicant); otherwise the
@@ -45,7 +56,7 @@ create table if not exists public.water_rights_filings (
   point_key              text not null,              -- filing number | point (see the mapping)
   filing_no              text not null,              -- the application number the agency uses
   right_no               text,                       -- the underlying water right, when stated
-  filing_type            text,                       -- verbatim (e.g. "Application To Appropriate")
+  filing_type            text,                       -- Utah: from the filing's own number (water_rights_ut_filing_type)
   diversion              text,                       -- verbatim point type / source
   status                 text,                       -- verbatim
   uses                   text,                       -- verbatim
@@ -129,7 +140,11 @@ values
   ('id_idwr_applications', 'ID', 'Idaho Department of Water Resources',
    'https://gis.idwr.idaho.gov/hosting/rest/services/Allocation/AppropriationApplicationPods/FeatureServer/0/query',
    '1%3D1',
-   'WaterRightNumber,Status,PriorityDate,Applicant,Source,Uses,DiversionType,WRReport,PointOfDiversionID,OBJECTID', 1000, 6)
+   'WaterRightNumber,Status,PriorityDate,Applicant,Source,Uses,DiversionType,WRReport,PointOfDiversionID,OBJECTID', 1000, 6),
+  ('nv_ndwr_pending', 'NV', 'Nevada Division of Water Resources',
+   'https://arcgis.water.nv.gov/arcgis/rest/services/NDWR/Water_Rights_Points_of_Diversion/MapServer/0/query',
+   'app_status+in+(%27APP%27,%27RFA%27,%27RFP%27)',
+   'app,app_status,site_name,source_desc,file_date,permit_record,OBJECTID', 2000, 3)
 on conflict (source) do update set state = excluded.state, agency = excluded.agency,
   query_url = excluded.query_url, where_sql = excluded.where_sql, out_fields = excluded.out_fields,
   page_size = excluded.page_size, max_pages = excluded.max_pages;
@@ -149,7 +164,7 @@ insert into public.water_rights_states (state, name, status, source, note) value
   ('MN','Minnesota','not_checked',null,null), ('MS','Mississippi','not_checked',null,null),
   ('MO','Missouri','not_checked',null,null), ('MT','Montana','not_checked',null,null),
   ('NE','Nebraska','not_checked',null,null),
-  ('NV','Nevada','held',null,'NDWR publishes application status as undecoded 3-letter codes (APP, RFA, PER, …); held until the codes are sourced (2026-10-28).'),
+  ('NV','Nevada','loaded','nv_ndwr_pending',null),
   ('NH','New Hampshire','not_checked',null,null), ('NJ','New Jersey','not_checked',null,null),
   ('NM','New Mexico','not_checked',null,null), ('NY','New York','not_checked',null,null),
   ('NC','North Carolina','not_checked',null,null), ('ND','North Dakota','not_checked',null,null),
@@ -162,6 +177,11 @@ insert into public.water_rights_states (state, name, status, source, note) value
   ('WA','Washington','not_checked',null,null), ('WV','West Virginia','not_checked',null,null),
   ('WI','Wisconsin','not_checked',null,null), ('WY','Wyoming','not_checked',null,null)
 on conflict (state) do nothing;   -- a later decision about a state is never overwritten by a replay
+
+-- 2026-10-29: Nevada's codes are decoded from NDWR's own pages (header), so its 2026-10-28 hold
+-- is lifted. Only that exact hold is changed; any other later decision about Nevada stands.
+update public.water_rights_states set status = 'loaded', source = 'nv_ndwr_pending', note = null
+ where state = 'NV' and status = 'held' and source is null;
 
 -- ── loader: fire ──────────────────────────────────────────────────────────────────────────
 create or replace function public.water_rights_fire(p_source text)
@@ -207,6 +227,37 @@ as $fn$
   end
 $fn$;
 
+-- ── Utah: what kind of filing a pending row is (2026-10-29) ──────────────────────────────
+-- TYPE_OF_RIGHT on a change row describes the BASE water right being changed, not the change
+-- filing: a55167 (Bar H Ranch's change of right 13-2) read "Application To Appropriate".
+-- A change or exchange filing is classified by its own number, the way DWRi's own record pages
+-- do it (getWrChExTypeJs on chPrintAction.asp, read 2026-10-29): "##-" is a water right; E or X
+-- is an exchange; a lowercase letter is a change application. Case is significant: only a
+-- LOWERCASE first letter is a change. The change letters are DWRi's own kinds of change
+-- application (DWRi glossary: a change application is permanent or temporary; fixed-time):
+--   a  permanent change application   (0 of 6 recent a-records mention a temporary change)
+--   t  temporary change application   (t55206: "This temporary change will expire October 31, 2027")
+--   f  fixed-time change application  (f52296: "This is a fixed-time change application")
+-- E: f52296's own text calls E3100 / E3101 "exchange applications"; DWRi's code agrees.
+-- A row with no CHEXNUM is the right itself, and keeps TYPE_OF_RIGHT verbatim.
+-- An unrecognised change number gets no type rather than the base right's type.
+create or replace function public.water_rights_ut_filing_type(p_chexnum text, p_type_of_right text)
+returns text
+language sql
+immutable
+set search_path to 'public', 'pg_temp'
+as $fn$
+  select case
+    when nullif(btrim(p_chexnum), '') is null then nullif(btrim(p_type_of_right), '')
+    when substr(btrim(p_chexnum), 3, 1) = '-' then nullif(btrim(p_type_of_right), '')
+    when left(btrim(p_chexnum), 1) in ('E', 'X') then 'Exchange application'
+    when left(btrim(p_chexnum), 1) = 'a' then 'Permanent change application'
+    when left(btrim(p_chexnum), 1) = 't' then 'Temporary change application'
+    when left(btrim(p_chexnum), 1) = 'f' then 'Fixed-time change application'
+    when left(btrim(p_chexnum), 1) ~ '^[a-z]$' then 'Change application'
+  end
+$fn$;
+
 -- ── per-source mapping: the only place field names live ───────────────────────────────────
 create or replace function public.water_rights_map_feature(p_source text, f jsonb, p_now timestamptz)
 returns public.water_rights_filings
@@ -228,7 +279,7 @@ begin
     -- changes (WRNUM); a new appropriation is known by its WRNUM.
     w.right_no := nullif(btrim(a ->> 'WRNUM'), '');
     w.filing_no := coalesce(nullif(btrim(a ->> 'CHEXNUM'), ''), w.right_no);
-    w.filing_type := nullif(btrim(a ->> 'TYPE_OF_RIGHT'), '');
+    w.filing_type := public.water_rights_ut_filing_type(a ->> 'CHEXNUM', a ->> 'TYPE_OF_RIGHT');
     w.diversion := nullif(btrim(concat_ws(' · ', nullif(btrim(a ->> 'TYPE'), ''), nullif(btrim(a ->> 'SOURCE'), ''))), '');
     w.status := nullif(btrim(a ->> 'STATUS'), '');
     w.uses := nullif(btrim(a ->> 'USES'), '');
@@ -253,6 +304,25 @@ begin
     w.location := null;
     w.state := 'ID';
     w.record_url := case when a ->> 'WRReport' ~ '^https://research\.idwr\.idaho\.gov/' then a ->> 'WRReport' end;
+    w.content_md5 := md5((a - 'OBJECTID')::text || coalesce(g::text, ''));
+  elsif p_source = 'nv_ndwr_pending' then
+    w.filing_no := nullif(btrim(a ->> 'app'), '');
+    w.right_no := null;
+    w.filing_type := null;
+    w.diversion := nullif(btrim(a ->> 'source_desc'), '');
+    -- NDWR's own words for the three loaded codes (header); any other code stores no status
+    w.status := case btrim(a ->> 'app_status')
+                  when 'APP' then 'APPLICATION'
+                  when 'RFA' then 'READY FOR ACTION'
+                  when 'RFP' then 'READY FOR ACTION (PROTESTED)' end;
+    w.uses := null;
+    w.applicant := null;
+    w.filed_on := public.water_rights_date(a -> 'file_date');
+    w.date_label := 'Filing date';
+    w.location := nullif(regexp_replace(btrim(a ->> 'site_name'), '\s+', ' ', 'g'), '');
+    w.state := 'NV';
+    w.record_url := case when a ->> 'permit_record' ~ '^https://tools\.water\.nv\.gov/permitinformation\.aspx\?app=[A-Za-z0-9]+$'
+                         then a ->> 'permit_record' end;
     w.content_md5 := md5((a - 'OBJECTID')::text || coalesce(g::text, ''));
   else
     raise exception 'no mapping for water rights source %', p_source;
@@ -382,6 +452,34 @@ as $fn$
   end
 $fn$;
 
+-- ONE shape for a list of filings, used by both readers (the ZIP page / Map 1 ZIP mode, and Map 1's
+-- address circle). Points are grouped back into filings per source. p_zip_member stamps each point
+-- with the ZIP reader's polygon verdict ('member'), which Map 1 ZIP mode admits on; the circle
+-- reader sends no verdict, because it makes no ZIP claim.
+create or replace function public.water_rights_filings_json(p_points public.water_rights_filings[], p_zip_member boolean)
+returns jsonb
+language sql
+stable
+set search_path to 'public', 'pg_temp'
+as $fn$
+  select coalesce(jsonb_agg(f order by f ->> 'filed_on' desc nulls last, f ->> 'filing_no' collate "C"), '[]'::jsonb)
+    from (select jsonb_strip_nulls(jsonb_build_object(
+                   'source', w.source, 'state', min(w.state),
+                   'filing_no', w.filing_no,
+                   'right_no', case when w.right_no is distinct from w.filing_no then w.right_no end,
+                   'filing_type', min(w.filing_type), 'status', min(w.status),
+                   'uses', min(w.uses), 'diversion', min(w.diversion),
+                   'applicant', public.water_rights_display_applicant(min(w.applicant)),
+                   'applicant_withheld', case when public.water_rights_display_applicant(min(w.applicant)) = 'Individual applicant' then true end,
+                   'filed_on', min(w.filed_on), 'date_label', min(w.date_label),
+                   'record_url', min(w.record_url),
+                   'points', jsonb_agg(jsonb_build_object('lat', w.lat, 'lng', w.lng)
+                                       || case when p_zip_member then jsonb_build_object('zip_membership', 'member') else '{}'::jsonb end
+                                       order by w.point_key collate "C"))) f
+            from unnest(p_points) w
+           group by w.source, w.filing_no, w.right_no) x
+$fn$;
+
 create or replace function public.water_rights_for_zip(p_zip text)
 returns jsonb
 language plpgsql
@@ -392,6 +490,7 @@ as $fn$
 declare
   v_state text; st public.water_rights_states; src public.water_rights_sources;
   v_last timestamptz; v_geom geometry; v_box box2d; v_filings jsonb; v_status text;
+  v_pts public.water_rights_filings[];
 begin
   if p_zip is null or p_zip !~ '^[0-9]{5}$' then
     raise exception 'invalid zip' using errcode = '22023';
@@ -416,26 +515,57 @@ begin
   end if;
   v_status := case when v_last is null or v_last < now() - interval '48 hours' then 'unavailable' else 'complete' end;
   v_box := box2d(v_geom);
-  select coalesce(jsonb_agg(f order by f ->> 'filed_on' desc nulls last, f ->> 'filing_no' collate "C"), '[]'::jsonb)
-    into v_filings
-    from (select jsonb_strip_nulls(jsonb_build_object(
-                   'filing_no', w.filing_no,
-                   'right_no', case when w.right_no is distinct from w.filing_no then w.right_no end,
-                   'filing_type', min(w.filing_type), 'status', min(w.status),
-                   'uses', min(w.uses), 'diversion', min(w.diversion),
-                   'applicant', public.water_rights_display_applicant(min(w.applicant)),
-                   'applicant_withheld', case when public.water_rights_display_applicant(min(w.applicant)) = 'Individual applicant' then true end,
-                   'filed_on', min(w.filed_on), 'date_label', min(w.date_label),
-                   'record_url', min(w.record_url),
-                   'points', jsonb_agg(jsonb_build_object('lat', w.lat, 'lng', w.lng) order by w.point_key collate "C"))) f
-            from public.water_rights_filings w
-           where w.source = src.source and w.removed_from_source_at is null and w.record_url is not null
-             and w.lat between st_ymin(v_box) and st_ymax(v_box)
-             and w.lng between st_xmin(v_box) and st_xmax(v_box)
-             and geo.zip_point_membership_in(v_geom, w.lat, w.lng) = 'member'
-           group by w.filing_no, w.right_no) x;
+  select array_agg(w) into v_pts
+    from public.water_rights_filings w
+   where w.source = src.source and w.removed_from_source_at is null and w.record_url is not null
+     and w.lat between st_ymin(v_box) and st_ymax(v_box)
+     and w.lng between st_xmin(v_box) and st_xmax(v_box)
+     and geo.zip_point_membership_in(v_geom, w.lat, w.lng) = 'member';
+  v_filings := public.water_rights_filings_json(v_pts, true);
   return jsonb_build_object('zip', p_zip, 'state', v_state, 'state_name', st.name, 'agency', src.agency,
                             'status', v_status, 'checked_at', v_last, 'filings', v_filings);
+end
+$fn$;
+
+-- Map 1 ADDRESS MODE: the pending filings whose point lies within the resident's circle, from
+-- every loaded state (a circle can cross a state line). Each source says when it was last
+-- loaded and whether that is older than 48 hours; its filings are still returned, and the page
+-- says they were last confirmed then. A bad point or radius is refused, never answered "none".
+create or replace function public.map1_water_rights_near(p_lat double precision, p_lng double precision, p_radius_mi double precision)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path to 'public', 'extensions', 'pg_temp'
+as $fn$
+declare
+  v_pts public.water_rights_filings[]; v_sources jsonb;
+begin
+  if p_lat is null or p_lng is null or p_radius_mi is null
+     or p_lat not between -90 and 90 or p_lng not between -180 and 180
+     or p_radius_mi <= 0 or p_radius_mi > 20 then
+    raise exception 'invalid point or radius' using errcode = '22023';
+  end if;
+  select coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+           'source', s.source, 'state', st.state, 'state_name', st.name, 'agency', s.agency,
+           'checked_at', r.last,
+           'status', case when r.last is null or r.last < now() - interval '48 hours' then 'unavailable' else 'complete' end))
+           order by s.source collate "C"), '[]'::jsonb)
+    into v_sources
+    from public.water_rights_states st
+    join public.water_rights_sources s on s.source = st.source
+    left join lateral (select max(x.finished_at) as last from public.water_rights_runs x
+                        where x.source = s.source and x.outcome = 'complete') r on true
+   where st.status = 'loaded';
+  select array_agg(w) into v_pts
+    from public.water_rights_filings w
+    join public.water_rights_states st on st.source = w.source and st.status = 'loaded'
+   where w.removed_from_source_at is null and w.record_url is not null
+     and w.lat between p_lat - p_radius_mi / 69.0 and p_lat + p_radius_mi / 69.0
+     and w.lng between p_lng - p_radius_mi / (69.0 * cos(radians(p_lat))) and p_lng + p_radius_mi / (69.0 * cos(radians(p_lat)))
+     and ST_DistanceSphere(ST_MakePoint(p_lng, p_lat), ST_MakePoint(w.lng, w.lat)) <= p_radius_mi * 1609.344;
+  return jsonb_build_object('status', 'complete', 'sources', v_sources,
+                            'filings', public.water_rights_filings_json(v_pts, false));
 end
 $fn$;
 
@@ -444,20 +574,25 @@ revoke all on function public.water_rights_fire(text) from public, anon, authent
 revoke all on function public.water_rights_collect() from public, anon, authenticated;
 revoke all on function public.water_rights_map_feature(text, jsonb, timestamptz) from public, anon, authenticated;
 revoke all on function public.water_rights_date(jsonb) from public, anon, authenticated;
+revoke all on function public.water_rights_ut_filing_type(text, text) from public, anon, authenticated;
 revoke all on function public.water_rights_display_applicant(text) from public, anon, authenticated;
+revoke all on function public.water_rights_filings_json(public.water_rights_filings[], boolean) from public, anon, authenticated;
 revoke all on function public.water_rights_for_zip(text) from public;
+revoke all on function public.map1_water_rights_near(double precision, double precision, double precision) from public;
 grant execute on function public.water_rights_for_zip(text) to anon, authenticated, service_role;
+grant execute on function public.map1_water_rights_near(double precision, double precision, double precision) to anon, authenticated, service_role;
 
 -- ── schedule: daily ───────────────────────────────────────────────────────────────────────
 do $$
 begin
   perform cron.unschedule(j.jobid) from cron.job j
-   where j.jobname in ('water-rights-ut-fire', 'water-rights-id-fire', 'water-rights-collect');
+   where j.jobname in ('water-rights-ut-fire', 'water-rights-id-fire', 'water-rights-nv-fire', 'water-rights-collect');
   perform cron.schedule('water-rights-ut-fire', '37 11 * * *', $c$select public.water_rights_fire('ut_dwr_pending')$c$);
   perform cron.schedule('water-rights-id-fire', '43 11 * * *', $c$select public.water_rights_fire('id_idwr_applications')$c$);
+  perform cron.schedule('water-rights-nv-fire', '49 11 * * *', $c$select public.water_rights_fire('nv_ndwr_pending')$c$);
   perform cron.schedule('water-rights-collect', '*/5 11-12 * * *', $c$select public.water_rights_collect()$c$);
 end $$;
 
 -- ── ROLLBACK (run by hand; keeps the tables and their history) ─────────────────────────────
--- select cron.unschedule(jobid) from cron.job where jobname in ('water-rights-ut-fire','water-rights-id-fire','water-rights-collect');
+-- select cron.unschedule(jobid) from cron.job where jobname in ('water-rights-ut-fire','water-rights-id-fire','water-rights-nv-fire','water-rights-collect');
 -- revoke execute on function public.water_rights_for_zip(text) from anon, authenticated;

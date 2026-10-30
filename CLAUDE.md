@@ -3780,10 +3780,14 @@ drawing them as "Other project" or listing them only on the ZIP page.
 Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) was on no page while three papers reported it.
 - **Data:** `docs/state-water-rights.sql` (cleanup-sites pattern): `water_rights_filings` (one row per point of diversion,
   history in `water_rights_filing_observations`), one fail-closed loader (`water_rights_fire(source)` + `water_rights_collect()`,
-  pg_cron 11:37 / 11:43 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
+  pg_cron 11:37 / 11:43 / 11:49 UTC), one row per agency layer in `water_rights_sources`, and `water_rights_states` (all 50).
   Loaded: each agency's PENDING applications. Utah DWRi Points of Diversion, `SUMMARY_ST='U'` (6,779 rows); Idaho IDWR
   AppropriationApplicationPods (1,974, all "Active").
-  **Nevada is held**: its status is undecoded 3-letter codes. The other 47 are `not_checked`.
+  **Nevada (2026-10-29):** NDWR's layer stores status as undecoded 3-letter codes, so Nevada was held. The codes were
+  then read off NDWR's own permit pages (`tools.water.nv.gov/permitinformation.aspx?app=…`, one real record per code,
+  all 24 codes). Loaded: APP "APPLICATION", RFA "READY FOR ACTION", RFP "READY FOR ACTION (PROTESTED)" (2,309 points),
+  stored in NDWR's words, dated by `file_date`. The use and source columns are codes too and are not stored. The layer
+  has no applicant column. The other 47 states are `not_checked`.
 - **Reader:** `water_rights_for_zip(zip)` answers every ZIP page: `complete` (polygon members via
   `geo.zip_point_membership_in`, maybe none), `unavailable` (no complete load in 48 h), `not_measured` (no ZCTA), or
   `not_covered`. ⛔ `not_covered` is about US: never say a state publishes nothing.
@@ -3795,7 +3799,14 @@ Utah application a55167 (Bar H Ranch Inc., a Stratos alias, filed 2026-10-15) wa
 - **Adding a state** = one `water_rights_sources` row + one branch in `water_rights_map_feature` + its `water_rights_states`
   row set to 'loaded' (a replay never overwrites a state row). Verify the layer's status vocabulary, filing date and per-record
   link first.
-- **Not yet built:** a Map 1 layer, a health alert for missed loads, the other western states.
+- **Map 1 layer (2026-10-29):** its own layer and switch, "Water rights filings" (blue circle "W", `?water=0/1`),
+  `lib/water-rights-map.js`. ZIP mode reuses `water_rights_for_zip`, whose points now carry the `'member'` verdict, through
+  `HS.zipModeSites`. Address mode reads `map1_water_rights_near(lat,lng,radius_mi)` (every loaded state, the circle decides,
+  radius capped at 20 mi). Both readers build filings with one helper, `water_rights_filings_json`. Pins are never counted as
+  EPA facilities or projects. Filings at one point are one pin. Lists count filings, not points.
+  Tests: `test/water-rights-map.test.mjs`, `test/map1-water-rights.browser.test.mjs`.
+- **Missed loads page:** homesignal-ingest `water_rights_loads` in `pipeline_health_tick()` (#957, applied 2026-10-29).
+- **Not yet built:** the other western states.
 - Tests: `test/state_water_rights_pg` (40 checks, 12 mutations killed; `state-water-rights-suite.yml`),
   `test/water-rights-section.test.mjs`, `test/water-rights-section.browser.test.mjs`.
 
@@ -5675,6 +5686,28 @@ Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`
 - Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
 - `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
+## DEVELOPMENT DOSSIERS: /development/<state>/<project_key>/ (2026-10-29) — BUILT, SQL NOT APPLIED
+
+One page per real-world development, built from REVIEWED links to objects HomeSignal already stores. Design:
+`docs/development-dossier-design-2026-10-29.md`; SQL of record `docs/development-dossier.sql` (NOT APPLIED; needs
+`docs/resolved-projects-display-name.sql` first); renderer `scripts/development_pages.py`; publisher homesignal-ingest
+`scripts/publish_development_dossiers.mjs` (dispatch-only).
+- **Only a reviewer publishes.** `development_project_link` and `_statement` are append-only. A job can only propose a
+  candidate. Every decided row must name a current `development_reviewer` with that scope (trigger). Only grades a/b are
+  approvable, and a link naming a private person never is. At most one current defining record. The role must fit the
+  object kind.
+- **Nothing is re-decided.** Facts are joined from the owning tables in `development_dossier_snapshot()`, and the Type
+  and lifecycle come from `lib/project-type.js` on the defining record (`scripts/dossier-type.mjs`). A project needs no
+  `app_projects` row (a DC entity can be the defining record).
+- **One name.** A project that links a land assembly takes `resolved_projects.display_name`, and a second name is
+  refused. A descriptive name (basis `descriptive`) says so on the page.
+- **Pages ship no script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
+  (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
+- `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
+  none yet, and any other failure stops the build. Family sitemap `development`.
+- Tests: `test/development_dossier_pg` (`development-dossier-suite.yml`; 41 checks, 11 mutations),
+  `test/development-pages.test.mjs`.
+
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
 A separate emotion-led story workflow: Library -> Intake -> Story Outline -> Script & Shorts -> Media -> Distribution ->
@@ -5731,6 +5764,44 @@ Results.
 - Apply order (integrated narrative): apply the SQL, deploy the page, then merge the ingest engine, so the page and the
   data never disagree. Tests: `test/impact_stories_pg/` (84 checks + the upgrade path),
   `test/impact-stories.test.mjs`, `test/impact-stories.browser.test.mjs`.
+- ⚖️ **VISUALS STEP: ONE APPROVAL FOR EVERY PICTURE BEFORE RENDER (2026-10-29; plan homesignal-ingest
+  `docs/impact-visuals/PLAN-v3-2026-10-29.md`, P2).** The workflow is Script & Shorts → **Visuals** → Media Review.
+  - **Prepare:** `hs_impact_story_visuals_prepare` queues a job of kind `visuals` on the render workflow. It renders one
+    still per shot with the video's own compositor (no video) and writes JPEG previews to
+    `impact-media/<story>/visuals/<job>/`. The bucket now also allows `image/jpeg`.
+  - **The set:** `job_complete` records an immutable `impact_story_visual_manifests` row. Every shot is `clear`,
+    `flagged` (worth a look) or `blocked`.
+  - **When the set is out of date:** `_hs_is_visuals` reads it as `stale` when the narrative, the sources, the photo
+    choices or the renderer moved.
+  - **Approve all visuals:** `hs_impact_story_visuals_approve` is ONE action, append-only in
+    `impact_story_visual_events`. It re-checks on the server:
+    - it is the current set and the hash the page showed;
+    - no shot is blocked;
+    - every photo has its license, file, checksum and cleared rights;
+    - every preview is inside the job's folder;
+    - the engine's preview-equals-render self-check passed.
+  - **Render** now requires approved visuals. It freezes `visual_manifest {hash, opts}` into the job and its key, and the
+    engine refuses a plan that hashes to anything else.
+  - **Other photos:** `hs_impact_story_choose_asset` also takes the alternatives a finished visuals job offered. A new
+    choice makes the set stale.
+  - **The page:** the contact sheet lists shots that need you first, has a Main / Short A / Short B / Thumbnail switch, and
+    loads previews as blobs, only those on screen.
+  - **Use your own photo (2026-10-30, P2).** The Visuals step has an upload form per subject (`discovery.subjects`):
+    JPEG or PNG under 15 MB, a credit shown on screen, "this photo shows this site" (else REPRESENTATIVE), and the
+    statement "I own this photo or have permission to use it in JODY Tracks videos." (the same words the database stores).
+    - The page hashes the file (SHA-256) and uploads it with the admin's own session to `impact-media/<story>/uploads/<uuid>`.
+      Storage policy `impact_media_admin_upload` allows exactly that: an admin INSERT into an uploads folder, `.jpg` or
+      `.png`. There is no update or delete policy.
+    - `hs_impact_story_upload_photo` then checks the subject, the stored file's size and type, and the statement, records
+      it in `impact_story_uploads` (append-only), and makes it that subject's photo choice (`upload_id`; a choice now
+      comes from a job or an upload, never neither). Previews then read stale, as for any new choice.
+    - The engine (homesignal-ingest `storycraft.upload_problems`, `assets.storage_get`) checks the sha256 against the
+      bytes and decodes the image under the pixel limit before showing it.
+    - Apply order: merge the ingest engine first, then apply this SQL, then deploy the page.
+  - **Not built yet** (P2 follow-ups): crop.
+  - Hot Topics' "Create video" now says to approve the visuals first.
+  - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
+  - pg checks 12V1-12V16 plus 12r4b, 8 mutations caught.
 
 ## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
 
@@ -5875,7 +5946,7 @@ runbook are in homesignal-ingest `docs/VIDEO_BLUESKY.md`. Tests: `test/video-blu
 disposable Postgres in `test/video_bluesky_queue_pg` (CI: `video-bluesky-queue-suite.yml`).
 
 **YouTube links found automatically (2026-10-25) - SQL PARKED (NOT APPLIED):** `docs/youtube-channel-sync.sql` adds
-`public.youtube_channel_videos` (one row per channel video, written only by ingest's hourly sync) and fills a project's
+`public.youtube_channel_videos` (one row per channel video, written only by ingest's twice-daily sync) and fills a project's
 `youtube_url` when its main video is matched and verified public. It never replaces an existing link and never links a
 video from the first import. Tab 16 shows what the sync found; typing a link by hand is now only for an exception. Every
 video post also carries `https://jodytracks.com`. Tests: `test/youtube_channel_sync_pg` (CI `youtube-channel-sync-suite.yml`),
@@ -5926,7 +5997,7 @@ post id. A post never measured shows a dash, never 0.
   displays one admin-only reader, `hs_youtube_engagement(p_days)` (`docs/youtube-engagement.sql`): subscribers and channel views,
   per-video views / likes / comments (MAIN or SHORT, the reader's `kind`, 3 minutes or less = Short), and first visits,
   registrations and reports whose channel is `youtube`.
-  - **Counts:** homesignal-ingest's hourly `youtube_channel_sync.py` also asks for `statistics` on the calls it already makes
+  - **Counts:** homesignal-ingest's twice-daily `youtube_channel_sync.py` also asks for `statistics` on the calls it already makes
     (no extra quota) and appends to `youtube_video_metrics` / `youtube_channel_metrics` (RLS on, no visitor access). A hidden count
     is null. "In this period" needs a reading from within 2 days before the period started, else it is a dash.
   - **Visits:** `classify_channel` files `utm_source=youtube` and a youtube.com / youtu.be referrer as `youtube` (from 2026-10-27;

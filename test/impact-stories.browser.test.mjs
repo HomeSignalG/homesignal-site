@@ -59,7 +59,7 @@ await page.evaluate(() => {
       hs_impact_story_list: [{ id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', primary_emotion: 'MOTIVATION', updated_at: '2026-10-25T10:00:00Z', verified_at: '2026-10-24T21:43:29Z', archived: false, status: window.db.status() },
         { id: 's2', title: 'Old story', video_slug: 'x', archived: true, updated_at: '2026-10-01T00:00:00Z', status: { library: 'archived', next: 'Archived.' } }],
       hs_impact_story_catalog: [{ slug: 'gig-harbor-fishing-homeport-dock', title: '3003 Gig Harbor' }],
-      hs_impact_story_get: { media: window.db.media || { render_job: null, files: [] }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
+      hs_impact_story_get: { media: window.db.media || { render_job: null, files: [] }, visuals: window.db.visuals || { state: 'none', why: 'Prepare the visuals.' }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
         version: { version: window.db.version, body: Object.assign(JSON.parse(JSON.stringify(body)), (window.db.extra || {}).body || {}), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
@@ -71,6 +71,8 @@ await page.evaluate(() => {
       hs_impact_story_request: { job_id: 'j2', status: 'queued', existing: false },
       hs_impact_story_create: { story_id: 's1' },
       hs_impact_story_section_revision: { recorded: true },
+      hs_impact_story_visuals_prepare: { job_id: 'jv', status: 'queued', existing: false },
+      hs_impact_story_visuals_approve: { ok: true },
     }[n];
     if (n === 'hs_impact_story_save') window.db.version = 8;
     return Promise.resolve({ data: d === undefined ? {} : d, error: null });
@@ -102,7 +104,7 @@ txt = await page.locator('#is').innerText();
 ok(txt.includes('sources checked 2026-10-24') && txt.includes('Saved'), 'workspace header: source freshness and save state');
 ok(txt.includes('Failed (attempt 1): The AI drafting key is not configured') && await page.locator('#is [data-act=retry]').count() === 1, 'a failed job says what failed and offers Retry');
 ok(txt.includes('no public link') && txt.includes('Documents that disagree') && txt.includes('Not reviewed'), 'intake: missing links, conflicts and unreviewed records are shown');
-ok(await page.locator('#is .is-step').count() === 6, 'stepper: six steps');
+ok(await page.locator('#is .is-step').count() === 7, 'stepper: seven steps (Visuals sits between Script & Shorts and Media Review)');
 
 await page.click('#is [data-act=step][data-step=outline]');
 txt = await page.locator('#is').innerText();
@@ -164,7 +166,172 @@ ok((await page.locator('#is').innerText()).includes('needs the one editorial app
    'media: no Render button before the narrative is approved');
 await page.evaluate(() => { window.db.nstate = 'approved'; window.db.nwhy = 'Approved on version 8.'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
+ok((await page.locator('#is').innerText()).includes('Approve the visuals first') && await page.locator('#is .is-panel [data-act=render]').count() === 0,
+   'media: before the visuals are approved, Render is replaced by a way to the Visuals step');
+
+// VISUALS (P2): one still per shot, the exceptions first, ONE approval for the whole set
+await page.click('#is [data-act=step][data-step=visuals]'); await page.waitForTimeout(50);
+await page.click('#is .is-panel [data-act=vprep]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_prepare' && c[1].p_expected_version === 8 && c[1].p_new === false)),
+   'visuals: Prepare queues one visuals job for the current approved version');
+await page.evaluate(() => {
+  const P = (k, i) => ({ path: 's1/visuals/jv/preview-' + k + '-00' + i + '.jpg', frame: 10 * i });
+  const rec = { license: 'CC BY 4.0', title: 'File:Oak.jpg', page_url: 'https://commons.wikimedia.org/wiki/File:Oak.jpg' };
+  window.db.visuals = { state: 'ready', why: 'Every shot passed the checks. Look them over, then Approve all visuals.', manifest_id: 41, manifest_hash: 'a'.repeat(64),
+    created_at: '2026-10-29T20:00:00Z', counts: { clear: 3, flagged: 1, blocked: 0 }, manifest_job_id: 'jv', job: { id: 'jv-newer', status: 'failed' },
+    manifest: { timing: { total_s: 640 }, identity: { same: true },
+      assets: { main: { shots: [
+        { id: 'a1-s1', act: 1, act_name: 'Attachment', status: 'clear', label: 'REPRESENTATIVE PHOTO · NOT THIS SITE', onscreen: 'A dock for <fishers>', preview: P('main', 0), photo: { id: 'oak', credit: 'Oak: A. Person, CC BY 4.0', record: rec } },
+        { id: 'a2-s1', act: 2, act_name: 'Disruption', status: 'flagged', label: 'ILLUSTRATION · NOT A PICTURE OF THE SITE', preview: P('main', 1), reasons: ['An illustration stands where the plan wanted a photo (trees).'], illustration: { category: 'trees', missing: true } }] },
+        short_a: { shots: [{ id: 'short_a-hook', beat: 'hook', status: 'clear', label: 'MAP', preview: P('short_a', 0), map: true }] },
+        thumbnail: { shots: [{ id: 'thumbnail', status: 'clear', label: 'PHOTO', preview: P('thumbnail', 0) }] } },
+      alternatives: [{ subject_id: 'oak-trees', subject: 'Oak trees', candidates: [{ id: 'oak-2', title: 'File:Oak2.jpg', license: 'CC BY-SA 4.0', author: 'B', page_url: 'https://commons.wikimedia.org/wiki/File:Oak2.jpg', preview: { path: 's1/visuals/jv/cand-x.jpg' } }] }] } };
+  window.db.baseStatus = window.db.status;
+  window.db.status = ((st) => () => Object.assign(st(), { stage: 'visuals', next: 'Review the visuals, then Approve all visuals' }))(window.db.status);
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+let vt = await page.locator('#is').innerText();
+ok(vt.includes('Needs your attention (1)') && vt.includes('An illustration stands where the plan wanted a photo'), 'visuals: the shots that need you are listed first, with why');
+ok(vt.includes('3 clear · 1 to look at · 0 blocked') && vt.includes('Approve all visuals (4 shots)'), 'visuals: the counts and ONE approve action for the whole set');
+ok(await page.evaluate(() => ['s1/visuals/jv/preview-main-000.jpg', 's1/visuals/jv/preview-main-001.jpg', 's1/visuals/jv/cand-x.jpg']
+   .every((p) => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === p))),
+   'visuals: the previews on screen are downloaded with the admin session (blob links)');
+ok(await page.evaluate(() => !window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')), 'visuals: previews of other videos load only when opened');
+ok(await page.locator('#is img[src^="blob:"]').count() >= 3 && (await page.innerHTML('#is')).includes('A dock for &lt;fishers&gt;'), 'visuals: previews show from blob links; text is escaped');
+await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(120);
+ok((await page.locator('#is').innerText()).includes('short_a-hook') && await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')),
+   'visuals: Short A shows its own shots');
+await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
+   'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
+// A preview that cannot be downloaded is tried once, says so, and is tried again only on request (no redraw loop).
+await page.evaluate(() => {
+  window.prevStorage = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => { window.calls.push(['download', b, p]);
+    if (p === 's1/visuals/jv/preview-short_b-000.jpg') return Promise.resolve({ data: null, error: new Error('Object not found') });
+    return window.prevStorage.from(b).download(p); } }) };
+  window.db.visuals.manifest.assets.short_b = { shots: [{ id: 'short_b-hook', beat: 'hook', status: 'clear', label: 'MAP', preview: { path: 's1/visuals/jv/preview-short_b-000.jpg', frame: 0 }, map: true }] };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+await page.click('#is [data-act=vtab][data-k=short_b]'); await page.waitForTimeout(400);
+const nFail = await page.evaluate(() => window.calls.filter((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_b-000.jpg').length);
+ok(nFail === 1 && (await page.locator('#is').innerText()).includes('Preview could not be loaded'), 'visuals: a failed preview download is tried once and says so (' + nFail + ' tries)');
+await page.click('#is [data-act=vretry]'); await page.waitForTimeout(300);
+ok(await page.evaluate(() => window.calls.filter((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_b-000.jpg').length) === 2,
+   'visuals: "Try the previews again" tries a failed preview exactly once more');
+await page.evaluate(() => { window.client.storage = window.prevStorage; });
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(50);
+await page.locator('#is .is-panel [data-act=vapprove]').last().focus();
+await page.keyboard.press('Enter'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_approve' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
+   'visuals: Approve all visuals (keyboard) sends the manifest the page showed');
+// Use your own photo (plan v3 §6.3): straight into the story's private uploads folder, then recorded with its checksum.
+// setContent pages are not a secure context, so the browser hides crypto.subtle and randomUUID (the https dashboard has
+// both): give this page Node's SHA-256 behind the same calls.
+await page.exposeFunction('__nodeSha256', async (bytes) => (await import('node:crypto')).createHash('sha256').update(Buffer.from(bytes)).digest('hex'));
+await page.evaluate(() => {
+  Object.defineProperty(window.crypto, 'subtle', { configurable: true, value: { digest: async (alg, buf) => {
+    const h = await window.__nodeSha256(Array.from(new Uint8Array(buf)));
+    return new Uint8Array(h.match(/../g).map((x) => parseInt(x, 16))).buffer; } } });
+  Object.defineProperty(window.crypto, 'randomUUID', { configurable: true, value: () => '1b2c3d4e-0000-4000-8000-00000000abcd' });
+});
+await page.evaluate(() => {
+  window.db.extra = { body: { discovery: { subjects: [{ id: 'oak-trees', subject: 'Oak trees', category: 'trees' }] } } };
+  window.prevStorage2 = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => window.prevStorage2.from(b).download(p),
+    upload: (p, f, o) => { window.calls.push(['upload', b, p, o && o.contentType, o && o.upsert, f.size]); return Promise.resolve({ data: { path: p }, error: null }); } }) };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+ok((await page.locator('#is').innerText()).includes('Use your own photo') && await page.locator('#is #is-up-subj option').count() === 1,
+   'upload: the Visuals step offers your own photo for each of the story\'s subjects');
+const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const { createHash } = await import('node:crypto');
+const jpgSha = createHash('sha256').update(jpg).digest('hex');
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'J. Founder');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(120);
+ok((await page.locator('#is').innerText()).includes('Confirm that you own this photo') && !(await page.evaluate(() => window.calls.some((c) => c[0] === 'upload'))),
+   'upload: nothing is uploaded until the permission statement is confirmed');
+await page.setInputFiles('#is #is-up-file', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(120);
+ok((await page.locator('#is').innerText()).includes('Upload a JPEG or PNG photo') && !(await page.evaluate(() => window.calls.some((c) => c[0] === 'upload'))),
+   'upload: a file that is not a JPEG or PNG is refused before upload');
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+ok(await page.inputValue('#is #is-up-credit') === 'J. Founder', 'upload: the form keeps what was typed after an error');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(200);
+const up = await page.evaluate(() => window.calls.find((c) => c[0] === 'upload'));
+const rec = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(up && up[1] === 'impact-media' && /^s1\/uploads\/[0-9a-f-]{36}\.jpg$/.test(up[2]) && up[3] === 'image/jpeg' && up[4] === false && up[5] === jpg.length,
+   'upload: the file goes into this story\'s private uploads folder as a new JPEG');
+ok(rec && rec.p_story === 's1' && rec.p_subject === 'oak-trees' && up[2].endsWith('/' + rec.p_upload + '.jpg') && rec.p_mime === 'image/jpeg'
+   && rec.p_sha256 === jpgSha && rec.p_credit === 'J. Founder' && rec.p_shows_site === false && rec.p_permission === true,
+   'upload: it is recorded with the same id, its checksum, the credit and the permission statement');
+ok((await page.locator('#is').innerText()).includes('Photo added. Prepare the visuals again'), 'upload: the page says what to do next');
+// Codex #2400: the panel is redrawn by the page's own refresh, and must not lose what was chosen and typed.
+await page.evaluate(() => { window.calls.length = 0; });
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-site');
+await page.check('#is #is-up-perm');
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is')));
+await page.waitForTimeout(150);
+ok(await page.inputValue('#is #is-up-credit') === 'K. Founder' && await page.isChecked('#is #is-up-site') && await page.isChecked('#is #is-up-perm')
+   && (await page.locator('#is #is-up-chosen').innerText()).includes('oak.jpg'),
+   'upload: a background redraw keeps the chosen photo, the credit and both boxes');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(200);
+const rec2 = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(rec2 && rec2.p_credit === 'K. Founder' && rec2.p_shows_site === true && rec2.p_sha256 === jpgSha,
+   'upload: after a redraw the photo chosen before it is the one uploaded');
+// Codex #2400: switching story while the file uploads must not record it on the other story.
+await page.evaluate(() => {
+  window.calls.length = 0;
+  const prev = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => prev.from(b).download(p),
+    upload: (p, f, o) => new Promise((res) => { window.calls.push(['upload', b, p]); window.__release = () => res({ data: { path: p }, error: null }); }) }) };
+  window.__restoreStorage = () => { window.client.storage = prev; };
+});
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(150);
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = 's2'; window.__release(); });
+await page.waitForTimeout(200);
+const up3 = await page.evaluate(() => window.calls.find((c) => c[0] === 'upload'));
+const rec3 = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(up3 && up3[2].startsWith('s1/uploads/') && rec3 && rec3.p_story === 's1',
+   'upload: a story switch during the upload still records the photo on the story it was uploaded for');
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))),
+   'upload: after a story switch the finished upload does not reload the page');
+// and leaving for the library while it uploads leaves the library on screen (Codex #2400)
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = 's1'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+await page.evaluate(() => { window.calls.length = 0; });
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(150);
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = null; window.__release(); });
+await page.waitForTimeout(200);
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))) && !(await page.locator('#is').innerText()).includes('could not load'),
+   'upload: going back to the library during an upload does not replace the library with an error');
+await page.evaluate(() => { window.__restoreStorage(); window.HS.acqImpactStories._state.open = 's1'; });
+await page.evaluate(() => { window.client.storage = window.prevStorage2; window.db.extra = null; });
+await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visuals, { state: 'needs_fixes', why: '1 shot(s) cannot be shown as planned.', counts: { clear: 3, flagged: 0, blocked: 1 } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(100);
+ok(await page.locator('#is [data-act=vapprove]').count() === 0 && (await page.locator('#is').innerText()).includes('Needs fixes'), 'visuals: a blocked shot leaves no approve button');
+await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visuals, { state: 'approved', why: 'Approved.' });
+  window.db.status = () => Object.assign(window.db.baseStatus(), { stage: 'media', next: 'Render the videos' });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
 await page.click('#is .is-panel [data-act=render]'); await page.waitForTimeout(50);
+await page.evaluate(() => { window.db.status = window.db.baseStatus; });
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_render' && c[1].p_expected_version === 8 && c[1].p_new === false)),
    'media: Render queues one render of the current approved version');
 const qc = (ok) => ({ ok, checks: [{ name: 'dimensions', ok: true, detail: '1920x1080' }, { name: 'loudness', ok, detail: '-14.0 LUFS (target -14)' }] });
