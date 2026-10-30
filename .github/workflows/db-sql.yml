@@ -3,10 +3,16 @@ name: db-sql
 # Run a COMMITTED .sql file against the project via the Supabase Management API
 # (api.supabase.com /database/query) from a GitHub runner. The runner-based cousin of
 # the recon-fetch pattern: when the sandbox's direct DB path (MCP pooler) is wedged but
-# the instance itself is healthy, SQL still needs an execution channel. Uses the same
-# SUPABASE_ACCESS_TOKEN the deploy-edge-functions workflow already holds; the SQL comes
+# the instance itself is healthy, SQL still needs an execution channel. Uses
+# PROD_SUPABASE_ACCESS_TOKEN from the GitHub environment `production` (main only); the SQL comes
 # from a committed file so every statement is code-reviewed and auditable. Results print
 # into the job log (the receipt channel — the sandbox cannot reach the artifact store).
+#
+# SINCE 2026-10-25 THIS JOB RUNS IN THE ENVIRONMENT `production`, WHICH ADMITS ONLY ref main.
+# A dispatch from a branch is refused before any step runs, so the branch read loop described
+# below no longer works, by design: branch code could choose the SQL and run it as `postgres`.
+# Reads go through db-read.yml (read-only endpoint, main's code, the SQL file fetched as data
+# from a named branch). This workflow runs a file that is on main.
 #
 # Manual dispatch remains the primary operator path. A push trigger exists so merges
 # that land apply-on-merge SQL can execute without workflow_dispatch (cloud agents
@@ -42,6 +48,7 @@ permissions:
 
 jobs:
   run-sql:
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-latest
     # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
     # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
@@ -50,12 +57,30 @@ jobs:
     env:
       SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
       - name: Execute SQL via Management API
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
+          # The dispatch input reaches the shell through env, never expanded into the script.
+          SQL_FILE: ${{ github.event.inputs.sql_file }}
         run: |
           set -euo pipefail
           run_file() {
@@ -98,7 +123,7 @@ jobs:
           PY
           }
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            run_file "${{ github.event.inputs.sql_file }}"
+            run_file "$SQL_FILE"
           else
             mapfile -t CHANGED < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -E '^(docs/candidates/.+\.sql|docs/[^/]+-capture\.sql)$' || true)
             if [ "${#CHANGED[@]}" -eq 0 ]; then

@@ -499,7 +499,23 @@ and that is worth recording as dead before anyone tries it again.
 session: two PRs opened, check runs read, both merged, and **eight workflow dispatches** —
 zero prompts throughout, against a Supabase prompt on every SQL call.
 
-**The loop, for any read-only question:**
+🛑 **SUPERSEDED 2026-10-25 IN THIS REPO: `db-sql.yml` NOW RUNS ONLY FROM `main`.** It moved into the GitHub
+environment `production` (deployment branches: main only), so a dispatch with `ref=<a branch>` is refused
+before any step runs (proven the same day: a branch dispatch got no runner and no step). That was the point:
+the branch loop let branch code choose SQL and run it as `postgres` through the write endpoint. **Read with
+`db-read.yml` instead** (read-only endpoint, read-only role, main's code):
+1. Write the query to **`docs/adhoc/query.sql`** on the working branch, and push the branch.
+2. Dispatch **`db-read.yml` with `ref=main`**, `sql_ref=<that branch>`, `sql_file=docs/adhoc/query.sql`.
+   The branch is read as data only: one blob, nothing from it runs.
+3. Read the result from the job log, between `----- BEGIN RESULT -----` and `END`.
+
+**Measured end to end** (site run `40202945217`, 2026-10-25): `HTTP 201`, live values returned (the
+acquisition dashboard snapshot of 13:19Z that day, 11 tabs). ⚠️ This repo is public, so the job log is
+world-readable: do not select from `auth.*`, `vault.*` or tables holding subscriber data (see the
+`db-read.yml` header; the read-only role can read them). The scratch-file hazard below still applies.
+The ingest repo's own `db-sql.yml` is a separate workflow and is not affected by this change.
+
+*(The original loop, kept as the dated record; in this repo step 3 is now refused:)*
 1. Write the query to **`docs/adhoc/query.sql`** on the working branch.
 2. Push the branch.
 3. Dispatch **`db-sql.yml`** with `sql_file=docs/adhoc/query.sql` and `ref=<that branch>`.
@@ -1387,6 +1403,35 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     **28,263** failures on 2026-09-14, before any of that day's work. Diff the count and the
     failure CLASS against a pre-change run; a red badge alone says nothing. It also reports a
     **negative** `Passed:` count when failures exceed pages, which will mislead the next reader.
+- 🔒 **PRODUCTION SUPABASE KEYS COME ONLY FROM THE GITHUB ENVIRONMENT `production` (2026-10-25).** The founder
+  created it on 2026-10-23: deployment branches **main only**, admin bypass **off**, no reviewers. It holds
+  `PROD_SUPABASE_SERVICE_ROLE_KEY` and `PROD_SUPABASE_ACCESS_TOKEN`. `PROD_SUPABASE_DB_URL` is **deferred**
+  (founder, 2026-10-23: the database password is not on record and a reset was declined for now).
+  - **Why:** this repo is public, and a job that names a repository secret hands it to whatever code the job
+    runs, including a branch's (a dispatch with `ref=<branch>`, or a push to any branch). An environment
+    secret reaches only jobs on `main`. Proven 2026-10-25: `verify-production-environment` from `main`
+    passed every check; the same dispatch from a branch got no runner and ran no step.
+  - **Every job that holds a PROD_ key** carries `environment: { name: production, deployment: false }` on
+    the line right before `runs-on:`, and its FIRST step is the canonical boundary step (it refuses a
+    dispatch unless both `github.actor` and `github.triggering_actor` are `HomeSignalG`). Dispatch inputs
+    reach the shell through `env:`, never as `${{ }}` inside `run:`. The text and every list live in
+    `test/lib/production-boundary.mjs`; `test/production-boundary.test.mjs` checks every workflow against
+    them (and `test/production-boundary-new-workflows.test.mjs` checks `db-read` / `verify` more strictly).
+    **Copy an existing production job when adding one; never retype the boundary step.**
+  - **21 jobs in 18 workflows** use the environment: the 2 built for it (`db-read`, `verify-production-
+    environment`) and 19 moved onto it on 2026-10-25 (including `n5-generation`, `maps-social-image`,
+    `source-monitor`, `deploy-edge-functions`, `db-sql`, `phase2-b1-zcta`). Scheduled runs and the database's
+    own dispatches (pg_cron `n5-generation-dispatch`, which runs as `HomeSignalG`) pass the boundary.
+  - **Still on repository secrets, by design:** the 24 jobs in `DEFERRED_DB_URL_JOBS` read the repository
+    `SUPABASE_DB_URL` until `PROD_SUPABASE_DB_URL` exists (the list may only shrink), and
+    `db-migrate-decide` reads its token from its OWN protected environment `prod-db-write`
+    (`OTHER_ENVIRONMENT`).
+  - **`db-sql.yml` and `deploy-edge-functions.yml` now run only from `main`.** Merge first, then dispatch.
+    Database reads from a branch go through `db-read.yml` (see the read-path section above).
+  - **Open founder step:** delete the repository secrets `SUPABASE_SERVICE_ROLE_KEY` and
+    `SUPABASE_ACCESS_TOKEN` once the moved jobs have run green from the environment. Before deleting
+    `SUPABASE_ACCESS_TOKEN`, check that Settings → Environments → `prod-db-write` lists its own
+    `SUPABASE_ACCESS_TOKEN`, or the migration runner loses its token. Keep `SUPABASE_DB_URL`.
 
 ## 6. Related repos & services
 - **`homesignal-ingest`** — the alert engine (feeds, scraping, grading, topic

@@ -92,9 +92,26 @@ env:
 
 jobs:
   capture:
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
     timeout-minutes: 25
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
 
       - name: ENABLE GATE - refuse unless capture is switched on
@@ -140,18 +157,25 @@ jobs:
       - name: Capture MAPS visuals
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
           NODE_PATH: ${{ github.workspace }}/../node_modules
+          # The dispatch inputs reach the shell through env, never expanded into the script. Each
+          # value is the same expression the command line used to carry, so a scheduled fire (no
+          # inputs) still runs with --limit 8 and no flags.
+          CAPTURE_LIMIT: ${{ inputs.limit || '8' }}
+          CAPTURE_IDS: ${{ inputs.ids }}
+          CAPTURE_DRY: ${{ inputs.dry == 'true' && '--dry' || '' }}
+          CAPTURE_RECAPTURE: ${{ inputs.recapture == 'true' && '--recapture' || '' }}
+          CAPTURE_STAMP_TYPES: ${{ inputs.stamp_types == 'true' && '--stamp-types' || '' }}
+          CAPTURE_STAMP_RECORD_MATCH: ${{ inputs.stamp_record_match == 'true' && '--stamp-record-match' || '' }}
         run: |
           set -euo pipefail
-          node scripts/maps-social-image.mjs \
-            --limit "${{ inputs.limit || '8' }}" \
-            ${{ (inputs.ids != '' && inputs.ids != null) && format('--ids {0}', inputs.ids) || '' }} \
-            ${{ inputs.dry == 'true' && '--dry' || '' }} \
-            ${{ inputs.recapture == 'true' && '--recapture' || '' }} \
-            ${{ inputs.stamp_types == 'true' && '--stamp-types' || '' }} \
-            ${{ inputs.stamp_record_match == 'true' && '--stamp-record-match' || '' }} \
-            --out "$GITHUB_WORKSPACE/maps-social-out"
+          args=(--limit "$CAPTURE_LIMIT")
+          if [ -n "$CAPTURE_IDS" ]; then args+=(--ids "$CAPTURE_IDS"); fi
+          for flag in "$CAPTURE_DRY" "$CAPTURE_RECAPTURE" "$CAPTURE_STAMP_TYPES" "$CAPTURE_STAMP_RECORD_MATCH"; do
+            if [ -n "$flag" ]; then args+=("$flag"); fi
+          done
+          node scripts/maps-social-image.mjs "${args[@]}" --out "$GITHUB_WORKSPACE/maps-social-out"
 
       - name: Upload the captured images as a run artifact (review copy)
         if: always()
