@@ -147,11 +147,11 @@ def _stmt_list(items, cls):
         return ""
     lis = []
     for s in items:
-        when = f'<span class="quiet">{esc(s.get("date_label") or "")} {esc(day(s.get("date")))}</span> ' \
+        when = f'<span class="small">{esc(s.get("date_label") or "")} {esc(day(s.get("date")))}</span> ' \
             if s.get("date") else ""
         title = f'<strong>{esc(s["title"])}</strong>. ' if s.get("title") else ""
         lis.append(f'<li>{when}{title}{esc(s["body"])}{_src(s.get("evidence_url"), s.get("evidence_label"))}'
-                   + (f' <span class="quiet">Checked {esc(day(s.get("checked_on")))}.</span>' if s.get("checked_on") else "")
+                   + (f' <span class="small">Checked {esc(day(s.get("checked_on")))}.</span>' if s.get("checked_on") else "")
                    + "</li>")
     return f'<ul class="{cls}">{"".join(lis)}</ul>'
 
@@ -160,8 +160,8 @@ def _section(h_id, title, inner, empty=None):
     if not inner:
         if empty is None:
             return ""
-        inner = f'<p class="quiet">{esc(empty)}</p>'
-    return f'<section class="zsec" id="{h_id}"><h2>{esc(title)}</h2>{inner}</section>'
+        inner = f'<p class="empty">{esc(empty)}</p>'
+    return f'<section id="{h_id}" aria-labelledby="h-{h_id}"><h2 id="h-{h_id}">{esc(title)}</h2>{inner}</section>'
 
 
 def _doc_title(l):
@@ -194,11 +194,74 @@ def _timeline(d):
     if not rows:
         return ""
     lis = "".join(
-        f'<li><time datetime="{esc(r[0])}">{esc(day(r[0]))}</time> · {esc(r[1] or "")}'
-        + (f' <span class="quiet">({esc(r[2])})</span>' if r[2] else "")
-        + f'<br>{esc(r[3])}{_src(r[4], r[5])}</li>' for r in rows)
-    return (f'<ol class="dtl">{lis}</ol><p class="quiet">Dates are each source\'s own. '
-            f'HomeSignal videos and posts are listed separately below; they are not government events.</p>')
+        f'<li><div class="tdate"><time datetime="{esc(r[0])}">{esc(day(r[0]))}</time>'
+        f'<span>{esc(r[1] or "")}</span></div><div class="tbody">'
+        + (f'<p class="chips"><span class="chip">{esc(r[2])}</span></p>' if r[2] else "")
+        + f'<p>{esc(r[3])}</p>' + (f'<p>{_src(r[4], r[5]).strip()}</p>' if _src(r[4], r[5]) else "")
+        + '</div></li>' for r in rows)
+    return (f'<p class="small">Dates are each source\'s own, newest first. HomeSignal videos and posts are '
+            f'listed separately below; they are not government events.</p><ol class="timeline">{lis}</ol>')
+
+
+TOC = (("overview", "Overview"), ("changed", "What changed"), ("next", "What's next"),
+       ("map", "Map &amp; land"), ("organizations", "Organizations"), ("documents", "Official documents"),
+       ("timeline", "Timeline"), ("coverage", "HomeSignal coverage"))
+
+# The page's own stylesheet. Dossier pages ship no script and do not use the app shell, so they
+# carry their layout inline (the CSP allows inline styles) instead of app.css, whose classes are
+# written for the shell. The look follows the reviewed prototype
+# (docs/prototypes/development-dossier/render.py): one reading column under a header bar.
+CSS = r"""
+:root{--bg:#f4f6f4;--panel:#fff;--ink:#16211c;--ink2:#4a5a52;--ink3:#6b7a72;--line:#e4e8e4;
+ --green:#157a49;--green2:#1f9d5c;--tint:#e9f5ee;--blue:#2f6a96;--violet:#5a4aa5;--violet-t:#efecfa;--on-green:#fff;
+ --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--panel:#17201b;--ink:#e6efe9;--ink2:#b3c2b9;
+ --ink3:#8fa097;--line:#2a3630;--green:#5cc98d;--green2:#5cc98d;--tint:#173326;--blue:#8cbbe0;--violet:#b4a8ec;--violet-t:#26213f;
+ --on-green:#0f1512;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1512;--panel:#17201b;--ink:#e6efe9;--ink2:#b3c2b9;--ink3:#8fa097;--line:#2a3630;
+ --green:#5cc98d;--green2:#5cc98d;--tint:#173326;--blue:#8cbbe0;--violet:#b4a8ec;--violet-t:#26213f;--on-green:#0f1512;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--font);margin:0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:46rem;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--green);overflow-wrap:anywhere}a:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:16px;top:8px;background:var(--panel);padding:.4rem .7rem;z-index:10}
+h1{font-size:clamp(1.7rem,4.5vw,2.4rem);line-height:1.15;margin:.2rem 0;text-wrap:balance}
+h2{font-size:1.35rem;margin:2.4rem 0 .6rem;text-wrap:balance}
+h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
+.small{font-size:.875rem;color:var(--ink2)}.empty{color:var(--ink2);font-style:italic}
+.site{background:var(--panel);border-bottom:1px solid var(--line)}
+.site .wrap{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding-block:.7rem}
+.brand{font-weight:700;color:var(--ink);text-decoration:none}.site nav{display:flex;gap:1rem;font-size:.9rem}
+.site nav a{color:var(--ink2);text-decoration:none}
+.crumbs{font-size:.85rem;color:var(--ink2);margin:1rem 0 .4rem}.crumbs a{color:var(--ink2)}
+.where{color:var(--ink2);margin:.2rem 0 .6rem}
+.meta{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.4rem 0}
+.pill{border-radius:999px;padding:.15rem .7rem;font-size:.85rem;font-weight:600;border:1px solid var(--line);background:var(--panel)}
+.pill.type{background:var(--tint);color:var(--green);border-color:transparent}
+.actions{margin:1rem 0 0}.actions p{margin:.4rem 0}
+.btn{display:inline-block;font:inherit;font-weight:600;border-radius:10px;padding:.7rem 1.2rem;min-height:44px;
+ background:var(--green);color:var(--on-green);border:1px solid var(--green);text-decoration:none}
+.note{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:.5rem .8rem;font-size:.875rem;color:var(--ink2)}
+.toc{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-top:1.4rem;padding-block:.4rem}
+.toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.2rem 1rem;font-size:.88rem}.toc a{text-decoration:none}
+.dsum{list-style:none;padding:0;font-size:1.06rem}.dsum li{margin:.4rem 0}
+.dknown,.dunk,.dimp,.dlatest,.dnext,.plain{padding-left:1.2rem}.dknown li,.dunk li,.dimp li,.plain li{margin:.35rem 0}
+.dlatest{list-style:none;padding:0}.dlatest li{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--green);
+ border-radius:12px;padding:1rem 1.1rem;margin:.6rem 0}
+.cards{list-style:none;padding:0;display:grid;gap:.6rem}
+.cards li{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.6rem .8rem}.cards p{margin:.15rem 0}
+.cards .t{font-weight:600}
+.timeline{list-style:none;padding:0;margin:0;border-left:2px solid var(--line)}
+.timeline>li{display:grid;grid-template-columns:7.5rem 1fr;gap:.8rem;padding:.8rem 0 .8rem .9rem;position:relative}
+.timeline>li::before{content:"";position:absolute;left:-6px;top:1.15rem;width:10px;height:10px;border-radius:50%;background:var(--green)}
+.tdate{font-size:.85rem;font-variant-numeric:tabular-nums}.tdate time{display:block;font-weight:700}.tdate span{color:var(--ink2)}
+.tbody{min-width:0}.tbody p{margin:.2rem 0}
+@media (max-width:520px){.timeline>li{grid-template-columns:1fr;gap:.2rem}}
+.chips{display:flex;flex-wrap:wrap;gap:.3rem}.chip{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:0 .5rem;color:var(--ink2)}
+.jody{background:var(--violet-t);border-radius:12px;padding:.2rem 1rem .8rem}.jody h3{color:var(--violet)}
+.method{border-top:1px solid var(--line);margin-top:2.5rem;padding-block:1rem 3rem}
+.method nav{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.9rem}
+"""
 
 
 def render(d, pages, built, head, crumb_place=None):
@@ -222,23 +285,25 @@ def render(d, pages, built, head, crumb_place=None):
     ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
           "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
                                "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
-    crumb_nav = ('<nav class="zcrumb" aria-label="Breadcrumb">'
-                 + " › ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in crumbs[:-1]) + "</nav>")
-    note = ('<p class="quiet">Descriptive label by HomeSignal. No public record names this project.</p>'
+    crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb">'
+                 + " › ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in crumbs[:-1])
+                 + f' › <span aria-current="page">{esc(name)}</span></nav>')
+    note = ('<p class="note">Descriptive label by HomeSignal. No public record names this project.</p>'
             if d.get("name_basis") == "descriptive" else "")
     df = d.get("defining") or {}
     defin = ""
     if kind or life:
-        defin = (f'<p>{esc(kind or "Type not stated")} · {esc(life or "Lifecycle unknown")}'
-                 f' <span class="quiet">from the defining record:'
-                 f'{_src(df.get("evidence_url"), df.get("evidence_label") or _doc_title(df))}</span></p>')
-    jump = ('<nav class="zsec" aria-label="On this page">'
-            + " · ".join(f'<a href="{d["path"]}#{i}">{t}</a>' for i, t in (
-                ("overview", "Overview"), ("changed", "What changed"), ("next", "What's next"),
-                ("map", "Map &amp; land"), ("organizations", "Organizations"), ("documents", "Official documents"),
-                ("timeline", "Timeline"), ("coverage", "HomeSignal coverage"))) + "</nav>")
-    follow = (f'<p><a class="btn" href="/follow-development.html?d={esc(d["state"].lower())}/{esc(key)}" rel="nofollow">'
-              f'Follow this development</a> <span class="quiet">Saved to your HomeSignal account.</span></p>')
+        defin = (f'<p class="meta"><span class="pill type">{esc(kind or "Type not stated")}</span>'
+                 f'<span class="pill life">{esc(life or "Lifecycle unknown")}</span></p>'
+                 f'<p class="small">From the defining record:'
+                 f'{_src(df.get("evidence_url"), df.get("evidence_label") or _doc_title(df))}</p>')
+    toc = ('<nav class="toc" aria-label="On this page"><ul>'
+           + "".join(f'<li><a href="{d["path"]}#{i}">{t}</a></li>' for i, t in TOC) + "</ul></nav>")
+    map_links = " · ".join(f'<a href="/map/{esc(z)}/">ZIP {esc(z)} on the map</a>' for z in zips)
+    follow = (f'<div class="actions"><p><a class="btn" href="/follow-development.html?d={esc(d["state"].lower())}/{esc(key)}" '
+              f'rel="nofollow">Follow this development</a></p>'
+              f'<p class="small">Saves this development to your HomeSignal account. It does not sign you up for email.</p>'
+              + (f'<p class="small">{map_links}</p>' if map_links else "") + '</div>')
 
     # Overview, what we know and don't, impacts
     ov = _stmt_list(summary, "dsum") + (
@@ -254,26 +319,31 @@ def render(d, pages, built, head, crumb_place=None):
             z = x.get("zip")
             if z in pages:
                 land.append(f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
-                            f' <span class="quiet">{esc(x.get("parcels"))} associated parcel'
+                            f' <span class="small">{esc(x.get("parcels"))} associated parcel'
                             f'{"" if x.get("parcels") == 1 else "s"}</span></li>')
     other = [z for z in zips if not any(f"/map/{z}/" in s for s in land)]
     land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a></li>' for z in other]
-    map_inner = (f'<ul>{"".join(land)}</ul><p class="quiet">Associated land is land the linked records tie to '
-                 f'this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
+    map_inner = (f'<ul class="plain">{"".join(land)}</ul><p class="small">Associated land is land the linked records '
+                 f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
 
     orgs = "".join(
-        f'<li><strong>{esc(l["ref"].split(":", 1)[1])}</strong> — {esc(ROLE_LABEL.get(l["role"], l["role"]))}'
-        + (f'. {esc(l["text"])}' if l.get("text") else "")
-        + f'{_src(l.get("evidence_url"), l.get("evidence_label"))}</li>'
+        f'<li><p class="t">{esc(l["ref"].split(":", 1)[1])}</p>'
+        f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
+        + (f'. {esc(l["text"])}' if l.get("text") else "") + "</p>"
+        + (f'<p class="small">{_src(l.get("evidence_url"), l.get("evidence_label")).strip()}</p>'
+           if _src(l.get("evidence_url"), l.get("evidence_label")) else "") + "</li>"
         for l in _links(d, "organization"))
-    docs = "".join(
-        f'<li>{esc(_doc_title(l))} <span class="quiet">{esc(ROLE_LABEL.get(l["role"], l["role"]))}'
-        + (f', {esc(day(l.get("date")))}' if l.get("date") else "") + "</span>"
-        + _src(l.get("evidence_url"), l.get("evidence_label") or "Official record")
-        + (_src((l.get("facts") or {}).get("record_url"), "Agency record")
-           if safe_url((l.get("facts") or {}).get("record_url")) != safe_url(l.get("evidence_url")) else "")
-        + "</li>" for l in _links(d, *DOC_KINDS))
+
+    def doc_li(l):
+        rec = safe_url((l.get("facts") or {}).get("record_url"))
+        srcs = _src(l.get("evidence_url"), l.get("evidence_label") or "Official record") + (
+            _src(rec, "Agency record") if rec != safe_url(l.get("evidence_url")) else "")
+        return (f'<li><p class="t">{esc(_doc_title(l))}</p>'
+                f'<p class="small">{esc(ROLE_LABEL.get(l["role"], l["role"]))}'
+                + (f' · {esc(day(l.get("date")))}' if l.get("date") else "") + "</p>"
+                + (f'<p class="small">{srcs.strip()}</p>' if srcs else "") + "</li>")
+    docs = "".join(doc_li(l) for l in _links(d, *DOC_KINDS))
 
     vids = _links(d, "youtube_video")
     main = [l for l in vids if (l.get("facts") or {}).get("kind") == "main"]
@@ -282,44 +352,51 @@ def render(d, pages, built, head, crumb_place=None):
 
     def vli(l):
         f = l["facts"]
-        return (f'<li><a href="{esc(safe_url(f.get("url")))}" rel="noopener">{esc(f.get("title"))}</a>'
-                + (f' <span class="quiet">{esc(l["text"])}</span>' if l.get("text") else "") + "</li>")
+        return (f'<li><a href="{esc(safe_url(f.get("url")))}" rel="noopener">{esc(f.get("title"))}</a></li>')
 
     cov = ""
     if main:
-        cov += f'<h3>Videos</h3><ul>{"".join(vli(l) for l in main)}</ul>'
+        cov += f'<h3>Videos</h3><ul class="plain">{"".join(vli(l) for l in main)}</ul>'
     if shorts:
-        cov += f'<h3>Shorts</h3><ul>{"".join(vli(l) for l in shorts)}</ul>'
+        cov += f'<h3>Shorts</h3><ul class="plain">{"".join(vli(l) for l in shorts)}</ul>'
     if posts:
-        cov += "<h3>Bluesky posts</h3><ul>" + "".join(
+        cov += '<h3>Bluesky posts</h3><ul class="plain">' + "".join(
             f'<li>{esc(day((l["facts"] or {}).get("published_at")))}: {esc((l["facts"] or {}).get("text"))}'
             + _src(l.get("evidence_url"), "Post on Bluesky") + "</li>" for l in posts) + "</ul>"
     if cov:
-        cov = ('<p class="quiet">HomeSignal\'s own explainers. They are editorial, not government records, and are '
-               'listed only after they are public.</p>' + cov)
+        cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
+               'records, and are listed only after they are public.</p>' + cov + '</div>')
 
     body = (
-        f'<main id="hs-ssr">{crumb_nav}<header><p class="eyebrow"><a href="/">HomeSignal</a> · Development</p>'
-        f'<h1>{esc(name)}</h1>{note}{defin}'
-        + (f'<p class="addr">{esc(where)}</p>' if where else "") + f'</header>{follow}{jump}'
+        '<a class="skip" href="#main">Skip to content</a>'
+        '<header class="site"><div class="wrap"><a class="brand" href="/">HomeSignal</a>'
+        '<nav aria-label="Primary"><a href="/">Explore</a><a href="/properties.html">My Places</a></nav></div></header>'
+        f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
+        f'<h1 id="h1">{esc(name)}</h1>'
+        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}</section>{toc}'
         + _section("overview", "Overview", ov, "HomeSignal has not written a summary of this development yet.")
         + _section("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"),
                    "No change has been recorded yet.")
         + _section("next", "What's next", _stmt_list(_stmts(d, "next"), "dnext"),
                    "No upcoming hearing or deadline has been confirmed in the sources HomeSignal tracks.")
         + _section("map", "Map & land", map_inner, "No location on record yet.")
-        + _section("organizations", "Organizations", f"<ul>{orgs}</ul>" if orgs else "",
+        + _section("organizations", "Organizations", f'<ul class="cards">{orgs}</ul>' if orgs else "",
                    "No organization has been linked to this development yet.")
-        + _section("documents", "Official documents", f"<ul>{docs}</ul>" if docs else "",
+        + _section("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "",
                    "No official document has been linked yet.")
         + _section("timeline", "Timeline", _timeline(d), "No dated event on record yet.")
         + _section("coverage", "HomeSignal coverage", cov, "No HomeSignal video or post about this development yet.")
-        + f'<p class="quiet">Every fact on this page links to its source. A link is shown only after a HomeSignal '
-          f'reviewer checked it against the source. Page compiled <time datetime="{esc(built)}">{esc(built)}</time>.</p>'
-        + '<nav class="zsec"><a href="/">HomeSignal home</a> · <a href="/how-it-works.html">How HomeSignal works</a></nav>'
-        + "</main>")
-    return (head(title, desc, canon, og_type="article", ld=ld)
-            + f'<body data-nav="project">\n{body}\n</body>\n</html>\n')
+        + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
+          'after a HomeSignal reviewer checked it against the source. Page compiled '
+          f'<time datetime="{esc(built)}">{esc(built)}</time>.</p>'
+          '<nav aria-label="More"><a href="/">HomeSignal home</a><a href="/how-it-works.html">How HomeSignal works</a></nav>'
+          '</footer></main>')
+    # The shell's stylesheets are written for the app shell, which this script-free page does not
+    # load; the page carries its own layout instead.
+    h = head(title, desc, canon, og_type="article", ld=ld)
+    h = re.sub(r'<link rel="stylesheet" href="/(?:layout|app)\.css[^"]*">\n?', "", h)
+    h = h.replace("</head>", f"<style>{CSS.strip()}</style>\n</head>", 1)
+    return h + f'<body>\n{body}\n</body>\n</html>\n'
 
 
 def link_pages(dossiers, pages, projects):
