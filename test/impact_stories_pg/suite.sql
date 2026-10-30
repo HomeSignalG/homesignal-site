@@ -370,6 +370,27 @@ select pg_temp.chk('12V29 rejecting a shot that shows a photo rejects the photo;
   and pg_temp.err('update public.impact_story_shot_decisions set note = null') is not null
   and pg_temp.err('delete from public.impact_story_shot_decisions') is not null);
 select public.hs_impact_story_photo_restore(pg_temp.id('s')::uuid, 'oak');
+-- 12V31: an approval on a shot whose picture did not change is shown again on the next previews; a changed one is not
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', pg_temp.vman((pg_temp.lastjob()).id)));
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'approved');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'main', 'a1-s1', 'approved');
+select pg_temp.chk('12V31a nothing is carried onto the previews the decisions were made on',
+  jsonb_array_length(pg_temp.vis()->'carried_decisions') = 0);
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest',
+  jsonb_set(pg_temp.vman((pg_temp.lastjob()).id), '{assets,main,shots,0,label}', '"A different picture"')));
+select pg_temp.chk('12V31b the unchanged thumbnail carries its approval; the changed main shot does not',
+  (select count(*) from jsonb_array_elements(pg_temp.vis()->'carried_decisions') c
+    where c->>'asset' = 'thumbnail' and c->>'shot_id' = 'thumbnail' and c->>'decision' = 'approved') = 1
+  and jsonb_array_length(pg_temp.vis()->'carried_decisions') = 1
+  and jsonb_array_length(pg_temp.vis()->'shot_decisions') = 0
+  and pg_temp.vis()->>'state' = 'ready');
+select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'rejected', 'Now wrong.');
+select pg_temp.chk('12V31c a decision on these previews replaces the carried one',
+  jsonb_array_length(pg_temp.vis()->'carried_decisions') = 0);
 -- 12V30 (founder, 2026-10-30: no drawings): previews that still carry a drawn shot are out of date and never approvable
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);

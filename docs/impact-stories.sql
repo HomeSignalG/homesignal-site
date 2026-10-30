@@ -908,6 +908,18 @@ returns setof public.impact_story_shot_decisions language sql stable security de
    order by asset, shot_id, id desc
 $$;
 
+-- What a viewer of one shot sees, as one fingerprint: the photo (its file checksum, else its id), the layout, the text
+-- and map on screen, the cited records, and any drawing or missing-photo note. Narration and timing are left out: they
+-- do not change the picture. Two previews of a shot with the same fingerprint show the same picture.
+create or replace function public._hs_is_shot_print(p_shot jsonb)
+returns text language sql immutable set search_path = public as $$
+  select md5(jsonb_build_object(
+    'photo', coalesce(p_shot->'photo'->'record'->>'sha256', p_shot->'photo'->>'id'),
+    'layout', p_shot->'layout', 'onscreen', p_shot->'onscreen', 'map', p_shot->'map', 'label', p_shot->'label',
+    'claims', p_shot->'claims', 'illustration', p_shot->'illustration', 'photo_needed', p_shot->'photo_needed',
+    'subject_ref', p_shot->'subject_ref')::text)
+$$;
+
 -- Where the story's visuals stand: none | preparing | blocked | failed | stale | needs_fixes | ready | approved.
 -- The CURRENT manifest is the newest one, and it counts only while the narrative it was made from is the approved one,
 -- the sources are the same, the photo choices are the same and the renderer is the same.
@@ -917,6 +929,7 @@ declare s public.impact_stories%rowtype; na jsonb := public._hs_is_artifact_stat
         ck jsonb := public._hs_is_choice_key(p_story); m public.impact_story_visual_manifests%rowtype;
         ev public.impact_story_visual_events%rowtype; vj public.impact_story_jobs%rowtype; st text; why text; cur boolean := false;
         nblk int := 0; blocked jsonb; nrej int := 0; sd jsonb := '[]'::jsonb; more jsonb := '[]'::jsonb; ndrawn int := 0;
+        carried jsonb := '[]'::jsonb; cur_shots jsonb; cur_id bigint;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into vj from public.impact_story_jobs where story_id = p_story and kind = 'visuals' order by created_at desc limit 1;
@@ -932,11 +945,28 @@ begin
     cur := cur and ndrawn = 0;
     select * into ev from public.impact_story_visual_events where manifest_id = m.id order by id desc limit 1;
     nblk := coalesce((m.counts->>'blocked')::int, 0);
+    cur_shots := coalesce(m.manifest->'assets', '{}'::jsonb); cur_id := m.id;
     select coalesce(jsonb_agg(jsonb_build_object('asset', d.asset, 'shot_id', d.shot_id, 'decision', d.decision,
              'subject_id', d.subject_id, 'photo_id', d.photo_id, 'note', d.note, 'actor', d.actor, 'at', d.at) order by d.asset, d.shot_id), '[]'::jsonb),
            count(*) filter (where d.decision = 'rejected' and d.photo_id is null and d.manifest_hash = m.manifest_hash),
            coalesce(jsonb_agg(distinct d.subject_id) filter (where d.decision = 'new_photo' and d.subject_id is not null), '[]'::jsonb)
       into sd, nrej, more from public._hs_is_shot_decisions(m.id) d;
+    -- A shot approved on the previous previews whose picture did not change shows as approved again ("Approved
+    -- earlier, same picture"), unless it has a decision of its own on these previews. Shown only; the one "Approve all
+    -- visuals" decision is unchanged and is still made on these previews.
+    select coalesce(jsonb_agg(jsonb_build_object('asset', d.asset, 'shot_id', d.shot_id, 'decision', d.decision,
+             'actor', d.actor, 'at', d.at, 'from_manifest', d.manifest_id) order by d.asset, d.shot_id), '[]'::jsonb)
+      into carried
+      from public.impact_story_visual_manifests pm
+      cross join lateral public._hs_is_shot_decisions(pm.id) d
+      join lateral (select e1.v as old_shot from jsonb_array_elements(coalesce(pm.manifest->'assets'->d.asset->'shots', '[]'::jsonb)) e1(v)
+                     where e1.v->>'id' = d.shot_id limit 1) o on true
+      join lateral (select e2.v as new_shot from jsonb_array_elements(coalesce(cur_shots->d.asset->'shots', '[]'::jsonb)) e2(v)
+                     where e2.v->>'id' = d.shot_id limit 1) n on true
+     where pm.id = (select max(x.id) from public.impact_story_visual_manifests x where x.story_id = p_story and x.id < cur_id)
+       and d.decision = 'approved'
+       and public._hs_is_shot_print(o.old_shot) = public._hs_is_shot_print(n.new_shot)
+       and not exists (select 1 from public._hs_is_shot_decisions(cur_id) c where c.asset = d.asset and c.shot_id = d.shot_id);
   end if;
   if vj.id is not null and vj.status = 'failed' and (m.id is null or vj.created_at > m.created_at) then
     blocked := jsonb_build_object('job_id', vj.id, 'at', vj.completed_at, 'error', vj.error,
@@ -972,7 +1002,7 @@ begin
     'created_at', m.created_at, 'version', m.version, 'counts', m.counts, 'approvable', m.approvable, 'manifest', m.manifest,
     'job', case when vj.id is null then null else jsonb_build_object('id', vj.id, 'status', vj.status, 'created_at', vj.created_at,
       'completed_at', vj.completed_at, 'error', vj.error) end,
-    'blocked', blocked, 'rejected', ck->'rejected', 'shot_decisions', sd, 'more_photos_for', more,
+    'blocked', blocked, 'rejected', ck->'rejected', 'shot_decisions', sd, 'carried_decisions', carried, 'more_photos_for', more,
     'last_decision', case when ev.id is null then null else jsonb_build_object('decision', ev.decision, 'actor', ev.actor,
       'at', ev.at, 'note', ev.note) end);
 end $$;
@@ -1686,7 +1716,8 @@ begin
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
     'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)',
-    'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)'] loop
+    'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
+    'public._hs_is_shot_print(jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
