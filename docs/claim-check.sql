@@ -322,7 +322,7 @@ language sql stable security definer set search_path = public as $$
     'bsky_status', c.bsky_status, 'bsky_slot_kind', c.bsky_slot_kind, 'scheduled_slot', c.scheduled_slot, 'bsky_uri', c.bsky_uri,
     'published_at', c.published_at, 'bsky_error', c.bsky_error,
     'created_at', c.created_at, 'updated_at', c.updated_at,
-    'sources', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'platform', s.platform, 'publisher', s.publisher,
+    'sources', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'source_key', s.source_key, 'platform', s.platform, 'publisher', s.publisher,
         'program', s.program, 'url', s.url, 'embed_url', s.embed_url, 'thumbnail_url', s.thumbnail_url, 'title', s.title,
         'author', s.author, 'published_at', s.published_at, 'rights', s.rights, 'transcript_status', s.transcript_status,
         'metrics', s.metrics, 'duration_s', s.duration_s) order by s.published_at), '[]'::jsonb)
