@@ -205,6 +205,19 @@ ok((await page.locator('#is').innerText()).includes('short_a-hook') && await pag
 await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
    'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
+// One save at a time: while a choice is saving, every "Use this photo" button is disabled and a second click sends nothing.
+await page.evaluate(() => { const real = window.client.rpc; window.__release = null;
+  window.client.rpc = (n, a) => n === 'hs_impact_story_choose_asset' ? (window.calls.push([n, a]), new Promise((r) => { window.__release = () => r({ data: {}, error: null }); })) : real(n, a); });
+const nChoose = () => page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_choose_asset').length);
+const nBefore = await nChoose();
+await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => { const bs = [...document.querySelectorAll('#is [data-act=choose]')]; return bs.length > 0 && bs.every((b) => b.disabled); })
+   && (await page.locator('#is [data-act=choose][data-id=oak-2]').innerText()).includes('Saving'),
+   'visuals: while a photo choice saves, it reads Saving… and every Use this photo button is disabled');
+await page.evaluate(() => document.querySelector('#is [data-act=choose]').click()); await page.waitForTimeout(50);
+ok(await nChoose() === nBefore + 1, 'visuals: a second click while saving sends nothing');
+await page.evaluate(() => window.__release()); await page.waitForTimeout(150);
+ok(await page.evaluate(() => [...document.querySelectorAll('#is [data-act=choose]')].some((b) => !b.disabled)), 'visuals: the buttons work again once the save and redraw finish');
 // Approve / Reject / Need new photo under every shot (2026-10-30), and rejecting every photo of an act.
 await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
 await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[0].subject_ref = 'oak-trees'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
