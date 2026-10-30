@@ -368,13 +368,19 @@ def render(d, pages, built, head, crumb_place=None):
                  f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
 
-    orgs = "".join(
-        f'<li><p class="t">{esc(l["ref"].split(":", 1)[1])}</p>'
-        f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
-        + (f'. {esc(prose(l["text"]))}' if l.get("text") else "") + "</p>"
-        + (f'<p class="small">{_src(l.get("evidence_url"), l.get("evidence_label")).strip()}</p>'
-           if _src(l.get("evidence_url"), l.get("evidence_label")) else "") + "</li>"
-        for l in _links(d, "organization"))
+    # Entities: one card per entity (organization link ref), every role it holds under its name,
+    # each role with its own source. Cards keep the snapshot's order of first appearance.
+    ents = {}
+    for l in _links(d, "organization"):
+        ents.setdefault(l["ref"], []).append(l)
+
+    def role_line(l):
+        src = _src(l.get("evidence_url"), l.get("evidence_label")).strip()
+        return (f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
+                + (f'. {esc(prose(l["text"]))}' if l.get("text") else "") + "</p>"
+                + (f'<p class="small">{src}</p>' if src else ""))
+    orgs = "".join(f'<li><p class="t">{esc(ref.split(":", 1)[1])}</p>{"".join(role_line(l) for l in ls)}</li>'
+                   for ref, ls in ents.items())
 
     def doc_li(l):
         rec = safe_url((l.get("facts") or {}).get("record_url"))
@@ -424,7 +430,7 @@ def render(d, pages, built, head, crumb_place=None):
         ("next", "What's next", _stmt_list(_stmts(d, "next"), "dnext"),
          "an upcoming hearing or deadline confirmed in the sources HomeSignal tracks"),
         ("map", "Map & land", map_inner, "a location"),
-        ("organizations", "Organizations", f'<ul class="cards">{orgs}</ul>' if orgs else "", "a linked organization"),
+        ("entities", "Entities", f'<ul class="cards">{orgs}</ul>' if orgs else "", "a linked entity"),
         ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", "a linked official document"),
         ("timeline", "Timeline", _timeline(d), "a dated event"),
         ("coverage", "HomeSignal coverage", cov, "a HomeSignal video or post"),

@@ -176,7 +176,16 @@ ok(vMap && vMap.length === 4 && JSON.stringify(vMap) === JSON.stringify(vDos),
 
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
-ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the organization and its role');
+ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the entity and its role');
+ok(pa.includes('<h2 id="h-entities">Entities</h2>') && !/Organizations/.test(pa), 'the section is called Entities');
+// one card per entity: a second role for the same entity sits under the same name
+const two = dossiers();
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'applicant', grade: 'b', evidence_url: W,
+  evidence_label: 'Change record x123', text: 'Applicant on the change', facts: {} });
+const pTwo = read(build(two).out, A);
+ok((pTwo.match(/<p class="t">Example Ranch, Inc\.<\/p>/g) || []).length === 1
+   && /<p class="t">Example Ranch, Inc\.<\/p><p><strong>Landowner of record<\/strong>.*?<p><strong>Applicant<\/strong>\. Applicant on the change<\/p>/.test(pTwo),
+   'an entity with two roles is one card listing both');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
 // videos: one reel of YouTube thumbnails with the title under each, main video first, then Shorts
@@ -211,7 +220,7 @@ ok(pa.includes('<p class="t">Data-center listing</p><p class="small">Defining re
 ok(!pa.includes('id="changed"') && !pa.includes('href="/development/ma/valley-campus/#changed"')
    && pa.includes('<p class="empty" id="not-yet">Not on record yet: a recorded change.</p>'),
    'an empty section is not drawn or listed; what is missing is said once', (pa.match(/id="not-yet">[^<]*/) || [''])[0]);
-ok(pb.includes('id="not-yet"') && /Not on record yet: [^<]*a linked organization/.test(pb), 'the same rule on the other page');
+ok(pb.includes('id="not-yet"') && /Not on record yet: [^<]*a linked entity/.test(pb), 'the same rule on the other page');
 const hero = pa.slice(pa.indexOf('<section class="hero"'), pa.indexOf('</section>', pa.indexOf('<section class="hero"')));
 ok(!hero.includes('/map/') && pa.includes('href="/map/01002/"'), 'the hero does not repeat the map links');
 ok(/<nav class="crumbs"[^>]*><a href="\/">HomeSignal<\/a> › <span>Hampshire County, MA<\/span> › <span aria-current="page">/.test(pa),
