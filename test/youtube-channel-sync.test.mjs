@@ -51,7 +51,7 @@ ok(/<details><summary class="sub">Fix the link by hand[\s\S]*?class="yv-yturl"/.
 ok(/YouTube channel<\/h3>[\s\S]*Checked automatically twice a day/.test(html), '3a channel card says it is automatic');
 ok((html.match(/class="yv-msel"/g) || []).length === 1 && /data-vid="UNKNOWN0001"/.test(html), '3b only the unmatched new video gets a match control');
 ok(!/data-vid="OLDVIDEO001"/.test(html), '3c a historical video is not put in front of the founder');
-ok(/value="\|none">Not a project video/.test(html) && /value="p1\|final">/.test(html), '3d choices are project items or "not a project video"');
+ok(/value="\|none">Not a project video/.test(html) && /value="p1\|short2">/.test(html), '3d choices are project items or "not a project video"');
 ok(/The last check failed/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: false, detail: { error: 'quotaExceeded' } } }))), '3e a failed check is shown');
 ok(/Public videos only/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: true, public_only: true } }))) && !/Public videos only/.test(html), '3f public-only reading is said, owner reading is not');
 // 4. without the sync applied the tab is unchanged
@@ -79,6 +79,15 @@ ok(/revoke all on public\.youtube_channel_videos from public, anon, authenticate
 }
 const wfs = fs.readdirSync(new URL('../.github/workflows/', import.meta.url));
 ok(wfs.some((f) => /youtube-channel-sync/.test(f)), '7g the SQL suite runs in CI');
+
+// 8. Save match (2026-10-30): a taken item is greyed out with its video, and a refusal survives the tab's rebuilds
+{
+  const h = Y.channelCard(channel, [row]);
+  ok(/<option value="p1\|final" disabled>Port X · Main video \(already matched: Full investigation\)<\/option>/.test(h), '8a a matched item cannot be chosen and names its video');
+  ok(/<option value="p1\|short2">Port X · Short 2<\/option>/.test(h), '8b a free item stays selectable');
+  const src = read('lib/acq-youtube-videos.js');
+  ok(/matchErrors\[vid\] = text/.test(src) && /querySelectorAll\('\.yv-msave'\)/.test(src), '8c a Save match refusal is kept and put back after each rebuild');
+}
 
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }
 console.log('all passed');
