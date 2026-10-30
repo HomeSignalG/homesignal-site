@@ -23,9 +23,10 @@
 --     that passed the server-side checks can set one;
 --   * a False or Misleading verdict needs at least one contradicting evidence item with an http(s) source, a quote whose
 --     words were found verbatim in a cited document (quote_verified), and a named speaker; approval re-checks all of it;
---   * nothing here posts to Bluesky. Claim Check posts need their own publishing slots, which is a founder decision about
---     the daily schedule (2 MAPS + 2 video a day today); 'schedule' is refused until claim_check_settings.bsky_slots_enabled
---     is set by that decision. See homesignal-ingest claimcheck/README.md;
+--   * Bluesky: Claim Check posts SHARE the MAPS and video times (founder, 2026-10-30): still 2 MAPS + 2 video times a day,
+--     at most 4 posts, 150 minutes apart. 'schedule' asks public.bsky_next_slot_any() for the next free time of either kind,
+--     and is refused until homesignal-ingest migration 20261030180000 (which defines it and books claim posts in
+--     bsky_booked) sets claim_check_settings.bsky_slots_enabled. The publisher (bluesky/publish-worker.mjs) posts them;
 --   * a failed scan stores its error and NO new rows; adapter status is written from the run's real outcome only;
 --   * decisions and research versions are append-only; a correction or retraction keeps the page and its history.
 begin;
@@ -177,11 +178,29 @@ create table if not exists public.claim_check_claims (
   public_state       text not null default 'none' check (public_state in ('none', 'published', 'corrected', 'retracted')),
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
+  -- Bluesky (founder 2026-10-30: Claim Check posts SHARE the MAPS and video times; no time is added). The slot and its
+  -- kind are chosen by public.bsky_next_slot_any() (homesignal-ingest 20261030180000), the one schedule authority.
+  bsky_status        text not null default 'none' check (bsky_status in ('none', 'scheduled', 'publishing', 'published', 'failed')),
+  bsky_slot_kind     text check (bsky_slot_kind in ('maps', 'video')),
+  scheduled_slot     timestamptz,
+  bsky_uri           text,
+  bsky_cid           text,
+  published_at       timestamptz,
+  bsky_error         text,
   constraint claim_check_verdict_needs_research check (verdict is null or research_version > 0),
   constraint claim_check_approved_has_slug check (status <> 'approved' or (slug is not null and verdict is not null and approved_at is not null)),
   constraint claim_check_public_needs_approval check (public_state = 'none' or approved_at is not null)
 );
 create index if not exists claim_check_claims_status on public.claim_check_claims (status, trend_score desc nulls last);
+-- columns added after the first version (re-apply safe)
+alter table public.claim_check_claims add column if not exists bsky_status text not null default 'none';
+alter table public.claim_check_claims add column if not exists bsky_slot_kind text;
+alter table public.claim_check_claims add column if not exists scheduled_slot timestamptz;
+alter table public.claim_check_claims add column if not exists bsky_uri text;
+alter table public.claim_check_claims add column if not exists bsky_cid text;
+alter table public.claim_check_claims add column if not exists published_at timestamptz;
+alter table public.claim_check_claims add column if not exists bsky_error text;
+create unique index if not exists claim_check_one_per_slot on public.claim_check_claims (scheduled_slot) where bsky_status in ('scheduled', 'publishing', 'published');
 
 -- research versions (append-only)
 create table if not exists public.claim_check_research (
@@ -214,7 +233,7 @@ create table if not exists public.claim_check_decisions (
   id               uuid primary key default gen_random_uuid(),
   claim_id         uuid not null references public.claim_check_claims(id),
   action           text not null check (action in ('approve', 'edit', 'request_research', 'skip', 'reject', 'restore',
-                                                    'schedule', 'correct', 'retract')),
+                                                    'schedule', 'unschedule', 'correct', 'retract')),
   note             text,
   edits            jsonb,
   research_version integer not null,
@@ -300,6 +319,8 @@ language sql stable security definer set search_path = public as $$
     'quote_source_url', c.quote_source_url, 'timestamp_s', c.timestamp_s, 'assertion', c.assertion, 'verdict', c.verdict,
     'verdict_explanation', c.verdict_explanation, 'research_version', c.research_version, 'headline', c.headline,
     'post_text', c.post_text, 'slug', c.slug, 'public_state', c.public_state, 'approved_at', c.approved_at,
+    'bsky_status', c.bsky_status, 'bsky_slot_kind', c.bsky_slot_kind, 'scheduled_slot', c.scheduled_slot, 'bsky_uri', c.bsky_uri,
+    'published_at', c.published_at, 'bsky_error', c.bsky_error,
     'created_at', c.created_at, 'updated_at', c.updated_at,
     'sources', (select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'platform', s.platform, 'publisher', s.publisher,
         'program', s.program, 'url', s.url, 'embed_url', s.embed_url, 'thumbnail_url', s.thumbnail_url, 'title', s.title,
@@ -375,13 +396,14 @@ begin
     execute $q$select jsonb_build_object(
         'visitors', count(distinct visitor_id) filter (where subject_type = 'visitor'),
         'registrations', count(*) filter (where subject_type = 'account'),
-        'by_slug', coalesce((select jsonb_object_agg(k, n) from (select utm_content k, count(distinct visitor_id) n from public.acquisition_touch
+        -- keyed by utm_content: the claim's id on Bluesky links (the publisher's tag), or its slug on links made by hand
+        'by_content', coalesce((select jsonb_object_agg(k, n) from (select utm_content k, count(distinct visitor_id) n from public.acquisition_touch
              where utm_campaign = 'claim-check' and subject_type = 'visitor' and utm_content is not null and not is_internal group by utm_content) z), '{}'::jsonb))
       from public.acquisition_touch where utm_campaign = 'claim-check' and not is_internal$q$ into touch;
   end if;
   return r || jsonb_build_object('site', coalesce(touch, '"not_collected"'::jsonb),
     'unavailable', jsonb_build_array(
-      'Bluesky likes, reposts and replies on Claim Check posts: no Claim Check post can be published until its schedule slots are decided.',
+      'Bluesky likes, reposts and replies on Claim Check posts: not collected yet.',
       'Impressions: Bluesky publishes none.',
       'Paid conversions credited to a claim check: not attributed yet.'));
 end $$;
@@ -400,7 +422,7 @@ create or replace function public.hs_claim_check_decide(p_claim uuid, p_action t
                                                         p_edits jsonb default null, p_expected_version integer default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); c public.claim_check_claims%rowtype; probs jsonb; nt text := nullif(btrim(coalesce(p_note, '')), '');
-        st public.claim_check_settings%rowtype; run_id uuid; base text; n int := 0; sent boolean;
+        st public.claim_check_settings%rowtype; run_id uuid; base text; n int := 0; sent boolean; k text; ns timestamptz;
 begin
   select * into c from public.claim_check_claims where id = p_claim for update;
   if not found then raise exception 'no such claim' using errcode = 'P0002'; end if;
@@ -427,8 +449,10 @@ begin
     if p_edits ? 'post_text' and char_length(coalesce(p_edits->>'post_text', '')) > 300 then raise exception 'The post is over 300 characters.' using errcode = '22023'; end if;
     if p_edits ? 'headline' and length(btrim(coalesce(p_edits->>'headline', ''))) < 8 then raise exception 'The headline is too short.' using errcode = '22023'; end if;
     -- an edit after approval needs approving again; a published page keeps showing the approved text until then
+    if c.bsky_status in ('publishing', 'published') then raise exception 'This post is already on Bluesky. Publish a correction instead.' using errcode = '55000'; end if;
+    -- edited text was never approved, so a booked Bluesky time is released until it is approved and scheduled again
     update public.claim_check_claims set headline = coalesce(p_edits->>'headline', headline), post_text = coalesce(p_edits->>'post_text', post_text),
-      status = 'research_ready', updated_at = now() where id = c.id;
+      status = 'research_ready', bsky_status = 'none', bsky_slot_kind = null, scheduled_slot = null, updated_at = now() where id = c.id;
   elsif p_action = 'request_research' then
     if nt is null then raise exception 'Say what to research.' using errcode = '22023'; end if;
     if c.public_state <> 'none' then raise exception 'This claim check is published. Use Correct instead.' using errcode = '55000'; end if;
@@ -453,13 +477,31 @@ begin
   elsif p_action = 'schedule' then
     select * into st from public.claim_check_settings;
     if not st.bsky_slots_enabled then
-      raise exception 'Claim Check posts have no Bluesky publishing slots yet. Bluesky posts 2 MAPS + 2 video a day; adding Claim Check posts changes that schedule, which is your decision.' using errcode = '55000';
+      raise exception 'Claim Check posts cannot be scheduled yet: the schedule change that lets them share the MAPS and video times is not applied.' using errcode = '55000';
     end if;
-    raise exception 'Claim Check scheduling is not built yet.' using errcode = '0A000';
+    if c.status <> 'approved' or c.public_state not in ('published', 'corrected') then
+      raise exception 'Only an approved, public claim check can be posted.' using errcode = '55000';
+    end if;
+    if c.bsky_status in ('scheduled', 'publishing', 'published') then
+      raise exception 'This claim check is already %.', c.bsky_status using errcode = '55000';
+    end if;
+    if char_length(coalesce(c.post_text, '')) < 10 then raise exception 'Write the Bluesky post first.' using errcode = '55000'; end if;
+    -- the ONE schedule authority picks the next free MAPS or video time (whichever comes first)
+    select x.kind, x.slot into k, ns from public.bsky_next_slot_any(now()) x;
+    update public.claim_check_claims set bsky_status = 'scheduled', bsky_slot_kind = k, scheduled_slot = ns, bsky_error = null,
+      bsky_uri = null, updated_at = now() where id = c.id;
+  elsif p_action = 'unschedule' then
+    if c.bsky_status <> 'scheduled' then raise exception 'Only a scheduled post can be taken off the schedule.' using errcode = '55000'; end if;
+    update public.claim_check_claims set bsky_status = 'none', bsky_slot_kind = null, scheduled_slot = null, updated_at = now() where id = c.id;
   elsif p_action in ('correct', 'retract') then
     if c.public_state = 'none' then raise exception 'Only a published claim check can be corrected or retracted.' using errcode = '55000'; end if;
     if nt is null then raise exception 'Write the correction notice readers will see.' using errcode = '22023'; end if;
-    update public.claim_check_claims set public_state = case p_action when 'correct' then 'corrected' else 'retracted' end, updated_at = now() where id = c.id;
+    update public.claim_check_claims set public_state = case p_action when 'correct' then 'corrected' else 'retracted' end,
+      -- a retracted claim check never goes out on Bluesky; one already posted stays posted (its page carries the retraction)
+      bsky_status = case when p_action = 'retract' and bsky_status = 'scheduled' then 'none' else bsky_status end,
+      scheduled_slot = case when p_action = 'retract' and bsky_status = 'scheduled' then null else scheduled_slot end,
+      bsky_slot_kind = case when p_action = 'retract' and bsky_status = 'scheduled' then null else bsky_slot_kind end,
+      updated_at = now() where id = c.id;
   else
     raise exception 'unknown action %', p_action using errcode = '22023';
   end if;

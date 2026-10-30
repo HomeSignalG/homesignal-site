@@ -6031,12 +6031,15 @@ What people say about data centers, against what documented evidence shows. SQL 
   quote; approval re-checks it; an edit after approval needs approval again; decisions and research versions are
   append-only; `claim_check_public_export()` (anon) returns approved claim checks only; corrections/retractions stay public.
 - **No geography is a ranking input** (founder brief). Places are metadata.
-- ⛔ **Bluesky publishing for Claim Check is NOT switched on.** It needs slots in the 2 MAPS + 2 video schedule (Rule #0):
-  `schedule` is refused until `claim_check_settings.bsky_slots_enabled` is set by the founder's decision, and no publisher
-  code exists for it yet.
+- ⚖️ **Bluesky: Claim Check posts SHARE the MAPS and video times (founder, 2026-10-30, "share maps and video times").**
+  Still 2 MAPS + 2 video times a day, at most 4 posts, 150 minutes apart; no time is added. Schedule takes the next free
+  time of either kind (`bsky_next_slot_any`), which MAPS and video then cannot use. `schedule` is refused until
+  homesignal-ingest migration `20261030180000` (which books claims in the schedule) sets `bsky_slots_enabled`. The posting
+  is homesignal-ingest `publish-worker.mjs` (waits until the claim's page answers 200; links tagged `claim-check`). An edit
+  is refused once the post is publishing/published and releases a scheduled time.
 - **Not read (adapter rows say `not_built`):** transcripts/captions (owner-only on YouTube), X, TikTok, Reddit, local TV
   sites. Thumbnails are the platform's own image (CSP `img-src` adds `i.ytimg.com`, `cdn.bsky.app`) or a labelled
   placeholder; video plays only in the `youtube-nocookie` player and only when the source is embeddable.
-- **Apply order:** merge the ingest workflows first (a dispatch to a missing workflow is lost), then apply
-  `docs/claim-check.sql`, then deploy this page. `pages.yml` treats a missing export function (404 PGRST202) as "none yet".
+- **Apply order:** merge the ingest PR first (a dispatch to a missing workflow is lost), then apply `docs/claim-check.sql`,
+  then the ingest migration `20261030180000`, then deploy this page. `pages.yml` treats a missing export function (404 PGRST202) as "none yet".
 - Tests: `test/claim_check_pg` (`claim-check-suite.yml`), `test/claim-check.test.mjs`, `test/fact-check-pages.test.mjs`.

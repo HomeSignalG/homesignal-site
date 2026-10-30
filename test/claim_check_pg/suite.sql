@@ -93,14 +93,30 @@ select pg_temp.chk('4b approval gives a slug and a public page', (select slug is
 select pg_temp.chk('4c the export carries the approved claim check only', jsonb_array_length(public.claim_check_public_export()) = 1
   and (public.claim_check_public_export() -> 0 ->> 'verdict') = 'false');
 select pg_temp.chk('4d the export shows the embed for embed_only footage', (public.claim_check_public_export() -> 0 -> 'sources' -> 0 ->> 'embed_url') like 'https://www.youtube-nocookie.com/embed/%');
-select pg_temp.chk('4e schedule is refused until the founder decides the slots', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L)', pg_temp.cid('k1'), 'schedule')) like '55000%Bluesky%');
+select pg_temp.chk('4e schedule is refused until the shared-slot schedule change is applied', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L)', pg_temp.cid('k1'), 'schedule')) like '55000%MAPS and video times%');
+-- stand-in for homesignal-ingest's schedule authority (tested there): the next free MAPS or video time
+create function public.bsky_next_slot_any(p_after timestamptz default null) returns table (kind text, slot timestamptz) language sql as $$
+  select 'video'::text, date_trunc('hour', now()) + interval '1 day' + (select count(*) from public.claim_check_claims where bsky_status = 'scheduled') * interval '3 hours' $$;
+update public.claim_check_settings set bsky_slots_enabled = true;
+select pg_temp.chk('4e2 schedule takes the next shared time', (public.hs_claim_check_decide(pg_temp.cid('k1'), 'schedule') ->> 'bsky_status') = 'scheduled');
+select pg_temp.chk('4e2b with its kind and time', (select bsky_slot_kind = 'video' and scheduled_slot > now() from public.claim_check_claims where claim_key = 'k1'));
+select pg_temp.chk('4e3 scheduling twice is refused', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L)', pg_temp.cid('k1'), 'schedule')) like '55000%already scheduled%');
+select pg_temp.chk('4e4 unschedule frees the time', (public.hs_claim_check_decide(pg_temp.cid('k1'), 'unschedule') ->> 'bsky_status') = 'none');
+select pg_temp.chk('4e4b and clears it', (select scheduled_slot is null from public.claim_check_claims where claim_key = 'k1'));
+select public.hs_claim_check_decide(pg_temp.cid('k1'), 'schedule');
 select pg_temp.chk('4f an edit after approval needs approval again', (public.hs_claim_check_decide(pg_temp.cid('k1'), 'edit', null, '{"headline":"A shorter, plainer headline"}') ->> 'status') = 'research_ready');
+select pg_temp.chk('4f2 an edit releases the booked Bluesky time', (select bsky_status = 'none' and scheduled_slot is null from public.claim_check_claims where claim_key = 'k1'));
 select pg_temp.chk('4g the page stays published while re-approval waits', (select public_state = 'published' from public.claim_check_claims where claim_key = 'k1'));
 select pg_temp.chk('4h skip is refused on a published claim', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L)', pg_temp.cid('k1'), 'skip')) like '55000%');
 select pg_temp.chk('4i a correction needs a notice', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L)', pg_temp.cid('k1'), 'correct')) like '22023%');
+select public.hs_claim_check_decide(pg_temp.cid('k1'), 'approve');
+select public.hs_claim_check_decide(pg_temp.cid('k1'), 'schedule');
 select public.hs_claim_check_decide(pg_temp.cid('k1'), 'correct', 'The timestamp was 1:35, not 1:53.');
 select pg_temp.chk('4j a correction shows on the page', (public.claim_check_public_export() -> 0 ->> 'public_state') = 'corrected'
   and (public.claim_check_public_export() -> 0 -> 'corrections' -> 0 ->> 'note') like 'The timestamp%');
+select pg_temp.chk('4j2 a scheduled post survives a correction', (select bsky_status = 'scheduled' from public.claim_check_claims where claim_key = 'k1'));
+update public.claim_check_claims set bsky_status = 'published', published_at = now() where claim_key = 'k1';
+select pg_temp.chk('4j3 a posted claim check cannot be edited', pg_temp.err(format('select public.hs_claim_check_decide(%L, %L, null, %L)', pg_temp.cid('k1'), 'edit', '{"headline":"Another headline here"}')) like '55000%already on Bluesky%');
 select pg_temp.chk('4k decisions are append-only', pg_temp.err('update public.claim_check_decisions set note = null') like '42501%');
 
 -- 5. request research, people, scan now ---------------------------------------------------------------------

@@ -32,12 +32,12 @@ ok(!/client\.from\(/.test(code), '2b the page touches no table directly');
 for (const f of ['hs_claim_check_overview()', 'hs_claim_check_decide(uuid,text,text,jsonb,integer)']) {
   ok(sql.includes("'" + f + "'"), '2c ' + f + ' is in the authenticated grant list');
 }
-ok(!/bsky\.social\/xrpc|createRecord|agent\.post/.test(code), '2d the page cannot post to Bluesky');
+ok(!/bsky\.social\/xrpc|createRecord|agent\.post/.test(code), '2d the page cannot post to Bluesky (the publisher does)');
 
 // 3. the SQL guarantees, by text (the pg suite proves behaviour)
 ok(/a false or misleading verdict needs at least one contradicting evidence item/.test(sql), '3a False/Misleading needs contradicting evidence');
 ok(/a scan cannot set a verdict, quote or evidence/.test(sql), '3b a scan cannot set a verdict');
-ok(/Claim Check posts have no Bluesky publishing slots yet/.test(sql), '3c scheduling is refused until the founder decides the slots');
+ok(/bsky_next_slot_any\(now\(\)\)/.test(sql) && /MAPS and video times is not applied/.test(sql), '3c a post takes the next shared MAPS/video time, refused until the schedule change is applied');
 ok(/where c\.public_state <> 'none' and c\.approved_at is not null/.test(sql), '3d the public export is approved claims only');
 ok(!/geograph|region_weight|state_weight|place_weight/i.test(sql.replace(/-- .*$/gm, '')), '3e no geographic weighting in the SQL');
 
@@ -67,6 +67,14 @@ const cand = T.detailView(Object.assign({}, claim, { status: 'candidate', verdic
 ok(!cand.includes('data-act="approve"') && cand.includes('No verdict.') && cand.includes('data-act="request_research"'), '4g a candidate cannot be approved and offers research');
 const pub = T.detailView(Object.assign({}, claim, { status: 'approved', public_state: 'published', slug: 's' }));
 ok(pub.includes('data-act="correct"') && !pub.includes('data-act="skip"'), '4h a published claim offers correction, not skip');
+const sched = T.detailView(Object.assign({}, claim, { status: 'approved', public_state: 'published', slug: 's', bsky_status: 'none' }));
+ok(sched.includes('data-act="schedule"') && sched.includes('no time is added'), '4h2 an approved public claim can be scheduled on a shared time');
+const booked = T.detailView(Object.assign({}, claim, { status: 'approved', public_state: 'published', slug: 's', bsky_status: 'scheduled',
+  bsky_slot_kind: 'maps', scheduled_slot: '2026-11-02T16:30:00Z' }));
+ok(booked.includes('data-act="unschedule"') && !booked.includes('data-act="schedule"') && booked.includes('(a MAPS time)') && booked.includes('8:30 AM Pacific'), '4h3 a booked post shows its time and kind, and can be taken off');
+const posted = T.detailView(Object.assign({}, claim, { status: 'approved', public_state: 'published', slug: 's', bsky_status: 'published',
+  bsky_uri: 'at://did:plc:abc/app.bsky.feed.post/3kabc', published_at: '2026-11-02T16:31:00Z' }));
+ok(posted.includes('https://bsky.app/profile/did:plc:abc/post/3kabc') && !posted.includes('data-act="schedule"'), '4h4 a posted claim links its Bluesky post');
 const noThumb = T.row({ id: 'x', status: 'candidate', topic: 'T', sources: [{ platform: 'youtube', thumbnail_url: 'https://evil.example/x.jpg' }] });
 ok(noThumb.includes('No thumbnail available') && !noThumb.includes('evil.example'), '4i an unknown thumbnail host shows the labelled placeholder');
 ok(T.graphemes('👍🏽ab') === 3, '4j the post counter counts graphemes');
