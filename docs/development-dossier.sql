@@ -415,6 +415,32 @@ end $fn$;
 -- facts joined from the owning tables; their current statements. A link whose object is not
 -- public or no longer exists (a video not verified public, a Bluesky post not published, a
 -- source record no longer stored) is withheld and counted, never shown.
+-- A data-center record's lifecycle, decided the way Map 1 decides it (2026-10-30). The rule is
+-- public.map1_dc_zip_members' (docs/map1-dc-publication.sql): the entity's CURRENT observation that
+-- states a displayable lifecycle (the location authority first, then the newest), mapped through
+-- THE ONE LIFECYCLE MAP. A stated lifecycle outside that map (e.g. cancelled), or none, is NULL:
+-- the page then says "Lifecycle unknown". The two VALUES lists are pinned equal by
+-- test/development-pages.test.mjs, so the dossier cannot drift from Map 1.
+create or replace function public.dc_entity_map_status(p_entity uuid)
+returns text language sql stable set search_path to 'public','pg_temp' as $fn$
+  with lifecycle(v, map_status) as (values
+    ('operational',        'Operating'),
+    ('under_construction', 'Approved'),
+    ('permitted',          'Approved'),
+    ('proposed',           'Proposed'))
+  select lc.map_status
+    from public.dc_entity_observation eo
+    join public.dc_current_observation cx on cx.home_signal_observation_id = eo.home_signal_observation_id
+    join public.dc_source_observation x on x.home_signal_observation_id = eo.home_signal_observation_id
+    join lifecycle lc on lc.v = x.source_native_status
+    left join public.dc_entity_geography ge on ge.canonical_entity_id = eo.canonical_entity_id
+   where eo.canonical_entity_id = p_entity
+   order by (x.home_signal_observation_id = ge.authority_observation_id) desc nulls last,
+            x.observed_at desc, x.home_signal_observation_id
+   limit 1
+$fn$;
+revoke all on function public.dc_entity_map_status(uuid) from public, anon, authenticated;
+
 create or replace function public.development_dossier_snapshot()
 returns jsonb language plpgsql stable security definer set search_path to 'public','pg_temp' as $fn$
 declare out jsonb := '{}'::jsonb; p record; links jsonb; stmts jsonb; withheld jsonb; nm text; nsrc text; def jsonb;
@@ -439,7 +465,8 @@ begin
              and ap.source_seq = nullif(split_part(c.object_ref, '|', 2), '')::smallint
            order by ap.id limit 1)
         when 'dc_entity' then (
-          select jsonb_build_object('classification', e.classification, 'superseded_by', e.superseded_by)
+          select jsonb_build_object('classification', e.classification, 'superseded_by', e.superseded_by,
+                   'lifecycle', public.dc_entity_map_status(e.canonical_entity_id))
             from public.dc_canonical_entity e where e.canonical_entity_id = c.object_ref::uuid
              and e.superseded_by is null)
         when 'land_assembly' then (

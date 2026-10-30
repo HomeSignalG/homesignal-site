@@ -154,6 +154,25 @@ ok(pb.includes(`<span class="pill type">${tB.label}</span><span class="pill life
 const tA = HS.canonicalProjectType({ name: 'x', type: 'Data center' });
 ok(pa.includes(`<span class="pill type">${tA.label}</span><span class="pill life">Lifecycle unknown</span>`), 'the DC page shows Data center · Lifecycle unknown (no lifecycle claimed without a source)');
 
+// 2b. a DC record's lifecycle is Map 1's own decision, carried by the snapshot (facts.lifecycle)
+const withLife = dossiers();
+for (const x of [withLife.dossiers['valley-campus'].defining, withLife.dossiers['valley-campus'].links[0]]) x.facts.lifecycle = 'Proposed';
+const lifeOut = build(withLife);
+const pLife = read(lifeOut.out, A);
+const lP = HS.canonicalLifecycle({ status: 'Proposed' });
+ok(lifeOut.r.status === 0 && pLife.includes(`<span class="pill type">${tA.label}</span><span class="pill life">${lP.label}</span>`),
+   `a DC record with a stated lifecycle shows ${lP.label}`);
+// the lookup's lifecycle map is Map 1's, word for word (docs/map1-dc-publication.sql)
+const valuesOf = (file, after) => {
+  const t = readFileSync(join(root, 'docs', file), 'utf8');
+  const i = t.indexOf(after); const m = i < 0 ? null : t.slice(i).match(/lifecycle\(v, map_status\) as \(values([\s\S]*?\))\)/);
+  return m ? [...m[1].matchAll(/\('([a-z_]+)',\s*'([A-Za-z]+)'\)/g)].map((x) => x[1] + '=' + x[2]).sort() : null;
+};
+const vMap = valuesOf('map1-dc-publication.sql', 'create or replace function public.map1_dc_zip_members');
+const vDos = valuesOf('development-dossier.sql', 'create or replace function public.dc_entity_map_status');
+ok(vMap && vMap.length === 4 && JSON.stringify(vMap) === JSON.stringify(vDos),
+   'the dossier lifecycle lookup uses exactly Map 1\'s lifecycle map', JSON.stringify({ vMap, vDos }));
+
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
 ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the organization and its role');

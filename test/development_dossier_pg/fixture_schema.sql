@@ -14,13 +14,22 @@ grant usage on schema public to anon, authenticated, service_role;
 
 drop table if exists public.resolved_projects, public.v_resolved_project_zip, public.app_projects,
   public.dc_canonical_entity, public.water_rights_filings, public.youtube_channel_videos,
-  public.video_bluesky_jobs, public.bsky_post_metrics cascade;
+  public.video_bluesky_jobs, public.bsky_post_metrics, public.dc_entity_observation, public.dc_source_observation,
+  public.dc_entity_geography cascade;
+drop view if exists public.dc_current_observation;
 create table public.resolved_projects (id uuid primary key default gen_random_uuid(), project_key text unique not null,
   display_name text, display_name_basis text);
 create table public.v_resolved_project_zip (project_key text, zip text, parcels_in_this_zip bigint, is_primary_zip boolean);
 create table public.app_projects (id uuid primary key default gen_random_uuid(), zip text, name text, type text, type_raw text,
   status text, submitted_at date, date_kind text, source_ref text, source_key text, source_seq smallint, record_kind text);
 create table public.dc_canonical_entity (canonical_entity_id uuid primary key, classification text, superseded_by uuid);
+-- The data-center observation chain public.dc_entity_map_status reads (Map 1's lifecycle rule).
+create table public.dc_source_observation (home_signal_observation_id uuid primary key, source_native_status text,
+  observed_at timestamptz, is_current boolean);
+create view public.dc_current_observation as
+  select home_signal_observation_id, source_native_status from public.dc_source_observation where is_current;
+create table public.dc_entity_observation (canonical_entity_id uuid, home_signal_observation_id uuid);
+create table public.dc_entity_geography (canonical_entity_id uuid primary key, authority_observation_id uuid);
 create table public.water_rights_filings (source text, point_key text, filing_no text, filing_type text, status text,
   filed_on date, date_label text, record_url text, removed_from_source_at timestamptz);
 create table public.youtube_channel_videos (video_id text primary key, url text, title text, privacy_status text,
@@ -51,3 +60,15 @@ insert into public.youtube_channel_videos values
 insert into public.video_bluesky_jobs (status, post_text, bsky_uri, published_at) values
   ('published', 'A Stratos post', 'at://did:plc:x/app.bsky.feed.post/aaa', '2026-10-29'),
   ('scheduled', 'Not yet', 'at://did:plc:x/app.bsky.feed.post/bbb', null);
+
+-- Stratos's entity: its CURRENT record says proposed; an older, no-longer-current record says
+-- operational and is observed later (so a lookup that ignores currency picks it); a current record
+-- that states a lifecycle outside the map (cancelled) never wins. Expected: Proposed.
+insert into public.dc_source_observation values
+  ('0b500000-0000-4000-8000-000000000001', 'proposed',    '2026-10-30', true),
+  ('0b500000-0000-4000-8000-000000000002', 'operational', '2026-10-31', false),
+  ('0b500000-0000-4000-8000-000000000003', 'cancelled',   '2026-11-01', true);
+insert into public.dc_entity_observation values
+  ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000001'),
+  ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000002'),
+  ('fe2068de-0000-4000-8000-000000000001', '0b500000-0000-4000-8000-000000000003');

@@ -18,7 +18,7 @@ reset_db; P -f "$shipped" >/dev/null 2>&1; P -f "$review" >/dev/null 2>&1
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 46 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+if [ "$n_all" -lt 53 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
 P -f "$shipped" >/dev/null && P -f "$review" >/dev/null && echo "RE-APPLY: ok" || { echo "FAIL — the file does not re-apply"; exit 1; }
 
 status=0
