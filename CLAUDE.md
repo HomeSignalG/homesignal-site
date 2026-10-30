@@ -5961,3 +5961,21 @@ post id. A post never measured shows a dash, never 0.
     with `utm_content=<video id or its URL>` is credited to that video.
   - **Not measured:** watch time, impressions, CTR, traffic sources (YouTube Analytics needs the channel owner's OAuth consent; the
     sync runs with a public API key). Tests: `test/acq-youtube.test.mjs`, `test/youtube_engagement_pg` (`youtube-engagement-suite.yml`).
+
+## TAB 16 NOTE BOX: "HERE'S WHAT I'LL CHANGE" BEFORE ANYTHING IS BUILT (2026-10-30, YouTube plan step 6)
+
+**Preview changes** (`lib/acq-youtube-videos.js`) calls `hs_youtube_video_plan_start`. The SQL of record is
+`docs/youtube-video-revision-plans.sql`.
+- It stores a `planning` row and dispatches homesignal-ingest `video-revise.yml` with `mode=plan`. Claude reads the note there,
+  with no database key, and the worker stores the plan with `hs_youtube_revision_plan_ready`, which only the service role may
+  call. **Reading a note changes no decision**: an approved file stays approved.
+- The tile shows each part of the note and what it becomes, what will not be done, and **Confirm and build**.
+  `hs_youtube_video_plan_confirm(plan, md5)` accepts only the md5 of the stored plan the page showed. It then records the note
+  as the rejection, creates one revision carrying the plan (`youtube_video_revisions.confirmed_plan`), and dispatches the build.
+  `_hs_yv_dispatch` sends that plan on every dispatch, so a retry builds the same plan.
+- A plan made on an older file version comes back `stale` and builds nothing. One plan can be open per file. A reader that has
+  not answered after 30 minutes is marked failed when the next plan starts.
+- The plans list is an optional call: until the SQL is applied, the note box starts a revision directly, as before.
+- **Apply order:** homesignal-ingest #973 (the new workflow inputs) first, then the SQL, then the page.
+- Tests: `test/youtube_video_revision_plans_pg` (CI `youtube-video-revision-plans-suite.yml`), `test/youtube-video-plans.test.mjs`,
+  `test/youtube-video-plans.browser.test.mjs`.
