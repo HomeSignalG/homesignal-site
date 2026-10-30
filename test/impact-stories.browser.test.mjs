@@ -178,7 +178,7 @@ await page.evaluate(() => {
   const P = (k, i) => ({ path: 's1/visuals/jv/preview-' + k + '-00' + i + '.jpg', frame: 10 * i });
   const rec = { license: 'CC BY 4.0', title: 'File:Oak.jpg', page_url: 'https://commons.wikimedia.org/wiki/File:Oak.jpg' };
   window.db.visuals = { state: 'ready', why: 'Every shot passed the checks. Look them over, then Approve all visuals.', manifest_id: 41, manifest_hash: 'a'.repeat(64),
-    created_at: '2026-10-29T20:00:00Z', counts: { clear: 3, flagged: 1, blocked: 0 }, job: { id: 'jv', status: 'complete' },
+    created_at: '2026-10-29T20:00:00Z', counts: { clear: 3, flagged: 1, blocked: 0 }, manifest_job_id: 'jv', job: { id: 'jv-newer', status: 'failed' },
     manifest: { timing: { total_s: 640 }, identity: { same: true },
       assets: { main: { shots: [
         { id: 'a1-s1', act: 1, act_name: 'Attachment', status: 'clear', label: 'REPRESENTATIVE PHOTO · NOT THIS SITE', onscreen: 'A dock for <fishers>', preview: P('main', 0), photo: { id: 'oak', credit: 'Oak: A. Person, CC BY 4.0', record: rec } },
@@ -204,7 +204,25 @@ ok((await page.locator('#is').innerText()).includes('short_a-hook') && await pag
    'visuals: Short A shows its own shots');
 await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
-   'visuals: another licensed photo is one click, from the visuals job');
+   'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
+// A preview that cannot be downloaded is tried once, says so, and is tried again only on request (no redraw loop).
+await page.evaluate(() => {
+  window.prevStorage = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => { window.calls.push(['download', b, p]);
+    if (p === 's1/visuals/jv/preview-short_b-000.jpg') return Promise.resolve({ data: null, error: new Error('Object not found') });
+    return window.prevStorage.from(b).download(p); } }) };
+  window.db.visuals.manifest.assets.short_b = { shots: [{ id: 'short_b-hook', beat: 'hook', status: 'clear', label: 'MAP', preview: { path: 's1/visuals/jv/preview-short_b-000.jpg', frame: 0 }, map: true }] };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+await page.click('#is [data-act=vtab][data-k=short_b]'); await page.waitForTimeout(400);
+const nFail = await page.evaluate(() => window.calls.filter((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_b-000.jpg').length);
+ok(nFail === 1 && (await page.locator('#is').innerText()).includes('Preview could not be loaded'), 'visuals: a failed preview download is tried once and says so (' + nFail + ' tries)');
+await page.click('#is [data-act=vretry]'); await page.waitForTimeout(300);
+ok(await page.evaluate(() => window.calls.filter((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_b-000.jpg').length) === 2,
+   'visuals: "Try the previews again" tries a failed preview exactly once more');
+await page.evaluate(() => { window.client.storage = window.prevStorage; });
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(50);
 await page.locator('#is .is-panel [data-act=vapprove]').last().focus();
 await page.keyboard.press('Enter'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_approve' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),

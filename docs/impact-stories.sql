@@ -844,7 +844,7 @@ begin
   else
     st := 'ready'; why := 'Every shot passed the checks. Look them over, then Approve all visuals.';
   end if;
-  return jsonb_build_object('state', st, 'why', why, 'current', cur, 'manifest_id', m.id, 'manifest_hash', m.manifest_hash,
+  return jsonb_build_object('state', st, 'why', why, 'current', cur, 'manifest_id', m.id, 'manifest_job_id', m.job_id, 'manifest_hash', m.manifest_hash,
     'created_at', m.created_at, 'version', m.version, 'counts', m.counts, 'approvable', m.approvable, 'manifest', m.manifest,
     'job', case when vj.id is null then null else jsonb_build_object('id', vj.id, 'status', vj.status, 'created_at', vj.created_at,
       'completed_at', vj.completed_at, 'error', vj.error) end,

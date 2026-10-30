@@ -288,6 +288,13 @@ select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()
 select pg_temp.chk('12V15 an alternative the visuals offered can be chosen; the previews are then stale',
   pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%another photo%'
   and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->'job'->>'id', 'oak-trees', 'made-up')) like '%not one of the candidates%');
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
+select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'Runner lost.');
+select pg_temp.chk('12V17 a newer prepare that failed: the shown manifest still names the job that made it (its alternatives are chosen from that job)',
+  pg_temp.vis()->'job'->>'status' = 'failed'
+  and pg_temp.vis()->>'manifest_job_id' = (select job_id::text from public.impact_story_visual_manifests order by id desc limit 1)
+  and pg_temp.vis()->>'manifest_job_id' is distinct from pg_temp.vis()->'job'->>'id');
 select pg_temp.approve_visuals();
 select pg_temp.chk('12V16 the bucket accepts the JPEG previews', (select 'image/jpeg' = any (allowed_mime_types) from storage.buckets where id = 'impact-media'));
 select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');
