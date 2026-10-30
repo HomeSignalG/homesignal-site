@@ -172,6 +172,11 @@ select pg_temp.ck('snapshot: Stratos is named by its land assembly, basis record
 select pg_temp.ck('snapshot: a project with no app_projects record still publishes (defining = the DC entity)',
   (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,kind}') = 'dc_entity'
   and (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,facts,classification}') = 'CONFIRMED_DC');
+select pg_temp.ck('snapshot: the DC entity carries Map 1''s lifecycle for it (current record, through the one map)',
+  (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,facts,lifecycle}') = 'Proposed', :'snap');
+select pg_temp.ck('the lifecycle lookup is not callable with the public key',
+  not has_function_privilege('anon', 'public.dc_entity_map_status(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.dc_entity_map_status(uuid)', 'execute'));
 select pg_temp.ck('snapshot: Proctor 4 defining record is the source record, with its facts and ZIPs',
   (:'snap'::jsonb #>> '{dossiers,proctor-4-tacoma,defining,facts,name}') = 'Proctor 4 - Mixed-Use Development'
   and (:'snap'::jsonb #> '{dossiers,proctor-4-tacoma,defining,facts,zips}') = '["98406","98407"]'::jsonb

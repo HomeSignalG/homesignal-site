@@ -88,7 +88,9 @@ def classifier_input(d):
     if df.get("kind") == "source_record":
         return {"name": f.get("name"), "type": f.get("type"), "status": f.get("status")}
     if df.get("kind") == "dc_entity" and f.get("classification") == "CONFIRMED_DC":
-        return {"name": d.get("display_name"), "type": "Data center"}
+        # Lifecycle: the snapshot's facts.lifecycle, Map 1's own decision for this record
+        # (public.dc_entity_map_status); absent means none was stated, and the page says unknown.
+        return {"name": d.get("display_name"), "type": "Data center", "status": f.get("lifecycle")}
     return None
 
 
