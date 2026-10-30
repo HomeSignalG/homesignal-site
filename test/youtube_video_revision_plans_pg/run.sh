@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs docs/youtube-video-review.sql + docs/youtube-video-revisions.sql + docs/youtube-video-revision-plans.sql on a
+# Runs docs/youtube-video-review.sql + docs/youtube-video-revisions.sql + the plan, step-7 and step-8 files on a
 # DISPOSABLE Postgres (stubbed auth/vault/net) and executes suite.sql. Exit code is the result.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; ROOT="$HERE/../.."
@@ -37,3 +37,16 @@ $P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
 $P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
 echo "ok step-7 applies twice"
 $P -f "$HERE/suite.sql"
+# step 8 refuses a dispatcher it was not written against, then applies (twice)
+if $P -c "create or replace function public._hs_yv_dispatch(p_id uuid) returns void language plpgsql as \$\$ begin null; end \$\$" >/dev/null \
+   && $P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null 2>&1; then
+  echo "FAIL guard: the step-8 SQL applied over an unknown _hs_yv_dispatch"; exit 1
+fi
+echo "ok step-8 guard refuses an unknown _hs_yv_dispatch"
+$P -f "$ROOT/docs/youtube-video-revisions.sql" >/dev/null   # put the real dispatcher back
+$P -f "$ROOT/docs/youtube-video-revision-plans.sql" >/dev/null   # then the step-6 one (live today)
+$P -f "$ROOT/docs/youtube-video-revision-plans-also.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null
+$P -f "$ROOT/docs/youtube-video-rebuild.sql" >/dev/null
+echo "ok step-8 applies twice"
+$P -f "$HERE/rebuild.sql"

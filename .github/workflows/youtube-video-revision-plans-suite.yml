@@ -7,6 +7,7 @@ on:
     paths:
       - 'docs/youtube-video-revision-plans.sql'
       - 'docs/youtube-video-revision-plans-also.sql'
+      - 'docs/youtube-video-rebuild.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-revisions.sql'
       - 'test/youtube_video_revision_plans_pg/**'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'docs/youtube-video-revision-plans.sql'
       - 'docs/youtube-video-revision-plans-also.sql'
+      - 'docs/youtube-video-rebuild.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-revisions.sql'
       - 'test/youtube_video_revision_plans_pg/**'
