@@ -334,6 +334,41 @@ def link_pages(dossiers, pages, projects):
                 pr.setdefault("part_of", []).append((d["display_name"], d["path"]))
 
 
+LAND_INDEX_SCHEMA = "development-land-index/1"
+LAND_INDEX_PATH = ("development", "land-index.json")
+LAND_REF_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def land_index(dossiers):
+    """Which land assembly has a published development page: {land ref: {path, name}}.
+
+    Map 1's land card (homesignalmap.html) reads this to link the land to its page. It is derived
+    from the same published snapshot as the pages themselves, so it can only name a page this
+    build writes, and only through a land link a reviewer approved (the snapshot carries no other
+    links). A land assembly linked from two pages is left out rather than guessed between."""
+    seen = {}
+    for key in sorted(dossiers):
+        d = dossiers[key]
+        for l in _links(d, "land_assembly"):
+            ref = str(l.get("ref") or "")
+            if LAND_REF_RE.match(ref):
+                seen.setdefault(ref, []).append({"path": d["path"], "name": d["display_name"]})
+    land = {ref: v[0] for ref, v in sorted(seen.items()) if len(v) == 1}
+    return {"schema": LAND_INDEX_SCHEMA, "land": land}
+
+
+def write_land_index(dossiers, out_dir):
+    """Written beside the dossier pages, and only when there are any: with no published dossier
+    there is nothing to link, and Map 1 reads a missing file (HTTP 404) as no links."""
+    if not dossiers:
+        return 0
+    doc = land_index(dossiers)
+    out = os.path.join(out_dir, *LAND_INDEX_PATH)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    open(out, "w", encoding="utf-8").write(json.dumps(doc, sort_keys=True, separators=(",", ":")))
+    return len(doc["land"])
+
+
 def build(dossiers, pages, out_dir, built, head, state=None, base=""):
     """Writes every dossier page. Rendered with the build-day token (page_semantics) so the
     fingerprint never moves on the date alone; the token is replaced when the file is written.

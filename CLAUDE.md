@@ -5662,6 +5662,13 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
   none yet, and any other failure stops the build. Family sitemap `development`.
 - Tests: `test/development_dossier_pg` (`development-dossier-suite.yml`; 41 checks, 11 mutations),
   `test/development-pages.test.mjs`.
+- **Map 1's land card links to the land's published page (2026-10-30).** The build writes
+  `development/land-index.json` (`development_pages.land_index`: land ref → {path, name}, from the
+  approved land links in the published snapshot; a land linked from two pages is left out; no file
+  when nothing is published). `homesignalmap.html` reads it once per ZIP load (`devPageFor`); a
+  failed read, a bad path or no name means no link. Tests: `test/map1-land-card-from-data.test.mjs` d1-d12.
+  Map 1 already drew the Stratos parcels (82, ZIPs 84336 and 84307) before this; the Compute Atlas point
+  for the same project is 45 miles from them, which is why it is not pinned.
 
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 

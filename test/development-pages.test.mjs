@@ -190,6 +190,20 @@ ok(build(bad3).r.status !== 0, 'a dossier whose path does not match its key fail
 const none = build(undefined);
 ok(none.r.status === 0 && !existsSync(join(none.out, 'development')), 'a fixture with no dossiers builds no dossier pages');
 
+// 7b. the land index Map 1 reads: built from the same snapshot, one entry per land with one page
+const LI = join(out, 'development', 'land-index.json');
+const li = existsSync(LI) ? JSON.parse(readFileSync(LI, 'utf8')) : null;
+ok(li && li.schema === 'development-land-index/1', 'the build writes development/land-index.json', JSON.stringify(li));
+ok(li && JSON.stringify(li.land) === JSON.stringify({ 'valley-campus': { name: 'Valley data center <campus>', path: A } }),
+   'it maps the approved land link to its page, and nothing else', JSON.stringify(li && li.land));
+const twice = dossiers();
+twice.dossiers['olympia-mixed-use'].links.push(JSON.parse(JSON.stringify(twice.dossiers['valley-campus'].links[1])));
+const tw = build(twice);
+const liTw = JSON.parse(readFileSync(join(tw.out, 'development', 'land-index.json'), 'utf8'));
+ok(tw.r.status === 0 && JSON.stringify(liTw.land) === '{}', 'land linked from two pages is left out, not guessed between',
+   JSON.stringify(liTw.land));
+ok(!existsSync(join(none.out, 'development', 'land-index.json')), 'no dossiers, no land index');
+
 // 8. determinism and the build day
 const again = build(dossiers());
 ok(read(again.out, A) === pa, 'identical input produces a byte-identical page');
