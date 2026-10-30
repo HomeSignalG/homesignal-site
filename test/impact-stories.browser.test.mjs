@@ -227,6 +227,100 @@ await page.locator('#is .is-panel [data-act=vapprove]').last().focus();
 await page.keyboard.press('Enter'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_approve' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
    'visuals: Approve all visuals (keyboard) sends the manifest the page showed');
+// Use your own photo (plan v3 §6.3): straight into the story's private uploads folder, then recorded with its checksum.
+// setContent pages are not a secure context, so the browser hides crypto.subtle and randomUUID (the https dashboard has
+// both): give this page Node's SHA-256 behind the same calls.
+await page.exposeFunction('__nodeSha256', async (bytes) => (await import('node:crypto')).createHash('sha256').update(Buffer.from(bytes)).digest('hex'));
+await page.evaluate(() => {
+  Object.defineProperty(window.crypto, 'subtle', { configurable: true, value: { digest: async (alg, buf) => {
+    const h = await window.__nodeSha256(Array.from(new Uint8Array(buf)));
+    return new Uint8Array(h.match(/../g).map((x) => parseInt(x, 16))).buffer; } } });
+  Object.defineProperty(window.crypto, 'randomUUID', { configurable: true, value: () => '1b2c3d4e-0000-4000-8000-00000000abcd' });
+});
+await page.evaluate(() => {
+  window.db.extra = { body: { discovery: { subjects: [{ id: 'oak-trees', subject: 'Oak trees', category: 'trees' }] } } };
+  window.prevStorage2 = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => window.prevStorage2.from(b).download(p),
+    upload: (p, f, o) => { window.calls.push(['upload', b, p, o && o.contentType, o && o.upsert, f.size]); return Promise.resolve({ data: { path: p }, error: null }); } }) };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+ok((await page.locator('#is').innerText()).includes('Use your own photo') && await page.locator('#is #is-up-subj option').count() === 1,
+   'upload: the Visuals step offers your own photo for each of the story\'s subjects');
+const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]);
+const { createHash } = await import('node:crypto');
+const jpgSha = createHash('sha256').update(jpg).digest('hex');
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'J. Founder');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(120);
+ok((await page.locator('#is').innerText()).includes('Confirm that you own this photo') && !(await page.evaluate(() => window.calls.some((c) => c[0] === 'upload'))),
+   'upload: nothing is uploaded until the permission statement is confirmed');
+await page.setInputFiles('#is #is-up-file', { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') });
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(120);
+ok((await page.locator('#is').innerText()).includes('Upload a JPEG or PNG photo') && !(await page.evaluate(() => window.calls.some((c) => c[0] === 'upload'))),
+   'upload: a file that is not a JPEG or PNG is refused before upload');
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+ok(await page.inputValue('#is #is-up-credit') === 'J. Founder', 'upload: the form keeps what was typed after an error');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(200);
+const up = await page.evaluate(() => window.calls.find((c) => c[0] === 'upload'));
+const rec = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(up && up[1] === 'impact-media' && /^s1\/uploads\/[0-9a-f-]{36}\.jpg$/.test(up[2]) && up[3] === 'image/jpeg' && up[4] === false && up[5] === jpg.length,
+   'upload: the file goes into this story\'s private uploads folder as a new JPEG');
+ok(rec && rec.p_story === 's1' && rec.p_subject === 'oak-trees' && up[2].endsWith('/' + rec.p_upload + '.jpg') && rec.p_mime === 'image/jpeg'
+   && rec.p_sha256 === jpgSha && rec.p_credit === 'J. Founder' && rec.p_shows_site === false && rec.p_permission === true,
+   'upload: it is recorded with the same id, its checksum, the credit and the permission statement');
+ok((await page.locator('#is').innerText()).includes('Photo added. Prepare the visuals again'), 'upload: the page says what to do next');
+// Codex #2400: the panel is redrawn by the page's own refresh, and must not lose what was chosen and typed.
+await page.evaluate(() => { window.calls.length = 0; });
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-site');
+await page.check('#is #is-up-perm');
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is')));
+await page.waitForTimeout(150);
+ok(await page.inputValue('#is #is-up-credit') === 'K. Founder' && await page.isChecked('#is #is-up-site') && await page.isChecked('#is #is-up-perm')
+   && (await page.locator('#is #is-up-chosen').innerText()).includes('oak.jpg'),
+   'upload: a background redraw keeps the chosen photo, the credit and both boxes');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(200);
+const rec2 = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(rec2 && rec2.p_credit === 'K. Founder' && rec2.p_shows_site === true && rec2.p_sha256 === jpgSha,
+   'upload: after a redraw the photo chosen before it is the one uploaded');
+// Codex #2400: switching story while the file uploads must not record it on the other story.
+await page.evaluate(() => {
+  window.calls.length = 0;
+  const prev = window.client.storage;
+  window.client.storage = { from: (b) => ({ download: (p) => prev.from(b).download(p),
+    upload: (p, f, o) => new Promise((res) => { window.calls.push(['upload', b, p]); window.__release = () => res({ data: { path: p }, error: null }); }) }) };
+  window.__restoreStorage = () => { window.client.storage = prev; };
+});
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(150);
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = 's2'; window.__release(); });
+await page.waitForTimeout(200);
+const up3 = await page.evaluate(() => window.calls.find((c) => c[0] === 'upload'));
+const rec3 = await page.evaluate(() => (window.calls.find((c) => c[0] === 'hs_impact_story_upload_photo') || [])[1]);
+ok(up3 && up3[2].startsWith('s1/uploads/') && rec3 && rec3.p_story === 's1',
+   'upload: a story switch during the upload still records the photo on the story it was uploaded for');
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))),
+   'upload: after a story switch the finished upload does not reload the page');
+// and leaving for the library while it uploads leaves the library on screen (Codex #2400)
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = 's1'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+await page.evaluate(() => { window.calls.length = 0; });
+await page.setInputFiles('#is #is-up-file', { name: 'oak.jpg', mimeType: 'image/jpeg', buffer: jpg });
+await page.fill('#is #is-up-credit', 'K. Founder');
+await page.check('#is #is-up-perm');
+await page.click('#is [data-act=vupload]'); await page.waitForTimeout(150);
+await page.evaluate(() => { window.HS.acqImpactStories._state.open = null; window.__release(); });
+await page.waitForTimeout(200);
+ok(!(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_get'))) && !(await page.locator('#is').innerText()).includes('could not load'),
+   'upload: going back to the library during an upload does not replace the library with an error');
+await page.evaluate(() => { window.__restoreStorage(); window.HS.acqImpactStories._state.open = 's1'; });
+await page.evaluate(() => { window.client.storage = window.prevStorage2; window.db.extra = null; });
 await page.evaluate(() => { window.db.visuals = Object.assign({}, window.db.visuals, { state: 'needs_fixes', why: '1 shot(s) cannot be shown as planned.', counts: { clear: 3, flagged: 0, blocked: 1 } });
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(100);

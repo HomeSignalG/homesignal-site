@@ -405,9 +405,12 @@ select pg_temp.chk('12m every file approved: ready to export, nothing published'
    and pg_temp.nxt() = 'Ready to export. Publishing is not built yet.' and (public._hs_is_media(pg_temp.id('s')::uuid)->>'complete')::boolean);
 select pg_temp.chk('12n rendered files and media decisions are append-only', pg_temp.err('update public.impact_story_assets set bytes = 1') is not null
    and pg_temp.err('delete from public.impact_story_media_decisions') is not null);
-select pg_temp.chk('12o the bucket is private and only admins may read it', not (select public from storage.buckets where id = 'impact-media')
+select pg_temp.chk('12o the bucket is private; only admins may read it, and the only browser write is an admin''s photo upload (never an update or delete)',
+   not (select public from storage.buckets where id = 'impact-media')
    and exists (select 1 from pg_policies where policyname = 'impact_media_admin_read' and cmd = 'SELECT')
-   and not exists (select 1 from pg_policies where tablename = 'objects' and policyname like 'impact_media%' and cmd <> 'SELECT'));
+   and (select array_agg(policyname || ':' || cmd order by policyname) from pg_policies where tablename = 'objects' and policyname like 'impact_media%')
+       = array['impact_media_admin_read:SELECT', 'impact_media_admin_upload:INSERT']
+   and (select with_check from pg_policies where policyname = 'impact_media_admin_upload') like '%/uploads/%');
 select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7, true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets', pg_temp.files((pg_temp.lastjob()).id, false)));
@@ -578,6 +581,78 @@ select public.hs_impact_story_job_claim((select id from _vj));
 select public.hs_impact_story_job_complete((select id from _vj), jsonb_build_object('manifest', pg_temp.vman((select id from _vj))));
 select pg_temp.chk('12V18 a save made while the visuals were prepared is checked when they finish',
   (pg_temp.lastjob()).kind = 'validate' and (pg_temp.lastjob()).status = 'queued' and (pg_temp.lastjob()).base_version = pg_temp.cur());
+
+-- 12U (plan v3 P2, 2026-10-30): a photo the founder uploads, recorded with their permission, becomes that subject's choice
+select pg_temp.as_user('founder@example.com');
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, pg_temp.cur(), pg_temp.body('Who gets the new dock?') ||
+  '{"discovery":{"subjects":[{"id":"oak-trees","subject":"Oak trees","category":"trees"}]}}'::jsonb);
+insert into _ids values ('u1', '0d0d0d0d-1111-2222-3333-444444444444'), ('u2', '0e0e0e0e-1111-2222-3333-444444444444'),
+  ('u3', '0f0f0f0f-1111-2222-3333-444444444444');
+create function pg_temp.up(u text, mime text default 'image/jpeg', subj text default 'oak-trees', perm boolean default true,
+                           credit text default 'J. Founder', sha text default repeat('a', 64)) returns text language sql as $$
+  select pg_temp.err(format('select public.hs_impact_story_upload_photo(%L, %L, %L, %L, %L, %L, true, %L)',
+    pg_temp.id('s'), subj, pg_temp.id(u), mime, sha, credit, perm)) $$;
+create function pg_temp.upath(u text, ext text default 'jpg') returns text language sql as $$
+  select pg_temp.id('s') || '/uploads/' || pg_temp.id(u) || '.' || ext $$;
+select pg_temp.chk('12U1 nothing is recorded before the file is in storage', pg_temp.up('u1') like '55000%not found in storage%');
+insert into storage.objects (bucket_id, name, metadata) values
+  ('impact-media', pg_temp.upath('u1'), '{"size": 204800, "mimetype": "image/jpeg"}'),
+  ('impact-media', pg_temp.upath('u2', 'png'), '{"size": 99999999, "mimetype": "image/png"}'),
+  ('impact-media', pg_temp.upath('u3'), '{"size": 1000, "mimetype": "image/png"}');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12U2 a non-admin cannot record an upload', pg_temp.up('u1') like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12U3 the founder must confirm the permission statement, name the photographer and pick a real subject',
+  pg_temp.up('u1', perm => false) like '%own this photo or have permission%'
+  and pg_temp.up('u1', credit => ' ') like '%who took the photo%'
+  and pg_temp.up('u1', subj => 'made-up') like '%not one of this story''s subjects%'
+  and pg_temp.up('u1', sha => 'abc') like '%checksum%');
+select pg_temp.chk('12U4 the stored file must be the uploaded kind and under 15 MB',
+  pg_temp.up('u1', mime => 'image/png') like '%not found in storage%'
+  and pg_temp.up('u2', mime => 'image/png') like '%smaller than 15 MB%'
+  and pg_temp.up('u3') like '%not the kind of image%'
+  and pg_temp.up('u1', mime => 'image/gif') like '%JPEG or PNG%');
+create temp table _u5 as select pg_temp.up('u1') as e;
+select pg_temp.chk('12U5 a recorded upload becomes the subject''s photo choice, as the engine reads it',
+  (select e is null from _u5)
+  and (select upload_id::text = pg_temp.id('u1') and job_id is null and entry->>'source' = 'founder_upload'
+              and entry->>'file_url' = 'storage:impact-media/' || pg_temp.upath('u1') and entry->>'rights_status' = 'cleared'
+              and entry->>'site_relation' = 'actual_site' and entry->>'category' = 'trees' and entry->>'author' = 'J. Founder'
+         from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'oak-trees')
+  and (select permission from public.impact_story_uploads where id = pg_temp.id('u1')::uuid) like 'I own this photo%'
+  and public._hs_is_media(pg_temp.id('s')::uuid)->'choices' @> '[{"subject_id":"oak-trees","source":"founder_upload"}]'
+  and exists (select 1 from public.impact_story_events where kind = 'photo_uploaded'));
+select pg_temp.chk('12U6 an upload is recorded once and never edited; a choice comes from a job or an upload, not neither',
+  pg_temp.up('u1') like '23505%'
+  and pg_temp.err('update public.impact_story_uploads set credit = ''x''') is not null
+  and pg_temp.err(format('insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, entry, actor) values (%L, %L, %L, %L, %L)',
+        pg_temp.id('s'), 'oak-trees', 'x', '{}', 'founder@example.com')) like '23514%');
+select pg_temp.chk('12U7 the upload function is for signed-in admins only',
+  not has_function_privilege('anon', 'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)', 'execute'));
+-- the storage rule itself, run as the browser's role
+create temp table _sq as select
+  format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'impact-media', pg_temp.id('s') || '/uploads/' || gen_random_uuid() || '.jpg') ok_upload,
+  format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'impact-media', pg_temp.id('s') || '/visuals/' || gen_random_uuid() || '.jpg') other_folder,
+  format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'impact-media', pg_temp.id('s') || '/uploads/' || gen_random_uuid() || '.mp4') other_kind,
+  format('insert into storage.objects (bucket_id, name) values (%L, %L)', 'impact-media', pg_temp.id('s') || '/uploads/' || gen_random_uuid() || '.jpg') stranger;
+grant select on _sq to authenticated;
+create temp table _st (k text, e text);
+grant insert, select on _st to authenticated;
+select pg_temp.as_user('founder@example.com');
+set role authenticated;
+insert into _st select 'ok_upload', pg_temp.err(ok_upload) from _sq;
+insert into _st select 'other_folder', pg_temp.err(other_folder) from _sq;
+insert into _st select 'other_kind', pg_temp.err(other_kind) from _sq;
+reset role;
+select pg_temp.as_user('stranger@example.com');
+set role authenticated;
+insert into _st select 'stranger', pg_temp.err(stranger) from _sq;
+reset role;
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12U8 an admin may put a photo only into a story''s uploads folder; nobody else may write',
+  (select e is null from _st where k = 'ok_upload') and (select e like '42501%' from _st where k = 'other_folder')
+  and (select e like '42501%' from _st where k = 'other_kind') and (select e like '42501%' from _st where k = 'stranger'));
 
 \o
 select count(*) || ' checks passed' as result from _res where ok;
