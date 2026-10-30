@@ -5781,6 +5781,9 @@ Results.
         new search.
       - Not built: alternatives shown already composed into the shot. They are shown as photos.
     - pg checks 12V19-12V29.
+  - ⚖️ **NO ILLUSTRATIONS (founder, 2026-10-30).** The engine never draws a picture (homesignal-ingest CLAUDE.md, V3
+    "NO ILLUSTRATIONS, EVER"). A shot with no photo carries `photo_needed`, shows its record, and the page says "No photo
+    yet: showing the record. Choose a photo below." No page text may offer or describe a drawing (browser test).
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
