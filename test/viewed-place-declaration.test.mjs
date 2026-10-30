@@ -177,7 +177,8 @@ const EXEMPT = {
   'privacy.html': 'marketing — no Place subject',
   'terms.html': 'legal policy — no Place subject',
   'refund-policy.html': 'legal policy — no Place subject',
-  'follow-embed.html': 'embed-only frame inside a shared report — header hidden, no Place chip shown, no Place subject'
+  'follow-embed.html': 'embed-only frame inside a shared report — header hidden, no Place chip shown, no Place subject',
+  'follow-development.html': 'follows one development (a project, not a ZIP) — no Place subject'
 };
 const chromePages = fs.readdirSync(new URL('../', import.meta.url))
   .filter((f) => f.endsWith('.html'))

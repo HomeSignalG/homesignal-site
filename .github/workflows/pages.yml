@@ -244,6 +244,26 @@ jobs:
                 "project_held", (pj.get("census") or {}).get("held_sources"))
           PY
 
+      - name: Fetch the published development dossiers
+        # Reviewed development pages (/development/<st>/<key>/; docs/development-dossier.sql, written by
+        # homesignal-ingest's dossier publisher). HTTP 404 = none published yet, which builds no dossier pages.
+        # Any other failure stops the build: an unreadable dossier list is not an empty one.
+        run: |
+          set -euo pipefail
+          URL='https://qwnnmljucajnexpxdgxr.supabase.co/storage/v1/object/public/email-assets/seo/development-dossiers.json'
+          code=$(curl -sS --retry 3 --retry-delay 2 -o data/development_dossiers.json -w '%{http_code}' "$URL" || echo 000)
+          if [ "$code" = "404" ] || [ "$code" = "400" ]; then
+            # Supabase Storage answers a missing public object with 400 "Object not found" or 404.
+            if [ "$code" = "400" ] && ! grep -q 'not_found\|Object not found' data/development_dossiers.json; then
+              echo "ERROR: development dossiers fetch failed (HTTP 400)"; exit 1
+            fi
+            echo '{"schema":"development-dossiers/1","generated_at":null,"dossiers":{}}' > data/development_dossiers.json
+            echo "development dossiers: none published yet (HTTP $code)"
+          elif [ "$code" != "200" ]; then
+            echo "ERROR: development dossiers fetch failed (HTTP $code)"; exit 1
+          fi
+          python3 -c "import json,sys; d=json.load(open('data/development_dossiers.json')); assert d.get('schema')=='development-dossiers/1' and isinstance(d.get('dossiers'),dict), 'bad shape'; print('development dossiers:', len(d['dossiers']))"
+
       - name: Generate one document per canonical ZIP
         env:
           HS_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}

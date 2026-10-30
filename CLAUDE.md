@@ -5641,6 +5641,28 @@ Full record, gaps and Phase 2 tags: `docs/acquisition-attribution-2026-10-23.md`
 - Count reports from `report_snapshot`, not from credits. Exclude admins and test signups through `analytics_exclusion` (user ids, no emails).
 - `attribute_report()` and the empty `report_attribution` table are retired and inert (a `DROP` hung through the MCP connection).
 
+## DEVELOPMENT DOSSIERS: /development/<state>/<project_key>/ (2026-10-29) — BUILT, SQL NOT APPLIED
+
+One page per real-world development, built from REVIEWED links to objects HomeSignal already stores. Design:
+`docs/development-dossier-design-2026-10-29.md`; SQL of record `docs/development-dossier.sql` (NOT APPLIED; needs
+`docs/resolved-projects-display-name.sql` first); renderer `scripts/development_pages.py`; publisher homesignal-ingest
+`scripts/publish_development_dossiers.mjs` (dispatch-only).
+- **Only a reviewer publishes.** `development_project_link` and `_statement` are append-only. A job can only propose a
+  candidate. Every decided row must name a current `development_reviewer` with that scope (trigger). Only grades a/b are
+  approvable, and a link naming a private person never is. At most one current defining record. The role must fit the
+  object kind.
+- **Nothing is re-decided.** Facts are joined from the owning tables in `development_dossier_snapshot()`, and the Type
+  and lifecycle come from `lib/project-type.js` on the defining record (`scripts/dossier-type.mjs`). A project needs no
+  `app_projects` row (a DC entity can be the defining record).
+- **One name.** A project that links a land assembly takes `resolved_projects.display_name`, and a second name is
+  refused. A descriptive name (basis `descriptive`) says so on the page.
+- **Pages ship no script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
+  (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
+- `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
+  none yet, and any other failure stops the build. Family sitemap `development`.
+- Tests: `test/development_dossier_pg` (`development-dossier-suite.yml`; 41 checks, 11 mutations),
+  `test/development-pages.test.mjs`.
+
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
 A separate emotion-led story workflow: Library -> Intake -> Story Outline -> Script & Shorts -> Media -> Distribution ->

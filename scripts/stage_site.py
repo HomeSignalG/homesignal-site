@@ -65,6 +65,7 @@ ROOT_FILES = (
     'shared-report.html',
     # The frame a shared report opens inline, only after the visitor clicks Follow this property: HomeSignal's own sign-in + add-an-address steps.
     'follow-embed.html',
+    'follow-development.html',
     'development.html',
     'eagle-mountain.html',
     'gov-archive.html',
