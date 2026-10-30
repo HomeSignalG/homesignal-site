@@ -6015,3 +6015,12 @@ post id. A post never measured shows a dash, never 0.
   (a ticked file with a newer version makes the plan stale; one being rebuilt refuses). Only pronunciation is shared.
   ⚠️ Replaying the step-6 file after this one brings back the two-argument confirm and the old plan start; re-apply this
   file after it.
+- **Step 8, Full rebuild, and fixes built with the code that made the video** (`docs/youtube-video-rebuild.sql`, applied
+  after the step-7 file). **Full rebuild** (`hs_youtube_video_rebuild`) makes a file again from the current script with
+  its current version's settings, so a script correction (a legal name in project.json) reaches the video and every
+  accepted fix is kept; fixes the new script has no place for are listed as "Fixes that no longer apply". It needs no
+  note, rejects nothing, and cancels a plan waiting for Confirm on that file. `_hs_yv_dispatch` now sends `mode`
+  (`rebuild` when the revision's plan says so) and `code`: the commit recorded on the version being fixed
+  (`meta.code_commit`), `run:<id>` of a first version's build run (from `meta.master.url`), or empty. Engine:
+  homesignal-ingest #977, which must be on main before this SQL is applied (an undeclared dispatch input is refused).
+  ⚠️ Replaying `youtube-video-revision-plans.sql` after this file is refused by its own guard; re-apply this one after it.
