@@ -625,6 +625,7 @@ begin
     on conflict (source_key) do update set
         metrics_prev = cs.metrics, metrics_prev_at = cs.metrics_at, metrics = excluded.metrics, metrics_at = now(),
         title = excluded.title, thumbnail_url = coalesce(excluded.thumbnail_url, cs.thumbnail_url),
+        publisher = coalesce(cs.publisher, excluded.publisher),
         person_ids = (select array(select distinct u from unnest(cs.person_ids || excluded.person_ids) u)),
         last_seen_at = now(), scan_id = p_scan;
     n_src := n_src + 1;
@@ -643,6 +644,8 @@ begin
         significance = greatest(c.significance, excluded.significance),
         source_ids = (select array(select distinct u from unnest(c.source_ids || excluded.source_ids) u)),
         lane = case when c.status = 'candidate' then excluded.lane else c.lane end,
+        -- a later scan may name a speaker an earlier one missed; it never replaces one already set (research may have)
+        speaker_name = coalesce(c.speaker_name, excluded.speaker_name), person_id = coalesce(c.person_id, excluded.person_id),
         reasons = excluded.reasons, updated_at = now()
     returning (xmax = 0) into ins;
     if ins then n_new := n_new + 1; end if;

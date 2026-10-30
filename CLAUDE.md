@@ -6072,3 +6072,8 @@ What people say about data centers, against what documented evidence shows. SQL 
 - **Apply order:** merge the ingest PR first (a dispatch to a missing workflow is lost), then apply `docs/claim-check.sql`,
   then the ingest migration `20261030180000`, then deploy this page. `pages.yml` treats a missing export function (404 PGRST202) as "none yet".
 - Tests: `test/claim_check_pg` (`claim-check-suite.yml`), `test/claim-check.test.mjs`, `test/fact-check-pages.test.mjs`.
+- **Bluesky sources (2026-10-30):** a card reads "Bluesky post by <display name> (@handle)" and shows the post's own
+  preview (`video.bsky.app` added to `thumbUrl` and the CSP), linked to the post. A re-scan fills a missing `publisher`,
+  `speaker_name` or `person_id` and never replaces one already stored (suite 2f2/2f3). ⚖️ Founder: a reporter's post that
+  quotes the speaker word for word with the clip (Aaron Rupar) is a usable quote source; research credits the reporter in
+  `context`, which the public page prints.
