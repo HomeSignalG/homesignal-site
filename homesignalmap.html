@@ -574,6 +574,7 @@
   .dt-title{font-weight:700;font-size:17px;color:var(--ink);margin-top:12px}
   .dt-name-note{font-size:12px;color:var(--soft);margin-top:2px;font-style:italic}
   .dt-straddle{font-size:13px;color:var(--soft);margin:5px 0 4px;line-height:1.5}
+  .dt-devpage{margin:6px 0 4px;font-size:14px;font-weight:600}
   .dt-lbl{font-weight:700;font-size:11.5px;color:var(--soft);text-transform:uppercase;
     letter-spacing:.04em;margin:18px 0 4px}
   .dt-lbl-note{font-weight:400;text-transform:none;letter-spacing:0;color:var(--mute)}
@@ -5230,8 +5231,22 @@ HS.onReady(function(){
               parent.display_name_basis === "descriptive");
   }
 
+  // The published development page for this land, from development/land-index.json (written by the
+  // site build from the same published snapshot as the pages: scripts/development_pages.py). Only a
+  // well-formed /development/<st>/<key>/ path is used; anything else means no link.
+  var LAND_INDEX_URL = "development/land-index.json";
+  function devPageFor(index, parent){
+    var land = index && index.schema === "development-land-index/1" && index.land;
+    var key = parent && parent.project_key;
+    if(!land || typeof key !== "string" || !Object.prototype.hasOwnProperty.call(land, key)) return null;
+    var e = land[key];
+    if(!e || typeof e.path !== "string" || !/^\/development\/[a-z]{2}\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(e.path)) return null;
+    var name = (typeof e.name === "string" && e.name.trim()) ? e.name.trim() : "";
+    return name ? { path: e.path, name: name } : null;
+  }
+
   // One land-assembly card. Pure: returns HTML, touches no DOM, so it can be tested offline.
-  function landCardHTML(zr, parent, parcels, zip){
+  function landCardHTML(zr, parent, parcels, zip, devPage){
     parcels = parcels || [];
     var total = zr.parcels_in_anchor_total, inZipN = zr.parcels_in_this_zip;
     var others = zr.other_zips || [];
@@ -5251,6 +5266,10 @@ HS.onReady(function(){
       h += "<div class='dt-name-note'>Descriptive label by JODY. No public record names this project.</div>";
     }
     h += "<div class='dt-straddle'>" + straddle + "</div>";
+    if(devPage){
+      h += "<div class='dt-devpage'><a href='" + escAttr(devPage.path) + "'>Read the project page: " +
+           esc(devPage.name) + " ›</a></div>";
+    }
 
     // Government status — only tracks the store carries a value for. None → one plain sentence.
     h += "<div class='dt-lbl'>Government status</div>";
@@ -5337,7 +5356,7 @@ HS.onReady(function(){
   // Render every land assembly the ZIP has, each from its own store row and its own parcels.
   function renderAnchors(cards, zip){
     $("dtAnchorBody").innerHTML = cards.map(function(c){
-      return landCardHTML(c.zr, c.parent, c.parcels, zip);
+      return landCardHTML(c.zr, c.parent, c.parcels, zip, c.devPage || null);
     }).join("");
   }
 
@@ -5414,6 +5433,8 @@ HS.onReady(function(){
         if(!r || !r.project_key || seen[r.project_key]) return false;
         seen[r.project_key] = true; return true;
       });
+      var landIndex = fetch(LAND_INDEX_URL, { cache: "no-cache" })
+        .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
       return Promise.all(rows.map(function(zr){
         return Promise.all([
           // select=* so a future column (e.g. display_name) is read without a page change.
@@ -5425,7 +5446,9 @@ HS.onReady(function(){
           var parent = (res[0] && res[0][0]) || null;
           var title = landCardTitle(parent);
           var parcels = (res[1] || []).map(function(p){ p.land_card_title = title; return p; });
-          return { zr:zr, parent:parent, parcels:parcels };
+          return landIndex.then(function(idx){
+            return { zr:zr, parent:parent, parcels:parcels, devPage: devPageFor(idx, parent) };
+          });
         });
       })).then(function(cards){
         if(CURRENT_DEV_ZIP !== zip) return; // a newer ZIP load owns the page now

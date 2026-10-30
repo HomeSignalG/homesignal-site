@@ -45,7 +45,7 @@ function extractVar(name) {
 }
 const stripComments = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/.*$/gm, '');
 
-const NAMES = ['hasTrackValue', 'renderTrack', 'landCardTitle', 'landCardTitleIsDescriptive', 'landCardHTML', 'renderAnchors', 'loadDevTracker', 'drawParcels'];
+const NAMES = ['devPageFor', 'hasTrackValue', 'renderTrack', 'landCardTitle', 'landCardTitleIsDescriptive', 'landCardHTML', 'renderAnchors', 'loadDevTracker', 'drawParcels'];
 const SRC = {};
 for (const n of NAMES) SRC[n] = extract(n);
 const GOV = extractVar('GOV_TRACKS');
@@ -65,9 +65,10 @@ const dom = { dtAnchorBody: { innerHTML: '' } };
 const ctx = vm.createContext({
   $: (id) => dom[id],
   esc: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+  escAttr: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
   console,
 });
-vm.runInContext([GOV, SRC.hasTrackValue, SRC.renderTrack, SRC.landCardTitle, SRC.landCardTitleIsDescriptive, SRC.landCardHTML, SRC.renderAnchors].join('\n'), ctx);
+vm.runInContext([GOV, SRC.devPageFor, SRC.hasTrackValue, SRC.renderTrack, SRC.landCardTitle, SRC.landCardTitleIsDescriptive, SRC.landCardHTML, SRC.renderAnchors].join('\n'), ctx);
 
 const SENT = 'Government actions for this land have not been reviewed on this map yet.';
 // Fixtures shaped like the production rows (2026-10-29): every government track NULL.
@@ -135,6 +136,31 @@ ok(/UTLCO/.test(cardA) && !/BAR H/.test(cardA), 'c3 card A lists only its own pa
 ok(/BAR H/.test(cardB) && !/UTLCO/.test(cardB), 'c4 card B lists only its own parcels');
 ok(/rows\.map\(/.test(SRC.loadDevTracker) && /land_card_title/.test(SRC.loadDevTracker) && /land_card_title/.test(SRC.drawParcels),
   'c5 loadDevTracker fetches per row and tags each drawn parcel with its own card title');
+
+// ---- (d) the link to the published development page ----------------------------------------
+const IDX = { schema: 'development-land-index/1', land: { 'stratos-box-elder': { path: '/development/ut/stratos-box-elder/', name: 'Stratos data center project' } } };
+const dp = ctx.devPageFor(IDX, stParent);
+ok(dp && dp.path === '/development/ut/stratos-box-elder/' && dp.name === 'Stratos data center project', 'd1 a published land gets its page', dp);
+ok(ctx.devPageFor(IDX, emParent) === null, 'd2 land with no page gets no link');
+ok(ctx.devPageFor(null, stParent) === null && ctx.devPageFor({ land: IDX.land }, stParent) === null,
+  'd3 a missing or unrecognised index means no link');
+const badPath = { schema: IDX.schema, land: { 'stratos-box-elder': { path: 'javascript:alert(1)', name: 'x' } } };
+ok(ctx.devPageFor(badPath, stParent) === null, 'd4 anything but a /development/<st>/<key>/ path is refused');
+ok(ctx.devPageFor({ schema: IDX.schema, land: { 'stratos-box-elder': { path: '/development/ut/stratos-box-elder/', name: '  ' } } }, stParent) === null,
+  'd5 no name, no link');
+ok(ctx.devPageFor({ schema: IDX.schema, land: Object.create({ 'stratos-box-elder': IDX.land['stratos-box-elder'] }) }, stParent) === null,
+  'd6 an inherited key is not a published page');
+const withLink = ctx.landCardHTML(stZr, stParent, stParcels, '84307', dp);
+ok(withLink.includes("<a href='/development/ut/stratos-box-elder/'>Read the project page: Stratos data center project ›</a>"),
+  'd7 the card links to the page by its published name', withLink.slice(0, 600));
+ok(!/dt-devpage/.test(ctx.landCardHTML(emZr, emParent, emParcels, '84005', null)), 'd8 no page, no link line');
+const xssName = ctx.landCardHTML(stZr, stParent, stParcels, '84307', { path: '/development/ut/a/', name: '<img src=x>' });
+ok(!/<img/.test(xssName), 'd9 the page name is escaped');
+ctx.renderAnchors([{ zr: stZr, parent: stParent, parcels: stParcels, devPage: dp }], '84307');
+ok(/Read the project page/.test(dom.dtAnchorBody.innerHTML), 'd10 renderAnchors passes the page to the card');
+ok(/LAND_INDEX_URL/.test(SRC.loadDevTracker) && /devPageFor\(idx, parent\)/.test(SRC.loadDevTracker) && /catch\(/.test(SRC.loadDevTracker),
+  'd11 loadDevTracker reads the index once and a failed read means no link');
+ok(/var LAND_INDEX_URL = "development\/land-index\.json";/.test(html), 'd12 the index URL is the one the build writes');
 
 if (fails) { console.log(`\n${fails} failure(s)`); process.exit(1); }
 console.log('\nall land-card checks passed');
