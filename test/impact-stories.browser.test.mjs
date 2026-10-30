@@ -255,6 +255,31 @@ ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_
 await page.evaluate(() => { delete window.db.visuals.rejected; delete window.db.visuals.more_photos_for; delete window.db.visuals.shot_decisions;
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
+// The status bar says where things stand and the next step; carried approvals and a photo used for two subjects show.
+ok(await page.locator('#is-visbar').count() === 1 && (await page.locator('#is-visbar').innerText()).includes('Ready for your approval.')
+   && await page.locator('#is-visbar [data-act=vapprove]').count() === 1 && await page.locator('#is-visbar [data-act=vprep]').count() === 1,
+   'visuals: one status bar says Ready for your approval, with Approve all visuals and Prepare again in it');
+await page.evaluate(() => { window.db.visuals.carried_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'approved', actor: 'f', from_manifest: 40 }];
+  window.db.visuals.manifest.assets.main.shots[1].photo = { id: 'oak', record: { title: 'File:Oak <1>.jpg' } };
+  window.db.visuals.manifest.assets.main.shots[1].subject_ref = 'wetland';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let cb = await page.locator('#is').innerText();
+ok(cb.includes('Approved earlier (same picture)'), 'visuals: a shot approved on the previous previews whose picture did not change reads Approved earlier (same picture)');
+ok(cb.includes('The same photo is used for different subjects') && /Oak.*\.jpg is used for oak-trees and wetland\. Choose a different photo/.test(cb)
+   && !(await page.innerHTML('#is')).includes('Oak <1>'), 'visuals: one photo used for two subjects is named, escaped, with both subjects');
+await page.evaluate(() => { delete window.db.visuals.carried_decisions; window.db.visuals.manifest.assets.main.shots[1].photo = null;
+  window.db.visuals.manifest.assets.main.shots[1].subject_ref = null;
+  window.db.visuals.state = 'stale'; window.db.visuals.why = 'You chose or rejected a photo since these previews were made. Prepare the visuals again.';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let sb = await page.locator('#is-visbar').innerText();
+ok(sb.includes('These previews are out of date.') && sb.includes('You chose or rejected a photo') && !/again\..*Next: click Prepare/.test(sb)
+   && await page.locator('#is-visbar [data-act=vprep]').count() === 1 && await page.locator('#is [data-act=vapprove]').count() === 0,
+   'visuals: out of date says why, offers Prepare again, and no Approve');
+await page.evaluate(() => { window.db.visuals.state = 'ready'; window.db.visuals.why = 'Every shot passed the checks. Look them over, then Approve all visuals.';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // A preview that cannot be downloaded is tried once, says so, and is tried again only on request (no redraw loop).
 await page.evaluate(() => {
   window.prevStorage = window.client.storage;
