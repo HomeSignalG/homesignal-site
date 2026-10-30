@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import page_semantics as ps  # noqa: E402
 import development_pages as dvp  # noqa: E402
+import fact_check_pages as fcp  # noqa: E402
 
 SUPA = "https://qwnnmljucajnexpxdgxr.supabase.co"
 BASE = ps.BASE   # one origin, from the brand contract
@@ -1740,7 +1741,7 @@ SITEMAP_MAX_URLS = 50000        # the sitemaps.org limit for one file
 
 
 def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide_paths=(),
-                      lastmod=None, map_paths=(), dev_paths=()):
+                      lastmod=None, map_paths=(), dev_paths=(), fc_paths=()):
     """Rewrite the ARTIFACT's sitemap so the advertised community set is exactly the set of
     documents this build made index-eligible.
 
@@ -1809,6 +1810,10 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     dps = sorted(dev_paths)
     if dps:
         block += "\n" + "\n".join(_url_el(f"{BASE}{dp_}", lm.get(dp_)) for dp_ in dps)
+    # Approved claim checks and their archive (/fact-checks/, Tab 19, 2026-10-30).
+    fps = sorted(fc_paths)
+    if fps:
+        block += "\n" + "\n".join(_url_el(f"{BASE}{fp_}", lm.get(fp_)) for fp_ in fps)
     if not os.path.exists(path):
         print("WARNING: no sitemap.xml staged in the artifact — writing community URLs only")
         body = ('<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -1820,7 +1825,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
         # key here is a KeyError that kills the whole build on the no-sitemap path only —
         # a branch the SEO suite's happy path never takes.
         return {"removed": 0, "removed_dev": 0, "added": len(zips), "cities": len(cps),
-                "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps)}
+                "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps),
+                "fact_checks": len(fps)}
     txt = open(path, encoding="utf-8").read()
     removed = len(SITEMAP_LEGACY_RE.findall(txt))
     txt = SITEMAP_LEGACY_RE.sub("", txt)
@@ -1848,6 +1854,9 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     ndv = len(re.findall(r"<loc>[^<]*/development/[a-z]{2}/[a-z0-9-]+/</loc>", txt))
     if ndv != len(dps):
         sys.exit(f"ERROR: sitemap carries {ndv} development URLs for {len(dps)} development pages")
+    nfc = len(re.findall(r"<loc>[^<]*/fact-checks/(?:[a-z0-9-]+/)?</loc>", txt))
+    if nfc != len(fps):
+        sys.exit(f"ERROR: sitemap carries {nfc} fact-check URLs for {len(fps)} fact-check pages")
     n_master = len(re.findall(r"<loc>", txt))
     if n_master > SITEMAP_MAX_URLS:
         sys.exit(f"ERROR: sitemap.xml lists {n_master} URLs, over the {SITEMAP_MAX_URLS} limit")
@@ -1860,7 +1869,8 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
     if re.search(r"homesignalmap\.html\?zip=", txt):
         sys.exit("ERROR: a noindex homesignalmap.html?zip= URL survived in the artifact sitemap")
     return {"removed": removed, "removed_dev": removed_dev, "added": len(zips), "cities": len(cps),
-            "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps)}
+            "projects": len(pps), "guides": len(gps), "maps": len(mps), "developments": len(dps),
+                "fact_checks": len(fps)}
 
 
 # ---------------------------------------------------------------- family sitemaps (plan step 14)
@@ -1876,7 +1886,7 @@ def reconcile_sitemap(out_dir, indexable, city_paths=(), project_paths=(), guide
 # MEASUREMENT partitions (Search Console already has them submitted); they exclude nothing, because the
 # master and the "zip" family list every ZIP.
 SITEMAP_FAMILIES = ("zip", "zip-alerts", "zip-development", "city", "project", "guide", "map", "project-list",
-                    "development")
+                    "development", "fact-check")
 
 
 def write_family_sitemaps(out_dir, families, lastmod=None):
@@ -2150,6 +2160,9 @@ def main():
     ap.add_argument("--out", default="_site")
     ap.add_argument("--fixture", help="read data from a JSON fixture instead of the network")
     ap.add_argument("--now", help="ISO instant for the forward-meeting window (determinism)")
+    ap.add_argument("--fact-checks", default=None,
+                    help="approved claim checks (default: data/fact_checks.json, fetched by pages.yml from "
+                         "claim_check_public_export(); a fixture reads a sibling fact_checks.json when present)")
     ap.add_argument("--dev-plane", default=None,
                     help="compact Development SEO plane JSON (Rule D). "
                          "Production: missing/stale is a hard error.")
@@ -2235,6 +2248,12 @@ def main():
                                      cities_path=cities_path, projects_out=projects,
                                      projects_path=projects_path, max_age_hours=a.plane_max_age_hours)
 
+    fact_checks_path = a.fact_checks
+    if fact_checks_path is None and a.fixture:
+        sibling = os.path.join(os.path.dirname(os.path.abspath(a.fixture)), "fact_checks.json")
+        fact_checks_path = sibling if os.path.isfile(sibling) else None
+    if fact_checks_path is None and not a.fixture:
+        fact_checks_path = os.path.join(os.path.dirname(__file__), "..", "data", "fact_checks.json")
     dossiers_path = a.dev_dossiers
     if dossiers_path is None and a.fixture:
         sibling = os.path.join(os.path.dirname(os.path.abspath(a.fixture)), "development_dossiers.json")
@@ -2324,6 +2343,10 @@ def main():
     nproj, proj_bytes = build_projects(projects, pages, a.out, now_iso[:10], state)
     project_paths = sorted(pr["path"] for pr in projects.values())
     dev_paths = dvp.build(dossiers, pages, a.out, now_iso[:10], _head, state, base=BASE)
+    # Approved claim checks (Tab 19). The archive /fact-checks/ is always written, even when empty.
+    fc_claims = fcp.load(fact_checks_path, required=not a.fixture)
+    fc_pages, fc_index = fcp.build(fc_claims, a.out, now_iso[:10], _head, state, base=BASE)
+    fc_paths = fc_pages + [fc_index]
     n_land_links = dvp.write_land_index(dossiers, a.out)
     guide_paths = build_guides(cities, projects, pages, a.out, now_iso[:10], state,
                                areas=load_focus_areas(), indexable=indexable)
@@ -2342,12 +2365,13 @@ def main():
     if map_idx != {map_path(z) for z in map_indexable}:
         sys.exit("ERROR: robots-derived index-eligible map set != the sitemap's map set")
     for p, e in page_state.items():
-        if ps.family_of(p) in ("city", "project", "guide", "development") and not e["i"]:
+        if ps.family_of(p) in ("city", "project", "guide", "development", "fact-check") and not e["i"]:
             sys.exit(f"ERROR: {p} is advertised in the sitemap but its document says noindex")
     lastmod_map = {p: e["l"] for p, e in page_state.items() if e["l"]}
     map_paths = [map_path(z) for z in map_indexable]
     sm = reconcile_sitemap(a.out, indexable, city_paths, project_paths, guide_paths,
-                           lastmod=lastmod_map, map_paths=map_paths, dev_paths=dev_paths)
+                           lastmod=lastmod_map, map_paths=map_paths, dev_paths=dev_paths,
+                           fc_paths=fc_paths)
     fam = write_family_sitemaps(a.out, {
         "zip": [f"/community/{z}/" for z in sorted(pages)],
         "zip-alerts": [f"/community/{z}/" for z, p in pages.items() if p["rule_f"]],
@@ -2355,7 +2379,8 @@ def main():
         "city": city_paths, "project": project_paths, "guide": guide_paths,
         "map": map_paths,
         "project-list": [project_list_path(z) for z in sorted(pages) if pages[z].get("project_list")],
-        "development": dev_paths},
+        "development": dev_paths,
+        "fact-check": fc_paths},
         lastmod=lastmod_map)
     focus = write_focus_sitemaps(a.out, load_focus_areas(), pages, indexable, lastmod_map)
     state_doc = ps.build_document(page_state, now_stamp, a.build_id, a.commit)
@@ -2376,6 +2401,7 @@ def main():
     print(f"city pages     : {ncity}")
     print(f"development    : {len(dev_paths)} dossier pages "
           f"({sum(len(dv.get('withheld') or []) for dv in dossiers.values())} links withheld by the snapshot)")
+    print(f"fact-checks    : {len(fc_pages)} claim-check pages + the archive")
     print(f"development    : {n_land_links} land assemblies linked to their page (development/land-index.json)")
     print(f"project pages  : {nproj} ({proj_bytes/1048576:.1f} MB; "
           f"{sum(1 for p in projects.values() if p['held'])} held; {linked} linked from a card; "
@@ -2429,6 +2455,7 @@ def main():
                "city_pages": city_paths, "sitemap_city_urls": sm["cities"],
                "project_pages": project_paths, "sitemap_project_urls": sm["projects"],
                "development_pages": dev_paths, "sitemap_development_urls": sm["developments"],
+               "fact_check_pages": fc_paths, "sitemap_fact_check_urls": sm["fact_checks"],
                "guide_pages": sorted(guide_paths), "sitemap_guide_urls": sm["guides"],
                "family_sitemaps": fam,
                "focus_sitemaps": focus,
