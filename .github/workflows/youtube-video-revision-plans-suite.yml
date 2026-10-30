@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'docs/youtube-video-revision-plans.sql'
+      - 'docs/youtube-video-revision-plans-also.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-revisions.sql'
       - 'test/youtube_video_revision_plans_pg/**'
@@ -14,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'docs/youtube-video-revision-plans.sql'
+      - 'docs/youtube-video-revision-plans-also.sql'
       - 'docs/youtube-video-review.sql'
       - 'docs/youtube-video-revisions.sql'
       - 'test/youtube_video_revision_plans_pg/**'

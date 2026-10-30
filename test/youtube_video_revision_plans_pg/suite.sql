@@ -132,4 +132,81 @@ do $$ declare r jsonb; begin
   r := public.hs_youtube_video_plan_start('demo', 'final', 'shorten the pauses');
   perform pg_temp.ok(r ->> 'status' = 'failed', 'with no GitHub credential the plan fails at once');
 end $$;
+-- 9. step 7: one pronunciation fix, every video that says the word
+insert into public.youtube_video_reviews (slug, title, files, file_decisions, status)
+values ('trio', 'Trio', '{"final":{"path":"trio/final.mp4","bytes":10},"short1":{"path":"trio/short1.mp4","bytes":5},"short2":{"path":"trio/short2.mp4","bytes":5},"thumbnail":{"path":"trio/t.png","bytes":2}}',
+        '{"short1":{"status":"approved","version":1}}', 'pending');
+insert into public.youtube_video_versions (slug, file_key, version, path, settings) values ('trio', 'short1', 1, 'trio/short1.mp4', '{}'),
+  ('trio', 'short1', 2, 'trio/versions/short1/v2.mp4', '{"pron_level":{"tacoma":1}}');
+insert into vault.decrypted_secrets (name, decrypted_secret) values ('github_actions_pat', 'x');
+create function pg_temp.trio_plan(n_also int) returns jsonb language sql as $$
+  select jsonb_build_object('version', 1, 'asset', 'final', 'note', 'Tacoma is wrong', 'reader', 'claude',
+    'steps', '[{"from_note":"Tacoma is wrong","instruction":"\"Tacoma\" is mispronounced","changes":["x"]}]'::jsonb, 'not_done', '[]'::jsonb,
+    'corrections', '[{"kind":"pronunciation","summary":"x","delta":{"word":"tacoma","level":1}}]'::jsonb,
+    'also', case when n_also = 0 then '{}'::jsonb else jsonb_build_object(
+      'short1', jsonb_build_object('parent_version', 2, 'plan', jsonb_build_object('version', 1, 'asset', 'short1', 'steps', '[]'::jsonb,
+          'not_done', '[]'::jsonb, 'reader', 'claude', 'corrections', '[{"kind":"pronunciation","summary":"y","delta":{"word":"tacoma","level":2}}]'::jsonb)),
+      'short2', jsonb_build_object('parent_version', 1, 'plan', jsonb_build_object('version', 1, 'asset', 'short2', 'steps', '[]'::jsonb,
+          'not_done', '[]'::jsonb, 'reader', 'claude', 'corrections', '[{"kind":"pronunciation","summary":"z","delta":{"word":"tacoma","level":1}}]'::jsonb))) end) $$;
+do $$ declare r jsonb; pl public.youtube_video_revision_plans%rowtype; c jsonb; n0 bigint; s1 public.youtube_video_revisions%rowtype; begin
+  r := public.hs_youtube_video_plan_start('trio', 'final', 'Tacoma is wrong');
+  select * into pl from public.youtube_video_revision_plans where id = (r ->> 'plan_id')::uuid;
+  perform pg_temp.ok(pl.others = '{"short1":{"version":2,"settings":{"pron_level":{"tacoma":1}}},"short2":{"version":1,"settings":{}}}'::jsonb,
+                     'the plan records the other video files as they are now (never the thumbnail)');
+  perform public.hs_youtube_revision_plan_ready(pl.id, pg_temp.trio_plan(1));
+  select * into pl from public.youtube_video_revision_plans where id = pl.id;
+  begin perform public.hs_youtube_video_plan_confirm(pl.id, pl.plan_md5, array['thumbnail']); perform pg_temp.ok(false, 'a file with no fix in the plan is refused');
+  exception when sqlstate '22023' then perform pg_temp.ok(true, 'a file with no fix in the plan is refused'); end;
+  select count(*) into n0 from net.calls;
+  r := public.hs_youtube_video_plan_confirm(pl.id, pl.plan_md5, array['short1', 'short2', 'short1']);
+  perform pg_temp.ok(jsonb_typeof(r -> 'also') = 'object' and (select count(*) from jsonb_object_keys(r -> 'also')) = 2, 'one revision per ticked file');
+  perform pg_temp.ok((select count(*) from net.calls) = n0 + 3, 'three builds are started, one per file');
+  select * into s1 from public.youtube_video_revisions where id = (r -> 'also' ->> 'short1')::uuid;
+  perform pg_temp.ok(s1.parent_version = 2 and s1.settings = '{"pron_level":{"tacoma":1}}'::jsonb
+                     and s1.confirmed_plan = pl.plan -> 'also' -> 'short1' -> 'plan' and s1.instruction = pl.note,
+                     'each file is built from its own version, settings and plan');
+  select body into c from net.calls where body -> 'inputs' ->> 'revision_id' = s1.id::text;
+  perform pg_temp.ok(c -> 'inputs' ->> 'asset' = 'short1' and (c -> 'inputs' ->> 'plan')::jsonb = s1.confirmed_plan, 'its build gets its own plan');
+  perform pg_temp.ok((select confirmed_plan ? 'also' from public.youtube_video_revisions where id = (r ->> 'revision_id')::uuid) = false,
+                     'the main build carries only its own plan');
+  perform pg_temp.ok((select file_decisions -> 'short1' ->> 'status' from public.youtube_video_reviews where slug = 'trio') = 'rejected',
+                     'a ticked file that was approved is now rejected with the note');
+  update public.youtube_video_revisions set status = 'cancelled' where slug = 'trio';
+end $$;
+do $$ declare r jsonb; pl public.youtube_video_revision_plans%rowtype; begin
+  -- unticked files are left alone
+  r := public.hs_youtube_video_plan_start('trio', 'final', 'Tacoma again');
+  perform public.hs_youtube_revision_plan_ready((r ->> 'plan_id')::uuid, pg_temp.trio_plan(1) || '{"note":"Tacoma again"}');
+  select * into pl from public.youtube_video_revision_plans where id = (r ->> 'plan_id')::uuid;
+  update public.youtube_video_revision_plans set others = jsonb_set(others, '{short1,version}', '2') where id = pl.id;
+  r := public.hs_youtube_video_plan_confirm(pl.id, pl.plan_md5);
+  perform pg_temp.ok(r -> 'also' = '{}'::jsonb and (select count(*) from public.youtube_video_revisions where slug = 'trio' and file_key <> 'final'
+                       and status <> 'cancelled') = 0, 'with nothing ticked only this file is rebuilt');
+  update public.youtube_video_revisions set status = 'cancelled' where slug = 'trio';
+  -- a ticked file that changed since the note was read makes the plan stale and builds nothing
+  r := public.hs_youtube_video_plan_start('trio', 'final', 'Tacoma once more');
+  perform public.hs_youtube_revision_plan_ready((r ->> 'plan_id')::uuid, pg_temp.trio_plan(1) || '{"note":"Tacoma once more"}');
+  select * into pl from public.youtube_video_revision_plans where id = (r ->> 'plan_id')::uuid;
+  insert into public.youtube_video_versions (slug, file_key, version, path) values ('trio', 'short2', 2, 'trio/versions/short2/v2.mp4');
+  r := public.hs_youtube_video_plan_confirm(pl.id, pl.plan_md5, array['short2']);
+  perform pg_temp.ok((r ->> 'stale')::boolean and (select status from public.youtube_video_revision_plans where id = pl.id) = 'stale'
+                     and (select count(*) from public.youtube_video_revisions where slug = 'trio' and status <> 'cancelled') = 0,
+                     'a ticked file with a newer version makes the plan stale');
+  -- a ticked file being rebuilt refuses the whole confirm
+  r := public.hs_youtube_video_plan_start('trio', 'final', 'Tacoma one last time');
+  perform public.hs_youtube_revision_plan_ready((r ->> 'plan_id')::uuid, pg_temp.trio_plan(1) || '{"note":"Tacoma one last time"}');
+  select * into pl from public.youtube_video_revision_plans where id = (r ->> 'plan_id')::uuid;
+  update public.youtube_video_revision_plans set others = jsonb_set(others, '{short2,version}', '2'),
+         plan = jsonb_set(plan, '{also,short2,parent_version}', '2') where id = pl.id;
+  update public.youtube_video_revision_plans set plan_md5 = md5(plan::text) where id = pl.id;
+  select * into pl from public.youtube_video_revision_plans where id = pl.id;
+  insert into public.youtube_video_revisions (slug, file_key, parent_version, instruction, settings, requested_by, status)
+  values ('trio', 'short2', 2, 'x', '{}', 'founder@example.com', 'running');
+  begin perform public.hs_youtube_video_plan_confirm(pl.id, pl.plan_md5, array['short2']); perform pg_temp.ok(false, 'a ticked file being rebuilt refuses');
+  exception when sqlstate '55006' then perform pg_temp.ok(true, 'a ticked file being rebuilt refuses'); end;
+  perform pg_temp.ok(not exists (select 1 from pg_proc where oid = to_regprocedure('public.hs_youtube_video_plan_confirm(uuid,text)')),
+                     'the two-argument confirm is gone, so a call by name is never ambiguous');
+  perform pg_temp.ok(not has_function_privilege('anon', 'public.hs_youtube_video_plan_confirm(uuid,text,text[])', 'execute'), 'a visitor cannot confirm');
+end $$;
+
 \echo all plan checks passed

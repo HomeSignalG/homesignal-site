@@ -51,10 +51,28 @@ ok(!tile(newer, 'short1').includes('yv-pconfirm'), '4c: a plan older than the ne
 ok(!tile(base({ plans: [ready] }), 'final').includes('yv-pconfirm'), '4d: a plan belongs to its own file only');
 
 // 5. the wiring
-ok(js.includes("client.rpc('hs_youtube_video_plan_start'") && js.includes("client.rpc('hs_youtube_video_plan_confirm', { p_plan_id: t.getAttribute('data-plan'), p_plan_md5: t.getAttribute('data-md5') })"), '5a: Preview starts a plan; Confirm sends the md5');
+ok(js.includes("client.rpc('hs_youtube_video_plan_start'") && js.includes("var args = { p_plan_id: t.getAttribute('data-plan'), p_plan_md5: t.getAttribute('data-md5') };")
+   && js.includes("client.rpc('hs_youtube_video_plan_confirm', args)"), '5a: Preview starts a plan; Confirm sends the md5');
 ok(/hs_youtube_video_plans'\)\.then\(function \(x\) \{ return x && !x\.error/.test(js), '5b: the plans list is optional (the tab works before the SQL is applied)');
 ok(/x\.status === 'planning'/.test(js), '5c: the tab re-reads while Claude is reading');
-ok(/approvedNow && !window\.confirm/.test(js), '5d: confirming a plan on an approved file asks first');
+ok(/approvedNames\.length && !window\.confirm/.test(js), '5d: confirming a plan on an approved file asks first');
+
+// 7. step 7: the same pronunciation fix for the other videos that say the word
+const pron = { kind: 'pronunciation', summary: 'Pronunciation of "tacoma", treatment 1 of 3.', delta: { word: 'tacoma', level: 1 } };
+const withAlso = Object.assign({}, ready, { file_key: 'final', plan: { steps: [{ from_note: 'Tacoma is wrong', instruction: '"Tacoma" is mispronounced', changes: [pron.summary] }],
+  not_done: [], corrections: [pron], also: {
+    short1: { parent_version: 2, plan: { asset: 'short1', corrections: [Object.assign({}, pron, { summary: 'Pronunciation of "tacoma", <b>treatment</b> 2 of 3.' })] } },
+    short2: { parent_version: 1, plan: { asset: 'short2', corrections: [] } },
+    thumbnail: { parent_version: 1, plan: { asset: 'thumbnail', corrections: [pron] } } } } });
+const a = tile(base({ plans: [withAlso] }), 'final');
+ok(a.includes('Also fix this in:') && a.includes('value="short1" checked') && a.includes('Short 1'), '7a: a file that says the word is offered, ticked');
+ok(!a.includes('value="short2"') && !a.includes('value="thumbnail"'), '7b: a file with no fix, and the thumbnail, are not offered');
+ok(!a.includes('<b>treatment</b>') && a.includes('&lt;b&gt;treatment'), '7c: the other file\'s change is escaped');
+ok(!tile(base({ plans: [ready] }), 'short1').includes('Also fix this in'), '7d: a plan with nothing to share offers nothing');
+ok(js.includes("querySelectorAll('.yv-palso:checked')") && js.includes('if (alsoKeys.length) args.p_also = alsoKeys;'), '7e: only the ticked files are sent');
+const also = read('docs/youtube-video-revision-plans-also.sql');
+ok(also.includes("pl.plan - 'also'") && also.includes("a -> 'plan')") && /perform public\._hs_yv_dispatch\(\(also_ids ->> k\)::uuid\)/.test(also),
+   '7f: each file is built from its own plan; the main build carries only its own');
 
 // 6. the SQL contract
 ok(!/hs_youtube_video_plan_start[\s\S]*?file_decide[\s\S]*?\$fn\$;/.test(sql.split('create or replace function public.hs_youtube_video_plan_confirm')[0].split('create or replace function public.hs_youtube_video_plan_start')[1] || 'file_decide'), '6a: starting a plan records no decision');
