@@ -182,7 +182,7 @@ await page.evaluate(() => {
     manifest: { timing: { total_s: 640 }, identity: { same: true },
       assets: { main: { shots: [
         { id: 'a1-s1', act: 1, act_name: 'Attachment', status: 'clear', label: 'REPRESENTATIVE PHOTO · NOT THIS SITE', onscreen: 'A dock for <fishers>', preview: P('main', 0), photo: { id: 'oak', credit: 'Oak: A. Person, CC BY 4.0', record: rec } },
-        { id: 'a2-s1', act: 2, act_name: 'Disruption', status: 'flagged', label: 'ILLUSTRATION · NOT A PICTURE OF THE SITE', preview: P('main', 1), reasons: ['An illustration stands where the plan wanted a photo (trees).'], illustration: { category: 'trees', missing: true } }] },
+        { id: 'a2-s1', act: 2, act_name: 'Disruption', status: 'flagged', label: 'FROM THE RECORD', preview: P('main', 1), reasons: ['No photo yet for Oak trees, so the shot shows the record. Choose one of the licensed photos offered, or upload your own.'], photo_needed: true, illustration: null }] },
         short_a: { shots: [{ id: 'short_a-hook', beat: 'hook', status: 'clear', label: 'MAP', preview: P('short_a', 0), map: true }] },
         thumbnail: { shots: [{ id: 'thumbnail', status: 'clear', label: 'PHOTO', preview: P('thumbnail', 0) }] } },
       alternatives: [{ subject_id: 'oak-trees', subject: 'Oak trees', candidates: [{ id: 'oak-2', title: 'File:Oak2.jpg', license: 'CC BY-SA 4.0', author: 'B', page_url: 'https://commons.wikimedia.org/wiki/File:Oak2.jpg', preview: { path: 's1/visuals/jv/cand-x.jpg' } }] }] } };
@@ -192,7 +192,8 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(150);
 let vt = await page.locator('#is').innerText();
-ok(vt.includes('Needs your attention (1)') && vt.includes('An illustration stands where the plan wanted a photo'), 'visuals: the shots that need you are listed first, with why');
+ok(vt.includes('Needs your attention (1)') && vt.includes('No photo yet for Oak trees') && vt.includes('No photo yet: showing the record'), 'visuals: the shots that need you are listed first, with why');
+ok(!/illustration/i.test(vt), 'visuals: no shot is offered or described as a drawing (founder, 2026-10-30: no illustrations)');
 ok(vt.includes('3 clear · 1 to look at · 0 blocked') && vt.includes('Approve all visuals (4 shots)'), 'visuals: the counts and ONE approve action for the whole set');
 ok(await page.evaluate(() => ['s1/visuals/jv/preview-main-000.jpg', 's1/visuals/jv/preview-main-001.jpg', 's1/visuals/jv/cand-x.jpg']
    .every((p) => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === p))),
