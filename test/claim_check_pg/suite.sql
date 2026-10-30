@@ -65,6 +65,19 @@ do $$ declare sid uuid := pg_temp.newscan(); r jsonb; begin
   perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('vidA') || '{"metrics":{"views":5000}}'), '[]', '[]');
   perform pg_temp.chk('2f metrics history kept', (select (metrics_prev->>'views')::int = 1000 and (metrics->>'views')::int = 5000
      from public.claim_check_sources where source_key = 'youtube:vidA'));
+  -- a later scan fills a missing display name / speaker; it never replaces one already stored
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('bskyP', 'bluesky') || '{"source_key":"bsky:bskyP","publisher":null}'),
+     jsonb_build_array(pg_temp.clm('kS', array['bsky:bskyP']) || '{"speaker_name":null}'), '[]');
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('bskyP', 'bluesky') || '{"source_key":"bsky:bskyP","publisher":"Aaron Rupar"}'),
+     jsonb_build_array(pg_temp.clm('kS', array['bsky:bskyP']) || '{"speaker_name":"Donald Trump"}'), '[]');
+  perform pg_temp.chk('2f2 a re-scan fills a missing publisher and speaker',
+     (select publisher from public.claim_check_sources where source_key = 'bsky:bskyP') = 'Aaron Rupar'
+     and (select speaker_name from public.claim_check_claims where claim_key = 'kS') = 'Donald Trump');
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('bskyP', 'bluesky') || '{"source_key":"bsky:bskyP","publisher":"Someone Else"}'),
+     jsonb_build_array(pg_temp.clm('kS', array['bsky:bskyP']) || '{"speaker_name":"Someone Else"}'), '[]');
+  perform pg_temp.chk('2f3 a re-scan never replaces a stored publisher or speaker',
+     (select publisher from public.claim_check_sources where source_key = 'bsky:bskyP') = 'Aaron Rupar'
+     and (select speaker_name from public.claim_check_claims where claim_key = 'kS') = 'Donald Trump');
   perform public.claim_check_scan_finish(sid, 'partial', '{}', '[{"kind":"bluesky"}]');
   perform pg_temp.chk('2g finishing twice is refused', pg_temp.err(format('select public.claim_check_scan_finish(%L, %L, %L, %L)', sid, 'ok', '{}', '[]')) like '55000%');
 end $$;

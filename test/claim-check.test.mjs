@@ -93,5 +93,15 @@ ok(!doneOld.includes('Last research did not finish'), '5d a researched claim doe
 ok(T.researchLine(Object.assign({}, base, { research_active: null, runs: [] })) === '', '5e no runs, no line');
 ok(/setTimeout\(function \(\) \{[\s\S]*?hs_claim_check_claim[\s\S]*?\}, POLL_MS\)/.test(code) && /var POLL_MS = 30000;/.test(code), '5f an active run is read again every 30 s');
 
+// 6. a Bluesky source shows who posted it and its own preview, linked to the post
+const bsky = { platform: 'bluesky', author: 'atrupar.com', publisher: 'Aaron Rupar', url: 'https://bsky.app/profile/atrupar.com/post/3mynwycgzla2p',
+  thumbnail_url: 'https://video.bsky.app/watch/did%3Aplc%3Ax/bafk/thumbnail.jpg', rights: 'link_only', published_at: '2026-10-25T00:00:00Z' };
+const bd = T.detailView(Object.assign({}, claim, { status: 'candidate', verdict: null, quote: null, research_version: 0, sources: [bsky] }));
+ok(bd.includes('Bluesky post by Aaron Rupar (@atrupar.com)'), '6a a Bluesky card names the person and handle');
+ok(bd.includes('video.bsky.app/watch') && /<a href="https:\/\/bsky\.app\/profile\/atrupar\.com\/post\/3mynwycgzla2p"[^>]*title="Play on the original post"><img/.test(bd), '6b its video preview links to the post');
+ok(T.srcLabel({ platform: 'bluesky', author: 'a.bsky.social' }) === 'Bluesky post by @a.bsky.social' && T.srcLabel({ platform: 'youtube', publisher: 'Fox Business' }) === 'Fox Business', '6c no display name: the handle; YouTube keeps the channel');
+ok(T.thumbUrl('https://video.bsky.app/watch/x/thumbnail.jpg') && !T.thumbUrl('https://video.bsky.app.evil.example/x.jpg'), '6d only Bluesky\'s own video host is added');
+ok(/img-src [^;]*https:\/\/video\.bsky\.app/.test(csp), '6e the CSP allows Bluesky video previews');
+
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);
