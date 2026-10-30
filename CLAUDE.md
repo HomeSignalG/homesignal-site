@@ -5753,6 +5753,27 @@ Results.
     - The engine (homesignal-ingest `storycraft.upload_problems`, `assets.storage_get`) checks the sha256 against the
       bytes and decodes the image under the pixel limit before showing it.
     - Apply order: merge the ingest engine first, then apply this SQL, then deploy the page.
+  - **Reject a photo (2026-10-30, founder: "reject all photos in act 5, 6, 7").** Each still that shows a photo has
+    "Reject this photo", and each act has "Reject every photo in this act".
+    - `hs_impact_story_photo_reject` only accepts a photo the NEWEST previews show. Rows go in
+      `impact_story_photo_rejections`, which is append-only; the newest row per photo decides.
+      `hs_impact_story_photo_restore` ("Use it again") undoes a rejection.
+    - `_hs_is_choice_key` adds the rejected ids to the key, but only when there are some, so older previews stay current.
+      Prepare and render both freeze `rejected_photos` into the job input.
+    - The engine (homesignal-ingest `impact/render/plan.py`, `job.rejected_files`) shows the photo nowhere in that story.
+      It searches new licensed candidates for the photo's subjects, leaves the rejected file out, and offers them under
+      "Other licensed photos".
+    - A rejection removes the photo from every shot that uses it, in every video.
+    - **Approve / Reject / Need new photo under every shot** (founder, same day: "i need an approve, reject, need new
+      photo, under every picture"). `hs_impact_story_shot_decide` writes to `impact_story_shot_decisions`, which is
+      append-only and tied to the manifest id and hash; the newest decision per shot counts.
+      - Reject on a shot with a photo also rejects that photo.
+      - Reject on any other shot needs a note, and it blocks "Approve all visuals" (state `needs_fixes`) until that shot
+        is approved or the previews are prepared again.
+      - Need new photo adds the shot's subject to `more_photos_for`, which the next Prepare carries to the engine as a
+        new search.
+      - Not built: alternatives shown already composed into the shot. They are shown as photos.
+    - pg checks 12V19-12V29.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
