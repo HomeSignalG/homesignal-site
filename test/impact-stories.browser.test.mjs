@@ -205,6 +205,27 @@ ok((await page.locator('#is').innerText()).includes('short_a-hook') && await pag
 await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
    'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
+// Reject a photo (2026-10-30): one shot, or every photo in an act, then Use it again.
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
+ok(await page.locator('#is [data-act=vreject][data-photo=oak]').count() >= 1 && await page.locator('#is [data-act=vrejectgroup]').count() === 1,
+   'visuals: a shot with a photo has "Reject this photo", and its act has "Reject every photo in this act"');
+await page.locator('#is [data-act=vreject][data-photo=oak]').first().click(); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_photo_reject' && c[1].p_story === 's1' && c[1].p_manifest_id === 41 && c[1].p_photo === 'oak')),
+   'visuals: Reject this photo sends the photo and the previews the page showed');
+const nRej = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photo_reject').length);
+await page.click('#is [data-act=vrejectgroup]'); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photo_reject').length) === nRej + 1,
+   'visuals: rejecting an act sends each of its photos once');
+await page.evaluate(() => { window.db.visuals.rejected = [{ id: 'oak', title: 'File:Oak.jpg' }]; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let rt = await page.locator('#is').innerText();
+ok(rt.includes('Rejected photos (1)') && rt.includes('File:Oak.jpg') && await page.locator('#is [data-act=vreject][data-photo=oak]').count() === 0
+   && await page.locator('#is [data-act=vrejectgroup]').count() === 0,
+   'visuals: a rejected photo is listed, marked Rejected on its shot, and cannot be rejected twice');
+await page.locator('#is [data-act=vrestore][data-photo=oak]').first().click(); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_photo_restore' && c[1].p_photo === 'oak')), 'visuals: Use it again restores the photo');
+await page.evaluate(() => { delete window.db.visuals.rejected; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // A preview that cannot be downloaded is tried once, says so, and is tried again only on request (no redraw loop).
 await page.evaluate(() => {
   window.prevStorage = window.client.storage;

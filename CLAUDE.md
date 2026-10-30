@@ -5753,6 +5753,18 @@ Results.
     - The engine (homesignal-ingest `storycraft.upload_problems`, `assets.storage_get`) checks the sha256 against the
       bytes and decodes the image under the pixel limit before showing it.
     - Apply order: merge the ingest engine first, then apply this SQL, then deploy the page.
+  - **Reject a photo (2026-10-30, founder: "reject all photos in act 5, 6, 7").** Each still that shows a photo has
+    "Reject this photo", and each act has "Reject every photo in this act".
+    - `hs_impact_story_photo_reject` only accepts a photo the NEWEST previews show. Rows go in
+      `impact_story_photo_rejections`, which is append-only; the newest row per photo decides.
+      `hs_impact_story_photo_restore` ("Use it again") undoes a rejection.
+    - `_hs_is_choice_key` adds the rejected ids to the key, but only when there are some, so older previews stay current.
+      Prepare and render both freeze `rejected_photos` into the job input.
+    - The engine (homesignal-ingest `impact/render/plan.py`, `job.rejected_files`) shows the photo nowhere in that story.
+      It searches new licensed candidates for the photo's subjects, leaves the rejected file out, and offers them under
+      "Other licensed photos".
+    - A rejection removes the photo from every shot that uses it, in every video.
+    - pg checks 12V19-12V24.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.

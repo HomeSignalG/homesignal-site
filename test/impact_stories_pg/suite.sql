@@ -286,7 +286,7 @@ select pg_temp.chk('12V14 revoking the approval sends the story back to the Visu
   pg_temp.vis()->>'state' = 'ready' and pg_temp.stage() = 'visuals');
 select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()->'job'->>'id')::uuid, 'oak-trees', 'oak-alt-1');
 select pg_temp.chk('12V15 an alternative the visuals offered can be chosen; the previews are then stale',
-  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%another photo%'
+  pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%chose or rejected a photo%'
   and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->'job'->>'id', 'oak-trees', 'made-up')) like '%not one of the candidates%');
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
@@ -295,6 +295,40 @@ select pg_temp.chk('12V17 a newer prepare that failed: the shown manifest still 
   pg_temp.vis()->'job'->>'status' = 'failed'
   and pg_temp.vis()->>'manifest_job_id' = (select job_id::text from public.impact_story_visual_manifests order by id desc limit 1)
   and pg_temp.vis()->>'manifest_job_id' is distinct from pg_temp.vis()->'job'->>'id');
+-- 12V19-12V24 (2026-10-30): a photo the founder rejects in the Visuals step
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12V19 non-admin cannot reject or restore a photo',
+  pg_temp.err(format('select public.hs_impact_story_photo_reject(%L, 1, %L)', pg_temp.id('s'), 'oak')) like '42501%'
+  and pg_temp.err(format('select public.hs_impact_story_photo_restore(%L, %L)', pg_temp.id('s'), 'oak')) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+insert into _ids select 'vk0', public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key';
+select pg_temp.chk('12V20 only a photo the newest previews show can be rejected, and only on those previews',
+  pg_temp.err(format('select public.hs_impact_story_photo_reject(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', 'made-up')) like '%not in these previews%'
+  and pg_temp.err(format('select public.hs_impact_story_photo_reject(%L, %s, %L)', pg_temp.id('s'), (pg_temp.vis()->>'manifest_id')::bigint - 1, 'oak')) like '40001%Newer previews%');
+select public.hs_impact_story_photo_reject(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, 'oak', 'Wrong kind of tree.');
+select pg_temp.chk('12V21 a rejected photo is listed with its file and changes the photo key, and rejecting it again changes nothing',
+  pg_temp.vis()->'rejected'->0->>'id' = 'oak' and pg_temp.vis()->'rejected'->0->>'file_url' = 'https://upload.wikimedia.org/x.jpg'
+  and pg_temp.vis()->'rejected'->0->>'sha256' = repeat('c', 64)
+  and public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key' <> pg_temp.id('vk0')
+  and (public.hs_impact_story_photo_reject(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, 'oak')->>'existing')::boolean
+  and (select count(*) from public.impact_story_photo_rejections) = 1
+  and exists (select 1 from public.impact_story_events where kind = 'photo_rejected'));
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+select pg_temp.chk('12V22 the next Prepare carries the rejected photos to the engine',
+  (pg_temp.lastjob()).input->'rejected_photos'->0->>'id' = 'oak'
+  and public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'input'->'rejected_photos'->0->>'file_url' = 'https://upload.wikimedia.org/x.jpg');
+select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('manifest', pg_temp.vman((pg_temp.lastjob()).id)));
+select pg_temp.chk('12V23 previews made with the rejection are current',
+  pg_temp.vis()->>'state' = 'ready');
+select public.hs_impact_story_photo_restore(pg_temp.id('s')::uuid, 'oak');
+select pg_temp.chk('12V24 a rejection can be undone, once; with none left the key is the old one again; rows are append-only',
+  jsonb_array_length(pg_temp.vis()->'rejected') = 0 and pg_temp.vis()->>'state' = 'stale'
+  and pg_temp.vis()->>'why' like '%chose or rejected a photo%'
+  and public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key' = pg_temp.id('vk0')
+  and pg_temp.err(format('select public.hs_impact_story_photo_restore(%L, %L)', pg_temp.id('s'), 'oak')) like '%not rejected%'
+  and pg_temp.err('update public.impact_story_photo_rejections set note = null') is not null
+  and pg_temp.err('delete from public.impact_story_photo_rejections') is not null);
 select pg_temp.approve_visuals();
 select pg_temp.chk('12V16 the bucket accepts the JPEG previews', (select 'image/jpeg' = any (allowed_mime_types) from storage.buckets where id = 'impact-media'));
 select pg_temp.chk('12a the story is ready to render', pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos');
