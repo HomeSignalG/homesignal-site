@@ -31,6 +31,9 @@ ROLE_LABEL = {
     "land_use_case_for": "Land-use case", "defining_record": "Defining record",
     "facility_of": "Data-center listing", "primary_document": "Document",
 }
+ENTITY_ORDER = {r: i for i, r in enumerate((
+    "governing_body", "filing_receiver", "applicant", "master_developer", "buyer_under_contract",
+    "landowner_of_record", "designer", "consultant"))}
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
 
 
@@ -44,6 +47,28 @@ def day(s):
         return ""
     y, m, d = s.split("-")
     return f"{MONTHS[int(m) - 1]} {int(d)}, {y}"
+
+
+ISO_DAY_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+HASHTAG_RE = re.compile(r"(?:^|\s)#[A-Za-z][\w]*")
+
+
+def prose(s):
+    """Text a reader sees: a source's ISO date written as a date ("2026-10-15" -> "Oct 15, 2026")
+    and hashtags removed. Wording is otherwise the source's own; nothing is reworded."""
+    s = ISO_DAY_RE.sub(lambda m: day(m.group(1)) or m.group(1), str(s or ""))
+    return re.sub(r"\s{2,}", " ", HASHTAG_RE.sub("", s)).strip()
+
+
+YT_ID_RE = re.compile(r"^https://(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})(?:[?&#].*)?$")
+# YouTube's own thumbnail host; the page's CSP allows images from it and nothing else new.
+CSP_FROM = "img-src 'self' data:; font-src 'self';"
+CSP_TO = "img-src 'self' data: https://i.ytimg.com; font-src 'self';"
+
+
+def yt_id(url):
+    m = YT_ID_RE.match(str(url or ""))
+    return m.group(1) if m else ""
 
 
 def safe_url(u):
@@ -133,7 +158,7 @@ def _src(url, label):
     u = safe_url(url)
     if not u:
         return ""
-    return f' <a href="{esc(u)}" rel="nofollow noopener">{esc(label or "Source")}</a>'
+    return f' <a href="{esc(u)}" rel="nofollow noopener">{esc(prose(label) or "Source")}</a>'
 
 
 def _links(d, *kinds):
@@ -151,23 +176,27 @@ def _stmt_list(items, cls):
     for s in items:
         when = f'<span class="small">{esc(s.get("date_label") or "")} {esc(day(s.get("date")))}</span> ' \
             if s.get("date") else ""
-        title = f'<strong>{esc(s["title"])}</strong>. ' if s.get("title") else ""
-        lis.append(f'<li>{when}{title}{esc(s["body"])}{_src(s.get("evidence_url"), s.get("evidence_label"))}'
+        title = f'<strong>{esc(prose(s["title"]))}</strong>. ' if s.get("title") else ""
+        lis.append(f'<li>{when}{title}{esc(prose(s["body"]))}{_src(s.get("evidence_url"), s.get("evidence_label"))}'
                    + (f' <span class="small">Checked {esc(day(s.get("checked_on")))}.</span>' if s.get("checked_on") else "")
                    + "</li>")
     return f'<ul class="{cls}">{"".join(lis)}</ul>'
 
 
-def _section(h_id, title, inner, empty=None):
+def _section(h_id, title, inner):
+    """A section with something in it. An empty one is not drawn; what is missing is said once,
+    at the end of the page (see render)."""
     if not inner:
-        if empty is None:
-            return ""
-        inner = f'<p class="empty">{esc(empty)}</p>'
+        return ""
     return f'<section id="{h_id}" aria-labelledby="h-{h_id}"><h2 id="h-{h_id}">{esc(title)}</h2>{inner}</section>'
 
 
 def _doc_title(l):
+    """What a linked document is called on the page. The defining record is named by the source
+    its link opens (its evidence label), so the card says what the reader will see."""
     f = l.get("facts") or {}
+    if l.get("role") == "defining_record" and l.get("evidence_label"):
+        return l["evidence_label"]
     if l.get("text"):
         return l["text"]
     if l["kind"] == "water_filing":
@@ -199,15 +228,15 @@ def _timeline(d):
         f'<li><div class="tdate"><time datetime="{esc(r[0])}">{esc(day(r[0]))}</time>'
         f'<span>{esc(r[1] or "")}</span></div><div class="tbody">'
         + (f'<p class="chips"><span class="chip">{esc(r[2])}</span></p>' if r[2] else "")
-        + f'<p>{esc(r[3])}</p>' + (f'<p>{_src(r[4], r[5]).strip()}</p>' if _src(r[4], r[5]) else "")
+        + f'<p>{esc(prose(r[3]))}</p>' + (f'<p>{_src(r[4], r[5]).strip()}</p>' if _src(r[4], r[5]) else "")
         + '</div></li>' for r in rows)
     return (f'<p class="small">Dates are each source\'s own, newest first. HomeSignal videos and posts are '
             f'listed separately below; they are not government events.</p><ol class="timeline">{lis}</ol>')
 
 
-TOC = (("overview", "Overview"), ("changed", "What changed"), ("next", "What's next"),
-       ("map", "Map &amp; land"), ("organizations", "Organizations"), ("documents", "Official documents"),
-       ("timeline", "Timeline"), ("coverage", "HomeSignal coverage"))
+# The footer's date as words. Rendered as a token beside the build-day token and replaced in
+# build(), so the page fingerprint still never moves on the date alone.
+BUILT_HUMAN = "@@HS-BUILD-DAY-HUMAN@@"
 
 # The page's own stylesheet. Dossier pages ship no script and do not use the app shell, so they
 # carry their layout inline (the CSP allows inline styles) instead of app.css, whose classes are
@@ -261,6 +290,19 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 @media (max-width:520px){.timeline>li{grid-template-columns:1fr;gap:.2rem}}
 .chips{display:flex;flex-wrap:wrap;gap:.3rem}.chip{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:0 .5rem;color:var(--ink2)}
 .jody{background:var(--violet-t);border-radius:12px;padding:.2rem 1rem .8rem}.jody h3{color:var(--violet)}
+.reel{overflow:hidden;margin:.4rem -1rem 0;padding:.2rem 1rem;mask-image:linear-gradient(90deg,transparent,#000 1rem,#000 calc(100% - 1rem),transparent)}
+.reel-track{list-style:none;margin:0;padding:0;display:flex;width:max-content}
+.reel-track>li{width:15rem;padding-right:.9rem;flex:none}
+.reel-track a{display:block;text-decoration:none;color:var(--ink)}.reel-track a:hover .vtitle{text-decoration:underline}
+.vthumb{display:block;position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--line)}
+.vthumb img,.vthumb .noimg{display:block;width:100%;height:100%;object-fit:cover}
+.vtag{position:absolute;left:.4rem;bottom:.4rem;background:rgba(0,0,0,.72);color:#fff;font-size:.72rem;font-weight:600;border-radius:6px;padding:.05rem .4rem}
+.vtitle{display:block;font-size:.9rem;font-weight:600;line-height:1.35;margin-top:.45rem}
+.reel.moving .reel-track{animation:reel calc(var(--n) * 7s) linear infinite}
+.reel.moving:hover .reel-track,.reel.moving:focus-within .reel-track{animation-play-state:paused}
+@keyframes reel{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.reel{overflow-x:auto;mask-image:none}.reel.moving .reel-track{animation:none}
+ .reel-track>li[aria-hidden]{display:none}}
 .method{border-top:1px solid var(--line);margin-top:2.5rem;padding-block:1rem 3rem}
 .method nav{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.9rem}
 """
@@ -271,25 +313,28 @@ def render(d, pages, built, head, crumb_place=None):
     gen_zip_pages._head; `built` is the build-day token."""
     key, name = d["project_key"], d["display_name"]
     zips = [z for z in zips_of(d) if z in pages]
-    where = ""
-    if zips:
-        p0 = pages[zips[0]]
-        where = f'{p0.get("county") or p0["name"]}, {p0.get("state") or d["state"]}'
+    # Where it is: the county (its own name, gen_zip_pages county_label), not the first ZIP's
+    # town. A development touching several counties names each.
+    counties = []
+    for z in zips:
+        c = pages[z].get("county_label") or (f'{pages[z]["county"]} County' if pages[z].get("county") else "")
+        if c and c not in counties:
+            counties.append(c)
+    where = (f'{" and ".join(counties)}, {pages[zips[0]].get("state") or d["state"]}' if counties else "")
     kind, life = d.get("_type") or "", d.get("_lifecycle") or ""
     canon = f'{d.get("_base", "")}{d["path"]}'
     summary = _stmts(d, "summary")
     desc = (summary[0]["body"] if summary else f"Public records, official documents and timeline for {name}.")[:300]
     title = f"{name}" + (f" — {kind}" if kind else "") + (f" in {where}" if where else "") + " | HomeSignal"
-    crumbs = [("HomeSignal", "/")]
-    if zips:
-        crumbs.append((pages[zips[0]]["name"], f"/community/{zips[0]}/"))
-    crumbs.append((name, d["path"]))
+    # Breadcrumb: home, the county (no page of its own, so plain text and not in the structured
+    # list), the development.
+    crumbs = [("HomeSignal", "/"), (name, d["path"])]
     ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
           "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
                                "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
-    crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb">'
-                 + " › ".join(f'<a href="{esc(u)}">{esc(n)}</a>' for n, u in crumbs[:-1])
-                 + f' › <span aria-current="page">{esc(name)}</span></nav>')
+    crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="/">HomeSignal</a> › '
+                 + (f'<span>{esc(where)}</span> › ' if where else "")
+                 + f'<span aria-current="page">{esc(name)}</span></nav>')
     note = ('<p class="note">Descriptive label by HomeSignal. No public record names this project.</p>'
             if d.get("name_basis") == "descriptive" else "")
     df = d.get("defining") or {}
@@ -299,13 +344,10 @@ def render(d, pages, built, head, crumb_place=None):
                  f'<span class="pill life">{esc(life or "Lifecycle unknown")}</span></p>'
                  f'<p class="small">From the defining record:'
                  f'{_src(df.get("evidence_url"), df.get("evidence_label") or _doc_title(df))}</p>')
-    toc = ('<nav class="toc" aria-label="On this page"><ul>'
-           + "".join(f'<li><a href="{d["path"]}#{i}">{t}</a></li>' for i, t in TOC) + "</ul></nav>")
-    map_links = " · ".join(f'<a href="/map/{esc(z)}/">ZIP {esc(z)} on the map</a>' for z in zips)
+    # The map links live in Map & land, with their parcel counts; the hero does not repeat them.
     follow = (f'<div class="actions"><p><a class="btn" href="/follow-development.html?d={esc(d["state"].lower())}/{esc(key)}" '
               f'rel="nofollow">Follow this development</a></p>'
-              f'<p class="small">Saves this development to your HomeSignal account. It does not sign you up for email.</p>'
-              + (f'<p class="small">{map_links}</p>' if map_links else "") + '</div>')
+              f'<p class="small">Saves this development to your HomeSignal account. It does not sign you up for email.</p></div>')
 
     # Overview, what we know and don't, impacts
     ov = _stmt_list(summary, "dsum") + (
@@ -329,19 +371,25 @@ def render(d, pages, built, head, crumb_place=None):
                  f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
 
-    orgs = "".join(
-        f'<li><p class="t">{esc(l["ref"].split(":", 1)[1])}</p>'
-        f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
-        + (f'. {esc(l["text"])}' if l.get("text") else "") + "</p>"
-        + (f'<p class="small">{_src(l.get("evidence_url"), l.get("evidence_label")).strip()}</p>'
-           if _src(l.get("evidence_url"), l.get("evidence_label")) else "") + "</li>"
-        for l in _links(d, "organization"))
+    # Entities: one card per entity (organization link ref), every role it holds under its name,
+    # each role with its own source. Who decides comes first, then who applies, then who owns.
+    ents = {}
+    for l in sorted(_links(d, "organization"), key=lambda l: ENTITY_ORDER.get(l["role"], len(ENTITY_ORDER))):
+        ents.setdefault(l["ref"], []).append(l)
+
+    def role_line(l):
+        src = _src(l.get("evidence_url"), l.get("evidence_label")).strip()
+        return (f'<p><strong>{esc(ROLE_LABEL.get(l["role"], l["role"]))}</strong>'
+                + (f'. {esc(prose(l["text"]))}' if l.get("text") else "") + "</p>"
+                + (f'<p class="small">{src}</p>' if src else ""))
+    orgs = "".join(f'<li><p class="t">{esc(ref.split(":", 1)[1])}</p>{"".join(role_line(l) for l in ls)}</li>'
+                   for ref, ls in ents.items())
 
     def doc_li(l):
         rec = safe_url((l.get("facts") or {}).get("record_url"))
         srcs = _src(l.get("evidence_url"), l.get("evidence_label") or "Official record") + (
             _src(rec, "Agency record") if rec != safe_url(l.get("evidence_url")) else "")
-        return (f'<li><p class="t">{esc(_doc_title(l))}</p>'
+        return (f'<li><p class="t">{esc(prose(_doc_title(l)))}</p>'
                 f'<p class="small">{esc(ROLE_LABEL.get(l["role"], l["role"]))}'
                 + (f' · {esc(day(l.get("date")))}' if l.get("date") else "") + "</p>"
                 + (f'<p class="small">{srcs.strip()}</p>' if srcs else "") + "</li>")
@@ -352,23 +400,50 @@ def render(d, pages, built, head, crumb_place=None):
     shorts = [l for l in vids if (l.get("facts") or {}).get("kind") == "short"]
     posts = _links(d, "bluesky_post")
 
-    def vli(l):
+    def card(l, copy=False):
+        """A video as its YouTube thumbnail with the title under it. The copy (second pass of the
+        reel, so it can loop) is hidden from screen readers and the keyboard."""
         f = l["facts"]
-        return (f'<li><a href="{esc(safe_url(f.get("url")))}" rel="noopener">{esc(f.get("title"))}</a></li>')
+        url, vid = safe_url(f.get("url")), yt_id(f.get("url"))
+        tab = ' tabindex="-1"' if copy else ""
+        thumb = (f'<img src="https://i.ytimg.com/vi/{vid}/hqdefault.jpg" alt="" width="480" height="360" loading="lazy">'
+                 if vid else '<span class="noimg"></span>')
+        tag = '<span class="vtag">Short</span>' if f.get("kind") == "short" else ""
+        return (f'<li{" aria-hidden=\"true\"" if copy else ""}><a href="{esc(url)}" rel="noopener"{tab}>'
+                f'<span class="vthumb">{thumb}{tag}</span><span class="vtitle">{esc(prose(f.get("title")))}</span></a></li>')
 
     cov = ""
-    if main:
-        cov += f'<h3>Videos</h3><ul class="plain">{"".join(vli(l) for l in main)}</ul>'
-    if shorts:
-        cov += f'<h3>Shorts</h3><ul class="plain">{"".join(vli(l) for l in shorts)}</ul>'
+    vids_all = [l for l in main + shorts if safe_url((l.get("facts") or {}).get("url"))]
+    if vids_all:
+        moving = len(vids_all) > 1
+        track = "".join(card(l) for l in vids_all) + ("".join(card(l, True) for l in vids_all) if moving else "")
+        cov += (f'<h3>Videos</h3><div class="reel{" moving" if moving else ""}" role="region" aria-label="Videos">'
+                f'<ul class="reel-track" style="--n:{len(vids_all)}">{track}</ul></div>')
     if posts:
         cov += '<h3>Bluesky posts</h3><ul class="plain">' + "".join(
-            f'<li>{esc(day((l["facts"] or {}).get("published_at")))}: {esc((l["facts"] or {}).get("text"))}'
+            f'<li>{esc(day((l["facts"] or {}).get("published_at")))}: {esc(prose((l["facts"] or {}).get("text")))}'
             + _src(l.get("evidence_url"), "Post on Bluesky") + "</li>" for l in posts) + "</ul>"
     if cov:
         cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
                'records, and are listed only after they are public.</p>' + cov + '</div>')
 
+    parts = [
+        ("overview", "Overview", ov, "a HomeSignal summary"),
+        ("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"), "a recorded change"),
+        ("next", "What's next", _stmt_list(_stmts(d, "next"), "dnext"),
+         "an upcoming hearing or deadline confirmed in the sources HomeSignal tracks"),
+        ("map", "Map & land", map_inner, "a location"),
+        ("entities", "Entities", f'<ul class="cards">{orgs}</ul>' if orgs else "", "a linked entity"),
+        ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", "a linked official document"),
+        ("timeline", "Timeline", _timeline(d), "a dated event"),
+        ("coverage", "HomeSignal coverage", cov, "a HomeSignal video or post"),
+    ]
+    shown = [p for p in parts if p[2]]
+    missing = [p[3] for p in parts if not p[2]]
+    toc = ('<nav class="toc" aria-label="On this page"><ul>'
+           + "".join(f'<li><a href="{d["path"]}#{i}">{esc(t)}</a></li>' for i, t, _, _ in shown) + "</ul></nav>"
+           if len(shown) > 1 else "")
+    gaps = (f'<p class="empty" id="not-yet">Not on record yet: {esc("; ".join(missing))}.</p>' if missing else "")
     body = (
         '<a class="skip" href="#main">Skip to content</a>'
         '<header class="site"><div class="wrap"><a class="brand" href="/">HomeSignal</a>'
@@ -376,21 +451,11 @@ def render(d, pages, built, head, crumb_place=None):
         f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
         f'<h1 id="h1">{esc(name)}</h1>'
         + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}</section>{toc}'
-        + _section("overview", "Overview", ov, "HomeSignal has not written a summary of this development yet.")
-        + _section("changed", "What changed", _stmt_list(_stmts(d, "latest"), "dlatest"),
-                   "No change has been recorded yet.")
-        + _section("next", "What's next", _stmt_list(_stmts(d, "next"), "dnext"),
-                   "No upcoming hearing or deadline has been confirmed in the sources HomeSignal tracks.")
-        + _section("map", "Map & land", map_inner, "No location on record yet.")
-        + _section("organizations", "Organizations", f'<ul class="cards">{orgs}</ul>' if orgs else "",
-                   "No organization has been linked to this development yet.")
-        + _section("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "",
-                   "No official document has been linked yet.")
-        + _section("timeline", "Timeline", _timeline(d), "No dated event on record yet.")
-        + _section("coverage", "HomeSignal coverage", cov, "No HomeSignal video or post about this development yet.")
+        + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
+        + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
           'after a HomeSignal reviewer checked it against the source. Page compiled '
-          f'<time datetime="{esc(built)}">{esc(built)}</time>.</p>'
+          f'<time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
           '<nav aria-label="More"><a href="/">HomeSignal home</a><a href="/how-it-works.html">How HomeSignal works</a></nav>'
           '</footer></main>')
     # The shell's stylesheets are written for the app shell, which this script-free page does not
@@ -398,6 +463,10 @@ def render(d, pages, built, head, crumb_place=None):
     h = head(title, desc, canon, og_type="article", ld=ld)
     h = re.sub(r'<link rel="stylesheet" href="/(?:layout|app)\.css[^"]*">\n?', "", h)
     h = h.replace("</head>", f"<style>{CSS.strip()}</style>\n</head>", 1)
+    if vids_all:
+        if CSP_FROM not in h:
+            sys.exit("ERROR: development page head has no img-src to widen for video thumbnails")
+        h = h.replace(CSP_FROM, CSP_TO, 1)
     return h + f'<body>\n{body}\n</body>\n</html>\n'
 
 
@@ -464,6 +533,7 @@ def build(dossiers, pages, out_dir, built, head, state=None, base=""):
             state.add(d["path"], doc, hint if DAY_RE.match(hint) else None)
         out = os.path.join(out_dir, *d["path"].strip("/").split("/"))
         os.makedirs(out, exist_ok=True)
-        open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(doc.replace(ps.BUILD_DAY_TOKEN, built))
+        open(os.path.join(out, "index.html"), "w", encoding="utf-8").write(
+            doc.replace(BUILT_HUMAN, esc(day(built) or built)).replace(ps.BUILD_DAY_TOKEN, built))
         paths.append(d["path"])
     return paths

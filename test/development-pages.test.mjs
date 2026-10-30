@@ -49,7 +49,8 @@ function dossiers() {
                     evidence_label: 'Data-center listing', facts: { classification: 'CONFIRMED_DC' } },
         links: [
           { kind: 'dc_entity', ref: 'fe2068de-0000-4000-8000-000000000001', role: 'defining_record', grade: 'a',
-            evidence_url: 'https://atlas.example.org/dc/1', evidence_label: 'Data-center listing', facts: { classification: 'CONFIRMED_DC' } },
+            evidence_url: 'https://atlas.example.org/dc/1', evidence_label: 'Data-center listing', text: 'Valley campus (atlas record dc-1; status proposed)',
+            facts: { classification: 'CONFIRMED_DC' } },
           { kind: 'land_assembly', ref: 'valley-campus', role: 'associated_land', grade: 'a', evidence_url: 'https://county.example.gov/parcels',
             facts: { display_name: 'Valley data center <campus>', display_name_basis: 'descriptive',
                      zips: [{ zip: '01002', parcels: 12, primary: true }, { zip: '01003', parcels: 1, primary: false }] } },
@@ -58,7 +59,7 @@ function dossiers() {
             facts: { filing_no: 'x123', filing_type: 'Permanent change application', status: 'Unapproved',
                      filed_on: '2026-10-15', date_label: 'Priority date', record_url: W, points: 2 } },
           { kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'landowner_of_record', grade: 'a', evidence_url: W,
-            evidence_label: 'Change record x123', text: 'Owner of the water right being changed', facts: {} },
+            evidence_label: 'Change record x123', text: 'Owner of the water right being changed, filed 2026-10-15', facts: {} },
           { kind: 'government_record', ref: 'https://board.example.gov/agenda/9', role: 'agenda_item', grade: 'a',
             evidence_url: 'https://board.example.gov/agenda/9', evidence_label: 'Board agenda', text: 'Board agenda item 9',
             date: '2026-07-15', date_label: 'On agenda', aspect: 'Approvals', facts: {} },
@@ -67,7 +68,7 @@ function dossiers() {
             facts: { title: 'What the water filing says', url: 'https://www.youtube.com/watch?v=q-phnTGrMRQ', kind: 'main' } },
           { kind: 'youtube_video', ref: 'youtube:shortAAAAAA', role: 'explains', grade: 'a',
             evidence_url: 'https://www.youtube.com/shorts/shortAAAAAA',
-            facts: { title: 'The filing in 40 seconds', url: 'https://www.youtube.com/shorts/shortAAAAAA', kind: 'short' } },
+            facts: { title: 'The filing in 40 seconds #Shorts #jodytracks', url: 'https://www.youtube.com/shorts/shortAAAAAA', kind: 'short' } },
           { kind: 'bluesky_post', ref: 'bsky:at://did:plc:x/app.bsky.feed.post/aaa', role: 'explains', grade: 'a',
             evidence_url: 'https://bsky.app/profile/x/post/aaa',
             facts: { text: 'A filing to move ranch water to a data center', published_at: '2026-10-29T15:00:00Z' } },
@@ -175,17 +176,60 @@ ok(vMap && vMap.length === 4 && JSON.stringify(vMap) === JSON.stringify(vDos),
 
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
-ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the organization and its role');
+ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the entity and its role');
+ok(pa.includes('<h2 id="h-entities">Entities</h2>') && !/Organizations/.test(pa), 'the section is called Entities');
+// one card per entity: a second role for the same entity sits under the same name
+const two = dossiers();
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'applicant', grade: 'b', evidence_url: W,
+  evidence_label: 'Change record x123', text: 'Applicant on the change', facts: {} });
+const pTwo = read(build(two).out, A);
+ok((pTwo.match(/<p class="t">Example Ranch, Inc\.<\/p>/g) || []).length === 1
+   && /<p class="t">Example Ranch, Inc\.<\/p><p><strong>Applicant<\/strong>\. Applicant on the change<\/p>.*?<p><strong>Landowner of record<\/strong>/.test(pTwo),
+   'an entity with two roles is one card listing both');
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Water Board', role: 'governing_body', grade: 'a', evidence_url: W, facts: {} });
+const pOrd = read(build(two).out, A);
+ok(pOrd.indexOf('<p class="t">Water Board</p>') > 0 && pOrd.indexOf('<p class="t">Water Board</p>') < pOrd.indexOf('<p class="t">Example Ranch, Inc.</p>'),
+   'the governing body is listed before the landowner');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
-ok(/<h3>Videos<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/watch\?v=q-phnTGrMRQ"/.test(pa), 'the main video under Videos');
-ok(/<h3>Shorts<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/shorts\/shortAAAAAA"/.test(pa), 'the Short under Shorts');
+// videos: one reel of YouTube thumbnails with the title under each, main video first, then Shorts
+const reel = (pa.match(/<div class="reel moving" role="region" aria-label="Videos"><ul class="reel-track" style="--n:2">(.*?)<\/ul><\/div>/) || [])[1] || '';
+const items = reel.split('</li>').filter(Boolean);
+ok(items.length === 4, 'the reel holds both videos, then a hidden copy of each so it can loop', String(items.length));
+ok(items[0].includes('href="https://www.youtube.com/watch?v=q-phnTGrMRQ"')
+   && items[0].includes('<img src="https://i.ytimg.com/vi/q-phnTGrMRQ/hqdefault.jpg"')
+   && /<\/span><span class="vtitle">What the water filing says<\/span>/.test(items[0]), 'the main video: thumbnail, then its title');
+ok(items[1].includes('i.ytimg.com/vi/shortAAAAAA/hqdefault.jpg') && items[1].includes('<span class="vtag">Short</span>'), 'the Short is labelled');
+ok(!items[0].includes('aria-hidden') && !items[0].includes('tabindex')
+   && items.slice(2).every((x) => x.startsWith('<li aria-hidden="true">') && x.includes('tabindex="-1"')),
+   'only the loop copies are hidden from screen readers and the keyboard');
+ok(/\.reel\.moving:hover \.reel-track,\.reel\.moving:focus-within \.reel-track\{animation-play-state:paused\}/.test(pa)
+   && /prefers-reduced-motion:reduce\)\{[^}]*\}\.reel\.moving \.reel-track\{animation:none\}/.test(pa),
+   'the reel pauses on hover or focus and does not move for reduced motion');
+ok(pa.includes("img-src 'self' data: https://i.ytimg.com;") && !pb.includes('i.ytimg.com'),
+   'the CSP allows YouTube thumbnails only on a page that shows videos');
 ok(pa.includes('A filing to move ranch water to a data center') && pa.includes('href="https://bsky.app/profile/x/post/aaa"'), 'the Bluesky post');
 ok(!pa.includes('privateAAAA'), 'a withheld video is not on the page');
 ok(pa.includes('href="/map/01002/"') && pa.includes('12 associated parcels'), 'map links with the associated parcels');
 ok(pa.includes('It is not a confirmed project footprint'), 'associated land is not called a footprint');
 ok(pa.includes('href="/follow-development.html?d=ma/valley-campus"'), 'the Follow link');
 ok(pa.includes('Valley data center &lt;campus&gt;') && !pa.includes('<campus>'), 'source text is escaped');
+
+// 3b. presentation (2026-10-30 audit): dates as words, no hashtags, the defining record named by
+// the source it opens, empty sections said once, map links only in Map & land, the county crumb
+ok(pa.includes('being changed, filed Oct 15, 2026') && !pa.includes('filed 2026-10-15'), 'an ISO date in source text reads as a date');
+ok(pa.includes('>The filing in 40 seconds</span>') && !/#Shorts|#jodytracks/.test(pa), 'hashtags are dropped from a title');
+ok(pa.includes('<p class="t">Data-center listing</p><p class="small">Defining record</p>') && !pa.includes('atlas record dc-1'),
+   'the defining-record card is named by the source it links to');
+ok(!pa.includes('id="changed"') && !pa.includes('href="/development/ma/valley-campus/#changed"')
+   && pa.includes('<p class="empty" id="not-yet">Not on record yet: a recorded change.</p>'),
+   'an empty section is not drawn or listed; what is missing is said once', (pa.match(/id="not-yet">[^<]*/) || [''])[0]);
+ok(pb.includes('id="not-yet"') && /Not on record yet: [^<]*a linked entity/.test(pb), 'the same rule on the other page');
+const hero = pa.slice(pa.indexOf('<section class="hero"'), pa.indexOf('</section>', pa.indexOf('<section class="hero"')));
+ok(!hero.includes('/map/') && pa.includes('href="/map/01002/"'), 'the hero does not repeat the map links');
+ok(/<nav class="crumbs"[^>]*><a href="\/">HomeSignal<\/a> › <span>Hampshire County, MA<\/span> › <span aria-current="page">/.test(pa),
+   'the breadcrumb names the county, not a town', (pa.match(/<nav class="crumbs".*?<\/nav>/) || [''])[0]);
+ok(pa.includes('<time datetime="2026-10-29">Oct 29, 2026</time>.</p>'), 'the footer date reads as a date');
 
 // 4. name basis
 ok(pa.includes('Descriptive label by HomeSignal. No public record names this project.'), 'a descriptive name says so');
