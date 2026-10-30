@@ -5719,7 +5719,19 @@ Results.
     choice makes the set stale.
   - **The page:** the contact sheet lists shots that need you first, has a Main / Short A / Short B / Thumbnail switch, and
     loads previews as blobs, only those on screen.
-  - **Not built yet** (P2 follow-ups): manual upload and crop.
+  - **Use your own photo (2026-10-30, P2).** The Visuals step has an upload form per subject (`discovery.subjects`):
+    JPEG or PNG under 15 MB, a credit shown on screen, "this photo shows this site" (else REPRESENTATIVE), and the
+    statement "I own this photo or have permission to use it in JODY Tracks videos." (the same words the database stores).
+    - The page hashes the file (SHA-256) and uploads it with the admin's own session to `impact-media/<story>/uploads/<uuid>`.
+      Storage policy `impact_media_admin_upload` allows exactly that: an admin INSERT into an uploads folder, `.jpg` or
+      `.png`. There is no update or delete policy.
+    - `hs_impact_story_upload_photo` then checks the subject, the stored file's size and type, and the statement, records
+      it in `impact_story_uploads` (append-only), and makes it that subject's photo choice (`upload_id`; a choice now
+      comes from a job or an upload, never neither). Previews then read stale, as for any new choice.
+    - The engine (homesignal-ingest `storycraft.upload_problems`, `assets.storage_get`) checks the sha256 against the
+      bytes and decodes the image under the pixel limit before showing it.
+    - Apply order: merge the ingest engine first, then apply this SQL, then deploy the page.
+  - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
   - pg checks 12V1-12V16 plus 12r4b, 8 mutations caught.

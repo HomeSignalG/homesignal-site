@@ -220,6 +220,38 @@ create table if not exists public.impact_story_asset_choices (
 alter table public.impact_story_asset_choices enable row level security;
 revoke all on public.impact_story_asset_choices from public, anon, authenticated;
 
+-- A photo the founder uploaded for one subject of one story (plan v3 §6.3 "Upload owned/cleared photo"). The file is in
+-- the private impact-media bucket at <story>/uploads/<id>.jpg|png (written by the dashboard admin's own session, see the
+-- storage policy below); this row records it with the founder's permission statement, and a photo choice naming it
+-- (upload_id) hands it to the next job. The engine reads it with its own key and checks this sha256 before using it
+-- (homesignal-ingest impact/storycraft.py upload_problems, impact/render/assets.py storage_get). Append-only.
+create table if not exists public.impact_story_uploads (
+  id          uuid primary key,
+  story_id    uuid not null references public.impact_stories(id),
+  subject_id  text not null check (subject_id ~ '^[a-z0-9:][a-z0-9:-]{1,60}$'),
+  path        text not null unique,
+  mime        text not null check (mime in ('image/jpeg', 'image/png')),
+  bytes       bigint not null check (bytes between 1 and 15728640),
+  sha256      text not null check (sha256 ~ '^[0-9a-f]{64}$'),
+  credit      text not null check (char_length(btrim(credit)) between 2 and 120),
+  shows_site  boolean not null,
+  permission  text not null,          -- the statement the founder confirmed, word for word
+  actor       text not null,
+  at          timestamptz not null default now(),
+  check (path = story_id::text || '/uploads/' || id::text || case mime when 'image/png' then '.png' else '.jpg' end)
+);
+alter table public.impact_story_uploads enable row level security;
+revoke all on public.impact_story_uploads from public, anon, authenticated;
+-- a choice comes from exactly one place: a job's candidates, or an upload
+alter table public.impact_story_asset_choices alter column job_id drop not null;
+alter table public.impact_story_asset_choices add column if not exists upload_id uuid references public.impact_story_uploads(id);
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'impact_story_asset_choices_one_source') then
+    alter table public.impact_story_asset_choices add constraint impact_story_asset_choices_one_source
+      check ((job_id is null) <> (upload_id is null));
+  end if;
+end $$;
+
 -- VISUALS (2026-10-29, homesignal-ingest docs/impact-visuals/PLAN-v3-2026-10-29.md P2). A `visuals` job plans the story
 -- exactly as a render does and renders ONE still per shot with the real compositor (impact/render/build.py
 -- build_stills), uploaded as JPEG previews under impact-media/<story>/visuals/<job>/. Its manifest (one row here,
@@ -260,19 +292,29 @@ alter table public.impact_story_visual_events enable row level security;
 revoke all on public.impact_story_visual_events from public, anon, authenticated;
 
 -- The private bucket. Readable only by dashboard admins (the same helper Tab 16's bucket uses); written only by the
--- worker's service role (no insert/update/delete policy exists, so no browser session can write to it).
+-- worker's service role, apart from a dashboard admin's photo uploads (impact_media_admin_upload below).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('impact-media', 'impact-media', false, 262144000, array['video/mp4', 'image/png', 'text/plain', 'application/json', 'image/jpeg'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 drop policy if exists impact_media_admin_read on storage.objects;
 create policy impact_media_admin_read on storage.objects
   for select to authenticated using (bucket_id = 'impact-media' and public.hs_is_dashboard_admin());
+-- The one thing a browser session may write: a dashboard admin's photo upload, only into a story's uploads folder, only
+-- as a new .jpg or .png (no update or delete policy, so an upload is never replaced). It is used only once
+-- hs_impact_story_upload_photo has recorded it, with its checksum and the founder's permission statement.
+drop policy if exists impact_media_admin_upload on storage.objects;
+create policy impact_media_admin_upload on storage.objects
+  for insert to authenticated with check (bucket_id = 'impact-media' and public.hs_is_dashboard_admin()
+    and name ~ '^[0-9a-f-]{36}/uploads/[0-9a-f-]{36}\.(jpg|png)$');
 
 -- Append-only: approvals and events are evidence, never edited.
 create or replace function public._hs_is_append_only() returns trigger language plpgsql as $$
 begin raise exception 'impact story % rows are append-only', tg_table_name using errcode = '42501'; end $$;
 drop trigger if exists impact_story_approvals_append_only on public.impact_story_approvals;
 create trigger impact_story_approvals_append_only before update or delete on public.impact_story_approvals
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_uploads_append_only on public.impact_story_uploads;
+create trigger impact_story_uploads_append_only before update or delete on public.impact_story_uploads
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_asset_choices_append_only on public.impact_story_asset_choices;
 create trigger impact_story_asset_choices_append_only before update or delete on public.impact_story_asset_choices
@@ -473,7 +515,8 @@ begin
   end if;
   select coalesce(jsonb_agg(jsonb_build_object('subject_id', c.subject_id, 'candidate_id', c.candidate_id, 'job_id', c.job_id,
            'title', c.entry->>'title', 'license', c.entry->>'license', 'author', c.entry->>'author',
-           'page_url', c.entry->>'page_url', 'actor', c.actor, 'at', c.at) order by c.subject_id), '[]'::jsonb)
+           'page_url', c.entry->>'page_url', 'source', coalesce(c.entry->>'source', 'commons'), 'upload_id', c.upload_id,
+           'actor', c.actor, 'at', c.at) order by c.subject_id), '[]'::jsonb)
     into choices from public._hs_is_choices(p_story) c;
   if j.id is null then
     return jsonb_build_object('render_job', null, 'current', false, 'complete', false, 'files', '[]'::jsonb,
@@ -1026,6 +1069,56 @@ begin
   return jsonb_build_object('ok', true, 'subject', p_subject, 'candidate', p_candidate);
 end $$;
 
+-- Record a photo the founder uploaded (the file is already in impact-media at <story>/uploads/<p_upload>.jpg|png, put
+-- there by the dashboard with the admin's own session) and make it this subject's photo choice. The founder must
+-- confirm the permission statement; the credit is shown on screen with the photo. The engine checks p_sha256 against
+-- the file's bytes, so a wrong checksum means the photo is refused, never shown differently.
+create or replace function public.hs_impact_story_upload_photo(p_story uuid, p_subject text, p_upload uuid, p_mime text,
+  p_sha256 text, p_credit text, p_shows_site boolean, p_permission boolean)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; subj jsonb; p text; sz bigint; mt text;
+        cid text; c jsonb;
+        stmt constant text := 'I own this photo or have permission to use it in JODY Tracks videos.';
+begin
+  select * into s from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if not coalesce(p_permission, false) then
+    raise exception 'Confirm that you own this photo or have permission to use it.' using errcode = '22023';
+  end if;
+  if coalesce(p_mime, '') not in ('image/jpeg', 'image/png') then raise exception 'Upload a JPEG or PNG photo.' using errcode = '22023'; end if;
+  if coalesce(p_sha256, '') !~ '^[0-9a-f]{64}$' then raise exception 'The photo''s checksum is missing. Upload it again.' using errcode = '22023'; end if;
+  if char_length(btrim(coalesce(p_credit, ''))) not between 2 and 120 then
+    raise exception 'Say who took the photo (2 to 120 characters). It is shown on screen as the credit.' using errcode = '22023';
+  end if;
+  select x into subj from public.impact_story_versions v, jsonb_array_elements(coalesce(v.body->'discovery'->'subjects', '[]'::jsonb)) x
+   where v.story_id = p_story and v.version = s.current_version and x->>'id' = p_subject limit 1;
+  if subj is null then raise exception 'That is not one of this story''s subjects.' using errcode = '22023'; end if;
+  if exists (select 1 from public.impact_story_uploads where id = p_upload) then
+    raise exception 'That upload is already recorded.' using errcode = '23505';
+  end if;
+  p := p_story::text || '/uploads/' || p_upload::text || case when p_mime = 'image/png' then '.png' else '.jpg' end;
+  select (o.metadata->>'size')::bigint, o.metadata->>'mimetype' into sz, mt
+    from storage.objects o where o.bucket_id = 'impact-media' and o.name = p;
+  if not found then raise exception 'The photo was not found in storage. Upload it again.' using errcode = '55000'; end if;
+  if coalesce(sz, 0) not between 1 and 15728640 then raise exception 'The photo must be smaller than 15 MB.' using errcode = '22023'; end if;
+  if coalesce(mt, '') <> p_mime then raise exception 'The stored file is not the kind of image that was uploaded.' using errcode = '22023'; end if;
+  insert into public.impact_story_uploads (id, story_id, subject_id, path, mime, bytes, sha256, credit, shows_site, permission, actor)
+  values (p_upload, p_story, p_subject, p, p_mime, sz, p_sha256, btrim(p_credit), coalesce(p_shows_site, false), stmt, e);
+  cid := 'upload-' || left(replace(p_upload::text, '-', ''), 12);
+  c := jsonb_build_object('id', cid, 'source', 'founder_upload', 'subject_id', p_subject, 'file_url', 'storage:impact-media/' || p,
+    'sha256', p_sha256, 'mime', p_mime, 'title', 'Photo', 'author', btrim(p_credit), 'license', 'Used with permission',
+    'rights_status', 'cleared', 'site_specific', coalesce(p_shows_site, false),
+    'site_relation', case when p_shows_site then 'actual_site' else 'representative' end,
+    'category', coalesce(subj->>'category', 'place'), 'depicts', coalesce(subj->>'subject', p_subject),
+    'verified_at', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'uploaded_by', e, 'permission', stmt);
+  insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, upload_id, entry, actor)
+  values (p_story, p_subject, cid, null, p_upload, c, e);
+  update public.impact_stories set updated_at = now() where id = p_story;
+  perform public._hs_is_event(p_story, 'photo_uploaded', jsonb_build_object('subject', p_subject, 'upload', p_upload,
+    'shows_site', coalesce(p_shows_site, false), 'credit', btrim(p_credit)), e);
+  return jsonb_build_object('ok', true, 'subject', p_subject, 'candidate', cid);
+end $$;
+
 create or replace function public.hs_impact_story_save(p_story uuid, p_expected_version integer, p_body jsonb, p_note text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; nv int;
@@ -1432,7 +1525,8 @@ begin
     'public.hs_impact_story_section_revision(uuid, integer, text, text)', 'public.hs_impact_story_render(uuid, integer, boolean)',
     'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)',
     'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
-    'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)'] loop
+    'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
+    'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

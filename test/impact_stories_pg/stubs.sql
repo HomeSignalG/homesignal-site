@@ -21,7 +21,9 @@ grant usage on schema public, auth to anon, authenticated, service_role;
 -- storage (the render bucket and its read policy) and Tab 16's admin helper, as Supabase has them
 create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, metadata jsonb);
 alter table storage.objects enable row level security;
+grant usage on schema storage to authenticated;
+grant select, insert on storage.objects to authenticated;
 create function public.hs_is_dashboard_admin() returns boolean language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.dashboard_admins da where da.email = (auth.jwt() ->> 'email')) $$;

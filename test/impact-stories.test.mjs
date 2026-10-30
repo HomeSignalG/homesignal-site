@@ -50,9 +50,12 @@ ok(/values \('impact-media', 'impact-media', false,/.test(sql) && /for select to
 
 // 4. the page cannot publish, upload or hold a secret
 ok(!/googleapis|youtube\.com\/upload|open\.tiktokapis|bsky\.social|com\.atproto/i.test(code), 'page: no platform API');
-ok((code.match(/\.storage\./g) || []).length === 1 && /\.storage\.from\(BUCKET\)\.download\(/.test(code)
-   && !/\.(upload|createSignedUrl|getPublicUrl|createSignedUploadUrl)\(/.test(code)
-   && !/service_role|SUPABASE_WRITE_KEY|sk-ant/i.test(code), 'page: storage is read only (download as the admin), no secret');
+ok((code.match(/\.storage\./g) || []).length === 2
+   && JSON.stringify([...code.matchAll(/\.storage\.from\(BUCKET\)\.(\w+)\(/g)].map((m) => m[1]).sort()) === '["download","upload"]'
+   && /var id = crypto\.randomUUID\(\), path = S\.open \+ '\/uploads\/' \+ id/.test(code)
+   && !/createSignedUrl|getPublicUrl|createSignedUploadUrl/.test(code)
+   && !/service_role|SUPABASE_WRITE_KEY|sk-ant/i.test(code),
+   'page: storage is read as the admin, and the one write is a new photo in the story\'s uploads folder; no secret');
 ok(!/hs_youtube|hs_video_|social_posts/.test(code), 'page: never calls a Tab 16 / Bluesky queue function');
 ok(/nothing is published/.test(js) && /Not published/.test(js) && /Not connected/.test(js) && !/Not built yet/.test(js), 'page: honest Media / Distribution states');
 ok(!/innerHTML\s*=\s*[^;]*\+\s*(?!esc\()[a-z]+\.(title|text|error)\b/.test(code), 'page: database text goes through esc()');
@@ -75,6 +78,15 @@ ok(/function viewAccountability\(m, r\)/.test(js) && /viewAccountability\(d\.acc
    && /p_section: 'accountability'/.test(js) && /'visuals', 'accountability'\) then/.test(sql),
    'page+sql: the Accountability research section reads the responsibility map, and deeper research is a revision note');
 ok(/accountability: 'C\. Accountability'/.test(js) && /consequences: 'E\. Consequences'/.test(js), 'page: the accountability arc beats have labels');
+
+{ // a founder upload: the page shows the statement the database stores, word for word (plan v3 §6.3)
+  const pj = (js.match(/var UPLOAD_PERMISSION = '([^']+)'/) || [])[1];
+  const ps = (sql.match(/stmt constant text := '([^']+)'/) || [])[1];
+  ok(pj && pj === ps, 'page+sql: the upload permission statement is the same words on the page and in the database');
+  ok(/storage\.from\(BUCKET\)\.upload\(path, file, \{ contentType: file\.type, upsert: false \}\)/.test(js)
+     && /rpc\('hs_impact_story_upload_photo'/.test(js) && /'public\.hs_impact_story_upload_photo\(uuid, text, uuid, text, text, text, boolean, boolean\)'[,\]]/.test(sql),
+     'page+sql: an upload is a new file (never replacing one), recorded by the admin-only function');
+}
 
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
