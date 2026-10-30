@@ -568,5 +568,16 @@ select pg_temp.chk('13e the render key names impact-render-3',
   position('impact-render-3' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) > 0
   and position('impact-render-2' in pg_get_functiondef('public.hs_impact_story_render(uuid,integer,boolean)'::regprocedure)) = 0);
 
+-- 12V18 (Codex on #2386): a save made while the visuals are being prepared gets its check once they finish
+select public._hs_is_queue(pg_temp.id('s')::uuid, 'visuals', jsonb_build_object('scope', 'visuals|followup-test',
+  'narrative_hash', 'n'||md5('x'), 'renderer', 'impact-render-3', 'choices_key', md5('')), 'founder@example.com');
+create temp table _vj as select (pg_temp.lastjob()).id as id;
+select public.hs_impact_story_save(pg_temp.id('s')::uuid, pg_temp.cur(), pg_temp.body('Who gets the new dock?'));
+select pg_temp.chk('12V18a the save waits while the visuals job runs', (pg_temp.lastjob()).kind = 'visuals');
+select public.hs_impact_story_job_claim((select id from _vj));
+select public.hs_impact_story_job_complete((select id from _vj), jsonb_build_object('manifest', pg_temp.vman((select id from _vj))));
+select pg_temp.chk('12V18 a save made while the visuals were prepared is checked when they finish',
+  (pg_temp.lastjob()).kind = 'validate' and (pg_temp.lastjob()).status = 'queued' and (pg_temp.lastjob()).base_version = pg_temp.cur());
+
 \o
 select count(*) || ' checks passed' as result from _res where ok;

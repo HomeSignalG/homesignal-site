@@ -1205,6 +1205,7 @@ begin
      where id = p_job_id;
     perform public._hs_is_event(j.story_id, 'rendered', jsonb_build_object('job_id', j.id, 'version', j.base_version,
       'files', (select jsonb_agg(a->>'asset') from jsonb_array_elements(p_result->'assets') a)), 'worker');
+    perform public._hs_is_followup(s.id, 'worker');   -- a save made during the render is checked now
     return jsonb_build_object('ok', true, 'files', jsonb_array_length(p_result->'assets'));
   end if;
   if j.kind = 'visuals' then
@@ -1233,6 +1234,7 @@ begin
      where id = p_job_id;
     perform public._hs_is_event(j.story_id, 'visuals_prepared', jsonb_build_object('job_id', j.id, 'manifest_id', mid,
       'counts', vman->'counts'), 'worker');
+    perform public._hs_is_followup(s.id, 'worker');   -- a save made while the previews were prepared is checked now
     return jsonb_build_object('ok', true, 'manifest_id', mid);
   end if;
   if j.kind = 'validate' then
