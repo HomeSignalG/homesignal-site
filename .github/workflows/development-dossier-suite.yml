@@ -9,12 +9,14 @@ on:
   pull_request:
     paths:
       - 'docs/development-dossier.sql'
+      - 'docs/development-review.sql'
       - 'test/development_dossier_pg/**'
       - '.github/workflows/development-dossier-suite.yml'
   push:
     branches: [main]
     paths:
       - 'docs/development-dossier.sql'
+      - 'docs/development-review.sql'
       - 'test/development_dossier_pg/**'
       - '.github/workflows/development-dossier-suite.yml'
   workflow_dispatch: {}
