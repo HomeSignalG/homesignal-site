@@ -14,7 +14,7 @@
 //   7. a malformed snapshot or a link with no https source fails the build
 //   8. identical input produces byte-identical pages, and the build day never moves a fingerprint
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -203,6 +203,21 @@ const liTw = JSON.parse(readFileSync(join(tw.out, 'development', 'land-index.jso
 ok(tw.r.status === 0 && JSON.stringify(liTw.land) === '{}', 'land linked from two pages is left out, not guessed between',
    JSON.stringify(liTw.land));
 ok(!existsSync(join(none.out, 'development', 'land-index.json')), 'no dossiers, no land index');
+
+// 7c. every file the build writes is one the deploy's artifact audit accepts (pages.yml,
+// "Audit the REAL artifact"). 2026-10-30: the first real dossier build failed that audit on
+// development/ut/stratos-box-elder/index.html and development/land-index.json.
+const PAGES = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
+const gen = PAGES.slice(PAGES.indexOf('def generated(p):'), PAGES.indexOf('unexpected = sorted('));
+const exact = [...(gen.match(/p in \(([^)]*)\)/) || [, ''])[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+const prefixes = [...gen.matchAll(/p\.startswith\('([^']+)'\)/g)].map((m) => m[1]);
+ok(prefixes.length >= 8 && exact.includes('zip-pages-manifest.json'), 'the audit list of accepted files was read', JSON.stringify([exact, prefixes]));
+const walk = (d, base = '') => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(join(d, e.name), base + e.name + '/') : [base + e.name]);
+const written = walk(out).filter((p) => p !== 'sitemap.xml');
+const refused = written.filter((p) => !exact.includes(p) && !prefixes.some((x) => p.startsWith(x)));
+ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
+   'the artifact audit accepts every file the build writes', JSON.stringify(refused.slice(0, 10)));
 
 // 8. determinism and the build day
 const again = build(dossiers());

@@ -461,7 +461,7 @@ jobs:
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps|development)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -503,7 +503,8 @@ jobs:
               return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
                       or p.startswith('guides/') or p.startswith('sitemaps/')
-                      or p.startswith('map/') or p.startswith('map1/'))
+                      or p.startswith('map/') or p.startswith('map1/')
+                      or p.startswith('development/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'
