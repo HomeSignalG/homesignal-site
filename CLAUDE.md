@@ -5827,6 +5827,12 @@ format (homesignal-ingest `video/`: one development record told from its own doc
 - Links are where to start, never evidence: the video still uses only the record's fetched documents and `video/validate.py`.
 - Tests: `test/video-suggest.test.mjs`, `test/video-suggest.browser.test.mjs`, `test/youtube_video_suggestions_pg`
   (`youtube-video-suggestions-suite.yml`).
+- **Make video (founder, 2026-10-30: "is a button missing to have it generate?").** Each open suggestion has **Make
+  video** (`hs_youtube_video_suggestion_make`, same file): one `youtube_video_suggestion_runs` row, dispatched to
+  homesignal-ingest `video-suggestion-run.yml` on main (Claude on the founder's plan writes the project per
+  `video/MAKE_VIDEO.md`; a keyless job validates it; it lands on main, is built and uploaded to Tab 16 for review).
+  The run records made / declined (with the reason) / failed (back to waiting). Apply order: ingest workflow on main
+  first, then the SQL, then the page.
 
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 

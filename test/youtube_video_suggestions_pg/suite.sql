@@ -56,5 +56,65 @@ select pg_temp.chk('4b a made suggestion cannot be withdrawn',
 select pg_temp.chk('4c the made suggestion still lists, with its slug',
   exists (select 1 from jsonb_array_elements(public.hs_youtube_video_suggestions_list()) x where x->>'project_slug' = 'port-tacoma-blair'));
 
+-- 5. Make video
+select pg_temp.as_user('founder@example.com');
+select public.hs_youtube_video_suggest('{"title":"Apollo Global Management, data center"}');
+create temp table _ids as select id from public.youtube_video_suggestions where title = 'Apollo Global Management, data center';
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('5a a non-admin cannot press Make video', pg_temp.err(format('select public.hs_youtube_video_suggestion_make(%L::uuid)', (select id from _ids))) like '42501%');
+select pg_temp.as_user('founder@example.com');
+create temp table _mk as select public.hs_youtube_video_suggestion_make((select id from _ids)) r;
+select pg_temp.chk('5b Make video queues a run and dispatches the ingest workflow from main with the run id',
+  (select r->'run'->>'status' from _mk) = 'queued'
+  and exists (select 1 from net.requests where url like '%/workflows/video-suggestion-run.yml/dispatches'
+              and body->>'ref' = 'main' and body->'inputs'->>'run' = (select r.id::text from public.youtube_video_suggestion_runs r)));
+create temp table _mk2 as select public.hs_youtube_video_suggestion_make((select id from _ids)) r;
+select pg_temp.chk('5c a second press returns the same run and starts it again',
+  (select (r->>'existing')::boolean from _mk2)
+  and (select count(*) from public.youtube_video_suggestion_runs) = 1
+  and (select count(*) from net.requests where url like '%video-suggestion-run.yml%') = 2);
+select pg_temp.chk('5d the list carries the run', exists (select 1 from jsonb_array_elements(public.hs_youtube_video_suggestions_list()) x
+  where x->'run'->>'status' = 'queued'));
+select pg_temp.chk('5e no visitor can claim or complete',
+  pg_temp.err(format('select public.youtube_video_suggestion_claim(%L::uuid)', (select id from public.youtube_video_suggestion_runs))) is null
+  and not has_function_privilege('authenticated', 'public.youtube_video_suggestion_claim(uuid)', 'execute')
+  and not has_function_privilege('anon', 'public.youtube_video_suggestion_complete(uuid, jsonb)', 'execute')
+  and not has_function_privilege('authenticated', 'public._hs_yvs_dispatch(uuid)', 'execute'));
+select pg_temp.chk('5f claiming marks the run working and the suggestion picked',
+  (select status from public.youtube_video_suggestion_runs) = 'working'
+  and (select status from public.youtube_video_suggestions where id = (select id from _ids)) = 'picked');
+select pg_temp.chk('5g a working run cannot be claimed twice',
+  pg_temp.err(format('select public.youtube_video_suggestion_claim(%L::uuid)', (select id from public.youtube_video_suggestion_runs))) like '55000%');
+select pg_temp.chk('5h made without a slug is refused',
+  pg_temp.err(format('select public.youtube_video_suggestion_complete(%L::uuid, %L)', (select id from public.youtube_video_suggestion_runs),
+    '{"status":"made","summary":"done"}')) like '22023%');
+select public.youtube_video_suggestion_complete((select id from public.youtube_video_suggestion_runs), '{"status":"made","summary":"Made from 16 documents.","project_slug":"stream-data-centers-stamp-alabama"}');
+select pg_temp.chk('5i made closes the run and marks the suggestion made with the slug and the summary',
+  (select status = 'made' and project_slug = 'stream-data-centers-stamp-alabama' and status_note like 'Made from 16 documents.%'
+   from public.youtube_video_suggestions where id = (select id from _ids))
+  and (select status from public.youtube_video_suggestion_runs) = 'made');
+select pg_temp.chk('5j a made suggestion cannot be made again',
+  pg_temp.err(format('select public.hs_youtube_video_suggestion_make(%L::uuid)', (select id from _ids))) like '55000%');
+-- a failed run puts the suggestion back to waiting
+select public.hs_youtube_video_suggest('{"title":"A record with no fetcher yet"}');
+select public.hs_youtube_video_suggestion_make((select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'));
+select public.youtube_video_suggestion_claim((select r.id from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'A record with no fetcher yet'));
+select public.youtube_video_suggestion_complete((select r.id from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'A record with no fetcher yet'), '{"status":"failed","summary":"The build failed."}');
+select pg_temp.chk('5k a failed run returns the suggestion to waiting',
+  (select status from public.youtube_video_suggestions where title = 'A record with no fetcher yet') = 'waiting');
+select public.hs_youtube_video_suggestion_make((select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'));
+select public.youtube_video_suggestion_claim((select r.id from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'A record with no fetcher yet' and r.status = 'queued'));
+select public.youtube_video_suggestion_complete((select r.id from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'A record with no fetcher yet' and r.status = 'working'), '{"status":"declined","summary":"No fetcher for that host.","next_step":"Ask Claude to add one."}');
+select pg_temp.chk('5l a declined run declines the suggestion with the reason',
+  (select status = 'declined' and status_note = 'No fetcher for that host. Ask Claude to add one.' from public.youtube_video_suggestions where title = 'A record with no fetcher yet'));
+-- a missing credential fails the run readably instead of raising
+delete from vault.decrypted_secrets;
+select public.hs_youtube_video_suggest('{"title":"One more project to film"}');
+select public.hs_youtube_video_suggestion_make((select id from public.youtube_video_suggestions where title = 'One more project to film'));
+select pg_temp.chk('5m with no GitHub credential, the run is failed with a reason',
+  (select r.status = 'failed' and r.summary like 'The video could not start%' from public.youtube_video_suggestion_runs r
+   join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'One more project to film'));
+insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
+
 \o
 select count(*) || ' checks passed' from _res where ok;
