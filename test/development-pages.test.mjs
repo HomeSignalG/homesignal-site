@@ -184,8 +184,12 @@ two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Exampl
   evidence_label: 'Change record x123', text: 'Applicant on the change', facts: {} });
 const pTwo = read(build(two).out, A);
 ok((pTwo.match(/<p class="t">Example Ranch, Inc\.<\/p>/g) || []).length === 1
-   && /<p class="t">Example Ranch, Inc\.<\/p><p><strong>Landowner of record<\/strong>.*?<p><strong>Applicant<\/strong>\. Applicant on the change<\/p>/.test(pTwo),
+   && /<p class="t">Example Ranch, Inc\.<\/p><p><strong>Applicant<\/strong>\. Applicant on the change<\/p>.*?<p><strong>Landowner of record<\/strong>/.test(pTwo),
    'an entity with two roles is one card listing both');
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Water Board', role: 'governing_body', grade: 'a', evidence_url: W, facts: {} });
+const pOrd = read(build(two).out, A);
+ok(pOrd.indexOf('<p class="t">Water Board</p>') > 0 && pOrd.indexOf('<p class="t">Water Board</p>') < pOrd.indexOf('<p class="t">Example Ranch, Inc.</p>'),
+   'the governing body is listed before the landowner');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
 // videos: one reel of YouTube thumbnails with the title under each, main video first, then Shorts

@@ -31,6 +31,9 @@ ROLE_LABEL = {
     "land_use_case_for": "Land-use case", "defining_record": "Defining record",
     "facility_of": "Data-center listing", "primary_document": "Document",
 }
+ENTITY_ORDER = {r: i for i, r in enumerate((
+    "governing_body", "filing_receiver", "applicant", "master_developer", "buyer_under_contract",
+    "landowner_of_record", "designer", "consultant"))}
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
 
 
@@ -369,9 +372,9 @@ def render(d, pages, built, head, crumb_place=None):
                  if land else "")
 
     # Entities: one card per entity (organization link ref), every role it holds under its name,
-    # each role with its own source. Cards keep the snapshot's order of first appearance.
+    # each role with its own source. Who decides comes first, then who applies, then who owns.
     ents = {}
-    for l in _links(d, "organization"):
+    for l in sorted(_links(d, "organization"), key=lambda l: ENTITY_ORDER.get(l["role"], len(ENTITY_ORDER))):
         ents.setdefault(l["ref"], []).append(l)
 
     def role_line(l):
