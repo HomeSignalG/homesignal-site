@@ -52,7 +52,7 @@ ok(/values \('impact-media', 'impact-media', false,/.test(sql) && /for select to
 ok(!/googleapis|youtube\.com\/upload|open\.tiktokapis|bsky\.social|com\.atproto/i.test(code), 'page: no platform API');
 ok((code.match(/\.storage\./g) || []).length === 2
    && JSON.stringify([...code.matchAll(/\.storage\.from\(BUCKET\)\.(\w+)\(/g)].map((m) => m[1]).sort()) === '["download","upload"]'
-   && /var id = crypto\.randomUUID\(\), path = S\.open \+ '\/uploads\/' \+ id/.test(code)
+   && /var id = crypto\.randomUUID\(\), path = story \+ '\/uploads\/' \+ id/.test(code)
    && !/createSignedUrl|getPublicUrl|createSignedUploadUrl/.test(code)
    && !/service_role|SUPABASE_WRITE_KEY|sk-ant/i.test(code),
    'page: storage is read as the admin, and the one write is a new photo in the story\'s uploads folder; no secret');
