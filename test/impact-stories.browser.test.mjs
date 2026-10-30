@@ -216,6 +216,10 @@ ok(await page.evaluate(() => { const bs = [...document.querySelectorAll('#is [da
    'visuals: while a photo choice saves, it reads Saving… and every Use this photo button is disabled');
 await page.evaluate(() => document.querySelector('#is [data-act=choose]').click()); await page.waitForTimeout(50);
 ok(await nChoose() === nBefore + 1, 'visuals: a second click while saving sends nothing');
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
+await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => { const bs = [...document.querySelectorAll('#is [data-act=choose]')]; return bs.length > 0 && bs.every((b) => b.disabled); }),
+   'visuals: switching video tabs while saving keeps every Use this photo button disabled');
 await page.evaluate(() => window.__release()); await page.waitForTimeout(150);
 ok(await page.evaluate(() => [...document.querySelectorAll('#is [data-act=choose]')].some((b) => !b.disabled)), 'visuals: the buttons work again once the save and redraw finish');
 // Approve / Reject / Need new photo under every shot (2026-10-30), and rejecting every photo of an act.
