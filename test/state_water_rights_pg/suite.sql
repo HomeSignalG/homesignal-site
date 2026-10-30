@@ -50,6 +50,11 @@ select pg_temp.ck('map: a change application is known by its own number, beside 
   (select bool_and(filing_no = 'a55167' and right_no = '13-2') and count(*) = 2 from public.water_rights_filings where filing_no = 'a55167'));
 select pg_temp.ck('map: PRIORITY 20261015 is the date, labelled Priority date',
   (select bool_and(filed_on = date '2026-10-15' and date_label = 'Priority date') from public.water_rights_filings where filing_no = 'a55167'));
+select pg_temp.ck('map: a55167 is a permanent change application, not the base right''s "Application To Appropriate"',
+  (select bool_and(filing_type = 'Permanent change application') and count(*) = 2 from public.water_rights_filings where filing_no = 'a55167'),
+  (select string_agg(distinct coalesce(filing_type,'(null)'), ',') from public.water_rights_filings where filing_no = 'a55167'));
+select pg_temp.ck('map: a right with no change number keeps its own TYPE_OF_RIGHT verbatim',
+  (select filing_type = 'Application To Appropriate' from public.water_rights_filings where filing_no = '29-4501'));
 select pg_temp.ck('map: a year-only PRIORITY is not a date', (select filed_on is null from public.water_rights_filings where filing_no = '01-1'));
 
 -- 3. readers
@@ -172,6 +177,39 @@ select pg_temp.ck('nevada: after a complete load, Reno lists the filing in NDWR'
   (public.water_rights_for_zip('89501') ->> 'status') = 'complete'
   and (public.water_rights_for_zip('89501') #>> '{filings,0,filing_no}') = '94917'
   and (public.water_rights_for_zip('89501') #>> '{filings,0,status}') = 'READY FOR ACTION');
+
+-- 8c. Utah filing type: from the filing's own number, case preserved (DWRi's own rule).
+-- Every other field of the row is exactly what it was: the type is the only thing decided here.
+create temp table ut_type_cases (chex text, tor text, want text);
+insert into ut_type_cases values
+ ('a55167', 'Application To Appropriate', 'Permanent change application'),
+ ('t55206', 'Application To Appropriate', 'Temporary change application'),
+ ('t92-61-05', 'Application To Appropriate', 'Temporary change application'),
+ ('f52296', 'Application To Appropriate', 'Fixed-time change application'),
+ ('E2297', 'Application To Appropriate', 'Exchange application'),
+ ('X12', 'Application To Appropriate', 'Exchange application'),
+ ('c123', 'Application To Appropriate', 'Change application'),
+ ('A55167', 'Application To Appropriate', null),
+ ('T55206', 'Application To Appropriate', null),
+ ('', 'Application To Appropriate', 'Application To Appropriate'),
+ (null, 'Temporary Application', 'Temporary Application'),
+ (null, 'Fixed-Time Application', 'Fixed-Time Application'),
+ (null, 'Diligence Claim', 'Diligence Claim'),
+ ('13-2', 'Application To Appropriate', 'Application To Appropriate'),
+ (null, '', null);
+select pg_temp.ck('ut type: every case classified as DWRi classifies it (case preserved)',
+  (select bool_and(public.water_rights_ut_filing_type(chex, tor) is not distinct from want) from ut_type_cases),
+  (select string_agg(coalesce(chex,'(null)') || '->' || coalesce(public.water_rights_ut_filing_type(chex, tor),'(null)'), '; ')
+     from ut_type_cases where public.water_rights_ut_filing_type(chex, tor) is distinct from want));
+with feat as (select ('{"attributes":{"OBJECTID":1,"WRNUM":"13-2","CHEXNUM":"' || c || '","STATUS":"Unapproved","TYPE_OF_RIGHT":"Application To Appropriate","TYPE":"Surface","PRIORITY":"20261015","USES":"OP","CFS":4,"ACFT":1712,"LOCATION":"L","OWNER":"BAR H RANCH INC.","SOURCE":"Salt Wells Spring Stream","WebLink":"https://www.waterrights.utah.gov/search/?q=' || c || '"},"geometry":{"x":-112.7,"y":41.7}}')::jsonb f, c
+                from unnest(array['a55167','t55206','E2297']) c),
+     m as (select c, f, public.water_rights_map_feature('ut_dwr_pending', f, now()) w from feat)
+select pg_temp.ck('ut type: status, uses, applicant, dates, number, base right and content fingerprint are unchanged',
+  bool_and((w).status = 'Unapproved' and (w).uses = 'OP' and (w).applicant = 'BAR H RANCH INC.'
+           and (w).filed_on = date '2026-10-15' and (w).date_label = 'Priority date'
+           and (w).filing_no = c and (w).right_no = '13-2'
+           and (w).content_md5 = md5(((f -> 'attributes') - 'OBJECTID')::text || (f -> 'geometry')::text)))
+from m;
 
 -- 9. names
 select pg_temp.ck('names: a family trust is a person', public.water_rights_display_applicant('DOROTHY M REVOCABLE TRUST') = 'Individual applicant');

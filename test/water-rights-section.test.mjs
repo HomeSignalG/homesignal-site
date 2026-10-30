@@ -22,7 +22,7 @@ const text = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\
 // The real production answer for 84336 (a55167, shape from the local PostGIS run of the shipped SQL).
 const A55167 = { zip: '84336', state: 'UT', state_name: 'Utah', agency: 'Utah Division of Water Rights', status: 'complete',
   checked_at: '2026-10-28T15:45:00+00:00',
-  filings: [{ filing_no: 'a55167', right_no: '13-2', filing_type: 'Application To Appropriate', status: 'Unapproved',
+  filings: [{ filing_no: 'a55167', right_no: '13-2', filing_type: 'Permanent change application', status: 'Unapproved',
     uses: 'OP', diversion: 'Point of Return · Salt Wells Spring Stream', applicant: 'BAR H RANCH INC.',
     filed_on: '2026-10-15', date_label: 'Priority date', record_url: 'https://www.waterrights.utah.gov/search/?q=a55167',
     points: [{ lat: 41.7334, lng: -112.7003 }, { lat: 41.7534, lng: -112.6602 }] }] };
@@ -47,7 +47,7 @@ const un1 = text(W.sectionHTML(Object.assign({}, A55167, { status: 'unavailable'
 ok(un1.includes('could not be refreshed') && un1.includes('last confirmed Oct 28, 2026') && un1.includes('a55167'), 'A9: unavailable shows stored filings with their date', un1);
 
 // B
-ok(t1.includes('Application To Appropriate a55167') && t1.includes('Agency status: Unapproved'), 'B1: filing type, number and the agency’s status word', t1);
+ok(t1.includes('Permanent change application a55167') && t1.includes('Agency status: Unapproved'), 'B1: filing type, number and the agency’s status word', t1);
 ok(t1.includes('BAR H RANCH INC.') && t1.includes('Priority date Oct 15, 2026') && t1.includes('Changes right 13-2'), 'B2: applicant, labelled date, underlying right', t1);
 ok(h1.includes('href="https://www.waterrights.utah.gov/search/?q=a55167"'), 'B3: links the agency’s own record');
 ok(!/Use: OP/.test(t1), 'B4: an undecoded use code is not shown', t1);
