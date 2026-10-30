@@ -26,3 +26,21 @@ $P -c "do \$\$ begin
   if not exists (select 1 from pg_constraint where conname = 'impact_story_approvals_artifact_check'
                  and pg_get_constraintdef(oid) like '%narrative%') then raise exception 'FAIL: upgrade did not widen the artifact list'; end if;
 end \$\$;" && echo "upgrade: artifact list widened on re-apply"
+# upgrade path: a database from before photo sets (the newest choice per subject replaced the others) keeps exactly what
+# it showed: re-applying adds the column and a 'remove' row for every photo the old rule had replaced
+$P -c "alter table public.impact_story_asset_choices drop column action;"
+$P -c "insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, entry, actor)
+       select story_id, subject_id, 'replaced-' || candidate_id, job_id, entry, actor from public.impact_story_asset_choices where job_id is not null limit 1;
+       insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, entry, actor)
+       select story_id, subject_id, 'newest-' || candidate_id, job_id, entry, actor from public.impact_story_asset_choices where job_id is not null order by id limit 1;"
+$P -c "create table public._old_newest as select distinct on (story_id, subject_id) story_id, subject_id, candidate_id
+         from public.impact_story_asset_choices order by story_id, subject_id, id desc;"
+$P -f "$ROOT/docs/impact-stories.sql" >/dev/null
+$P -c "do \$\$ begin
+  if exists (select story_id, subject_id, candidate_id from public._old_newest
+             except select c.story_id, c.subject_id, c.candidate_id from public.impact_stories s, public._hs_is_choices(s.id) c)
+     or exists (select c.story_id, c.subject_id, c.candidate_id from public.impact_stories s, public._hs_is_choices(s.id) c
+             except select story_id, subject_id, candidate_id from public._old_newest)
+  then raise exception 'FAIL: photo sets after the upgrade differ from what the old rule showed'; end if;
+end \$\$;" && echo "upgrade: photo sets equal the old newest-per-subject choices"
+

@@ -214,7 +214,10 @@ create function pg_temp.vman(j uuid, shot_status text default 'clear', same bool
     'alternatives', jsonb_build_array(jsonb_build_object('subject_id', 'oak-trees', 'candidates', jsonb_build_array(
       jsonb_build_object('id', 'oak-alt-1', 'title', 'File:Oak2.jpg', 'license', 'CC BY 4.0', 'author', 'B. Person',
         'page_url', 'https://commons.wikimedia.org/wiki/File:Oak2.jpg', 'file_url', 'https://upload.wikimedia.org/y.jpg',
-        'sha256', repeat('d', 64), 'preview', jsonb_build_object('path', pg_temp.id('s') || '/visuals/' || j || '/cand-d.jpg')))))) $$;
+        'sha256', repeat('d', 64), 'preview', jsonb_build_object('path', pg_temp.id('s') || '/visuals/' || j || '/cand-d.jpg')),
+      jsonb_build_object('id', 'oak-alt-2', 'title', 'File:Oak3.jpg', 'license', 'CC0', 'author', 'C. Person',
+        'page_url', 'https://commons.wikimedia.org/wiki/File:Oak3.jpg', 'file_url', 'https://upload.wikimedia.org/z.jpg',
+        'sha256', repeat('e', 64), 'preview', jsonb_build_object('path', pg_temp.id('s') || '/visuals/' || j || '/cand-e.jpg')))))) $$;
 create function pg_temp.vis() returns jsonb language sql as $$ select public._hs_is_visuals(pg_temp.id('s')::uuid) $$;
 create function pg_temp.prep_visuals(shot_status text default 'clear', same boolean default true, pfx_ok boolean default true,
                                      license text default 'CC BY 4.0') returns uuid language plpgsql as $$ declare j uuid; begin
@@ -288,6 +291,28 @@ select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()
 select pg_temp.chk('12V15 an alternative the visuals offered can be chosen; the previews are then stale',
   pg_temp.vis()->>'state' = 'stale' and pg_temp.vis()->>'why' like '%chose or rejected a photo%'
   and pg_temp.err(format('select public.hs_impact_story_choose_asset(%L, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->'job'->>'id', 'oak-trees', 'made-up')) like '%not one of the candidates%');
+-- 12V32-12V34 (2026-10-30): a SET of photos per subject; the engine picks the best fit for each shot from it
+insert into _ids select 'vk1', public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key';
+select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()->'job'->>'id')::uuid, 'oak-trees', 'oak-alt-2');
+select pg_temp.chk('12V32 a second photo for the same subject is added to its set, not swapped in; clicking it again adds nothing',
+  (select count(*) from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'oak-trees') = 2
+  and jsonb_array_length(public._hs_is_choice_key(pg_temp.id('s')::uuid)->'choices') = 2
+  and public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key' <> pg_temp.id('vk1')
+  and (public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, (pg_temp.vis()->'job'->>'id')::uuid, 'oak-trees', 'oak-alt-2')->>'existing')::boolean
+  and jsonb_array_length(public._hs_is_media(pg_temp.id('s')::uuid)->'choices') = 2);
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12V33 non-admin cannot take a photo out of a set',
+  pg_temp.err(format('select public.hs_impact_story_unchoose_asset(%L, %L, %L)', pg_temp.id('s'), 'oak-trees', 'oak-alt-2')) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_story_unchoose_asset(uuid, text, text)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_story_unchoose_asset(uuid, text, text)', 'execute'));
+select pg_temp.as_user('founder@example.com');
+select public.hs_impact_story_unchoose_asset(pg_temp.id('s')::uuid, 'oak-trees', 'oak-alt-2');
+select pg_temp.chk('12V34 taking it out leaves the other photo and the old key; doing it twice changes nothing; rows stay append-only',
+  (select string_agg(candidate_id, ',') from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'oak-trees') = 'oak-alt-1'
+  and public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key' = pg_temp.id('vk1')
+  and (public.hs_impact_story_unchoose_asset(pg_temp.id('s')::uuid, 'oak-trees', 'oak-alt-2')->>'existing')::boolean
+  and exists (select 1 from public.impact_story_events where kind = 'asset_unchosen')
+  and pg_temp.err('update public.impact_story_asset_choices set action = ''add''') is not null);
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);
 select public.hs_impact_story_job_fail((pg_temp.lastjob()).id, 'Runner lost.');
@@ -563,7 +588,7 @@ select pg_temp.chk('12r3 non-admin cannot choose a photo',
 select pg_temp.as_user('founder@example.com');
 select public.hs_impact_story_choose_asset(pg_temp.id('s')::uuid, pg_temp.id('rb')::uuid, 'oak-trees', 'oak-photo-1a2b3c4d');
 select pg_temp.chk('12r4 the choice is recorded and append-only',
-  public._hs_is_media(pg_temp.id('s')::uuid)->'choices'->0->>'candidate_id' = 'oak-photo-1a2b3c4d'
+  public._hs_is_media(pg_temp.id('s')::uuid)->'choices' @> '[{"candidate_id":"oak-photo-1a2b3c4d"}]'
   and pg_temp.err('delete from public.impact_story_asset_choices') is not null);
 select pg_temp.chk('12r4b a new photo choice makes the approved visuals stale: Render is refused until they are approved again',
   pg_temp.vis()->>'state' = 'stale'
@@ -572,9 +597,9 @@ select pg_temp.approve_visuals();
 select public.hs_impact_story_render(pg_temp.id('s')::uuid, 7);
 select pg_temp.chk('12r5 the next Render is a new job carrying the chosen photo',
   (pg_temp.lastjob()).id <> pg_temp.id('rb')::uuid and (pg_temp.lastjob()).status = 'queued'
-  and (select x->'entry'->>'sha256' from jsonb_array_elements((pg_temp.lastjob()).input->'asset_choices') x where x->>'subject_id' = 'oak-trees') = repeat('b', 64)
+  and exists (select 1 from jsonb_array_elements((pg_temp.lastjob()).input->'asset_choices') x where x->>'subject_id' = 'oak-trees' and x->'entry'->>'sha256' = repeat('b', 64))
   and (pg_temp.lastjob()).input->>'renderer' = 'impact-render-3'
-  and (select x->>'candidate_id' from jsonb_array_elements(public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'asset_choices') x where x->>'subject_id' = 'oak-trees') = 'oak-photo-1a2b3c4d');
+  and public.hs_impact_story_job_claim((pg_temp.lastjob()).id)->'asset_choices' @> '[{"subject_id":"oak-trees","candidate_id":"oak-photo-1a2b3c4d"}]');
 select public.hs_impact_story_job_complete((pg_temp.lastjob()).id, jsonb_build_object('assets',
   jsonb_set(pg_temp.files((pg_temp.lastjob()).id), '{1,qc}', jsonb_build_object('ok', true, 'quality', jsonb_build_object('ok', false,
     'failures', jsonb_build_array(jsonb_build_object('code', 'excessive_documents', 'label', 'Too many documents and cards'))))),
@@ -724,7 +749,7 @@ select pg_temp.chk('12U5 a recorded upload becomes the subject''s photo choice, 
   and (select upload_id::text = pg_temp.id('u1') and job_id is null and entry->>'source' = 'founder_upload'
               and entry->>'file_url' = 'storage:impact-media/' || pg_temp.upath('u1') and entry->>'rights_status' = 'cleared'
               and entry->>'site_relation' = 'actual_site' and entry->>'category' = 'trees' and entry->>'author' = 'J. Founder'
-         from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'oak-trees')
+         from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'oak-trees' and upload_id is not null)
   and (select permission from public.impact_story_uploads where id = pg_temp.id('u1')::uuid) like 'I own this photo%'
   and public._hs_is_media(pg_temp.id('s')::uuid)->'choices' @> '[{"subject_id":"oak-trees","source":"founder_upload"}]'
   and exists (select 1 from public.impact_story_events where kind = 'photo_uploaded'));

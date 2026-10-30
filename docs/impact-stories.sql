@@ -251,6 +251,26 @@ do $$ begin
       check ((job_id is null) <> (upload_id is null));
   end if;
 end $$;
+-- A SET OF PHOTOS PER SUBJECT (founder, 2026-10-30: "i should be able to click on a bunch of photos i approve and you can
+-- select the best fits"). A choice row now adds a photo to its subject's set ('add') or takes it out ('remove'); a photo
+-- is in the set while its newest row is 'add', and the engine picks the best fit for each shot from the set. Before
+-- this, the newest choice per subject replaced the others. When the column is first added, every photo that the old
+-- rule had already replaced gets a 'remove' row, so nothing a founder replaced comes back and each story's set is
+-- exactly what it showed before.
+do $$ begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public'
+                  and table_name = 'impact_story_asset_choices' and column_name = 'action') then
+    alter table public.impact_story_asset_choices add column action text not null default 'add' check (action in ('add', 'remove'));
+    insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, upload_id, entry, actor, action)
+    select o.story_id, o.subject_id, o.candidate_id, o.job_id, o.upload_id, o.entry, 'system:photo-set-migration', 'remove'
+      from (select distinct on (story_id, subject_id, candidate_id) * from public.impact_story_asset_choices
+             order by story_id, subject_id, candidate_id, id desc) o
+     where not exists (select 1 from (select distinct on (story_id, subject_id) story_id, subject_id, candidate_id
+                                        from public.impact_story_asset_choices order by story_id, subject_id, id desc) n
+                        where n.story_id = o.story_id and n.subject_id = o.subject_id and n.candidate_id = o.candidate_id)
+     order by o.id;
+  end if;
+end $$;
 
 -- VISUALS (2026-10-29, homesignal-ingest docs/impact-visuals/PLAN-v3-2026-10-29.md P2). A `visuals` job plans the story
 -- exactly as a render does and renders ONE still per shot with the real compositor (impact/render/build.py
@@ -505,8 +525,9 @@ end $$;
 -- The photo chosen for each subject: the newest choice per subject wins.
 create or replace function public._hs_is_choices(p_story uuid)
 returns setof public.impact_story_asset_choices language sql stable security definer set search_path = public as $$
-  select distinct on (subject_id) * from public.impact_story_asset_choices where story_id = p_story
-   order by subject_id, id desc
+  select * from (select distinct on (subject_id, candidate_id) * from public.impact_story_asset_choices where story_id = p_story
+                  order by subject_id, candidate_id, id desc) c
+   where c.action = 'add' order by c.subject_id, c.candidate_id
 $$;
 
 create or replace function public._hs_is_media(p_story uuid)
@@ -892,10 +913,10 @@ create or replace function public._hs_is_choice_key(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
     'choices', coalesce((select jsonb_agg(jsonb_build_object('subject_id', c.subject_id, 'candidate_id', c.candidate_id, 'entry', c.entry)
-                 order by c.subject_id) from public._hs_is_choices(p_story) c), '[]'::jsonb),
+                 order by c.subject_id, c.candidate_id) from public._hs_is_choices(p_story) c), '[]'::jsonb),
     'rejected', coalesce((select jsonb_agg(r.entry || jsonb_build_object('id', r.photo_id, 'rejected_at', r.at)
                  order by r.photo_id) from public._hs_is_rejections(p_story) r), '[]'::jsonb),
-    'key', md5(coalesce((select string_agg(c.subject_id || '=' || c.candidate_id, ',' order by c.subject_id collate "C")
+    'key', md5(coalesce((select string_agg(c.subject_id || '=' || c.candidate_id, ',' order by c.subject_id collate "C", c.candidate_id collate "C")
                            from public._hs_is_choices(p_story) c), '')
             || coalesce((select '|rejected:' || string_agg(r.photo_id, ',' order by r.photo_id collate "C")
                            from public._hs_is_rejections(p_story) r), '')))
@@ -1175,11 +1196,31 @@ begin
   if coalesce(c->>'sha256', '') !~ '^[0-9a-f]{64}$' or coalesce(c->>'license', '') = '' or coalesce(c->>'file_url', '') = '' then
     raise exception 'That candidate is missing its license, file or checksum.' using errcode = '22023';
   end if;
+  if exists (select 1 from public._hs_is_choices(p_story) x where x.subject_id = p_subject and x.candidate_id = p_candidate) then
+    return jsonb_build_object('ok', true, 'existing', true, 'subject', p_subject, 'candidate', p_candidate);
+  end if;
   insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, entry, actor)
   values (p_story, p_subject, p_candidate, p_job, c, e);
   update public.impact_stories set updated_at = now() where id = p_story;
   perform public._hs_is_event(p_story, 'asset_chosen', jsonb_build_object('subject', p_subject, 'candidate', p_candidate,
     'license', c->>'license', 'title', c->>'title'), e);
+  return jsonb_build_object('ok', true, 'subject', p_subject, 'candidate', p_candidate);
+end $$;
+
+-- Take a photo out of its subject's set (the set is the photos the founder clicked; the engine picks from it).
+create or replace function public.hs_impact_story_unchoose_asset(p_story uuid, p_subject text, p_candidate text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); c public.impact_story_asset_choices%rowtype;
+begin
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  select * into c from public._hs_is_choices(p_story) x where x.subject_id = p_subject and x.candidate_id = p_candidate;
+  if not found then return jsonb_build_object('ok', true, 'existing', true); end if;
+  insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, upload_id, entry, actor, action)
+  values (p_story, p_subject, p_candidate, c.job_id, c.upload_id, c.entry, e, 'remove');
+  update public.impact_stories set updated_at = now() where id = p_story;
+  perform public._hs_is_event(p_story, 'asset_unchosen', jsonb_build_object('subject', p_subject, 'candidate', p_candidate,
+    'title', c.entry->>'title'), e);
   return jsonb_build_object('ok', true, 'subject', p_subject, 'candidate', p_candidate);
 end $$;
 
@@ -1728,6 +1769,7 @@ begin
     'public.hs_impact_story_angle(uuid, integer, text, text)', 'public.hs_impact_story_decide(uuid, text, text, integer, text, text)',
     'public.hs_impact_story_section_revision(uuid, integer, text, text)', 'public.hs_impact_story_render(uuid, integer, boolean)',
     'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)',
+    'public.hs_impact_story_unchoose_asset(uuid, text, text)',
     'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
     'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',

@@ -5801,6 +5801,22 @@ Results.
     - When one photo is used for two subjects (choices or planned shots), the bar names the photo and both subjects.
       The engine half (homesignal-ingest #981) keeps such a photo for both subjects; before it, the second choice
       replaced the first and Stratos's Prepare stopped on "no licensed photo yet" for the Great Salt Lake.
+  - **A set of photos per subject, approve per act (founder, 2026-10-30: "i should be able to click on a bunch of photos
+    i approve and you can select the best fits. then approve under each act").**
+    - **Photos:** "Add to your photos" adds a photo to its subject's set; it no longer replaces the one before.
+      `impact_story_asset_choices.action` is `add` or `remove`; a photo is in the set while its newest row is `add`
+      (`_hs_is_choices`). `hs_impact_story_unchoose_asset` takes one out. "Your photos" lists the whole set, each with
+      Remove. The engine already picks the best fit per shot from a subject's photos.
+      - Measured offline on Stratos: 1 photo per subject → 50% real imagery, 5 distinct photos; 2 per subject → 81%, 10.
+    - **Upgrade:** the first apply adds the column and a `remove` row (actor `system:photo-set-migration`) for every
+      photo the old newest-per-subject rule had replaced. Nothing a founder replaced comes back, and each story's set
+      equals what it showed before. One photo per subject gives the same choice key, so current previews stay current.
+    - **Approval:** each act (Short beat, thumbnail) has "Approve this act" (`vapprovegroup`). It approves every shot in
+      that part through `hs_impact_story_shot_decide`, leaving any shot already rejected or asked a new photo for.
+      Approving the last part calls `hs_impact_story_visuals_approve`, which still re-checks everything on the server.
+      The per-shot Approve button is gone (Reject and Need new photo stay); "Approve everything at once" remains in the
+      status bar.
+    - Tests: pg 12V32-12V34 and the upgrade check in `run.sh`; `test/impact-stories.browser.test.mjs`.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
