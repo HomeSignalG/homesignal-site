@@ -179,8 +179,22 @@ ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`
 ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the organization and its role');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
-ok(/<h3>Videos<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/watch\?v=q-phnTGrMRQ"/.test(pa), 'the main video under Videos');
-ok(/<h3>Shorts<\/h3><ul class="plain"><li><a href="https:\/\/www\.youtube\.com\/shorts\/shortAAAAAA"/.test(pa), 'the Short under Shorts');
+// videos: one reel of YouTube thumbnails with the title under each, main video first, then Shorts
+const reel = (pa.match(/<div class="reel moving" role="region" aria-label="Videos"><ul class="reel-track" style="--n:2">(.*?)<\/ul><\/div>/) || [])[1] || '';
+const items = reel.split('</li>').filter(Boolean);
+ok(items.length === 4, 'the reel holds both videos, then a hidden copy of each so it can loop', String(items.length));
+ok(items[0].includes('href="https://www.youtube.com/watch?v=q-phnTGrMRQ"')
+   && items[0].includes('<img src="https://i.ytimg.com/vi/q-phnTGrMRQ/hqdefault.jpg"')
+   && /<\/span><span class="vtitle">What the water filing says<\/span>/.test(items[0]), 'the main video: thumbnail, then its title');
+ok(items[1].includes('i.ytimg.com/vi/shortAAAAAA/hqdefault.jpg') && items[1].includes('<span class="vtag">Short</span>'), 'the Short is labelled');
+ok(!items[0].includes('aria-hidden') && !items[0].includes('tabindex')
+   && items.slice(2).every((x) => x.startsWith('<li aria-hidden="true">') && x.includes('tabindex="-1"')),
+   'only the loop copies are hidden from screen readers and the keyboard');
+ok(/\.reel\.moving:hover \.reel-track,\.reel\.moving:focus-within \.reel-track\{animation-play-state:paused\}/.test(pa)
+   && /prefers-reduced-motion:reduce\)\{[^}]*\}\.reel\.moving \.reel-track\{animation:none\}/.test(pa),
+   'the reel pauses on hover or focus and does not move for reduced motion');
+ok(pa.includes("img-src 'self' data: https://i.ytimg.com;") && !pb.includes('i.ytimg.com'),
+   'the CSP allows YouTube thumbnails only on a page that shows videos');
 ok(pa.includes('A filing to move ranch water to a data center') && pa.includes('href="https://bsky.app/profile/x/post/aaa"'), 'the Bluesky post');
 ok(!pa.includes('privateAAAA'), 'a withheld video is not on the page');
 ok(pa.includes('href="/map/01002/"') && pa.includes('12 associated parcels'), 'map links with the associated parcels');
@@ -191,7 +205,7 @@ ok(pa.includes('Valley data center &lt;campus&gt;') && !pa.includes('<campus>'),
 // 3b. presentation (2026-10-30 audit): dates as words, no hashtags, the defining record named by
 // the source it opens, empty sections said once, map links only in Map & land, the county crumb
 ok(pa.includes('being changed, filed Oct 15, 2026') && !pa.includes('filed 2026-10-15'), 'an ISO date in source text reads as a date');
-ok(pa.includes('>The filing in 40 seconds</a>') && !/#Shorts|#jodytracks/.test(pa), 'hashtags are dropped from a title');
+ok(pa.includes('>The filing in 40 seconds</span>') && !/#Shorts|#jodytracks/.test(pa), 'hashtags are dropped from a title');
 ok(pa.includes('<p class="t">Data-center listing</p><p class="small">Defining record</p>') && !pa.includes('atlas record dc-1'),
    'the defining-record card is named by the source it links to');
 ok(!pa.includes('id="changed"') && !pa.includes('href="/development/ma/valley-campus/#changed"')

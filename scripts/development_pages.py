@@ -57,6 +57,17 @@ def prose(s):
     return re.sub(r"\s{2,}", " ", HASHTAG_RE.sub("", s)).strip()
 
 
+YT_ID_RE = re.compile(r"^https://(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})(?:[?&#].*)?$")
+# YouTube's own thumbnail host; the page's CSP allows images from it and nothing else new.
+CSP_FROM = "img-src 'self' data:; font-src 'self';"
+CSP_TO = "img-src 'self' data: https://i.ytimg.com; font-src 'self';"
+
+
+def yt_id(url):
+    m = YT_ID_RE.match(str(url or ""))
+    return m.group(1) if m else ""
+
+
 def safe_url(u):
     u = str(u or "")
     return u if re.match(r"^https://[^\s\"<>]+$", u) else ""
@@ -276,6 +287,19 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 @media (max-width:520px){.timeline>li{grid-template-columns:1fr;gap:.2rem}}
 .chips{display:flex;flex-wrap:wrap;gap:.3rem}.chip{font-size:.72rem;border:1px solid var(--line);border-radius:999px;padding:0 .5rem;color:var(--ink2)}
 .jody{background:var(--violet-t);border-radius:12px;padding:.2rem 1rem .8rem}.jody h3{color:var(--violet)}
+.reel{overflow:hidden;margin:.4rem -1rem 0;padding:.2rem 1rem;mask-image:linear-gradient(90deg,transparent,#000 1rem,#000 calc(100% - 1rem),transparent)}
+.reel-track{list-style:none;margin:0;padding:0;display:flex;width:max-content}
+.reel-track>li{width:15rem;padding-right:.9rem;flex:none}
+.reel-track a{display:block;text-decoration:none;color:var(--ink)}.reel-track a:hover .vtitle{text-decoration:underline}
+.vthumb{display:block;position:relative;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:var(--line)}
+.vthumb img,.vthumb .noimg{display:block;width:100%;height:100%;object-fit:cover}
+.vtag{position:absolute;left:.4rem;bottom:.4rem;background:rgba(0,0,0,.72);color:#fff;font-size:.72rem;font-weight:600;border-radius:6px;padding:.05rem .4rem}
+.vtitle{display:block;font-size:.9rem;font-weight:600;line-height:1.35;margin-top:.45rem}
+.reel.moving .reel-track{animation:reel calc(var(--n) * 7s) linear infinite}
+.reel.moving:hover .reel-track,.reel.moving:focus-within .reel-track{animation-play-state:paused}
+@keyframes reel{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.reel{overflow-x:auto;mask-image:none}.reel.moving .reel-track{animation:none}
+ .reel-track>li[aria-hidden]{display:none}}
 .method{border-top:1px solid var(--line);margin-top:2.5rem;padding-block:1rem 3rem}
 .method nav{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.9rem}
 """
@@ -367,15 +391,25 @@ def render(d, pages, built, head, crumb_place=None):
     shorts = [l for l in vids if (l.get("facts") or {}).get("kind") == "short"]
     posts = _links(d, "bluesky_post")
 
-    def vli(l):
+    def card(l, copy=False):
+        """A video as its YouTube thumbnail with the title under it. The copy (second pass of the
+        reel, so it can loop) is hidden from screen readers and the keyboard."""
         f = l["facts"]
-        return (f'<li><a href="{esc(safe_url(f.get("url")))}" rel="noopener">{esc(prose(f.get("title")))}</a></li>')
+        url, vid = safe_url(f.get("url")), yt_id(f.get("url"))
+        tab = ' tabindex="-1"' if copy else ""
+        thumb = (f'<img src="https://i.ytimg.com/vi/{vid}/hqdefault.jpg" alt="" width="480" height="360" loading="lazy">'
+                 if vid else '<span class="noimg"></span>')
+        tag = '<span class="vtag">Short</span>' if f.get("kind") == "short" else ""
+        return (f'<li{" aria-hidden=\"true\"" if copy else ""}><a href="{esc(url)}" rel="noopener"{tab}>'
+                f'<span class="vthumb">{thumb}{tag}</span><span class="vtitle">{esc(prose(f.get("title")))}</span></a></li>')
 
     cov = ""
-    if main:
-        cov += f'<h3>Videos</h3><ul class="plain">{"".join(vli(l) for l in main)}</ul>'
-    if shorts:
-        cov += f'<h3>Shorts</h3><ul class="plain">{"".join(vli(l) for l in shorts)}</ul>'
+    vids_all = [l for l in main + shorts if safe_url((l.get("facts") or {}).get("url"))]
+    if vids_all:
+        moving = len(vids_all) > 1
+        track = "".join(card(l) for l in vids_all) + ("".join(card(l, True) for l in vids_all) if moving else "")
+        cov += (f'<h3>Videos</h3><div class="reel{" moving" if moving else ""}" role="region" aria-label="Videos">'
+                f'<ul class="reel-track" style="--n:{len(vids_all)}">{track}</ul></div>')
     if posts:
         cov += '<h3>Bluesky posts</h3><ul class="plain">' + "".join(
             f'<li>{esc(day((l["facts"] or {}).get("published_at")))}: {esc(prose((l["facts"] or {}).get("text")))}'
@@ -420,6 +454,10 @@ def render(d, pages, built, head, crumb_place=None):
     h = head(title, desc, canon, og_type="article", ld=ld)
     h = re.sub(r'<link rel="stylesheet" href="/(?:layout|app)\.css[^"]*">\n?', "", h)
     h = h.replace("</head>", f"<style>{CSS.strip()}</style>\n</head>", 1)
+    if vids_all:
+        if CSP_FROM not in h:
+            sys.exit("ERROR: development page head has no img-src to widen for video thumbnails")
+        h = h.replace(CSP_FROM, CSP_TO, 1)
     return h + f'<body>\n{body}\n</body>\n</html>\n'
 
 
