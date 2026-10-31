@@ -6121,3 +6121,12 @@ What people say about data centers, against what documented evidence shows. SQL 
 - **A Bluesky video plays in the detail view (2026-10-30)** in Bluesky's own embed, `embed.bsky.app/embed/<did>/app.bsky.feed.post/<rkey>`,
   built from the source's `source_key` (now in `_cc_claim_json`). It is the platform's player, like YouTube's; CSP `frame-src` adds
   `embed.bsky.app`. Video previews also need `img-src https://video.cdn.bsky.app`: `video.bsky.app` answers with a redirect there.
+- **Audit fixes (founder "fix all", 2026-10-31):**
+  - `claim_check_claims.listed`: a scan unlists a stored candidate that no longer qualifies (homesignal-ingest
+    `score.checkable`: Trending needs a number, amount or absolute fact). Both lists hide unlisted candidates; the row stays,
+    and a later scan can list it again. Suite 2f4-2f6.
+  - The Bluesky player is sandboxed (`allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`: no forms,
+    no top-page navigation). Test 7d. The YouTube nocookie player is unchanged.
+  - `verify-claim-check-media-live.yml` (daily 15:41 UTC): renders the LIVE page's own detail view, from its live script and
+    CSP, for a real Bluesky post and a real YouTube video in Chromium. It fails on any preview that does not load, a player
+    that does not answer, or any CSP violation.

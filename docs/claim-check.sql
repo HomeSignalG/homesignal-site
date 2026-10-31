@@ -200,6 +200,8 @@ alter table public.claim_check_claims add column if not exists bsky_uri text;
 alter table public.claim_check_claims add column if not exists bsky_cid text;
 alter table public.claim_check_claims add column if not exists published_at timestamptz;
 alter table public.claim_check_claims add column if not exists bsky_error text;
+-- A scan stops listing a stored candidate it no longer finds checkable (ingest claimcheck/score.checkable); the row stays.
+alter table public.claim_check_claims add column if not exists listed boolean not null default true;
 create unique index if not exists claim_check_one_per_slot on public.claim_check_claims (scheduled_slot) where bsky_status in ('scheduled', 'publishing', 'published');
 
 -- research versions (append-only)
@@ -352,9 +354,11 @@ begin
     'counts', (select jsonb_object_agg(x.status, x.n) from (select status, count(*) n from public.claim_check_claims group by status) x),
     'trending', (select coalesce(jsonb_agg(public._cc_claim_json(c) order by c.trend_score desc nulls last), '[]'::jsonb) from (
         select * from public.claim_check_claims where lane = 'trending' and status in ('candidate', 'needs_research', 'researching')
+           and (listed or status <> 'candidate')
          order by trend_score desc nulls last limit 50) c),
     'emerging', (select coalesce(jsonb_agg(public._cc_claim_json(c) order by c.significance desc nulls last, c.created_at desc), '[]'::jsonb) from (
         select * from public.claim_check_claims where lane = 'emerging' and status in ('candidate', 'needs_research', 'researching')
+           and (listed or status <> 'candidate')
          order by significance desc nulls last, created_at desc limit 50) c),
     'review', (select coalesce(jsonb_agg(public._cc_claim_json(c) order by c.updated_at desc), '[]'::jsonb) from (
         select * from public.claim_check_claims where status in ('research_ready', 'approved') order by updated_at desc limit 50) c),
@@ -635,15 +639,16 @@ begin
     ids := array(select cs.id from public.claim_check_sources cs where cs.source_key in (select jsonb_array_elements_text(coalesce(x->'source_keys', '[]'))));
     if coalesce(array_length(ids, 1), 0) = 0 then continue; end if;
     insert into public.claim_check_claims as c (claim_key, lane, topic, speaker_name, person_id, place, source_ids, trend_score,
-        score_parts, score_confidence, significance, reasons)
+        score_parts, score_confidence, significance, reasons, listed)
     values (x->>'claim_key', coalesce(x->>'lane', 'emerging'), left(x->>'topic', 300), x->>'speaker_name', (x->>'person_id')::uuid,
         x->>'place', ids, (x->>'trend_score')::int, coalesce(x->'score_parts', '{}'), x->>'score_confidence',
-        (x->>'significance')::int, coalesce(x->'reasons', '[]'))
+        (x->>'significance')::int, coalesce(x->'reasons', '[]'), coalesce((x->>'listed')::boolean, true))
     on conflict (claim_key) do update set
         trend_score = excluded.trend_score, score_parts = excluded.score_parts, score_confidence = excluded.score_confidence,
         significance = greatest(c.significance, excluded.significance),
         source_ids = (select array(select distinct u from unnest(c.source_ids || excluded.source_ids) u)),
         lane = case when c.status = 'candidate' then excluded.lane else c.lane end,
+        listed = case when c.status = 'candidate' then excluded.listed else c.listed end,
         -- a later scan may name a speaker an earlier one missed; it never replaces one already set (research may have)
         speaker_name = coalesce(c.speaker_name, excluded.speaker_name), person_id = coalesce(c.person_id, excluded.person_id),
         reasons = excluded.reasons, updated_at = now()

@@ -110,6 +110,8 @@ const bp = T.detailView(Object.assign({}, claim, { status: 'candidate', verdict:
 ok(/<iframe class="cc-embed cc-bsky"[^>]*src="https:\/\/embed\.bsky\.app\/embed\/did:plc:4llrhdclvdlmmynkwsmg5tdc\/app\.bsky\.feed\.post\/3mynwycgzla2p"/.test(bp), '7a a Bluesky post with a key plays in its embed');
 ok(T.bskyEmbed({ platform: 'bluesky', source_key: 'bsky:did:plc:x"onload=1/app.bsky.feed.post/abcdef' }) === '' && T.bskyEmbed({ platform: 'youtube', source_key: bkey }) === '' && T.bskyEmbed({ platform: 'bluesky' }) === '', '7b no embed for a bad key, another platform, or no key');
 ok(/frame-src[^;]*https:\/\/embed\.bsky\.app[ ;]/.test(csp + ';'), '7c the CSP allows Bluesky\'s embed');
+const bsb = (bp.match(/<iframe class="cc-embed cc-bsky"[^>]*sandbox="([^"]*)"/) || [])[1] || '';
+ok(bsb.split(' ').sort().join(' ') === 'allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts', '7d the Bluesky player is sandboxed: no forms, no top-page navigation, no downloads');
 
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);
