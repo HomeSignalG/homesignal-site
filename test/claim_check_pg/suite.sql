@@ -78,6 +78,16 @@ do $$ declare sid uuid := pg_temp.newscan(); r jsonb; begin
   perform pg_temp.chk('2f3 a re-scan never replaces a stored publisher or speaker',
      (select publisher from public.claim_check_sources where source_key = 'bsky:bskyP') = 'Aaron Rupar'
      and (select speaker_name from public.claim_check_claims where claim_key = 'kS') = 'Donald Trump');
+  -- a scan that no longer finds a stored candidate checkable unlists it; the row stays, and a later scan can list it again
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('vidU')), jsonb_build_array(pg_temp.clm('kU', array['youtube:vidU'])), '[]');
+  perform pg_temp.chk('2f4 a new claim is listed', (select listed from public.claim_check_claims where claim_key = 'kU')
+     and exists (select 1 from jsonb_array_elements(public.hs_claim_check_overview()->'trending') e where e->>'id' = pg_temp.cid('kU')::text));
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('vidU')), jsonb_build_array(pg_temp.clm('kU', array['youtube:vidU'], 'emerging') || '{"listed":false}'), '[]');
+  perform pg_temp.chk('2f5 an unlisted candidate leaves both lists but stays stored', pg_temp.cid('kU') is not null
+     and not exists (select 1 from jsonb_array_elements(public.hs_claim_check_overview()->'trending') e where e->>'id' = pg_temp.cid('kU')::text)
+     and not exists (select 1 from jsonb_array_elements(public.hs_claim_check_overview()->'emerging') e where e->>'id' = pg_temp.cid('kU')::text));
+  perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('vidU')), jsonb_build_array(pg_temp.clm('kU', array['youtube:vidU'])), '[]');
+  perform pg_temp.chk('2f6 a later scan lists it again', (select listed from public.claim_check_claims where claim_key = 'kU'));
   perform public.claim_check_scan_finish(sid, 'partial', '{}', '[{"kind":"bluesky"}]');
   perform pg_temp.chk('2g finishing twice is refused', pg_temp.err(format('select public.claim_check_scan_finish(%L, %L, %L, %L)', sid, 'ok', '{}', '[]')) like '55000%');
 end $$;
