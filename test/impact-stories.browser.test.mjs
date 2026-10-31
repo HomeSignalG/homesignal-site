@@ -194,6 +194,13 @@ await page.waitForTimeout(150);
 let vt = await page.locator('#is').innerText();
 ok(vt.includes('Needs your attention (1)') && vt.includes('No photo yet for Oak trees') && vt.includes('No photo yet: showing the record'), 'visuals: the shots that need you are listed first, with why');
 ok(!/illustration/i.test(vt), 'visuals: no shot is offered or described as a drawing (founder, 2026-10-30: no illustrations)');
+// audit 2026-10-31: one approve path, buttons once, and the shots before the photo tools
+ok(await page.locator('#is [data-act=vapprove].primary').count() === 0 && await page.locator('#is [data-act=vnext]').count() === 1,
+   'visuals: while parts wait, the header does not offer to approve the whole set; it offers the next part to approve');
+ok(await page.locator('#is [data-act=vshot][data-shot=a2-s1][data-d=rejected]').count() === 1 && await page.locator('#is [data-act=vgoto][data-k=main]').count() === 1,
+   'visuals: a shot that needs attention is listed once with Show it, and its buttons appear once (in the sheet)');
+ok(await page.evaluate(() => { const h = document.getElementById('is').innerHTML; return h.indexOf('is-vgroup-main-0') > 0 && h.indexOf('is-vgroup-main-0') < h.indexOf('More licensed photos you can add'); }),
+   'visuals: the acts to approve come before the photo tools');
 ok(vt.includes('3 clear · 1 to look at · 0 blocked') && vt.includes('0 of 4 parts approved')
    && await page.locator('#is [data-act=vapprovegroup]').count() === 2 && vt.includes('Approve this act'),
    'visuals: the counts, and one Approve this act under each act (founder, 2026-10-30)');
@@ -205,6 +212,9 @@ ok(await page.locator('#is img[src^="blob:"]').count() >= 3 && (await page.inner
 await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(120);
 ok((await page.locator('#is').innerText()).includes('short_a-hook') && await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')),
    'visuals: Short A shows its own shots');
+await page.click('#is [data-act=vnext]'); await page.waitForTimeout(80);
+ok(await page.locator('#is-vgroup-main-0').count() === 1, 'visuals: Show the next part to approve opens the tab of the first part still waiting');
+await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(80);
 await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
    'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
