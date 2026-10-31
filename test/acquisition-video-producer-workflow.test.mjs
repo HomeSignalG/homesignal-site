@@ -25,6 +25,13 @@ function startServer() {
       }
       const types = { '.html': 'text/html', '.js': 'text/javascript' };
       res.writeHead(200, { 'Content-Type': types[path.extname(fp)] || 'application/octet-stream' });
+      if (fp.endsWith('acquisition.html')) {
+        // the page pins supabase-js by hash; the test replaces that library with a stub (below), so the copy served
+        // here drops the hash on that one tag. Production keeps it.
+        const html = fs.readFileSync(fp, 'utf8').replace(
+          /(<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@[^"]+") integrity="[^"]+"/, '$1');
+        res.end(html); return;
+      }
       fs.createReadStream(fp).pipe(res);
     });
     srv.listen(0, '127.0.0.1', () => resolve({ srv, port: srv.address().port }));
@@ -45,6 +52,25 @@ const { srv, port } = await startServer();
 const base = 'http://127.0.0.1:' + port;
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
+// supabase-js comes from jsDelivr, which a runner cannot always reach (the cause of this test's
+// intermittent "no uncaught page errors (7)": window.supabase undefined -> createClient throws).
+// Serve a signed-out stub so the page boots the same way every run; any call chain resolves empty.
+const SB_STUB = `(function(){
+  var empty = { data: null, error: null };
+  function chain(){ return new Proxy(function(){}, {
+    get: function(_t, k){
+      if (k === 'then') return function(res){ return Promise.resolve(empty).then(res); };
+      if (k === 'getSession') return function(){ return Promise.resolve({ data: { session: null }, error: null }); };
+      if (k === 'getUser') return function(){ return Promise.resolve({ data: { user: null }, error: null }); };
+      if (k === 'onAuthStateChange') return function(){ return { data: { subscription: { unsubscribe: function(){} } } }; };
+      return chain();
+    },
+    apply: function(){ return chain(); }
+  }); }
+  window.supabase = { createClient: function(){ return chain(); } };
+})();`;
+await page.route('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2*', (route) =>
+  route.fulfill({ status: 200, contentType: 'text/javascript', body: SB_STUB }));
 page.on('dialog', (d) => d.accept());
 const pageErrors = [];
 const consoleErrors = [];
