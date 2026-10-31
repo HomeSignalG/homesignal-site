@@ -6125,6 +6125,9 @@ What people say about data centers, against what documented evidence shows. SQL 
   - `claim_check_claims.listed`: a scan unlists a stored candidate that no longer qualifies (homesignal-ingest
     `score.checkable`: Trending needs a number, amount or absolute fact). Both lists hide unlisted candidates; the row stays,
     and a later scan can list it again. Suite 2f4-2f6.
+  - `claim_check_scan_claim` returns `known_claims` (every stored claim key); the scanner keeps an unlisted claim only when its
+    key is in it. Its first version used known SOURCES and stored 214 new uncheckable posts (removed 2026-10-31). Suite 2f7.
+    Applied to production 2026-10-31 (md5(prosrc) `2d3362db…`).
   - The Bluesky player is sandboxed (`allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`: no forms,
     no top-page navigation). Test 7d. The YouTube nocookie player is unchanged.
   - `verify-claim-check-media-live.yml` (daily 15:41 UTC): renders the LIVE page's own detail view, from its live script and

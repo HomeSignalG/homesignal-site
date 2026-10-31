@@ -25,6 +25,10 @@ create function pg_temp.good(verdict text default 'false') returns jsonb languag
 create function pg_temp.newscan() returns uuid language plpgsql as $$ declare sid uuid; begin
   insert into public.claim_check_scans (trigger, requested_by) values ('manual', 'test') returning id into sid;
   perform public.claim_check_scan_claim(sid); return sid; end $$;
+create function pg_temp.claim_twice() returns jsonb language plpgsql as $$ declare x uuid; r jsonb; begin
+  insert into public.claim_check_scans (trigger, requested_by) values ('manual', 'test') returning id into x;
+  r := jsonb_build_array(public.claim_check_scan_claim(x), public.claim_check_scan_claim(x));
+  delete from public.claim_check_scans where id = x; return r; end $$;
 create function pg_temp.cid(k text) returns uuid language sql as $$ select id from public.claim_check_claims where claim_key = k $$;
 create function pg_temp.research(k text, body jsonb) returns jsonb language plpgsql as $$ declare r uuid; begin
   insert into public.claim_check_research_runs (claim_id, note, requested_by) values (pg_temp.cid(k), 'test', 'test') returning id into r;
@@ -88,6 +92,8 @@ do $$ declare sid uuid := pg_temp.newscan(); r jsonb; begin
      and not exists (select 1 from jsonb_array_elements(public.hs_claim_check_overview()->'emerging') e where e->>'id' = pg_temp.cid('kU')::text));
   perform public.claim_check_scan_record(sid, jsonb_build_array(pg_temp.src('vidU')), jsonb_build_array(pg_temp.clm('kU', array['youtube:vidU'])), '[]');
   perform pg_temp.chk('2f6 a later scan lists it again', (select listed from public.claim_check_claims where claim_key = 'kU'));
+  perform pg_temp.chk('2f7 a claimed scan is told which claim keys are stored (and a second claim of it gets nothing)',
+     (select (t->0->'known_claims') ? 'kU' and not (t->1 ? 'known_claims') from (select pg_temp.claim_twice() t) q));
   perform public.claim_check_scan_finish(sid, 'partial', '{}', '[{"kind":"bluesky"}]');
   perform pg_temp.chk('2g finishing twice is refused', pg_temp.err(format('select public.claim_check_scan_finish(%L, %L, %L, %L)', sid, 'ok', '{}', '[]')) like '55000%');
 end $$;
