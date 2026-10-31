@@ -13,6 +13,9 @@ import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
+import { surfaceBanner } from './lib/surface-banner.mjs';
+
+surfaceBanner('verify-claim-check-media-live');
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const SITE = arg('--site', 'https://jodytracks.com').replace(/\/$/, '');
