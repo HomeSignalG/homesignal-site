@@ -337,6 +337,30 @@ ok(await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_sto
    'visuals: approving the last part approves the whole set');
 await page.evaluate(() => { delete window.db.visuals.shot_decisions; });
 await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(50);
+// Every part approved by approvals kept from the previous previews, the set itself not approved yet: the bar says one
+// click is left and makes Approve the visuals the main button (before, it read "5 of 5 approved" with no clear next step).
+await page.evaluate(() => {
+  window.db.visuals.carried_decisions = [['main', 'a1-s1'], ['main', 'a2-s1'], ['short_a', 'short_a-hook'], ['short_b', 'short_b-hook'], ['thumbnail', 'thumbnail']]
+    .map((x) => ({ asset: x[0], shot_id: x[1], decision: 'approved', actor: 'f', from_manifest: 40 }));
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+const cbar = await page.locator('#is-visbar').innerText();
+ok(cbar.includes('Every part is approved. One click left.') && cbar.includes('Next: click Approve the visuals.')
+   && await page.locator('#is-visbar .is-btn.primary[data-act=vapprove]').count() === 1 && await page.locator('#is [data-act=vapprovegroup]').count() === 0,
+   'visuals: every part approved earlier, set not approved: the bar says one click is left, with Approve the visuals as the main button');
+// A part whose only open shot is one the founder rejected has nothing to approve: no button, a badge that says why.
+await page.evaluate(() => {
+  window.db.visuals.carried_decisions = window.db.visuals.carried_decisions.filter((d) => d.shot_id !== 'a2-s1');
+  window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'rejected', note: 'wrong place' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+const nfx = await page.locator('#is').innerText();
+ok(nfx.includes('Needs a fix: prepare the visuals again') && await page.locator('#is [data-act=vapprovegroup]').count() === 0,
+   'visuals: a part holding only a rejected shot shows Needs a fix, not a button that approves nothing');
+await page.evaluate(() => { delete window.db.visuals.carried_decisions; delete window.db.visuals.shot_decisions; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // Use your own photo (plan v3 §6.3): straight into the story's private uploads folder, then recorded with its checksum.
 // setContent pages are not a secure context, so the browser hides crypto.subtle and randomUUID (the https dashboard has
 // both): give this page Node's SHA-256 behind the same calls.
