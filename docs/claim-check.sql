@@ -607,7 +607,9 @@ begin
                  'priority', p.priority, 'organization', p.organization) order by p.priority, p.name), '[]'::jsonb)
                  from public.claim_check_people p where p.status = 'active'),
     'known_sources', (select coalesce(jsonb_object_agg(source_key, jsonb_build_object('metrics', metrics, 'metrics_at', metrics_at)), '{}'::jsonb)
-                 from public.claim_check_sources where last_seen_at > now() - interval '30 days'));
+                 from public.claim_check_sources where last_seen_at > now() - interval '30 days'),
+    -- claim keys already stored: the scanner keeps only these (unlisted) when they stop qualifying; a known SOURCE is not one
+    'known_claims', (select coalesce(jsonb_agg(claim_key order by claim_key), '[]'::jsonb) from public.claim_check_claims));
 end $$;
 
 -- Records what one scan found. Sources upsert by source_key (metrics move to metrics_prev); claims upsert by claim_key and
