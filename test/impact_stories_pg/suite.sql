@@ -416,6 +416,36 @@ select pg_temp.chk('12V31b the unchanged thumbnail carries its approval; the cha
 select public.hs_impact_story_shot_decide(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint, pg_temp.vis()->>'manifest_hash', 'thumbnail', 'thumbnail', 'rejected', 'Now wrong.');
 select pg_temp.chk('12V31c a decision on these previews replaces the carried one',
   jsonb_array_length(pg_temp.vis()->'carried_decisions') = 0);
+-- 12V35: Approve this act / Reject every photo in this act are all-or-nothing
+select pg_temp.chk('12V35a a bad shot in the list saves no approval at all',
+  pg_temp.err(format('select public.hs_impact_story_shots_approve(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id',
+        pg_temp.vis()->>'manifest_hash', 'main', '{a1-s1,nope}')) like '%not in these previews%'
+  and not exists (select 1 from public.impact_story_shot_decisions d where d.story_id = pg_temp.id('s')::uuid
+                   and d.manifest_id = (pg_temp.vis()->>'manifest_id')::bigint and d.asset = 'main'));
+create temp table _v35 as select public.hs_impact_story_shots_approve(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint,
+  pg_temp.vis()->>'manifest_hash', 'main', array['a1-s1', 'a1-s1']) r;
+select pg_temp.chk('12V35b the shots of one part are approved together, each once',
+  (select r->>'approved' from _v35) = '1'
+  and (select count(*) from public.impact_story_shot_decisions d where d.story_id = pg_temp.id('s')::uuid
+        and d.manifest_id = (pg_temp.vis()->>'manifest_id')::bigint and d.asset = 'main' and d.decision = 'approved') = 1
+  and pg_temp.err(format('select public.hs_impact_story_shots_approve(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id',
+        repeat('0', 64), 'main', '{a1-s1}')) like '40001%'
+  and pg_temp.err(format('select public.hs_impact_story_shots_approve(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id',
+        pg_temp.vis()->>'manifest_hash', 'main', '{}')) like '%No shots%');
+select pg_temp.chk('12V35c a bad photo in the list rejects none of them',
+  pg_temp.err(format('select public.hs_impact_story_photos_reject(%L, %s, %L)', pg_temp.id('s'), pg_temp.vis()->>'manifest_id', '{oak,nope}'))
+    like '%not in these previews%'
+  and not exists (select 1 from public._hs_is_rejections(pg_temp.id('s')::uuid) where photo_id = 'oak'));
+create temp table _v35d as select public.hs_impact_story_photos_reject(pg_temp.id('s')::uuid, (pg_temp.vis()->>'manifest_id')::bigint,
+  array['oak'], 'Too dark') r;
+select pg_temp.chk('12V35d the photos of one part are rejected together, with the note',
+  (select r->>'rejected' from _v35d) = '1'
+  and exists (select 1 from public._hs_is_rejections(pg_temp.id('s')::uuid) where photo_id = 'oak'));
+select public.hs_impact_story_photo_restore(pg_temp.id('s')::uuid, 'oak');
+select pg_temp.chk('12V35e neither can be run by visitors',
+  not has_function_privilege('anon', 'public.hs_impact_story_shots_approve(uuid, bigint, text, text, text[])', 'execute')
+  and not has_function_privilege('anon', 'public.hs_impact_story_photos_reject(uuid, bigint, text[], text)', 'execute')
+  and has_function_privilege('authenticated', 'public.hs_impact_story_shots_approve(uuid, bigint, text, text, text[])', 'execute'));
 -- 12V30 (founder, 2026-10-30: no drawings): previews that still carry a drawn shot are out of date and never approvable
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);

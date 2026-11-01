@@ -5831,11 +5831,17 @@ Results.
       photo the old newest-per-subject rule had replaced. Nothing a founder replaced comes back, and each story's set
       equals what it showed before. One photo per subject gives the same choice key, so current previews stay current.
     - **Approval:** each act (Short beat, thumbnail) has "Approve this act" (`vapprovegroup`). It approves every shot in
-      that part through `hs_impact_story_shot_decide`, leaving any shot already rejected or asked a new photo for.
+      that part in ONE call, `hs_impact_story_shots_approve` (2026-11-01): every shot is saved through
+      `hs_impact_story_shot_decide` in one transaction, or none is, leaving any shot already rejected or asked a new photo for.
       Approving the last part calls `hs_impact_story_visuals_approve`, which still re-checks everything on the server.
       The per-shot Approve button is gone (Reject and Need new photo stay); "Approve everything at once" remains in the
       status bar.
     - Tests: pg 12V32-12V34 and the upgrade check in `run.sh`; `test/impact-stories.browser.test.mjs`.
+    - **Rejecting asks in the page, never in a browser pop-up (2026-11-01).** Reject under a shot, and "Reject every photo
+      in this act", open a note box in place (`S.vask`, `askBox`) with Reject and Cancel; nothing is saved until Reject is
+      pressed. A shot with no photo needs a note, and the box says so. "Reject every photo in this act" saves through
+      `hs_impact_story_photos_reject` in one transaction. Both new functions fall back to the one-at-a-time calls if the
+      database does not have them yet (PostgREST `PGRST202`). Other steps still use the browser's dialogs. pg 12V35a-e.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
