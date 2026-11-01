@@ -5608,7 +5608,7 @@ Pinned by `test/shared-report-follow-inline.browser.test.mjs` (behaviour in Chro
 ## DEVELOPMENT ACTIVITY REPORT, national-4 (2026-11-01): WHOSE RECORD, WHICH RECORD, AND MINOR WORK LISTED APART
 
 Found preparing the NWMLS sample (3101 Western Ave, Seattle). All four rules live in the engine, `supabase/functions/_shared/national-report.ts`.
-`lib/da-report-view.js` only renders them, and a report saved before national-4 renders exactly as before. Test: `test/report-quality-national4.test.mjs`.
+The report page only renders them, and a report saved before national-4 renders exactly as before. Test: `test/report-quality-national4.test.mjs`.
 - **Every record names its publishing agency and dataset** (`source.agency`, `source.feed_ref`). Both come from
   `_shared/source-publishers.generated.json`, which is generated from the source registry's `jurisdiction`
   (`node scripts/gen-source-publishers.mjs`; `--check` runs in the suite).
