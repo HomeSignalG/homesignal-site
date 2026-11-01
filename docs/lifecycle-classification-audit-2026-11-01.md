@@ -8,6 +8,10 @@ section 9.
 **Revision 2, 2026-11-01: founder decision on inactive records incorporated** (new section 4.4; sections
 4.1, 4.2, 5, 6, 7, 8 and 9 updated; D2 and D4 decided; D6–D8 added).
 
+**Revision 3, 2026-11-01: architecture direction approved; D1, D3, D5–D8 and the national requirements
+decided** (4.1 stages, 4.2 table, 4.4 items 2–8a, new 4.5, sections 7, 8 and 9 rewritten, new section 10
+release gate). Status: **APPROVED DIRECTION, NOT ENABLED.**
+
 Concurrency check (CLAUDE.md): `origin/main` on both repos since 2026-10-15 carries no lifecycle or
 stage-classification work in flight; the only related commit is #2418 (dossier pages read Map 1's
 lifecycle), which this plan keeps. Verdict: **GENUINE GAP**.
@@ -175,23 +179,27 @@ evidence, not construction evidence.** That is not a national count; section 7 m
 
    | stage | meaning |
    |---|---|
-   | `preliminary` | consultation, neighborhood contact, pre-application, pre-screen |
+   | `preliminary_identified` | consultation, neighborhood contact, pre-application, where the official record identifies a contemplated development (D1, below) |
+   | `preliminary_unidentified` | the same activity without an identifiable contemplated development |
    | `filed` | formal application submitted / intake accepted |
    | `under_review` | in review, hearing scheduled, notice sent, staff recommendation |
    | `programmed` | in a funded transportation or capital program, not yet let |
    | `entitled` | zoning / plat / SUP / land-use approval granted or recorded |
    | `permitted` | permit approved or issued, work not shown to have started |
    | `under_construction` | inspections under way, construction, awarded/advertised contract |
-   | `completed` | final inspection, CO, construction complete (only on a construction record) |
-   | `closed_unspecified` | "Closed" with no stated reason |
+   | `operation_established` | evidence that the facility or development itself operates: a certificate of occupancy or final inspection on a permit to build or add to that structure; "In Service" / "Operationally Complete" on a project that builds a new facility (D3) |
+   | `work_completed` | completed work that does not establish operation: demolition, abatement, resurfacing, repair or maintenance, and a final inspection on such a permit (D3) |
+   | `closed_unspecified` | "Closed" whose meaning the publisher does not define for this record class (D5) |
    | `not_established` | blank, UNKNOWN, opaque code |
-   | `invalid_record` | not a development at all: issued in error, duplicate, test, template, deleted, not required, exempt, out of jurisdiction, never-submitted draft. Not shown; counted in the run report. |
+   | `invalid_record` | not a development at all, per the publisher's documented term: issued in error, duplicate, test, template, deleted, not required, exempt, out of jurisdiction, never-submitted draft. Not shown; counted in the run report. |
 
    Denied, withdrawn, cancelled, expired and on-hold are **not stages**. Under the founder decision of
-   2026-11-01 they are an activity status (fact 4), so they never overwrite the stage.
-3. **Activity status** (founder decision 2026-11-01, section 4.4): `active` | `paused` | `inactive`,
-   with the government's own term, a reason category (cancelled / withdrawn / denied / expired), and a
-   verified effective date or none.
+   2026-11-01 they are an activity status (fact 3), so they never overwrite the stage.
+3. **Activity status** (founder decisions 2026-11-01, section 4.4): `active` | `paused` | `inactive` |
+   `undetermined`, with the government's exact term, a reason category for `inactive` (cancelled /
+   withdrawn / denied / expired) and a verified effective date or none. `undetermined` (D8) is a source
+   term whose meaning the agency does not document ("Aborted", "Void" or "Revoked" without documented
+   semantics). It is fail-closed: never shown as inactive and never counted as active.
 4. **Evidence**: the verbatim status (already stored as `app_projects.stage`), the rule that mapped it
    (`stage_basis`: `status_map` | `status_const` | `issued_promotes`; for an inactive or paused record,
    `observed` | `term` | `class_entry`, section 4.4), `stage_rule_version`, the record URL and its
@@ -214,13 +222,15 @@ evidence, not construction evidence.** That is not a national count; section 7 m
 
   | stage | column | notes |
   |---|---|---|
-  | preliminary | Proposed **or** Lifecycle unknown | decision D1; never counted as an active application |
+  | preliminary_identified | Proposed | D1; card "Pre-application — formal application not verified."; never counted as a formal active application |
+  | preliminary_unidentified | Lifecycle unknown | D1 |
   | filed, under_review | Proposed | |
   | programmed | Proposed | normalises the 3 DOT entries that say Approved |
   | entitled | Approved | card: "construction status not verified" |
   | permitted, under_construction | Approved | |
-  | completed | Operating now | only when class is a construction class; for land-use classes → Approved |
-  | closed_unspecified, not_established | Lifecycle unknown | |
+  | operation_established | Operating now | the only stage that reaches Operating now; never from a land-use class |
+  | work_completed | previously verified column, else Lifecycle unknown | D3; card names the completed work in the publisher's words |
+  | closed_unspecified, not_established | Lifecycle unknown | D5: Closed is not completed, operating, cancelled or inactive |
   | invalid_record | not shown | today: mostly dropped already; now counted by name |
 
   The column is decided by the stage alone. An inactive or paused record takes the column of its
@@ -236,7 +246,7 @@ evidence, not construction evidence.** That is not a national count; section 7 m
 
 - One function, `HS.recordStageLine(class, stage, decision)` in `lib/project-type.js`, with a Python twin in
   `gen_zip_pages.py` pinned by a parity test (the `decision-vocabulary-parity` pattern). Examples:
-  "Pre-application contact recorded — formal application not verified", "Development application
+  "Pre-application — formal application not verified." (founder wording, D1, exact), "Development application
   submitted — decision pending", "Permit approved — construction status not verified", "Zoning amendment
   recorded — project construction status unknown", "Construction underway — completion not verified".
   It replaces `currentStatusLine`'s fixed "Application on file" for every non-application class.
@@ -263,27 +273,63 @@ link and history. The rule applies to every state and record type. The four colu
 2. **The historical stage is taken from evidence, strongest first.** A source usually publishes only the
    current status, so an "Expired" record does not say what it was before. The ladder:
    - `observed`: the last active stage JODY itself recorded for this record. `public.dev_change_event`
-     already stores every publisher-status change with before and after values (append-only, since
-     2026-09-30, comparable records only).
-   - `term`: the government's own inactive term names the stage. "Application Expired" / "Expired
-     Application" / "Application Withdrawn" mean the record was filed (Proposed). "Permit Expired",
-     "Permit Cancelled" or "Voided - Applicant Withdrew Permit" on a permit class mean the permit was
-     issued (Approved). "Approval(s) Expired" means entitled (Approved).
-   - `class_entry`: the registry entry's `entry_stage`, the stage a record must have reached to appear in
-     that dataset at all. An application or case dataset starts at `filed` (Proposed). An issuance ledger,
-     or a permit carrying the publisher's own issue date (the §7.12a rule), starts at `permitted`
-     (Approved). A transportation program starts at `programmed` (Proposed).
-   - None of these: Lifecycle unknown, with the inactive status still shown. No title, type or date is
+     already stores every publisher-status change with before and after values (append-only, comparable
+     records only). **JODY's history begins 2026-09-30 and is incomplete before it** (founder rule): the
+     rung reports only stages actually observed, and no earlier lifecycle event, date or stage is ever
+     created to fill the gap.
+   - `term`: the government's own term names the earlier stage **in its words, with documented
+     semantics** (D8). "Application Expired" or "Application Withdrawn" names an application (`filed`).
+     "Permit Expired" names a permit that existed, which establishes `permitted` only where the agency's
+     documentation says its permits are recorded at issuance. "Approval(s) Expired" names an approval
+     (`entitled`). An ambiguous term establishes nothing.
+   - `class_entry`: the registry entry's `entry_stage`, used **only when the publisher's own dataset
+     definition guarantees that stage for every record in it** (for example a dataset documented as
+     "issued permits" only, or a record carrying the publisher's own issue date, the §7.12a rule). **Generic
+     dataset membership never establishes an earlier approval or construction stage** (founder rule): a
+     mixed "permits" dataset establishes at most `filed`, and only when the dataset is documented as
+     applications. Each `entry_stage` carries its documentation reference in the registry's `_receipts`.
+   - None of these: Lifecycle unknown, with the activity status still shown. No title, type or date is
      ever used to guess a stage.
 
-   An inactive record never moves to an earlier column than its last observed one: Approved stays
-   Approved. A record that was Operating keeps Operating (for example a revoked certificate of occupancy).
+   An inactive or paused record never moves to an earlier column than its last observed one: Approved
+   stays Approved. A record with established operation keeps Operating (for example a revoked certificate
+   of occupancy).
 
-3. **"Genuinely Proposed" is enforced.** Rows that were never a development are `invalid_record` (issued
-   in error, duplicate, test, template, deleted, not required, exempt, out of jurisdiction, a saved or
-   never-submitted draft). They are not shown, as today, but counted by term in the run report. A plain
-   "Void" or "Voided" is treated as a cancellation (the record existed); only a void that states a data
-   error is `invalid_record`. Each source's list is adjudicated in step 2 of section 6.
+3. **"Genuinely Proposed" is enforced.** Rows that were never a development are `invalid_record`, but only
+   where the agency's documented term says so (issued in error, duplicate, test, template, deleted, not
+   required, exempt, out of jurisdiction, a saved or never-submitted draft). They are not shown, as today,
+   but counted by term in the run report.
+
+3a. **Terms are read with documented agency semantics (D8).** "Aborted", "Void", "Voided", "Revoked",
+   "Terminated", "Abandoned", "Lapsed" and similar map to an inactive category only where that agency's
+   own documentation (glossary, data dictionary, status definitions, ordinance) defines them. The
+   documentation is cited in the registry's `_receipts`. Without it, the activity is `undetermined`:
+   - the record keeps its evidenced stage and column;
+   - it shows the source's exact term ("Status on the record: Aborted — meaning not stated by the agency");
+   - it is never labelled inactive or cancelled;
+   - it is excluded from active counts and MAPS posts, like a paused record.
+
+   The source's exact terminology is always preserved and shown.
+
+3b. **"Closed" (D5).** Lifecycle unknown, unless the publisher defines Closed and the record class
+   supports that reading (for example a building-permit agency whose documentation says Closed = final
+   inspection passed, which gives `operation_established` for a permit to build). Closed is never
+   automatically completed, operating, cancelled or inactive; with no definition its activity is
+   `undetermined`.
+
+3c. **Completed work (D3).** Completed demolition, abatement, resurfacing, repair or maintenance is
+   `work_completed`. It keeps a previously verified column (`observed` rung only), otherwise Lifecycle
+   unknown. The card names the completed work in the publisher's words ("Demolition permit finaled").
+   Operating now appears only with `operation_established` evidence for the facility or development
+   itself.
+
+3d. **Pre-application (D1).** `preliminary_identified` requires the official record to identify a
+   contemplated development: its site (address or parcel) and what is proposed (a stated use, project
+   type or description), as the record itself states. A contact or meeting record without both is
+   `preliminary_unidentified` (Lifecycle unknown). Identified pre-applications sit in Proposed with
+   "Pre-application — formal application not verified." and are counted separately from formal active
+   applications (item 7). Portland's neighborhood-contact layer is judged per record by this rule, not
+   as a dataset.
 
 4. **The date.** "INACTIVE AS OF [date]" uses only a date the publisher states for the inactivity: the
    registry's `inactive_date` columns (expiration date, withdrawal date, cancellation date, decision
@@ -306,24 +352,58 @@ link and history. The rule applies to every state and record type. The four colu
    the government's term, or "Paused — date not verified". It is not permanent: the next active
    observation clears it.
 
-7. **One active predicate.** `HS.isActive(item)` (replaces `HS.isActiveUndecided`, same field-precedence
-   care) is true only when activity is `active` and no decision is present. It is the only test used by:
+7. **One active predicate, two count kinds.** `HS.isActive(item)` (replaces `HS.isActiveUndecided`, same
+   field-precedence care) is true only when activity is `active`, no decision is present, and the stage is
+   not `preliminary_*`. Paused (D6), undetermined (D8) and inactive records are all false. It is the only
+   test used by:
    - active counts (`counts.proposed_active`, a new `counts.approved_active`, the "New projects proposed"
      tile);
-   - MAPS eligibility (`homesignal-ingest/bluesky/lib/maps-eligibility.mjs`), which already refuses
-     Decided;
+   - MAPS eligibility (`homesignal-ingest/bluesky/lib/maps-eligibility.mjs`);
    - active-development alerts (Bluesky MAPS posts and their email copies);
    - the Development Activity Report's current-project sections (C2).
 
-   The column totals on Map 1's four chips still include inactive and paused records, because they stay
-   in their column.
+   Identified pre-applications get their own count (`counts.preliminary`), never added to active
+   applications.
 
-8. **Presentation within a column.** Active first, then paused, then inactive (newest verified inactive
-   date first, undated last). The existing "Includes historical proposals" rail note becomes "Includes
-   inactive records" on any column that holds one. The marker keeps its column colour.
+   **Active and historical counts are distinguishable everywhere a count is shown.** A column states its
+   total and its active part ("Proposed · 42 records, 17 active"). A counter tile that says "active" counts
+   only `HS.isActive`. A count never mixes the two without saying so.
+
+8. **Presentation within a column.** Active first, then paused, then undetermined, then inactive (newest
+   verified inactive date first, undated last). The existing "Includes historical proposals" rail note
+   becomes "Includes inactive records" on any column that holds one. The marker keeps its column colour.
+   Paused shows "PAUSED", with the verified reason and date where available (D6).
+
+8a. **Property-follow notifications (D7).** One notification per (record, publisher-status transition),
+   only when all of these hold:
+   - a genuine new government record establishes that the filing became inactive or paused: a material
+     `status_changed` event in `dev_change_event`, whose `prev_facts.stage` and `new_facts.stage` are both
+     publisher words and whose new stage maps to inactive or paused;
+   - the event was observed after the feature went live;
+   - the event is not a baseline or `first_detected` event.
+
+   Deduplicated on `(identity_key, prev stage → new stage)`. Never sent for a historical backfill (a record
+   first seen already inactive), a rule change, or a reclassification (`source_record_updated`, a derived
+   field). Uses the existing property-watch path (`_shared/property-watch.ts`, which already lists only
+   material ledger events and records what each follower was told, exactly once); no second notifier.
 
 9. **Link and history.** The `record_url`, its precision label (4.3), the verbatim publisher status and
    the ledger history are unchanged. An inactive record is never deleted.
+
+### 4.5 A reclassification is not a project change (founder rule, 2026-11-01)
+
+A rule change moves the derived `status` and the new provenance fields, never a publisher fact. Every
+consumer that reacts to change must see it as a rule-version change:
+
+| Consumer | Today | Required |
+|---|---|---|
+| Change ledger (`dev_change_event`) | `status` is derived; a change with `stage` unchanged is `source_record_updated`, non-material (rule 3) | Unchanged. The new provenance fields join the non-fact list. |
+| Property-follow emails | Material events only | Unchanged (8a). |
+| Project pages `changed_on` / sitemap `lastmod` | `status` is in `PAGE_FACTS` (ingest `bluesky/lib/development-seo-plane.mjs`) | `changed_on` moves only on a publisher-fact change. A derived status or stage line is versioned by `stage_rule_version`, so a rule release refreshes no project date. |
+| IndexNow (`page_semantics.py`) | A changed page text changes the fingerprint | A rule release is released deliberately past the mass-change hold, never as a stream of "changed" pages; dated `lastmod` stays on publisher facts. |
+| MAPS drafts | `mapsDedupeKey` (ingest `bluesky/lib/maps-eligibility.mjs`) folds `status` + `submitted_at`, so a moved status can mint a new draft | The dedupe identity stops folding the derived status; it folds the publisher's verbatim `stage` instead. Changing the key is itself a duplicate hazard (every existing post's old key stops matching), so during the change a candidate counts as already posted if it matches on the old key OR the new key, and the switch is proven with a dry run that mints 0 drafts for unchanged records. |
+| Development Activity Report snapshots | Immutable | Unchanged; new reports carry `stage_rule_version`. |
+| N5 generations | Status from the snapshot | Unchanged; the change appears on the next generation's pre-activation proof. |
 
 ---
 
@@ -403,34 +483,71 @@ link and history. The rule applies to every state and record type. The four colu
 - **No-inflation check:** per ZIP, total development records before = after, except the explicitly
   re-admitted inactive and paused records, which are counted separately. No unknown record moves to
   Proposed.
-- **Inactive and paused records (founder decision 2026-11-01):**
+- **Inactive, paused and undetermined records (founder decisions 2026-11-01):**
   - *Column preserved:* a record observed Proposed then Withdrawn stays Proposed. Observed Approved then
-    Expired stays Approved. Observed Operating then Revoked stays Operating. Never an earlier column than
-    the last observed one.
+    Expired stays Approved. Observed with established operation then Revoked stays Operating. Never an
+    earlier column than the last observed one.
   - *Evidence ladder:* each rung (`observed`, `term`, `class_entry`, none) is tested on its own, with the
     rung recorded in `historical_stage_basis`. No title, type or date ever sets the stage (negative pin).
+  - *No inference from ambiguity or generic membership:* an ambiguous term ("Closed", "Void", "Aborted"
+    without documentation) never sets an earlier stage. A record in a mixed "permits" dataset with no
+    per-record issue evidence never reaches Approved. An `entry_stage` with no documentation receipt fails
+    the registry check.
+  - *History boundary:* an `observed` stage is only ever one the ledger recorded on or after 2026-09-30. A
+    record first seen already inactive gets no invented earlier event, date or stage (negative pin over
+    the rung and the card text).
   - *Date:* the verified publisher date is shown. A future date, a date before filing, a sentinel, a
     missing column, the filing or issue date, `refreshed_at` and the ledger's observed time each produce
-    "Inactive — date not verified" (one negative case per item).
-  - *Reason:* the displayed reason is the government's verbatim term. The category is one of the four and
-    is never shown in place of the term.
-  - *Paused:* On Hold, Suspended and Stop Work give "PAUSED", never "INACTIVE". The stage is kept. A later
-    active observation clears it.
-  - *Exclusions:* every inactive and paused record is false under `HS.isActive`. It is absent from active
-    counts, MAPS eligibility, active-development alerts and the report's current sections. Its column chip
-    total still counts it.
-  - *Genuinely proposed:* `invalid_record` terms (issued in error, duplicate, test, template) never render.
-    A plain "Void" renders as cancelled.
-  - *Universal:* the same inactive term on two sources of the same class gives the same activity,
-    category and column in every state.
+    "Inactive — date not verified" (one negative case per item). The same rules apply to "PAUSED AS OF".
+  - *Reason:* the displayed reason is the government's exact term. The category is one of the four and is
+    never shown in place of the term.
+  - *Paused (D6):* On Hold, Suspended and Stop Work give "PAUSED", never "INACTIVE". The stage and column
+    are kept. A later active observation clears it. Excluded from active counts and new MAPS posts.
+  - *Undetermined (D8):* "Aborted", "Void" and "Revoked" with no documentation receipt give
+    `undetermined`: shown with the exact term and "meaning not stated by the agency", never labelled
+    inactive or cancelled, never counted active, never MAPS-eligible. The same term with a receipt maps to
+    its documented category.
+  - *Closed (D5):* "Closed" with no publisher definition gives Lifecycle unknown and `undetermined`. It is
+    never completed, operating, cancelled or inactive. With a documented definition and a supporting class
+    it gives that meaning only.
+  - *Completed work (D3):* a finaled demolition, abatement or resurfacing record never reaches Operating
+    now. It keeps an `observed` column, else Lifecycle unknown, and the card names the work in the
+    publisher's words. Operating now requires `operation_established` (negative pin: no other stage
+    reaches it).
+  - *Pre-application (D1):* a record with both a site and a stated proposal gives Proposed, the exact text
+    "Pre-application — formal application not verified.", and `counts.preliminary`, never
+    `proposed_active`. A record missing either gives Lifecycle unknown. Tested per record on Portland's
+    layer, plus one other state's pre-application source.
+  - *Counts distinguishable:* every displayed count names whether it is total or active; total minus
+    active equals paused + undetermined + inactive + preliminary, exactly, per column and per ZIP.
+  - *Exclusions:* every non-active record is false under `HS.isActive`. It is absent from active counts,
+    MAPS eligibility, active-development alerts and the report's current sections. Its column chip total
+    still counts it.
+  - *Genuinely proposed:* documented `invalid_record` terms never render; an undocumented void is
+    `undetermined`, not invalid and not cancelled.
+  - *Universal:* the same documented term on two sources of the same class gives the same stage, activity,
+    category and column in every state. No test, rule or label names a state, county or source.
   - *History:* `record_url`, verbatim status and ledger rows are unchanged, and no inactive record is
     removed.
-  - *Parity:* the page and the engine agree on `isActive` and on the status line, the
-    `decision-vocabulary-parity` pattern.
+  - *Parity:* the page, the Python page generator and the engine agree on `isActive`, the stage line and
+    the status line (the `decision-vocabulary-parity` pattern).
+- **Notifications (D7):** a material publisher-status transition to inactive or paused observed after go-live
+  sends exactly one property-follow notification per (record, transition). A retried job sends none extra.
+  A record first seen inactive, a baseline run, a rule-version change, a derived-status change and a
+  backfill send zero. Measured on a replica by running the watch job twice.
+- **Reclassification is not a change (4.5):** applying the new rules to an unchanged publisher snapshot
+  produces:
+  - 0 material ledger events, 0 property-follow notifications;
+  - 0 moved `changed_on` dates, 0 moved dated `lastmod` values;
+  - 0 new MAPS drafts (old-key-or-new-key dedupe);
+  - 0 new IndexNow submissions outside the deliberate release.
+  Each is run on a replica against the current production snapshot.
 - **Inactive examples per state** in fixtures: Austin zoning Withdrawn (TX), Anaheim Denied (CA), Hartford
   "Closed - Denied" (CT), a Phoenix EXPR permit (AZ), a Raleigh "On Hold" (NC), a Montgomery County "Stop
-  Work" (MD), an Austin site plan "Aborted" (TX, adjudicated), a "Voided - Issued in Error" (excluded) and
-  a plain "Void" (shown as cancelled).
+  Work" (MD), an Austin site plan "Aborted" (TX; `undetermined` unless a documentation receipt exists), a
+  documented "Voided - Issued in Error" (excluded), an undocumented plain "Void" (`undetermined`), a
+  Madison "Approved, Demolished" (WI; `work_completed`), and a Burlington zoning "Closed" (VT; Lifecycle
+  unknown).
 - **Preservation check:** source identity, `record_url`, coordinates and ZIP membership byte-identical
   before and after on every moved record.
 - **Replica dry run** over all 12,744 ZIP pages: national before/after per column, per class, per state,
@@ -445,43 +562,77 @@ link and history. The rule applies to every state and record type. The four colu
 
 | Consumer | Risk | Mitigation |
 |---|---|---|
-| Map 1 counts / columns | Large visible moves (thousands Operating → Approved/Unknown). | Per-class enablement; national moved-count report before each step. |
+| Map 1 counts / columns | Large visible moves (thousands Operating → Approved/Unknown; D5 and D8 send more to Lifecycle unknown). | Per-class enablement; national before/after counts reviewed before each step (section 10). |
+| Documentation coverage | D5/D8 need agency documentation; sources without it fall to Lifecycle unknown / `undetermined`, which may be many. | Measured in the generated mapping audit; receipts added source by source, never assumed. |
 | ZIP pages, `indexable`, Rule F/D | Rule D counts publishable development; status moves do not change membership, but re-admitted terminal records could. | Terminal states excluded from Rule D and indexability counts. |
-| MAPS eligibility (`ELIGIBLE_STATUS = {Proposed, Approved}`) | Records leaving Operating become postable; **`mapsDedupeKey` folds status**, so a moved record can mint a new social draft. | Add stage to eligibility (preliminary and terminal not postable); exclude reclassification from the dedupe key or freeze drafts during rollout. |
-| Project pages (`development-seo-projects`) | `status` is a page fact, so `changed_on` and sitemap lastmod move for every moved project ⇒ IndexNow mass-change hold. | Treat reclassification as a rule-version change, not a fact change; or release with `allow_mass_change`. |
+| MAPS eligibility (`ELIGIBLE_STATUS = {Proposed, Approved}`) | Records leaving Operating become postable; **`mapsDedupeKey` folds status**, so a moved record can mint a new draft, and changing the key can too. | Eligibility reads `HS.isActive` (preliminary, paused, undetermined and inactive not postable); dedupe on old key OR new key; 0-new-drafts dry run (4.5). |
+| Project pages (`development-seo-projects`) | `status` is a page fact, so `changed_on` and sitemap lastmod would move for every moved project. | `changed_on` on publisher facts only; rule changes versioned; one deliberate IndexNow release (4.5). |
 | Development Activity Report snapshots | Immutable; old reports keep old wording. | Correct by design; new reports carry `stage_rule_version`. |
 | Change ledger | None: `status` is derived (rule 3). | Pinned by existing test. |
 | N5 generations | Markers carry status from the snapshot; change appears only on the next generation. | Sequence after a generation; pre-activation proof unchanged. |
 | Cache size | Re-admitted inactive and paused records grow rows. | Size from run-report `excluded_by_status`; enable per category. |
 | Materialiser cost | The `observed` rung reads the ledger. | Inactive/paused rows only; measure on dense ZIPs; engine carry-forward fallback. |
 | `Decided` readers | Stopping the `Decided` write before every reader switches would make denied records look active. | Readers switch first (step 7.2); `Decided` stops last (7.5). |
-| Founder rulings | §7.05 (denied/withdrawn only as decisions), §7.12a issued-is-approved, 2026-11-01 inactive rule. | Reconciled: cancelled and expired are activity statuses, not decision outcomes, so the §7.05 vocabulary is unchanged. |
+| Founder rulings | §7.05 (denied/withdrawn only as decisions), §7.12a issued-is-approved, 2026-11-01 inactive rule and D1–D8. | Reconciled: cancelled and expired are activity statuses, not decision outcomes, so the §7.05 vocabulary is unchanged. |
 
-## 9. Decisions needed before implementation
+## 9. Founder decisions (all decided, 2026-11-01)
 
-- **D1. Preliminary activity column.** Proposed (with "formal application not verified", never counted as
-  active) or Lifecycle unknown. Recommendation: **Proposed**, because a neighborhood contact is
-  first-party evidence that a development is planned, and the card says what is not known.
-- **D2. Cancelled and expired records.** ✅ **DECIDED by the founder, 2026-11-01** (section 4.4): kept in
-  their historical column with "INACTIVE AS OF [verified date]" and the government's term, excluded from
-  active counts, alerts and new MAPS posts.
-- **D3. Completed demolition / abatement / resurfacing.** "Operating now" reads oddly for a finished
-  demolition. Options: Operating now, or Lifecycle unknown for non-building work. Recommendation:
-  Lifecycle unknown with "Demolition completed".
-- **D4. On hold / stop work.** ✅ **DECIDED by the founder, 2026-11-01** (section 4.4): "Paused",
-  distinct from inactive, keeping the previously verified classification.
-- **D5. Ambiguous "Closed" on permits.** Recommendation: Lifecycle unknown unless the publisher's own
-  vocabulary documents Closed as completion (recorded per source with the evidence). "Closed" is not
-  read as inactive either: it says nothing about cancellation.
-- **D6. Paused records in active counts and new MAPS posts.** The ruling excludes inactive records; it
-  does not say whether a paused record counts as active. Recommendation: exclude paused records from
-  active counts and new MAPS posts too (a paused project is not advancing), and show them under their
-  column as "Paused".
-- **D7. A followed property's record becoming inactive.** Property-follow emails report record changes.
-  Recommendation: never present an inactive record as active development, but do tell a follower once
-  that a record "became inactive" (it is a real publisher status change already in the ledger).
-- **D8. Austin "Aborted" and similar source-specific terms.** Read as cancelled (the case was filed and
-  then stopped), or held for per-source adjudication? Recommendation: adjudicate per source in step 2 of
-  section 6, defaulting to cancelled only where the publisher's documentation says the filing existed.
+- **Architecture direction: approved**, subject to the release gate in section 10.
+- **D1. Pre-application.** Proposed only when the official evidence identifies a contemplated development,
+  labelled "Pre-application — formal application not verified."; otherwise Lifecycle unknown. Never
+  counted as a formal active application. (4.4 item 3d.)
+- **D2. Cancelled, withdrawn, denied, expired.** Kept in the historical column as "INACTIVE AS OF
+  [verified date]" with the government's term; excluded from active counts, alerts and new MAPS posts.
+  (4.4.)
+- **D3. Completed demolition, abatement or resurfacing.** Does not establish operation. Keep a previously
+  verified classification, else Lifecycle unknown with the completed-work description. Operating now only
+  with evidence of operation of the facility or development. (4.4 item 3c.)
+- **D4. On hold.** "Paused", distinct from inactive, keeping the previously verified classification.
+  (4.4 item 6.)
+- **D5. "Closed".** Lifecycle unknown unless the publisher defines it and the record class supports the
+  reading; never automatically completed, operating, cancelled or inactive. (4.4 item 3b.)
+- **D6. Paused.** Stays visible in its lifecycle column; excluded from active-development counts and new
+  MAPS posts; shows PAUSED with the verified reason and date where available. (4.4 items 7–8.)
+- **D7. Property-follow.** One notification per record and source-status transition, only for a genuine
+  new government record of becoming inactive or paused; never for backfills, rule changes or
+  reclassification. (4.4 item 8a.)
+- **D8. Agency terms.** Interpreted only with documented agency semantics; exact terminology preserved;
+  no assumed cancellation (activity `undetermined`). (4.4 item 3a.)
+
+National requirements from the same ruling, and where each is met:
+
+| Requirement | Section |
+|---|---|
+| Exactly the four existing Map 1 columns | 4.2 (`lifecycleKey` unchanged) |
+| Lifecycle stage, activity status, official evidence and effective date kept separate | 4.1 |
+| Historical records preserved, never presented as currently active | 4.4 items 1, 7, 8 |
+| Active and historical counts distinguishable | 4.4 item 7 |
+| No earlier approval or construction stage from an ambiguous status or generic dataset membership | 4.4 item 2 |
+| Observation history incomplete before 2026-09-30; no fabricated earlier events | 4.4 item 2 |
+| Reclassification causes no false change notifications, refreshed project dates or duplicate MAPS posts | 4.5 |
+| One canonical shared engine, no state-specific presentation patches | 4.2; universal test in section 7 |
+
+## 10. Release gate (founder, 2026-11-01)
+
+**Building may proceed (sections 6 steps 1–3: vocabulary module, report-only generator, connector
+switch defaulting off). Nothing is enabled nationwide until the founder has reviewed all four of these:**
+
+1. **The generated status-mapping audit.** For every registry entry and every verbatim status:
+   - old bucket, new stage, new activity, new column;
+   - the documentation receipt behind each D5/D8 interpretation, or "none → undetermined";
+   - the `entry_stage` and its receipt.
+
+   It is generated from the registry (claims rule 7) and fingerprinted (rules 8–9).
+2. **Before/after record counts.** From a replica run over all 12,744 ZIP pages against the current
+   production snapshot: per column, per activity, per record class, per state and per source, with the
+   moved records listed and total = active + paused + undetermined + inactive + preliminary checked
+   exactly.
+3. **Downstream impact tests.** The section 7 suite green, plus the replica proofs of section 4.5 (0 false
+   changes, notifications, dates, MAPS drafts) and the cache-size and materialiser-cost measurements.
+4. **The rollback plan, rehearsed.** Each per-category switch turned off on the replica restores the
+   previous `status` on the next refresh, byte-identical on unchanged records. The `Decided` write is
+   retired only after this.
+
+Each enablement step in section 6 is then shown its own slice of items 2 and 3 before it is switched on.
 
 Nothing in production has been changed.
