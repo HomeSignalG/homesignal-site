@@ -113,7 +113,8 @@ m('unfollow_without_id_allowed', HAN, "(action === 'follow' || action === 'unfol
 m('follow_without_id_allowed', HAN, "(action === 'follow' || action === 'unfollow') && !followId) return reply(", "action === 'unfollow' && !followId) return reply(")
 m('report_id_not_lowercased', HAN, "UUID.test(b.report_id) ? b.report_id.toLowerCase() : null", "UUID.test(b.report_id) ? b.report_id : null")
 m('follow_id_not_lowercased', HAN, "followId = b.follow_id.toLowerCase();", "followId = b.follow_id;")
-m('view_default_internal', HAN, "(b.view === undefined ? 'customer' : b.view)", "(b.view === undefined ? 'internal' : b.view)")
+# view_default_internal retired 2026-11-01: under the national source policy the customer and internal changes views return the
+# same records (the only difference was the uncleared-source label), so the default view is no longer observable.
 m('view_unchecked', HAN, "if (view !== 'customer' && view !== 'internal') return reply(", "if (false) return reply(")
 m('missing_report_is_empty', HAN, "if (!stored) return reply(req, { error: 'report_not_found' }, 404);", "if (!stored) return reply(req, { status: 'OK', result: null });")
 m('purged_context_reopened', HAN, "if (opened === 'CONTEXT_PURGED') return reply(req, { status: 'CONTEXT_PURGED', report_id: reportId });", "void 0;")

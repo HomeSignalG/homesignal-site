@@ -72,7 +72,8 @@ m('partial_never_reported', "partial: core.flags.sourcesNotFullyRead", "partial:
 m('duplicate_nearby_project_accepted', "    if (seenProjects.has(r.project_id)) throw new ReportUnreadable('a nearby project appears twice');\n", "", EDGE, PW)
 m('baseline_is_what_the_list_says_now', "homesignal_detected_changes: shownBy.get(x.project_id) ?? [],", "homesignal_detected_changes: (x.homesignal_detected_changes as never) ?? [],", EDGE, PW)
 m('baseline_is_now_not_the_report', "issuedAt: original.generated_at", "issuedAt: i.now.toISOString()", EDGE, PW)
-m('check_uses_the_internal_view', "now: i.now, view: 'customer', attribution: i.attribution", "now: i.now, view: 'internal', attribution: i.attribution", EDGE, PW)
+# check_uses_the_internal_view retired 2026-11-01: the customer and internal changes views now return the same records (national
+# source policy), so which one the watch asks is no longer observable.
 m('lookback_ignores_the_window', "Math.max(reportBoundary, window)", "reportBoundary", EDGE, PW)
 m('lookback_ignores_the_report', "Math.max(reportBoundary, window)", "window", EDGE, PW)
 

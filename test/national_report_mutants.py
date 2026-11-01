@@ -166,7 +166,7 @@ m('empty_called_no_activity', MOD, "projectsInReport > 0 ? 'DEVELOPMENT_SHOWN' :
 m('fractional_count_shows_development', MOD, "return Number.isInteger(projectsInReport) && projectsInReport > 0", "return projectsInReport > 0")
 m('outcome_left_out_of_the_report', MOD, "    activity: { outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION },\n", "")
 m('outcome_labels_swapped', MOD, "  NO_DEVELOPMENT_ACTIVITY: 'No development activity',\n  NO_DATA_INGESTED: 'No data ingested',", "  NO_DEVELOPMENT_ACTIVITY: 'No data ingested',\n  NO_DATA_INGESTED: 'No development activity',")
-m('outcome_rule_not_in_inputs', MOD, "activity_rule_version: ACTIVITY_RULE_VERSION, rights_registry_version", "rights_registry_version")
+m('outcome_rule_not_in_inputs', MOD, "activity_rule_version: ACTIVITY_RULE_VERSION, source_policy", "source_policy")
 m('credit_charges_no_data_ingested', CR, "new Set(['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY'])", "new Set(['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_DATA_INGESTED'])")
 m('credit_never_charges', CR, "  return decide(true, outcome);", "  return decide(false, outcome);")
 m('credit_charges_the_internal_view', CR, "  if (input.view !== 'customer') return decide(false, 'INTERNAL_VIEW');\n", "")
