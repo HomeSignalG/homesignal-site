@@ -109,6 +109,10 @@
    "agency": "City of Bellevue",
    "dataset": "services1.arcgis.com, service Bellevue_Permits"
   },
+  "bellingham-trakit-permits": {
+   "agency": "City of Bellingham",
+   "dataset": "maps.cob.org, service Maps/Permits"
+  },
   "bend-or-permit-applications": {
    "agency": "City of Bend, Oregon",
    "dataset": "services5.arcgis.com, service Permit_Applications_Point"
