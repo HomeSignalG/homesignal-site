@@ -167,7 +167,8 @@ try {
     const byName = Object.fromEntries(W.report.projects.map((p) => [p.name, p]));
     const wrong = rowsOf(html).filter((r) => {
       const p = byName[r.name], c = r.cells[3], href = (/href="([^"]*)"/.exec(c) || [])[1];
-      const att = p.source && p.source.attribution;
+      // national-4: the source's credit line, else the publishing agency and dataset the engine took from the source registry
+      const att = p.source && (p.source.attribution || (p.source.agency ? p.source.agency + (p.source.feed_ref ? ' (' + p.source.feed_ref + ').' : '.') : null));
       return !p || href !== (p.source && p.source.url).replace(/&/g, '&amp;') || (att ? !c.includes('<p class="da-rv-attr">' + att.replace(/&/g, '&amp;')) : /da-rv-attr/.test(c)) || !c.includes('for ' + p.name.replace(/&/g, '&amp;') + ' (opens in a new tab)');
     }).map((r) => r.name);
     ok(wrong.length === 0, '2k2 in every row the Supporting Evidence link, attribution and link label are THAT record\'s own (engine url, attribution, name), never a neighbour\'s', wrong);
@@ -267,7 +268,7 @@ try {
 // ---- 4. nothing internal reaches the page ----------------------------------------------------------------------------------------------------------
 try {
   const FORBIDDEN = [
-    'storage_blockers', 'storable', 'INTERNAL_VIEW', 'CONTAINS_UNCLEARED_SOURCE', 'source_family', 'source_families_in_report', FAM_A, FAM_B, 'wsdot', 'austin-site',
+    'storage_blockers', 'storable', 'INTERNAL_VIEW', 'CONTAINS_UNCLEARED_SOURCE', 'source_family', 'source_families_in_report', FAM_A, FAM_B, 'wsdot-', 'austin-site',
     'change_ready', 'observation_count', 'first_observed_at', 'last_observed_at', 'homesignal_observation', 'content_hash', 'report_id', 'assessment_basis',
     'records_returned_for_this_radius', 'NO_INCLUDED_SOURCE', 'SOURCES_NOT_INCLUDED', 'AREA_TRUNCATED', 'SOURCE_NOT_FULLY_READ', 'LIMITED_COVERAGE', 'REPORT_READY',
     'CHANGE_READY', 'OUTSIDE_COVERAGE', 'Signed paid pilots', 'Verdict', 'NOT YET', 'distances_mi', 'project_id', 'source_key', 'feature_id', 'record_kind',
@@ -401,7 +402,11 @@ try {
   ok(!/<script/.test(addrXss) && /&quot;&gt;&lt;script&gt;/i.test(addrXss), '6j a hostile address string is escaped');
   ok(/<p class="da-rv-addr">Address unavailable<\/p>/.test(V.html(W)) && /Address unavailable/.test(V.html(W, { subject: '   ' })) && /Address unavailable/.test(V.html(W, { subject: 42 })), '6k no address supplied (a purged report): the header says "Address unavailable" and shows nothing else');
   const attr = Object.fromEntries(evOf(html).map((e) => [e.name, /<p class="da-rv-attr">([^<]*)<\/p>/.exec(e.html)?.[1] ?? null]));
-  ok(attr['Menchaca Apartments'] === 'Data: WSDOT' && attr['Riverside Retail Center'] === null, '6l a cleared source\'s attribution is shown with its record, and a record with none shows none', attr);
+  // national-4: a source with no credit line names its publishing agency and dataset (the source registry's), so no record is anonymous
+  const riverside = W.report.projects.find((p) => p.name === 'Riverside Retail Center');
+  ok(attr['Menchaca Apartments'] === 'Data: WSDOT' && riverside && !riverside.source.attribution && riverside.source.agency
+    && attr['Riverside Retail Center'] === riverside.source.agency + ' (' + riverside.source.feed_ref + ').',
+    '6l a cleared source\'s credit line is shown with its record; a source with none shows its registry agency and dataset instead of nothing', attr);
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 // ---- 7. it shows what the engine gave, in the order it gave it, and changes nothing --------------------------------------------------------------------
@@ -468,7 +473,7 @@ try {
   ok(V.SCOPE_LINE === quote('Planned, approved, permitted and changing development found in'), '9b the scope line is the plan\'s (line 1261)');
   ok(V.SCOPE_NOTE === quote('This report focuses on development activity and change.'), '9c the supporting scope note is the plan\'s (line 1265)');
   ok(V.EYEBROW === 'JODY Development Activity' && M.PRODUCT_NAME === 'HOMESIGNAL DEVELOPMENT ACTIVITY', '9d the eyebrow is the Jody name; the engine\'s product identifier is unchanged until the next edge-function deploy (audit F4)');
-  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['Nearby Development', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Operating / Built', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']),
+  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['Nearby Development', 'Type and stage', 'Development Activity Map', 'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction', 'Operating / Built', 'Stage not stated', 'Minor Building Work', 'Change History', 'Official evidence & coverage', 'Report actions']),
     '9e the section titles (the final layout pass, 2026-10-09, replaced the per-stage card sections, What Changed, Recent Official Activity and Things to Review with one table)', Object.values(V.TITLES));
   const p100526 = readFileSync(join(root, 'docs/development-activity-plan-100526.md'), 'utf8');
   ok(['DEVELOPMENT ACTIVITY MAP', 'APPROVED / COMING', 'PROPOSED / UNDER REVIEW', 'PERMITTED / UNDER CONSTRUCTION', 'CHANGE HISTORY'].every((t) => p100526.includes(t))

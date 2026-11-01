@@ -249,7 +249,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-3', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-4', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
 
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
@@ -309,7 +309,7 @@ const FIELD = {
   ok(ids(r.intelligence.projects.map((p) => p.project_id)) === 'ka,kb', '8a projects are sorted by project id; a project not in the spatial answer is not added', ids(r.intelligence.projects.map((p) => p.project_id)));
   const r2 = run({ rows: [row('kc', 0.2), row('kd', 0.2), row('ke', 0.2)], projects: [proj('kc', { source_ref: '' }), proj('kd', { source_ref: null }), proj('ke', { record_kind: 'facility' })] });
   ok(r2.intelligence.projects.length === 0, '8b a record with no source URL, or that is not a development record, is not in the report');
-  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-3' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
+  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-4' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
   ok(M.parseRadius(0.5) === 0.5 && M.parseRadius('2') === 2 && M.parseRadius(3) === null && M.parseRadius('') === null && M.parseRadius(null) === null && M.parseRadius('x') === null, '8d only the four canonical radii parse');
   ok(throws(() => run({ radius_mi: 3 })) !== null && throws(() => run({ view: 'staff' })) !== null && throws(() => run({ subject: { ...SUBJECT, zip: '9747' } })) !== null && throws(() => run({ subject: { ...SUBJECT, address: '  ' } })) !== null
     && throws(() => run({ subject: { ...SUBJECT, lat: NaN } })) !== null, '8e a bad radius, view, ZIP, blank address or non-finite point is refused');
