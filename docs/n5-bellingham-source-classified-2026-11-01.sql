@@ -7,6 +7,7 @@
 -- permits joined by the city to address points, parcels or street centroids). Measured 2026-11-01: 269 of 269
 -- in-scope rows carry a point, all inside ZCTAs 98225 / 98226 / 98229.
 --
+-- APPLIED 2026-11-01 ~17:45Z (no generation BUILDING; read back: 251 -> 252 rows, bellingham-trakit-permits = PROVEN).
 -- TAKES EFFECT with the next generation that opens. Apply only while no generation is BUILDING.
 
 do $$
