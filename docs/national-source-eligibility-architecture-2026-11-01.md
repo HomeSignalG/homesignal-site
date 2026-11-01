@@ -110,9 +110,10 @@ included when it passes the existing record rules (§0). Concretely:
 
 - remove `validateRights`, the `cleared` map, `excluded.no_rights`, the internal `rights: CLEARED/HOLD` marker, and the
   `NO_INCLUDED_SOURCE` / `SOURCES_NOT_INCLUDED` / `SOURCES_NOT_INCLUDED_SINCE` limitations;
-- **provenance rule kept explicitly:** a development row with **no `registry_id`** (5 rows on 2026-10-04) is still left
-  out, because it cannot be traced to a wired source. It is counted as `excluded.no_source_family`, and the report says
-  so in a limitation that names provenance, not rights;
+- **provenance rule kept explicitly (founder, 2026-11-01):** a development row with no known source family is still
+  left out, because it cannot be traced to a wired source. It is counted as `excluded.no_source_family`, and the report
+  says so in a limitation that names provenance, not rights. The 5 rows that hit this today are restored, not dropped
+  (§4.1);
 - report meta: drop `rights_registry_version` and `cleared_families` from new reports and bump `REPORT_VERSION`.
   **Stored snapshots are permanent and keep the old fields;** the report view already ignores them (checked: no front-end
   reader).
@@ -150,9 +151,10 @@ New `test/no-source-allowlist.test.mjs`:
    `validateRights` or `SOURCES_NOT_INCLUDED` (comment-stripped, with a positive control that the stripper keeps code).
 3. **Behavioural:** a fixture registry gets a brand-new source id that no other file names; a record from it is in the
    customer report, on the generated Map 1 freeze, and in the changes view. Nothing else is edited to make that happen.
-4. A record with no `registry_id`, or no `source_ref`, is still excluded (provenance is preserved).
+4. A record with no known source family, or no `source_ref`, is still excluded (provenance is preserved); a TABS record reaches the report with family `tdlr-tabs`.
 5. The attribution file is generated from the registry and has no entries without a credit line.
-6. Mutations that must fail it: re-adding an allowlist lookup, freezing an unrowed source as `UNCLASSIFIED`, dropping the
+7. Each superseded document carries the §4.2 notice, and the policy document it names exists.
+8. Mutations that must fail it: re-adding an allowlist lookup, freezing an unrowed source as `UNCLASSIFIED`, dropping the
    provenance exclusion, dropping a credit line.
 
 The existing report suites keep every non-rights assertion; only their rights fixtures and rights assertions go.
@@ -167,9 +169,9 @@ Each step is one PR. The order matters because of the open expansion work.
 |---|---|---|
 | 0 | **Wait for #2487 (Oregon) and any open WA/OR registry PR to merge.** They edit `report-rights.json`, the R7 test and add Gate B rows; this work deletes or rewrites those. Do not edit their branches. | none |
 | 1 | **Measure first (read-only, `db-sql.yml`):** every `registry_id` with development rows in `app_projects` vs the registry and vs the current allowlist; every registry id with no `geo.n5_accepted_source` row. Expected: all wired sources already cleared, so step 2 changes no report. Any difference is listed by name before step 2. | none |
-| 2 | **Reports.** Remove the gate from `national-report.ts`, `changes-since-report.ts`, the three handlers and `index.ts` imports; add the provenance limitation; move the credit lines to the registry plus generated `source-attribution.json`; delete `report-rights.json`, `build-report-rights.mjs`, `test/report-rights-r7.test.mjs`, `test/report-rights-evidence.test.mjs`; update the fixture tests and mutant suites; add `test/no-source-allowlist.test.mjs`; drop the path from `report-snapshot-suite.yml`. Deploy the three functions. | none at cutover if step 1 found no difference; from then on new sources appear in reports automatically |
+| 2 | **Reports.** Remove the gate from `national-report.ts`, `changes-since-report.ts`, the three handlers and `index.ts` imports; add the provenance limitation; stamp the TABS adapter's family `tdlr-tabs` and refresh 78617 so the 5 unnamed rows are restored (§4.1); move the credit lines to the registry plus generated `source-attribution.json`; delete `report-rights.json`, `build-report-rights.mjs`, `test/report-rights-r7.test.mjs`, `test/report-rights-evidence.test.mjs`; update the fixture tests and mutant suites; add `test/no-source-allowlist.test.mjs`; drop the path from `report-snapshot-suite.yml`. Deploy the three functions. | none at cutover if step 1 found no difference; from then on new sources appear in reports automatically |
 | 3 | **Map 1.** Add the `geometry` field to the registry (filled from each layer's own service metadata on a runner, never typed); derive the treatment in `n5_shard.py`; keep existing `accepted_source` rows authoritative; test that no source freezes as `UNCLASSIFIED`. Takes effect with the next N5 generation. | sources wired but never classified start drawing (step 1 lists them) |
-| 4 | **Documentation.** New dated record of the 2026-11-01 decision (the quotation in §0), cited as the governing policy. Mark as superseded, without rewriting their dated content: the R7 ruling, `docs/source-clearance-evidence-template.md`, the R4/R5 references in `development-activity-*` docs, `docs/development-activity-launch-gate-2026-10-04.md`. Add a pointer at the top of the rights audit that it no longer gates outputs. Update `CLAUDE.md` and the `docs/source-registry.md` onboarding steps: a new source needs only its registry entry (and `geometry`); no rights file, no approval, no N5 classification migration. Remove "Founder cleared" wording from the onboarding pattern. | none |
+| 4 | **Documentation.** New dated record of the 2026-11-01 decision (the quotation in §0), cited as the governing policy. Mark as superseded, without rewriting their dated content: the R7 ruling, `docs/source-clearance-evidence-template.md`, the R4/R5 references in `development-activity-*` docs, `docs/development-activity-launch-gate-2026-10-04.md`. Add the superseded notice in §4.2 to the rights audit, the R7 ruling and the clearance template. Update `CLAUDE.md` and the `docs/source-registry.md` onboarding steps: a new source needs only its registry entry (and `geometry`); no rights file, no approval, no N5 classification migration. Remove "Founder cleared" wording from the onboarding pattern. | none |
 | 5 | **Tell the expansion sessions** (through the PR descriptions they read): after step 2, registry PRs no longer touch `report-rights.json` or the R7 test; after step 3, no N5 classification SQL is needed. A branch that still edits a deleted file resolves the conflict by dropping that hunk. | none |
 
 ### 3.1 Rollback
@@ -191,9 +193,57 @@ Each step is one PR. The order matters because of the open expansion work.
 
 ---
 
-## 4. Open questions (factual, not approvals)
+## 4. Founder answers (2026-11-01) and what they add to the plan
 
-1. **Rows with no `registry_id`:** keep excluding them for provenance (recommended above), or trace where they come
-   from and wire them properly. Step 1 measures them.
-2. **The rights audit document** (`corporate-output-source-rights-audit-2026-09-27.md`): kept as a dated analysis with a
-   superseded pointer (recommended), or archived.
+1. **Rows with no source name: keep them out of reports, and restore their source where possible.** The founder's
+   words: *"Every Development Activity Report record needs to be traceable to an official government record. But I
+   would also have Claude investigate those five records and restore their source associations wherever possible.
+   Exclusion should not mean permanently losing valid data."*
+2. **The September rights audit: keep it, marked superseded.** *"Preserve it as historical documentation. Clearly mark
+   it as superseded by the November 1 national policy, so future Claude Code sessions don't accidentally revive outdated
+   approval requirements."*
+
+### 4.1 The five rows, investigated (read-only, production, 2026-11-01)
+
+`app_projects where record_kind = 'development' and registry_id is null`: **5 rows** (the count still matches R7's 5 from 2026-10-04).
+All five are the Texas Department of Licensing and Regulation (TDLR) architectural-barrier project registrations (TABS)
+at ZIP 78617, i.e. the Caldwell Lane case study:
+
+| source_key | name | type | status | official record |
+|---|---|---|---|---|
+| `tdlr_tabs:TABS2023006449` | River Bottoms Ranch Barn 2 | animal-facility | Active | `https://www.tdlr.texas.gov/TABS/Projects/TABS2023006449` |
+| `tdlr_tabs:TABS2023006483` | Histology Lab | research | Active | `…/TABS2023006483` |
+| `tdlr_tabs:TABS2024016698` | Barn 2 ACT Office | commercial | Active | `…/TABS2024016698` |
+| `tdlr_tabs:TABS2024022676` | ATX1 New Construction | industrial | Active | `…/TABS2024022676` |
+| `tdlr_tabs:TABS2026011928` | ATX1 - Third Floor Tenant Improvement | commercial | Active | `…/TABS2026011928` |
+
+All five were last seen on 2026-10-30 13:00Z, so they are current.
+
+**Cause.** Every registry connector (`arcgis.ts`, `socrata.ts`, `ckan.ts`, `csv.ts`, `carto.ts`) stamps
+`source_registry_id` on each record. `sources/tdlr-tabs.ts` is a separate adapter that sits outside the registry, and
+it stamps none, so the materializer stores `registry_id = null`. The records themselves are fully traceable: each one
+carries its own TDLR record URL, and that URL is required by the adapter. **The source association was never written.
+It was not lost.**
+
+**Restoration (added to step 2).**
+- Give the TABS adapter a fixed source family, `tdlr-tabs`, written as `source_registry_id` on every site it emits. It
+  is the adapter's own identifier, not an approval.
+- The report's provenance rule then reads: *a record must carry a known source family (a registry entry, or one of the
+  built-in adapters, each of which declares its family in code) and its official record link.* That is a list of the
+  connectors that exist, not an allowlist anyone maintains: adding a registry entry adds a family automatically.
+- After the engine deploy, refresh ZIP 78617. Check that the five rows now carry `registry_id = 'tdlr-tabs'` and appear
+  in a report there. Re-run the step-1 query; the expected count of development rows with no family is 0.
+- Test: a TABS fixture record reaches the report with its family set. A record with no family and no record link is
+  still excluded.
+
+### 4.2 Superseded notice on the audit (added to step 4)
+
+At the top of `docs/corporate-output-source-rights-audit-2026-09-27.md`, and of the R7 ruling and the clearance template,
+add a notice above the dated content. The dated content is not edited. The notice says:
+
+> **SUPERSEDED — 2026-11-01 national source policy** (`docs/national-source-policy-2026-11-01.md`). This document is
+> kept as history. It no longer decides what may appear on maps, feeds or Development Activity Reports. Do not
+> reintroduce per-source clearance, terms verification, a class approval or a review queue on the strength of it.
+
+A test (`test/no-source-allowlist.test.mjs`, item 7) checks that each of those documents carries the notice and that
+the policy document it names exists, so the notice cannot be lost in a later edit.
