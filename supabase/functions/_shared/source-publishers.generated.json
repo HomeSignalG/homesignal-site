@@ -101,6 +101,10 @@
    "agency": "Baltimore County",
    "dataset": "bcgisdata.baltimorecountymd.gov, service DevelopmentManagement/ActiveDevelopment"
   },
+  "beaverton-or-site-development-permits": {
+   "agency": "City of Beaverton, Oregon",
+   "dataset": "services.arcgis.com, service SD_Permits_Data"
+  },
   "bellevue-permits": {
    "agency": "City of Bellevue",
    "dataset": "services1.arcgis.com, service Bellevue_Permits"
@@ -356,6 +360,10 @@
   "el-paso-new-residential-permits": {
    "agency": "City of El Paso",
    "dataset": "gis.elpasotexas.gov, service Planning/NewResidential"
+  },
+  "eugene-or-current-capital-projects": {
+   "agency": "City of Eugene, Oregon",
+   "dataset": "services3.arcgis.com, service Current_Projects"
   },
   "fairfax-active-site-construction": {
    "agency": "Fairfax County Land Development Services",
@@ -749,6 +757,10 @@
    "agency": "City of Portland",
    "dataset": "www.portlandmaps.com, service COP_OpenData_PlanningDevelopment"
   },
+  "portland-neighborhood-contact-applications": {
+   "agency": "City of Portland",
+   "dataset": "www.portlandmaps.com, service COP_OpenData_PlanningDevelopment"
+  },
   "prince-georges-county-permits": {
    "agency": "Prince George's County",
    "dataset": "data.princegeorgescountymd.gov, dataset weik-ttee"
@@ -904,6 +916,14 @@
   "thurston-county-residential-permits": {
    "agency": "Thurston County, Washington",
    "dataset": "services1.arcgis.com, service Residential_Building_Permits"
+  },
+  "tigard-or-active-building-permits": {
+   "agency": "City of Tigard, Oregon",
+   "dataset": "svr.tigardmaps.com, service Featured_Public/active_permits"
+  },
+  "tigard-or-active-planning-cases": {
+   "agency": "City of Tigard, Oregon",
+   "dataset": "svr.tigardmaps.com, service Featured_Public/active_permits"
   },
   "topeka-building-permits": {
    "agency": "City of Topeka, Kansas",
