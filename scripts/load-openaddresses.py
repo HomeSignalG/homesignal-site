@@ -26,7 +26,8 @@ partial success.
 
 Config via env:
   SUPABASE_URL                (else read from homesignalmap.html ENDPOINT)
-  SUPABASE_SERVICE_ROLE_KEY   (repo secret — RLS on national_address_points is service-role only)
+  SUPABASE_SERVICE_ROLE_KEY   (set by the workflow from PROD_SUPABASE_SERVICE_ROLE_KEY in the GitHub environment
+                              `production` — RLS on national_address_points is service-role only)
   ZIPS      comma list of target ZIPs   (else: distinct zips from property_reports)
   STATES    comma list of 2-letter states to download (else: derived from the target ZIPs)
   OA_BASE   region-collection base URL   (default https://data.openaddresses.io/openaddr-collected-)
@@ -268,7 +269,7 @@ def upsert(rows: list) -> int:
 # ── main ───────────────────────────────────────────────────────────────────────────────────────
 def main() -> int:
     if not SERVICE_KEY:
-        raise SystemExit("FATAL: SUPABASE_SERVICE_ROLE_KEY not set (repo secret). Cannot write "
+        raise SystemExit("FATAL: SUPABASE_SERVICE_ROLE_KEY not set (the workflow sets it from PROD_SUPABASE_SERVICE_ROLE_KEY in the environment production). Cannot write "
                          "national_address_points (RLS service-role only). Stopping — not retrying blind.")
     zips = target_zips()
     states = set(target_states(zips))
