@@ -518,6 +518,10 @@ for (const [label, w, count, disabled] of [
   await make(page);
   ok(reports.length === 1 && reports[0].body.idempotency_key === undefined && w.used === 0 && /Admin report: no free report was used/.test(await text(page, '#creditnote')),
     '4e an admin\'s report carries no key (the report function refuses one), uses nothing, and says so', reports.map((r) => r.body));
+  // an inert action (here Watch Property: no data-da-action) is as wide as the live ones (it was half width, 2026-11-01)
+  const widths = await page.$$eval('#rail-actions .da-rv-act', (els) => els.map((e) => ({ t: e.textContent, inert: e.getAttribute('aria-disabled') === 'true', w: Math.round(e.getBoundingClientRect().width) })));
+  ok(widths.length >= 3 && widths.some((b) => b.inert) && widths.every((b) => b.w === widths[0].w && b.w > 0),
+    '4e2 every action in the rail is the same width, an inert one included', widths);
   await ctx.close();
 }
 {
