@@ -1049,8 +1049,8 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
     return { report: shown('#report .da-rv'), head: shown('header.top'), share: shown('#share'), trial: shown('#trial'), status: shown('#status'), form: shown('#rf'),
       actions: shown('.da-rv-actions'), filters: shown('.da-rv-sec--filters'), saved: shown('#saved'), auth: shown('#auth-overlay') };
   });
-  ok(printed.report && !printed.head && !printed.share && !printed.trial && !printed.status && !printed.form && !printed.actions && !printed.filters && !printed.saved && !printed.auth,
-    '9p in print only the report is shown: no header, card, form, status, filter chips or action buttons', printed);
+  ok(printed.report && !printed.head && !printed.share && !printed.trial && !printed.status && !printed.form && !printed.actions && printed.filters && !printed.saved && !printed.auth,
+    '9p in print only the report is shown, with its Type/Stage filters (they print so a PDF shows what was picked, founder 2026-11-01): no header, card, form, status or action buttons', printed);
   await page.emulateMedia({ media: 'screen' });
   ok(errors.length === 0 && foreign.length === 0, '9q no page error, nothing foreign fetched', { errors, foreign });
   await ctx.close();

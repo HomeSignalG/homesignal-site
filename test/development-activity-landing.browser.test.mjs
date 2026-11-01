@@ -125,9 +125,9 @@ const order = await page.evaluate(() => {
     links: r.querySelectorAll('a[href]').length
   };
 });
-const want = ['Client Briefing: Nearby Activity', order.viewTitles.filters, order.viewTitles.records, order.viewTitles.map, order.viewTitles.history, order.viewTitles.evidence];
+const want = ['Client Briefing: Nearby Activity', order.viewTitles.filters, order.viewTitles.map, order.viewTitles.records, order.viewTitles.history, order.viewTitles.evidence];
 ok(JSON.stringify(order.heads) === JSON.stringify(want),
-  'sections in the real report\'s order: briefing → Type and stage → Nearby Development → Development Activity Map → Change History → Official evidence & coverage', order.heads);
+  'sections in the real report\'s order: briefing → Type and stage → Development Activity Map → Nearby Development → Change History → Official evidence & coverage', order.heads);
 ok(order.eyebrow === 'JODY Development Activity', 'the header carries the report view\'s own eyebrow', order.eyebrow);
 ok(/1234 Sample Street/i.test(order.text) && /Sample Realty · Agent Name/.test(order.text) && /Generated /.test(order.text) && /Search radius 0\.5 miles/.test(order.text),
   'property, brokerage/agent identity, generated date and search radius are present');
