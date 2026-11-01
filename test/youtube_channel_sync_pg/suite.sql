@@ -29,6 +29,15 @@ select pg_temp.chk('0a every video post carries https://jodytracks.com', public.
 update public.youtube_video_reviews set bsky_posts = jsonb_set(bsky_posts, '{short1,caption}', '"More: jodytracks.com"') where slug='p3';
 select pg_temp.chk('0b a caption that already names the site does not get it twice', public.video_bsky_text('p3','short1') = E'More: jodytracks.com\n\n#Tacoma #JodyTracks');
 
+-- 0c-0e. a caption with its own hashtags keeps exactly those (2026-11-01; Stratos doubled #JodyTracks and reached 330)
+update public.youtube_video_reviews set bsky_posts = jsonb_set(bsky_posts, '{final,caption}', '"Main video caption.\n\n#JODYTracks #UtahWater"') where slug='p2';
+select pg_temp.chk('0c a caption carrying its own hashtags gets no generated ones', public.video_bsky_text('p2','final') = E'Main video caption.\n\n#JODYTracks #UtahWater\nhttps://jodytracks.com');
+update public.youtube_video_reviews set bsky_posts = jsonb_set(bsky_posts, '{final,caption}', '"Call 555-0100 #2 option. Issue #42 too."') where slug='p2';
+select pg_temp.chk('0d an all-digit #2 / #42 is not a hashtag (Bluesky needs a letter), so the generated tags stay', public.video_bsky_text('p2','final') = E'Call 555-0100 #2 option. Issue #42 too.\nhttps://jodytracks.com\n\n#Tacoma #JodyTracks');
+update public.youtube_video_reviews set bsky_posts = jsonb_set(bsky_posts, '{final,caption}', '"Rank C# stays a caption, and so does a lone # sign."') where slug='p2';
+select pg_temp.chk('0e a # with no space before it, or with nothing after it, is not a hashtag', public.video_bsky_text('p2','final') = E'Rank C# stays a caption, and so does a lone # sign.\nhttps://jodytracks.com\n\n#Tacoma #JodyTracks');
+update public.youtube_video_reviews set bsky_posts = jsonb_set(bsky_posts, '{final,caption}', '"Main video caption."') where slug='p2';
+
 -- 1. the first import is historical: recorded, never linked
 select public.youtube_sync_record(jsonb_build_array(pg_temp.row('OLDVIDEO001','old','final','matched',true)), 'oauth');
 select pg_temp.chk('1a first import is marked historical', (pg_temp.vid('OLDVIDEO001')).historical);
