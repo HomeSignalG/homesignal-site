@@ -174,6 +174,9 @@ def open_harness(lose, verify_ok):
     n3.PROVEN_POLL_S = 0
     o.say = lambda *a, **k: None
     o.GENERATION = "gen-open"
+    # the Map 1 treatment step before the capture has its own tests (scripts/test_n5_classify_sources.py,
+    # run_lifecycle.py E1c/E1d); this harness is about the capture transaction only
+    o.classify_sources = lambda: None
     return calls
 
 

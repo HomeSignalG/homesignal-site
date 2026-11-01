@@ -1,6 +1,8 @@
 -- ============================================================================
 -- SOURCE FRESHNESS — per development source, plus this ZIP's own read status (SQL OF RECORD)
--- NOT APPLIED. Founder, 2026-11-01: build and test; apply only after final approval.
+-- APPLIED 2026-11-01 (founder-approved) as migration 20261101191620 dev_source_freshness; the applied
+-- text was this file with md5 9ef08451923d14cab729e27c0c97806a (before this header line changed).
+-- Verified live the same day: verify-source-freshness-live run 41343115114, 320 checks, 0 failed.
 --
 -- WHAT A PAGE SAYS, for each development source it reads (homesignalmap.html, ZIP pages):
 --   1. the newest record date the source has given us        -> newest_record_date (source-wide)

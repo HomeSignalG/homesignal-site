@@ -201,7 +201,7 @@ const visible = (page, sel) => page.evaluate((s) => { const e = document.querySe
     const shown = (sel) => { const e = document.querySelector(sel); return !!e && e.getClientRects().length > 0; };
     return { report: shown('#report .da-rv'), head: shown('header.top'), pdf: shown('#pdf'), status: shown('#status'), privateNote: shown('#private'), rid: shown('#rid'), notice: shown('#gone'), cards: shown('.da-rv-table tbody tr'), filters: shown('.da-rv-sec--filters'), bg: getComputedStyle(document.body).backgroundColor };
   });
-  ok(p.report && p.cards && p.rid && !p.head && !p.pdf && !p.status && !p.privateNote && !p.notice && !p.filters && p.bg === 'rgb(255, 255, 255)', '6a on paper: the report and its id, on white; no header, no button, no status line, no privacy note, no filter chips', p);
+  ok(p.report && p.cards && p.rid && !p.head && !p.pdf && !p.status && !p.privateNote && !p.notice && p.filters && p.bg === 'rgb(255, 255, 255)', '6a on paper: the report and its id, on white; no header, no button, no status line, no privacy note; the Type/Stage filters print (founder 2026-11-01)', p);
   ok(await visible(page, '#invite'), '6a2 the invitation prints, so a saved PDF carries it');
   const links = await page.evaluate(() => { const a = [...document.querySelectorAll('.da-rv a[href^="http"]')]; return a.length ? getComputedStyle(a[0], '::after').content : 'none'; });
   ok(links === 'none' || /^" \(http/.test(links), '6b each official link prints its address after it, so the paper copy still leads to the record', links);

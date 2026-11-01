@@ -32,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'status | open | work | publish | unresolved | reconcile | ready | prove | prove_dry | prove_negative | activate | rollback | fail | discard'
+        description: 'status | classify | open | work | publish | unresolved | reconcile | ready | prove | prove_dry | prove_negative | activate | rollback | fail | discard'
         required: true
         default: 'status'
       generation:
