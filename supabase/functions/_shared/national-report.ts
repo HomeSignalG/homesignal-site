@@ -610,7 +610,7 @@ export function assemble(input: AssembleInput): Assembled {
       source_family: family || null,
       name: p.name,
       address: p.address,
-      type: t ? { key: t.typeKey, label: t.label } : null,
+      type: t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
       lifecycle: { key: lc.key, label: lc.label },
       stage: stage ? { key: stage, label: STAGE_LABELS[stage], ...(evidence ? { evidence: evidence.label } : {}) } : null,
       publisher_status: p.status,

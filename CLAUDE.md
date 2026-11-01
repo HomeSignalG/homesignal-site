@@ -3587,6 +3587,18 @@ a literal lifecycle word in the template; the badge beside it is what kind of re
 **Membership is separate and still differs:** the ZIP page lists `app_projects` facility rows,
 Map 1 draws only ZIP-member points from `zip_mode_report_sites` (e.g. 122 vs 73 in four ZIPs).
 
+## 7.12k LANDFILLS, QUARRIES, BURNING FACILITIES AND TRANSFER STATIONS ARE INDUSTRIAL ⚖️ FOUNDER RULING (2026-11-01)
+
+"classify them as industrial and give them each their own impact sentence". `heavyFacilityKind` in `lib/project-type.js`
+(precedence 2.5 in `classifyProjectType`: after a stated data centre, before every class-field lookup) returns
+`landfill | quarry | burning | transfer`; the record is Industrial (`shapeRule HEAVY:<kind>`, `facilityKind`) whatever bucket
+its source used ("Solid Waste Transfer Station [Utility]"). This also changes those records' Map 1 pin and ZIP-page badge.
+- Patterns need a facility phrase, and guards refuse street, creek and place names ("Landfill Rd", "Rock Quarry Road",
+  "Gravel Pit Interchange", "Bitcoin mining", "hauled to the landfill"). Measured on production names 2026-11-01.
+- The engine passes `type.kind` (national-report.ts, only when set); the report view gives each kind its own sentence
+  (`QOL_BY_FACILITY`). Reports saved before have no kind and read as before.
+- Test: `test/heavy-facility-type.test.mjs` (real production names, both directions).
+
 ## 7.12a AN ISSUED PERMIT IS "APPROVED", NOT "OPERATING NOW" ⚖️ FOUNDER RULING (2026-10-20)
 
 **A source whose only date is the permit's issue date (`file_date_kind: "issued"`) and that has no
