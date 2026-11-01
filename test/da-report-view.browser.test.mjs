@@ -88,8 +88,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-table tbody tr').length,
   }));
-  ok(info.h2.join('|') === 'Type and stage|Nearby Development|Development Activity Map|Change History|Official evidence & coverage',
-    '1c the sections render as headings, in the final layout\'s order: the records table, then the map, history and evidence', info.h2);
+  ok(info.h2.join('|') === 'Type and stage|Development Activity Map|Nearby Development|Change History|Official evidence & coverage',
+    '1c the sections render as headings in order: the filters with the map under them, then the records table, history and evidence', info.h2);
   ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight table rows', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
   ok(await page.evaluate(() => document.querySelectorAll('#da-rv-style').length) === 1, '1e mounting again does not add a second stylesheet');
@@ -133,8 +133,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { secs, cols, cardW, headBottom: head.bottom + scrollY, viewport: innerWidth };
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
-  const PLAN_MOBILE = ['Type and stage', 'Nearby Development', 'Development Activity Map', 'Change History', 'Official evidence & coverage'];
-  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the page order: the filters, the one records table, the map, history, evidence', lay.secs.map((s) => s.label));
+  const PLAN_MOBILE = ['Type and stage', 'Development Activity Map', 'Nearby Development', 'Change History', 'Official evidence & coverage'];
+  ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the page order: the filters, the map, the one records table, history, evidence', lay.secs.map((s) => s.label));
   const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
   ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
   const plot = await page.evaluate(() => { const r = document.querySelector('.da-rv-plot').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 0.5]; });
@@ -414,7 +414,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const namePages = ['100 North', '200 North', '300 North'].map((nm) => firstPage(new RegExp('SR-13 \\(Main St\\) & ' + nm)));
       ok(verifyPages.length >= 3 && namePages.every((p, i) => p === verifyPages[i]), '12n no table row is split across pages: each record\'s name and its stale-record warning are on the same page', { namePages, verifyPages });
       { const L = tb.split('\n'); const vi = L.map((l, i) => (/Verify:/.test(l) ? i : -1)).filter((i) => i >= 0);
-        ok(vi.length === 3 && pagesText[0].includes('Verify:') && vi.every((i) => /Filed Aug 26,/.test(L.slice(i, i + 3).join(' '))), '12o each stale record carries its concise warning in the printed table (the line may wrap inside the Stage column)', vi); }
+        ok(vi.length === 3 && vi.every((i) => /Filed Aug 26,/.test(L.slice(i, i + 3).join(' '))), '12o each stale record carries its concise warning in the printed table (the line may wrap inside the Stage column)', vi); }
       // a large report: it paginates, the header row repeats, no row is stranded
       const many = { rows: [], projects: [], ledger: [], events: [], health: [] };
       for (let i = 0; i < 40; i++) { many.rows.push(row('m' + i, 0.05 + i * 0.011, i % 2 ? FA : FAM_B)); many.projects.push(proj('m' + i, i % 2 ? FA : FAM_B, { name: 'Project ' + String(i).padStart(2, '0') + ' Long Descriptive Development Name', status: ['Approved', 'Proposed', 'Under Construction'][i % 3], date_kind: 'filed', submitted_at: '2026-0' + (1 + (i % 8)) + '-10' })); }
@@ -516,7 +516,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     ok(o.length === 8 && o.every((x) => x === 'dev,stage,qol,evid|Development:Stage:Quality-of-Life Impact:Supporting Evidence:'), '14c a narrow report on a wide screen stacks in the required order with all four labels', o[0]);
     await ctx.close();
   }
-  // (d) filters take the whole record, evidence included, in both layouts; the totals do not move; a zero match says so; print restores everything
+  // (d) filters take the whole record, evidence included, in both layouts; the totals do not move; a zero match says so; print keeps the filter (founder, 2026-11-01)
   for (const [label, extra] of [['four columns', ''], ['stacked', '#host{max-width:600px}']]) {
     const { ctx, page } = await open(1440, 900);
     await mount(page, W, ADDRESS);
@@ -531,13 +531,28 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="commercial"]');
     const t = await shown();
     ok(t.rows.length === 2 && t.evCells === 2 && t.links === 2, `14d2 (${label}) Type and Stage filters combine on whole rows (2 commercial proposed records, 2 evidence cells)`, t);
+    // print keeps what the filters show, prints the filters with the pressed ones ticked, and says in words what was picked
+    await page.emulateMedia({ media: 'print' });
+    const pf = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length,
+      filters: document.querySelector('.da-rv-sec--filters').getBoundingClientRect().height > 0,
+      pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => [getComputedStyle(b, '::before').content, getComputedStyle(b).backgroundColor]),
+      unpressed: getComputedStyle(document.querySelector('.da-rv-chip[aria-pressed="false"]')).backgroundColor,
+      now: document.querySelector('[data-da-fnow]').textContent,
+      marks: [...document.querySelectorAll('.da-rv-mk')].filter((e) => e.getBoundingClientRect().height > 0).length }));
+    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.pressed.length === 2 && pf.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== pf.unpressed)
+      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks, the filters themselves with the two pressed ones ticked and filled, and "Showing … : 2 of 8 records."`, pf);
+    await page.emulateMedia({ media: 'screen' });
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="datacenter"]').catch(() => {});
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="operating"]');
     const z = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length, table: document.querySelector('.da-rv-tablewrap').getBoundingClientRect().height, note: !document.querySelector('.da-rv-nomatch').hidden && /No records match/.test(document.querySelector('.da-rv-nomatch').textContent) }));
     ok(z.rows === 0 && z.table === 0 && z.note, `14d3 (${label}) a filter that matches nothing hides the table and says "No records match the filters." (no orphaned evidence)`, z);
     await page.emulateMedia({ media: 'print' });
     const pr = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length);
-    ok(pr === 8, `14d4 (${label}) printing with a filter active still prints all 8 records`, pr);
+    ok(pr === 0, `14d4 (${label}) printing with a filter that matches nothing prints no rows (the PDF follows the filters)`, pr);
+    await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="all"]');
+    await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
+    const pa = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length, now: document.querySelector('[data-da-fnow]').textContent }));
+    ok(pa.rows === 8 && pa.now === 'Showing all 8 records.', `14d5 (${label}) with "All" pressed on both, the PDF prints all 8 records and says so`, pa);
     await ctx.close();
   }
   // (e) hostile publisher text in the evidence cell (name, attribution, URL) neither runs nor creates elements, in either layout
