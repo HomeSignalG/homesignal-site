@@ -64,6 +64,12 @@ registry entry and nothing else.
   Before this they carried none, so the five Caldwell Lane filings at ZIP 78617 were stored with no family and left out.
 - `test/no-source-allowlist.test.mjs`: fails if an allowlist, a clearance lookup or an "uncleared" blocker comes back, if a
   source no file has ever named does not reach the report, or if a superseded document loses its notice.
+- Map 1: `scripts/n5_classify_sources.py`, called by `n5_orchestrate.open_generation` before each capture. A source with no
+  `geo.n5_accepted_source` row gets one, from the publisher's own layer: non-ArcGIS -> PROVEN; ArcGIS Table -> PROVEN
+  (fenced geocode); ArcGIS layer with geometry -> RECOVERY (the build re-reads the publisher's geometry); unreadable
+  metadata -> no row this generation, asked again at the next open. Existing rows always win. Hand-written N5
+  classification migrations are no longer needed. Tests: `scripts/test_n5_classify_sources.py`,
+  `test/n5_generation_pg/run_lifecycle.py` E1c/E1d.
 
 ## 5. Measured when this was written (read-only, production, 2026-11-01)
 
@@ -73,3 +79,7 @@ registry entry and nothing else.
 - Map 1 (`geo.n5_accepted_source`): 6 registry sources had no row, so Map 1 drew none of their records. Of these, only
   `baltimore-city-housing-permits` had stored records (2,824). That gate is removed separately; see
   `docs/national-source-eligibility-architecture-2026-11-01.md` §2.2.
+  Counted again with the TDLR family: 7 sources had no row (also `tdlr-tabs`, 5 records). Their layers, read through
+  `pg_net` on 2026-11-01, give: Baltimore City, Harris County permits (points), Harris County plats, Houston plat
+  applications (polygons), San Antonio preliminary plan review (points) -> RECOVERY; Shelby County (opendatasoft) and
+  `tdlr-tabs` -> PROVEN. They are written at the next generation's open.

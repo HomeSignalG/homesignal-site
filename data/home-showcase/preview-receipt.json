@@ -1,5 +1,5 @@
 {
- "view_sha256": "f777b2b92b2c47ed7fd474270d0c8ea8e03c11e7e48e5fd6d8f59e3a2ce8c7fb",
+ "view_sha256": "25b0e63acb400a12f3a8566de9f1eb3a566c049153cd2b76b2d5053777442ba5",
  "fixture_md5": "f04579a6f3adfc15f4f7ab3300e884c3",
  "subject": "4700 Point Fosdick Dr NW, Gig Harbor, WA 98335",
  "caption": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source.",
@@ -38,7 +38,7 @@
     }
    ],
    "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property: 1 permitted / under construction · 1 proposed / under review. Types: 2 Residential. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Construction Residential Long Acres, Lot 20 Residential Proposed / Under Review Source agency status: Accepted Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Construction Residential Long Acres, Lot 15 Residential Permitted / Under Construction Source agency status: Issued Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "f007ae4d1bfb35ceef7f5968f60a59dd61dc7b11d577b3579f3a1dfa59614cd2"
+   "asset_sha256": "ef69319287b7f910f95ed1829371f8a17125a54ad578314154ea31e355055fd9"
   },
   "mobile": {
    "width": 688,
@@ -67,7 +67,7 @@
     }
    ],
    "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property: 1 permitted / under construction · 1 proposed / under review. Types: 2 Residential. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Development: Construction Residential Long Acres, Lot 20 Residential Stage: Proposed / Under Review Source agency status: Accepted Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Supporting Evidence: Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Development: Construction Residential Long Acres, Lot 15 Residential Stage: Permitted / Under Construction Source agency status: Issued Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Supporting Evidence: Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "a6dd4573f60e05f618c2992ac37f616a6c67e783b42da4a0cdd47eb5416ee2c9"
+   "asset_sha256": "f769074876969e99ab09c2b0ae91d5fb78b4ac22df5996159ef0f57dff455bac"
   }
  }
 }
