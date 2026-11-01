@@ -339,6 +339,44 @@
     }
     return null;
   }
+  // ── HEAVY FACILITIES — landfill · quarry/mine · burning · transfer station ──────────────
+  // Founder ruling 2026-11-01: these are Industrial, whatever bucket the source filed them in
+  // ("Solid Waste Transfer Station [Utility]", "Bismarck Landfill … [Commercial]"), and each
+  // kind gets its own quality-of-life sentence in the report (the report view reads
+  // `facilityKind`, carried as type.kind). ONE decision, here; the engine copy is generated verbatim.
+  // Patterns are calibrated on production app_projects names (2026-11-01): bare words
+  // over-match ("hauled to the landfill", "Rock Quarry Rd", "Gravel Pit Interchange",
+  // "Bitcoin mining"), so a kind needs a facility phrase and the guards refuse street,
+  // creek and place names built from the same words. Order: burning before landfill, since a
+  // waste-to-energy plant may sit at a landfill.
+  const HEAVY_STREET = '(?:rd|road|st|street|ave|avenue|dr|drive|ln|lane|way|blvd|boulevard|pkwy|parkway|ct|court|creek|interchange|tennis|terrace)\\b';
+  const HEAVY_FACILITY_RULES = [
+    { kind: 'burning',
+      re: /\b(?:incinerat|pyrolys)|waste[-\s]?to[-\s]?energy|\bgasification\b|\btires?\b.{0,15}\bburn|plastics?.{0,30}(?:burn|incinerat|pyrolys)/i },
+    { kind: 'landfill',
+      re: /\blandfills?\b/i,
+      not: new RegExp('\\b(?:haul|hauled|hauling|taken|disposed|dispose|transported|delivered|removed)\\b.{0,60}landfill|landfill\\s+' + HEAVY_STREET, 'i') },
+    { kind: 'quarry',
+      re: /\bquarrying\b|\b(?:rock|stone|limestone|granite|gravel|sand|aggregate|shale|clay)\s+quarr(?:y|ies)\b|\bquarr(?:y|ies)\s+(?:operation|expansion|mining|pit|reclamation|excavation|blasting)\b|\bgravel\s+pits?\b|\bsand\s+(?:and|&)\s+gravel\b|\bsurface\s+min(?:e|es|ing)\b|\baggregate\s+(?:mine|mining|pit|extraction)\b|\bmining\b/i,
+      not: new RegExp('(?:crypto|bitcoin|data|digital)\\s*mining|(?:quarr(?:y|ies)|pits?|gravel)\\s+' + HEAVY_STREET + '|terrace\\s+at\\s+rock\\s+quarry', 'i') },
+    { kind: 'transfer',
+      re: /\btransfer\s+stations?\b/i,
+      not: new RegExp('transfer\\s+stations?\\s+' + HEAVY_STREET, 'i') }
+  ];
+  const HEAVY_FACILITY_KINDS = HEAVY_FACILITY_RULES.map(function (r) { return r.kind; });
+  // The record's name and its own class fields, as one string. null = not a heavy facility.
+  function heavyFacilityKind(item) {
+    if (!item) return null;
+    const text = [item.name, item.title, item.label, item.type, item.use_type, item.layer, item.category]
+      .filter(Boolean).map(String).join(' • ');
+    if (!text) return null;
+    for (let i = 0; i < HEAVY_FACILITY_RULES.length; i++) {
+      const r = HEAVY_FACILITY_RULES[i];
+      if (r.re.test(text) && !(r.not && r.not.test(text))) return r.kind;
+    }
+    return null;
+  }
+
   // ── TERMINAL-NEUTRAL — an EXPLICIT "type unresolved", checked before every inference ──
   // The engine already writes one such value: commercial-eligibility.ts downgrades a record to
   // NON_QUALIFYING_COMMERCIAL_USE_TYPE ("other project") when the property's occupancy was its
@@ -381,6 +419,16 @@
     // vocabulary and every category it can displace is strictly broader.
     const dc = statedDataCenter(item);
     if (dc) return dc;
+    // PRECEDENCE 2.5 — a heavy facility is Industrial whatever bucket the source used
+    // (founder, 2026-11-01). After the data centre, before every class-field lookup.
+    const heavy = heavyFacilityKind(item);
+    if (heavy) {
+      return Object.assign(cat('industrial'), {
+        typeLabel: display || CATEGORY_REGISTRY.industrial.label,
+        shapeRule: 'HEAVY:' + heavy,
+        facilityKind: heavy
+      });
+    }
     const fields = [item && item.type, item && item.use_type, item && item.layer, item && item.category];
     for (let i = 0; i < fields.length; i++) {
       const hit = typeInfoFromExact(fields[i], i === 0 ? display : (fields[0] || fields[i]));
@@ -511,7 +559,10 @@
     const info = classifyProjectType({ type: t, use_type: t, name: n, title: n, label: n });
     const c = info && CATEGORY_REGISTRY[info.typeKey];
     if (!c || c.isFacility) return null;
-    return { typeKey: c.key, label: c.label };
+    // facilityKind (landfill · quarry · burning · transfer) rides along only when set, so
+    // every other record's answer is byte-identical to before.
+    return info.facilityKind ? { typeKey: c.key, label: c.label, facilityKind: info.facilityKind }
+                             : { typeKey: c.key, label: c.label };
   }
   HS.canonicalProjectType = canonicalProjectType;
 
@@ -572,6 +623,8 @@
     classifyProjectType: classifyProjectType,
     statedDataCenter: statedDataCenter,
     canonicalProjectType: canonicalProjectType,
+    heavyFacilityKind: heavyFacilityKind,
+    HEAVY_FACILITY_KINDS: HEAVY_FACILITY_KINDS,
     TYPE_FILTER_KEYS: TYPE_FILTER_KEYS,
     classifyFacilityOverlayType: classifyFacilityOverlayType,
     facilityIdentity: facilityIdentity,
