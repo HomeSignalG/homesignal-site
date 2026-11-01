@@ -109,7 +109,7 @@ insertEvent({ key: 'k1', observed: "now() - interval '4 minutes'", created: "now
 
 // ---- 1. a real report from the real engine, its events read through the real shared reads, stored through the real writer ---------------------
 const FAM = 'fam-a';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-09-29', audit_ref: 'fixture', attribution: 'Data: A' }] };
+const RIGHTS = { version: 1, attribution: { [FAM]: 'Data: A' } };
 const SUBJECT = { address: '742 Evergreen Terrace, Springfield, OR 97477', matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477', label: 'Homer client' };
 const SUBJECT2 = { address: '31 Spooner Street Quahog RI', matched_address: '31 SPOONER ST, QUAHOG, RI, 97477', lat: 41.83452, lng: -71.41255, zip: '97477', label: 'Griffin, Peter' };
 const proj = (k, x = {}) => ({ source_key: k, registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.gov/r/1', ...x });
@@ -121,7 +121,7 @@ const sinceDay = M.addDays(M.dayOf(new Date()), -M.RECENT_DAYS);
 const engineLedger = await reads.ledger(keys);
 const engineEvents = await reads.events(keys, sinceDay);
 ok(engineLedger.length === 2 && engineEvents.length === 2 && engineEvents.every((e) => e.identity_key === 'k1'), '1a the engine\'s inputs are read through the real shared reads from the real view: two ledger rows, the two k1 events written so far', [engineLedger.length, engineEvents.length]);
-const assembleFor = (subject) => M.assemble({ now: new Date(), view: 'customer', zip_supported: true, radius_mi: 1, rights: RIGHTS, subject,
+const assembleFor = (subject) => M.assemble({ now: new Date(), view: 'customer', zip_supported: true, radius_mi: 1, attribution: RIGHTS, subject,
   rows: [radiusRow('k1', 0.3), radiusRow('k2', 0.6)], projects: [proj('k1'), proj('k2', { name: 'Weather Station', status: 'Proposed' })], ledger: engineLedger, events: engineEvents, health: [] });
 const rpc = async (fn, a) => {
   if (fn !== 'report_snapshot_issue') throw new Error('unexpected rpc ' + fn);
@@ -158,7 +158,7 @@ insertEvent({ key: 'k1', observed: TS + " - interval '30 minutes'", created: TS 
 const NOW = new Date(T.getTime() + 2 * 3600 * 1000);
 // the follow ids belong to the CALLER: the function mints none. They carry a hex letter so a lower-casing test can fail.
 const ids = ['a1111111-1111-4111-8111-111111111111', 'a2222222-2222-4222-8222-222222222222', 'a3333333-3333-4333-8333-333333333333', 'a4444444-4444-4444-8444-444444444444'];
-const handler = H.makeHandler(D.makeDeps({ url: 'http://pg.test', serviceKey: 'service-key', rights: RIGHTS, now: () => NOW }, pgrest));
+const handler = H.makeHandler(D.makeDeps({ url: 'http://pg.test', serviceKey: 'service-key', attribution: RIGHTS, now: () => NOW }, pgrest));
 const responses = [];
 const ask = async (body) => {
   const res = await handler(new Request('https://x.supabase.co/functions/v1/follow-development-report', { method: 'POST', headers: { authorization: 'Bearer user-token', 'content-type': 'application/json' }, body: JSON.stringify(body) }));

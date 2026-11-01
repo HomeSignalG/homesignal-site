@@ -8,7 +8,7 @@
 //   * events come ONLY from public.dev_change_event_reportable, the view that owns "may this event be shown as a change"
 //     (docs/dev-change-reportable.sql). The ledger's raw event table is never named here, and a structural test fails
 //     if any file in this repo's edge functions names it.
-//   * `rights_class` is never selected: a rights decision is _shared/report-rights.json's, not a ledger column's.
+//   * `rights_class` is never selected: whether a record may appear is decided by provenance (national source policy 2026-11-01), never by a ledger column.
 //   * nothing here reads the private context. It has no handle to it.
 // It makes no decision and holds no rule; it fetches through the `rest` it is handed, which fails closed.
 import { inBatches, quoteIn } from './service-rest.ts';

@@ -11,7 +11,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_AB, wire } from './lib/da-report-view-world.mjs';
+import { RICH, ATTRIBUTION_AB, wire } from './lib/da-report-view-world.mjs';
 
 const VH = await import('../supabase/functions/view-shared-report/handler.ts');
 const Svc = await import('../supabase/functions/_shared/service-rest.ts');
@@ -29,7 +29,7 @@ const VIEW_FN = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shar
 const LIVE = 'L'.repeat(42) + '1', REVOKED = 'R'.repeat(43), EXPIRED = 'E'.repeat(43), UNKNOWN = 'U'.repeat(43);
 const RID = 'c0000000-0000-4000-8000-000000000001';
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
-const stored = (await wire(RICH, { view: 'customer', rights: RIGHTS_AB })).report;
+const stored = (await wire(RICH, { view: 'customer', attribution: ATTRIBUTION_AB })).report;
 
 function world({ address = ADDRESS, brokerage = 'Acme Realty' } = {}) {
   const w = { opened: [], down: false, address, brokerage };

@@ -28,7 +28,7 @@ const V = sandbox.window.HS.daReportView;
 
 // ---- the engine: every response comes from its real handler (test/lib/da-report-view-world.mjs), and assemble() is called directly once, to compare
 const M = await import('../supabase/functions/_shared/national-report.ts');
-import { NOW, FAM_A, FAM_B, RIGHTS_NONE, RIGHTS_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
+import { NOW, FAM_A, FAM_B, NO_FAMILY, ATTRIBUTION_AB, ADDRESS, row, proj, RICH, COLD, wire, clone } from './lib/da-report-view-world.mjs';
 /** The view of a response. A throw is returned as a marker so the check that looked at it fails BY NAME instead of the whole suite crashing. */
 let threw = 0;
 const view = (r, subject = ADDRESS) => { try { return V.html(r, { subject }); } catch (e) { threw++; return '[[the view threw: ' + String((e && e.message) || e) + ']]'; } };
@@ -47,8 +47,8 @@ const stripShapes = (h) => h.replace(/<svg class="da-rv-shape"[\s\S]*?<\/svg>/g,
 
 const W = await wire(RICH);
 const WCOLD = await wire(COLD);
-const WNONE = await wire(RICH, { rights: RIGHTS_NONE });
-const WINT = await wire(RICH, { view: 'internal', rights: RIGHTS_NONE });
+const WNONE = await wire(NO_FAMILY(RICH));
+const WINT = await wire(RICH, { view: 'internal' });
 const html = view(W), htmlCold = view(WCOLD), htmlNone = view(WNONE), htmlInt = view(WINT);
 // The internal review page asks for the lifecycle line (opts.showLifecycle); customer renderers do not. These are the pins on what the line says WHEN it is shown.
 const viewLife = (r) => V.html(r, { subject: ADDRESS, showLifecycle: true });
@@ -57,7 +57,7 @@ const htmlLife = viewLife(W);
 // ---- 0. the fixtures ARE the engine's output --------------------------------------------------------------------------------------------
 try {
   ok(W.status === 'OK' && W.report.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && Array.isArray(W.report.projects), '0a the response is the real handler\'s: status OK, the engine\'s product name, a projects array');
-  const direct = M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, rights: RIGHTS_AB,
+  const direct = M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: ATTRIBUTION_AB,
     subject: { address: ADDRESS, matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' },
     rows: RICH.rows, projects: RICH.projects, ledger: RICH.ledger, events: RICH.events, health: [] });
   ok(JSON.stringify(W.report) === JSON.stringify(direct.intelligence), '0b the wire report equals assemble() called directly on the same inputs, byte for byte');
@@ -68,10 +68,10 @@ try {
   ok(W.report.sections.by_lifecycle.approved.join() === 'k-approved,k-old-appr' && W.report.sections.by_lifecycle.proposed.join() === 'k-decided,k-first,k-proposed,k-sched'
     && W.report.sections.by_lifecycle.operating.join() === 'k-op' && W.report.sections.by_lifecycle.unknown.join() === 'k-unk',
     '0f engine: the four lifecycle buckets (Decided is proposed; an operating record with no event is absent)', W.report.sections.by_lifecycle);
-  ok(WNONE.report.projects.length === 0 && WNONE.coverage_state === 'LIMITED_COVERAGE', '0g the SHIPPED rights file (nothing cleared) gives an empty customer report: LIMITED_COVERAGE, zero records');
+  ok(WNONE.report.projects.length === 0 && WNONE.coverage_state === 'LIMITED_COVERAGE', '0g a world whose records carry no source family gives an empty customer report: LIMITED_COVERAGE, zero records');
   ok([html, htmlCold, htmlNone, htmlInt].every((h) => h.startsWith('<article class="da-rv')), '0i the view renders every one of these responses without throwing', [html, htmlCold, htmlNone, htmlInt].map((h) => h.slice(0, 40)));
-  ok(WINT.report.projects.length === 8 && WINT.report.projects.every((p) => p.rights === 'HOLD') && WINT.storage_blockers.includes('INTERNAL_VIEW'),
-    '0h the internal view carries the records, each marked HOLD, with INTERNAL_VIEW among its blockers (the strings the view must never print)');
+  ok(WINT.report.projects.length === 8 && WINT.report.projects.every((p) => !('rights' in p)) && WINT.storage_blockers.includes('INTERNAL_VIEW'),
+    '0h the internal view carries the records, none with a rights label, with INTERNAL_VIEW among its blockers (the strings the view must never print)');
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 // ---- helpers for the single-table layout (2026-10-09, final layout pass) ---------------------------------------------------------------------------
@@ -270,14 +270,14 @@ try {
   const FORBIDDEN = [
     'storage_blockers', 'storable', 'INTERNAL_VIEW', 'CONTAINS_UNCLEARED_SOURCE', 'source_family', 'source_families_in_report', FAM_A, FAM_B, 'wsdot-', 'austin-site',
     'change_ready', 'observation_count', 'first_observed_at', 'last_observed_at', 'homesignal_observation', 'content_hash', 'report_id', 'assessment_basis',
-    'records_returned_for_this_radius', 'NO_INCLUDED_SOURCE', 'SOURCES_NOT_INCLUDED', 'AREA_TRUNCATED', 'SOURCE_NOT_FULLY_READ', 'LIMITED_COVERAGE', 'REPORT_READY',
+    'records_returned_for_this_radius', 'RECORDS_NOT_TRACEABLE', 'AREA_TRUNCATED', 'SOURCE_NOT_FULLY_READ', 'LIMITED_COVERAGE', 'REPORT_READY',
     'CHANGE_READY', 'OUTSIDE_COVERAGE', 'Signed paid pilots', 'Verdict', 'NOT YET', 'distances_mi', 'project_id', 'source_key', 'feature_id', 'record_kind',
     'date_kind', 'submitted_at', 'type_raw', 'publisher_event', 'detected_at', 'event_type', 'rights', 'allowlist', 'audit', 'debug', 'zip_supported',
   ];
   const WORD = [/\bHOLD\b/, /\bCLEARED\b/, /\bhash\b/i, /\bdebug\b/i];
   const trunc = { ...RICH, rows: RICH.rows.map((r, i) => (i === 0 ? { ...r, has_more: true } : r)) };
   const WTRUNC = await wire(trunc);
-  const outputs = { customer: html, cold: htmlCold, 'empty customer (shipped rights)': htmlNone, internal: htmlInt, truncated: view(WTRUNC) };
+  const outputs = { customer: html, cold: htmlCold, 'empty customer (no source family)': htmlNone, internal: htmlInt, truncated: view(WTRUNC) };
   ok(WTRUNC.report.coverage.limitations.some((l) => l.code === 'AREA_TRUNCATED'), '4a (control) the truncated fixture really carries the AREA_TRUNCATED limitation, whose code must not print');
   for (const [name, out] of Object.entries(outputs)) {
     const hits = FORBIDDEN.filter((f) => out.includes(f)).concat(WORD.filter((w) => w.test(out)).map(String));
@@ -303,7 +303,7 @@ try {
 // ---- 5. coverage: the engine's own words, never "no activity" ------------------------------------------------------------------------------------
 try {
   const lim = WNONE.report.coverage.limitations.map((l) => l.text);
-  ok(lim.length === 1 && lim[0] === 'No official development source for this area is included in this report.', '5a the engine\'s limitation text for the shipped state', lim);
+  ok(lim.length === 1 && lim[0] === 'Some records near this address are not included because their official source is not identified.', '5a the engine\'s limitation text when records cannot be traced', lim);
   const ev = sec(htmlNone, 'evidence').html;
   ok(ev.includes('<li>' + lim[0] + '</li>'), '5b a LIMITED_COVERAGE report with zero records shows the engine\'s limitation text verbatim');
   const ABSENCE = /\bno ((recent|new|official) )*(development )?activity|\bno (development|projects?|records?|changes?)( were| was)? (found|nearby|in this area|to report)|\bnothing (was |is )?(found|nearby|happening)|\bno development (was )?found|\bnothing to report|\b0 (projects|records)/i;
@@ -312,7 +312,7 @@ try {
   ok(textOf(htmlNone).includes(V.DISCLOSURE) && textOf(htmlNone).includes(V.SCOPE_LINE) && textOf(htmlNone).includes(V.SCOPE_NOTE), '5e the standard disclosure and both scope lines are on it');
   ok(/da-rv--empty/.test(htmlNone) && !/da-rv--empty/.test(html), '5f an empty report is marked so its limitation text is drawn prominently');
   const nothingNear = await wire({ rows: [], projects: [], ledger: [], events: [], health: [] });
-  ok(nothingNear.report.projects.length === 0 && nothingNear.report.coverage.limitations.length === 0, '5g (control) a cleared-source, zero-record, no-limitation report exists in the engine', nothingNear.report.coverage.limitations);
+  ok(nothingNear.report.projects.length === 0 && nothingNear.report.coverage.limitations.length === 0, '5g (control) a zero-record, no-limitation report exists in the engine', nothingNear.report.coverage.limitations);
   const hn = view(nothingNear);
   ok(keysOf(hn) === 'outcome,evidence' && sec(hn, 'outcome').label === 'No data ingested' && !ABSENCE.test(textOf(hn)) && !/<ul class="da-rv-lims">/.test(hn),
     '5h it says "No data ingested", renders the scope and disclosure, and makes no statement of absence either (a query that returns nothing is not proof, plan line 1338)', keysOf(hn));
@@ -344,7 +344,7 @@ try {
   const notObj = clone(WNONE); notObj.report.activity = 'NO_DEVELOPMENT_ACTIVITY';
   ok([noField, odd, notObj].every((r) => keysOf(view(r)) === 'evidence'), '5q an older response with no outcome, or an outcome the view does not know, shows no outcome block: the view never infers one from an empty list');
   ok(W.report.activity.outcome === 'DEVELOPMENT_SHOWN' && WNONE.report.activity.outcome === 'NO_DATA_INGESTED' && WINT.report.activity.outcome === 'DEVELOPMENT_SHOWN',
-    '5r (control) the engine sends the outcome these tests read: development shown when cleared records are shown, "No data ingested" in the shipped customer view');
+    '5r (control) the engine sends the outcome these tests read: development shown when traceable records are shown, "No data ingested" when none can be traced');
   const DIST = /\d\.\d mi\b|Under 0\.1 mi/;
   ok(DIST.test(textOf(html)) && DIST.test(textOf(htmlCold)), '5i (control) with render present, distances are shown');
   const noRender = clone(W); delete noRender.render;
@@ -406,7 +406,7 @@ try {
   const riverside = W.report.projects.find((p) => p.name === 'Riverside Retail Center');
   ok(attr['Menchaca Apartments'] === 'Data: WSDOT' && riverside && !riverside.source.attribution && riverside.source.agency
     && attr['Riverside Retail Center'] === riverside.source.agency + ' (' + riverside.source.feed_ref + ').',
-    '6l a cleared source\'s credit line is shown with its record; a source with none shows its registry agency and dataset instead of nothing', attr);
+    '6l a source\'s required credit line is shown with its record; a source with none shows its registry agency and dataset instead of nothing', attr);
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 // ---- 7. it shows what the engine gave, in the order it gave it, and changes nothing --------------------------------------------------------------------

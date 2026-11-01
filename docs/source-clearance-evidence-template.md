@@ -1,5 +1,9 @@
 # Source clearance — evidence record (TEMPLATE)
 
+> **SUPERSEDED — 2026-11-01 national source policy** (`docs/national-source-policy-2026-11-01.md`). This document is
+> kept as history. It no longer decides what may appear on maps, feeds or Development Activity Reports. Do not
+> reintroduce per-source clearance, terms verification, a class approval or a review queue on the strength of it.
+
 Copy this file to `docs/source-clearance-<publisher>-<YYYY-MM-DD>.md` when a publisher **answers in writing**, fill in every line
 from the answer itself, and only then add the source to `supabase/functions/_shared/report-rights.json`. **A drafted request is not a
 pending one, and silence is not consent** (`docs/corporate-output-utah-clearance-2026-10-02.md` §5). `test/report-rights-evidence.test.mjs`

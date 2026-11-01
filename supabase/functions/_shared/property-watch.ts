@@ -9,7 +9,7 @@
 //                                            the SAME function the report and Changes Since Report ask, over the same ledger view
 //   when a change counts as "since" ........... changes-since-report.ts `changesForProjects`: created_at, the overlap, de-duplication against
 //                                            what the stored report already showed. Not restated here.
-//   which sources may be named ................ _shared/report-rights.json, read now
+//   which records may be named ................ national source policy 2026-11-01 (provenance only); credits from _shared/source-attribution.json
 // What this file owns is the two things only a watch has:
 //   1. THE STARTING POINT is the stored report, so nothing falls between "the report" and "the watch": the first check reports everything the
 //      ledger recorded after the report. A project that is near the property now but was not in the report is covered by the same boundary.
@@ -68,7 +68,7 @@ export type WatchCheck = {
 
 export type CheckInput = {
   now: Date;
-  rights: unknown;
+  attribution: unknown;
   /** the stored report this watch started from: its permanent body and issue time, never its private context */
   original: Pick<StoredReport, 'generated_at' | 'body'>;
   /** `assemble(...).intelligence.projects` for the watched point NOW, customer view */
@@ -115,7 +115,7 @@ export function checkWatch(i: CheckInput): WatchCheck {
     nearby.push(r);
   }
   const core = changesForProjects({
-    now: i.now, view: 'customer', rights: i.rights, issuedAt: original.generated_at, projects: nearby,
+    now: i.now, view: 'customer', attribution: i.attribution, issuedAt: original.generated_at, projects: nearby,
     ledger: i.ledger, events: i.events, health: i.health,
   });
   const changes: WatchChange[] = [];

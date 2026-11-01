@@ -6,7 +6,7 @@
 //
 // WHAT THIS IS AND IS NOT. It is a PLACE to type into the report, so the whole journey (address -> ZIP -> coverage -> report) is exercised somewhere real.
 // It is NOT a data source and NOT a clearance: the ZIP being covered says where a report can be asked for, never that any publisher's records may be shown
-// to a paying customer (that is supabase/functions/_shared/report-rights.json, which clears nothing today; build step 12). The street address and the
+// to a paying customer (under the national source policy of 2026-11-01 that is any record with its source family and official record link). The street address and the
 // point below are FIXTURE VALUES copied from test/national-report.test.mjs, where they stand in for what the geocoder returns; whether the live geocoder
 // resolves this exact address is checked by a person in the manual test (docs/development-activity-manual-test-brigham-city-84302.md), not here.
 export const LAUNCH_TEST_LOCATION = Object.freeze({

@@ -25,6 +25,14 @@
 
 import { fenceGeocode, filedZipOf, noteFenceOutcome } from "./geo-fence.ts";
 
+/**
+ * The source family every TABS record carries, the same field the registry connectors stamp (`source_registry_id`).
+ * It is how a stored record is traced back to the adapter that produced it (provenance, national source policy
+ * 2026-11-01). Before this, TABS stamped none, so its records were stored with registry_id = null and could not appear
+ * in a Development Activity Report even though each carries its own TDLR record URL.
+ */
+export const TABS_SOURCE_FAMILY = "tdlr-tabs";
+
 // ───────────────────────────── types ─────────────────────────────
 
 /** Extended site shape (§4.1 of the case-study doc) — additive over the v15 contract. */
@@ -48,6 +56,7 @@ export interface TabsSite {
   n?: number;                           // miles N of the report anchor (engine fills)
   src: string;                          // "TX TDLR TABS · TABS2024022676"
   record_url: string;                   // the anti-fabrication key — always present
+  source_registry_id: string;           // TABS_SOURCE_FAMILY: the record's source family (provenance)
   // §4.1 extension fields — present ONLY when stated on the registry page
   project_no: string;
   owner?: string;
@@ -296,6 +305,7 @@ async function normalize(
     lng: geo.lng,
     src: `TX TDLR TABS · ${p.project_no}`,
     record_url: recordUrl(p.project_no),
+    source_registry_id: TABS_SOURCE_FAMILY,
     project_no: p.project_no,
   };
   // Absent stays absent: a null lifecycle is REMOVED from the emitted record (not sent

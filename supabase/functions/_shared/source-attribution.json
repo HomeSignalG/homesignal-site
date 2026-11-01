@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "_doc": "Credit lines a publisher requires, by source family (registry_id). This file decides NOTHING about which records may appear: under the national source policy of 2026-11-01 (docs/national-source-policy-2026-11-01.md) every record a wired connector stamps with its source family and official record link is eligible. A source absent here simply carries no credit line. Each entry names the publisher's own recorded requirement in `_evidence`; test/no-source-allowlist.test.mjs checks it.",
+  "attribution": {
+    "nyc-dob-permit-issuance": "New York City Department of Buildings, via NYC Open Data (dataset ipu4-2q9a). HomeSignal selected and renamed fields.",
+    "nyc-dobnow-approved-permits": "New York City Department of Buildings, via NYC Open Data (dataset rbx6-tga4). HomeSignal selected and renamed fields.",
+    "seattle-building-permits": "City of Seattle, Seattle Department of Construction & Inspections (data.seattle.gov, dataset 76t5-zqzr)."
+  },
+  "_evidence": {
+    "nyc-dob-permit-issuance": { "file": "docs/corporate-output-nyc-dob-permits-2026-09-27.md", "dataset": "ipu4-2q9a" },
+    "nyc-dobnow-approved-permits": { "file": "docs/corporate-output-nyc-dob-permits-2026-09-27.md", "dataset": "rbx6-tga4" },
+    "seattle-building-permits": { "file": "docs/corporate-output-seattle-building-permits-2026-09-27.md", "dataset": "76t5-zqzr" }
+  }
+}

@@ -21,7 +21,7 @@ import { makeWatchReads } from '../_shared/watch-reads.ts';
 import { isMailable, sendEmail } from '../_shared/email-send.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
 
-export type Config = { url: string; serviceKey: string; rights: unknown; secret: string; resendKey: string; now?: () => Date };
+export type Config = { url: string; serviceKey: string; attribution: unknown; secret: string; resendKey: string; now?: () => Date };
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { base, svc, rest, rpc } = makeServiceReads(cfg, fetchFn);
@@ -33,7 +33,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
 
   return {
     now: cfg.now ?? (() => new Date()),
-    rights: cfg.rights,
+    attribution: cfg.attribution,
     secret: cfg.secret,
     emailConfigured: cfg.resendKey !== '',
 

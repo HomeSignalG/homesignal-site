@@ -33,7 +33,7 @@ function fakes(over = {}) {
   const rec = (name, fn) => async (...a) => { calls.push([name, ...a]); return fn(...a); };
   const never = (name) => rec(name, async () => { throw new Error(name + ' must not run'); });
   const deps = {
-    now: () => new Date('2026-10-03T12:00:00Z'), rights: { version: 1, cleared: [] },
+    now: () => new Date('2026-10-03T12:00:00Z'), attribution: { version: 1, attribution: {} },
     authenticate: rec('authenticate', async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null)),
     isAdmin: rec('isAdmin', async () => false),
     trialOf: rec('trialOf', async () => ACTIVE),
@@ -185,7 +185,7 @@ function stub(routes) {
     throw new Error('unexpected ' + u.pathname);
   };
 }
-const dataFor = (routes) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', rights: { version: 1, cleared: [] } }, stub(routes));
+const dataFor = (routes) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', attribution: { version: 1, attribution: {} } }, stub(routes));
 const dbRow = { report_id: R1, number: 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: CTX1 };
 let d = dataFor([[/rpc\/saved_reports_listed$/, () => json([dbRow])]]);
 await d.savedReports(UID, true);

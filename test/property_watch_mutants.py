@@ -72,7 +72,8 @@ m('partial_never_reported', "partial: core.flags.sourcesNotFullyRead", "partial:
 m('duplicate_nearby_project_accepted', "    if (seenProjects.has(r.project_id)) throw new ReportUnreadable('a nearby project appears twice');\n", "", EDGE, PW)
 m('baseline_is_what_the_list_says_now', "homesignal_detected_changes: shownBy.get(x.project_id) ?? [],", "homesignal_detected_changes: (x.homesignal_detected_changes as never) ?? [],", EDGE, PW)
 m('baseline_is_now_not_the_report', "issuedAt: original.generated_at", "issuedAt: i.now.toISOString()", EDGE, PW)
-m('check_uses_the_internal_view', "now: i.now, view: 'customer', rights: i.rights", "now: i.now, view: 'internal', rights: i.rights", EDGE, PW)
+# check_uses_the_internal_view retired 2026-11-01: the customer and internal changes views now return the same records (national
+# source policy), so which one the watch asks is no longer observable.
 m('lookback_ignores_the_window', "Math.max(reportBoundary, window)", "reportBoundary", EDGE, PW)
 m('lookback_ignores_the_report', "Math.max(reportBoundary, window)", "window", EDGE, PW)
 
@@ -132,8 +133,8 @@ m('log_carries_the_exception_message', "stage, outcome, reason: known ? (e as Er
 m('run_log_carries_the_exception_message', "stage: 'run', status: known ? 502 : 500, reason: known ? (e as Error).message : (e instanceof Error ? e.name : 'unknown')", "stage: 'run', status: known ? 502 : 500, reason: (e as Error).message", EDGE, RH)
 m('partial_check_recorded_as_complete', "check.partial ? 'CHECKED_PARTIAL' : 'CHECKED'", "'CHECKED'", EDGE, RH)
 m('no_recipient_not_noticed', "    if (!to) throw new NoRecipient('no address');\n", "", EDGE, RH)
-# NOT A MUTATION, ON PURPOSE: removing the handler's own `validateRights(deps.rights)` call is an EQUIVALENT mutant. `assemble` and
-# `changesForProjects` each validate the same registry independently, so a malformed one still fails the check (test 6a proves that outcome);
+# NOT A MUTATION, ON PURPOSE: removing the handler's own `validateAttribution(deps.attribution)` call is an EQUIVALENT mutant. `assemble` and
+# `changesForProjects` each validate the same credit-line file independently, so a malformed one still fails the check (test 6a proves that outcome);
 # the handler's call is a second guard, and a mutation that cannot change any outcome cannot be killed.
 m('run_budget_ignored', "if (deps.now().getTime() - started > RUN_BUDGET_MS) {", "if (false) {", EDGE, RH)
 m('property_radius_not_the_reports', "const radiusMi = parseRadius(stored.radius_mi) ?? REPORT_RADIUS_MI;", "const radiusMi = 3;", EDGE, RH)

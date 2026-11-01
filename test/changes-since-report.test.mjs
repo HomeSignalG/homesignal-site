@@ -12,8 +12,8 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 // ---- the inputs the engine is given ---------------------------------------------------------------------------------------
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const OTHER = 'a-source-with-no-clearance';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-09-29', audit_ref: 'fixture', attribution: 'Data: WSDOT' }] };
+const OTHER = null; // a record no wired connector stamped: it cannot be traced to a source
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } };
 const NOW_REPORT = new Date('2026-09-29T12:00:00Z');
 const row = (k, d, x = {}) => ({ source_key: k, feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...x });
 const proj = (k, x = {}) => ({ source_key: k, registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Proposed', stage: 'Not Yet Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-12', date_kind: 'filed', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0', ...x });
@@ -26,29 +26,29 @@ const FIELD = {
   projects: [
     proj('k1', { status: 'Approved', date_kind: 'issued', submitted_at: '2026-09-24' }),
     proj('k2', { name: 'Weather Station Replacement', address: '520 King' }),
-    proj('k4', { name: 'A Project From An Uncleared Source', registry_id: OTHER }),
+    proj('k4', { name: 'A Project With No Source Family', registry_id: OTHER }),
   ],
   ledger: [led('k1'), led('k2', { change_ready: false, observation_count: 1 }), led('k4', { registry_id: OTHER })],
   events: [ev('k1', { created_at: '2026-09-25T10:05:00Z' })],
   health: [],
 };
-const assembleFor = (view, rights, f = FIELD) => M.assemble({ now: NOW_REPORT, view, zip_supported: true, radius_mi: 1, rights, subject: SUBJECT, ...f });
+const assembleFor = (view, attribution, f = FIELD) => M.assemble({ now: NOW_REPORT, view, zip_supported: true, radius_mi: 1, attribution, subject: SUBJECT, ...f });
 const REPORT_ID = '11111111-1111-4111-8111-111111111111';
 const ISSUED = '2026-09-29T12:00:05.000Z';
 const storedFrom = (out, extra = {}) => ({ report_id: REPORT_ID, content_hash: 'h'.repeat(64), report_version: M.REPORT_VERSION, generated_at: ISSUED, body: S.snapshotBodyOf(out.intelligence), ...extra });
 
-const internalOut = assembleFor('internal', RIGHTS);               // all three projects (k4 is HOLD)
-const customerOut = assembleFor('customer', RIGHTS);               // k4 is left out
+const internalOut = assembleFor('internal', CREDITS);             // k4 is left out here too: provenance is not a view setting
+const customerOut = assembleFor('customer', CREDITS);             // k4 is left out
 const NOW = new Date('2026-09-30T08:00:00Z');
 const wev = (k, created, x = {}) => ({ ...ev(k, { observed_at: '2026-09-30T06:30:00Z' }), created_at: created, ...x });
-const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', rights: RIGHTS, report: storedFrom(customerOut), ledger: FIELD.ledger, events: [], health: [], ...o });
+const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', attribution: CREDITS, report: storedFrom(customerOut), ledger: FIELD.ledger, events: [], health: [], ...o });
 
 // ---- 1. the body the engine really writes is readable, and its identities are the ledger's ------------------------------------------------
 {
   const parsed = C.parseStoredReport(storedFrom(customerOut));
   ok(same(parsed.projects.map((p) => p.project_id), ['k1', 'k2']), '1a a real customer report parses to its project identities, sorted: k1, k2', parsed.projects.map((p) => p.project_id));
   ok(parsed.generated_at === ISSUED, '1b and carries the issue instant it was given');
-  ok(same(C.parseStoredReport(storedFrom(internalOut)).projects.map((p) => p.project_id), ['k1', 'k2', 'k4']), '1c an internal report also carries the HOLD project (k4)');
+  ok(same(C.parseStoredReport(storedFrom(internalOut)).projects.map((p) => p.project_id), ['k1', 'k2']), '1c an internal report leaves out the record with no source family too (k4)');
   const k1 = parsed.projects[0];
   ok(k1.homesignal_detected_changes.length === 1 && k1.homesignal_detected_changes[0].event_type === 'status_changed', '1d k1 already carries the one change the report showed (status_changed on 2026-09-25)');
 }
@@ -62,13 +62,13 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
   ok(same(c, [{ event_type: 'status_changed', detected_at: '2026-09-30T06:30:00Z', publisher_event: { kind: 'issued', date: '2026-09-24' }, changes: [{ field: 'status', from: 'Approved', to: 'Operating' }], recorded_at: '2026-09-30T06:35:00Z', source_retrieved_before_report: false }]),
     '2b its change is exactly: status Approved to Operating, detected 2026-09-30T06:30:00Z, recorded 06:35:00Z, source retrieved AFTER the report, with the publisher event', c);
   // the SAME event, shown by the report itself, has the same shared shape: one rule, one entry shape. The since-reader adds exactly two fields to it.
-  const reportShows = assembleFor('customer', RIGHTS, { ...FIELD, events: [{ ...e, observed_at: '2026-09-29T09:00:00Z' }] });
+  const reportShows = assembleFor('customer', CREDITS, { ...FIELD, events: [{ ...e, observed_at: '2026-09-29T09:00:00Z' }] });
   const inReport = reportShows.intelligence.projects.find((p) => p.project_id === 'k1').homesignal_detected_changes[0];
   const { recorded_at: _r, source_retrieved_before_report: _s, ...shared } = c[0];
   ok(same(inReport, { ...shared, detected_at: '2026-09-29T09:00:00Z' }), '2c and the report, given the same event, builds the identical entry (only the date differs, and the since-reader\'s two extra fields): the two cannot disagree about what a change looks like');
   ok(same(Object.keys(c[0]).filter((k) => !(k in inReport)).sort(), ['recorded_at', 'source_retrieved_before_report']), '2c2 and the since-reader adds EXACTLY recorded_at and source_retrieved_before_report to the shared entry', Object.keys(c[0]));
   ok(r.changed[0].name === 'Ravenna Bridge Retrofit' && r.changed[0].lifecycle_at_report.key === 'approved' && r.changed[0].type.key === 'infrastructure' && r.changed[0].type.label === 'Roads & infrastructure', '2d the project is named and typed as the REPORT said (lifecycle at the report: approved)', [r.changed[0].lifecycle_at_report, r.changed[0].type]);
-  ok(r.changed[0].source.url === 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0' && r.changed[0].source.attribution === 'Data: WSDOT', '2e with its official source link, and the attribution from the rights registry as it stands now');
+  ok(r.changed[0].source.url === 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0' && r.changed[0].source.attribution === 'Data: WSDOT', '2e with its official source link, and the credit line from the attribution file as it stands now');
   ok(r.report.report_id === REPORT_ID && r.report.issued_at === ISSUED && r.as_of === '2026-09-30' && r.through === '2026-09-30T08:00:00.000Z' && r.projects_in_report === 2, '2f the answer names the report, when it was issued, and the instant it is current to');
   ok(same(r.limitations.map((l) => l.code), ['NEW_PROJECTS_NOT_COVERED']), '2f2 an event retrieved AFTER the report adds no RECORDED_AFTER_REPORT limitation: there is nothing to explain', r.limitations);
 }
@@ -157,18 +157,21 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
   ok(run({ report: stored, events: [wev('k1', '2026-09-29T11:55:00Z', { observed_at: '2026-09-29T11:55:00.123456+00:00' })] }).changed.length === 0, '4j an instant with microseconds, as the database writes it, matches the body\'s own entry and is removed');
 }
 
-// ---- 5. rights are read NOW ---------------------------------------------------------------------------------------------------------------------------
+// ---- 5. provenance and credit lines (national source policy, 2026-11-01) -----------------------------------------------------------------------------
 {
   const e = [wev('k1', '2026-09-30T06:35:00Z')];
-  const revoked = run({ rights: { version: 2, cleared: [] }, events: e });
-  ok(revoked.changed.length === 0 && same(revoked.excluded.no_rights, { [FAM]: 2 }), '5a a source whose clearance was WITHDRAWN after the report stops appearing: customer answers drop it and count it', revoked.excluded);
-  ok(revoked.limitations.some((l) => l.code === 'SOURCES_NOT_INCLUDED'), '5b and say that some sources are not included');
-  const internal = run({ view: 'internal', report: storedFrom(internalOut), rights: { version: 2, cleared: [] }, events: e });
-  ok(internal.changed.length === 1 && internal.changed[0].rights === 'HOLD' && internal.changed[0].source.attribution === null, '5c the internal view still shows it, labelled HOLD, with no attribution it has no right to');
-  const clearedOne = run({ view: 'internal', report: storedFrom(internalOut), events: [wev('k1', '2026-09-30T06:35:00Z'), wev('k4', '2026-09-30T06:36:00Z', { observed_at: '2026-09-30T07:00:00Z' })] });
-  ok(same(clearedOne.changed.map((c) => [c.project_id, c.rights]), [['k4', 'HOLD'], ['k1', 'CLEARED']]), '5d internal: a cleared and an uncleared project are each labelled, newest change first (k4 then k1)', clearedOne.changed.map((c) => [c.project_id, c.rights]));
-  let threw = null; try { run({ rights: { version: 1, cleared: [{ registry_id: '*', cleared_on: '2026-09-29', audit_ref: 'x', attribution: '' }] } }); } catch (x) { threw = String(x.message); }
-  ok(threw !== null, '5e a malformed rights registry fails the answer: never "everything is cleared"', threw);
+  const now = run({ attribution: { version: 2, attribution: {} }, events: e });
+  ok(now.changed.length === 1 && now.changed[0].source.attribution === null, '5a the credit line is read NOW: a source with no credit line on file shows none, and still appears', now.changed);
+  const untraced = JSON.parse(storedFrom(customerOut).body); untraced.projects[0].source_family = null;
+  const r = run({ report: { ...storedFrom(customerOut), body: JSON.stringify(untraced) }, events: e });
+  ok(r.changed.length === 0 && r.excluded.no_source_family === 1, '5b a stored project with no source family is left out of the answer and counted', r.excluded);
+  ok(r.limitations.some((l) => l.code === 'RECORDS_NOT_TRACEABLE'), '5c and the answer says some records could not be traced');
+  const internal = run({ view: 'internal', report: { ...storedFrom(customerOut), body: JSON.stringify(untraced) }, events: e });
+  ok(internal.changed.length === 0, '5d the internal view leaves it out too');
+  const both = run({ events: [wev('k1', '2026-09-30T06:35:00Z')] });
+  ok(both.changed.every((c) => !('rights' in c)), '5e no change carries a rights label');
+  let threw = null; try { run({ attribution: { version: 1, attribution: { '*': 'x' } } }); } catch (x) { threw = String(x.message); }
+  ok(threw !== null, '5f a malformed attribution file fails the answer: a required credit is never dropped', threw);
 }
 
 // ---- 6. the answer says what it cannot see ----------------------------------------------------------------------------------------------------------
@@ -233,24 +236,26 @@ const run = (o = {}) => C.changesSinceReport({ now: NOW, view: 'customer', right
 
 // ---- 9. ordering --------------------------------------------------------------------------------------------------------------------------------------
 {
-  const r = run({ view: 'internal', report: storedFrom(internalOut), events: [
+  // k4 here is a second TRACEABLE project, so two projects can be ordered against each other
+  const orderOut = assembleFor('internal', CREDITS, { ...FIELD, rows: FIELD.rows.map((r) => ({ ...r, registry_id: FAM })), projects: FIELD.projects.map((p) => ({ ...p, registry_id: FAM })) });
+  const r = run({ view: 'internal', report: storedFrom(orderOut), events: [
     wev('k1', '2026-09-30T06:35:00Z', { observed_at: '2026-09-30T05:00:00Z' }),
     wev('k4', '2026-09-30T06:36:00Z', { observed_at: '2026-09-30T05:00:00Z' }),
   ] });
   ok(same(r.changed.map((c) => c.project_id), ['k1', 'k4']), '9a projects changed at the same instant are ordered by identity (k1 before k4)');
-  const r2 = run({ view: 'internal', report: storedFrom(internalOut), events: [
+  const r2 = run({ view: 'internal', report: storedFrom(orderOut), events: [
     wev('k1', '2026-09-30T06:35:00Z', { observed_at: '2026-09-30T05:00:00Z' }),
     wev('k1', '2026-09-30T06:36:00Z', { observed_at: '2026-09-30T05:30:00Z', event_type: 'first_detected' }),
   ] });
   ok(same(r2.changed[0].changes_since_report.map((c) => c.detected_at), ['2026-09-30T05:30:00Z', '2026-09-30T05:00:00Z']), '9b within a project, the newest change is first');
   // across projects the order is by each project's NEWEST change: k1 changed at 05:00 and 06:00, k4 at 05:30, so k1 leads (its newest is 06:00)
-  const r3 = run({ view: 'internal', report: storedFrom(internalOut), events: [
+  const r3 = run({ view: 'internal', report: storedFrom(orderOut), events: [
     wev('k1', '2026-09-30T06:40:00Z', { observed_at: '2026-09-30T05:00:00Z' }),
     wev('k1', '2026-09-30T06:41:00Z', { observed_at: '2026-09-30T06:00:00Z', event_type: 'first_detected' }),
     wev('k4', '2026-09-30T06:42:00Z', { observed_at: '2026-09-30T05:30:00Z' }),
   ] });
   ok(same(r3.changed.map((c) => c.project_id), ['k1', 'k4']), '9c projects are ordered by their NEWEST change, not their oldest: k1 (05:00 and 06:00) before k4 (05:30)', r3.changed.map((c) => c.project_id));
-  const r4 = run({ view: 'internal', report: storedFrom(internalOut), events: [
+  const r4 = run({ view: 'internal', report: storedFrom(orderOut), events: [
     wev('k1', '2026-09-30T06:40:00Z', { observed_at: '2026-09-30T04:00:00Z' }),
     wev('k4', '2026-09-30T06:42:00Z', { observed_at: '2026-09-30T05:30:00Z' }),
   ] });
