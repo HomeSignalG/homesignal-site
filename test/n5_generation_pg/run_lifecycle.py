@@ -112,6 +112,29 @@ def publish_boundaries(sql, lit):
     return load_boundaries
 
 
+# A registry with one already-classified source (reg-down: its row must not move) and four new
+# ones with no geo.n5_accepted_source row, one per rule in scripts/n5_classify_sources.py.
+CLASSIFY_REGISTRY = {
+    "reg-down": ("arcgis", {"registry_id": "reg-down", "service_url": "https://publisher.invalid/FeatureServer/0"}),
+    "reg-new-poly": ("arcgis", {"registry_id": "reg-new-poly", "service_url": "https://meta.test/poly/0"}),
+    "reg-new-table": ("arcgis", {"registry_id": "reg-new-table", "service_url": "https://meta.test/table/0"}),
+    "reg-new-down": ("arcgis", {"registry_id": "reg-new-down", "service_url": "https://meta.test/down/0"}),
+    "reg-new-socrata": ("socrata", {"registry_id": "reg-new-socrata"}),
+}
+CLASSIFY_META = {
+    "https://meta.test/poly/0": {"type": "Feature Layer", "geometryType": "esriGeometryPolygon"},
+    "https://meta.test/table/0": {"type": "Table", "fields": [{"name": "OBJECTID"}]},
+    # reg-down already has a row: if its metadata is ever read, the test sees a point layer that
+    # would derive PROVEN - and its RECOVERY row must still stand
+    "https://publisher.invalid/FeatureServer/0": {"type": "Feature Layer", "geometryType": "esriGeometryPoint"},
+}
+
+
+def classify_http(url, params=None, **kw):
+    m = CLASSIFY_META.get(url)
+    return (m, None) if m is not None else (None, "URLError <urlopen error timed out>")
+
+
 class Env:
     """Import the shipped modules with THIS run's environment and the three seams replaced."""
 
@@ -131,6 +154,10 @@ class Env:
         O = importlib.reload(O)
         O.sql = self.n3.sql
         O.subprocess.run = self.run_shard_inprocess
+        # the Map 1 treatment step at open (national source policy 2026-11-01) reads the registry
+        # and each publisher's layer metadata; both are fixture seams here, never the network
+        O.load_registry = lambda: CLASSIFY_REGISTRY
+        O.http = classify_http
         return O
 
     def run_shard_inprocess(self, argv, env=None, **kw):
@@ -212,6 +239,12 @@ def main():
        R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s "
                "and (identity_hash is null or content_hash is null)", (GEN,)) == 0
        and R.q1(c, "select count(*) from preservation.app_project_identity where snapshot_id='n5-' || %s", (GEN,)) == 16)
+    acc = {r["registry_id"]: r["treatment"] for r in R.q(c, "select registry_id, treatment from geo.n5_accepted_source")}
+    ok("E1c open gave each new source its treatment from the publisher's own layer: polygon RECOVERY, Table PROVEN, socrata PROVEN, adapter tdlr-tabs PROVEN",
+       (acc.get("reg-new-poly"), acc.get("reg-new-table"), acc.get("reg-new-socrata"), acc.get("tdlr-tabs"))
+       == ("RECOVERY", "PROVEN", "PROVEN", "PROVEN"))
+    ok("E1d an unreadable layer gets NO row (stays UNCLASSIFIED, asked again next open), and an existing row never moves",
+       "reg-new-down" not in acc and acc.get("reg-down") == "RECOVERY" and acc.get("reg-pt") == "PROVEN")
     ok("E4 open refuses to re-open an existing generation (and writes nothing)",
        _raises(lambda: env.orchestrator("open").mode_open(), "already exists"))
 

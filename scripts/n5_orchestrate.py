@@ -65,6 +65,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from n3_pilot import sql, lit, sql_proven  # noqa: E402  - one implementation, imported not re-derived
+from n3_pilot import http  # noqa: E402  - the publisher metadata read the shards use
+import n5_classify_sources  # noqa: E402  - Map 1 treatment for sources with no row (national policy 2026-11-01)
 
 GENERATION = os.environ.get("GENERATION", "").strip()
 MODE = os.environ.get("MODE", "status").strip()
@@ -247,6 +249,30 @@ def mode_open():
     return open_generation(require_generation())
 
 
+def mode_classify():
+    """Dry run: print the treatment the next open would give each source with no row. Writes nothing."""
+    out = n5_classify_sources.classify_unrowed(sql, lit, load_registry(), http,
+                                               say=lambda k, v="": say(k, v), dry=True)
+    say("would write / unresolved", f"{len(out['written'])} / {len(out['unresolved'])}")
+    return 0
+
+
+def load_registry():
+    """The registry exactly as the shards read it (one implementation: n5_shard.load_registry)."""
+    import n5_shard
+    return n5_shard.load_registry()
+
+
+def classify_sources():
+    """Before a capture: give every source with no geo.n5_accepted_source row its treatment.
+
+    National source policy (founder, 2026-11-01): adding a source is its registry entry, so Map 1
+    must not need a hand-written classification row. The rule and why it is a technical fact are
+    in scripts/n5_classify_sources.py. Existing rows always win; nothing already drawn moves."""
+    return n5_classify_sources.classify_unrowed(sql, lit, load_registry(), http,
+                                                say=lambda k, v="": say(k, v))
+
+
 def open_generation(gen):
     """Capture an immutable snapshot and open a generation bound to it.
 
@@ -263,6 +289,10 @@ def open_generation(gen):
            f"limit 1;", "snap exists", read_only=True):
         raise SystemExit(f"STOP: snapshot {snapshot_id} already has rows. A capture is "
                          f"immutable; refusing to append to one.")
+
+    # Every source gets its Map 1 treatment BEFORE the capture, so this generation freezes
+    # with no source left UNCLASSIFIED merely for lacking a hand-written row.
+    classify_sources()
 
     # The cutoff is read ONCE and reused for the capture and the generation row, so the
     # watermark the generation advertises is exactly the instant it captured.
@@ -1062,7 +1092,7 @@ def mode_discard():
     return 0
 
 
-MODES = {"status": lambda: 0, "open": mode_open, "work": mode_work, "publish": mode_publish,
+MODES = {"status": lambda: 0, "open": mode_open, "classify": mode_classify, "work": mode_work, "publish": mode_publish,
          "unresolved": mode_unresolved, "reconcile": mode_reconcile, "ready": mode_ready,
          "prove": mode_prove, "prove_dry": mode_prove_dry, "prove_negative": mode_prove_negative, "activate": mode_activate, "rollback": mode_rollback, "fail": mode_fail,
          "discard": mode_discard}
