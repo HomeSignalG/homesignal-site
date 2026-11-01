@@ -16583,6 +16583,323 @@
       "_receipts": "[VERIFIED 2026-08-30 via pg_net against the live endpoint, in the connector's own scope] Permit Sonoma (the County of Sonoma's Permit & Resource Management Department) wildfire-rebuild permit register. Org NAME receipt: arcgis.com/sharing/rest/portals/P5Mv5GY5S66M8Z1Q -> 'The County of Sonoma' (never the acronym, never the subdomain). Sonoma was one of five CA counties with 100% of its pages dark (40) and no covering source; caltrans-sb1-projects reaches it statewide but only where a STIP project falls within 3 mi. SCOPE IS HONEST AND NARROW: this is the rebuild register for the 2017 Sonoma Complex, Kincade, Glass and Lightning fires \u2014 homes being rebuilt after they burned. It is NOT a general Sonoma building-permit ledger and will light the fire-affected ZIPs only. 2,094 records. \u26a0\ufe0f FRESHNESS \u2014 THE ITEM DATE UNDERSTATED THIS SOURCE BY TEN MONTHS, the exact inverse of the NMDOT trap recorded in the New Mexico pass. The AGO item reports modified 2025-10-31; the LAYER reports editingInfo.dataLastEditDate = 2026-08-30, the day it was probed. Date_Opened spans 2017-08-14 to 2026-07-24. **Read dataLastEditDate on the layer in BOTH directions: the item date can overstate freshness (NMDOT, by 23 months) or understate it (here, by 10).** TWO COMPLETE VOCABULARIES, each enumerated in BOTH orderByFields directions and each summing EXACTLY to 2,094 with 0 nulls: Permit_Status = Finaled 1611 + Issued 237 + Expired 164 + Plan Check Expired 45 + Resubmittal Requested 13 + Plan Check Comments Sent 7 + Pre-Issue/Payment Due 6 + Payment Due 3 + Plan Check Approved 3 + Ready for Plan Check 2 + Application Accepted/In Review 1 + Awaiting Applicant Response 1 + Waiting for Other Approvals 1; Category = Single Family Home 1778 + Accessory Dwelling Unit 246 + Bridge 40 + Multi-Family Home 30. 'Plan Check Approved' buckets to approved on the publisher's OWN word, not on an inference about whether the permit has issued (the Anaheim 'Approved' precedent); both Expired states are excluded. Bridge maps to Utility, the rest to Residential. \u26a0\ufe0f GEOMETRY-LESS TABLE WITH **STRING** LAT/LNG COLUMNS \u2014 the hazard that had to be cleared before wiring. type=Table, no geometryType, so it rides spatial_latlng_cols (the Scottsdale attribute-bbox path) which ANDs `Latitude >= ymin AND ... AND Longitude <= xmax` into WHERE. Latitude and Longitude are esriFieldTypeString, and a LEXICOGRAPHIC comparison would scope NEGATIVE LONGITUDES BACKWARDS ('-122...' sorts below '-123...' as text) \u2014 silently wrong, never an error. PROVEN NUMERIC on the live server before wiring: the exact clause the connector emits for a 3-mi envelope around Santa Rosa 95404 returned 72 rows, and all 72 fall inside it \u2014 lat 38.459913-38.492265 within [38.4053, 38.4923], lng -122.737044 to -122.631023 within [-122.7390, -122.6282], **0 rows outside**. Control: 0 rows in the whole table have a null or empty Latitude/Longitude, so nothing is silently dropped by the clause. file_date is Date_Opened (when the application was opened) with file_date_kind 'filed'; Approval_Date, Issue_Date and First_Inspection_Date are real but are milestone dates, not the filing. No recency_days: the register is a bounded post-fire set and its 1,611 Finaled rows are completed rebuilds \u2014 real built work a resident should see \u2014 and per-ZIP subsets are ~72 rows, far from any row-size ceiling. No per-record URL column, so precision is `dataset` on Permit Sonoma's own site permitsonoma.org (HTTP 200 same round). REJECTED WITH RECEIPTS, same CA Bay Area round \u2014 see the source-registry pass for the full list, including the Santa Rosa County FLORIDA lookalike and the federated-catalog instrument fault."
     },
     {
+      "registry_id": "tigard-or-active-building-permits",
+      "platform": "arcgis",
+      "service_url": "https://svr.tigardmaps.com/arcgis/rest/services/Featured_Public/active_permits/MapServer/1",
+      "dataset_url": "https://svr.tigardmaps.com/arcgis/rest/services/Featured_Public/active_permits/MapServer/1",
+      "jurisdiction": "City of Tigard, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Washington"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CASE_TYPE",
+          "DESCRIPTION"
+        ],
+        "status_raw": "CASE_STATUS",
+        "type_source": "CASE_TYPE",
+        "file_date": "OPEN_DATE",
+        "address": "ADDRESS",
+        "case_number": "ALTID",
+        "record_url": "ACA_LINK",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "extra_where": "(CASE_TYPE IN ('Residential','Multifamily') AND (USE_TYPE IN ('New Construction','Addition') OR WORK_CLASS IN ('New Dwelling Unit','New Structure'))) OR CASE_TYPE IN ('Commercial','Demolition')",
+      "type_map": {
+        "Residential": "Residential",
+        "Multifamily": "Residential",
+        "Commercial": "Commercial",
+        "Demolition": "Development"
+      },
+      "commercial_work_evidence": {
+        "column": "USE_TYPE",
+        "qualifying": [
+          "New Construction",
+          "Addition",
+          "Alteration"
+        ],
+        "note": "CASE_TYPE is the building class; USE_TYPE is the work. Trade permits (Electrical, Mechanical, Plumbing, Fire Protection System, Renewable Energy) and Site Work are not read at all."
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Application Received",
+          "Under Review"
+        ],
+        "approved": [
+          "Permit Approved",
+          "Permit Issued"
+        ],
+        "operating": [],
+        "exclude": [
+          "On Hold"
+        ]
+      },
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "ALTID",
+        "OPEN_DATE",
+        "CASE_STATUS",
+        "CASE_TYPE",
+        "DESCRIPTION",
+        "ADDRESS",
+        "USE_TYPE",
+        "WORK_CLASS",
+        "ACA_LINK"
+      ],
+      "record_url_precision": "record",
+      "_receipts": "2026-11-01 (pg_net): City of Tigard's own ArcGIS Server, the layer behind the city's 'Active Building Permits - PROD' web map (AGO item 4c98e746e88d49c690249c26584d50a6). Point geometry, 1,117 rows (active permits only), newest OPEN_DATE 2026-10-31. Tyler EnerGov: ACA_LINK is a per-record SelfService URL. CASE_TYPE (11 values) and CASE_STATUS (5 values) enumerated with returnDistinctValues. APPNAME is NOT mapped: it carries applicants' personal names. Polygon check of the 303 development rows: 97223 161, 97224 139, 97007 2, 97140 1."
+    },
+    {
+      "registry_id": "tigard-or-active-planning-cases",
+      "platform": "arcgis",
+      "service_url": "https://svr.tigardmaps.com/arcgis/rest/services/Featured_Public/active_permits/MapServer/0",
+      "dataset_url": "https://svr.tigardmaps.com/arcgis/rest/services/Featured_Public/active_permits/MapServer/0",
+      "jurisdiction": "City of Tigard, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Washington"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "CASE_TYPE",
+          "DESCRIPTION"
+        ],
+        "status_raw": "CASE_STATUS",
+        "type_source": "CASE_TYPE",
+        "file_date": "OPEN_DATE",
+        "address": "ADDRESS",
+        "case_number": "ALTID",
+        "record_url": "ACA_LINK",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "extra_where": "CASE_TYPE IN ('Site Development Review','Development Design Review','Subdivision','Land Partition','Sublot Plat','Planned Development Review','Conditional Use','Zone Change','Comprehensive Plan Map Amendment')",
+      "type_map": {
+        "Site Development Review": "Development",
+        "Development Design Review": "Development",
+        "Subdivision": "Development",
+        "Land Partition": "Development",
+        "Sublot Plat": "Development",
+        "Planned Development Review": "Development",
+        "Conditional Use": "Development",
+        "Zone Change": "Development",
+        "Comprehensive Plan Map Amendment": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Application Received",
+          "Under Review",
+          "Public Hearing"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": [
+          "Decision Issued"
+        ]
+      },
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "ALTID",
+        "OPEN_DATE",
+        "CASE_STATUS",
+        "CASE_TYPE",
+        "DESCRIPTION",
+        "ADDRESS",
+        "ACA_LINK"
+      ],
+      "record_url_precision": "record",
+      "_receipts": "2026-11-01 (pg_net): same Tigard server, layer 0 'Planning Case Status' (307 rows), behind the 'Active Planning Permits - PROD' web map (e58ab4c8b75b491781206b70236c44da). Tree removal, temporary use, home business, adjustments, lot-line changes, modifications, sensitive-lands and urban-forestry reviews are NOT read. 'Decision Issued' does not say whether the decision approved or denied the case, so it is excluded rather than called approved (\u00a77.05). CASE_STATUS carries a trailing space on 'Public Hearing '; the connector trims."
+    },
+    {
+      "registry_id": "beaverton-or-site-development-permits",
+      "platform": "arcgis",
+      "service_url": "https://services.arcgis.com/mpOrhWpH9jj0z4rU/arcgis/rest/services/SD_Permits_Data/FeatureServer/0",
+      "dataset_url": "https://services.arcgis.com/mpOrhWpH9jj0z4rU/arcgis/rest/services/SD_Permits_Data/FeatureServer/0",
+      "jurisdiction": "City of Beaverton, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Washington"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "Project_Phase_Name"
+        ],
+        "status_raw": "Milestone",
+        "type_source": "Application_Type",
+        "file_date": "Approved_Date",
+        "address": "Address",
+        "case_number": "Application_Number",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "issued",
+      "extra_where": "Application_Type IN ('SDCOMM','SDSUB')",
+      "type_map": {
+        "SDCOMM": "Development",
+        "SDSUB": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "Completeness Review",
+          "Plans Review",
+          "Plan Rev Completeness Rev OTA",
+          "Plans and Documents Review OTA",
+          "Out to Applicant",
+          "Plans Out to Applicant",
+          "Pay Fees",
+          "Permit Readiness",
+          "Security Determination",
+          "Security Determination OTA",
+          "Permit Issuance Fees Due"
+        ],
+        "approved": [
+          "Permit Issuance",
+          "Site Inspection",
+          "Maintenance Period",
+          "Substantial Completion",
+          "Final Inspection",
+          "Security Close Out"
+        ],
+        "operating": [],
+        "withdrawn": [
+          "Withdraw",
+          "Withdrawn"
+        ],
+        "exclude": [
+          "Stop Work"
+        ]
+      },
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "ObjectId",
+        "Application_Type",
+        "Application_Number",
+        "Project_Phase_Name",
+        "Approved_Date",
+        "Milestone",
+        "Address"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-01 (pg_net): City of Beaverton's AGO org (owner kle@beavertonoregon.gov_beaverton), 859 point rows 2023-09 to 2026-10, dataLastEditDate 2026-10-08. Only SDCOMM (site development, commercial / multi-family / institutional: 35 rows, e.g. Henry Street Apartments, Elmonica Mixed Use, McKinley ES modernization) and SDSUB (subdivisions: 12, e.g. Fox Hollow phases, Scholls Valley Heights) are read. SDGA (grading, crane and lane-closure notices), FRUT/COBUT (franchise utility and sewer connections) and ST/STSK/OAB are NOT read: they are right-of-way workflow, and their Project_Phase_Name often carries a private person's name. Type is Development, not Commercial: SDCOMM covers schools and apartments. No per-record URL is published. Polygon check: 97005 17, 97006 9, 97007 9, 97008 7, 97225 5."
+    },
+    {
+      "registry_id": "portland-neighborhood-contact-applications",
+      "platform": "arcgis",
+      "service_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/1298",
+      "dataset_url": "https://www.portlandmaps.com/od/rest/services/COP_OpenData_PlanningDevelopment/MapServer/1298",
+      "jurisdiction": "City of Portland",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Multnomah"
+        },
+        {
+          "state": "OR",
+          "county": "Washington"
+        },
+        {
+          "state": "OR",
+          "county": "Clackamas"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "project_name"
+        ],
+        "file_date": "date_submitted_utc",
+        "address": "address",
+        "case_number": "OBJECTID",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "status_const": "Neighborhood contact filed before a land-use or building application",
+      "status_to_bucket": {
+        "proposed": [
+          "Neighborhood contact filed before a land-use or building application"
+        ],
+        "approved": [],
+        "operating": [],
+        "exclude": []
+      },
+      "use_type_const": "Development",
+      "recency_days": 1095,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "project_name",
+        "address",
+        "date_submitted_utc",
+        "application_type"
+      ],
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-01 (pg_net): City of Portland's own open-data MapServer, layer 1298 'Neighborhood Contact Applications' \u2014 the notice a developer must file with the city before applying for a large new building or land division (412 rows since 2019-11, 108 since 2023-11, newest 2026-09-30). application_type in that window is exactly {new construction, land division}. No status column: every row is a proposal on file, hence status_const. applicant, phone, email and meeting_notes are personal or free text and are NOT read (out_fields). Polygon check of the 108: 24 Portland ZCTAs, including 97208."
+    },
+    {
+      "registry_id": "eugene-or-current-capital-projects",
+      "platform": "arcgis",
+      "service_url": "https://services3.arcgis.com/F7NiRLGNbA2hh7gE/arcgis/rest/services/Current_Projects/FeatureServer/0",
+      "dataset_url": "https://www.eugene-or.gov/2558/Current-Projects",
+      "jurisdiction": "City of Eugene, Oregon",
+      "coverage": [
+        {
+          "state": "OR",
+          "county": "Lane"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PROJECT_TITLE"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "INFRASTRUCT_CAT",
+        "case_number": "JOB_NO",
+        "record_url": "ProjectLinks",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "type_map": {
+        "Transportation": "Utility",
+        "Stormwater": "Utility",
+        "Wastewater": "Utility",
+        "Parks & Open Space": "Civic/Public"
+      },
+      "status_to_bucket": {
+        "proposed": [],
+        "approved": [
+          "current"
+        ],
+        "operating": [],
+        "exclude": []
+      },
+      "return_centroid": true,
+      "spatial_zip_radius_mi": 3,
+      "out_fields": [
+        "OBJECTID",
+        "JOB_NO",
+        "STATUS",
+        "PROJECT_TITLE",
+        "INFRASTRUCT_CAT",
+        "ProjectLinks"
+      ],
+      "record_url_precision": "record",
+      "_receipts": "2026-11-01 (pg_net): City of Eugene's own AGO org (City_of_Eugene), the layer behind the city's Current Projects page. 26 polygon rows, every one STATUS 'current' (funded city construction now underway: bridge seismic retrofits, paving, bikeways, stormwater and wastewater work, park trails). INFRASTRUCT_CAT is exactly {Transportation, Stormwater, Wastewater, Parks & Open Space}. ProjectLinks is the city's own project page or info sheet where present; otherwise the record links the Current Projects page. No date is published, so none is shown. Contact name and phone are NOT read. Polygon-centroid check: 97402 11, 97405 8, 97401 5, 97404 1, 97408 1."
+    },
+    {
       "registry_id": "jackson-county-or-building-permits",
       "platform": "arcgis",
       "service_url": "https://jcportal.jacksoncountyor.gov/server/rest/services/Property/Permits_Building/FeatureServer/1",
