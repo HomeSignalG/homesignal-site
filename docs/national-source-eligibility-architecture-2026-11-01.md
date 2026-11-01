@@ -1,6 +1,10 @@
 # National source eligibility: removing the per-source approval gates — audit and removal plan (2026-11-01)
 
-**Status: steps 1, 2 and 4 IMPLEMENTED 2026-11-01 (founder "go"); step 3 (Map 1) follows in its own change.** The audit text below is as reviewed (written read-only against `main` `1dfdcbc`).
+**Status: steps 1-4 IMPLEMENTED 2026-11-01 (founder "go").** Step 3 differs from §2.2 in one way: no `geometry` field
+was added to the registry. The treatment is read from each publisher's own layer metadata when a generation opens
+(`scripts/n5_classify_sources.py`), so a registry PR adds nothing new and the 256 existing entries are untouched. A point
+layer defaults to RECOVERY (the build re-reads the publisher's point) rather than PROVEN, because PROVEN for a point
+layer was historically granted only after the n2a fidelity comparison. The audit text below is as reviewed (written read-only against `main` `1dfdcbc`).
 
 **This replaces the first version of this document** (same file, same PR #2489, earlier commit). That version proposed
 per-source terms evidence, a policy evaluator, a class rule and a review queue. The founder's decision below rules all of

@@ -226,7 +226,11 @@ Record of the decision, in the founder's words: `docs/national-source-policy-202
 - ⛔ **Do not reintroduce** a per-source allowlist, a terms check, a "silent or permissive" check, a class approval or a
   review queue. `supabase/functions/_shared/report-rights.json`, `scripts/build-report-rights.mjs` and the R7 tests are
   deleted; `test/no-source-allowlist.test.mjs` fails if any comes back.
-- **Adding a source is its registry entry.** No rights file edit, no fingerprint, no founder approval.
+- **Adding a source is its registry entry.** No rights file edit, no fingerprint, no founder approval, and no N5
+  classification migration: each generation's open gives every source without a `geo.n5_accepted_source` row its Map 1
+  treatment from the publisher's own layer (`scripts/n5_classify_sources.py`; non-ArcGIS or ArcGIS Table -> PROVEN, ArcGIS
+  layer with geometry -> RECOVERY, unreadable metadata -> asked again next open). Existing rows always win. Preview with
+  `n5-generation.yml` mode `classify` (writes nothing).
 - **Credit lines** a publisher requires live in `supabase/functions/_shared/source-attribution.json` (3 today). Absence
   means "no credit", never "excluded". Add a line only with the publisher's own evidence on file.
 - **Known legal restrictions still apply:** a source whose own written terms forbid commercial use is not wired (NDDOT work
