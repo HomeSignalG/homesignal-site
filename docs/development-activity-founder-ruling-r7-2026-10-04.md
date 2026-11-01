@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`250` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `ae89c23c9d47ef1ea20eb40732cbb4d4`.
+`256` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `9e9648a720e07f2f41fb17eac318712c`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -76,7 +76,9 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `austin-zoning-cases`
 - `baltimore-city-housing-permits`
 - `baltimore-county-permits`
+- `beaverton-or-site-development-permits`
 - `bellevue-permits`
+- `bellingham-trakit-permits`
 - `bend-or-permit-applications`
 - `bentonville-catalyst-permits`
 - `bismarck-building-permits`
@@ -140,6 +142,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `durham-building-permits`
 - `east-baton-rouge-building-permits`
 - `el-paso-new-residential-permits`
+- `eugene-or-current-capital-projects`
 - `fairfax-active-site-construction`
 - `fairfax-recent-building-permits`
 - `fdot-active-construction-projects`
@@ -238,6 +241,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `pierce-county-pals-permits`
 - `pittsburgh-pli-permits`
 - `portland-building-permits`
+- `portland-neighborhood-contact-applications`
 - `prince-georges-county-permits`
 - `provo-planning-applications`
 - `raleigh-building-permits`
@@ -278,6 +282,8 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `tempe-building-permits`
 - `tennessee-dot-projects`
 - `thurston-county-residential-permits`
+- `tigard-or-active-building-permits`
+- `tigard-or-active-planning-cases`
 - `topeka-building-permits`
 - `tucson-commercial-building-permits`
 - `tucson-residential-building-permits`
