@@ -49,7 +49,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 
 <!-- BEGIN GENERATED SOURCES (scripts/build-report-rights.mjs) -->
 
-`255` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `121d07f8c83b3e7e1c704dec33c36679`.
+`256` sources, `supabase/functions/_shared/report-rights.json` version 2, cleared on 2026-10-04. Fingerprint: md5 of the ids joined with "," in code-point order = `9e9648a720e07f2f41fb17eac318712c`.
 
 - `adams-county-building-permits`
 - `adot-tip-fy2026-2030`
@@ -78,6 +78,7 @@ Every one of these is `cleared_on` 2026-10-04 with `audit_ref` this section. The
 - `baltimore-county-permits`
 - `beaverton-or-site-development-permits`
 - `bellevue-permits`
+- `bellingham-trakit-permits`
 - `bend-or-permit-applications`
 - `bentonville-catalyst-permits`
 - `bismarck-building-permits`

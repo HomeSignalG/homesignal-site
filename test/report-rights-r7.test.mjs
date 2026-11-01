@@ -51,8 +51,12 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // (City of Eugene's Current Projects). None states a licence; each carries only an as-is / informational disclaimer.
 // 250 -> 255 ids. Prior value ae89c23c9d47ef1ea20eb40732cbb4d4.
 // Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
-const FINGERPRINT_2026_10_04 = '121d07f8c83b3e7e1c704dec33c36679';
-const EXPECTED_IDS = 255;
+// Founder approval 2026-11-01 (Washington coverage expansion, asked and answered in session: "yes") cleared exactly one source,
+// bellingham-trakit-permits (City of Bellingham's own TRAKiT permit layer, maps.cob.org; the city's metadata for D_Permits states
+// 'Access Constraints None. Use Constraints None.' and a no-warranty disclaimer): 255 -> 256 ids. Prior value 121d07f8c83b3e7e1c704dec33c36679.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = '9e9648a720e07f2f41fb17eac318712c';
+const EXPECTED_IDS = 256;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();

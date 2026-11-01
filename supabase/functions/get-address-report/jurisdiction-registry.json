@@ -10208,6 +10208,86 @@
       "_receipts": "2026-10-22 Skagit WA permit pass (founder: 'wire it'). PROBED via pg_net from Postgres, HTTP 200. LAYER: Skagit County Planning 'Active Permits Last 5 Years' MapServer/7 'Active Permits', esriGeometryPoint (wkid 102100, flattened to __lat/__lng by the connector), maxRecordCount 2000. FIELDS: OBJECTID, PermitNumber, ParcelNumber, CompDescription, Applied, Approved, Issued (esriFieldTypeDate), PermitID, PermitDetails. No address, ZIP, status or description column; ZIP scoping is spatial (3 mi). STATUS: the layer lists ACTIVE permits only and every row carries Issued, so status_const 'Issued' (an issued permit is Approved, section 7.12a). TYPES (CompDescription groupBy, Issued >= 2024-10-22, the connector's 730-day window): Building (Residential) 377, Building (Commercial) 214, Demolition (BLDG) 50, Manufactured/Modular Structure 28 kept (669); dropped at source: Floodplain Permit 264, Public Health | On Site Septic 262, Water System Evaluation 175, Access Permit (Public Works) 97, Mechanical (Residential) 53, Burn Permits 49, Title Elimination 7, Plumbing (Residential) 7, Mechanical (Commercial) 3. Sum 1,586. Newest Issued 2026-10-20. Rows with Issued or PermitDetails null: 0 (whole layer). RECORD URL: PermitDetails is the county's own Tyler EnerGov self-service permit page per PermitID (Ann Arbor STREAMURL / Pierce urlOnlinePermits precedent). Demolition maps to Development (Pierce precedent). NOTE: with no description column, 'Building (Residential)' and 'Manufactured/Modular Structure' carry no construction evidence, so Map 1's Residential gate (lib/residential-qualify.js) judges them UNRESOLVED and does not draw them; that is the shared rule working, not bypassed. No Skagit city permit layers were found."
     },
     {
+      "registry_id": "bellingham-trakit-permits",
+      "platform": "arcgis",
+      "service_url": "https://maps.cob.org/arcgis3/rest/services/Maps/Permits/MapServer/0",
+      "dataset_url": "https://permits.cob.org/etrakit/Search/permit.aspx",
+      "jurisdiction": "City of Bellingham",
+      "coverage": [
+        {
+          "state": "WA",
+          "county": "Whatcom"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "PermitType",
+          "PermitSubType"
+        ],
+        "status_raw": "STATUS",
+        "type_source": "PermitType",
+        "file_date": "APPLIED",
+        "decision_date": "ISSUED",
+        "address": "SITE_ADDR",
+        "case_number": "PERMIT_NO",
+        "lat": "__lat",
+        "lng": "__lng"
+      },
+      "file_date_kind": "filed",
+      "spatial_zip_radius_mi": 3,
+      "extra_where": "PermitType IN ('BUILDING MIXED USE','BUILDING MULTIFAMILY RESIDENTIAL','BUILDING NONRESIDENTIAL','DEMOLITION','NEW CONSTRUCTION SINGLE FAMILY OR DUPLEX','NEW CONSTRUCTION TOWNHOME') AND PermitSubType IN ('NEW CONSTRUCTION','ADDITION','NEW STRUCTURE','ADU','TOTAL','FOUNDATION ONLY')",
+      "out_fields": [
+        "PERMIT_NO",
+        "PermitType",
+        "PermitSubType",
+        "STATUS",
+        "APPLIED",
+        "ISSUED",
+        "SITE_ADDR"
+      ],
+      "page_size": 2000,
+      "type_map": {
+        "BUILDING MIXED USE": "Commercial",
+        "BUILDING MULTIFAMILY RESIDENTIAL": "Residential",
+        "BUILDING NONRESIDENTIAL": "Development",
+        "DEMOLITION": "Development",
+        "NEW CONSTRUCTION SINGLE FAMILY OR DUPLEX": "Residential",
+        "NEW CONSTRUCTION TOWNHOME": "Residential"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "APPLIED",
+          "IN REVIEW",
+          "INCOMPLETE",
+          "REQUEST FOR INFO",
+          "READY TO ISSUE",
+          "AMENDMENT IN REVIEW",
+          "AMENDMENT RTI",
+          "IN APPEAL"
+        ],
+        "approved": [
+          "ISSUED"
+        ],
+        "operating": [
+          "FINALED"
+        ],
+        "exclude": [
+          "VOIDED OR WITHDRAWN",
+          "EXPIRED",
+          "ARCHIVED",
+          "AMENDMENT CCL",
+          "RTI HOLD"
+        ],
+        "denied": [
+          "DENIED"
+        ]
+      },
+      "incremental_field": "APPLIED",
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-01 (read-only probe via pg_net). City of Bellingham's own ArcGIS Server (maps.cob.org), layer 'Permits' = D_Permits, TRAKiT permits joined to address points / parcel / street centroids (city metadata data.cob.org/gis/metadata/D_Permits.html: 'Access Constraints None. Use Constraints None.' + no-warranty disclaimer). 218,874 rows; newest APPLIED 2026-10-29; maxRecordCount 2000, pagination supported; point geometry served in 4326 via outSR. 16 STATUS values VERBATIM via returnDistinctValues over the whole layer (AMENDMENT CCL, AMENDMENT IN REVIEW, AMENDMENT RTI, APPLIED, ARCHIVED, DENIED, EXPIRED, FINALED, IN APPEAL, IN REVIEW, INCOMPLETE, ISSUED, READY TO ISSUE, REQUEST FOR INFO, RTI HOLD, VOIDED OR WITHDRAWN), every one assigned; RTI HOLD -> exclude per the 2026-08-18 hold ruling; VOIDED OR WITHDRAWN -> exclude (states alternatives, not a ruling). PermitType: 31 values applied in the last 365 days; the 6 construction/demolition types are whitelisted at source, and within them only the construction PermitSubTypes NEW CONSTRUCTION / ADDITION / NEW STRUCTURE / ADU / TOTAL (demolition) / FOUNDATION ONLY (the full subtype list of those 6 types over 365 days was enumerated: TENANT IMPROVEMENT 160, REPAIR 22, INTERIOR REMODEL 6, UNDERGROUND STORMWATER FACILITY 5, PARTIAL OR INTERIOR 9, DEFERRED IMPACT FEES 1 are dropped as routine). 269 rows in 365 days (472 before the subtype filter). NO ZIP column -> spatial_zip_radius_mi 3 on the city's own points. Measured: all 269 points carry geometry and fall inside ZCTAs 98225 (123), 98226 (94), 98229 (52). Offline run of the shipped arcgis connector on the live 98225 response (md5 9d1283601d0b0fb1af41c52e025d6ea2, before the subtype filter): fetched 403, emitted 378, unmapped statuses 0, no_record_url 0, quarantined 0. out_fields projects ONLY mapped columns: the layer carries OWNER_NAME / APPLICANT_NAME / CONTRACTOR_NAME, which are never requested. Per-record link NOT verified: permits.cob.org/etrakit/Search/permit.aspx?activityNo=BLD2025-0988 returned the search page without the permit, so record_url_precision is dataset (the city's eTRAKiT permit search)."
+    },
+    {
       "registry_id": "butler-county-ks-permits",
       "geocode_assemble": true,
       "platform": "arcgis",
