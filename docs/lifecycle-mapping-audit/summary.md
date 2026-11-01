@@ -35,25 +35,25 @@ replica of production.
 | transition | values |
 |---|---:|
 | proposed → proposed | 536 |
-| dropped → historical column (per record: observed > term > class_entry, else unknown) | 394 |
+| dropped → historical column (per record: observed > term > class_entry, else unknown) | 323 |
 | approved → approved | 302 |
 | operating → operating or unknown (work_completed keeps an observed column) | 220 |
-| proposed → historical column (per record: observed > term > class_entry, else unknown) | 119 |
+| proposed → historical column (per record: observed > term > class_entry, else unknown) | 113 |
 | proposed (decision notation) → historical column (per record: observed > term > class_entry, else unknown) | 105 |
-| approved → historical column (per record: observed > term > class_entry, else unknown) | 87 |
-| operating → historical column (per record: observed > term > class_entry, else unknown) | 60 |
+| approved → historical column (per record: observed > term > class_entry, else unknown) | 79 |
+| dropped → unknown | 72 |
+| operating → unknown | 56 |
 | proposed → approved | 42 |
-| approved → unknown | 26 |
+| approved → unknown | 34 |
+| proposed → unknown | 30 |
 | approved → proposed | 25 |
-| proposed → unknown | 24 |
 | approved → operating or unknown (work_completed keeps an observed column) | 17 |
 | dropped → not shown | 16 |
 | proposed → proposed or unknown | 10 |
+| operating → historical column (per record: observed > term > class_entry, else unknown) | 8 |
 | dropped → proposed | 8 |
 | operating → approved | 7 |
-| operating → unknown | 4 |
 | operating → unknown (work_completed keeps an observed column) | 3 |
-| dropped → unknown | 1 |
 
 Of the 294 values that reach Operating now today,
 74 no longer reach it on wording alone. Of the 419

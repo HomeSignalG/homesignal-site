@@ -141,6 +141,8 @@ function oldColumn(bucket) {
 // record keeps its historical column, which is decided per record by the evidence ladder (§4.4 item 2).
 function newColumn(L, cls, p) {
   if (p.stage === 'invalid_record') return 'not shown';
+  // D5: an undefined "Closed" is Lifecycle unknown outright (plan §4.4 item 3b), never a kept historical column.
+  if (p.stage === 'closed_unspecified') return L.stageColumn(cls, p.stage, null) || 'not shown';
   if (p.activity !== 'active') return 'historical column (per record: observed > term > class_entry, else unknown)';
   if (String(p.stage).includes('|')) {
     const outs = [...new Set(p.stage.split('|').map((st) => L.stageColumn(cls, st, null) || 'not shown'))];

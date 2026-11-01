@@ -59,7 +59,7 @@ const expect = (id, status, want, name) => {
 };
 
 // 3. The founder's examples (plan §3) and decisions.
-expect('austin-zoning-cases', 'Closed', { proposed_stage: 'closed_unspecified', proposed_activity: 'undetermined', needs: 'receipt', documentation_receipt: 'none on file' },
+expect('austin-zoning-cases', 'Closed', { proposed_stage: 'closed_unspecified', proposed_activity: 'undetermined', proposed_column: 'unknown', needs: 'receipt', documentation_receipt: 'none on file' },
   '3a: D5 — Austin zoning "Closed" is not Operating; needs the agency definition');
 expect('burlington-vt-zoning-permits', 'Closed', { proposed_stage: 'closed_unspecified', needs: 'receipt' }, '3b: D5 — Burlington zoning "Closed"');
 expect('dallas-specific-use-permits', 'In force', { proposed_stage: 'entitled', proposed_column: 'approved' }, '3c: an SUP in force is an entitlement, not operation');
