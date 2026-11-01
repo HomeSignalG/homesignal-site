@@ -1297,6 +1297,37 @@ begin
   return jsonb_build_object('ok', true, 'decision', p_decision, 'photo_rejected', p_decision = 'rejected' and pid is not null);
 end $$;
 
+-- Approve several shots of one video at once ("Approve this act"): all of them, or none. Each shot goes through
+-- hs_impact_story_shot_decide (the same checks), inside this one transaction, so a failure part way saves nothing.
+create or replace function public.hs_impact_story_shots_approve(p_story uuid, p_manifest_id bigint, p_expected_hash text,
+                                                                p_asset text, p_shots text[])
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); sid text; n int := 0;
+begin
+  if coalesce(cardinality(p_shots), 0) = 0 then raise exception 'No shots to approve.' using errcode = '22023'; end if;
+  if cardinality(p_shots) > 500 then raise exception 'Too many shots at once.' using errcode = '22023'; end if;
+  foreach sid in array (select array_agg(distinct x) from unnest(p_shots) x) loop
+    perform public.hs_impact_story_shot_decide(p_story, p_manifest_id, p_expected_hash, p_asset, sid, 'approved', null);
+    n := n + 1;
+  end loop;
+  return jsonb_build_object('ok', true, 'approved', n);
+end $$;
+
+-- Reject several photos at once ("Reject every photo in this act"): all of them, or none, through the same checks.
+create or replace function public.hs_impact_story_photos_reject(p_story uuid, p_manifest_id bigint, p_photos text[],
+                                                                p_note text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); pid text; n int := 0;
+begin
+  if coalesce(cardinality(p_photos), 0) = 0 then raise exception 'No photos to reject.' using errcode = '22023'; end if;
+  if cardinality(p_photos) > 200 then raise exception 'Too many photos at once.' using errcode = '22023'; end if;
+  foreach pid in array (select array_agg(distinct x) from unnest(p_photos) x) loop
+    perform public.hs_impact_story_photo_reject(p_story, p_manifest_id, pid, p_note);
+    n := n + 1;
+  end loop;
+  return jsonb_build_object('ok', true, 'rejected', n);
+end $$;
+
 -- Undo a rejection: the photo may be shown again after the next Prepare.
 create or replace function public.hs_impact_story_photo_restore(p_story uuid, p_photo text)
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -1774,7 +1805,8 @@ begin
     'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',
     'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'public.hs_impact_story_photo_restore(uuid, text)',
-    'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)'] loop
+    'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)',
+    'public.hs_impact_story_shots_approve(uuid, bigint, text, text, _text)', 'public.hs_impact_story_photos_reject(uuid, bigint, _text, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

@@ -259,16 +259,48 @@ ok(await page.locator('#is [data-act=vshot][data-d=approved]').count() === 0 && 
 await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').first().click(); await page.waitForTimeout(60);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'new_photo' && c[1].p_asset === 'main' && c[1].p_shot === 'a1-s1' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
    'visuals: Need new photo sends the shot and the previews the page showed');
+// a reject asks in the page, never in a browser pop-up
+await page.evaluate(() => { window.realConfirm = window.confirm; window.realPrompt = window.prompt;
+  window.confirm = () => { throw new Error('no confirm pop-up in Visuals'); }; window.prompt = () => { throw new Error('no prompt pop-up in Visuals'); }; });
+const nDec0 = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length);
 await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
-ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'rejected' && c[1].p_shot === 'a1-s1')),
-   'visuals: Reject sends the shot decision');
+ok(await page.locator('#is #is-vask-note').count() === 1 && await page.locator('#is [data-act=vaskgo]').count() === 1
+   && await page.evaluate(() => document.activeElement && document.activeElement.id === 'is-vask-note')
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
+   'visuals: Reject opens a note box in the page (focused) and saves nothing yet');
+await page.click('#is [data-act=vaskno]'); await page.waitForTimeout(40);
+ok(await page.locator('#is #is-vask-note').count() === 0 && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
+   'visuals: Cancel closes the box and saves nothing');
+await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
+await page.fill('#is #is-vask-note', 'Too blurry'); await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'rejected' && c[1].p_shot === 'a1-s1' && c[1].p_note === 'Too blurry')),
+   'visuals: Reject sends the shot decision with the note typed in the page');
+// a shot with no photo needs a note: an empty box says so in the page and saves nothing
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+const nDec1 = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length);
+await page.locator('#is [data-act=vshot][data-shot=a2-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
+await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(60);
+ok((await page.locator('#is [role=alert]').allInnerTexts()).some((x) => x.includes('Say what is wrong with this shot'))
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec1),
+   'visuals: rejecting a shot with no photo needs a note, said in the page');
+await page.click('#is [data-act=vaskno]'); await page.waitForTimeout(40);
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = window.savedPhoto1 || null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 await page.locator('#is [data-act=vapprovegroup][data-group="1"]').click(); await page.waitForTimeout(80);
-ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'approved' && c[1].p_shot === 'a2-s1' && c[1].p_manifest_id === 41)),
-   'visuals: Approve this act approves every shot in it, on the previews the page showed');
-const nRej = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photo_reject').length);
-await page.click('#is [data-act=vrejectgroup]'); await page.waitForTimeout(60);
-ok(await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photo_reject').length) === nRej + 1,
-   'visuals: rejecting an act sends each of its photos once');
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shots_approve' && c[1].p_shots.indexOf('a2-s1') >= 0 && c[1].p_asset === 'main' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
+   'visuals: Approve this act saves every shot in it in ONE call, on the previews the page showed');
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = { id: 'oak2', record: { title: 'File:Oak2.jpg' } }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+const nRej = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject').length);
+await page.locator('#is [data-act=vrejectgroup]').first().click(); await page.waitForTimeout(60);
+ok(await page.locator('#is #is-vask-note').count() === 1 && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject').length === n, nRej),
+   'visuals: Reject every photo in this act asks in the page first');
+await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(80);
+ok(await page.evaluate((n) => { const r = window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject'); return r.length === n + 1 && r[r.length - 1][1].p_photos.length >= 1
+   && new Set(r[r.length - 1][1].p_photos).size === r[r.length - 1][1].p_photos.length; }, nRej),
+   'visuals: rejecting an act sends its photos once, in ONE call');
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = null; window.confirm = window.realConfirm; window.prompt = window.realPrompt; });
 await page.evaluate(() => { window.db.visuals.rejected = [{ id: 'oak', title: 'File:Oak.jpg' }]; window.db.visuals.more_photos_for = ['oak-trees'];
   window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'rejected', note: 'Too dark <here>' }];
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
@@ -334,7 +366,8 @@ await page.evaluate(() => {
   const real = window.client.rpc;
   window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a1-s1', decision: 'approved' }, { asset: 'main', shot_id: 'a2-s1', decision: 'approved' },
     { asset: 'short_a', shot_id: 'short_a-hook', decision: 'approved' }, { asset: 'short_b', shot_id: 'short_b-hook', decision: 'approved' }];
-  window.client.rpc = (n, a) => { if (n === 'hs_impact_story_shot_decide') window.db.visuals.shot_decisions.push({ asset: a.p_asset, shot_id: a.p_shot, decision: a.p_decision }); return real(n, a); };
+  window.client.rpc = (n, a) => { if (n === 'hs_impact_story_shot_decide') window.db.visuals.shot_decisions.push({ asset: a.p_asset, shot_id: a.p_shot, decision: a.p_decision });
+    if (n === 'hs_impact_story_shots_approve') a.p_shots.forEach((sid) => window.db.visuals.shot_decisions.push({ asset: a.p_asset, shot_id: sid, decision: 'approved' })); return real(n, a); };
   window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
 });
 await page.waitForTimeout(150);
@@ -343,7 +376,7 @@ const vbt = await page.locator('#is-visbar').innerText(); ok(vbt.includes('4 of 
 await page.click('#is [data-act=vtab][data-k=thumbnail]'); await page.waitForTimeout(80);
 await page.click('#is [data-act=vapprovegroup]'); await page.waitForTimeout(250);
 ok(await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_visuals_approve').length === n + 1
-   && window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_asset === 'thumbnail' && c[1].p_decision === 'approved'), nApprove),
+   && window.calls.some((c) => c[0] === 'hs_impact_story_shots_approve' && c[1].p_asset === 'thumbnail'), nApprove),
    'visuals: approving the last part approves the whole set');
 await page.evaluate(() => { delete window.db.visuals.shot_decisions; });
 await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(50);
