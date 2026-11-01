@@ -8,7 +8,7 @@ name: db-sql
 # from a committed file so every statement is code-reviewed and auditable. Results print
 # into the job log (the receipt channel — the sandbox cannot reach the artifact store).
 #
-# SINCE 2026-10-25 THIS JOB RUNS IN THE ENVIRONMENT `production`, WHICH ADMITS ONLY ref main.
+# SINCE PR #2244 MERGED, THIS JOB RUNS IN THE ENVIRONMENT `production`, WHICH ADMITS ONLY ref main.
 # A dispatch from a branch is refused before any step runs, so the branch read loop described
 # below no longer works, by design: branch code could choose the SQL and run it as `postgres`.
 # Reads go through db-read.yml (read-only endpoint, main's code, the SQL file fetched as data

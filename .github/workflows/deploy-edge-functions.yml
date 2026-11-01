@@ -7,7 +7,7 @@ name: deploy-edge-functions
 # MCP inline-bundle deploy (which has a ~30 KB payload ceiling and must be hand-transmitted).
 #
 # ONE-TIME SETUP (repo → Settings → Environments → production → Environment secrets):
-#   • PROD_SUPABASE_ACCESS_TOKEN — a Supabase access token (since 2026-10-25 an ENVIRONMENT secret,
+#   • PROD_SUPABASE_ACCESS_TOKEN — a Supabase access token (since PR #2244 an ENVIRONMENT secret,
 #     issued only to ref main; it was the repository secret SUPABASE_ACCESS_TOKEN before that)
 #   (SUPABASE_PROJECT_REF is hard-coded below; it is not a secret — it's in docs already.)
 #

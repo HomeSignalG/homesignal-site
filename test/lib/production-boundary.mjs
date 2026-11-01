@@ -7,7 +7,7 @@
 // (comment lines removed, dedented), and any generator that writes the step into a workflow
 // imports BOUNDARY_STEP_SOURCE from here instead of retyping it.
 //
-// Since 2026-10-25 every job that holds a PROD_ secret uses it: the two workflows built for the
+// Since PR #2244 every job that holds a PROD_ secret uses it: the two workflows built for the
 // environment (db-read.yml, verify-production-environment.yml, pinned more strictly by
 // test/production-boundary-new-workflows.test.mjs) and the 19 existing jobs moved onto it from the
 // repository secrets SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ACCESS_TOKEN. The full rule test over
@@ -64,8 +64,8 @@ export const SECRETLESS_ENVIRONMENTS = {
 
 // Privileged but still repository secrets (decision 5). SHRINK-ONLY: every (secret, job) pair must
 // exist; any other pair fails; moving one into the environment = delete the entry here.
-// (DEPLOY_KEY left this list on 2026-10-25: sitemap.yml was deleted and source-monitor.yml stopped
-// pushing on 2026-10-24, and no workflow names it; test/no-deploy-key-push.test.mjs keeps it out.)
+// (DEPLOY_KEY left this list in PR #2244: sitemap.yml was deleted and source-monitor.yml stopped
+// pushing on 2026-10-22 (#2167), and no workflow names it; test/no-deploy-key-push.test.mjs keeps it out.)
 export const PRIVILEGED_PENDING = {
   INGEST_DISPATCH_TOKEN: { jobs: ['n5-generation.yml#orchestrate'],
     reason: 'fine-grained PAT, Actions: write on homesignal-ingest: dispatches any ingest workflow on main with chosen inputs' },

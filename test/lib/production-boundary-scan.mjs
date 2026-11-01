@@ -167,7 +167,12 @@ export const BOUNDARY_CONJUNCT = "steps.boundary.outcome != 'failure'";
 export const SHELL_ENV_KEY = /(^\s*|[{,]\s*)['"]?(BASH_ENV|ENV|BASH_FUNC_[^'"\s:]*|SHELLOPTS|BASHOPTS|PS4)['"]?\s*:/;
 
 // A line that references secrets in any form: ${{ … secrets … }}, secrets.NAME, secrets[...].
-export const SECRET_REF = /\$\{\{[^}]*\bsecrets\b|\bsecrets\s*(?:\.\s*[A-Za-z_]|\[)/;
+// Since 2026-11-01 any case counts INSIDE ${{ }} (GitHub resolves `Secrets.X` like `secrets.X`); outside an
+// expression only the lower-case form counts, so prose such as "repository Secrets. The" is not a reference.
+// STEP_ENV_SECRET below stays lower-case, so a production job must write the canonical form.
+const SECRET_IN_EXPR = /\$\{\{[^}]*\bsecrets\b/i;
+const SECRET_BARE = /\bsecrets\s*(?:\.\s*[A-Za-z_]|\[)/;
+export const SECRET_REF = { test: (l) => SECRET_IN_EXPR.test(l) || SECRET_BARE.test(l) };
 // The only accepted form: the WHOLE value of a step-level env key.
 export const STEP_ENV_SECRET = /^ {10}([A-Za-z_][A-Za-z0-9_]*): \$\{\{ secrets\.([A-Za-z0-9_]+) \}\}$/;
 

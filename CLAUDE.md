@@ -499,9 +499,10 @@ and that is worth recording as dead before anyone tries it again.
 session: two PRs opened, check runs read, both merged, and **eight workflow dispatches** —
 zero prompts throughout, against a Supabase prompt on every SQL call.
 
-🛑 **SUPERSEDED 2026-10-25 IN THIS REPO: `db-sql.yml` NOW RUNS ONLY FROM `main`.** It moved into the GitHub
+🛑 **SUPERSEDED BY PR #2244 IN THIS REPO: `db-sql.yml` NOW RUNS ONLY FROM `main`.** It moved into the GitHub
 environment `production` (deployment branches: main only), so a dispatch with `ref=<a branch>` is refused
-before any step runs (proven the same day: a branch dispatch got no runner and no step). That was the point:
+before any step runs (proven 2026-10-25 on `verify-production-environment`, which names the same environment:
+a branch dispatch got no runner and no step). That was the point:
 the branch loop let branch code choose SQL and run it as `postgres` through the write endpoint. **Read with
 `db-read.yml` instead** (read-only endpoint, read-only role, main's code):
 1. Write the query to **`docs/adhoc/query.sql`** on the working branch, and push the branch.
@@ -1403,14 +1404,15 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     **28,263** failures on 2026-09-14, before any of that day's work. Diff the count and the
     failure CLASS against a pre-change run; a red badge alone says nothing. It also reports a
     **negative** `Passed:` count when failures exceed pages, which will mislead the next reader.
-- 🔒 **PRODUCTION SUPABASE KEYS COME ONLY FROM THE GITHUB ENVIRONMENT `production` (2026-10-25).** The founder
+- 🔒 **PRODUCTION SUPABASE KEYS COME ONLY FROM THE GITHUB ENVIRONMENT `production` (PR #2244).** The founder
   created it on 2026-10-23: deployment branches **main only**, admin bypass **off**, no reviewers. It holds
   `PROD_SUPABASE_SERVICE_ROLE_KEY` and `PROD_SUPABASE_ACCESS_TOKEN`. `PROD_SUPABASE_DB_URL` is **deferred**
   (founder, 2026-10-23: the database password is not on record and a reset was declined for now).
   - **Why:** this repo is public, and a job that names a repository secret hands it to whatever code the job
     runs, including a branch's (a dispatch with `ref=<branch>`, or a push to any branch). An environment
     secret reaches only jobs on `main`. Proven 2026-10-25: `verify-production-environment` from `main`
-    passed every check; the same dispatch from a branch got no runner and ran no step.
+    passed every check (the deferred database-URL rows read DEFERRED, by design); the same dispatch from a
+    branch got no runner and ran no step.
   - **Every job that holds a PROD_ key** carries `environment: { name: production, deployment: false }` on
     the line right before `runs-on:`, and its FIRST step is the canonical boundary step (it refuses a
     dispatch unless both `github.actor` and `github.triggering_actor` are `HomeSignalG`). Dispatch inputs
@@ -1419,7 +1421,7 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     them (and `test/production-boundary-new-workflows.test.mjs` checks `db-read` / `verify` more strictly).
     **Copy an existing production job when adding one; never retype the boundary step.**
   - **21 jobs in 18 workflows** use the environment: the 2 built for it (`db-read`, `verify-production-
-    environment`) and 19 moved onto it on 2026-10-25 (including `n5-generation`, `maps-social-image`,
+    environment`) and 19 moved onto it by PR #2244 (including `n5-generation`, `maps-social-image`,
     `source-monitor`, `deploy-edge-functions`, `db-sql`, `phase2-b1-zcta`). Scheduled runs and the database's
     own dispatches (pg_cron `n5-generation-dispatch`, which runs as `HomeSignalG`) pass the boundary.
   - **Still on repository secrets, by design:** the 24 jobs in `DEFERRED_DB_URL_JOBS` read the repository
@@ -3047,6 +3049,12 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
       - ⚠️ **Still open:** all of these workflows can be dispatched from any branch with the secrets. Only
         the protected `production` environment closes that (founder step 9; draft #1333 is the earlier
         version of the workflow half).
+        - ✅ **Closed for these three, and for `dc-atlas-dryrun`, by PR #2244.** Their jobs run in the
+          environment `production` (main only, no reviewers by design; see §5's production-keys bullet), so a
+          branch dispatch gets no runner, and that withholds the repository `SUPABASE_DB_URL` they read too.
+          **Still open:** jobs that read ONLY the repository `SUPABASE_DB_URL` (e.g. `dc-atlas-phase-a-proof`;
+          the full list is `DEFERRED_DB_URL_JOBS` in `test/lib/production-boundary.mjs`), until
+          `PROD_SUPABASE_DB_URL` exists.
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
   - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**

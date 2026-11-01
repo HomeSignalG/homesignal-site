@@ -24,7 +24,9 @@
 //                BASH_FUNC_*, SHELLOPTS, BASHOPTS, PS4) anywhere in the file.
 // Across EVERY workflow:
 //   CLASSIFY     every secret name is classified, and secrets are never read dynamically (toJSON(secrets),
-//                secrets[...], secrets: inherit), which no classification could follow;
+//                secrets[...], secrets: inherit), which no classification could follow. Names and functions are
+//                matched in any case (GitHub accepts toJson, Secrets.X, Always()), and a secret outside any job
+//                (workflow-level env:) counts as a reference by every job in that file;
 //   RETIRED      SUPABASE_SERVICE_ROLE_KEY is named nowhere; SUPABASE_ACCESS_TOKEN only by an OTHER_ENVIRONMENT
 //                job that lists it; SUPABASE_DB_URL only by the jobs in DEFERRED_DB_URL_JOBS, each of which still
 //                names it (SHRINK-ONLY); no retired or PROD_ name outside a job (workflow env, top comments);
@@ -65,8 +67,21 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 const DB_URL = 'SUPABASE_DB_URL';
 const SRK = 'SUPABASE_SERVICE_ROLE_KEY';
 const TOKEN = 'SUPABASE_ACCESS_TOKEN';
-const NAME_RE = /\bsecrets\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g;
-const DYNAMIC_RE = /toJSON\(\s*secrets\s*\)|\bsecrets\s*\[|^\s*secrets\s*:\s*inherit\b/;
+// GitHub resolves context and function names in any case (toJson(secrets), Secrets.X and Always() all work), and
+// secret names are case-insensitive, so every name is compared in upper case. Lower-case `secrets.NAME` counts
+// anywhere (as before, comments included); another spelling counts only inside ${{ }}, where GitHub reads it, so
+// prose such as "repository Secrets. The" is not mistaken for a reference.
+const ctxRefs = (word) => (l) => {
+  const lower = new RegExp(`\\b${word}\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)`, 'g');
+  const any = new RegExp(`\\b${word}\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)`, 'gi');
+  const out = [...l.matchAll(lower)].map((m) => m[1]);
+  for (const e of l.matchAll(/\$\{\{([\s\S]*?)\}\}/g)) for (const m of e[1].matchAll(any)) out.push(m[1]);
+  return [...new Set(out.map((n) => n.toUpperCase()))];
+};
+const secretNames = ctxRefs('secrets');
+const varNames = ctxRefs('vars');
+const DYNAMIC_RE = /toJSON\(\s*secrets\s*\)|\bsecrets\s*\[|^\s*secrets\s*:\s*inherit\b/i;
+const STATUS_FN_RE = /\b(always|failure|cancelled)\s*\(/i;
 const GUARD_DISPATCH = "github.event_name == 'workflow_dispatch'";
 const GUARD_NOT_PR = "github.event_name != 'pull_request'";
 const ALLOWED_TRIGGERS = ['workflow_dispatch', 'schedule', 'push', 'pull_request'];
@@ -152,7 +167,7 @@ function secretRefs(lines, jobs) {
   for (const j of jobs) for (const { n } of j.body) owner.set(n, j.name);
   const refs = [];
   lines.forEach((l, i) => {
-    for (const m of l.matchAll(NAME_RE)) refs.push({ name: m[1], line: i, job: owner.get(i) ?? null, comment: isCommentLine(l) });
+    for (const name of secretNames(l)) refs.push({ name, line: i, job: owner.get(i) ?? null, comment: isCommentLine(l) });
   });
   return refs;
 }
@@ -179,10 +194,13 @@ export function analyse(corpus) {
         v('RETIRED', `${f}:${r.line + 1}`, `${r.name} named outside any job (workflow env or a top comment)`);
       }
     }
+    // A secret outside any job (workflow-level env:) reaches EVERY job in the file, so it counts as each job's
+    // reference for CLASSIFY, PENDING, OTHER_ENV and RETIRED. YAML comments outside a job reach no job.
+    const fileWide = refs.filter((r) => r.job === null && !r.comment).map((r) => r.name);
     for (const j of jobs) {
       const key = `${f}#${j.name}`;
       jobsByKey.set(key, { f, job: j, lines });
-      jobRefs.set(key, new Set(refs.filter((r) => r.job === j.name).map((r) => r.name)));
+      jobRefs.set(key, new Set([...refs.filter((r) => r.job === j.name).map((r) => r.name), ...fileWide]));
     }
 
     // ENV_NAME, per job
@@ -236,6 +254,13 @@ export function analyse(corpus) {
     lines.forEach((l, i) => {
       const m = isCommentLine(l) ? null : l.match(SHELL_ENV_KEY);
       if (m) v('DEFAULTS', `${f}:${i + 1}`, `env key ${m[2]} is not allowed (it can re-route or neuter the boundary step's shell)`);
+    });
+
+    // VARS outside any job (workflow-level env:, run-name, concurrency) reach the production job too
+    const inJob = new Set(jobs.flatMap((j) => j.body.map(({ n }) => n)));
+    lines.forEach((l, i) => {
+      if (inJob.has(i) || isCommentLine(l)) return;
+      for (const name of varNames(l)) if (!Object.hasOwn(ALLOWED_VARS, name)) v('VARS', `${f}:${i + 1}`, `vars.${name} is not in ALLOWED_VARS (outside any job, so every job reads it)`);
     });
 
     // the expression-bearing blocks of the whole file, attributed to jobs below
@@ -297,7 +322,7 @@ export function analyse(corpus) {
       // VARS, ACTION_PIN
       for (const { n, l } of jl) {
         if (isCommentLine(l)) continue;
-        for (const m of l.matchAll(/\bvars\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g)) if (!Object.hasOwn(ALLOWED_VARS, m[1])) v('VARS', `${key}:${n + 1}`, `vars.${m[1]} is not in ALLOWED_VARS`);
+        for (const name of varNames(l)) if (!Object.hasOwn(ALLOWED_VARS, name)) v('VARS', `${key}:${n + 1}`, `vars.${name} is not in ALLOWED_VARS`);
         const u = l.match(/^\s*(?:- )?uses\s*:\s*['"]?([^'"\s#]+)['"]?\s*(#.*)?$/);
         if (!u) continue;
         const [, ref, comment] = u;
@@ -312,7 +337,7 @@ export function analyse(corpus) {
         const iff = stepKey(st, 'if');
         if (iff !== null && st.some(({ n }) => secretLines.has(n))) {
           const e = ifExpression(iff);
-          if (/\b(always|failure|cancelled)\s*\(/.test(e)) {
+          if (STATUS_FN_RE.test(e)) {
             if (e.includes('||')) v('STATUS_IF', at, 'a status-function if: holding a secret may not contain ||');
             else if (!topLevelAnd(e).some((c) => c.replace(/\s+/g, ' ') === BOUNDARY_CONJUNCT)) v('STATUS_IF', at, `a status-function if: holding a secret needs the top-level conjunct ${BOUNDARY_CONJUNCT}`);
           }
@@ -455,6 +480,15 @@ const MUTATIONS = [
   ['PENDING', 'n5-generation.yml', 'the pending job stops naming its token (the list must shrink)', (t) => mut(t, '          INGEST_DISPATCH_TOKEN: ${{ secrets.INGEST_DISPATCH_TOKEN }}\n', '')],
   ['CLASSIFY', 'pages.yml', 'an unclassified secret in a non-production workflow', (t) => t.replace(/( {8}env:\n)/, '$1          N: ${{ secrets.SOME_NEW_TOKEN }}\n')],
   ['CLASSIFY', 'pages.yml', 'toJSON(secrets)', (t) => t.replace(/( {8}env:\n)/, '$1          ALL: ${{ toJSON(secrets) }}\n')],
+  ['CLASSIFY', 'pages.yml', 'toJson(secrets), the camel-case spelling GitHub also accepts', (t) => t.replace(/( {8}env:\n)/, '$1          ALL: ${{ toJson(secrets) }}\n')],
+  ['CLASSIFY', 'pages.yml', 'workflow-level env with an unclassified secret', (t) => mut(t, '\njobs:\n', '\nenv:\n  N: ${{ secrets.SOME_NEW_TOKEN }}\njobs:\n')],
+  ['PENDING', 'pages.yml', 'workflow-level env hands INGEST_DISPATCH_TOKEN to every job', (t) => mut(t, '\njobs:\n', '\nenv:\n  D: ${{ secrets.INGEST_DISPATCH_TOKEN }}\njobs:\n')],
+  ['OTHER_ENV', 'pages.yml', 'workflow-level env hands the one-time-code seed to every job', (t) => mut(t, '\njobs:\n', '\nenv:\n  S: ${{ secrets.MIGRATION_TOTP_SECRET }}\njobs:\n')],
+  ['VARS', 'n5-generation.yml', 'workflow-level env reads a repository variable', (t) => mut(t, '\njobs:\n', '\nenv:\n  X: ${{ vars.SOMETHING }}\njobs:\n')],
+  ['RETIRED', 'verify-maps-preview-live.yml', 'Secrets.SUPABASE_DB_URL with a capital S', (t) => t.replace(/( {8}env:\n)/, '$1          DB: ${{ Secrets.SUPABASE_DB_URL }}\n')],
+  ['SECRET', 'dc-step3c-probe.yml', 'a production key written as Secrets.PROD_... (non-canonical case)', (t) => mut(t, '${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}', '${{ Secrets.PROD_SUPABASE_ACCESS_TOKEN }}')],
+  ['RETIRED', 'verify-maps-preview-live.yml', 'secrets.supabase_db_url in lower case (secret names are case-insensitive)', (t) => t.replace(/( {8}env:\n)/, '$1          DB: ${{ secrets.supabase_db_url }}\n')],
+  ['STATUS_IF', 'source-monitor.yml', 'if: Always() on the scoreboard step', (t) => mut(t, "        if: always() && steps.boundary.outcome != 'failure'\n", '        if: Always()\n')],
   ['CLASSIFY', 'source-monitor.yml', 'DEPLOY_KEY comes back', (t) => t.replace(/( {8}env:\n)/, '$1          K: ${{ secrets.DEPLOY_KEY }}\n')],
   ['OTHER_ENV', 'db-migrate-decide.yml', 'rename its environment', (t) => mut(t, 'environment: prod-db-write\n', 'environment: prod-db-write-2\n')],
   ['OTHER_ENV', 'db-migrate-decide.yml', 'stop reading the one-time-code seed', (t) => mut(t, '          MIGRATION_TOTP_SECRET: ${{ secrets.MIGRATION_TOTP_SECRET }}\n', '')],
@@ -476,6 +510,8 @@ for (const [f, label, fn] of [
   ['db-sql.yml', 'push branches as a block list', (t) => mut(t, '    branches: [main]\n', '    branches:\n      - main\n')],
   ['n5-generation.yml', 'permissions in flow form', (t) => mut(t, 'permissions:\n  contents: read\n', 'permissions: { contents: read }\n')],
   ['dc-atlas-dryrun.yml', 'an extra conjunct beside the dispatch guard', (t) => mut(t, "    if: github.event_name == 'workflow_dispatch'\n", "    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'\n")],
+  ['source-monitor.yml', 'prose "Secrets. The" in a comment inside a job is not a reference', (t) => mut(t, '      - name: Live scoreboard', '      # Kept out of repository Secrets. The scoreboard reads one key.\n      - name: Live scoreboard')],
+  ['pages.yml', 'a YAML comment outside any job naming a pending secret (comments reach no job)', (t) => mut(t, '\njobs:\n', '\n# uses secrets.INGEST_DISPATCH_TOKEN elsewhere\njobs:\n')],
   ['load-openaddresses.yml', 'checkout with fetch-depth only', (t) => mut(t, '      - uses: actions/checkout@v4\n', '      - uses: actions/checkout@v4\n        with:\n          fetch-depth: 0\n')],
 ]) {
   const vs = withFile(f, fn(C(f))).violations;

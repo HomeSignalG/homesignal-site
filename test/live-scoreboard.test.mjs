@@ -315,7 +315,7 @@ test('dev_zip_source_ids is read with the runner secret, never the anon key (ano
   assert.match(pages, /Bearer \$\{KEY\}/); assert.doesNotMatch(pages, /INTERNAL_KEY/);
   const wf = readFileSync(new URL('../.github/workflows/source-monitor.yml', import.meta.url), 'utf8');
   const step = wf.slice(wf.indexOf('- name: Live scoreboard'));
-  // Since 2026-10-25 the key is the environment secret PROD_SUPABASE_SERVICE_ROLE_KEY (test/lib/production-boundary.mjs).
+  // Since PR #2244 the key is the environment secret PROD_SUPABASE_SERVICE_ROLE_KEY (test/lib/production-boundary.mjs).
   assert.match(step, /SUPABASE_SERVICE_ROLE_KEY: \$\{\{ secrets\.PROD_SUPABASE_SERVICE_ROLE_KEY \}\}/, 'the workflow hands the step the secret');
   assert.equal((wf.match(/SUPABASE_SERVICE_ROLE_KEY/g) || []).filter((x, i, a) => true).length >= 2, true);
   const before = wf.slice(0, wf.indexOf('- name: Live scoreboard'));

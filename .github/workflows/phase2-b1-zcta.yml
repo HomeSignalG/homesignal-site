@@ -33,7 +33,7 @@ name: phase2-b1-zcta
 #             scratch boundary table it creates and drops in the same run, because the
 #             per-shard ZCTA slices are correctly discarded at cleanup.
 #
-# Credentials: PROD_SUPABASE_ACCESS_TOKEN only (environment `production`, since 2026-10-25), and never in B1
+# Credentials: PROD_SUPABASE_ACCESS_TOKEN only (environment `production`, since PR #2244), and never in B1
 # validate mode. It is the same token db-sql.yml and deploy-edge-functions.yml use. No new secret was created for this
 # work. B3's two modes both hold it: b3-probe to READ the frozen candidate list,
 # b3-load to write recovered geometry.

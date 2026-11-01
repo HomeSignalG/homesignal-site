@@ -30,7 +30,7 @@
 //
 // The canonical text and constants live in ONE place, test/lib/production-boundary.mjs, and the line
 // scanner in test/lib/production-boundary-scan.mjs. The rules for EVERY workflow (the 19 jobs moved onto
-// the environment on 2026-10-25 among them) are test/production-boundary.test.mjs; this file holds the
+// the environment by PR #2244 among them) are test/production-boundary.test.mjs; this file holds the
 // two workflows built for the environment to stricter rules. HYGIENE, NOT THE BOUNDARY:
 // a PR can edit this test, and a line scanner cannot follow code that builds a URL or an expression
 // from fragments; the environment's main-only branch rule is what enforces.

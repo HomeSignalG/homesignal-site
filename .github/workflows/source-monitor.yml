@@ -181,7 +181,7 @@ jobs:
       # Public reads use the committed anon key from config.js. The ONE internal read (dev_zip_source_ids) needs the service
       # role key, scoped to this step only: anon lost SELECT on app_zip_source_ids on 2026-09-26
       # (phase1_revoke_anon_internal_read_surface) and this step has failed with HTTP 401 / 42501 every night since.
-      # Since 2026-10-25 the key is PROD_SUPABASE_SERVICE_ROLE_KEY from the environment `production`, and the if: also
+      # Since PR #2244 the key is PROD_SUPABASE_SERVICE_ROLE_KEY from the environment `production`, and the if: also
       # needs the boundary step not to have refused: always() alone would still hand the key to a refused dispatch.
       - name: Live scoreboard (ranked work list)
         if: always() && steps.boundary.outcome != 'failure'
