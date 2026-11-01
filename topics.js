@@ -37,7 +37,8 @@
     'Livestock, Crops, Pets & Wildlife Health',
     'Weather & Climate Hazards',
     'Radiation',
-    'Data Centers'
+    'Data Centers',
+    'Development & Land Use'   // 13th, founder ruling 2026-11-01 (Local News; the emerging and global tiers are on hold)
   ];
 
   var PIPELINES = [

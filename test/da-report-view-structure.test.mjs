@@ -81,9 +81,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 5
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the one quality-of-life rule); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the one quality-of-life rule and its heavy-facility kind check); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
@@ -181,7 +181,7 @@ const C = code(SRC);
   };
   walk('.');
   const REVIEW_PAGE = 'development-activity-review.html', CUSTOMER_PAGE = 'development-activity-reports.html', CLIENT_PAGE = 'shared-report.html', LANDING_PAGE = 'development-activity.html';
-  const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
+  const ALLOWED = new Set([MOD, 'test/da-report-view.test.mjs', 'test/da-report-view-structure.test.mjs', 'test/heavy-facility-type.test.mjs', 'test/da-report-view.browser.test.mjs', 'test/da_report_view_mutants.py', 'test/lib/da-report-view-world.mjs',
     'docs/development-activity-report-view-2026-10-02.md', 'docs/development-activity-status-2026-09-30.md', 'docs/development-activity-build-steps-100526.md',
     // build step 4: its one caller, the admin-only review page, and that page's tests; lib-cache-keys keys the file now a page loads it
     // 2026-10-17: the public landing page draws its SAMPLE report through the view, replacing a hand-built copy of an older layout

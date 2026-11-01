@@ -260,7 +260,7 @@ window.HS_SEED = (function () {
     meetings: { title:'Upcoming Meetings', sub:'Choose which meetings you want advance alerts for', badge:'▦ Meetings',
                 items:['County Commission & county business','Planning, zoning & development','Property taxes & assessments','Public safety & emergencies','Water districts & utilities','Elections & voting'], on:[0,1,2,3,4,5] },
     news:     { title:'Local News', sub:'Select the news topics you want real-time alerts for', badge:'✉ News',
-                items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers'], on:[0,4] }
+                items:['Water Quality','Air Quality','Soil Quality','Animal & Human Viruses / Diseases','Infrastructure','EMF','Noise Pollution','Light Pollution','Livestock, Crops, Pets & Wildlife Health','Weather & Climate Hazards','Radiation','Data Centers','Development & Land Use'], on:[0,4] }
   };
 
   return { community, demoUser, properties, projects, changes, meetings,
