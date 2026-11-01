@@ -1,0 +1,71 @@
+name: source-freshness-suite
+
+# SOURCE FRESHNESS (docs/source-freshness.sql): per development source, the newest record date and the
+# last completed read, plus this ZIP's own read status. Runs the SHIPPED SQL against a DISPOSABLE
+# Postgres with pg_cron and Supabase-role stand-ins: the reader's three states, the date-kind rule,
+# who may run what, replay, an overlapping run, a change, a removal and the rollback. Every
+# prohibited mutation in test/source_freshness_pg/mutations MUST fail the suite.
+
+on:
+  pull_request:
+    paths:
+      - 'docs/source-freshness.sql'
+      - 'docs/source-freshness.rollback.sql'
+      - 'test/source_freshness_pg/**'
+      - '.github/workflows/source-freshness-suite.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/source-freshness.sql'
+      - 'docs/source-freshness.rollback.sql'
+      - 'test/source_freshness_pg/**'
+      - '.github/workflows/source-freshness-suite.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-freshness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: source_freshness_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any Supabase credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then
+            echo "ABORT: this suite must only ever address the disposable container."; exit 1
+          fi
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client >/dev/null
+      - name: Shipped SQL passes; behaviours hold; every prohibited mutation is killed
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: source_freshness_disposable
+        run: |
+          set -o pipefail
+          bash test/source_freshness_pg/run.sh 2>&1 | grep -v -E 'NOTICE|DETAIL|drop cascades' | tee /tmp/sf.log
+      - name: Receipt
+        if: always()
+        run: |
+          { echo '## Source freshness'; echo '```'; grep -E 'SHIPPED|PASS|FAIL|KILLED|SURVIVED|NO-OP|\|f$' /tmp/sf.log || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
