@@ -10,15 +10,16 @@ reset_db() {
   P -f "$here/fixture_schema.sql" >/dev/null 2>&1
 }
 shipped="$root/docs/development-dossier.sql"
+review="$root/docs/development-review.sql"
 suite() { P -tA -F'|' -f "$here/suite.sql"; }
 fails_of() { grep -c '|f|' <<<"$1" || true; }
 
-reset_db; P -f "$shipped" >/dev/null
+reset_db; P -f "$shipped" >/dev/null 2>&1; P -f "$review" >/dev/null 2>&1
 out="$(suite)"; echo "$out" | sed 's/^/  /'
 n_all=$(grep -c '|' <<<"$out"); n_fail=$(fails_of "$out")
 echo "SHIPPED: $n_all checks, $n_fail failed"
-if [ "$n_all" -lt 40 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
-P -f "$shipped" >/dev/null && echo "RE-APPLY: ok" || { echo "FAIL — the file does not re-apply"; exit 1; }
+if [ "$n_all" -lt 53 ] || [ "$n_fail" -ne 0 ]; then echo "FAIL — the shipped SQL does not pass"; exit 1; fi
+P -f "$shipped" >/dev/null && P -f "$review" >/dev/null && echo "RE-APPLY: ok" || { echo "FAIL — the file does not re-apply"; exit 1; }
 
 status=0
 tmp="$(mktemp)"; trap 'rm -f "$tmp"' EXIT
@@ -27,7 +28,7 @@ for m in "$here"/mutations/*.sed; do
   if cmp -s "$tmp" "$shipped"; then
     echo "NO-OP    $(basename "$m") — the mutation did not change the file"; status=1; continue
   fi
-  reset_db; P -f "$tmp" >/dev/null 2>&1 || true
+  reset_db; P -f "$tmp" >/dev/null 2>&1 || true; P -f "$review" >/dev/null 2>&1 || true
   out="$(suite 2>&1 || true)"; n_fail=$(fails_of "$out")
   n_got=$(grep -c '|[tf]|' <<<"$out" || true)
   if [ "$n_fail" -gt 0 ] || [ "$n_got" -lt "$n_all" ]; then
@@ -36,5 +37,20 @@ for m in "$here"/mutations/*.sed; do
     echo "SURVIVED $(basename "$m") — the suite cannot see this regression"; status=1
   fi
 done
-reset_db; P -f "$shipped" >/dev/null
+# the review file's own prohibited mutations
+for m in "$here"/mutations-review/*.sed; do
+  sed -f "$m" "$review" > "$tmp"
+  if cmp -s "$tmp" "$review"; then
+    echo "NO-OP    $(basename "$m") — the mutation did not change the file"; status=1; continue
+  fi
+  reset_db; P -f "$shipped" >/dev/null 2>&1; P -f "$tmp" >/dev/null 2>&1 || true
+  out="$(suite 2>&1 || true)"; n_fail=$(fails_of "$out")
+  n_got=$(grep -c '|[tf]|' <<<"$out" || true)
+  if [ "$n_fail" -gt 0 ] || [ "$n_got" -lt "$n_all" ]; then
+    echo "KILLED   $(basename "$m") — $n_fail check(s) failed"
+  else
+    echo "SURVIVED $(basename "$m") — the suite cannot see this regression"; status=1
+  fi
+done
+reset_db; P -f "$shipped" >/dev/null 2>&1; P -f "$review" >/dev/null 2>&1
 exit $status

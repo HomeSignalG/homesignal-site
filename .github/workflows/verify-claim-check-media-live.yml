@@ -1,0 +1,35 @@
+name: verify-claim-check-media-live
+# Read-only, daily. Renders Tab 19's own detail view, from the LIVE acquisition.html's script and CSP, for a real Bluesky
+# post and a real YouTube video in Chromium, and fails unless every preview loads, both players load from their own hosts,
+# and the browser reports no CSP violation. Holds no secret and writes nothing. Runs on a PR that changes it, so the check
+# is proven before it is trusted; it reads production, not the PR.
+on:
+  schedule:
+    - cron: '41 15 * * *'
+  workflow_dispatch:
+    inputs:
+      site: {description: 'site to check', default: 'https://jodytracks.com', required: false}
+  pull_request:
+    paths:
+      - scripts/verify-claim-check-media-live.mjs
+      - .github/workflows/verify-claim-check-media-live.yml
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.48.2
+          npx playwright install --with-deps chromium
+      - name: Verify live media
+        shell: bash   # pipefail: tee must not hide a failure
+        env:
+          SITE: ${{ inputs.site || 'https://jodytracks.com' }}
+        run: node scripts/verify-claim-check-media-live.mjs --site "$SITE" | tee -a "$GITHUB_STEP_SUMMARY"

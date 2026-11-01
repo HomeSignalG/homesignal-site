@@ -51,7 +51,17 @@ ok(/<details><summary class="sub">Fix the link by hand[\s\S]*?class="yv-yturl"/.
 ok(/YouTube channel<\/h3>[\s\S]*Checked automatically twice a day/.test(html), '3a channel card says it is automatic');
 ok((html.match(/class="yv-msel"/g) || []).length === 1 && /data-vid="UNKNOWN0001"/.test(html), '3b only the unmatched new video gets a match control');
 ok(!/data-vid="OLDVIDEO001"/.test(html), '3c a historical video is not put in front of the founder');
-ok(/value="\|none">Not a project video/.test(html) && /value="p1\|final">/.test(html), '3d choices are project items or "not a project video"');
+ok(/value="\|none">Not a project video/.test(html) && /value="p1\|final"/.test(html) && !/value="p1\|short[12]"/.test(html), '3d choices are a project\'s main video or "not a project video"; never a Short');
+{ // 3g (founder, 2026-10-30): an unmatched Short is never asked for; only the main video's match sets the link
+  const ch = Object.assign({}, channel, { videos: channel.videos.concat([
+    v({ video_id: 'SHORTUNM001', title: 'A Short', match_state: 'unmatched', duration_s: 49 }),
+    v({ video_id: 'LONGUNM0001', title: 'A full video', match_state: 'unmatched', duration_s: 313 })]) });
+  const h = Y.channelCard(ch, [row]);
+  ok(!/data-vid="SHORTUNM001"/.test(h) && /data-vid="LONGUNM0001"/.test(h) && /data-vid="UNKNOWN0001"/.test(h),
+    '3g an unmatched Short (3 minutes or less) is not listed; a full video, or one of unknown length, still is');
+  ok(/data-vid="SHORTUNM001"/.test(Y.channelCard(Object.assign({}, ch, { videos: [v({ video_id: 'SHORTUNM001', duration_s: 49, link_state: 'conflict' })] }), [row])),
+    '3h a link conflict is still shown, whatever the length');
+}
 ok(/The last check failed/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: false, detail: { error: 'quotaExceeded' } } }))), '3e a failed check is shown');
 ok(/Public videos only/.test(Y.render([row], {}, true, Object.assign({}, channel, { last_run: { ok: true, public_only: true } }))) && !/Public videos only/.test(html), '3f public-only reading is said, owner reading is not');
 // 4. without the sync applied the tab is unchanged
@@ -79,6 +89,15 @@ ok(/revoke all on public\.youtube_channel_videos from public, anon, authenticate
 }
 const wfs = fs.readdirSync(new URL('../.github/workflows/', import.meta.url));
 ok(wfs.some((f) => /youtube-channel-sync/.test(f)), '7g the SQL suite runs in CI');
+
+// 8. Save match (2026-10-30): a taken item is greyed out with its video, and a refusal survives the tab's rebuilds
+{
+  const h = Y.channelCard(channel, [row]);
+  ok(/<option value="p1\|final" disabled>Port X · Main video \(already matched: Full investigation\)<\/option>/.test(h), '8a a matched item cannot be chosen and names its video');
+  ok(/<option value="p2\|final">Port Y · Main video<\/option>/.test(Y.channelCard(channel, [row, Object.assign({}, row, { slug: 'p2', title: 'Port Y' })])), '8b a free item stays selectable');
+  const src = read('lib/acq-youtube-videos.js');
+  ok(/matchErrors\[vid\] = text/.test(src) && /querySelectorAll\('\.yv-msave'\)/.test(src), '8c a Save match refusal is kept and put back after each rebuild');
+}
 
 if (fails) { console.log(fails + ' FAILED'); process.exit(1); }
 console.log('all passed');

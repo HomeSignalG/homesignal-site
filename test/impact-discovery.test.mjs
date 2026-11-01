@@ -24,7 +24,7 @@ for (const f of called) {
   const src = f.startsWith('hs_impact_story_') ? storiesSql : sql;
   const body = (src.match(new RegExp('create or replace function public\\.' + f + '\\([\\s\\S]*?\\$\\$;', 'm')) || [''])[0];
   ok(/public\._hs_is_admin\(\)/.test(body), '2b ' + f + ' checks the dashboard allowlist');
-  ok(new RegExp("'public\\." + f + "\\([^']*\\)'").test(src.slice(src.indexOf("revoke all on function ' || f || ' from public, anon';") - 900)), '2c ' + f + ' is in the authenticated grant list');
+  ok(new RegExp("'public\\." + f + "\\([^']*\\)'").test(((i) => src.slice(src.lastIndexOf('foreach f in array array[', i), i))(src.indexOf("revoke all on function ' || f || ' from public, anon';"))), '2c ' + f + ' is in the authenticated grant list');
 }
 ok(!/\.from\(['"]impact_discovery/.test(js), '2d the page never reads a discovery table directly');
 ok(!/(^|[^_a-z])impact_discovery_(scan_record|scan_finish|research|prepare|scan_claim|tick|nominations)/.test(js.replace(/hs_impact_discovery_research_start/g, '')), '2e the page never calls a scanner, research or tick function');

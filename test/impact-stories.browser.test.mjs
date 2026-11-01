@@ -182,7 +182,7 @@ await page.evaluate(() => {
     manifest: { timing: { total_s: 640 }, identity: { same: true },
       assets: { main: { shots: [
         { id: 'a1-s1', act: 1, act_name: 'Attachment', status: 'clear', label: 'REPRESENTATIVE PHOTO · NOT THIS SITE', onscreen: 'A dock for <fishers>', preview: P('main', 0), photo: { id: 'oak', credit: 'Oak: A. Person, CC BY 4.0', record: rec } },
-        { id: 'a2-s1', act: 2, act_name: 'Disruption', status: 'flagged', label: 'ILLUSTRATION · NOT A PICTURE OF THE SITE', preview: P('main', 1), reasons: ['An illustration stands where the plan wanted a photo (trees).'], illustration: { category: 'trees', missing: true } }] },
+        { id: 'a2-s1', act: 2, act_name: 'Disruption', status: 'flagged', label: 'FROM THE RECORD', preview: P('main', 1), reasons: ['No photo yet for Oak trees, so the shot shows the record. Choose one of the licensed photos offered, or upload your own.'], photo_needed: true, illustration: null }] },
         short_a: { shots: [{ id: 'short_a-hook', beat: 'hook', status: 'clear', label: 'MAP', preview: P('short_a', 0), map: true }] },
         thumbnail: { shots: [{ id: 'thumbnail', status: 'clear', label: 'PHOTO', preview: P('thumbnail', 0) }] } },
       alternatives: [{ subject_id: 'oak-trees', subject: 'Oak trees', candidates: [{ id: 'oak-2', title: 'File:Oak2.jpg', license: 'CC BY-SA 4.0', author: 'B', page_url: 'https://commons.wikimedia.org/wiki/File:Oak2.jpg', preview: { path: 's1/visuals/jv/cand-x.jpg' } }] }] } };
@@ -192,8 +192,18 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(150);
 let vt = await page.locator('#is').innerText();
-ok(vt.includes('Needs your attention (1)') && vt.includes('An illustration stands where the plan wanted a photo'), 'visuals: the shots that need you are listed first, with why');
-ok(vt.includes('3 clear · 1 to look at · 0 blocked') && vt.includes('Approve all visuals (4 shots)'), 'visuals: the counts and ONE approve action for the whole set');
+ok(vt.includes('Needs your attention (1)') && vt.includes('No photo yet for Oak trees') && vt.includes('No photo yet: showing the record'), 'visuals: the shots that need you are listed first, with why');
+ok(!/illustration/i.test(vt), 'visuals: no shot is offered or described as a drawing (founder, 2026-10-30: no illustrations)');
+// audit 2026-10-31: one approve path, buttons once, and the shots before the photo tools
+ok(await page.locator('#is [data-act=vapprove].primary').count() === 0 && await page.locator('#is [data-act=vnext]').count() === 1,
+   'visuals: while parts wait, the header does not offer to approve the whole set; it offers the next part to approve');
+ok(await page.locator('#is [data-act=vshot][data-shot=a2-s1][data-d=rejected]').count() === 1 && await page.locator('#is [data-act=vgoto][data-k=main]').count() === 1,
+   'visuals: a shot that needs attention is listed once with Show it, and its buttons appear once (in the sheet)');
+ok(await page.evaluate(() => { const h = document.getElementById('is').innerHTML; return h.indexOf('is-vgroup-main-0') > 0 && h.indexOf('is-vgroup-main-0') < h.indexOf('More licensed photos you can add'); }),
+   'visuals: the acts to approve come before the photo tools');
+ok(vt.includes('3 clear · 1 to look at · 0 blocked') && vt.includes('0 of 4 parts approved')
+   && await page.locator('#is [data-act=vapprovegroup]').count() === 2 && vt.includes('Approve this act'),
+   'visuals: the counts, and one Approve this act under each act (founder, 2026-10-30)');
 ok(await page.evaluate(() => ['s1/visuals/jv/preview-main-000.jpg', 's1/visuals/jv/preview-main-001.jpg', 's1/visuals/jv/cand-x.jpg']
    .every((p) => window.calls.some((c) => c[0] === 'download' && c[1] === 'impact-media' && c[2] === p))),
    'visuals: the previews on screen are downloaded with the admin session (blob links)');
@@ -202,9 +212,133 @@ ok(await page.locator('#is img[src^="blob:"]').count() >= 3 && (await page.inner
 await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(120);
 ok((await page.locator('#is').innerText()).includes('short_a-hook') && await page.evaluate(() => window.calls.some((c) => c[0] === 'download' && c[2] === 's1/visuals/jv/preview-short_a-000.jpg')),
    'visuals: Short A shows its own shots');
+await page.click('#is [data-act=vnext]'); await page.waitForTimeout(80);
+ok(await page.locator('#is-vgroup-main-0').count() === 1, 'visuals: Show the next part to approve opens the tab of the first part still waiting');
+await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(80);
 await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jv' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-2')),
    'visuals: another licensed photo is one click, from the job that made the manifest shown (not a newer failed job)');
+// One save at a time: while a choice is saving, every "Use this photo" button is disabled and a second click sends nothing.
+await page.evaluate(() => { const real = window.client.rpc; window.__release = null;
+  window.client.rpc = (n, a) => n === 'hs_impact_story_choose_asset' ? (window.calls.push([n, a]), new Promise((r) => { window.__release = () => r({ data: {}, error: null }); })) : real(n, a); });
+const nChoose = () => page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_choose_asset').length);
+const nBefore = await nChoose();
+await page.click('#is [data-act=choose][data-id=oak-2]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => { const bs = [...document.querySelectorAll('#is [data-act=choose]')]; return bs.length > 0 && bs.every((b) => b.disabled); })
+   && (await page.locator('#is [data-act=choose][data-id=oak-2]').innerText()).includes('Saving'),
+   'visuals: while a photo choice saves, it reads Saving… and every Use this photo button is disabled');
+await page.evaluate(() => document.querySelector('#is [data-act=choose]').click()); await page.waitForTimeout(50);
+ok(await nChoose() === nBefore + 1, 'visuals: a second click while saving sends nothing');
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
+await page.click('#is [data-act=vtab][data-k=short_a]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => { const bs = [...document.querySelectorAll('#is [data-act=choose]')]; return bs.length > 0 && bs.every((b) => b.disabled); }),
+   'visuals: switching video tabs while saving keeps every Use this photo button disabled');
+await page.evaluate(() => window.__release()); await page.waitForTimeout(150);
+ok(await page.evaluate(() => [...document.querySelectorAll('#is [data-act=choose]')].some((b) => !b.disabled)), 'visuals: the buttons work again once the save and redraw finish');
+// A set of photos per subject (founder, 2026-10-30): an added photo reads "In your photos" with Remove, and is listed under Your photos.
+await page.evaluate(() => { window.db.media = Object.assign({}, window.db.media || {}, { choices: [{ subject_id: 'oak-trees', candidate_id: 'oak-2', title: 'File:Oak2.jpg' },
+  { subject_id: 'oak-trees', candidate_id: 'oak-9', title: 'File:Oak9.jpg' }] });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(150);
+let yp = await page.locator('#is').innerText();
+ok(yp.includes('Your photos (2)') && yp.includes('In your photos') && await page.locator('#is [data-act=choose][data-id=oak-2]').count() === 0
+   && await page.locator('#is [data-act=unchoose][data-id=oak-9]').count() === 1,
+   'visuals: every added photo is listed under Your photos, and an added candidate reads In your photos');
+await page.locator('#is [data-act=unchoose][data-id=oak-9]').click(); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_unchoose_asset' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-9')),
+   'visuals: Remove takes the photo out of the subject\'s set');
+await page.evaluate(() => { window.db.media.choices = []; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+// Approve / Reject / Need new photo under every shot (2026-10-30), and rejecting every photo of an act.
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(80);
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[0].subject_ref = 'oak-trees'; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+ok(await page.locator('#is [data-act=vshot][data-d=approved]').count() === 0 && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').count() >= 1
+   && await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').count() >= 1,
+   'visuals: every shot has Reject, and Need new photo when it is about a subject; approving is per act, not per shot');
+await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=new_photo]').first().click(); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'new_photo' && c[1].p_asset === 'main' && c[1].p_shot === 'a1-s1' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
+   'visuals: Need new photo sends the shot and the previews the page showed');
+// a reject asks in the page, never in a browser pop-up
+await page.evaluate(() => { window.realConfirm = window.confirm; window.realPrompt = window.prompt;
+  window.confirm = () => { throw new Error('no confirm pop-up in Visuals'); }; window.prompt = () => { throw new Error('no prompt pop-up in Visuals'); }; });
+const nDec0 = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length);
+await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
+ok(await page.locator('#is #is-vask-note').count() === 1 && await page.locator('#is [data-act=vaskgo]').count() === 1
+   && await page.evaluate(() => document.activeElement && document.activeElement.id === 'is-vask-note')
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
+   'visuals: Reject opens a note box in the page (focused) and saves nothing yet');
+await page.click('#is [data-act=vaskno]'); await page.waitForTimeout(40);
+ok(await page.locator('#is #is-vask-note').count() === 0 && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec0),
+   'visuals: Cancel closes the box and saves nothing');
+await page.locator('#is [data-act=vshot][data-shot=a1-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
+await page.fill('#is #is-vask-note', 'Too blurry'); await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shot_decide' && c[1].p_decision === 'rejected' && c[1].p_shot === 'a1-s1' && c[1].p_note === 'Too blurry')),
+   'visuals: Reject sends the shot decision with the note typed in the page');
+// a shot with no photo needs a note: an empty box says so in the page and saves nothing
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+const nDec1 = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length);
+await page.locator('#is [data-act=vshot][data-shot=a2-s1][data-d=rejected]').first().click(); await page.waitForTimeout(60);
+await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(60);
+ok((await page.locator('#is [role=alert]').allInnerTexts()).some((x) => x.includes('Say what is wrong with this shot'))
+   && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_shot_decide').length === n, nDec1),
+   'visuals: rejecting a shot with no photo needs a note, said in the page');
+await page.click('#is [data-act=vaskno]'); await page.waitForTimeout(40);
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = window.savedPhoto1 || null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+await page.locator('#is [data-act=vapprovegroup][data-group="1"]').click(); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_shots_approve' && c[1].p_shots.indexOf('a2-s1') >= 0 && c[1].p_asset === 'main' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
+   'visuals: Approve this act saves every shot in it in ONE call, on the previews the page showed');
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = { id: 'oak2', record: { title: 'File:Oak2.jpg' } }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+const nRej = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject').length);
+await page.locator('#is [data-act=vrejectgroup]').first().click(); await page.waitForTimeout(60);
+ok(await page.locator('#is #is-vask-note').count() === 1 && await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject').length === n, nRej),
+   'visuals: Reject every photo in this act asks in the page first');
+await page.click('#is [data-act=vaskgo]'); await page.waitForTimeout(80);
+ok(await page.evaluate((n) => { const r = window.calls.filter((c) => c[0] === 'hs_impact_story_photos_reject'); return r.length === n + 1 && r[r.length - 1][1].p_photos.length >= 1
+   && new Set(r[r.length - 1][1].p_photos).size === r[r.length - 1][1].p_photos.length; }, nRej),
+   'visuals: rejecting an act sends its photos once, in ONE call');
+await page.evaluate(() => { window.db.visuals.manifest.assets.main.shots[1].photo = null; window.confirm = window.realConfirm; window.prompt = window.realPrompt; });
+await page.evaluate(() => { window.db.visuals.rejected = [{ id: 'oak', title: 'File:Oak.jpg' }]; window.db.visuals.more_photos_for = ['oak-trees'];
+  window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'rejected', note: 'Too dark <here>' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let rt = await page.locator('#is').innerText();
+ok(rt.includes('Rejected photos (1)') && rt.includes('File:Oak.jpg') && rt.includes('New photos asked for') && rt.includes('Photo rejected')
+   && rt.includes('Your note: Too dark <here>') && await page.locator('#is [data-act=vrejectgroup]').count() === 0,
+   'visuals: rejected photos, asked-for photos and each shot decision with its note are shown');
+await page.locator('#is [data-act=vrestore][data-photo=oak]').first().click(); await page.waitForTimeout(60);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_photo_restore' && c[1].p_photo === 'oak')), 'visuals: Use it again restores the photo');
+await page.evaluate(() => { delete window.db.visuals.rejected; delete window.db.visuals.more_photos_for; delete window.db.visuals.shot_decisions;
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+// The status bar says where things stand and the next step; carried approvals and a photo used for two subjects show.
+ok(await page.locator('#is-visbar').count() === 1 && (await page.locator('#is-visbar').innerText()).includes('Ready for your approval')
+   && await page.locator('#is-visbar [data-act=vapprove]').count() === 1 && await page.locator('#is-visbar [data-act=vprep]').count() === 1,
+   'visuals: one status bar says Ready for your approval, with Approve all visuals and Prepare again in it');
+await page.evaluate(() => { window.db.visuals.carried_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'approved', actor: 'f', from_manifest: 40 }];
+  window.db.visuals.manifest.assets.main.shots[1].photo = { id: 'oak', record: { title: 'File:Oak <1>.jpg' } };
+  window.db.visuals.manifest.assets.main.shots[1].subject_ref = 'wetland';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let cb = await page.locator('#is').innerText();
+ok(cb.includes('Approved earlier (same picture)'), 'visuals: a shot approved on the previous previews whose picture did not change reads Approved earlier (same picture)');
+ok(cb.includes('The same photo is used for different subjects') && /Oak.*\.jpg is used for oak-trees and wetland\. Choose a different photo/.test(cb)
+   && !(await page.innerHTML('#is')).includes('Oak <1>'), 'visuals: one photo used for two subjects is named, escaped, with both subjects');
+await page.evaluate(() => { delete window.db.visuals.carried_decisions; window.db.visuals.manifest.assets.main.shots[1].photo = null;
+  window.db.visuals.manifest.assets.main.shots[1].subject_ref = null;
+  window.db.visuals.state = 'stale'; window.db.visuals.why = 'You chose or rejected a photo since these previews were made. Prepare the visuals again.';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+let sb = await page.locator('#is-visbar').innerText();
+ok(sb.includes('These previews are out of date.') && sb.includes('You chose or rejected a photo') && !/again\..*Next: click Prepare/.test(sb)
+   && await page.locator('#is-visbar [data-act=vprep]').count() === 1 && await page.locator('#is [data-act=vapprove]').count() === 0,
+   'visuals: out of date says why, offers Prepare again, and no Approve');
+await page.evaluate(() => { window.db.visuals.state = 'ready'; window.db.visuals.why = 'Every shot passed the checks. Look them over, then Approve all visuals.';
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // A preview that cannot be downloaded is tried once, says so, and is tried again only on request (no redraw loop).
 await page.evaluate(() => {
   window.prevStorage = window.client.storage;
@@ -227,6 +361,61 @@ await page.locator('#is .is-panel [data-act=vapprove]').last().focus();
 await page.keyboard.press('Enter'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_visuals_approve' && c[1].p_manifest_id === 41 && c[1].p_expected_hash === 'a'.repeat(64))),
    'visuals: Approve all visuals (keyboard) sends the manifest the page showed');
+// Approving the last part approves the whole set (the server re-checks everything).
+await page.evaluate(() => {
+  const real = window.client.rpc;
+  window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a1-s1', decision: 'approved' }, { asset: 'main', shot_id: 'a2-s1', decision: 'approved' },
+    { asset: 'short_a', shot_id: 'short_a-hook', decision: 'approved' }, { asset: 'short_b', shot_id: 'short_b-hook', decision: 'approved' }];
+  window.client.rpc = (n, a) => { if (n === 'hs_impact_story_shot_decide') window.db.visuals.shot_decisions.push({ asset: a.p_asset, shot_id: a.p_shot, decision: a.p_decision });
+    if (n === 'hs_impact_story_shots_approve') a.p_shots.forEach((sid) => window.db.visuals.shot_decisions.push({ asset: a.p_asset, shot_id: sid, decision: 'approved' })); return real(n, a); };
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+const nApprove = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_visuals_approve').length);
+const vbt = await page.locator('#is-visbar').innerText(); ok(vbt.includes('4 of 5 parts approved'), 'visuals: the status bar counts approved parts (' + vbt.split('\n')[0] + ')');
+// The bar pinned to the bottom (founder, 2026-11-01: "something that tells me something is processing or what to do next")
+const dk = await page.locator('#is-vdock').innerText();
+ok(dk.includes('4 of 5 pictures approved') && dk.includes('Next: Thumbnail') && await page.locator('#is-vdock [data-act=vnext]').count() === 1
+   && await page.evaluate(() => getComputedStyle(document.getElementById('is-vdock')).position === 'sticky'),
+   'visuals: a bar pinned to the bottom says how many pictures are approved and names the next part, with a button to go there');
+await page.click('#is-vdock [data-act=vnext]'); await page.waitForTimeout(80);
+ok(await page.locator('#is-vgroup-thumbnail-0').count() === 1, 'visuals: the bar takes you to the next part still waiting');
+await page.evaluate(() => { const real = window.client.rpc; window.__go = null;
+  window.client.rpc = (n, a) => n === 'hs_impact_story_shots_approve' ? new Promise((r) => { window.__go = () => r(real(n, a)); }) : real(n, a); });
+await page.click('#is [data-act=vapprovegroup]'); await page.waitForTimeout(60);
+ok((await page.locator('#is-vdock').innerText()).includes('Saving Thumbnail') && await page.locator('#is-vdock .is-spin').count() === 1
+   && (await page.locator('#is [data-act=vapprovegroup]').innerText()).includes('Saving') && await page.locator('#is [data-act=vapprovegroup]').isDisabled(),
+   'visuals: while an act saves, its button reads Saving… and the bar says what is being saved, with a spinner');
+await page.evaluate(() => window.__go()); await page.waitForTimeout(250);
+ok(await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_visuals_approve').length === n + 1
+   && window.calls.some((c) => c[0] === 'hs_impact_story_shots_approve' && c[1].p_asset === 'thumbnail'), nApprove),
+   'visuals: approving the last part approves the whole set');
+await page.evaluate(() => { delete window.db.visuals.shot_decisions; });
+await page.click('#is [data-act=vtab][data-k=main]'); await page.waitForTimeout(50);
+// Every part approved by approvals kept from the previous previews, the set itself not approved yet: the bar says one
+// click is left and makes Approve the visuals the main button (before, it read "5 of 5 approved" with no clear next step).
+await page.evaluate(() => {
+  window.db.visuals.carried_decisions = [['main', 'a1-s1'], ['main', 'a2-s1'], ['short_a', 'short_a-hook'], ['short_b', 'short_b-hook'], ['thumbnail', 'thumbnail']]
+    .map((x) => ({ asset: x[0], shot_id: x[1], decision: 'approved', actor: 'f', from_manifest: 40 }));
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+const cbar = await page.locator('#is-visbar').innerText();
+ok(cbar.includes('Every part is approved. One click left.') && cbar.includes('Next: click Approve the visuals.')
+   && await page.locator('#is-visbar .is-btn.primary[data-act=vapprove]').count() === 1 && await page.locator('#is [data-act=vapprovegroup]').count() === 0,
+   'visuals: every part approved earlier, set not approved: the bar says one click is left, with Approve the visuals as the main button');
+// A part whose only open shot is one the founder rejected has nothing to approve: no button, a badge that says why.
+await page.evaluate(() => {
+  window.db.visuals.carried_decisions = window.db.visuals.carried_decisions.filter((d) => d.shot_id !== 'a2-s1');
+  window.db.visuals.shot_decisions = [{ asset: 'main', shot_id: 'a2-s1', decision: 'rejected', note: 'wrong place' }];
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(150);
+const nfx = await page.locator('#is').innerText();
+ok(nfx.includes('Needs a fix: prepare the visuals again') && await page.locator('#is [data-act=vapprovegroup]').count() === 0,
+   'visuals: a part holding only a rejected shot shows Needs a fix, not a button that approves nothing');
+await page.evaluate(() => { delete window.db.visuals.carried_decisions; delete window.db.visuals.shot_decisions; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
 // Use your own photo (plan v3 §6.3): straight into the story's private uploads folder, then recorded with its checksum.
 // setContent pages are not a secure context, so the browser hides crypto.subtle and randomUUID (the https dashboard has
 // both): give this page Node's SHA-256 behind the same calls.

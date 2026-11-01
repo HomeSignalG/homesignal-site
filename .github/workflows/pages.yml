@@ -264,6 +264,23 @@ jobs:
           fi
           python3 -c "import json,sys; d=json.load(open('data/development_dossiers.json')); assert d.get('schema')=='development-dossiers/1' and isinstance(d.get('dossiers'),dict), 'bad shape'; print('development dossiers:', len(d['dossiers']))"
 
+      - name: Fetch the approved claim checks
+        # Tab 19 Data Center Claim Check (/fact-checks/<slug>/; docs/claim-check.sql). claim_check_public_export() returns
+        # APPROVED claim checks only, never a candidate or a provisional verdict. Until that SQL is applied the function does
+        # not exist (PostgREST 404 PGRST202): no claim-check pages, only the empty archive. Any other failure stops the build.
+        run: |
+          set -euo pipefail
+          KEY=$(python3 -c "import re;print(re.search(r\"SUPABASE_ANON_KEY:\\s*'([^']+)'\", open('config.js').read()).group(1))")
+          code=$(curl -sS --retry 3 --retry-delay 2 -o "$RUNNER_TEMP/fc.json" -w '%{http_code}' -X POST \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}' \
+            'https://qwnnmljucajnexpxdgxr.supabase.co/rest/v1/rpc/claim_check_public_export' || echo 000)
+          if [ "$code" = "404" ] && grep -q 'PGRST202' "$RUNNER_TEMP/fc.json"; then
+            echo '[]' > "$RUNNER_TEMP/fc.json"; echo "claim checks: the export function is not applied yet"
+          elif [ "$code" != "200" ]; then
+            echo "ERROR: claim checks fetch failed (HTTP $code)"; head -c 400 "$RUNNER_TEMP/fc.json"; exit 1
+          fi
+          python3 -c "import json,os; c=json.load(open(os.environ['RUNNER_TEMP']+'/fc.json')); assert isinstance(c,list), 'bad shape'; json.dump({'schema':'claim-checks/1','claims':c}, open('data/fact_checks.json','w')); print('claim checks:', len(c))"
+
       - name: Generate one document per canonical ZIP
         env:
           HS_BUILD_ID: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -461,7 +478,7 @@ jobs:
                 f"{len(man['indexable_zips'])} (F={man['rule_f_pass']} D={man.get('rule_d_pass', 0)})")
           PY
           # nothing generated may ever enter git
-          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps)/' && \
+          git status --porcelain | grep -E '^\?\?\s+(community|city|project|guides|sitemaps|development)/' && \
             { echo 'ERROR: generated ZIP HTML appeared in the working tree'; exit 1; } || true
           echo "GATES OK"
 
@@ -503,7 +520,8 @@ jobs:
               return (p in ('zip-pages-manifest.json', 'indexnow.txt') or p.startswith('community/')
                       or p.startswith('city/') or p.startswith('project/')
                       or p.startswith('guides/') or p.startswith('sitemaps/')
-                      or p.startswith('map/') or p.startswith('map1/'))
+                      or p.startswith('map/') or p.startswith('map1/')
+                      or p.startswith('development/') or p.startswith('fact-checks/'))
           unexpected = sorted(p for p in actual - contract if not generated(p))
           # an empty audit is not a clean audit
           assert len(actual) > len(contract), f'artifact ({len(actual)}) did not grow past the contract ({len(contract)})'

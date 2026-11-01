@@ -139,6 +139,14 @@ export const SURFACES = {
         + 'only; the browser half stubs the storage transport with those real bytes because the '
         + 'dashboard is email-OTP gated and a service key must never reach a page.',
   },
+  'verify-claim-check-media-live': {
+    surface: 'acquisition.html — Tab 19 Claim Check detail view (owner-only)',
+    tables: [],
+    capped: null,
+    note: 'Reads no table. Renders the deployed page\'s own claim-check script under its deployed CSP for a real '
+        + 'Bluesky post and a real YouTube video, and checks only that the previews and players load. It says '
+        + 'nothing about claims, verdicts or scans.',
+  },
   'verify-maps-rollout': {
     surface: 'n/a — rollout state only',
     tables: [],

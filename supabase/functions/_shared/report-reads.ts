@@ -33,7 +33,7 @@ export function makeReportReads(conn: { base: string; svc: Record<string, string
     },
 
     async hydrate(keys: string[]): Promise<ProjectRow[]> {
-      const cols = 'source_key,registry_id,record_kind,name,type,type_raw,status,stage,developer,size,investment,submitted_at,date_kind,address,source_ref,last_seen_at';
+      const cols = 'source_key,registry_id,record_kind,name,type,type_raw,status,stage,developer,size,investment,submitted_at,date_kind,address,source_ref,provenance,last_seen_at';
       const rows = await inBatches<ProjectRow & { last_seen_at: string | null }>(keys, (b) =>
         rest('app_projects?select=' + cols + '&record_kind=eq.development&source_key=in.' + encodeURIComponent(quoteIn(b))));
       // a project has one copy per ZIP page; the newest materialisation is the one used (the order the N5 shadow read uses)

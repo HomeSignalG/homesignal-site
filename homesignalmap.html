@@ -325,6 +325,11 @@
   .band-h.t-proposed{background:#E2772F}
   /* Lifecycle unknown — the legend's own neutral (HS.LIFECYCLE_HEX.unknown / statusHex.onfile). */
   .band-h.t-unknown{background:#706468}
+  /* State cleanup sites and water rights filings are not lifecycle stages; each header takes its
+     own pin colour (lib/state-cleanup.js, lib/water-rights-map.js). Without a class the header
+     was white text on a white card, so the column read as having no title. */
+  .band-h.t-cleanup{background:#8a5a00}
+  .band-h.t-water{background:#1c6ea4}
   .band-s{font-size:12.5px;color:var(--mute);margin:10px 0}
   .rec{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--line)}
   .rec .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
@@ -574,6 +579,7 @@
   .dt-title{font-weight:700;font-size:17px;color:var(--ink);margin-top:12px}
   .dt-name-note{font-size:12px;color:var(--soft);margin-top:2px;font-style:italic}
   .dt-straddle{font-size:13px;color:var(--soft);margin:5px 0 4px;line-height:1.5}
+  .dt-devpage{margin:6px 0 4px;font-size:14px;font-weight:600}
   .dt-lbl{font-weight:700;font-size:11.5px;color:var(--soft);text-transform:uppercase;
     letter-spacing:.04em;margin:18px 0 4px}
   .dt-lbl-note{font-weight:400;text-transform:none;letter-spacing:0;color:var(--mute)}
@@ -949,7 +955,7 @@
         <!-- STATE CLEANUP SITES (founder decision, 2026-10-21): their own band, hidden when this
              view holds none. Not projects and not EPA facilities (lib/state-cleanup.js). -->
         <div class="card read" id="cleanupBand" hidden>
-          <div class="band-h">State cleanup sites</div>
+          <div class="band-h t-cleanup">State cleanup sites</div>
           <div class="band-s">Cases on the state's cleanup-site list that are not closed</div>
           <div id="cleanupList"></div>
         </div>
@@ -957,7 +963,7 @@
              Pending applications on a state agency's list; not projects and not EPA facilities
              (lib/water-rights-map.js). -->
         <div class="card read" id="waterBand" hidden>
-          <div class="band-h">Water rights filings</div>
+          <div class="band-h t-water">Water rights filings</div>
           <div class="band-s">Pending applications on the state agency's list, not yet decided</div>
           <div id="waterList"></div>
         </div>
@@ -978,6 +984,7 @@
         </div>
       </div>
 
+      <div id="srcFresh"></div>
       <div class="foot" id="foot"></div>
     </div>
 
@@ -1019,9 +1026,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=4d7e6fb8"></script>
+<script src="lib/data.js?v=3ef05390"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=c408a2cb"></script>
+<script src="lib/templates.js?v=ab49fa3e"></script>
 <script src="lib/project-type.js?v=108e00a6"></script>
 <script src="lib/map.js?v=c2fa4469"></script>
 <script src="lib/residential-qualify.js?v=20260905"></script>
@@ -3067,6 +3074,12 @@ HS.onReady(function(){
            + " public record of a cleanup case, not a finding about any owner.")
         : "") +
       (data.paywall ? (" " + locked + " more items are available with a subscription.") : " Free during launch.");
+    // SOURCE FRESHNESS (founder, 2026-11-01): each development source's newest record date, last
+    // completed read, and (ZIP mode) this ZIP's own read status. Address mode spans several ZIPs, so
+    // it shows the source-wide facts only and makes no ZIP claim.
+    if(window.HS && HS.mountSourceFreshness){
+      HS.mountSourceFreshness($("srcFresh"), { zip: ZIP_MODE ? ZIP_CODE : null, ids: HS.sourceFreshnessIds(sites) });
+    }
     // EMBED ZIP ONLY. Hooked at the END of render because render OWNS the camera: every
     // pass does `map.setView(...)`, so a fit applied from the RPC's own callback would be
     // overwritten by the next render, and a fit applied before the first render would find
@@ -5230,8 +5243,22 @@ HS.onReady(function(){
               parent.display_name_basis === "descriptive");
   }
 
+  // The published development page for this land, from development/land-index.json (written by the
+  // site build from the same published snapshot as the pages: scripts/development_pages.py). Only a
+  // well-formed /development/<st>/<key>/ path is used; anything else means no link.
+  var LAND_INDEX_URL = "development/land-index.json";
+  function devPageFor(index, parent){
+    var land = index && index.schema === "development-land-index/1" && index.land;
+    var key = parent && parent.project_key;
+    if(!land || typeof key !== "string" || !Object.prototype.hasOwnProperty.call(land, key)) return null;
+    var e = land[key];
+    if(!e || typeof e.path !== "string" || !/^\/development\/[a-z]{2}\/[a-z0-9]+(?:-[a-z0-9]+)*\/$/.test(e.path)) return null;
+    var name = (typeof e.name === "string" && e.name.trim()) ? e.name.trim() : "";
+    return name ? { path: e.path, name: name } : null;
+  }
+
   // One land-assembly card. Pure: returns HTML, touches no DOM, so it can be tested offline.
-  function landCardHTML(zr, parent, parcels, zip){
+  function landCardHTML(zr, parent, parcels, zip, devPage){
     parcels = parcels || [];
     var total = zr.parcels_in_anchor_total, inZipN = zr.parcels_in_this_zip;
     var others = zr.other_zips || [];
@@ -5251,6 +5278,10 @@ HS.onReady(function(){
       h += "<div class='dt-name-note'>Descriptive label by JODY. No public record names this project.</div>";
     }
     h += "<div class='dt-straddle'>" + straddle + "</div>";
+    if(devPage){
+      h += "<div class='dt-devpage'><a href='" + escAttr(devPage.path) + "'>Read the project page: " +
+           esc(devPage.name) + " ›</a></div>";
+    }
 
     // Government status — only tracks the store carries a value for. None → one plain sentence.
     h += "<div class='dt-lbl'>Government status</div>";
@@ -5337,7 +5368,7 @@ HS.onReady(function(){
   // Render every land assembly the ZIP has, each from its own store row and its own parcels.
   function renderAnchors(cards, zip){
     $("dtAnchorBody").innerHTML = cards.map(function(c){
-      return landCardHTML(c.zr, c.parent, c.parcels, zip);
+      return landCardHTML(c.zr, c.parent, c.parcels, zip, c.devPage || null);
     }).join("");
   }
 
@@ -5414,6 +5445,8 @@ HS.onReady(function(){
         if(!r || !r.project_key || seen[r.project_key]) return false;
         seen[r.project_key] = true; return true;
       });
+      var landIndex = fetch(LAND_INDEX_URL, { cache: "no-cache" })
+        .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
       return Promise.all(rows.map(function(zr){
         return Promise.all([
           // select=* so a future column (e.g. display_name) is read without a page change.
@@ -5425,7 +5458,9 @@ HS.onReady(function(){
           var parent = (res[0] && res[0][0]) || null;
           var title = landCardTitle(parent);
           var parcels = (res[1] || []).map(function(p){ p.land_card_title = title; return p; });
-          return { zr:zr, parent:parent, parcels:parcels };
+          return landIndex.then(function(idx){
+            return { zr:zr, parent:parent, parcels:parcels, devPage: devPageFor(idx, parent) };
+          });
         });
       })).then(function(cards){
         if(CURRENT_DEV_ZIP !== zip) return; // a newer ZIP load owns the page now

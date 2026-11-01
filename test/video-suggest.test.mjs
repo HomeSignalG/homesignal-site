@@ -22,8 +22,13 @@ ok(/acqVideoSuggest\.mount\(window\.hsClient, sg\)/.test(page0) && /getElementBy
   '1c the tab mounts the box and loads the list into its own host');
 ok(!/yv-suggest|acqImpactDiscovery|impactstories/.test(yv), '1d Tab 16 no longer jumps to Tab 17');
 const rpcs = (lib.match(/rpc\('([a-z_]+)'/g) || []).map((s) => s.slice(5, -1)).sort();
-ok(JSON.stringify(rpcs) === JSON.stringify(['hs_youtube_video_suggest', 'hs_youtube_video_suggestion_withdraw', 'hs_youtube_video_suggestions_list']),
-  '1e the box calls only its three functions: ' + rpcs.join(', '));
+ok(JSON.stringify(rpcs) === JSON.stringify(['hs_youtube_video_suggest', 'hs_youtube_video_suggestion_make', 'hs_youtube_video_suggestion_withdraw', 'hs_youtube_video_suggestions_list']),
+  '1e the box calls only its four functions: ' + rpcs.join(', '));
+ok(/workflows\/video-suggestion-run\.yml\/dispatches/.test(sql) && /'ref', 'main'/.test(sql),
+  '1h Make video starts the ingest workflow from main');
+ok(/grant execute on function public\.youtube_video_suggestion_claim\(uuid\) to service_role/.test(sql)
+  && !/grant execute on function public\.youtube_video_suggestion_(claim|complete)[^;]*to authenticated/.test(sql),
+  '1i only the service role can claim or complete a run');
 ok(!/impact_discovery/.test(sql.replace(/--.*$/gm, '')) && !/rpc\('hs_impact/.test(lib), '1f it never touches Tab 17\'s Hot Topics queue');
 ok(/revoke all on public\.youtube_video_suggestions from public, anon, authenticated/.test(sql) && /enable row level security/.test(sql),
   '1g the table is closed to visitors');

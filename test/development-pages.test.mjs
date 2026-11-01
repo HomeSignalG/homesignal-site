@@ -14,7 +14,7 @@
 //   7. a malformed snapshot or a link with no https source fails the build
 //   8. identical input produces byte-identical pages, and the build day never moves a fingerprint
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,7 +49,8 @@ function dossiers() {
                     evidence_label: 'Data-center listing', facts: { classification: 'CONFIRMED_DC' } },
         links: [
           { kind: 'dc_entity', ref: 'fe2068de-0000-4000-8000-000000000001', role: 'defining_record', grade: 'a',
-            evidence_url: 'https://atlas.example.org/dc/1', evidence_label: 'Data-center listing', facts: { classification: 'CONFIRMED_DC' } },
+            evidence_url: 'https://atlas.example.org/dc/1', evidence_label: 'Data-center listing', text: 'Valley campus (atlas record dc-1; status proposed)',
+            facts: { classification: 'CONFIRMED_DC' } },
           { kind: 'land_assembly', ref: 'valley-campus', role: 'associated_land', grade: 'a', evidence_url: 'https://county.example.gov/parcels',
             facts: { display_name: 'Valley data center <campus>', display_name_basis: 'descriptive',
                      zips: [{ zip: '01002', parcels: 12, primary: true }, { zip: '01003', parcels: 1, primary: false }] } },
@@ -58,7 +59,7 @@ function dossiers() {
             facts: { filing_no: 'x123', filing_type: 'Permanent change application', status: 'Unapproved',
                      filed_on: '2026-10-15', date_label: 'Priority date', record_url: W, points: 2 } },
           { kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'landowner_of_record', grade: 'a', evidence_url: W,
-            evidence_label: 'Change record x123', text: 'Owner of the water right being changed', facts: {} },
+            evidence_label: 'Change record x123', text: 'Owner of the water right being changed, filed 2026-10-15', facts: {} },
           { kind: 'government_record', ref: 'https://board.example.gov/agenda/9', role: 'agenda_item', grade: 'a',
             evidence_url: 'https://board.example.gov/agenda/9', evidence_label: 'Board agenda', text: 'Board agenda item 9',
             date: '2026-07-15', date_label: 'On agenda', aspect: 'Approvals', facts: {} },
@@ -67,7 +68,7 @@ function dossiers() {
             facts: { title: 'What the water filing says', url: 'https://www.youtube.com/watch?v=q-phnTGrMRQ', kind: 'main' } },
           { kind: 'youtube_video', ref: 'youtube:shortAAAAAA', role: 'explains', grade: 'a',
             evidence_url: 'https://www.youtube.com/shorts/shortAAAAAA',
-            facts: { title: 'The filing in 40 seconds', url: 'https://www.youtube.com/shorts/shortAAAAAA', kind: 'short' } },
+            facts: { title: 'The filing in 40 seconds #Shorts #jodytracks', url: 'https://www.youtube.com/shorts/shortAAAAAA', kind: 'short' } },
           { kind: 'bluesky_post', ref: 'bsky:at://did:plc:x/app.bsky.feed.post/aaa', role: 'explains', grade: 'a',
             evidence_url: 'https://bsky.app/profile/x/post/aaa',
             facts: { text: 'A filing to move ranch water to a data center', published_at: '2026-10-29T15:00:00Z' } },
@@ -138,7 +139,8 @@ const pa = read(out, A), pb = read(out, B);
 for (const [p, h] of [[A, pa], [B, pb]]) {
   ok(/<meta name="robots" content="index, follow">/.test(h), `${p} is indexable`);
   ok(h.includes(`<link rel="canonical" href="https://jodytracks.com${p}">`), `${p} is self-canonical`);
-  ok((h.match(/<h1>/g) || []).length === 1, `${p} has one H1`);
+  ok((h.match(/<h1[ >]/g) || []).length === 1, `${p} has one H1`);
+  ok(!/href="\/(layout|app)\.css/.test(h) && /<style>[^<]*\.wrap\{/.test(h), `${p} carries its own layout, not the app shell's stylesheets`);
   ok(!/<script(?![^>]*application\/ld\+json)/.test(h), `${p} ships no script but structured data`);
   ok(/script-src 'none'/.test(h), `${p} forbids scripts in its CSP`);
 }
@@ -149,23 +151,85 @@ vm.runInContext(readFileSync(join(root, 'lib', 'project-type.js'), 'utf8'), ctx)
 const HS = ctx.window.HS;
 const tB = HS.canonicalProjectType({ name: 'Olympia Apartments', type: 'Residential', status: 'Approved' });
 const lB = HS.canonicalLifecycle({ name: 'Olympia Apartments', type: 'Residential', status: 'Approved' });
-ok(pb.includes(`<p>${tB.label} · ${lB.label}`), `the non-DC page shows ${tB.label} · ${lB.label} from lib/project-type.js`);
+ok(pb.includes(`<span class="pill type">${tB.label}</span><span class="pill life">${lB.label}</span>`), `the non-DC page shows ${tB.label} · ${lB.label} from lib/project-type.js`);
 const tA = HS.canonicalProjectType({ name: 'x', type: 'Data center' });
-ok(pa.includes(`<p>${tA.label} · Lifecycle unknown`), 'the DC page shows Data center · Lifecycle unknown (no lifecycle claimed without a source)');
+ok(pa.includes(`<span class="pill type">${tA.label}</span><span class="pill life">Lifecycle unknown</span>`), 'the DC page shows Data center · Lifecycle unknown (no lifecycle claimed without a source)');
+
+// 2b. a DC record's lifecycle is Map 1's own decision, carried by the snapshot (facts.lifecycle)
+const withLife = dossiers();
+for (const x of [withLife.dossiers['valley-campus'].defining, withLife.dossiers['valley-campus'].links[0]]) x.facts.lifecycle = 'Proposed';
+const lifeOut = build(withLife);
+const pLife = read(lifeOut.out, A);
+const lP = HS.canonicalLifecycle({ status: 'Proposed' });
+ok(lifeOut.r.status === 0 && pLife.includes(`<span class="pill type">${tA.label}</span><span class="pill life">${lP.label}</span>`),
+   `a DC record with a stated lifecycle shows ${lP.label}`);
+// the lookup's lifecycle map is Map 1's, word for word (docs/map1-dc-publication.sql)
+const valuesOf = (file, after) => {
+  const t = readFileSync(join(root, 'docs', file), 'utf8');
+  const i = t.indexOf(after); const m = i < 0 ? null : t.slice(i).match(/lifecycle\(v, map_status\) as \(values([\s\S]*?\))\)/);
+  return m ? [...m[1].matchAll(/\('([a-z_]+)',\s*'([A-Za-z]+)'\)/g)].map((x) => x[1] + '=' + x[2]).sort() : null;
+};
+const vMap = valuesOf('map1-dc-publication.sql', 'create or replace function public.map1_dc_zip_members');
+const vDos = valuesOf('development-dossier.sql', 'create or replace function public.dc_entity_map_status');
+ok(vMap && vMap.length === 4 && JSON.stringify(vMap) === JSON.stringify(vDos),
+   'the dossier lifecycle lookup uses exactly Map 1\'s lifecycle map', JSON.stringify({ vMap, vDos }));
 
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
-ok(pa.includes('<strong>Example Ranch, Inc.</strong> — Landowner of record'), 'the organization and its role');
+ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the entity and its role');
+ok(pa.includes('<h2 id="h-entities">Entities</h2>') && !/Organizations/.test(pa), 'the section is called Entities');
+// one card per entity: a second role for the same entity sits under the same name
+const two = dossiers();
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'applicant', grade: 'b', evidence_url: W,
+  evidence_label: 'Change record x123', text: 'Applicant on the change', facts: {} });
+const pTwo = read(build(two).out, A);
+ok((pTwo.match(/<p class="t">Example Ranch, Inc\.<\/p>/g) || []).length === 1
+   && /<p class="t">Example Ranch, Inc\.<\/p><p><strong>Applicant<\/strong>\. Applicant on the change<\/p>.*?<p><strong>Landowner of record<\/strong>/.test(pTwo),
+   'an entity with two roles is one card listing both');
+two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Water Board', role: 'governing_body', grade: 'a', evidence_url: W, facts: {} });
+const pOrd = read(build(two).out, A);
+ok(pOrd.indexOf('<p class="t">Water Board</p>') > 0 && pOrd.indexOf('<p class="t">Water Board</p>') < pOrd.indexOf('<p class="t">Example Ranch, Inc.</p>'),
+   'the governing body is listed before the landowner');
 ok(pa.includes('Board agenda item 9') && pa.includes('href="https://board.example.gov/agenda/9"'), 'the government record');
 ok(/id="timeline".*2026-10-15.*2026-07-15/s.test(pa), 'the timeline lists the filing before the older agenda item');
-ok(/<h3>Videos<\/h3><ul><li><a href="https:\/\/www\.youtube\.com\/watch\?v=q-phnTGrMRQ"/.test(pa), 'the main video under Videos');
-ok(/<h3>Shorts<\/h3><ul><li><a href="https:\/\/www\.youtube\.com\/shorts\/shortAAAAAA"/.test(pa), 'the Short under Shorts');
+// videos: one reel of YouTube thumbnails with the title under each, main video first, then Shorts
+const reel = (pa.match(/<div class="reel moving" role="region" aria-label="Videos"><ul class="reel-track" style="--n:2">(.*?)<\/ul><\/div>/) || [])[1] || '';
+const items = reel.split('</li>').filter(Boolean);
+ok(items.length === 4, 'the reel holds both videos, then a hidden copy of each so it can loop', String(items.length));
+ok(items[0].includes('href="https://www.youtube.com/watch?v=q-phnTGrMRQ"')
+   && items[0].includes('<img src="https://i.ytimg.com/vi/q-phnTGrMRQ/hqdefault.jpg"')
+   && /<\/span><span class="vtitle">What the water filing says<\/span>/.test(items[0]), 'the main video: thumbnail, then its title');
+ok(items[1].includes('i.ytimg.com/vi/shortAAAAAA/hqdefault.jpg') && items[1].includes('<span class="vtag">Short</span>'), 'the Short is labelled');
+ok(!items[0].includes('aria-hidden') && !items[0].includes('tabindex')
+   && items.slice(2).every((x) => x.startsWith('<li aria-hidden="true">') && x.includes('tabindex="-1"')),
+   'only the loop copies are hidden from screen readers and the keyboard');
+ok(/\.reel\.moving:hover \.reel-track,\.reel\.moving:focus-within \.reel-track\{animation-play-state:paused\}/.test(pa)
+   && /prefers-reduced-motion:reduce\)\{[^}]*\}\.reel\.moving \.reel-track\{animation:none\}/.test(pa),
+   'the reel pauses on hover or focus and does not move for reduced motion');
+ok(pa.includes("img-src 'self' data: https://i.ytimg.com;") && !pb.includes('i.ytimg.com'),
+   'the CSP allows YouTube thumbnails only on a page that shows videos');
 ok(pa.includes('A filing to move ranch water to a data center') && pa.includes('href="https://bsky.app/profile/x/post/aaa"'), 'the Bluesky post');
 ok(!pa.includes('privateAAAA'), 'a withheld video is not on the page');
 ok(pa.includes('href="/map/01002/"') && pa.includes('12 associated parcels'), 'map links with the associated parcels');
 ok(pa.includes('It is not a confirmed project footprint'), 'associated land is not called a footprint');
 ok(pa.includes('href="/follow-development.html?d=ma/valley-campus"'), 'the Follow link');
 ok(pa.includes('Valley data center &lt;campus&gt;') && !pa.includes('<campus>'), 'source text is escaped');
+
+// 3b. presentation (2026-10-30 audit): dates as words, no hashtags, the defining record named by
+// the source it opens, empty sections said once, map links only in Map & land, the county crumb
+ok(pa.includes('being changed, filed Oct 15, 2026') && !pa.includes('filed 2026-10-15'), 'an ISO date in source text reads as a date');
+ok(pa.includes('>The filing in 40 seconds</span>') && !/#Shorts|#jodytracks/.test(pa), 'hashtags are dropped from a title');
+ok(pa.includes('<p class="t">Data-center listing</p><p class="small">Defining record</p>') && !pa.includes('atlas record dc-1'),
+   'the defining-record card is named by the source it links to');
+ok(!pa.includes('id="changed"') && !pa.includes('href="/development/ma/valley-campus/#changed"')
+   && pa.includes('<p class="empty" id="not-yet">Not on record yet: a recorded change.</p>'),
+   'an empty section is not drawn or listed; what is missing is said once', (pa.match(/id="not-yet">[^<]*/) || [''])[0]);
+ok(pb.includes('id="not-yet"') && /Not on record yet: [^<]*a linked entity/.test(pb), 'the same rule on the other page');
+const hero = pa.slice(pa.indexOf('<section class="hero"'), pa.indexOf('</section>', pa.indexOf('<section class="hero"')));
+ok(!hero.includes('/map/') && pa.includes('href="/map/01002/"'), 'the hero does not repeat the map links');
+ok(/<nav class="crumbs"[^>]*><a href="\/">HomeSignal<\/a> › <span>Hampshire County, MA<\/span> › <span aria-current="page">/.test(pa),
+   'the breadcrumb names the county, not a town', (pa.match(/<nav class="crumbs".*?<\/nav>/) || [''])[0]);
+ok(pa.includes('<time datetime="2026-10-29">Oct 29, 2026</time>.</p>'), 'the footer date reads as a date');
 
 // 4. name basis
 ok(pa.includes('Descriptive label by HomeSignal. No public record names this project.'), 'a descriptive name says so');
@@ -176,6 +240,25 @@ const z = read(out, '/community/01002/');
 ok(z.includes(`href="${A}"`) && z.includes(`href="${B}"`), 'the ZIP page links to both dossiers');
 const proj = man.project_pages.find((p) => p.startsWith('/project/town-permits/bld-2026-0001-'));
 ok(proj && read(out, proj).includes(`Part of <a href="${B}">Olympia mixed-use building</a>`), 'the defining /project/ page says Part of');
+
+// 3c. a water filing's open protest window: the agency's form, only while the window is open
+const PF = 'https://agency.example.gov/protest-form', PH = 'https://agency.example.gov/protest-guide.pdf';
+const withProtest = (end, form = PF) => {
+  const x = dossiers();
+  x.dossiers['valley-campus'].links[2].facts.protest = { protest_end: end, protested: 'Protested', record_url: W,
+    checked_at: '2026-10-28T12:29:08Z', agency: 'Example Water Agency', form_url: form, form_label: 'File a protest with the agency',
+    help_url: PH, help_label: 'Protest guide', who: 'Anyone affected may file a protest.', how: 'The form asks for your reasons.' };
+  return x;
+};
+const pOpen = read(build(withProtest('2026-12-01')).out, A);
+ok(pOpen.includes('<p class="t">Protest period open until Dec 1, 2026</p>') && pOpen.includes(`<a class="btn" href="${PF}"`)
+   && pOpen.includes(`href="${PH}"`) && pOpen.includes('lists it as protested'), 'an open protest window shows the agency\'s form');
+ok(pOpen.indexOf('class="protest"') < pOpen.indexOf('<nav class="toc"'), 'the protest box sits in the page header');
+ok(read(build(withProtest('2026-12-01'), { now: '2026-12-01T20:00:00' }).out, A).includes(`href="${PF}"`), 'the last day still shows it');
+ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="protest"'), 'a closed window shows no form');
+ok(!read(build(withProtest('2026-12-01', 'http://agency.example.gov/f')).out, A).includes('class="protest"'), 'a form link that is not https is not shown');
+ok(!read(build(withProtest('soon')).out, A).includes('class="protest"'), 'an undated window is not shown');
+ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no box');
 
 // 6. one code path
 const src = readFileSync(join(root, 'scripts', 'development_pages.py'), 'utf8').toLowerCase();
@@ -190,6 +273,35 @@ ok(build(bad3).r.status !== 0, 'a dossier whose path does not match its key fail
 const none = build(undefined);
 ok(none.r.status === 0 && !existsSync(join(none.out, 'development')), 'a fixture with no dossiers builds no dossier pages');
 
+// 7b. the land index Map 1 reads: built from the same snapshot, one entry per land with one page
+const LI = join(out, 'development', 'land-index.json');
+const li = existsSync(LI) ? JSON.parse(readFileSync(LI, 'utf8')) : null;
+ok(li && li.schema === 'development-land-index/1', 'the build writes development/land-index.json', JSON.stringify(li));
+ok(li && JSON.stringify(li.land) === JSON.stringify({ 'valley-campus': { name: 'Valley data center <campus>', path: A } }),
+   'it maps the approved land link to its page, and nothing else', JSON.stringify(li && li.land));
+const twice = dossiers();
+twice.dossiers['olympia-mixed-use'].links.push(JSON.parse(JSON.stringify(twice.dossiers['valley-campus'].links[1])));
+const tw = build(twice);
+const liTw = JSON.parse(readFileSync(join(tw.out, 'development', 'land-index.json'), 'utf8'));
+ok(tw.r.status === 0 && JSON.stringify(liTw.land) === '{}', 'land linked from two pages is left out, not guessed between',
+   JSON.stringify(liTw.land));
+ok(!existsSync(join(none.out, 'development', 'land-index.json')), 'no dossiers, no land index');
+
+// 7c. every file the build writes is one the deploy's artifact audit accepts (pages.yml,
+// "Audit the REAL artifact"). 2026-10-30: the first real dossier build failed that audit on
+// development/ut/stratos-box-elder/index.html and development/land-index.json.
+const PAGES = readFileSync(join(root, '.github', 'workflows', 'pages.yml'), 'utf8');
+const gen = PAGES.slice(PAGES.indexOf('def generated(p):'), PAGES.indexOf('unexpected = sorted('));
+const exact = [...(gen.match(/p in \(([^)]*)\)/) || [, ''])[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+const prefixes = [...gen.matchAll(/p\.startswith\('([^']+)'\)/g)].map((m) => m[1]);
+ok(prefixes.length >= 8 && exact.includes('zip-pages-manifest.json'), 'the audit list of accepted files was read', JSON.stringify([exact, prefixes]));
+const walk = (d, base = '') => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+  e.isDirectory() ? walk(join(d, e.name), base + e.name + '/') : [base + e.name]);
+const written = walk(out).filter((p) => p !== 'sitemap.xml');
+const refused = written.filter((p) => !exact.includes(p) && !prefixes.some((x) => p.startsWith(x)));
+ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
+   'the artifact audit accepts every file the build writes', JSON.stringify(refused.slice(0, 10)));
+
 // 8. determinism and the build day
 const again = build(dossiers());
 ok(read(again.out, A) === pa, 'identical input produces a byte-identical page');
@@ -199,6 +311,27 @@ const st2 = JSON.parse(readFileSync(join(later.out, 'sitemaps', 'page-state.json
 const h = (st, p) => (st.pages || st.entries || {})[p];
 ok(h(st1, A) && JSON.stringify(h(st1, A).h) === JSON.stringify(h(st2, A).h), 'a later build day does not move the fingerprint',
    JSON.stringify([h(st1, A), h(st2, A)]));
+
+// 3d. The header and footer are the site's own (founder, 2026-11-01: "they are not same as website").
+{
+  const shell = readFileSync(join(root, 'partials', 'shell.html'), 'utf8');
+  const hrefs = (t) => [...t.matchAll(/href="([^"]+)"/g)].map(m => m[1].replace(/^(?!https?:|\/)/, '/'));
+  const sHead = shell.match(/<header class="hs-header"[\s\S]*?<\/header>/)[0];
+  const sFoot = shell.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/)[0];
+  const pg = read(out, A);
+  const pHead = (pg.match(/<header class="hs-header"[\s\S]*?<\/header>/) || [''])[0];
+  const pFoot = (pg.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/) || [''])[0];
+  ok(pHead && JSON.stringify(hrefs(pHead)) === JSON.stringify(hrefs(sHead)), 'the header has the site header\'s links, in order',
+     JSON.stringify([hrefs(pHead), hrefs(sHead)]));
+  ok(pFoot && JSON.stringify(hrefs(pFoot)) === JSON.stringify(hrefs(sFoot)), 'the footer has the site footer\'s links, in order',
+     JSON.stringify([hrefs(pFoot), hrefs(sFoot)]));
+  ok(hrefs(sHead).length >= 8 && hrefs(sFoot).length >= 8, 'control: the site header and footer were read');
+  ok(!/HomeSignal home|How HomeSignal works|class="site"/.test(pg), 'the old hand-made header and footer are gone');
+  ok(!/onclick=|<script/.test(pHead + pFoot), 'the header and footer need no script');
+  ok(/@media \(max-width:1023px\)\{\.hs-menutoggle:checked~\.hs-nav\{display:flex\}\}/.test(pg)
+     && pHead.indexOf('id="hs-menutoggle"') < pHead.indexOf('<nav class="hs-nav"'), 'the narrow-screen menu opens without a script');
+  ok(pg.includes('.hs-header{position:sticky'), 'the site header styles are on the page');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -172,6 +172,11 @@ select pg_temp.ck('snapshot: Stratos is named by its land assembly, basis record
 select pg_temp.ck('snapshot: a project with no app_projects record still publishes (defining = the DC entity)',
   (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,kind}') = 'dc_entity'
   and (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,facts,classification}') = 'CONFIRMED_DC');
+select pg_temp.ck('snapshot: the DC entity carries Map 1''s lifecycle for it (current record, through the one map)',
+  (:'snap'::jsonb #>> '{dossiers,stratos-box-elder,defining,facts,lifecycle}') = 'Proposed', :'snap');
+select pg_temp.ck('the lifecycle lookup is not callable with the public key',
+  not has_function_privilege('anon', 'public.dc_entity_map_status(uuid)', 'execute')
+  and not has_function_privilege('authenticated', 'public.dc_entity_map_status(uuid)', 'execute'));
 select pg_temp.ck('snapshot: Proctor 4 defining record is the source record, with its facts and ZIPs',
   (:'snap'::jsonb #>> '{dossiers,proctor-4-tacoma,defining,facts,name}') = 'Proctor 4 - Mixed-Use Development'
   and (:'snap'::jsonb #> '{dossiers,proctor-4-tacoma,defining,facts,zips}') = '["98406","98407"]'::jsonb
@@ -218,5 +223,40 @@ update public.development_project set display_name = 'Other name' where project_
 alter table public.development_project enable trigger development_project_guard;
 select pg_temp.ck('snapshot: two names for one project refuse the snapshot (never a silent pick)',
   pg_temp.try('service_role', null, 'select public.development_dossier_snapshot()') = 'P0001');
+
+
+-- 5. the review screen's reads (docs/development-review.sql)
+select pg_temp.ck('review: anon cannot read the queue',
+  pg_temp.try('anon', null, 'select public.development_review_queue()') = '42501');
+select pg_temp.ck('review: a signed-in non-reviewer cannot read the queue',
+  pg_temp.try('authenticated', :'nobody', 'select public.development_review_queue()') = '42501');
+select pg_temp.ck('review: a revoked reviewer cannot read the queue',
+  pg_temp.try('authenticated', :'rev2', 'select public.development_review_queue()') = '42501');
+select pg_temp.ck('review: a reviewer can read the queue',
+  pg_temp.try('authenticated', :'rev', 'select public.development_review_queue()') = 'ok');
+select pg_temp.as_uid(:'rev');
+select public.development_review_queue() as q \gset
+select pg_temp.as_uid(null);
+select pg_temp.ck('review: every project is listed, withdrawn ones included',
+  (select count(*) = 2 from jsonb_array_elements(:'q'::jsonb -> 'projects')));
+select pg_temp.ck('review: only the current row of each link chain is listed',
+  (select count(*) = 1 and bool_and(l ->> 'link_state' = 'revoked')
+     from jsonb_array_elements(:'q'::jsonb -> 'projects') p, jsonb_array_elements(p -> 'links') l
+    where l ->> 'object_ref' = 'UT:Bar H Ranch, Inc.'));
+select pg_temp.ck('review: the listed link ids are exactly the current rows',
+  (select array_agg((l ->> 'link_id')::uuid order by (l ->> 'link_id') collate "C")
+     from jsonb_array_elements(:'q'::jsonb -> 'projects') p, jsonb_array_elements(p -> 'links') l)
+  = (select array_agg(x.link_id order by x.link_id::text collate "C") from public.development_project_link x
+      where not exists (select 1 from public.development_project_link s where s.supersedes = x.link_id)));
+select pg_temp.ck('review: the path is the page the build writes',
+  (select bool_and(p ->> 'path' = '/development/' || lower(p ->> 'state') || '/' || (p ->> 'project_key') || '/')
+     from jsonb_array_elements(:'q'::jsonb -> 'projects') p));
+select pg_temp.ck('review: only a reviewer can request publishing',
+  pg_temp.try('anon', null, 'select public.development_publish_request()') = '42501'
+  and pg_temp.try('authenticated', :'nobody', 'select public.development_publish_request()') = '42501'
+  and pg_temp.try('authenticated', :'rev2', 'select public.development_publish_request()') = '42501');
+select pg_temp.ck('review: nobody signed in reads the publish log',
+  pg_temp.try('authenticated', :'rev', 'select * from public.development_publish_request_log') = '42501'
+  and pg_temp.try('anon', null, 'select * from public.development_publish_request_log') = '42501');
 
 select name, case when ok then 't' else 'f' end, left(detail, 300) from ck order by n;

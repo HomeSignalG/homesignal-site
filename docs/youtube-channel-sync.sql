@@ -16,6 +16,7 @@
 --   * video_bsky_problems: a link-bearing item whose link is a channel video that is not public yet is held
 --     ('youtube_not_public'), and the sync releases it when the video goes public.
 --   * video_bsky_text: every video post also carries https://jodytracks.com (unless the caption already names the site).
+--     A caption that carries its own #hashtags gets no generated ones (2026-11-01).
 -- Nothing here posts anything; posting is still only the approved-job path in bluesky/publish-worker.mjs.
 
 do $$
@@ -90,7 +91,10 @@ as $fn$
                     and coalesce((b ->> 'link_youtube')::boolean, false) and coalesce(r.youtube_url, '') <> ''
                    then E'\n' || r.youtube_url else '' end
            || case when (b ->> 'caption') ~* 'jodytracks\.com' then '' else E'\nhttps://jodytracks.com' end
-           || case when jsonb_typeof(b -> 'hashtags') = 'array' and jsonb_array_length(b -> 'hashtags') > 0
+           -- a caption that carries its own hashtags keeps exactly those (2026-11-01): appending the generated ones too
+           -- doubled #JodyTracks on Stratos and pushed it to 330 characters, and Proctor's tag list had been emptied by hand
+           || case when (b ->> 'caption') !~ '(^|\s)#[A-Za-z0-9_]*[A-Za-z]'
+                    and jsonb_typeof(b -> 'hashtags') = 'array' and jsonb_array_length(b -> 'hashtags') > 0
                    then E'\n\n' || (select string_agg('#' || t, ' ') from jsonb_array_elements_text(b -> 'hashtags') t) else '' end
          end
     from public.youtube_video_reviews r

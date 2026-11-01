@@ -13,7 +13,7 @@ const code = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 // 1. the tab
 const nav = html.match(/<nav class="tabs">([\s\S]*?)<\/nav>/)[1];
 const labels = [...nav.matchAll(/data-tab="([^"]+)">([^<]+)</g)].map((m) => [m[1], m[2]]);
-ok(labels.length === 17 && labels[16][0] === 'impactstories' && labels[16][1] === '17 · Impact Stories', 'nav: tab 17 is named exactly "17 · Impact Stories"');
+ok(labels.length >= 17 && labels[16][0] === 'impactstories' && labels[16][1] === '17 · Impact Stories', 'nav: tab 17 is named exactly "17 · Impact Stories"');
 ok(!/youtube|tiktok/i.test(labels[16][1]), 'nav: the tab name carries no platform name');
 ok(labels[10][1] === '11 · Video Producer' && labels[15][1] === '16 · YouTube Videos' && labels[15][0] === 'youtubevideos', 'nav: tabs 11 and 16 keep their ids and names');
 ok(html.includes('<div class="tab" id="tab-impactstories"></div>'), 'shell: the tab container exists');

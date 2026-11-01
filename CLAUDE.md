@@ -5658,6 +5658,28 @@ The frame tells the report page only `ready` / `height` / `following` / `unavail
 
 Pinned by `test/shared-report-follow-inline.browser.test.mjs` (behaviour in Chromium, fake Supabase), `test/shared-report-follow-inline.test.mjs` (shape), `test/shared-report-page*.test.mjs`, `test/shared-report-follow-handoff.test.mjs` (the fallback).
 
+## DEVELOPMENT ACTIVITY REPORT, national-4 (2026-11-01): WHOSE RECORD, WHICH RECORD, AND MINOR WORK LISTED APART
+
+Found preparing the NWMLS sample (3101 Western Ave, Seattle). All four rules live in the engine, `supabase/functions/_shared/national-report.ts`.
+The report page only renders them, and a report saved before national-4 renders exactly as before. Test: `test/report-quality-national4.test.mjs`.
+- **Every record names its publishing agency and dataset** (`source.agency`, `source.feed_ref`). Both come from
+  `_shared/source-publishers.generated.json`, which is generated from the source registry's `jurisdiction`
+  (`node scripts/gen-source-publishers.mjs`; `--check` runs in the suite).
+  - Before this, 247 of 251 cleared sources showed no agency at all: the report printed only `report-rights.json`'s `attribution`.
+  - ⛔ **That `attribution` is a credit line a publisher REQUIRES, and the file is generated.** Never add an agency name there; the
+    rights suite fails on it. The view shows the credit line when one exists, otherwise "agency (dataset)". The coverage note lists every agency.
+- **The agency's own record number** (`source.record_id`) is `app_projects.provenance.case_number` (hydrate now reads `provenance`).
+  It is shown only when the record's official link carries the same number.
+  - Records that share a title are told apart by it, e.g. three Ecology SEPA filings all titled "315 1ST AVE N".
+- **Shortened titles** (`title_cut`): every connector stores a title cut at 120 characters (`SOURCE_TITLE_CAP`, pinned to the connectors).
+  - A title at the cap ends in "…" and says the full description is in the official record.
+  - Restoring the full text (and the SEPA `proposaldescription`) is an ingest change and was not made.
+- **Minor building work** (`scope.key = 'minor_work'`): interior, single-unit, like-for-like repair and small-fixture permits go in their
+  own section with their links. They get no map number and stay in the totals.
+  - The record's own words must show it, and any significance phrase wins (new, demolish, change of use, land use, stories, addition…).
+  - Roads & infrastructure is never minor.
+  - Measured on a national 1% sample (28,301 records): 605 flagged (2.1%), and all 45 sampled hits were genuinely minor.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are
@@ -5709,12 +5731,47 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
   `app_projects` row (a DC entity can be the defining record).
 - **One name.** A project that links a land assembly takes `resolved_projects.display_name`, and a second name is
   refused. A descriptive name (basis `descriptive`) says so on the page.
+- **The header and footer are the site's own (founder, 2026-11-01).** `development_pages.py::site_chrome` reads them from
+  `partials/shell.html` and their rules from `app.css` / `layout.css` at build time, so they cannot drift. Share, Sign in and the
+  account button need `shell.js` and are left out; the phone Menu opens with a checkbox. Test 3d in `test/development-pages.test.mjs`.
 - **Pages ship no script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
   (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
 - `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
   none yet, and any other failure stops the build. Family sitemap `development`.
 - Tests: `test/development_dossier_pg` (`development-dossier-suite.yml`; 41 checks, 11 mutations),
   `test/development-pages.test.mjs`.
+- **Map 1's land card links to the land's published page (2026-10-30).** The build writes
+  `development/land-index.json` (`development_pages.land_index`: land ref → {path, name}, from the
+  approved land links in the published snapshot; a land linked from two pages is left out; no file
+  when nothing is published). `homesignalmap.html` reads it once per ZIP load (`devPageFor`); a
+  failed read, a bad path or no name means no link. Tests: `test/map1-land-card-from-data.test.mjs` d1-d12.
+  Map 1 already drew the Stratos parcels (82, ZIPs 84336 and 84307) before this; the Compute Atlas point
+  for the same project is 45 miles from them, which is why it is not pinned.
+
+## DEVELOPMENT DOSSIERS: OFFICIAL RECORDS AND NEW ENTITIES ARE PROPOSED DAILY (2026-10-30)
+
+Founder: *"the code needs to account for integrating new entities that pop up"* and *"build ingest of all
+official records so you do not miss things like change and amendments"*. SQL of record
+`docs/development-official-records.sql` (after `docs/development-dossier.sql`); fetcher homesignal-ingest
+`scripts/ingest_official_records.py` (`ingest-official-records.yml`, daily 12:23 UTC).
+- **`official_record` / `_observation` (append-only) / `_party`**: the records a dossier's links point at (today
+  the Utah change record and the base water right's document folder), every changed reading, and the
+  ORGANIZATIONS each names with the record's words. People, family trusts and owner addresses are never stored
+  (`development_entity_is_organization`, checked by the write function and the table).
+- **`official_records_ingest(payload)`** is the one write path (service_role). Something that leaves the source is
+  marked removed, never deleted.
+- **`development_propose_from_records(job)`** proposes CANDIDATE links only: parties of linked change records,
+  anchor-parcel owners, verified governing bodies, action documents in a linked right's folder (a year before the
+  filing onward, or new since first read; never protests, letters of concern or correspondence), and new filings by
+  an entity the project already links. Anything linked in any state, rejected included, is skipped. Names match
+  through `development_entity_keys` ("Inc." = "Incorporated", "(MIDA)" = "MIDA"). Review on tab 18.
+- Tests: `test/development_official_records_pg` (`development-official-records-suite.yml`; 21 checks, 12 mutations).
+- **An open protest window gets the agency's own form on the dossier page (founder, 2026-11-01).**
+  `development_water_protest(ref)` (official-records SQL; a do-nothing stand-in in the dossier SQL until that file is applied)
+  reads the change record's `protest_end`, and the snapshot carries it as `facts.protest` on each water filing. Which agency
+  form and guide is named per source in that function (Utah: Division of Water Rights "Protest of Application", $15 fee);
+  the renderer names no agency. The page shows the box in its header while `protest_end` >= the build day, and drops it the
+  day after. Tests: `test/development-pages.test.mjs` 3c, suite checks 20-23.
 
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
@@ -5806,6 +5863,75 @@ Results.
     - The engine (homesignal-ingest `storycraft.upload_problems`, `assets.storage_get`) checks the sha256 against the
       bytes and decodes the image under the pixel limit before showing it.
     - Apply order: merge the ingest engine first, then apply this SQL, then deploy the page.
+  - **Reject a photo (2026-10-30, founder: "reject all photos in act 5, 6, 7").** Each still that shows a photo has
+    "Reject this photo", and each act has "Reject every photo in this act".
+    - `hs_impact_story_photo_reject` only accepts a photo the NEWEST previews show. Rows go in
+      `impact_story_photo_rejections`, which is append-only; the newest row per photo decides.
+      `hs_impact_story_photo_restore` ("Use it again") undoes a rejection.
+    - `_hs_is_choice_key` adds the rejected ids to the key, but only when there are some, so older previews stay current.
+      Prepare and render both freeze `rejected_photos` into the job input.
+    - The engine (homesignal-ingest `impact/render/plan.py`, `job.rejected_files`) shows the photo nowhere in that story.
+      It searches new licensed candidates for the photo's subjects, leaves the rejected file out, and offers them under
+      "Other licensed photos".
+    - A rejection removes the photo from every shot that uses it, in every video.
+    - **Approve / Reject / Need new photo under every shot** (founder, same day: "i need an approve, reject, need new
+      photo, under every picture"). `hs_impact_story_shot_decide` writes to `impact_story_shot_decisions`, which is
+      append-only and tied to the manifest id and hash; the newest decision per shot counts.
+      - Reject on a shot with a photo also rejects that photo.
+      - Reject on any other shot needs a note, and it blocks "Approve all visuals" (state `needs_fixes`) until that shot
+        is approved or the previews are prepared again.
+      - Need new photo adds the shot's subject to `more_photos_for`, which the next Prepare carries to the engine as a
+        new search.
+      - Not built: alternatives shown already composed into the shot. They are shown as photos.
+    - pg checks 12V19-12V29.
+  - ⚖️ **NO ILLUSTRATIONS (founder, 2026-10-30).** The engine never draws a picture (homesignal-ingest CLAUDE.md, V3
+    "NO ILLUSTRATIONS, EVER"). A shot with no photo carries `photo_needed`, shows its record, and the page says "No photo
+    yet: showing the record. Choose a photo below." No page text may offer or describe a drawing (browser test).
+    A picture set that still carries a drawn shot (made before the engine change) reads `stale` and is refused by
+    approval (`_hs_is_visuals`, `hs_impact_story_visuals_approve`; applied 2026-10-30; pg check 12V30).
+  - **One status bar, kept approvals, duplicate-photo warning (founder, 2026-10-30: "the ui design is bad").**
+    - The top of the Visuals step (`#is-visbar`, `visStatusBar`) always says where things stand and the one next step,
+      with the action buttons in it. While a Prepare runs it says when it started, that it usually takes 8 to 15 minutes,
+      and that the pictures below are the previous set.
+    - `_hs_is_visuals` returns `carried_decisions`: an Approve on the previous previews is shown again ("Approved earlier
+      (same picture)") on a shot whose picture did not change. "Same picture" is `_hs_is_shot_print(shot)`: photo
+      checksum (else id), layout, on-screen text, map, label, cited records, drawing and missing-photo note. Narration and
+      timing are left out. Only Approve carries; a decision on the new previews replaces it. It is shown only: the one
+      "Approve all visuals" is unchanged. pg checks 12V31a-c.
+    - ⚠️ In that query, name every `jsonb_array_elements` output column (`e1(v)`, `e2(v)`). With two laterals each
+      aliased `sh`, the second lookup's unqualified `sh` resolved to the FIRST lateral's column, so it compared a shot
+      with itself.
+    - When one photo is used for two subjects (choices or planned shots), the bar names the photo and both subjects.
+      The engine half (homesignal-ingest #981) keeps such a photo for both subjects; before it, the second choice
+      replaced the first and Stratos's Prepare stopped on "no licensed photo yet" for the Great Salt Lake.
+  - **A set of photos per subject, approve per act (founder, 2026-10-30: "i should be able to click on a bunch of photos
+    i approve and you can select the best fits. then approve under each act").**
+    - **Photos:** "Add to your photos" adds a photo to its subject's set; it no longer replaces the one before.
+      `impact_story_asset_choices.action` is `add` or `remove`; a photo is in the set while its newest row is `add`
+      (`_hs_is_choices`). `hs_impact_story_unchoose_asset` takes one out. "Your photos" lists the whole set, each with
+      Remove. The engine already picks the best fit per shot from a subject's photos.
+      - Measured offline on Stratos: 1 photo per subject → 50% real imagery, 5 distinct photos; 2 per subject → 81%, 10.
+    - **Upgrade:** the first apply adds the column and a `remove` row (actor `system:photo-set-migration`) for every
+      photo the old newest-per-subject rule had replaced. Nothing a founder replaced comes back, and each story's set
+      equals what it showed before. One photo per subject gives the same choice key, so current previews stay current.
+    - **Approval:** each act (Short beat, thumbnail) has "Approve this act" (`vapprovegroup`). It approves every shot in
+      that part in ONE call, `hs_impact_story_shots_approve` (2026-11-01): every shot is saved through
+      `hs_impact_story_shot_decide` in one transaction, or none is, leaving any shot already rejected or asked a new photo for.
+      Approving the last part calls `hs_impact_story_visuals_approve`, which still re-checks everything on the server.
+      The per-shot Approve button is gone (Reject and Need new photo stay); "Approve everything at once" remains in the
+      status bar.
+    - Tests: pg 12V32-12V34 and the upgrade check in `run.sh`; `test/impact-stories.browser.test.mjs`.
+    - **A bar pinned to the bottom of Visuals says what is happening and what to click next (2026-11-01, founder: "there
+      need to be something that tells me something is processing or what to do next").** `visDock` (`#is-vdock`, sticky):
+      pictures approved of all, parts approved, the next part by name with a "Go to" button, "Approve the visuals" when every
+      part is done, "Render the videos" once approved, and a spinner with what is saving or how long previews take. While an act
+      saves, its button reads "Saving…" and is disabled (`setBusy`). After an act is approved, the page moves to the next part
+      still waiting. Measured on Stratos before this: the founder approved Acts 1-3 (9 of 33 pictures) and read it as everything.
+    - **Rejecting asks in the page, never in a browser pop-up (2026-11-01).** Reject under a shot, and "Reject every photo
+      in this act", open a note box in place (`S.vask`, `askBox`) with Reject and Cancel; nothing is saved until Reject is
+      pressed. A shot with no photo needs a note, and the box says so. "Reject every photo in this act" saves through
+      `hs_impact_story_photos_reject` in one transaction. Both new functions fall back to the one-at-a-time calls if the
+      database does not have them yet (PostgREST `PGRST202`). Other steps still use the browser's dialogs. pg 12V35a-e.
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
@@ -5847,6 +5973,12 @@ format (homesignal-ingest `video/`: one development record told from its own doc
 - Links are where to start, never evidence: the video still uses only the record's fetched documents and `video/validate.py`.
 - Tests: `test/video-suggest.test.mjs`, `test/video-suggest.browser.test.mjs`, `test/youtube_video_suggestions_pg`
   (`youtube-video-suggestions-suite.yml`).
+- **Make video (founder, 2026-10-30: "is a button missing to have it generate?").** Each open suggestion has **Make
+  video** (`hs_youtube_video_suggestion_make`, same file): one `youtube_video_suggestion_runs` row, dispatched to
+  homesignal-ingest `video-suggestion-run.yml` on main (Claude on the founder's plan writes the project per
+  `video/MAKE_VIDEO.md`; a keyless job validates it; it lands on main, is built and uploaded to Tab 16 for review).
+  The run records made / declined (with the reason) / failed (back to waiting). Apply order: ingest workflow on main
+  first, then the SQL, then the page.
 
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 
@@ -6014,3 +6146,86 @@ post id. A post never measured shows a dash, never 0.
     with `utm_content=<video id or its URL>` is credited to that video.
   - **Not measured:** watch time, impressions, CTR, traffic sources (YouTube Analytics needs the channel owner's OAuth consent; the
     sync runs with a public API key). Tests: `test/acq-youtube.test.mjs`, `test/youtube_engagement_pg` (`youtube-engagement-suite.yml`).
+
+## TAB 16 NOTE BOX: "HERE'S WHAT I'LL CHANGE" BEFORE ANYTHING IS BUILT (2026-10-30, YouTube plan step 6)
+
+**Preview changes** (`lib/acq-youtube-videos.js`) calls `hs_youtube_video_plan_start`. The SQL of record is
+`docs/youtube-video-revision-plans.sql`.
+- It stores a `planning` row and dispatches homesignal-ingest `video-revise.yml` with `mode=plan`. Claude reads the note there,
+  with no database key, and the worker stores the plan with `hs_youtube_revision_plan_ready`, which only the service role may
+  call. **Reading a note changes no decision**: an approved file stays approved.
+- The tile shows each part of the note and what it becomes, what will not be done, and **Confirm and build**.
+  `hs_youtube_video_plan_confirm(plan, md5)` accepts only the md5 of the stored plan the page showed. It then records the note
+  as the rejection, creates one revision carrying the plan (`youtube_video_revisions.confirmed_plan`), and dispatches the build.
+  `_hs_yv_dispatch` sends that plan on every dispatch, so a retry builds the same plan.
+- A plan made on an older file version comes back `stale` and builds nothing. One plan can be open per file. A reader that has
+  not answered after 30 minutes is marked failed when the next plan starts.
+- The plans list is an optional call: until the SQL is applied, the note box starts a revision directly, as before.
+- **Apply order:** homesignal-ingest #973 (the new workflow inputs) first, then the SQL, then the page.
+- Tests: `test/youtube_video_revision_plans_pg` (CI `youtube-video-revision-plans-suite.yml`), `test/youtube-video-plans.test.mjs`,
+  `test/youtube-video-plans.browser.test.mjs`.
+- **Step 7, one fix for every video that says the word** (`docs/youtube-video-revision-plans-also.sql`, applied after the
+  step-6 file). Plan start records the other video files' current version and settings on the plan row (`others`); the
+  worker plans the same PRONUNCIATION steps for each file that says the word (`plan.also`, homesignal-ingest
+  `note_plan.also_plans`). The plan shows "Also fix this in:" with those files ticked; `hs_youtube_video_plan_confirm(plan,
+  md5, also)` creates one revision per ticked file, rejected with the same note and built from its own plan and version
+  (a ticked file with a newer version makes the plan stale; one being rebuilt refuses). Only pronunciation is shared.
+  ⚠️ Replaying the step-6 file after this one brings back the two-argument confirm and the old plan start; re-apply this
+  file after it.
+- **Step 8, Full rebuild, and fixes built with the code that made the video** (`docs/youtube-video-rebuild.sql`, applied
+  after the step-7 file). **Full rebuild** (`hs_youtube_video_rebuild`) makes a file again from the current script with
+  its current version's settings, so a script correction (a legal name in project.json) reaches the video and every
+  accepted fix is kept; fixes the new script has no place for are listed as "Fixes that no longer apply". It needs no
+  note, rejects nothing, and cancels a plan waiting for Confirm on that file. `_hs_yv_dispatch` now sends `mode`
+  (`rebuild` when the revision's plan says so) and `code`: the commit recorded on the version being fixed
+  (`meta.code_commit`), `run:<id>` of a first version's build run (from `meta.master.url`), or empty. Engine:
+  homesignal-ingest #977, which must be on main before this SQL is applied (an undeclared dispatch input is refused).
+  ⚠️ Replaying `youtube-video-revision-plans.sql` after this file is refused by its own guard; re-apply this one after it.
+
+## TAB 19 · DATA CENTER CLAIM CHECK (2026-10-30) — BUILT; SQL APPLY ORDER BELOW
+
+What people say about data centers, against what documented evidence shows. SQL of record `docs/claim-check.sql` (after
+`docs/impact-stories.sql`, for `_hs_is_admin`); page `lib/acq-claim-check.js`; public pages `scripts/fact_check_pages.py`
+(`/fact-checks/<slug>/` + `/fact-checks/`, family sitemap `fact-check`); engine homesignal-ingest `claimcheck/`.
+- **Chain:** pg_cron `claim-check-tick` (every 15 min; slots 07:30 / 16:30 Pacific) or Scan Now → `claim_check_scans` →
+  dispatch of ingest `claim-check-scan.yml` (YouTube Data API for the broadcaster channels in `claimcheck/config.py` and a
+  search per watched person, plus Bluesky search) → `claim_check_scan_record`. "Request research" → `claim_check_research_runs`
+  → ingest `claim-check-research-run.yml` (Claude on the founder's plan, no database key in that job) → `research.py check`
+  (quote re-found verbatim at its source, every evidence URL fetched) → `claim_check_research_record`.
+- **Guarantees (pinned by `test/claim_check_pg`, 59 checks):** a scan cannot set a verdict, quote or evidence; a verdict
+  only comes from research that passed `_cc_research_problems`; False/Misleading need a contradicting source AND a verified
+  quote; approval re-checks it; an edit after approval needs approval again; decisions and research versions are
+  append-only; `claim_check_public_export()` (anon) returns approved claim checks only; corrections/retractions stay public.
+- **No geography is a ranking input** (founder brief). Places are metadata.
+- ⚖️ **Bluesky: Claim Check posts SHARE the MAPS and video times (founder, 2026-10-30, "share maps and video times").**
+  Still 2 MAPS + 2 video times a day, at most 4 posts, 150 minutes apart; no time is added. Schedule takes the next free
+  time of either kind (`bsky_next_slot_any`), which MAPS and video then cannot use. `schedule` is refused until
+  homesignal-ingest migration `20261030180000` (which books claims in the schedule) sets `bsky_slots_enabled`. The posting
+  is homesignal-ingest `publish-worker.mjs` (waits until the claim's page answers 200; links tagged `claim-check`). An edit
+  is refused once the post is publishing/published and releases a scheduled time.
+- **Not read (adapter rows say `not_built`):** transcripts/captions (owner-only on YouTube), X, TikTok, Reddit, local TV
+  sites. Thumbnails are the platform's own image (CSP `img-src` adds `i.ytimg.com`, `cdn.bsky.app`) or a labelled
+  placeholder; video plays only in the `youtube-nocookie` player and only when the source is embeddable.
+- **Apply order:** merge the ingest PR first (a dispatch to a missing workflow is lost), then apply `docs/claim-check.sql`,
+  then the ingest migration `20261030180000`, then deploy this page. `pages.yml` treats a missing export function (404 PGRST202) as "none yet".
+- Tests: `test/claim_check_pg` (`claim-check-suite.yml`), `test/claim-check.test.mjs`, `test/fact-check-pages.test.mjs`.
+- **Bluesky sources (2026-10-30):** a card reads "Bluesky post by <display name> (@handle)" and shows the post's own
+  preview (`video.bsky.app` added to `thumbUrl` and the CSP), linked to the post. A re-scan fills a missing `publisher`,
+  `speaker_name` or `person_id` and never replaces one already stored (suite 2f2/2f3). ⚖️ Founder: a reporter's post that
+  quotes the speaker word for word with the clip (Aaron Rupar) is a usable quote source; research credits the reporter in
+  `context`, which the public page prints.
+- **A Bluesky video plays in the detail view (2026-10-30)** in Bluesky's own embed, `embed.bsky.app/embed/<did>/app.bsky.feed.post/<rkey>`,
+  built from the source's `source_key` (now in `_cc_claim_json`). It is the platform's player, like YouTube's; CSP `frame-src` adds
+  `embed.bsky.app`. Video previews also need `img-src https://video.cdn.bsky.app`: `video.bsky.app` answers with a redirect there.
+- **Audit fixes (founder "fix all", 2026-10-31):**
+  - `claim_check_claims.listed`: a scan unlists a stored candidate that no longer qualifies (homesignal-ingest
+    `score.checkable`: Trending needs a number, amount or absolute fact). Both lists hide unlisted candidates; the row stays,
+    and a later scan can list it again. Suite 2f4-2f6.
+  - `claim_check_scan_claim` returns `known_claims` (every stored claim key); the scanner keeps an unlisted claim only when its
+    key is in it. Its first version used known SOURCES and stored 214 new uncheckable posts (removed 2026-10-31). Suite 2f7.
+    Applied to production 2026-10-31 (md5(prosrc) `2d3362db…`).
+  - The Bluesky player is sandboxed (`allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox`: no forms,
+    no top-page navigation). Test 7d. The YouTube nocookie player is unchanged.
+  - `verify-claim-check-media-live.yml` (daily 15:41 UTC): renders the LIVE page's own detail view, from its live script and
+    CSP, for a real Bluesky post and a real YouTube video in Chromium. It fails on any preview that does not load, a player
+    that does not answer, or any CSP violation.
