@@ -13344,3 +13344,36 @@ Audit of the 668 existing Texas ZIP pages (22 counties); full record in
     `Doc_Share_URL`) but carries no case-ID field, so it cannot date the projects. It is a lead for Round Rock's
     GOVERNMENT tile (ingest), not for this layer.
   - Unlock path: the city exposing `CreationDate`/`EditDate` (or a filed date) in the public view.
+
+---
+
+## OREGON EXPANSION (2026-11-01, #2487) — five city sources, three rejections, and why Portland pages go stale
+
+**Wired** (all probed live through `pg_net`; founder cleared all five for reports, R7 250 → 255):
+`tigard-or-active-building-permits` + `tigard-or-active-planning-cases` (Tigard's own EnerGov-backed MapServer,
+per-record links) · `beaverton-or-site-development-permits` (SDCOMM + SDSUB only) ·
+`portland-neighborhood-contact-applications` (Portland layer 1298, pre-application notices) ·
+`eugene-or-current-capital-projects` (Lane County's first local source). N5 rows applied
+(`docs/n5-oregon-sources-classified-2026-11-01.sql`). Pre-snapshot estimate, same definitions as the baseline
+(control: the estimator reproduces the served local count, 53 = 53): ZIPs with Map 1 development 97 → 104,
+with local permit sources 53 → 66; dark → lit 97006, 97007, 97008, 97208, 97225, 97404, 97405. Confirm on the
+first N5 generation opened after 2026-11-01 18:15Z.
+
+**Rejected, with receipts — do not re-probe:**
+- **Lane County** `lcmaps.lanecounty.org/.../Permits/PermitsWithMilestones/MapServer/0`: rich Accela schema
+  (ACADeepLinkUrl, milestones), but `returnCountOnly` = 0 and `OBJECTID>0` returns no features. Published, empty.
+- **Mid-Willamette Valley COG** `Permits_online/PermitsSince1998`: residential units by YEAR (max `Year` 2025-01-01,
+  i.e. data through 2024); year-granular and stale.
+- **Gresham** `DevelopmentMap`: 45 points, last edited 2017, no dates.
+- **Beaverton** `SD_Permits_Data` FRUT / COBUT / ST / STSK / OAB / SDGA rows: right-of-way, utility and grading
+  workflow; `Project_Phase_Name` is often a private person's name. Only SDCOMM/SDSUB are read.
+- **Salem** `Land_Use_Applications` (fresh, 2026-11-01): not wired yet. `CASENUMBER` is null on new cases and
+  `DESC_DISPLAY` is comma-joined multi-values, so a type_map needs its own enumeration. Salem ZIPs are already lit.
+
+**Why Portland pages go stale (P0, measured):** portlandmaps.com resets connections when several of our refreshes
+ask at once. On 2026-10-31 15:52–16:30Z it reset 13 Portland ZIPs in one burst; the write guard kept their cached
+records (correct), and the 53 h rotation had not revisited them. Re-firing them on 2026-11-01: 8 ZIPs at once →
+3 reset; 4 at once → 1–3 reset; 2 at once → 0. Since #2487 each Portland-area ZIP makes TWO requests to that host
+(layers 89 and 1298). A per-host concurrency limit in the engine is the durable fix; until then re-fire Portland
+ZIPs at most 2–4 at a time. Separately, layer 89's own newest `ISSUEDATE` is 2026-10-01: the city has not
+published newer residential permits, which is not an ingest fault.

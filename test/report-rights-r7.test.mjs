@@ -44,8 +44,15 @@ const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 // spokane-city-permits (City of Spokane's own nightly Accela permit layer, services.spokanegis.org; the layer states no licence,
 // only a 'not a legal document' disclaimer): 249 -> 250 ids. Prior value b011e6f351281ba376cef8444dc98533.
 // Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
-const FINGERPRINT_2026_10_04 = 'ae89c23c9d47ef1ea20eb40732cbb4d4';
-const EXPECTED_IDS = 250;
+// Founder approval 2026-11-01 (Oregon expansion, asked and answered in session) cleared exactly five sources:
+// tigard-or-active-building-permits, tigard-or-active-planning-cases (City of Tigard's own active-permits MapServer),
+// beaverton-or-site-development-permits (City of Beaverton's SD_Permits_Data, SDCOMM + SDSUB only),
+// portland-neighborhood-contact-applications (City of Portland open-data layer 1298) and eugene-or-current-capital-projects
+// (City of Eugene's Current Projects). None states a licence; each carries only an as-is / informational disclaimer.
+// 250 -> 255 ids. Prior value ae89c23c9d47ef1ea20eb40732cbb4d4.
+// Recomputed from the registry by the generator and independently in Python (sorted codepoint order, md5 of the ','-joined ids).
+const FINGERPRINT_2026_10_04 = '121d07f8c83b3e7e1c704dec33c36679';
+const EXPECTED_IDS = 255;
 
 const shipped = JSON.parse(read(RIGHTS_PATH));
 const ids = registryIds();
