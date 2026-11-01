@@ -103,6 +103,12 @@ for (const id of Object.keys(HS.SOURCE_RECORD_SCOPE)) {
   ok(!!HS.SOURCE_RECORD_SCOPE[id].evidence, 'coverage note carries its evidence: ' + id);
 }
 
+// #2487's five Oregon sources each carry their stated coverage limit.
+for (const id of ['portland-neighborhood-contact-applications', 'tigard-or-active-building-permits', 'tigard-or-active-planning-cases',
+  'beaverton-or-site-development-permits', 'eugene-or-current-capital-projects']) {
+  ok(!!(HS.SOURCE_RECORD_SCOPE[id] && HS.SOURCE_RECORD_SCOPE[id].scope), 'Oregon source carries its coverage limit: ' + id);
+}
+
 // ids helper
 ok(JSON.stringify(HS.sourceFreshnessIds([{ source_registry_id: 'b-x' }, { registry_id: 'a-x' }, { zip_authoritative: true, src: 'c-x' },
   { src: 'EPA FRS · registry 1' }, { registry_id: 'Bad Id' }])) === JSON.stringify(['a-x', 'b-x', 'c-x']),
