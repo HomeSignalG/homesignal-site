@@ -37,6 +37,56 @@ ENTITY_ORDER = {r: i for i, r in enumerate((
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
 
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _read(rel):
+    with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+        return fh.read()
+
+
+def _one(rx, text, what):
+    m = re.findall(rx, text, re.S)
+    if len(m) != 1:
+        sys.exit(f"ERROR: expected exactly one {what}, found {len(m)}")
+    return m[0]
+
+
+def site_chrome():
+    """The site's own header and footer, taken from partials/shell.html, and their rules from
+    app.css and layout.css, so a dossier page shows the same links as every other page. Nothing
+    is copied by hand. The header's Share / Sign in / account buttons need shell.js, which this
+    page does not load, so they are left out; the Menu button opens the nav without a script."""
+    shell = _read("partials/shell.html")
+    header = _one(r'<header class="hs-header" id="hs-top">.*?</header>', shell, "site header")
+    footer = _one(r'<footer class="hs-footer" id="hs-footer">.*?</footer>', shell, "site footer")
+    actions = _one(r'\n[ \t]*<div class="hs-header__actions">.*?\n[ \t]*</div>(?=\n[ \t]*</div>\n</header>)',
+                   header, "header actions block")
+    menu = ('\n    <div class="hs-header__actions"><label class="hs-header__menu" for="hs-menutoggle" '
+            'aria-label="Menu">☰</label></div>')
+    header = header.replace(actions, menu, 1)
+    header = header.replace('<nav class="hs-nav"', '<input type="checkbox" id="hs-menutoggle" class="hs-menutoggle" '
+                            'aria-label="Show the menu">\n    <nav class="hs-nav"', 1)
+    chrome = re.sub(r'href="(?!https?:|/|#)([^"]+)"', r'href="/\1"', header), \
+        re.sub(r'href="(?!https?:|/|#)([^"]+)"', r'href="/\1"', footer)
+    app = _read("app.css")
+    rules = _one(r'(\.hs-header\{position:sticky.*?\.hs-footer__links a:hover\{[^}]*\})', app, "header/footer rules")
+    root = _one(r':root\s*\{(.*?)\}', app, "app.css :root")
+    layout = _read("layout.css")
+    lroot = _one(r':root\s*\{(.*?)\}', layout, "layout.css :root")
+    cont = _one(r'(\.hs-container\s*\{[^}]*\})', layout, "layout.css .hs-container")
+    css = ('.hs-header,.hs-footer{' + root + lroot + 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",'
+           'Roboto,Helvetica,Arial,sans-serif;line-height:1.4}\n' + cont + '\n' + rules + '\n'
+           '.hs-menutoggle{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}\n'
+           '.hs-header__menu{cursor:pointer}\n'
+           '.hs-menutoggle:focus-visible~.hs-header__actions .hs-header__menu{outline:2px solid var(--green);outline-offset:2px}\n'
+           '@media (max-width:1023px){.hs-menutoggle:checked~.hs-nav{display:flex}}\n')
+    return chrome[0], chrome[1], css
+
+
+SITE_HEADER, SITE_FOOTER, CHROME_CSS = site_chrome()
+
+
 def esc(s):
     return html.escape("" if s is None else str(s), quote=True)
 
@@ -272,6 +322,8 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .actions{margin:1rem 0 0}.actions p{margin:.4rem 0}
 .btn{display:inline-block;font:inherit;font-weight:600;border-radius:10px;padding:.7rem 1.2rem;min-height:44px;
  background:var(--green);color:var(--on-green);border:1px solid var(--green);text-decoration:none}
+.protest{background:var(--tint);border:1px solid var(--green2);border-radius:12px;padding:.8rem 1rem;margin:1rem 0 0}
+.protest p{margin:.35rem 0}.protest .t{font-weight:700}
 .note{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:.5rem .8rem;font-size:.875rem;color:var(--ink2)}
 .toc{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-top:1.4rem;padding-block:.4rem}
 .toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.2rem 1rem;font-size:.88rem}.toc a{text-decoration:none}
@@ -306,6 +358,38 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .method{border-top:1px solid var(--line);margin-top:2.5rem;padding-block:1rem 3rem}
 .method nav{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.9rem}
 """
+
+
+def _protests(d):
+    """Open protest windows of the linked water filings, from the state's own change record
+    (facts.protest, development_water_protest). A window is open while its protest end date is on
+    or after the build day (d["_today"], the real UTC date; the page is rebuilt at least daily, so
+    the box leaves the page the day after the window closes). An unknown build day, an undated
+    window or a form link that is not https shows nothing: the page never offers a form it cannot
+    say is open."""
+    today = str(d.get("_today") or "")
+    if not DAY_RE.match(today):
+        return ""
+    out = []
+    for l in _links(d, "water_filing"):
+        pr = (l.get("facts") or {}).get("protest") or {}
+        end, form = str(pr.get("protest_end") or ""), safe_url(pr.get("form_url"))
+        if not DAY_RE.match(end) or end < today or not form:
+            continue
+        f = l.get("facts") or {}
+        filing = f'{f.get("filing_type") or "Water-rights filing"} {f.get("filing_no") or ""}'.strip()
+        already = (f' The state\'s record lists it as {esc(str(pr["protested"]).lower())}.'
+                   if str(pr.get("protested") or "").strip() else "")
+        checked = day(pr.get("checked_at"))
+        out.append(
+            f'<div class="protest"><p class="t">Protest period open until {esc(day(end))}</p>'
+            f'<p>{esc(prose(filing))}. {esc(pr.get("who") or "")}{already}</p>'
+            f'<p class="small">{esc(pr.get("how") or "")}</p>'
+            f'<p><a class="btn" href="{esc(form)}" rel="nofollow noopener">{esc(pr.get("form_label") or "File a protest")}</a></p>'
+            + (f'<p class="small">{_src(pr.get("help_url"), pr.get("help_label")).strip()}</p>' if safe_url(pr.get("help_url")) else "")
+            + f'<p class="small">Dates from the{_src(pr.get("record_url"), "state change record").rstrip()}'
+            + (f', checked {esc(checked)}' if checked else "") + '. HomeSignal is not part of the protest process.</p></div>')
+    return "".join(out)
 
 
 def render(d, pages, built, head, crumb_place=None):
@@ -446,23 +530,21 @@ def render(d, pages, built, head, crumb_place=None):
     gaps = (f'<p class="empty" id="not-yet">Not on record yet: {esc("; ".join(missing))}.</p>' if missing else "")
     body = (
         '<a class="skip" href="#main">Skip to content</a>'
-        '<header class="site"><div class="wrap"><a class="brand" href="/">HomeSignal</a>'
-        '<nav aria-label="Primary"><a href="/">Explore</a><a href="/properties.html">My Places</a></nav></div></header>'
-        f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
+        + SITE_HEADER +
+                f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
         f'<h1 id="h1">{esc(name)}</h1>'
-        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}</section>{toc}'
+        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}{_protests(d)}</section>{toc}'
         + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
           'after a HomeSignal reviewer checked it against the source. Page compiled '
           f'<time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
-          '<nav aria-label="More"><a href="/">HomeSignal home</a><a href="/how-it-works.html">How HomeSignal works</a></nav>'
-          '</footer></main>')
+          '</footer></main>' + SITE_FOOTER)
     # The shell's stylesheets are written for the app shell, which this script-free page does not
     # load; the page carries its own layout instead.
     h = head(title, desc, canon, og_type="article", ld=ld)
     h = re.sub(r'<link rel="stylesheet" href="/(?:layout|app)\.css[^"]*">\n?', "", h)
-    h = h.replace("</head>", f"<style>{CSS.strip()}</style>\n</head>", 1)
+    h = h.replace("</head>", f"<style>{CHROME_CSS}{CSS.strip()}</style>\n</head>", 1)
     if vids_all:
         if CSP_FROM not in h:
             sys.exit("ERROR: development page head has no img-src to widen for video thumbnails")
@@ -524,7 +606,7 @@ def build(dossiers, pages, out_dir, built, head, state=None, base=""):
     import page_semantics as ps
     paths = []
     for key in sorted(dossiers):
-        d = dict(dossiers[key], _base=base)
+        d = dict(dossiers[key], _base=base, _today=built)
         if not PATH_RE.match(d["path"]):
             sys.exit(f"ERROR: dossier path refused: {d['path']!r}")
         doc = render(d, pages, ps.BUILD_DAY_TOKEN, head)

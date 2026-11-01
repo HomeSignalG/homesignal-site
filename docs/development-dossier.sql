@@ -441,6 +441,18 @@ returns text language sql stable set search_path to 'public','pg_temp' as $fn$
 $fn$;
 revoke all on function public.dc_entity_map_status(uuid) from public, anon, authenticated;
 
+-- The protest window of a linked water filing, read from the state's own change record. The real
+-- definition is in docs/development-official-records.sql (it reads public.official_record, which is
+-- created there). Until that file is applied this stand-in answers "no window known"; it is created
+-- only when the function does not exist, so replaying this file never replaces the real one.
+do $do$ begin
+  if to_regprocedure('public.development_water_protest(text)') is null then
+    execute $f$create function public.development_water_protest(p_ref text) returns jsonb
+      language sql stable security definer set search_path = public, pg_temp as $b$ select null::jsonb $b$$f$;
+    revoke all on function public.development_water_protest(text) from public, anon, authenticated;
+  end if;
+end $do$;
+
 create or replace function public.development_dossier_snapshot()
 returns jsonb language plpgsql stable security definer set search_path to 'public','pg_temp' as $fn$
 declare out jsonb := '{}'::jsonb; p record; links jsonb; stmts jsonb; withheld jsonb; nm text; nsrc text; def jsonb;
@@ -478,7 +490,8 @@ begin
         when 'water_filing' then (
           select jsonb_build_object('filing_no', w.filing_no, 'filing_type', min(w.filing_type), 'status', min(w.status),
                    'filed_on', min(w.filed_on), 'date_label', min(w.date_label), 'record_url', min(w.record_url),
-                   'points', count(*), 'on_pending_list', bool_or(w.removed_from_source_at is null))
+                   'points', count(*), 'on_pending_list', bool_or(w.removed_from_source_at is null),
+                   'protest', public.development_water_protest(c.object_ref))
             from public.water_rights_filings w
            where w.source = case split_part(c.object_ref, ':', 1) when 'ut_dwr' then 'ut_dwr_pending'
                                 when 'id_idwr' then 'id_idwr_applications' when 'nv_ndwr' then 'nv_ndwr_pending' end

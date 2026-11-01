@@ -5656,6 +5656,9 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
   `app_projects` row (a DC entity can be the defining record).
 - **One name.** A project that links a land assembly takes `resolved_projects.display_name`, and a second name is
   refused. A descriptive name (basis `descriptive`) says so on the page.
+- **The header and footer are the site's own (founder, 2026-11-01).** `development_pages.py::site_chrome` reads them from
+  `partials/shell.html` and their rules from `app.css` / `layout.css` at build time, so they cannot drift. Share, Sign in and the
+  account button need `shell.js` and are left out; the phone Menu opens with a checkbox. Test 3d in `test/development-pages.test.mjs`.
 - **Pages ship no script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
   (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
 - `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
@@ -5688,6 +5691,12 @@ official records so you do not miss things like change and amendments"*. SQL of 
   an entity the project already links. Anything linked in any state, rejected included, is skipped. Names match
   through `development_entity_keys` ("Inc." = "Incorporated", "(MIDA)" = "MIDA"). Review on tab 18.
 - Tests: `test/development_official_records_pg` (`development-official-records-suite.yml`; 21 checks, 12 mutations).
+- **An open protest window gets the agency's own form on the dossier page (founder, 2026-11-01).**
+  `development_water_protest(ref)` (official-records SQL; a do-nothing stand-in in the dossier SQL until that file is applied)
+  reads the change record's `protest_end`, and the snapshot carries it as `facts.protest` on each water filing. Which agency
+  form and guide is named per source in that function (Utah: Division of Water Rights "Protest of Application", $15 fee);
+  the renderer names no agency. The page shows the box in its header while `protest_end` >= the build day, and drops it the
+  day after. Tests: `test/development-pages.test.mjs` 3c, suite checks 20-23.
 
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 

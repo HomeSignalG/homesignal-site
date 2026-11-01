@@ -379,6 +379,46 @@ begin
   end loop;
 end $fn$;
 
+-- The protest window of a water filing, for the development dossier page (development_dossier_snapshot
+-- calls it for every linked water_filing). Read from the state's own change record: its protest end
+-- date and publication dates, the record's status words, and when we last read it. A filing with no
+-- dated change record answers null, so the page shows no protest link. How to protest is the
+-- agency's own form and guide, named per source here (the page renderer names no agency).
+-- Utah (verified 2026-11-01): the Division of Water Rights' online form "Protest of Application"
+-- takes the Water Right, Change, or Exchange number, the protesting party's name, mailing address,
+-- phone and email, and the reasons, and charges a $15.00 non-refundable fee; a protest after the
+-- protest period is "a Late Protest". Its home page: "If a party believes the proposed application
+-- will impair existing water rights they may file a protest to the application."
+create or replace function public.development_water_protest(p_ref text) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $fn$
+  select jsonb_build_object(
+           'protest_end', r.facts ->> 'protest_end',
+           'publication_began', r.facts ->> 'publication_began',
+           'publication_end', r.facts ->> 'publication_end',
+           'protested', r.facts ->> 'protested',
+           'record_status', r.facts ->> 'status',
+           'record_url', r.url,
+           'checked_at', r.last_seen_at,
+           'agency', a.agency, 'form_url', a.form_url, 'form_label', a.form_label,
+           'help_url', a.help_url, 'help_label', a.help_label, 'who', a.who, 'how', a.how)
+    from public.official_record r
+    join (values ('ut_dwr', 'Utah Division of Water Rights',
+                  'https://waterrights.utah.gov/protestOfApplication/protestOfApplication.asp',
+                  'File a protest with the Utah Division of Water Rights',
+                  'https://waterrights.utah.gov/wrinfo/Brochures/Protest-Filing-Process-2026.pdf',
+                  'Protest Filing Q & A (Utah Division of Water Rights)',
+                  'Anyone who believes this application will impair existing water rights may file a protest.',
+                  'The state''s online form asks for the application number, your name, mailing address, phone and '
+                  'email, and your reasons, and charges a $15 non-refundable fee. A protest filed after the period '
+                  'ends is treated as a late protest.'))
+         as a(src, agency, form_url, form_label, help_url, help_label, who, how)
+      on a.src = split_part(p_ref, ':', 1)
+   where r.subject_ref = p_ref and r.kind = 'change_record' and r.removed_from_source_at is null
+     and (r.facts ->> 'protest_end') ~ '^\d{4}-\d{2}-\d{2}$'
+   order by r.last_seen_at desc limit 1;
+$fn$;
+revoke all on function public.development_water_protest(text) from public, anon, authenticated;
+
 revoke all on function public.official_records_ingest(jsonb), public.official_records_watch_list(),
   public.development_propose_from_records(text) from public, anon, authenticated;
 grant execute on function public.official_records_ingest(jsonb), public.official_records_watch_list(),

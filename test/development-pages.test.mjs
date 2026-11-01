@@ -241,6 +241,25 @@ ok(z.includes(`href="${A}"`) && z.includes(`href="${B}"`), 'the ZIP page links t
 const proj = man.project_pages.find((p) => p.startsWith('/project/town-permits/bld-2026-0001-'));
 ok(proj && read(out, proj).includes(`Part of <a href="${B}">Olympia mixed-use building</a>`), 'the defining /project/ page says Part of');
 
+// 3c. a water filing's open protest window: the agency's form, only while the window is open
+const PF = 'https://agency.example.gov/protest-form', PH = 'https://agency.example.gov/protest-guide.pdf';
+const withProtest = (end, form = PF) => {
+  const x = dossiers();
+  x.dossiers['valley-campus'].links[2].facts.protest = { protest_end: end, protested: 'Protested', record_url: W,
+    checked_at: '2026-10-28T12:29:08Z', agency: 'Example Water Agency', form_url: form, form_label: 'File a protest with the agency',
+    help_url: PH, help_label: 'Protest guide', who: 'Anyone affected may file a protest.', how: 'The form asks for your reasons.' };
+  return x;
+};
+const pOpen = read(build(withProtest('2026-12-01')).out, A);
+ok(pOpen.includes('<p class="t">Protest period open until Dec 1, 2026</p>') && pOpen.includes(`<a class="btn" href="${PF}"`)
+   && pOpen.includes(`href="${PH}"`) && pOpen.includes('lists it as protested'), 'an open protest window shows the agency\'s form');
+ok(pOpen.indexOf('class="protest"') < pOpen.indexOf('<nav class="toc"'), 'the protest box sits in the page header');
+ok(read(build(withProtest('2026-12-01'), { now: '2026-12-01T20:00:00' }).out, A).includes(`href="${PF}"`), 'the last day still shows it');
+ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="protest"'), 'a closed window shows no form');
+ok(!read(build(withProtest('2026-12-01', 'http://agency.example.gov/f')).out, A).includes('class="protest"'), 'a form link that is not https is not shown');
+ok(!read(build(withProtest('soon')).out, A).includes('class="protest"'), 'an undated window is not shown');
+ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no box');
+
 // 6. one code path
 const src = readFileSync(join(root, 'scripts', 'development_pages.py'), 'utf8').toLowerCase();
 ok(!/stratos|proctor|a55167|84336|box elder|tacoma|eagle mountain/.test(src), 'the renderer names no project, place or filing');
@@ -292,6 +311,27 @@ const st2 = JSON.parse(readFileSync(join(later.out, 'sitemaps', 'page-state.json
 const h = (st, p) => (st.pages || st.entries || {})[p];
 ok(h(st1, A) && JSON.stringify(h(st1, A).h) === JSON.stringify(h(st2, A).h), 'a later build day does not move the fingerprint',
    JSON.stringify([h(st1, A), h(st2, A)]));
+
+// 3d. The header and footer are the site's own (founder, 2026-11-01: "they are not same as website").
+{
+  const shell = readFileSync(join(root, 'partials', 'shell.html'), 'utf8');
+  const hrefs = (t) => [...t.matchAll(/href="([^"]+)"/g)].map(m => m[1].replace(/^(?!https?:|\/)/, '/'));
+  const sHead = shell.match(/<header class="hs-header"[\s\S]*?<\/header>/)[0];
+  const sFoot = shell.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/)[0];
+  const pg = read(out, A);
+  const pHead = (pg.match(/<header class="hs-header"[\s\S]*?<\/header>/) || [''])[0];
+  const pFoot = (pg.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/) || [''])[0];
+  ok(pHead && JSON.stringify(hrefs(pHead)) === JSON.stringify(hrefs(sHead)), 'the header has the site header\'s links, in order',
+     JSON.stringify([hrefs(pHead), hrefs(sHead)]));
+  ok(pFoot && JSON.stringify(hrefs(pFoot)) === JSON.stringify(hrefs(sFoot)), 'the footer has the site footer\'s links, in order',
+     JSON.stringify([hrefs(pFoot), hrefs(sFoot)]));
+  ok(hrefs(sHead).length >= 8 && hrefs(sFoot).length >= 8, 'control: the site header and footer were read');
+  ok(!/HomeSignal home|How HomeSignal works|class="site"/.test(pg), 'the old hand-made header and footer are gone');
+  ok(!/onclick=|<script/.test(pHead + pFoot), 'the header and footer need no script');
+  ok(/@media \(max-width:1023px\)\{\.hs-menutoggle:checked~\.hs-nav\{display:flex\}\}/.test(pg)
+     && pHead.indexOf('id="hs-menutoggle"') < pHead.indexOf('<nav class="hs-nav"'), 'the narrow-screen menu opens without a script');
+  ok(pg.includes('.hs-header{position:sticky'), 'the site header styles are on the page');
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
