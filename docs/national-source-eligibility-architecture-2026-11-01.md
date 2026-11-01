@@ -1,294 +1,199 @@
-# National source eligibility and report rights: audit and plan (2026-11-01)
+# National source eligibility: removing the per-source approval gates — audit and removal plan (2026-11-01)
 
-**Status: PROPOSAL FOR REVIEW. Nothing here is implemented, deployed or applied.** No production data, no edge
-function, no rights file, no test and no registry entry was changed to write this document. It is read-only work
-against `main` at `1dfdcbc` plus the open PRs named in §1.4.
+**Status: PLAN FOR REVIEW. Nothing is implemented.** No code, test, workflow, rights file, registry entry, edge function
+or production data was changed to write this. Read-only against `main` (`1dfdcbc`) and the open PRs named below.
 
-**Scope: national.** No state, county or city is special-cased anywhere in the proposed model. Washington, Oregon,
-Denton, Douglas County and the rest appear only as measured examples of the current behaviour.
-
----
-
-## 1. Current state and root cause
-
-### 1.1 What exists
-
-| Piece | File | What it does |
-|---|---|---|
-| Source connectors | `supabase/functions/get-address-report/jurisdiction-registry.json` | 250 entries. Each one is a connector config: platform, URLs, `column_map`, `status_to_bucket`, coverage, `_receipts`. **No entry holds any rights field** (no licence, no terms URL, no verified date). Measured: the 49 distinct keys used across the 250 entries contain none. |
-| Report allowlist | `supabase/functions/_shared/report-rights.json` (version 2) | `cleared[]`, one object per `registry_id`: `cleared_on`, `audit_ref`, `attribution`. 250 entries, all `cleared_on: 2026-10-04`, all `audit_ref: …ruling-r7… §2`. 3 carry a publisher credit line (NYC DOB ×2, Seattle). |
-| Generator | `scripts/build-report-rights.mjs` | Builds `report-rights.json` and the R7 ruling's §2 block **from the registry**: every registry id becomes a cleared entry. `PUBLISHER_ATTRIBUTION` holds the 3 credit lines. |
-| R7 gate | `test/report-rights-r7.test.mjs` (in the required `unit` check) | 1a/1b: the rights file and ruling block are byte-equal to the generator output. 2a: the registry has exactly `EXPECTED_IDS` (250). 2b: the cleared list equals the registry exactly. 2c: md5 of the ids equals a hard-coded constant. 2d: every entry is dated 2026-10-04 and points at R7 §2. |
-| Evidence gate | `test/report-rights-evidence.test.mjs` | Every cleared entry is backed by either a publisher evidence record (the template's seven labelled lines and a quotation) or the R7 ruling (which must quote the founder and say it is a risk acceptance). Shown able to fail on synthetic defects. |
-| Runtime | `_shared/national-report.ts` `validateRights` + `assemble` | Used by `get-development-activity-report`, `follow-development-report`, `run-property-watch`. A project whose `registry_id` is not in `cleared` is **dropped from the customer view** and counted in `excluded.no_rights`; the report then carries the limitation `SOURCES_NOT_INCLUDED` ("Some official sources for this area are not included in this report."). The internal view keeps it, marked `HOLD`. |
-| Rights audit | `docs/corporate-output-source-rights-audit-2026-09-27.md` | Verdict NOT YET. All jurisdiction-registry sources are HOLD for paid outputs ("no recorded commercial-use grant; empty publisher terms are not permission"). NDDOT `rcrs_dynamic` is EXCLUDE (publisher text forbids commercial use and systematic compilation). |
-| Ruling R7 | `docs/development-activity-founder-ruling-r7-2026-10-04.md` | The founder accepted the risk of every registry source appearing in a paid report. Explicitly not a publisher grant; no HOLD is reinterpreted. |
-
-### 1.2 The runtime is already decoupled. The block is in CI.
-
-The edge functions do the right thing: **an uncleared source is simply left out of reports, the report says so, and
-the map and ZIP pages are unaffected**. Nothing at runtime would break if a new source were on the map but not in
-`report-rights.json`.
-
-The block comes entirely from how R7 was encoded:
-
-1. **R7 was implemented as an identity, not a policy.** The generator defines "cleared" as "is in the registry".
-   There is no way to express "this source is on the map but held from reports". Test 2b fails on any difference
-   in either direction.
-2. **The fingerprint is a hand-maintained constant** (2a, 2c). Adding a registry id changes the md5, so `unit`
-   fails until someone edits the constant. The test's own comment says that edit is "a decision ... in a new ruling",
-   so every map-source PR needs a founder approval to pass CI.
-3. **Removal is coupled too.** Retiring Round Rock (2026-10-20, #2094) needed the fingerprint changed even though
-   it cleared nothing.
-
-So: adding a map source = clearing it for paid reports, and the only way to get CI green is a per-source founder
-approval. That is the bottleneck, and it is technical coupling, not a rights requirement.
-
-### 1.3 Measured cost
-
-- Since 2026-10-04, **24** commits on `main` changed the registry; **6** of them also had to change
-  `report-rights.json` and the R7 test with an in-session founder approval (#1921 Denton ×7, #2094 Round Rock
-  removal, #2125 Douglas CO, #2166 Skagit, #2169 WA Ecology SEPA, #2175 Spokane). `git log origin/main`.
-- **Open now:** #2487 (Oregon, five sources) edits `report-rights.json` and `test/report-rights-r7.test.mjs`.
-  Draft #1846 (Frisco proposed zoning) is titled "not activated, not rights-cleared": a map source that cannot
-  merge without a report clearance nobody has decided.
-
-### 1.4 Defects in the current audit trail (found while auditing; not fixed here)
-
-1. **Wrong clearance dates.** 10 sources approved on 2026-10-14 (7 Denton), 2026-10-21 (Douglas CO) and
-   2026-10-22 (Skagit, SEPA, Spokane) carry `cleared_on: 2026-10-04` and `audit_ref: R7 §2`. Test 2d forces this.
-   Their real approval date and wording exist only in a code comment in `test/report-rights-r7.test.mjs`.
-2. **The "dated record, not edited afterwards" ruling has been edited 6 times.** Its §2 block was regenerated by
-   each of the commits above. Its header and test 4a say it is fixed; its contents say otherwise.
-3. **No per-source terms evidence exists for 247 of 250 sources.** Only NYC DOB ×2 and Seattle have a recorded
-   publisher grant. The other 247 rest on R7 or a session approval, which is a risk acceptance, not terms.
-4. **Consumer outputs have no recorded eligibility at all.** Map 1, ZIP pages, MAPS/Bluesky posts, email and
-   development dossiers display every registry source. The rights audit classifies MAPS and email as HOLD; nothing
-   records a decision for the free map. Not changed by this plan (see §5), but recorded.
-
-### 1.5 Protections that are correct and must stay
-
-- Reports are **closed by default**: unlisted = excluded.
-- No wildcard and no pattern can clear anything.
-- A HOLD is never reinterpreted as cleared; a founder risk acceptance is recorded as one, never as a grant.
-- Publisher credit lines travel with the record.
-- Stored report snapshots are permanent; property watch reads the rights list *now*, so it follows changes both ways.
-- The NDDOT-type exclusion: a publisher that forbids commercial use or systematic compilation is never wired for
-  paid use.
-- Generated, never typed: the allowlist must never be hand-listed (rule 7/8 of the ingest claims discipline).
+**This replaces the first version of this document** (same file, same PR #2489, earlier commit). That version proposed
+per-source terms evidence, a policy evaluator, a class rule and a review queue. The founder's decision below rules all of
+that out; none of it is carried forward.
 
 ---
 
-## 2. Proposed national eligibility model
+## 0. The national policy, as decided
 
-### 2.1 Principle
+The founder, 2026-11-01, in session (verbatim):
 
-Separate three things that are currently one file:
+> I have already removed the following two requirements nationally for JODY:
+> 1. Requiring verification that source terms are silent or permissive.
+> 2. Requiring verification that nothing prohibits commercial use, bulk copying, or redistribution.
+>
+> Do not reintroduce either requirement through Option B, Option C, a new class-based approval process, or a manual
+> exception queue.
 
-1. **Connector config**: how to read a source (`jurisdiction-registry.json`, unchanged).
-2. **Rights evidence**: what the source's own terms say, captured with a date and a hash.
-3. **Eligibility decision per use**: computed from (2) by a versioned policy, or recorded by a person.
+The intended architecture, in the founder's words:
 
-`report-rights.json` stays exactly where it is, with exactly the shape the three edge functions read today. It
-becomes a **generated output** of (2) + (3), so the runtime and its rollback do not change.
+- Official government development records enter the national ingestion pipeline without individual owner approval.
+- Eligible records flow automatically into JODY maps, feeds, and Development Activity Reports.
+- Adding cities, counties, and states does not require changes to a manually maintained source allowlist.
+- Obsolete policy gates are removed consistently across code, tests, documentation, and workflows.
+- Factual accuracy, source provenance, and record verification are preserved.
+- Removal of internal checks is not permission to disregard independently applicable legal or contractual restrictions.
 
-### 2.2 Uses (decided separately)
+**What "eligible" means after this change.** A record is eligible for a map, a feed or a report when it passes the
+**accuracy and provenance** rules that already exist. Who published it is no longer asked as a separate question:
 
-| Use | Meaning | Gate today |
-|---|---|---|
-| `map_display` | Map 1, ZIP pages, development feeds, linking to the official record | none |
-| `report_web` | Paid Development Activity Report on the web, shared report link | `report-rights.json` |
-| `report_pdf` | The downloadable / printed report | same file |
-| `consumer_reprint` | Email digests, MAPS/Bluesky posts | none (audit: HOLD) |
-| `api`, `white_label` | Not built | must default DENY |
+- it came from a source wired in `jurisdiction-registry.json` (it carries that source's `registry_id`);
+- `record_kind = 'development'` (the report is development only);
+- it has its official record link (`source_ref`);
+- it passes the existing record rules: ZIP membership and distance, the fail-closed `status_to_bucket` and type maps,
+  the geocode fence, the standing-inventory rule (R3), date sanity, and so on.
 
-Phase 1 **enforces only `report_web` / `report_pdf`**, exactly as now. The others are recorded so the decisions
-exist, but not enforced (enforcing `map_display` would change what residents see and is an owner decision, §6).
-
-### 2.3 Per-source rights record
-
-One file per source, `data/source-rights/<registry_id>.json` (one file each so parallel expansion PRs never
-conflict on a shared list). Shape:
-
-```json
-{
-  "registry_id": "seattle-building-permits",
-  "publisher": "City of Seattle, SDCI",
-  "evidence": [
-    {
-      "kind": "dataset_license | portal_terms | publisher_grant | publisher_statement | none_found",
-      "url": "https://data.seattle.gov/...",
-      "captured_on": "2026-09-27",
-      "method": "runner fetch | founder email | manual read",
-      "text_sha256": "…",
-      "verbatim": "the publisher's own words",
-      "license_id": "PDDL-1.0 | CC-BY-4.0 | US-PD-17USC105 | NONE_STATED | CUSTOM"
-    }
-  ],
-  "attribution": "City of Seattle, Seattle Department of Construction & Inspections (data.seattle.gov, dataset 76t5-zqzr).",
-  "flags": ["prohibits_commercial", "prohibits_systematic_compilation", "prohibits_redistribution", "requires_attribution"],
-  "decisions": [
-    { "use": "report_web", "decision": "ALLOW", "basis": "publisher_grant",
-      "decided_on": "2026-09-27", "decided_by": "evidence", "ref": "docs/corporate-output-seattle-building-permits-2026-09-27.md §…" }
-  ]
-}
-```
-
-A missing file is legal and means **no evidence**: the source is map-eligible as today and report-HELD.
-
-### 2.4 The evaluator (one function, no jurisdiction branches)
-
-`scripts/source-eligibility.mjs::evaluate(record, use, policy) → { decision, basis, reasons[] }` where decision is
-`ALLOW`, `HOLD` (excluded, not yet reviewed), `DENY` (excluded, terms forbid) or `REVIEW` (excluded, a person must
-look). Order, first match wins:
-
-1. **Recorded human decision for this use** (publisher grant or founder ruling) → that decision. A recorded
-   decision is never overridden by a later rule silently; a contradiction goes to step 6.
-2. **Any prohibition flag** that covers the use (`prohibits_commercial`, `prohibits_systematic_compilation`,
-   `prohibits_redistribution`) → `DENY`. Fixes the NDDOT class generically.
-3. **Conflicting evidence** (e.g. an open dataset licence plus portal terms that restrict use; two captures of the
-   same terms with different hashes and different meaning) → `REVIEW`.
-4. **Stale evidence** (newest capture older than `policy.max_evidence_age_days`) → `REVIEW` for report uses.
-5. **A licence on the policy's allow list** (e.g. CC0, PDDL, CC-BY / ODC-BY with attribution, US federal works
-   under 17 U.S.C. 105) → `ALLOW`, with attribution required where the licence requires it. **Only licences the
-   owner approves in the policy file are on this list** (§6, decision 2).
-6. **No terms stated at all** → the policy's default for that use: `map_display` ALLOW (today's behaviour);
-   report uses **HOLD** unless the owner adopts a standing class policy (§6, decision 1).
-7. Anything else → `REVIEW`.
-
-"Public government record" alone never produces ALLOW (the audit's rule: *"Do not treat 'public record' or an
-empty copyright field as a commercial license."*).
-
-The policy is `data/source-rights/policy.json`, versioned, with an id per rule so every computed decision names the
-rule and policy version that produced it.
-
-### 2.5 What makes onboarding hands-off
-
-- A new registry entry with **no** rights file passes CI and goes on the map; reports leave it out and say so.
-- A runner job (read-only, dispatch and on PR) harvests the machine-readable licence fields every platform already
-  publishes: ArcGIS item `licenseInfo` / `accessInformation`, Socrata dataset `license` and `attribution`, CKAN
-  `license_id`, OpenDataSoft `license`. It writes the evidence block (verbatim + sha256 + date) and lets the
-  evaluator decide. Where the licence is on the approved list it becomes `ALLOW` automatically; prohibitions become
-  `DENY`; silence becomes `HOLD`; contradictions become `REVIEW`.
-- Only `REVIEW` items, and only if the owner wants them in reports, need a person. They are listed in a generated
-  queue (`docs/source-rights/review-queue.md`) with the evidence beside each.
-
-### 2.6 Audit trail
-
-- `decisions[]` is append-only in review (a CI check refuses edits to an existing decision; a change is a new row).
-- `cleared_on` in the generated `report-rights.json` becomes the **real** date of the decision that allowed it, and
-  `audit_ref` points at that decision (`data/source-rights/<id>.json#decisions[n]` or the evidence doc).
-- Each generator run prints a **decision diff**: sources that entered or left report eligibility and the rule or
-  decision responsible. A PR that changes the eligible set shows exactly why.
-- Dated ruling documents are left exactly as written. New rulings are new files.
-
-### 2.7 Future sources beyond the jurisdiction registry
-
-The same record and evaluator take any source key, so EPA FRS/ECHO, TCEQ, TDLR, Compute Atlas, Epoch, OSM,
-government notices and Local News can be added later by key prefix (`registry:`, `dc:`, `epa:`…) without new code.
-Phase 1 covers only the jurisdiction registry, because that is all the report reads (development only).
+None of these is a rights rule, and none of them names a source.
 
 ---
 
-## 3. Migration of existing sources
+## 1. Audit: where per-source approval still lives
 
-The migration must change **nothing a customer sees**. The test is: the generated set of report-eligible ids equals
-today's 250 exactly (fingerprint `ae89c23c9d47ef1ea20eb40732cbb4d4`, sorted in code-point order), and the
-credit lines are unchanged.
+Two separate per-source allowlists exist. Each is maintained by hand (or by a generator that refuses to change without a
+recorded approval), and each blocks new sources.
 
-1. **Grandfather every current clearance as a recorded decision, with its real basis and date:**
-   - 3 sources: `basis: publisher_grant`, the existing evidence docs, attribution unchanged.
-   - 230 sources in R7's original 240: `basis: founder_ruling`, ref R7 §2, `decided_on: 2026-10-04`.
-   - 7 Denton (2026-10-14), Douglas CO (2026-10-21), Skagit, WA SEPA, Spokane (2026-10-22):
-     `basis: founder_approval`, `decided_on` the real date, `ref` a new dated record that moves the wording now
-     kept only in the test comment into a doc (verbatim, not reinterpreted).
-   - Records are **generated** from the current rights file and the test comment, never typed (rule 7); the
-     generated set is fingerprinted against the current file (rule 8, `collate "C"`-equivalent code-point order).
-2. **Founder rulings are recorded per use:** R7 covered paid reports. It is recorded as `report_web` + `report_pdf`
-   ALLOW only. Nothing is inferred for API or white-label.
-3. **Harvest evidence for all 250 (read-only, runner).** The evaluator runs, but a grandfathered decision wins
-   (step 1 of §2.4). Any source where harvested terms **contradict** the grandfathered ALLOW (e.g. a newly found
-   "non-commercial" clause) is listed for the owner. **It is not removed automatically** in the migration; whether a
-   contradiction auto-revokes is an owner decision (§6, decision 3).
-4. Sources left out by the founder (none today) or retired (Round Rock) need no record.
+### 1.1 Gate A — paid reports: `report-rights.json` + R7
 
----
-
-## 4. Implementation plan
-
-Each step is its own PR. None deploys an edge function unless the eligible set changes, and the migration steps
-are built so it does not.
-
-| Step | Change | Files | Customer-visible change |
+| Piece | File | What it does today | Why it is obsolete |
 |---|---|---|---|
-| 0 | Wait for #2487 (Oregon) to land; then fetch `main` again. It edits the same two files. | none | none |
-| 1 | Schema, policy file, evaluator, generator **in new files**, plus a parity check that the new generator reproduces today's `cleared` ids and credit lines exactly. Old generator and R7 test untouched. | `data/source-rights/policy.json`, `scripts/source-eligibility.mjs`, `scripts/build-source-rights.mjs`, `test/source-eligibility.test.mjs` | none |
-| 2 | Generate the 250 grandfathered records + the dated record of the 10 later approvals. | `data/source-rights/*.json`, `docs/source-rights-grandfathered-approvals-2026-…md` | none |
-| 3 | Cut over: `build-report-rights.mjs` reads the records instead of "every registry id". Replace R7 tests 2a–2d with: generated file = generator output; every cleared id is a registry id; a registry id without a record is report-held and **never fails CI**; the eligible-set fingerprint is computed, and a change prints the decision diff. Keep evidence-test rules for publisher grants. `cleared_on` takes the real dates. | `scripts/build-report-rights.mjs`, `test/report-rights-r7.test.mjs` (replaced by `test/source-eligibility-*.test.mjs`), `report-rights.json` (regenerated: same ids, corrected dates/refs) | none (runtime reads only `registry_id` and `attribution`; verified on a fixture by `assemble` output equality before and after) |
-| 4 | Read-only licence harvester on a runner; writes evidence blocks on a branch PR. | `scripts/harvest-source-terms.mjs`, `.github/workflows/harvest-source-terms.yml` (dispatch-only, no secrets) | none |
-| 5 | Generated review queue + a daily check that fails when a `REVIEW` item is older than N days or evidence is stale. | `docs/source-rights/review-queue.md` (generated), workflow | none |
-| 6 | Owner decisions in §6 applied as policy changes, each its own PR with its decision diff. | `policy.json` | **yes**, and the diff names every source affected |
+| Allowlist | `supabase/functions/_shared/report-rights.json` | 250 `cleared` entries; reports drop any source not listed | It is a manually maintained source allowlist |
+| Generator | `scripts/build-report-rights.mjs` | Writes the allowlist and the R7 ruling's §2 block from the registry; holds the 3 publisher credit lines | Exists only to feed the allowlist (the credit lines are kept; §3.3) |
+| R7 gate test | `test/report-rights-r7.test.mjs` | Requires the list to equal the registry (2b), pins the count `EXPECTED_IDS = 250` (2a) and a hand-edited md5 (2c), forces every date to 2026-10-04 (2d) | **This is the check that turns `unit` red on every new source until a founder approval is recorded.** |
+| Evidence test | `test/report-rights-evidence.test.mjs` | Every cleared entry must be backed by a publisher grant record or by the R7 ruling | Enforces the per-source clearance requirement itself |
+| Runtime: new report | `_shared/national-report.ts` `validateRights`, `assemble` | Drops uncleared families (`excluded.no_rights`), adds limitations `NO_INCLUDED_SOURCE` / `SOURCES_NOT_INCLUDED`, marks `HOLD` in the internal view, stamps `rights_registry_version` and `cleared_families` in the report meta | The rights half of report assembly |
+| Runtime: changes since report | `_shared/changes-since-report.ts` (`SOURCES_NOT_INCLUDED_SINCE`, `no_rights`) | Same gate for the follow-up view | same |
+| Runtime: handlers | `get-development-activity-report`, `follow-development-report`, `run-property-watch` (`index.ts` imports the JSON; `handler.ts` calls `validateRights`) | Fail the request if the allowlist is malformed | same |
+| Comments naming the gate | `_shared/property-watch.ts`, `_shared/change-reads.ts`, `lib/da-report-view.js` | Describe the rights gate as a step | Stale once it is gone |
+| Workflow | `.github/workflows/report-snapshot-suite.yml` | Runs on changes to `report-rights.json` | Path goes away |
+| Tests that pass a rights fixture | `national-report`, `national-report-structure`, `national-report-generation-points`, `national_report_mutants.py`, `changes-since-report`, `follow-development-report-structure`, `follow_report_mutants.py`, `property_watch_mutants.py`, `brigham-city-84302-journey`, `launch-location-structure`, `lib/launch-test-location.mjs`, `da-report-view(-structure)`, `lib/da-report-view-world.mjs`, `development-activity-review` | Feed `RIGHTS_NONE`/`RIGHTS_A` fixtures or check the gate | Need their rights inputs and rights assertions removed; their other assertions stay |
+| Tests that only forbid the front end from reading rights | `shared-report-page`, `development-activity-reports` | A regex that the page must not mention `report-rights` / `.cleared` | Harmless; simplify when convenient |
 
-### 4.1 Tests
+### 1.2 Gate B — Map 1: `geo.n5_accepted_source`
 
-Each case uses real captured terms text where one exists, and every rule is proven load-bearing by a mutation that
-must fail it (exit code, not FAIL-line count).
+`scripts/n5_shard.py` freezes every project with `coalesce(a.treatment, 'UNCLASSIFIED')` from
+`geo.n5_accepted_source`. **A source with no row is `UNCLASSIFIED`, and Map 1 draws none of its records** (outcome
+`REGISTRY_UNCLASSIFIED`). Every onboarding therefore also needs a hand-written classification migration, and those
+migrations record it as an owner approval:
 
-- **Allowed:** an approved open licence (CC-BY with required attribution → ALLOW and the credit carried; CC0 →
-  ALLOW, no credit); a recorded publisher grant (the Seattle and NYC records reproduce today's credit lines).
-- **Restricted:** non-commercial text, systematic-compilation prohibition (the NDDOT quotation), no-redistribution
-  → DENY; a DENY source is never in `report-rights.json`.
-- **Unknown:** no record → map yes, report HOLD, CI green; `none_found` evidence → HOLD; stale evidence → REVIEW.
-- **Conflicting:** open dataset licence + restrictive portal terms → REVIEW; recorded ALLOW contradicted by new
-  evidence → listed, not silently changed; two decisions for one use with no later supersession → refused.
-- **Structural:** no wildcard or pattern can clear; no jurisdiction, state or `registry_id` literal in the evaluator
-  (grep test with positive control); `report-rights.json` passes the unchanged `validateRights`; generated output
-  is byte-stable across runs; one-file-per-source means two PRs adding different sources never touch the same file.
-- **Parity (migration):** eligible set fingerprint = `ae89c23c…` and credits unchanged at step 3; `assemble` on a
-  fixture gives identical customer output before and after.
-- **Runtime:** existing `national-report`, `follow-report` and `property-watch` mutant suites still pass.
+- `docs/n5-oregon-sources-classified-2026-11-01.sql` (open #2487): *"Founder cleared these five on 2026-11-01."*
+- the same pattern in `n5-douglas-co-permits-classified-2026-10-21.sql`, `n5-skagit-county-permits-classified-2026-10-22.sql`,
+  `n5-wa-ecology-sepa-register-proven-2026-10-22.sql`, `n5-tx-sources-classified-2026-10-20.sql`.
 
-### 4.2 Rollback
+The **treatment value is a real technical fact** and must stay: `PROVEN` (the stored point is the publisher's own
+geometry, or a geocode that passed the fence, §7.12b) or `RECOVERY` (a polygon/line layer whose geometry N5 re-reads).
+What is obsolete is that the value is typed per source by hand and that its absence hides the source.
 
-- Steps 1, 2, 4, 5 add files only: revert the PR.
-- Step 3: the runtime artifact keeps its shape, so a revert of the PR restores the old generator, the old test and
-  the old file. Since the eligible set is unchanged, no edge-function redeploy is needed either way.
-- Step 6 (any change to the eligible set): revert the policy PR and redeploy the three functions that import
-  `report-rights.json` (`get-development-activity-report`, `follow-development-report`, `run-property-watch`), as
-  in R7 §4. Stored snapshots are permanent and are not recalled; property watch follows the file at its next run.
+### 1.3 Why these block onboarding
 
----
+The report runtime was already safe: an unlisted source was simply left out and the report said so. The block was in CI
+(Gate A, R7 tests 2a–2c) and in the Map 1 build (Gate B, no row means not drawn). Since 2026-10-04, **6 of the 24**
+registry commits on `main` had to carry a report approval (#1921, #2094, #2125, #2166, #2169, #2175), and every
+recent onboarding also carried a Gate B migration. Open now: **#2487** (Oregon) edits `report-rights.json`, the R7 test
+and adds a Gate B migration. Draft **#1846** (Frisco) is stuck as "not rights-cleared".
 
-## 5. Impact
+### 1.4 Not gates (they stay)
 
-- **Maps, ZIP pages, development feeds:** no change. They have no rights gate today and none is added in phases
-  1–5. `map_display` decisions are recorded but not enforced.
-- **Paid reports and property PDFs:** same 250 sources through the migration. After it, a newly onboarded source is
-  automatically included **only** if its evidence passes the policy; otherwise it is left out and the report already
-  says "Some official sources for this area are not included".
-- **Existing report snapshots:** untouched.
-- **Property watch:** follows the generated file as now.
-- **Geographic expansion work (WA/OR):** after step 3, registry PRs no longer need to touch `report-rights.json` or
-  the R7 test. Before step 3, nothing changes for them.
-- **Email, MAPS/Bluesky, dossiers, Map 1 data centres:** unchanged; their HOLD status in the audit is recorded, not
-  resolved.
+These are accuracy or provenance rules, not approvals, and the policy keeps them:
+`status_to_bucket` / `type_map` fail-closed vocabularies, `observed_types_unreviewed`, the coverage gate, the geocode
+fence, ZIP polygon membership, date sanity, the residential qualification rule, `record_url` required, the standing-inventory
+rule, `source-monitor.yml`'s drift checks, and the record-level dossier review (that verifies which records belong to one
+project; it is not a source approval).
+
+`geo.n5_accepted_source` rows `NOAUTH`, `HIST_UNRECOVERABLE` and `IDENT_UNRESOLVED` are **record-quality** outcomes (no
+usable geometry or identity) and stay; only "missing row = hidden" goes.
+
+Ingest (`homesignal-ingest`) has no per-source rights gate (`report-rights` appears nowhere there).
 
 ---
 
-## 6. Decisions that need the owner
+## 2. What replaces each gate
 
-1. **Standing class policy for sources whose terms say nothing (the main one).** Without it, automation can only
-   clear sources with an approved open licence or a publisher grant, so most new municipal permit layers will be
-   report-HELD by default. Options: (a) keep R7 as a one-time list; new silent sources are HELD until reviewed;
-   (b) a new ruling (R8) that accepts the same risk as R7 **as a class rule** ("government development records
-   where the publisher states no terms and no prohibition, from the publisher's own host"), which makes them
-   auto-eligible; (c) (b) only after a minimum evidence step (terms page fetched and hashed). This is a legal-risk
-   decision, as R7 was; counsel was recommended then and that advice stands.
-2. **Which licences are on the allow list**, and whether an attribution-required licence is acceptable in the PDF.
-3. **What happens when new evidence contradicts an existing clearance:** auto-hold (safer, can shrink reports
-   without notice) or flag-and-keep until reviewed.
-4. **Whether `map_display` and `consumer_reprint` decisions should ever be enforced** (that would remove records
-   from the free map, email or Bluesky where terms prohibit it).
-5. **Evidence freshness** (`max_evidence_age_days`) and how often terms are re-harvested.
-6. **Whether to correct the 10 misdated clearances in the generated file** (recommended: yes, it changes no
-   customer output) and record their approvals in a dated doc.
+### 2.1 Reports
+
+`assemble` and `changes-since-report` stop reading an allowlist. A development record from any registry source is
+included when it passes the existing record rules (§0). Concretely:
+
+- remove `validateRights`, the `cleared` map, `excluded.no_rights`, the internal `rights: CLEARED/HOLD` marker, and the
+  `NO_INCLUDED_SOURCE` / `SOURCES_NOT_INCLUDED` / `SOURCES_NOT_INCLUDED_SINCE` limitations;
+- **provenance rule kept explicitly:** a development row with **no `registry_id`** (5 rows on 2026-10-04) is still left
+  out, because it cannot be traced to a wired source. It is counted as `excluded.no_source_family`, and the report says
+  so in a limitation that names provenance, not rights;
+- report meta: drop `rights_registry_version` and `cleared_families` from new reports and bump `REPORT_VERSION`.
+  **Stored snapshots are permanent and keep the old fields;** the report view already ignores them (checked: no front-end
+  reader).
+
+### 2.2 Map 1
+
+The treatment comes from the registry entry. It is no longer looked up in a hand-filled table:
+
+- add one connector field per entry, `geometry: "point" | "polygon" | "line" | "none"`. It is declared at onboarding with
+  the rest of the connector config (it is how the layer is read, not an approval). Point / none → `PROVEN`; polygon /
+  line → `RECOVERY`. Existing rows in `geo.n5_accepted_source` are kept and win where present, so nothing already drawn
+  moves;
+- `geometry` is a required connector field, checked by the same CI that validates registry entries, so no source has an
+  unknown treatment. It is filled for the existing 250 from each layer's own service metadata (`geometryType`), read on a
+  runner, never typed;
+- `UNCLASSIFIED` stops being an outcome; a test fails if any registry source can freeze as it.
+
+### 2.3 Legal and contractual restrictions (the founder's last bullet)
+
+No verification step, no queue and no class rule is added. What is kept is only what is **already known and on file**,
+carried as data on the registry entry:
+
+- **Publisher credit lines.** The 3 recorded requirements (NYC DOB ×2, Seattle) move from `build-report-rights.mjs`
+  into an optional registry field `attribution`. A small generated `_shared/source-attribution.json` (only the sources
+  that have one) is what the report functions import. **Absence means "no credit recorded", never "excluded".**
+- **A known written prohibition** (the North Dakota DOT work-zone text) is handled the way it is today: that source is
+  not wired. That is an onboarding fact recorded in `docs/source-registry.md`, not a check anyone must run.
+
+### 2.4 Tests that stop the gates coming back
+
+New `test/no-source-allowlist.test.mjs`:
+
+1. No file named `report-rights*.json` exists, and no edge function imports one.
+2. `national-report.ts`, `changes-since-report.ts` and the three handlers contain no `cleared`, `no_rights`,
+   `validateRights` or `SOURCES_NOT_INCLUDED` (comment-stripped, with a positive control that the stripper keeps code).
+3. **Behavioural:** a fixture registry gets a brand-new source id that no other file names; a record from it is in the
+   customer report, on the generated Map 1 freeze, and in the changes view. Nothing else is edited to make that happen.
+4. A record with no `registry_id`, or no `source_ref`, is still excluded (provenance is preserved).
+5. The attribution file is generated from the registry and has no entries without a credit line.
+6. Mutations that must fail it: re-adding an allowlist lookup, freezing an unrowed source as `UNCLASSIFIED`, dropping the
+   provenance exclusion, dropping a credit line.
+
+The existing report suites keep every non-rights assertion; only their rights fixtures and rights assertions go.
+
+---
+
+## 3. Removal plan
+
+Each step is one PR. The order matters because of the open expansion work.
+
+| # | Change | Customer-visible effect |
+|---|---|---|
+| 0 | **Wait for #2487 (Oregon) and any open WA/OR registry PR to merge.** They edit `report-rights.json`, the R7 test and add Gate B rows; this work deletes or rewrites those. Do not edit their branches. | none |
+| 1 | **Measure first (read-only, `db-sql.yml`):** every `registry_id` with development rows in `app_projects` vs the registry and vs the current allowlist; every registry id with no `geo.n5_accepted_source` row. Expected: all wired sources already cleared, so step 2 changes no report. Any difference is listed by name before step 2. | none |
+| 2 | **Reports.** Remove the gate from `national-report.ts`, `changes-since-report.ts`, the three handlers and `index.ts` imports; add the provenance limitation; move the credit lines to the registry plus generated `source-attribution.json`; delete `report-rights.json`, `build-report-rights.mjs`, `test/report-rights-r7.test.mjs`, `test/report-rights-evidence.test.mjs`; update the fixture tests and mutant suites; add `test/no-source-allowlist.test.mjs`; drop the path from `report-snapshot-suite.yml`. Deploy the three functions. | none at cutover if step 1 found no difference; from then on new sources appear in reports automatically |
+| 3 | **Map 1.** Add the `geometry` field to the registry (filled from each layer's own service metadata on a runner, never typed); derive the treatment in `n5_shard.py`; keep existing `accepted_source` rows authoritative; test that no source freezes as `UNCLASSIFIED`. Takes effect with the next N5 generation. | sources wired but never classified start drawing (step 1 lists them) |
+| 4 | **Documentation.** New dated record of the 2026-11-01 decision (the quotation in §0), cited as the governing policy. Mark as superseded, without rewriting their dated content: the R7 ruling, `docs/source-clearance-evidence-template.md`, the R4/R5 references in `development-activity-*` docs, `docs/development-activity-launch-gate-2026-10-04.md`. Add a pointer at the top of the rights audit that it no longer gates outputs. Update `CLAUDE.md` and the `docs/source-registry.md` onboarding steps: a new source needs only its registry entry (and `geometry`); no rights file, no approval, no N5 classification migration. Remove "Founder cleared" wording from the onboarding pattern. | none |
+| 5 | **Tell the expansion sessions** (through the PR descriptions they read): after step 2, registry PRs no longer touch `report-rights.json` or the R7 test; after step 3, no N5 classification SQL is needed. A branch that still edits a deleted file resolves the conflict by dropping that hunk. | none |
+
+### 3.1 Rollback
+
+- Step 2: revert the PR, which restores the allowlist, generator and tests, then redeploy the three functions (as in R7
+  §4). Stored snapshots are untouched either way.
+- Step 3: revert; the next N5 generation goes back to table-only treatment. Already-active generations can be rolled
+  back with the existing `rollback` path.
+- Step 4: documentation only.
+
+### 3.2 Impact
+
+- **Maps, ZIP pages, feeds:** unchanged until step 3; then registry sources that were wired but never classified become
+  visible.
+- **Reports, PDFs, shared reports, property watch:** same output at cutover if step 1 shows no gap; afterwards every new
+  registry source is included with no owner step.
+- **Stored reports:** immutable, unchanged.
+- **Email, MAPS/Bluesky, dossiers, data centres:** they had no source gate, and nothing changes.
+
+---
+
+## 4. Open questions (factual, not approvals)
+
+1. **Rows with no `registry_id`:** keep excluding them for provenance (recommended above), or trace where they come
+   from and wire them properly. Step 1 measures them.
+2. **The rights audit document** (`corporate-output-source-rights-audit-2026-09-27.md`): kept as a dated analysis with a
+   superseded pointer (recommended), or archived.
