@@ -1,0 +1,38 @@
+name: verify-source-freshness-live
+
+# Does the source freshness box on real pages (ZIP page and Map 1) say exactly what the database says, per
+# source and per ZIP? Compares each page's rows with public.source_freshness_for_zip read with the page's
+# public anon key (scripts/probe-source-freshness-live.mjs). Read-only; no secret is used.
+# Dispatch-only: run it after a deploy. site_base defaults to https://jodytracks.com.
+
+on:
+  workflow_dispatch:
+    inputs:
+      zips:
+        description: 'Comma-separated ZIPs (default Oregon 97202,97030,97006 + Washington 98466,98101)'
+        required: false
+        default: ''
+      site_base:
+        description: 'Site to load (default https://jodytracks.com)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04   # ubuntu-latest became 26.04 (2026-10-27); Playwright 1.56 cannot install chromium there
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright (chromium)
+        run: npm init -y >/dev/null 2>&1 && npm i -D playwright@1.56.0 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Probe the live source freshness box
+        env:
+          SITE_BASE: ${{ inputs.site_base }}
+          ZIPS: ${{ inputs.zips }}
+        run: node scripts/probe-source-freshness-live.mjs
