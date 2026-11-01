@@ -58,7 +58,7 @@ ok(!existsSync(join(ROOT, 'supabase/functions/_shared/report-rights.json')), '4a
 const CREDITS = JSON.parse(read('supabase/functions/_shared/source-attribution.json') || '{}');
 ok(CREDITS && typeof CREDITS.attribution === 'object' && !JSON.stringify(CREDITS).includes('84302') && !JSON.stringify(CREDITS).toLowerCase().includes('brigham'), '4b the credit-line file is read and names no place');
 const NATIONAL = stripJs(read('supabase/functions/_shared/national-report.ts'));
-ok(NATIONAL.length > 5000 && !/zip_supported[^;]*family|family[^;]*zip_supported/.test(NATIONAL), '4c the engine does not derive inclusion from the covered-ZIP flag (positive control: the engine is read)', NATIONAL.length);
+ok(NATIONAL.length > 5000 && !/zip_supported[^;\n]*family|family[^;\n]*zip_supported/.test(NATIONAL), '4c the engine does not derive inclusion from the covered-ZIP flag (positive control: the engine is read)', NATIONAL.length);
 const JOURNEY = read('test/brigham-city-84302-journey.test.mjs');
 ok(/source-attribution\.json/.test(JOURNEY) && /readFileSync/.test(JOURNEY) && /stored\(null\)/.test(JOURNEY) && /RECORDS_NOT_TRACEABLE/.test(JOURNEY),
   '4d the journey test reads the shipped credit lines from disk and tests the provenance rule (rows with no source family) against the same location');

@@ -27,6 +27,7 @@
 // They are built separately and never split afterwards, so there is no step at which the address was ever
 // inside the permanent object.
 import './project-type.generated.js';
+import publishersFile from './source-publishers.generated.json' with { type: 'json' };
 import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
 
@@ -34,8 +35,11 @@ export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
 /**
  * national-2 (2026-10-02, 100526 plan step 2): adds the Stage dimension (`stage`, `sections.by_stage`, `stage_rule_version`).
  * national-3 (2026-10-02, step 5, founder ruling R5): adds `activity`, the report's outcome ("No development activity" vs "No data ingested").
+ * national-4 (2026-11-01): every record names its publishing agency and dataset (`source.agency`, `source.feed_ref`) and, when the official
+ *   link carries it, the agency's own record number (`source.record_id`); `title_cut` marks a title the source feed shortened; `scope` separates
+ *   minor building work from development; `coverage.source_agencies` lists the agencies in the report.
  */
-export const REPORT_VERSION = 'development-activity-national-3';
+export const REPORT_VERSION = 'development-activity-national-4';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -175,6 +179,8 @@ export type ProjectRow = {
   type_raw: string | null; status: string | null; stage: string | null; developer: string | null; size: string | null;
   investment: string | null; submitted_at: string | null; date_kind: string | null; address: string | null;
   source_ref: string | null;
+  /** app_projects.provenance as the ingest wrote it; the report reads only `case_number` from it (the agency's own record number). */
+  provenance?: Record<string, unknown> | null;
 };
 export type LedgerProject = {
   identity_key: string; registry_id: string | null; comparable: boolean; change_ready: boolean;
@@ -464,6 +470,72 @@ export function detectedChangeEntries(events: ReportableEvent[]) {
 
 // ── the assembly ─────────────────────────────────────────────────────────────────────────────────────────
 
+// ── WHOSE RECORD IT IS, WHICH RECORD, AND HOW BIG A PIECE OF WORK (national-4, 2026-11-01) ──────────────────────────────────────
+//
+// THE PUBLISHER. source-publishers.generated.json is derived mechanically from the development source registry (the one place a
+// source's agency is written down) by scripts/gen-source-publishers.mjs. A record whose source is not in the registry names no agency.
+type Publisher = { agency: string | null; dataset: string | null };
+const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { publishers?: Record<string, Publisher> }).publishers) ?? {};
+export function publisherOf(family: string | null): Publisher {
+  const p = family ? PUBLISHERS[family] : undefined;
+  return { agency: p && typeof p.agency === 'string' && p.agency.trim() ? p.agency.trim() : null, dataset: p && typeof p.dataset === 'string' && p.dataset.trim() ? p.dataset.trim() : null };
+}
+/**
+ * The agency's own record number, from the provenance the ingest stored (`case_number`), ONLY when the record's official link carries that
+ * same number. The link is the agency's record, so a number found in it is the agency's identifier for that record, not ours. A number the
+ * link does not carry is not shown: it could not be checked against the official record by the reader.
+ */
+export function recordIdOf(p: { provenance?: Record<string, unknown> | null; source_ref: string | null }): string | null {
+  const raw = p.provenance && typeof p.provenance === 'object' ? (p.provenance as Record<string, unknown>).case_number : null;
+  const id = typeof raw === 'string' || typeof raw === 'number' ? String(raw).trim() : '';
+  if (!id || id.length > 60 || !p.source_ref) return null;
+  let url = p.source_ref;
+  try { url = decodeURIComponent(p.source_ref); } catch { /* keep the raw link */ }
+  return url.includes(id) || p.source_ref.includes(id) ? id : null;
+}
+/**
+ * Every development connector stores a record's title cut to this many characters (get-address-report/sources/*.ts, `.slice(0, 120)`;
+ * test/national-report-structure.test.mjs pins the two together). A title of this length may have been cut mid-word by the feed, and the
+ * report says so instead of printing the fragment as if it were the whole description.
+ */
+export const SOURCE_TITLE_CAP = 120;
+export function titleCut(name: string | null): boolean { return typeof name === 'string' && name.length >= SOURCE_TITLE_CAP; }
+
+/**
+ * MINOR BUILDING WORK — a presentation scope, never an exclusion. A record whose own words say the work is inside an existing building, on
+ * one unit, or a like-for-like repair of a thing or a small fixture is listed in its own section; it stays in the report, with its stage, distance and
+ * official link. Positive evidence is required: a record that says nothing either way is development. Any significance phrase (new
+ * construction, demolition, a change of use, a land-use, shoreline or subdivision action, a size in stories or units, an addition...) wins
+ * over every minor phrase, so a large project that also mentions an interior or a repair is never demoted. One normalisation: lower case,
+ * every character outside a-z and 0-9 becomes a space, runs collapse, padded with spaces, so ' deck ' cannot match 'decker'.
+ */
+export function normalizeWords(s: string): string {
+  return ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+}
+export const SIGNIFICANT_WORK = [
+  ' new ', ' construct a ', ' construction of ', ' new construction ', ' demolish ', ' demolition ', ' demo ', ' shoring ', ' excavation ',
+  ' grading ', ' high rise ', ' story ', ' stories ', ' apartments ', ' townhouses ', ' townhomes ', ' dwelling units ',
+  ' change of use ', ' change use ', ' establish use ', ' master use permit ', ' land use ', ' shoreline ', ' subdivision ', ' short plat ',
+  ' plat ', ' rezone ', ' zoning ', ' variance ', ' conditional use ', ' site plan ', ' site development ', ' addition ', ' additions ',
+  ' phased permit ', ' substantial alterations ', ' substantial alteration ', ' mixed use development ', ' sepa ',
+];
+export const MINOR_WORK = [
+  ' stfi ', ' subject to field inspection ', ' interior alteration ', ' interior alterations ', ' interior remodel ', ' interior remodeling ',
+  ' bathroom remodel ', ' bath remodel ', ' kitchen remodel ', ' in kind ', ' like for like ', ' repair to ', ' repairs to ', ' repair of ',
+  ' repairs of ', ' damage repair ', ' facade repair ', ' facade repairs ', ' reroof ', ' re roof ',
+  ' window replacement ', ' replace windows ', ' replace 2 windows ', ' replace 3 windows ', ' replace 4 windows ', ' water heater ',
+  ' gas meter ', ' pergola ', ' to unit ', ' condo unit ', ' in unit ',
+];
+export type WorkScope = { key: 'development' } | { key: 'minor_work'; evidence: string };
+export function workScope(p: { name: string | null; type_raw: string | null }, typeKey?: string | null): WorkScope {
+  // a road, bridge or utility project is never "minor building work": its repairs close lanes and reroute traffic
+  if (typeKey === 'infrastructure') return { key: 'development' };
+  const words = normalizeWords((p.type_raw ?? '') + ' ' + (p.name ?? ''));
+  if (SIGNIFICANT_WORK.some((w) => words.includes(w))) return { key: 'development' };
+  const hit = MINOR_WORK.find((w) => words.includes(w));
+  return hit ? { key: 'minor_work', evidence: hit.trim() } : { key: 'development' };
+}
+
 export function assemble(input: AssembleInput): Assembled {
   const { now, subject, radius_mi, view } = input;
   if (!ALLOWED_RADII.includes(radius_mi)) throw new Error('assemble: radius_mi must be one of ' + ALLOWED_RADII.join(', '));
@@ -546,7 +618,10 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_event: ev,
       record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(recordDate(p, today)),
       developer: p.developer, size: p.size, investment: p.investment,
-      source: { url: p.source_ref, attribution: credits[family] ?? null },
+      ...(titleCut(p.name) ? { title_cut: true } : {}),
+      scope: workScope(p, t ? t.typeKey : null),
+      source: ((pub: Publisher) => ({ url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset,
+        record_id: recordIdOf(p) }))(publisherOf(family || null)),
       homesignal_observation: led
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,
@@ -608,6 +683,8 @@ export function assemble(input: AssembleInput): Assembled {
       area_truncated: truncated,
       source_families_in_report: [...familiesIncluded].filter(Boolean).sort(),
       source_feed_count: [...familiesIncluded].filter(Boolean).length,
+      // the publishing agency and dataset of each source in the report, in the families' order: the coverage note names all of them
+      source_agencies: [...familiesIncluded].filter(Boolean).sort().map((f) => ({ source_family: f, agency: publisherOf(f).agency, feed_ref: publisherOf(f).dataset })),
       assessment_basis: 'records_returned_for_this_radius',
       limitations,
     },

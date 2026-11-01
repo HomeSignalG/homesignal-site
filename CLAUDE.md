@@ -5622,6 +5622,28 @@ The frame tells the report page only `ready` / `height` / `following` / `unavail
 
 Pinned by `test/shared-report-follow-inline.browser.test.mjs` (behaviour in Chromium, fake Supabase), `test/shared-report-follow-inline.test.mjs` (shape), `test/shared-report-page*.test.mjs`, `test/shared-report-follow-handoff.test.mjs` (the fallback).
 
+## DEVELOPMENT ACTIVITY REPORT, national-4 (2026-11-01): WHOSE RECORD, WHICH RECORD, AND MINOR WORK LISTED APART
+
+Found preparing the NWMLS sample (3101 Western Ave, Seattle). All four rules live in the engine, `supabase/functions/_shared/national-report.ts`.
+The report page only renders them, and a report saved before national-4 renders exactly as before. Test: `test/report-quality-national4.test.mjs`.
+- **Every record names its publishing agency and dataset** (`source.agency`, `source.feed_ref`). Both come from
+  `_shared/source-publishers.generated.json`, which is generated from the source registry's `jurisdiction`
+  (`node scripts/gen-source-publishers.mjs`; `--check` runs in the suite).
+  - Before this, 247 of 251 cleared sources showed no agency at all: the report printed only `report-rights.json`'s `attribution`.
+  - ⛔ **That `attribution` is a credit line a publisher REQUIRES, and the file is generated.** Never add an agency name there; the
+    rights suite fails on it. The view shows the credit line when one exists, otherwise "agency (dataset)". The coverage note lists every agency.
+- **The agency's own record number** (`source.record_id`) is `app_projects.provenance.case_number` (hydrate now reads `provenance`).
+  It is shown only when the record's official link carries the same number.
+  - Records that share a title are told apart by it, e.g. three Ecology SEPA filings all titled "315 1ST AVE N".
+- **Shortened titles** (`title_cut`): every connector stores a title cut at 120 characters (`SOURCE_TITLE_CAP`, pinned to the connectors).
+  - A title at the cap ends in "…" and says the full description is in the official record.
+  - Restoring the full text (and the SEPA `proposaldescription`) is an ingest change and was not made.
+- **Minor building work** (`scope.key = 'minor_work'`): interior, single-unit, like-for-like repair and small-fixture permits go in their
+  own section with their links. They get no map number and stay in the totals.
+  - The record's own words must show it, and any significance phrase wins (new, demolish, change of use, land use, stories, addition…).
+  - Roads & infrastructure is never minor.
+  - Measured on a national 1% sample (28,301 records): 605 flagged (2.1%), and all 45 sampled hits were genuinely minor.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are
