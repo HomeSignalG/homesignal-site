@@ -13,8 +13,8 @@ const throws = (f, cls) => { try { f(); return false; } catch (e) { return cls ?
 
 // ---- the inputs the engine is given ----------------------------------------------------------------------------------------------------
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const OTHER = 'a-source-with-no-clearance';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-09-29', audit_ref: 'fixture', attribution: 'Data: WSDOT' }] };
+const OTHER = null; // no wired connector stamped this record: it cannot be traced to a source (national source policy, 2026-11-01)
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } };
 const row = (k, d, x = {}) => ({ source_key: k, feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...x });
 const proj = (k, x = {}) => ({ source_key: k, registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Proposed', stage: 'Not Yet Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-12', date_kind: 'filed', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0', ...x });
 const led = (k, x = {}) => ({ identity_key: k, registry_id: FAM, comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-09-20T19:00:00Z', last_observed_at: '2026-09-29T09:00:00Z', ...x });
@@ -31,7 +31,7 @@ const REPORT_FIELD = {
   events: [ev('k1', { created_at: '2026-09-25T10:05:00Z' })],
   health: [],
 };
-const reportOut = M.assemble({ now: NOW_REPORT, view: 'customer', zip_supported: true, radius_mi: 0.5, rights: RIGHTS, subject: SUBJECT, ...REPORT_FIELD });
+const reportOut = M.assemble({ now: NOW_REPORT, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: CREDITS, subject: SUBJECT, ...REPORT_FIELD });
 const original = { generated_at: ISSUED, body: S.snapshotBodyOf(reportOut.intelligence) };
 
 // the area NOW (2026-10-02): k1 and k2 as before, and k3, a project that was not near the property when the report was issued
@@ -42,19 +42,19 @@ const nowField = (x = {}) => ({
     proj('k1', { status: 'Operating', date_kind: 'completed', submitted_at: '2026-10-01', stage: 'Complete' }),
     proj('k2', { name: 'Weather Station Replacement', address: '520 King' }),
     proj('k3', { name: 'Fremont Bike Lane Extension', address: '100 Fremont' }),
-    proj('k4', { name: 'A Project From An Uncleared Source', registry_id: OTHER }),
+    proj('k4', { name: 'A Project With No Source Family', registry_id: OTHER }),
   ],
   ledger: [led('k1'), led('k2'), led('k3', { first_observed_at: '2026-09-30T19:00:00Z' }), led('k4', { registry_id: OTHER })],
   events: [ev('k1', { created_at: '2026-09-25T10:05:00Z' }), ev('k1', { observed_at: '2026-10-01T06:30:00Z', prev_facts: { stage: 'Approved' }, new_facts: { stage: 'Complete' }, changed_fields: ['stage'], created_at: '2026-10-01T06:35:00Z', publisher_event_type: 'completed', publisher_event_date: '2026-10-01' })],
   health: [],
   ...x,
 });
-const nearbyOut = (x = {}) => M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, rights: RIGHTS, subject: SUBJECT, ...nowField(x) });
+const nearbyOut = (x = {}) => M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: CREDITS, subject: SUBJECT, ...nowField(x) });
 const NEARBY = nearbyOut().intelligence.projects;
 const wev = (k, created, x = {}) => ({ ...ev(k, { observed_at: '2026-10-01T06:30:00Z' }), created_at: created, ...x });
 const E_K1 = wev('k1', '2026-10-01T06:35:00Z', { prev_facts: { stage: 'Approved' }, new_facts: { stage: 'Complete' }, changed_fields: ['stage'], publisher_event_type: 'completed', publisher_event_date: '2026-10-01' });
 const E_K3 = wev('k3', '2026-10-01T07:00:00Z', { event_type: 'first_detected', observed_at: '2026-09-30T19:00:00Z', prev_facts: null, new_facts: { status: 'Proposed', stage: 'Not Yet Advertised' }, changed_fields: [], publisher_event_type: 'filed', publisher_event_date: '2026-09-12' });
-const base = (o = {}) => ({ now: NOW, rights: RIGHTS, original, nearby: NEARBY, ledger: nowField().ledger, events: [], health: [], seen: [], ...o });
+const base = (o = {}) => ({ now: NOW, attribution: CREDITS, original, nearby: NEARBY, ledger: nowField().ledger, events: [], health: [], seen: [], ...o });
 const check = (o = {}) => W.checkWatch(base(o));
 
 // ---- 1. nothing happened ----------------------------------------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ const check = (o = {}) => W.checkWatch(base(o));
   const k3 = r.changes.find((c) => c.project_id === 'k3');
   ok(k3.entries[0].event_type === 'first_detected' && k3.entries[0].changes.length === 0 && k3.entries[0].publisher_event.kind === 'filed', '3b as a new official record, with the publisher\'s filing event');
   // CONTROL: Changes Since Report, asked over the SAME events, cannot see k3 — it covers the projects IN the report and says so
-  const since = C.changesSinceReport({ now: NOW, view: 'customer', rights: RIGHTS, report: { report_id: '11111111-1111-4111-8111-111111111111', content_hash: 'h'.repeat(64), report_version: M.REPORT_VERSION, ...original },
+  const since = C.changesSinceReport({ now: NOW, view: 'customer', attribution: CREDITS, report: { report_id: '11111111-1111-4111-8111-111111111111', content_hash: 'h'.repeat(64), report_version: M.REPORT_VERSION, ...original },
     ledger: nowField().ledger, events: [E_K1, E_K3], health: [] });
   ok(!since.changed.some((c) => c.project_id === 'k3') && since.limitations.some((l) => l.code === 'NEW_PROJECTS_NOT_COVERED') && since.changed.some((c) => c.project_id === 'k1'),
     '3c (control) Changes Since Report, over the same events, reports k1 and not k3 and says new projects are not covered: the watch is what covers them', since.changed.map((c) => c.project_id));
@@ -187,7 +187,7 @@ const check = (o = {}) => W.checkWatch(base(o));
 {
   // k4's source is not cleared. Even handed to the check as a nearby project with a real event, a customer-view check reports nothing about it:
   // the rights decision is the report's own, and the Watch asks it with the CUSTOMER view.
-  const k4 = { project_id: 'k4', source_family: OTHER, name: 'A Project From An Uncleared Source', type: null, lifecycle: null, source: { url: 'https://example.gov/k4' }, homesignal_detected_changes: [] };
+  const k4 = { project_id: 'k4', source_family: OTHER, name: 'A Project With No Source Family', type: null, lifecycle: null, source: { url: 'https://example.gov/k4' }, homesignal_detected_changes: [] };
   const E_K4 = wev('k4', '2026-10-01T07:30:00Z', { event_type: 'first_detected', prev_facts: null, new_facts: { status: 'Proposed' }, changed_fields: [] });
   const r = check({ nearby: [...NEARBY, k4], events: [E_K1, E_K4] });
   ok(same(r.changes.map((c) => c.project_id), ['k1']), '11a a nearby project from a source that is not cleared is never reported, even with a real event (control: k1 beside it is)', r.changes.map((c) => c.project_id));

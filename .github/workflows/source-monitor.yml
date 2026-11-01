@@ -45,12 +45,29 @@ concurrency:
 
 jobs:
   monitor:
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-latest
     # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
     # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
     # at $0. Measured max successful run: 11.6 min -> bound 45.
     timeout-minutes: 45
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
@@ -62,10 +79,13 @@ jobs:
         id: monitor
         env:
           SOURCE_MONITOR_OUT_DIR: ${{ runner.temp }}/source-monitor
+          # The dispatch inputs reach the shell through env, never expanded into the script.
+          DRY_RUN_INPUT: ${{ github.event.inputs.dry_run }}
+          INCLUDE_WIRED_INPUT: ${{ github.event.inputs.include_wired }}
         run: |
           ARGS=""
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
-          if [ "${{ github.event.inputs.include_wired }}" = "true" ]; then ARGS="--dry-run --include-wired"; fi
+          if [ "$DRY_RUN_INPUT" = "true" ]; then ARGS="--dry-run"; fi
+          if [ "$INCLUDE_WIRED_INPUT" = "true" ]; then ARGS="--dry-run --include-wired"; fi
           mkdir -p "$SOURCE_MONITOR_OUT_DIR"
           # tee hides node's exit code (no pipefail), so keep it: a crash must not pass green. The
           # outputs below are still written, and every later step runs under always().
@@ -158,11 +178,13 @@ jobs:
       # not enough — a scoreboard throw would then have SKIPPED the evidence step, and the
       # monitor's evidence would die with it, which is the same class of mistake in a new place.
       #
-      # Public reads use the committed anon key from config.js. The ONE internal read (dev_zip_source_ids) needs the repo's
-      # existing SUPABASE_SERVICE_ROLE_KEY secret, scoped to this step only: anon lost SELECT on app_zip_source_ids on 2026-09-26
+      # Public reads use the committed anon key from config.js. The ONE internal read (dev_zip_source_ids) needs the service
+      # role key, scoped to this step only: anon lost SELECT on app_zip_source_ids on 2026-09-26
       # (phase1_revoke_anon_internal_read_surface) and this step has failed with HTTP 401 / 42501 every night since.
+      # Since PR #2244 the key is PROD_SUPABASE_SERVICE_ROLE_KEY from the environment `production`, and the if: also
+      # needs the boundary step not to have refused: always() alone would still hand the key to a refused dispatch.
       - name: Live scoreboard (ranked work list)
-        if: always()
+        if: always() && steps.boundary.outcome != 'failure'
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/live-scoreboard.mjs

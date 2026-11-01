@@ -7,7 +7,7 @@ name: load-openaddresses
 # filter → canonical key → service-role upsert. No per-state custom code.
 #
 # Runs on the GitHub runner because it needs egress (the build sandbox cannot reach
-# data.openaddresses.io / *.supabase.co). Writes with SUPABASE_SERVICE_ROLE_KEY (repo secret) —
+# data.openaddresses.io / *.supabase.co). Writes with PROD_SUPABASE_SERVICE_ROLE_KEY (environment `production`) —
 # national_address_points is RLS service-role only. Manual/monthly; new ZIPs picked up with no code
 # change (scope derives from property_reports unless ZIPS is passed).
 
@@ -31,18 +31,38 @@ on:
                            # re-derives scope from property_reports, so a newly-ingested state's
                            # region is picked up automatically with no code change.
 
+permissions:
+  contents: read
+
 jobs:
   load:
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Load OpenAddresses into national_address_points
         env:
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PROD_SUPABASE_SERVICE_ROLE_KEY }}
           ZIPS: ${{ github.event.inputs.zips }}
           STATES: ${{ github.event.inputs.states }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}

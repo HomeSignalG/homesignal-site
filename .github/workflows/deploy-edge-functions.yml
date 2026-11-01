@@ -6,8 +6,9 @@ name: deploy-edge-functions
 # non-technical founder never has to run anything locally. This is the durable replacement for the
 # MCP inline-bundle deploy (which has a ~30 KB payload ceiling and must be hand-transmitted).
 #
-# ONE-TIME SETUP (repo → Settings → Secrets and variables → Actions):
-#   • SUPABASE_ACCESS_TOKEN — a personal access token from https://supabase.com/dashboard/account/tokens
+# ONE-TIME SETUP (repo → Settings → Environments → production → Environment secrets):
+#   • PROD_SUPABASE_ACCESS_TOKEN — a Supabase access token (since PR #2244 an ENVIRONMENT secret,
+#     issued only to ref main; it was the repository secret SUPABASE_ACCESS_TOKEN before that)
 #   (SUPABASE_PROJECT_REF is hard-coded below; it is not a secret — it's in docs already.)
 #
 # Manual by default so a deploy is always a deliberate act. Flip `push:` on if you want
@@ -26,12 +27,16 @@ on:
   #   paths:
   #     - 'supabase/functions/get-address-report/**'
 
+permissions:
+  contents: read
+
 concurrency:
   group: deploy-edge-${{ github.event.inputs.function || 'get-address-report' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
+    environment: { name: production, deployment: false }
     runs-on: ubuntu-latest
     # Bound added 2026-08-02: an unbounded job inherits GitHub's 6-HOUR default, which is how
     # verify-geocodes burned 11 consecutive 6 h cancellations on an account previously halted
@@ -40,18 +45,36 @@ jobs:
     env:
       SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
     steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
       - uses: actions/checkout@v4
 
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3, what @v1 resolved to on 2026-10-25
         with:
           version: latest
 
       - name: Deploy edge function (byte-exact, from repo source)
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
+          # The dispatch input reaches the shell through env, never expanded into the script.
+          FN_INPUT: ${{ github.event.inputs.function || 'get-address-report' }}
         run: |
-          FN="${{ github.event.inputs.function || 'get-address-report' }}"
+          FN="$FN_INPUT"
           echo "Deploying edge function: $FN → project $SUPABASE_PROJECT_REF"
           # --no-verify-jwt for exactly THREE functions. (1) The report engine: it authenticates via the
           # anon apikey at the gateway and is called from the browser + pg_net with no per-request JWT
@@ -94,7 +117,7 @@ jobs:
       # run computed from, so staleness is independently checkable (see the migration file).
       - name: Recompute + load registry_incomplete_entries (fail-loud)
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
           echo "--- computed exclusion list:"

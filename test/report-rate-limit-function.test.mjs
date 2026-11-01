@@ -32,7 +32,7 @@ const USER = '0f0e4d2c-1b3a-4c5d-8e9f-a1b2c3d4e5f6';
 const KEY = '3b2c1d4e-5f60-4718-8a9b-0c1d2e3f4a5b';
 const BKID = 'b0b0b0b0-1111-4222-8333-444444444444';
 const FAM = 'fixture-family-not-a-real-source';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'fixture', attribution: 'Data: fixture' }] };
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: fixture' } };
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Fixture Bridge', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.test/record' };
 const PLAN = (over = {}) => ({ brokerage_id: BKID, role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null, ...over });
@@ -44,7 +44,7 @@ function build(over = {}) {
   const calls = [], args = {};
   const rec = (name, fn) => async (...a) => { calls.push(name); args[name] = a; return fn(...a); };
   const base = {
-    now: () => NOW, rights: RIGHTS,
+    now: () => NOW, attribution: CREDITS,
     authenticate: async (t) => (t === 'member' ? { email: 'agent@example.test', id: USER } : t === 'admin' ? { email: 'founder@example.test' } : null),
     isAdmin: async (e) => e === 'founder@example.test',
     geocode: async () => ({ matchedAddress: '20 N MAIN ST, BRIGHAM CITY, UT, 84302', lat: 41.5109, lng: -112.0156, zip: '84302' }),
@@ -177,7 +177,7 @@ const didWork = (calls) => WORK.filter((w) => calls.includes(w));
   const r = await ask(f.deps, REQ);
   const cr = r.json?.credit;
   ok(cr?.uses_report === true && r.json?.allotment === 'trial' && r.json?.trial?.credits_used === 4 && r.json?.trial?.credits_remaining === 6, '5a an allowed request is charged exactly as before: the free allotment, one used', r.json?.trial);
-  const none = build({ rights: { version: 1, cleared: [] } });
+  const none = build({ radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: null, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }], hydrate: async () => [{ ...proj, registry_id: null }] });
   const rn = await ask(none.deps, REQ);
   ok(rn.status === 200 && rn.json?.report?.activity?.outcome === 'NO_DATA_INGESTED' && rn.json?.charged === false && !none.calls.includes('issue') && none.calls.filter((c) => c === 'rateClaim').length === 1,
     '5b a "No data ingested" request is free of charge and NOT free of the limiter: it is exactly the unlimited work the limit exists for', [rn.status, rn.json?.report?.activity?.outcome, none.calls]);
@@ -226,7 +226,7 @@ const verdict = async (data, error) => { try { return await R.makeRateReads(rpcO
 {
   const seen = [];
   const answer = (status, body) => async (url, init = {}) => { seen.push({ url: String(url), method: init.method, headers: init.headers, body: init.body }); return new Response(JSON.stringify(body), { status }); };
-  const make = (f) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', rights: RIGHTS, now: () => NOW }, f);
+  const make = (f) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', attribution: CREDITS, now: () => NOW }, f);
   let deps = make(answer(200, [{ allowed: true, retry_after_seconds: 0, limited_by: null, limited_window_secs: null }]));
   const v = await deps.rateClaim?.(USER);
   ok(v?.allowed === true && seen.length === 1 && seen[0].url === 'https://proj.supabase.co/rest/v1/rpc/report_rate_claim' && seen[0].method === 'POST' && JSON.stringify(JSON.parse(seen[0].body)) === JSON.stringify({ p_user: USER }),
@@ -246,7 +246,7 @@ const verdict = async (data, error) => { try { return await R.makeRateReads(rpcO
     if (u.pathname === '/rest/v1/rpc/report_rate_claim') return new Response(JSON.stringify([{ allowed: false, retry_after_seconds: 12, limited_by: 'brokerage', limited_window_secs: 60 }]), { status: 200 });
     throw new Error('unexpected request ' + u.pathname);
   };
-  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', rights: RIGHTS, now: () => NOW }, fetchFn);
+  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', attribution: CREDITS, now: () => NOW }, fetchFn);
   const handler = H.makeHandler({ ...real,
     authenticate: async () => ({ email: 'agent@example.test', id: USER }), isAdmin: async () => false,
     trialOf: async () => ({ status: 'active', credits_used: 0, credits_remaining: 10, expired: false }), planOf: async () => PLAN() });

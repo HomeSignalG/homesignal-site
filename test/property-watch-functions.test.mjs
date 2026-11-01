@@ -243,8 +243,8 @@ const MUTATING = ['startWatch', 'watchesOf', 'stopWatch', 'addressOf'];
 // ---- 3 + 4. run-property-watch -----------------------------------------------------------------------------------------------------------------------------------
 // The report is produced by the REAL engine, so the watch is proven against the shapes the engine writes.
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const OTHER = 'a-source-with-no-clearance';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-09-29', audit_ref: 'fixture', attribution: 'Data: WSDOT' }] };
+const OTHER = null; // no wired connector stamped this record: it cannot be traced to a source (national source policy, 2026-11-01)
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } };
 const row = (k, d, x = {}) => ({ source_key: k, feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...x });
 const proj = (k, x = {}) => ({ source_key: k, registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Proposed', stage: 'Not Yet Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-12', date_kind: 'filed', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/X/FeatureServer/0', ...x });
 const led = (k, x = {}) => ({ identity_key: k, registry_id: FAM, comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-09-20T19:00:00Z', last_observed_at: '2026-09-29T09:00:00Z', ...x });
@@ -257,7 +257,7 @@ const POINT = { lat: 44.04612345, lng: -122.98123456 };
 const SUBJECT = { address: PRIVATE_ADDRESS, matched_address: PRIVATE_ADDRESS.toUpperCase(), lat: POINT.lat, lng: POINT.lng, zip: '97477', label: PRIVATE_LABEL };
 const NOW_REPORT = new Date('2026-09-29T12:00:00Z');
 const ISSUED = '2026-09-29T12:00:05.000Z';
-const reportOut = M.assemble({ now: NOW_REPORT, view: 'customer', zip_supported: true, radius_mi: 0.5, rights: RIGHTS, subject: SUBJECT,
+const reportOut = M.assemble({ now: NOW_REPORT, view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: CREDITS, subject: SUBJECT,
   rows: [row('k1', 0.21), row('k2', 0.37)], projects: [proj('k1', { status: 'Approved', date_kind: 'issued', submitted_at: '2026-09-24' }), proj('k2', { name: 'Weather Station Replacement', address: '520 King' })],
   ledger: [led('k1'), led('k2', { change_ready: false, observation_count: 1 })], events: [ev('k1', { created_at: '2026-09-25T10:05:00Z' })], health: [] });
 const STORED_BODY = S.snapshotBodyOf(reportOut.intelligence);
@@ -269,7 +269,7 @@ const AREA = {
     proj('k1', { status: 'Operating', date_kind: 'completed', submitted_at: '2026-10-01', stage: 'Complete' }),
     proj('k2', { name: 'Weather Station Replacement', address: '520 King' }),
     proj('k3', { name: 'Fremont Bike Lane Extension', address: '100 Fremont' }),
-    proj('k4', { name: 'A Project From An Uncleared Source', registry_id: OTHER }),
+    proj('k4', { name: 'A Project With No Source Family', registry_id: OTHER }),
   ],
   ledger: [led('k1'), led('k2'), led('k3', { first_observed_at: '2026-09-30T19:00:00Z' }), led('k4', { registry_id: OTHER })],
   events: [ev('k1', { created_at: '2026-09-25T10:05:00Z' })],
@@ -291,7 +291,7 @@ function rdeps(over = {}) {
   const area = over.area ?? AREA;
   const d = {
     now: () => (over.now ?? NOW),
-    rights: over.rights ?? RIGHTS,
+    attribution: over.attribution ?? CREDITS,
     secret: over.secret ?? SECRET,
     emailConfigured: over.emailConfigured ?? true,
     claim: rec('claim', over.claim ?? (async () => [CLAIMED])),
@@ -484,7 +484,7 @@ const RECORDING = ['recordRun', 'recordFailure', 'endWatch'];
     ['the mail provider refuses', { send: async () => { throw new E.EmailFailed('http 422'); } }, 'EMAIL_FAILED', true],
     ['the stored body is not JSON', { openReport: async () => ({ report_id: REPORT, number: 3, generated_at: ISSUED, body: 'not json', private_context_id: CTX }) }, 'READ_FAILED', false],
     ['the stored body names no ZIP', { openReport: async () => ({ report_id: REPORT, number: 3, generated_at: ISSUED, body: '{"product":"x"}', private_context_id: CTX }) }, 'READ_FAILED', false],
-    ['the rights registry is malformed', { rights: { nonsense: true } }, 'READ_FAILED', false],
+    ['the rights registry is malformed', { attribution: { nonsense: true } }, 'READ_FAILED', false],
   ];
   let allOk = true;
   for (const [why, over, outcome, sendTried] of cases) {
@@ -606,15 +606,15 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
     [/api\.resend\.com\/emails$/, (init) => { sent.push(init); return json({ id: 'msg_1' }); }],
     [/property_watch\?select=watch_id/, () => json([{ watch_id: WATCH }, { watch_id: WATCH2 }])],
   ]);
-  const deps = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
+  const deps = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
   ok(deps.emailConfigured === true && deps.secret === SECRET, '5e the data layer carries the configuration it was given');
   const to = await deps.recipientOf(UID);
   const lookup = reqs.find((r) => /auth\/v1\/admin\/users/.test(r.url));
   ok(to === AGENT_EMAIL && lookup.url === 'https://proj.supabase.co/auth/v1/admin/users/' + UID && lookup.headers.Authorization === 'Bearer ' + KEY && lookup.method === 'GET', '5f the agent\'s address is read from the auth service, by id, with the service key, and returned trimmed');
   ok(await kind(() => deps.recipientOf('nope')) === 'DataUnavailable' && reqs.length === 1, '5g an id that is not a UUID makes no request');
-  const miss = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({}, 404)]]).f);
-  const down = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({}, 500)]]).f);
-  const nomail = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({ email: 'not an address' })]]).f);
+  const miss = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({}, 404)]]).f);
+  const down = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({}, 500)]]).f);
+  const nomail = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY }, stub([[/auth\/v1\/admin\/users/, () => json({ email: 'not an address' })]]).f);
   ok(await kind(() => miss.recipientOf(UID)) === 'NoRecipient' && await kind(() => down.recipientOf(UID)) === 'DataUnavailable' && (await nomail.recipientOf(UID)) === null,
     '5h no such user is NoRecipient, an auth service that fails is DataUnavailable (never "no address"), and an address that cannot be mailed is null');
   await deps.send({ from: 'HomeSignal <noreply@homesignal.net>', to: AGENT_EMAIL, subject: 'S', text: 'T', html: '<p>H</p>' }, 'watch-abc');
@@ -623,14 +623,14 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
      && same(mail.body.to, [AGENT_EMAIL]) && mail.body.from === 'HomeSignal <noreply@homesignal.net>', '5i an email is one POST to the mail provider with the mail key, the idempotency key and one recipient');
   ok(!JSON.stringify(reqs.filter((r) => !/api\.resend\.com/.test(r.url))).includes(MAILKEY) && !JSON.stringify(mail).includes(KEY), '5j the mail key goes only to the mail provider and the service key never does');
   for (const [status, label] of [[422, 'http 422'], [429, 'http 429'], [500, 'http 500']]) {
-    const bad = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY }, stub([[/api\.resend\.com/, () => json({ message: 'invalid to ' + AGENT_EMAIL, name: 'validation_error' }, status)]]).f);
+    const bad = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY }, stub([[/api\.resend\.com/, () => json({ message: 'invalid to ' + AGENT_EMAIL, name: 'validation_error' }, status)]]).f);
     let msg = null;
     try { await bad.send({ from: 'x', to: AGENT_EMAIL, subject: 's', text: 't', html: 'h' }, 'k'); } catch (e) { msg = e instanceof E.EmailFailed ? e.message : 'wrong class'; }
     ok(msg === label, '5k a provider refusal is EmailFailed with a fixed reason (' + label + '), never the provider\'s text (which echoes the recipient)', msg);
   }
-  const unreachable = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY }, async () => { throw new Error('connect ECONNREFUSED'); });
+  const unreachable = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY }, async () => { throw new Error('connect ECONNREFUSED'); });
   ok(await kind(() => unreachable.send({ from: 'x', to: AGENT_EMAIL, subject: 's', text: 't', html: 'h' }, 'k')) === 'EmailFailed', '5l a provider that cannot be reached is EmailFailed');
-  const nokey = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: '' }, f);
+  const nokey = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: '' }, f);
   const before = reqs.length;
   ok(nokey.emailConfigured === false && await kind(() => nokey.send({ from: 'x', to: AGENT_EMAIL, subject: 's', text: 't', html: 'h' }, 'k')) === 'EmailFailed' && reqs.length === before, '5m with no mail key nothing is sent, and the data layer says it is not configured');
   ok(await kind(() => deps.send({ from: 'x', to: 'not an address', subject: 's', text: 't', html: 'h' }, 'k')) === 'EmailFailed' && reqs.filter((r) => /resend/.test(r.url)).length === 1, '5n an address that cannot be mailed is refused before any request');
@@ -643,7 +643,7 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
     [/app_projects\?/, () => json([proj('k1')])],
     [/dev_change_project\?/, () => json([led('k1')])],
   ]);
-  const deps = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
+  const deps = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
   await deps.radius(44.1, -122.9, 0.5);
   const rad = reqs[0];
   ok(rad.url.endsWith('/rest/v1/rpc/n5_projects_within_radius') && same(rad.body, { p_lat: 44.1, p_lng: -122.9, p_radius_mi: 0.5, p_limit: 1000 }), '5p the area is the canonical spatial read with the report\'s own limit');
@@ -655,7 +655,7 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
 // ---- 6. found by the mutation loop: a malformed rights registry, and the private layer's point window ----------------------------------------------
 {
   // a rights registry that cannot be read must fail the check, never read as "everything is cleared"
-  const { d, log } = rdeps({ rights: { version: 1, cleared: 'everything' } });
+  const { d, log } = rdeps({ attribution: { version: 1, attribution: 'everything' } });
   const r = await quietly(() => run(d, {}));
   const fail = callOf(log, 'recordFailure');
   ok(r.status === 200 && r.json.failed === 1 && r.json.notified === 0 && fail && fail[1] === WATCH && fail[2] === 'READ_FAILED' && !names(log).includes('send') && !names(log).includes('recordRun'),
@@ -709,7 +709,7 @@ const CFG = { url: 'https://proj.supabase.co', serviceKey: KEY };
   const { f } = stub([
     [/api\.resend\.com\/emails$/, (init) => { sent.push(JSON.parse(init.body)); return json({ id: 'msg_rt' }); }],
   ]);
-  const real = RD.makeDeps({ ...CFG, rights: RIGHTS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
+  const real = RD.makeDeps({ ...CFG, attribution: CREDITS, secret: SECRET, resendKey: MAILKEY, now: () => NOW }, f);
   const { d, log } = rdeps({ send: real.send });
   const r = await quietly(() => run(d, {}));
   const want = BR.PUBLIC_REPLY_TO;

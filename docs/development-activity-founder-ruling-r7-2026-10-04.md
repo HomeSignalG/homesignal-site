@@ -1,5 +1,9 @@
 # Development Activity — founder ruling R7, 2026-10-04: every registry source may appear in a paid report
 
+> **SUPERSEDED — 2026-11-01 national source policy** (`docs/national-source-policy-2026-11-01.md`). This document is
+> kept as history. It no longer decides what may appear on maps, feeds or Development Activity Reports. Do not
+> reintroduce per-source clearance, terms verification, a class approval or a review queue on the strength of it.
+
 Dated record. It is not edited afterwards. The list in section 2 is generated from the jurisdiction registry by
 `scripts/build-report-rights.mjs` and checked against it by `test/report-rights-r7.test.mjs`; a different list is a new ruling (R8), not an edit.
 

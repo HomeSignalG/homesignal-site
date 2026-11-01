@@ -216,6 +216,23 @@ the exact problem `QUEUE.md` exists to end.
 ---
 
 
+## NATIONAL SOURCE POLICY ⚖️ FOUNDER DECISION (2026-11-01) — NO PER-SOURCE APPROVAL, ANYWHERE
+
+**Official government development records flow into maps, feeds and Development Activity Reports without owner approval.**
+Record of the decision, in the founder's words: `docs/national-source-policy-2026-11-01.md`. Removal plan and audit:
+`docs/national-source-eligibility-architecture-2026-11-01.md`.
+- **A record needs its source family and its official record link**, plus the existing accuracy rules. A record with no
+  source family is left out (provenance) and the report says so; trace it and restore its family rather than dropping data.
+- ⛔ **Do not reintroduce** a per-source allowlist, a terms check, a "silent or permissive" check, a class approval or a
+  review queue. `supabase/functions/_shared/report-rights.json`, `scripts/build-report-rights.mjs` and the R7 tests are
+  deleted; `test/no-source-allowlist.test.mjs` fails if any comes back.
+- **Adding a source is its registry entry.** No rights file edit, no fingerprint, no founder approval.
+- **Credit lines** a publisher requires live in `supabase/functions/_shared/source-attribution.json` (3 today). Absence
+  means "no credit", never "excluded". Add a line only with the publisher's own evidence on file.
+- **Known legal restrictions still apply:** a source whose own written terms forbid commercial use is not wired (NDDOT work
+  zones). Nobody has to go looking for terms.
+- Superseded and kept as history, each with a notice: the R7 ruling, the September rights audit, the clearance template.
+
 ## INDEX-ALL POLICY ⚖️ FOUNDER RULING (2026-10-26) — SUPERSEDES RULE F / RULE D ROBOTS GATING
 
 **Every public page on JODY TRACKS is allowed to be indexed. No automated quality-based indexing exclusions.**
@@ -499,7 +516,24 @@ and that is worth recording as dead before anyone tries it again.
 session: two PRs opened, check runs read, both merged, and **eight workflow dispatches** —
 zero prompts throughout, against a Supabase prompt on every SQL call.
 
-**The loop, for any read-only question:**
+🛑 **SUPERSEDED BY PR #2244 IN THIS REPO: `db-sql.yml` NOW RUNS ONLY FROM `main`.** It moved into the GitHub
+environment `production` (deployment branches: main only), so a dispatch with `ref=<a branch>` is refused
+before any step runs (proven 2026-10-25 on `verify-production-environment`, which names the same environment:
+a branch dispatch got no runner and no step). That was the point:
+the branch loop let branch code choose SQL and run it as `postgres` through the write endpoint. **Read with
+`db-read.yml` instead** (read-only endpoint, read-only role, main's code):
+1. Write the query to **`docs/adhoc/query.sql`** on the working branch, and push the branch.
+2. Dispatch **`db-read.yml` with `ref=main`**, `sql_ref=<that branch>`, `sql_file=docs/adhoc/query.sql`.
+   The branch is read as data only: one blob, nothing from it runs.
+3. Read the result from the job log, between `----- BEGIN RESULT -----` and `END`.
+
+**Measured end to end** (site run `40202945217`, 2026-10-25): `HTTP 201`, live values returned (the
+acquisition dashboard snapshot of 13:19Z that day, 11 tabs). ⚠️ This repo is public, so the job log is
+world-readable: do not select from `auth.*`, `vault.*` or tables holding subscriber data (see the
+`db-read.yml` header; the read-only role can read them). The scratch-file hazard below still applies.
+The ingest repo's own `db-sql.yml` is a separate workflow and is not affected by this change.
+
+*(The original loop, kept as the dated record; in this repo step 3 is now refused:)*
 1. Write the query to **`docs/adhoc/query.sql`** on the working branch.
 2. Push the branch.
 3. Dispatch **`db-sql.yml`** with `sql_file=docs/adhoc/query.sql` and `ref=<that branch>`.
@@ -1387,6 +1421,36 @@ just ship it. "Should I deploy?", "is it done?", "a feed isn't wired", "CI went 
     **28,263** failures on 2026-09-14, before any of that day's work. Diff the count and the
     failure CLASS against a pre-change run; a red badge alone says nothing. It also reports a
     **negative** `Passed:` count when failures exceed pages, which will mislead the next reader.
+- 🔒 **PRODUCTION SUPABASE KEYS COME ONLY FROM THE GITHUB ENVIRONMENT `production` (PR #2244).** The founder
+  created it on 2026-10-23: deployment branches **main only**, admin bypass **off**, no reviewers. It holds
+  `PROD_SUPABASE_SERVICE_ROLE_KEY` and `PROD_SUPABASE_ACCESS_TOKEN`. `PROD_SUPABASE_DB_URL` is **deferred**
+  (founder, 2026-10-23: the database password is not on record and a reset was declined for now).
+  - **Why:** this repo is public, and a job that names a repository secret hands it to whatever code the job
+    runs, including a branch's (a dispatch with `ref=<branch>`, or a push to any branch). An environment
+    secret reaches only jobs on `main`. Proven 2026-10-25: `verify-production-environment` from `main`
+    passed every check (the deferred database-URL rows read DEFERRED, by design); the same dispatch from a
+    branch got no runner and ran no step.
+  - **Every job that holds a PROD_ key** carries `environment: { name: production, deployment: false }` on
+    the line right before `runs-on:`, and its FIRST step is the canonical boundary step (it refuses a
+    dispatch unless both `github.actor` and `github.triggering_actor` are `HomeSignalG`). Dispatch inputs
+    reach the shell through `env:`, never as `${{ }}` inside `run:`. The text and every list live in
+    `test/lib/production-boundary.mjs`; `test/production-boundary.test.mjs` checks every workflow against
+    them (and `test/production-boundary-new-workflows.test.mjs` checks `db-read` / `verify` more strictly).
+    **Copy an existing production job when adding one; never retype the boundary step.**
+  - **21 jobs in 18 workflows** use the environment: the 2 built for it (`db-read`, `verify-production-
+    environment`) and 19 moved onto it by PR #2244 (including `n5-generation`, `maps-social-image`,
+    `source-monitor`, `deploy-edge-functions`, `db-sql`, `phase2-b1-zcta`). Scheduled runs and the database's
+    own dispatches (pg_cron `n5-generation-dispatch`, which runs as `HomeSignalG`) pass the boundary.
+  - **Still on repository secrets, by design:** the 24 jobs in `DEFERRED_DB_URL_JOBS` read the repository
+    `SUPABASE_DB_URL` until `PROD_SUPABASE_DB_URL` exists (the list may only shrink), and
+    `db-migrate-decide` reads its token from its OWN protected environment `prod-db-write`
+    (`OTHER_ENVIRONMENT`).
+  - **`db-sql.yml` and `deploy-edge-functions.yml` now run only from `main`.** Merge first, then dispatch.
+    Database reads from a branch go through `db-read.yml` (see the read-path section above).
+  - **Open founder step:** delete the repository secrets `SUPABASE_SERVICE_ROLE_KEY` and
+    `SUPABASE_ACCESS_TOKEN` once the moved jobs have run green from the environment. Before deleting
+    `SUPABASE_ACCESS_TOKEN`, check that Settings → Environments → `prod-db-write` lists its own
+    `SUPABASE_ACCESS_TOKEN`, or the migration runner loses its token. Keep `SUPABASE_DB_URL`.
 
 ## 6. Related repos & services
 - **`homesignal-ingest`** — the alert engine (feeds, scraping, grading, topic
@@ -3002,6 +3066,12 @@ Receipt: `docs/dc-atlas-phase-a-deploy-receipt-2026-09-25.md`.
       - ⚠️ **Still open:** all of these workflows can be dispatched from any branch with the secrets. Only
         the protected `production` environment closes that (founder step 9; draft #1333 is the earlier
         version of the workflow half).
+        - ✅ **Closed for these three, and for `dc-atlas-dryrun`, by PR #2244.** Their jobs run in the
+          environment `production` (main only, no reviewers by design; see §5's production-keys bullet), so a
+          branch dispatch gets no runner, and that withholds the repository `SUPABASE_DB_URL` they read too.
+          **Still open:** jobs that read ONLY the repository `SUPABASE_DB_URL` (e.g. `dc-atlas-phase-a-proof`;
+          the full list is `DEFERRED_DB_URL_JOBS` in `test/lib/production-boundary.mjs`), until
+          `PROD_SUPABASE_DB_URL` exists.
   - ⏳ **It is a DATED receipt:** it refuses to run once production resolves anything after the 15:25/15:35
     runs it replays. Re-deriving it later needs a new boundary, not a re-run.
   - 🔑 **Phase A also changed ACQUISITION, and that path had to be bounded separately.**
@@ -5604,6 +5674,28 @@ daily sync): homesignal-ingest CLAUDE.md "SALESHANDY CAMPAIGN STATS".
 The frame tells the report page only `ready` / `height` / `following` / `unavailable` by `postMessage`; the page accepts a message only from its own frame (`e.source`) on its own origin, then flips BOTH buttons to "Following this property ✓". Nothing about the brokerage, agent, link or report goes into the follow, and the report is not re-fetched (no regeneration, no credit). With no address on file (private layer purged) neither button shows. The buttons' `href` (`https://homesignal.net/#follow=<address>`, handled by `index.html` -> `HS.consumeFollowHandoff`) is the no-script / frame-unavailable fallback and still works. **Known limit:** on a later visit the report cannot know the visitor already follows the property (it has no session); re-confirming returns the idempotent "existing" result and the button still ends at "Following this property". Events: `shared_report_follow_clicked` / `_completed`, no payload.
 
 Pinned by `test/shared-report-follow-inline.browser.test.mjs` (behaviour in Chromium, fake Supabase), `test/shared-report-follow-inline.test.mjs` (shape), `test/shared-report-page*.test.mjs`, `test/shared-report-follow-handoff.test.mjs` (the fallback).
+
+## DEVELOPMENT ACTIVITY REPORT, national-4 (2026-11-01): WHOSE RECORD, WHICH RECORD, AND MINOR WORK LISTED APART
+
+Found preparing the NWMLS sample (3101 Western Ave, Seattle). All four rules live in the engine, `supabase/functions/_shared/national-report.ts`.
+The report page only renders them, and a report saved before national-4 renders exactly as before. Test: `test/report-quality-national4.test.mjs`.
+- **Every record names its publishing agency and dataset** (`source.agency`, `source.feed_ref`). Both come from
+  `_shared/source-publishers.generated.json`, which is generated from the source registry's `jurisdiction`
+  (`node scripts/gen-source-publishers.mjs`; `--check` runs in the suite).
+  - Before this, 247 of 251 cleared sources showed no agency at all: the report printed only `report-rights.json`'s `attribution`.
+  - ⛔ **That `attribution` is a credit line a publisher REQUIRES, and the file is generated.** Never add an agency name there; the
+    rights suite fails on it. The view shows the credit line when one exists, otherwise "agency (dataset)". The coverage note lists every agency.
+- **The agency's own record number** (`source.record_id`) is `app_projects.provenance.case_number` (hydrate now reads `provenance`).
+  It is shown only when the record's official link carries the same number.
+  - Records that share a title are told apart by it, e.g. three Ecology SEPA filings all titled "315 1ST AVE N".
+- **Shortened titles** (`title_cut`): every connector stores a title cut at 120 characters (`SOURCE_TITLE_CAP`, pinned to the connectors).
+  - A title at the cap ends in "…" and says the full description is in the official record.
+  - Restoring the full text (and the SEPA `proposaldescription`) is an ingest change and was not made.
+- **Minor building work** (`scope.key = 'minor_work'`): interior, single-unit, like-for-like repair and small-fixture permits go in their
+  own section with their links. They get no map number and stay in the totals.
+  - The record's own words must show it, and any significance phrase wins (new, demolish, change of use, land use, stories, addition…).
+  - Roads & infrastructure is never minor.
+  - Measured on a national 1% sample (28,301 records): 605 flagged (2.1%), and all 45 sampled hits were genuinely minor.
 
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 

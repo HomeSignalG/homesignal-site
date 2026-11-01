@@ -85,11 +85,11 @@ async function billingAsk(userId, body) {
   return { status: res.status, json: await res.json() };
 }
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'round-trip fixture', attribution: 'Data: WSDOT' }] };
+const CLEARED = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } }; // the credit lines (national source policy, 2026-11-01: no source has to be listed to appear)
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0' };
 function reportHandler(userId) {
-  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', rights: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
+  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', attribution: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
   return H.makeHandler({ ...real, authenticate: async () => ({ email: 'x@example.test', id: userId }), isAdmin: async () => false,
     geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
     radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],

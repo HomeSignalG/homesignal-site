@@ -1,6 +1,6 @@
 // THE NATIONAL DEVELOPMENT ACTIVITY REPORT — structural pins (Development Activity plan, Order G).
 // Each pin defends an architectural invariant that a behavioural test cannot see, because breaking it changes no output
-// today: one classifier, one geocoder, one spatial read, nothing stored, JWT on, the rights registry closed.
+// today: one classifier, one geocoder, one spatial read, nothing stored, JWT on, no per-source allowlist.
 // Reads source text only (comments stripped where a comment could quote what the code must not contain).
 // Run: node test/national-report-structure.test.mjs
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -144,21 +144,17 @@ const all = Object.values(src).map(code).join('\n');
   ok(/\(input, init\) => fetch\(input, init\)/.test(code(src.index)), '5e index.ts is the one place the real fetch is handed in');
 }
 
-// ---- 6. the rights registry: every entry is a RECORDED DECISION --------------------------------------------------------------------
-// Until 2026-10-04 this registry was closed (no source cleared). Founder ruling R7 (docs/development-activity-founder-ruling-r7-2026-10-04.md) lists every source in
-// the jurisdiction registry; test/report-rights-r7.test.mjs pins the list itself. A cleared source also switches on charging and storing trial reports (since build
-// step 5b), so a change to this list is a change to what is stored, not only to what is shown.
+// ---- 6. no per-source allowlist (national source policy, 2026-11-01) --------------------------------------------------------------
+// Every record a wired connector stamped with its source family is eligible. The only per-source file is the credit lines, and it
+// gates nothing. test/no-source-allowlist.test.mjs pins the same rule across every report function.
 {
-  const reg = JSON.parse(read('supabase/functions/_shared/report-rights.json'));
-  ok(Array.isArray(reg.cleared) && reg.cleared.length > 0 && reg.cleared.every((e) => /^docs\/[A-Za-z0-9._\-\/]+\.md §\d+$/.test(e.audit_ref) && existsSync(join(root, e.audit_ref.replace(/ §\d+$/, '')))),
-    '6a every cleared source names the recorded decision it rests on (a real file and section), so the list is never a default', reg.cleared.length);
-  ok(/corporate-output-source-rights-audit-2026-09-27\.md/.test(reg.authority) && /Founder ruling R7/.test(reg.rule) && /NOT a publisher grant/.test(reg.rule) && /HOLD finding stays a HOLD finding/.test(reg.rule),
-    '6b the registry names its authority and says plainly that the listing is a founder decision, not a publisher grant, and that no HOLD finding is rewritten');
-  ok(existsSync(join(root, reg.authority)), '6c and the authority file exists');
-  ok(/report-rights\.json/.test(src.index) && /rights/.test(code(src.handler)) && /validateRights\(/.test(code(src.module)), '6d the function loads that file and validates it on every request');
-  ok(!/rights_class/.test(all), '6e the report does not read the ledger\'s rights_class column (it is NULL by design; rights are enforced here, from the audit)');
+  ok(!existsSync(join(root, 'supabase/functions/_shared/report-rights.json')), '6a there is no report-rights.json');
   const m = code(src.module);
-  ok(/registry_id may not be a pattern/.test(m) && /duplicate registry_id/.test(m), '6f the registry rejects wildcards and duplicates');
+  ok(!/\bcleared\b|no_rights|validateRights|SOURCES_NOT_INCLUDED|NO_INCLUDED_SOURCE|CONTAINS_UNCLEARED_SOURCE/.test(m), '6b the engine holds no clearance lookup, rights exclusion or uncleared blocker');
+  ok(/if \(!family\) \{ excluded\.no_source_family\+\+; continue; \}/.test(m), '6c a record is left out only when it carries no source family (provenance)');
+  ok(/source-attribution\.json/.test(src.index) && /validateAttribution\(/.test(code(src.handler)) && /validateAttribution\(/.test(m), '6d the function loads the credit lines and validates them on every request');
+  ok(!/rights_class/.test(all), '6e the report does not read the ledger\'s rights_class column');
+  ok(/a pattern/.test(m) && /has no credit line/.test(m), '6f the credit file rejects pattern keys and blank lines');
 }
 
 // ---- 7. it is gated in CI ----------------------------------------------------------------------------------------------------------------
@@ -179,8 +175,8 @@ const all = Object.values(src).map(code).join('\n');
   ok(/actions\/setup-node@v4[\s\S]{0,120}node-version: '22'/.test(wf), '8b on Node 22 (the round trip imports TypeScript, which Node strips on import from 22.18)');
   const block = (from, to) => wf.slice(wf.indexOf(from), wf.indexOf(to));
   const pr = block('  pull_request:', '  push:'), push = block('  push:', '  workflow_dispatch:');
-  const needs = ["'test/national_report_pg/**'", "'supabase/functions/_shared/national-report.ts'", "'supabase/functions/_shared/report-rights.json'", "'supabase/functions/_shared/project-type.generated.js'"];
-  ok(pr.length > 100 && needs.every((p) => pr.includes(p)), '8c the PULL REQUEST trigger (the merge gate) runs when the engine, its rights registry, its generated authority copy or the round trip change', needs.filter((p) => !pr.includes(p)));
+  const needs = ["'test/national_report_pg/**'", "'supabase/functions/_shared/national-report.ts'", "'supabase/functions/_shared/source-attribution.json'", "'supabase/functions/_shared/project-type.generated.js'"];
+  ok(pr.length > 100 && needs.every((p) => pr.includes(p)), '8c the PULL REQUEST trigger (the merge gate) runs when the engine, its credit lines, its generated authority copy or the round trip change', needs.filter((p) => !pr.includes(p)));
   ok(push.length > 100 && needs.every((p) => push.includes(p)), '8c and so does the push-to-main trigger', needs.filter((p) => !push.includes(p)));
   ok(!/secrets\./.test(wf) && /Refuse to run if any Supabase credential is present/.test(wf), '8d the workflow holds no secret and refuses to run if a Supabase credential is present');
   const run = read('test/national_report_pg/run.sh');
@@ -211,7 +207,7 @@ const all = Object.values(src).map(code).join('\n');
   ok(defines(/uses_report\s*:/).join() === CR, '9f nothing but the credit rule writes a uses_report answer', defines(/uses_report\s*:/));
   const mod = code(src.module);
   ok((mod.match(/activityOutcome\(/g) || []).length === 2 && /const outcome = activityOutcome\(projects\.length\);/.test(mod),
-    '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the rights gate), never the spatial answer');
+    '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the provenance rule), never the spatial answer');
   const fnBody = /export function activityOutcome\([\s\S]*?\n\}/.exec(mod);
   ok(!!fnBody && !/NO_DEVELOPMENT_ACTIVITY/.test(fnBody[0]), '9h today\'s outcome rule cannot return "No development activity": that needs the VERIFIED ZERO proof, which has no inputs yet');
   ok(/const credit = creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\);/.test(code(src.handler))

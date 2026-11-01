@@ -1,5 +1,9 @@
 # Corporate Output Source Rights Audit
 
+> **SUPERSEDED — 2026-11-01 national source policy** (`docs/national-source-policy-2026-11-01.md`). This document is
+> kept as history. It no longer decides what may appear on maps, feeds or Development Activity Reports. Do not
+> reintroduce per-source clearance, terms verification, a class approval or a review queue on the strength of it.
+
 **Date:** 2026-09-27
 **Audited tree:** `HomeSignalG/homesignal-site` `main` at `09f5cdb5fb275a9e8a6b5e9daf6e4f7f560afe9e` (working tree matched `origin/main`; clean before this document).
 **Companion repo:** `HomeSignalG/homesignal-ingest` `main` at `8ef7221266ea7a1e3fdcaee41c0ee223d2890fa2` (2026-09-27, "Delete 3 inactive Box Elder placeholder feeds (founder) (#618)"). Continuation audit — ingest is readable in this session. Meetings / government notices (every live vendor family), Local News publishers, email output, and Bluesky/MAPS are **HOLD — TERMS/RIGHTS NOT ESTABLISHED**. NWS / `api.weather.gov` alert text is **CLEARED WITH ATTRIBUTION**. None of those families is **CLEARED FOR PAID REPORT** or **EXCLUDE**.

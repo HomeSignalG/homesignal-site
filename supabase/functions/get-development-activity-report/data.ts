@@ -22,7 +22,7 @@ import type { FetchFn } from '../_shared/service-rest.ts';
 import { LABEL_MAX } from './handler.ts';
 
 export { POSTGREST_ROW_CAP, quoteIn };
-export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
+export type Config = { url: string; serviceKey: string; attribution: unknown; now?: () => Date };
 
 export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
   const { base, svc, rest, rpc, authenticate, isAdmin } = makeServiceReads(cfg, fetchFn);
@@ -40,7 +40,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
 
   return {
     now: cfg.now ?? (() => new Date()),
-    rights: cfg.rights,
+    attribution: cfg.attribution,
 
     authenticate,
     isAdmin,

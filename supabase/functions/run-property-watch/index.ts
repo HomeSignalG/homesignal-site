@@ -7,7 +7,7 @@
 // mail provider the pipeline-health alert already uses (RESEND_API_KEY): one adapter, no second mail service.
 // Docs: docs/development-activity-watch-2026-10-03.md.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import rights from '../_shared/report-rights.json' with { type: 'json' };
+import attribution from '../_shared/source-attribution.json' with { type: 'json' };
 import { makeDeps } from './data.ts';
 import { makeHandler } from './handler.ts';
 
@@ -16,4 +16,4 @@ const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const secret = Deno.env.get('SIGNUP_HOOK_SECRET') ?? '';
 const resendKey = Deno.env.get('RESEND_API_KEY') ?? '';
 
-Deno.serve(makeHandler(makeDeps({ url, serviceKey, rights, secret, resendKey }, (input, init) => fetch(input, init))));
+Deno.serve(makeHandler(makeDeps({ url, serviceKey, attribution, secret, resendKey }, (input, init) => fetch(input, init))));

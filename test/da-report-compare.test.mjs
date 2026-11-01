@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { RICH, COLD, RIGHTS_NONE, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, COLD, NO_FAMILY, wire, clone } from './lib/da-report-view-world.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let n = 0, bad = 0;
@@ -39,7 +39,7 @@ runInNewContext(src('lib/da-report-compare.js'), alone);
 const reopened = (r) => { const c = clone(r); delete c.render; c.reopened = true; return c; };
 const W = reopened(await wire(RICH));                              // records, change history proven (the ledger has observed them twice)
 const WCOLD = reopened(await wire(COLD));                          // records, but no ledger: HomeSignal has not yet observed them long enough
-const WNONE = reopened(await wire(RICH, { rights: RIGHTS_NONE })); // nothing cleared: zero records, outcome "No data ingested"
+const WNONE = reopened(await wire(NO_FAMILY(RICH))); // nothing traceable: zero records, outcome "No data ingested"
 const WZERO = clone(WNONE); WZERO.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' }; // the engine's other outcome, set by hand: it never emits it today
 const WUNSTATED = clone(WNONE); delete WUNSTATED.report.activity;                // an older report with no records and no outcome
 const WREADY = clone(WCOLD); WREADY.report.coverage.change_ready = true;         // observed long enough, and still no change
@@ -60,7 +60,7 @@ const html3 = cmp(E3);
 // ---- 0. the fixtures ARE the engine's output, and the comparison loads ------------------------------------------------------------------------------
 {
   ok(W.status === 'OK' && W.report.projects.length === 8 && !('render' in W) && W.reopened === true, '0a the first fixture is the engine\'s report as a REOPENED saved report: 8 records, no render');
-  ok(WNONE.report.projects.length === 0 && WNONE.report.activity && WNONE.report.activity.outcome === 'NO_DATA_INGESTED', '0b the shipped rights file gives an empty report whose engine outcome is "No data ingested"');
+  ok(WNONE.report.projects.length === 0 && WNONE.report.activity && WNONE.report.activity.outcome === 'NO_DATA_INGESTED', '0b a world with no traceable record gives an empty report whose engine outcome is "No data ingested"');
   ok(WCOLD.report.coverage && WCOLD.report.coverage.change_ready !== true && W.report.coverage.change_ready === true, '0c the cold report has not been observed long enough (change_ready is not true); the rich one has');
   ok(typeof C.build === 'function' && typeof C.html === 'function' && typeof C.mount === 'function' && C.MIN === 2 && C.MAX === 5, '0d the module exposes build, html, mount, and a limit of 2 to 5');
   ok(html3.startsWith('<article class="da-cmp"'), '0e three real reports compare without throwing', html3.slice(0, 60));
@@ -211,7 +211,7 @@ const html3 = cmp(E3);
   const noas = cmp([entry(2, WNOAS), entry(1, W)]);
   ok(rowOf(noas, 'Report as of (UTC day)').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
   const lims = rowOf(html3, 'Limits the report states');
-  ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /No official development source for this area is included in this report/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
+  ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
   ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Status changed, detected Sep 27, 2026'),
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');

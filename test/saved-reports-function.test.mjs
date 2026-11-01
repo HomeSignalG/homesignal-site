@@ -37,7 +37,7 @@ function fakes(over = {}) {
   const rec = (name, fn) => async (...a) => { calls.push([name, ...a]); return fn(...a); };
   const never = (name) => rec(name, async () => { throw new Error(name + ' must not run'); });
   const deps = {
-    now: () => new Date('2026-10-03T12:00:00Z'), rights: { version: 1, cleared: [] },
+    now: () => new Date('2026-10-03T12:00:00Z'), attribution: { version: 1, attribution: {} },
     authenticate: rec('authenticate', async (t) => (t === 'user-token' ? { email: 'agent@example.test', id: UID } : null)),
     isAdmin: rec('isAdmin', async () => false),
     trialOf: rec('trialOf', async () => ACTIVE),
@@ -189,7 +189,7 @@ function stub(routes) {
   };
 }
 const dbRow = { report_id: R1, number: 1, generated_at: '2026-10-02T12:00:00+00:00', private_context_id: CTX1 };
-const dataFor = (routes) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', rights: { version: 1, cleared: [] } }, stub(routes));
+const dataFor = (routes) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', attribution: { version: 1, attribution: {} } }, stub(routes));
 let d = dataFor([[/rpc\/saved_reports_listed$/, () => json([dbRow, { ...dbRow, report_id: R2, number: 2, private_context_id: null }])]]);
 let rows = await d.savedReports(UID);
 ok(rows.length === 2 && JSON.stringify(seen.map((s) => s.path)) === JSON.stringify(['/rest/v1/rpc/saved_reports_listed']) && JSON.stringify(seen[0].body) === JSON.stringify({ p_user_id: UID, p_archived: false }) && seen[0].auth === 'Bearer svc-key',
@@ -223,7 +223,7 @@ for (const [label, route, call] of [
   ok(got2 === 'unavailable', '8e ' + label + ' is a fault (unavailable), never a report or an empty list', got2);
 }
 const subjectSeen = [];
-const mk = (c) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', rights: { version: 1, cleared: [] } }, async (url, init = {}) => {
+const mk = (c) => D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc-key', attribution: { version: 1, attribution: {} } }, async (url, init = {}) => {
   subjectSeen.push(new URL(url).pathname + ' ' + init.body);
   return json(c);
 });

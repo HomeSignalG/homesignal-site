@@ -34,7 +34,7 @@
 // can never charge, store or recompute anything, and the text shown is the text that was stored. An id that is not one of the caller's own
 // brokerage's reports is "not found", the same for another brokerage's and for an unknown one.
 import {
-  assemble, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateRights,
+  assemble, parseRadius, RECENT_DAYS, REPORT_RADIUS_MI, REPORT_VERSION, validateAttribution,
 } from '../_shared/national-report.ts';
 import { readReportInputs } from '../_shared/report-run.ts';
 import { creditDecision, CREDIT_RULE_VERSION } from '../_shared/credit-rule.ts';
@@ -60,7 +60,7 @@ export type Geocoded = { matchedAddress: string; lat: number; lng: number; zip: 
 
 export type Deps = {
   now: () => Date;
-  rights: unknown;
+  attribution: unknown;
   authenticate: (token: string) => Promise<{ email: string } | null>;
   isAdmin: (email: string) => Promise<boolean>;
   geocode: (address: string) => Promise<Geocoded | null>;
@@ -222,7 +222,7 @@ export function makeHandler(deps: Deps) {
     }
 
     try {
-      const rights = validateRights(deps.rights); // a malformed registry fails the request: never "everything is cleared"
+      const attribution = validateAttribution(deps.attribution); // a malformed file fails the request: a required credit is never dropped
 
       // 2b. the rate limit: a member's request that has passed validation takes one from the person's and the brokerage's windows BEFORE any work is
       // done for it. A refusal consumed nothing; a claim that cannot be made is DataUnavailable (502) and the geocoder is never asked.
@@ -252,7 +252,7 @@ export function makeHandler(deps: Deps) {
 
       // 5. compose
       const out = assemble({
-        now: deps.now(), view, zip_supported: true, radius_mi: radius, rights,
+        now: deps.now(), view, zip_supported: true, radius_mi: radius, attribution,
         subject: { address, matched_address: g.matchedAddress, lat: g.lat, lng: g.lng, zip: g.zip, ...(label ? { label } : {}) },
         rows, projects, ledger, events, health,
       });

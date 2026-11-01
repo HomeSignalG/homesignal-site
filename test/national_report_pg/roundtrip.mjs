@@ -33,7 +33,7 @@ const rpc = async (fn, a) => {
 
 // ---- the engine's inputs: real-shaped rows, six subjects that are not project sites ---------------------------------------
 const NOW = new Date('2026-09-29T12:00:00Z');
-const RIGHTS = { version: 1, cleared: [{ registry_id: 'wsdot-project-delivery-plan-proposed', cleared_on: '2026-09-29', audit_ref: 'round-trip fixture', attribution: 'Data: WSDOT' }] };
+const RIGHTS = { version: 1, attribution: { 'wsdot-project-delivery-plan-proposed': 'Data: WSDOT' } };
 const row = (k, d, x = {}) => ({ source_key: k, feature_id: 'pt:1', registry_id: 'wsdot-project-delivery-plan-proposed', provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...x });
 const proj = (k, x = {}) => ({ source_key: k, registry_id: 'wsdot-project-delivery-plan-proposed', record_kind: 'development', name: 'I-5/NB Ravenna Blvd. Bridges - Seismic Retrofit', type: 'Utility', type_raw: null, status: 'Proposed', stage: 'Not Yet Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-12', date_kind: 'filed', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0', ...x });
 const led = (k, x = {}) => ({ identity_key: k, registry_id: 'wsdot-project-delivery-plan-proposed', comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-09-29T19:00:00Z', last_observed_at: '2026-09-29T19:30:00Z', ...x });
@@ -56,7 +56,7 @@ const SUBJECTS = [
   { address: '221B Baker Street', matched_address: '221B BAKER ST, LONDON, 97477', lat: 51.52377, lng: -0.15854, zip: '97477' },
   { address: '9 1/2 Elm Street Apt 4', matched_address: '9 1/2 ELM ST APT 4, SPRINGWOOD, OH, 97477', lat: 40.12345, lng: -82.98765, zip: '97477', label: "O'Brien; unit #4" },
 ];
-const assemble = (s) => M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 1, rights: RIGHTS, subject: s, ...FIELD });
+const assemble = (s) => M.assemble({ now: NOW, view: 'customer', zip_supported: true, radius_mi: 1, attribution: RIGHTS, subject: s, ...FIELD });
 const opts = (o) => ({ reportVersion: M.REPORT_VERSION, engineInputs: o.engineInputs });
 
 // ---- 1. six real reports, stored by the real module through the real writer ----------------------------------------------------------

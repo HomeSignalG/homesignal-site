@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_NONE, RIGHTS_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
+import { RICH, NO_FAMILY, ATTRIBUTION_AB, NOW, wire, clone } from './lib/da-report-view-world.mjs';
 import { LAUNCH_TEST_LOCATION, OTHER_PROPERTY, addressNo, geocodeStandIn } from './lib/launch-test-location.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
@@ -80,9 +80,9 @@ window.supabase = { createClient: function () { return { auth: {
 /** The world behind both functions for one page: the trial's state and a fake ledger. */
 const MINT_TOKEN = 'hse1_' + 'fedcba9876543210'.repeat(4);
 const TEAM_M1 = 'c0000000-0000-4000-8000-000000000001', TEAM_M2 = 'c0000000-0000-4000-8000-000000000003', TEAM_I1 = 'c0000000-0000-4000-8000-000000000002';
-function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true, signup = 'ok', individual = false } = {}) {
+function world({ trial = 'active', used = 0, admin = false, untraceable = false, redeem = 'ok', role = 'agent', mint = 'ok', plan = 'none', paidUsed = 0, configured = true, signup = 'ok', individual = false } = {}) {
   // build step 11: `plan` is the state the database would answer for this brokerage (none, paid, past_due, canceled, ...), `paidUsed` the reports used this month
-  const w = { signup, individual, signedUp: [], used, trial, admin, rights, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
+  const w = { signup, individual, signedUp: [], used, trial, admin, untraceable, redeem, role, mint, plan, paidUsed, configured, rate: null, checkoutMade: 0, checkoutFails: false, billingFails: false, billingGone: false, made: new Map(), redeemed: 0, minted: 0, header: { brokerage: 'Acme Realty', agent: null }, headerFails: false,
     shares: [], shareSeq: 0, shareFails: false, shareLimit: false,
     watches: [], watchSeq: 0, watchFails: false, watchLimit: false, watchNotKept: false, watchListFails: false,
     // the owner's team (audit item D): what the database would list, and what the page asked it to change
@@ -202,12 +202,12 @@ function world({ trial = 'active', used = 0, admin = false, rights = RIGHTS_AB, 
     checkoutRelease: async () => undefined,
   });
   w.reportHandler = RH.makeHandler({
-    ...gate, now: () => NOW, rights: w.rights,
+    ...gate, now: () => NOW, attribution: ATTRIBUTION_AB,
     geocode: async (a) => geocodeStandIn(a),
     // the report rate limit (docs/report-rate-limit.sql): the database's answer, a refusal when the test sets `w.rate`
     rateClaim: async () => (w.rate ? { allowed: false, ...w.rate } : { allowed: true }),
     zipSupported: async () => true,
-    radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
+    radius: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).rows, hydrate: async () => (w.untraceable ? NO_FAMILY(RICH) : RICH).projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
     trialOf: async () => state(),
     planOf: async () => { if (w.billingFails) throw new RH.DataUnavailable('x'); return usage(); },
     issue: async (_u, key, intelligence, privateContext) => {
@@ -393,9 +393,9 @@ const waitCount = (page, re) => page.waitForFunction((src) => new RegExp(src).te
   ok(w.used === 4 && (await page.$$('#report .da-rv-sec')).length > 0 && /used 1 of your brokerage/.test(await text(page, '#creditnote')),
     '2c a report that shows development is drawn and says it used one free report', await text(page, '#creditnote'));
   ok(/^4 of 10 free reports used$/.test(await text(page, '#trial-count')), '2d the panel now says 6 left, from the report function\'s own count');
-  // a fresh world with nothing cleared: a "No data ingested" report
+  // a fresh world with no traceable record: a "No data ingested" report
   await ctx.close();
-  const w2 = world({ used: 4, rights: RIGHTS_NONE });
+  const w2 = world({ used: 4, untraceable: true });
   const o2 = await open({ w: w2 });
   await waitCount(o2.page, /^4 of 10 free reports used$/);
   await make(o2.page);
@@ -518,6 +518,10 @@ for (const [label, w, count, disabled] of [
   await make(page);
   ok(reports.length === 1 && reports[0].body.idempotency_key === undefined && w.used === 0 && /Admin report: no free report was used/.test(await text(page, '#creditnote')),
     '4e an admin\'s report carries no key (the report function refuses one), uses nothing, and says so', reports.map((r) => r.body));
+  // an inert action (here Watch Property: no data-da-action) is as wide as the live ones (it was half width, 2026-11-01)
+  const widths = await page.$$eval('#rail-actions .da-rv-act', (els) => els.map((e) => ({ t: e.textContent, inert: e.getAttribute('aria-disabled') === 'true', w: Math.round(e.getBoundingClientRect().width) })));
+  ok(widths.length >= 3 && widths.some((b) => b.inert) && widths.every((b) => b.w === widths[0].w && b.w > 0),
+    '4e2 every action in the rail is the same width, an inert one included', widths);
   await ctx.close();
 }
 {
@@ -1057,7 +1061,7 @@ const waitShare = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was NOT saved ("No data ingested" uses nothing and is stored nowhere) cannot be shared, but can still be printed
-  const w = world({ rights: RIGHTS_NONE });
+  const w = world({ untraceable: true });
   const { ctx, page, shareCalls } = await open({ w });
   await waitCount(page, /free reports used/);
   await make(page);
@@ -1220,7 +1224,7 @@ const waitWatch = (page, re) => page.waitForFunction((src) => new RegExp(src).te
 }
 {
   // a report that was not saved cannot be watched
-  const w = world({ rights: RIGHTS_NONE });
+  const w = world({ untraceable: true });
   const { ctx, page, watchCalls } = await open({ w });
   await waitCount(page, /free reports used/);
   await make(page);
@@ -1349,7 +1353,7 @@ const tableOf = (page) => page.evaluate(() => {
 });
 const rowCells = (t, label) => (t.rows.find((r) => r.label === label) || { cells: [] }).cells;
 const A1 = '1 First Ave, Brigham City, UT 84302', A2 = '2 Second Ave, Brigham City, UT 84302', A3 = '3 Third Ave, Brigham City, UT 84302', A4 = '4 Fourth Ave, Brigham City, UT 84302', A5 = '5 Fifth Ave, Brigham City, UT 84302', A6 = '6 Sixth Ave, Brigham City, UT 84302';
-const WNONE_REPORT = (await wire(RICH, { rights: RIGHTS_NONE })).report;   // the engine's report for an address where nothing is cleared: no records, "No data ingested"
+const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's report for an address where no record can be traced: no records, "No data ingested"
 {
   // before there are two reports there is nothing to compare, and the card says so
   const w = world();

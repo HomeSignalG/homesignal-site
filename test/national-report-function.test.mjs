@@ -12,7 +12,7 @@ const D = await import('../supabase/functions/get-development-activity-report/da
 
 const NOW = new Date('2026-09-29T12:00:00Z');
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
-const RIGHTS = { version: 1, cleared: [{ registry_id: 'fam-a', cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: 'Data: A' }] };
+const CREDITS = { version: 1, attribution: { ['fam-a']: 'Data: A' } };
 const proj = (k, x = {}) => ({ source_key: k, registry_id: 'fam-a', record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.gov/r/1', ...x });
 
 /** Fakes that record every call, so a test can say what was NOT called. */
@@ -21,7 +21,7 @@ function fakes(over = {}) {
   const rec = (name, fn) => async (...a) => { calls.push(name); return fn(...a); };
   const deps = {
     now: () => NOW,
-    rights: RIGHTS,
+    attribution: CREDITS,
     authenticate: rec('authenticate', async (t) => (t === 'user-token' ? { email: 'founder@example.com' } : null)),
     isAdmin: rec('isAdmin', async (e) => e === 'founder@example.com'),
     geocode: rec('geocode', async () => ({ matchedAddress: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' })),
@@ -144,7 +144,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     ok(r.status === 502 && r.json.error === 'data_unavailable' && r.json.report === undefined, '3d a failed ' + which + ' read is 502 with NO report (an empty report would read as "nothing near you")');
   }
 
-  f = fakes({ rights: { version: 1, cleared: 'everything' } });
+  f = fakes({ attribution: { version: 1, attribution: 'everything' } });
   const badRights = await call(f.deps, REQ, AUTH);
   ok(badRights.status === 500 && badRights.json.error === 'internal', '3e a malformed rights registry fails the request (500), it does not fall back to all-cleared');
 
@@ -185,20 +185,21 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const half = await call(fakes({ radius: async (a, b, rad) => { asked.push(rad); return []; } }).deps, { ...REQ, radius_mi: 0.5 }, AUTH);
   ok(asked[1] === 0.5 && half.json.report.radius_mi === 0.5, '4j and a stated 0.5 is the one asked for');
 
-  const internal = await call(fakes({ rights: { version: 1, cleared: [] } }).deps, { ...REQ, view: 'internal' }, AUTH);
-  ok(internal.json.storable === false && internal.json.storage_blockers.includes('INTERNAL_VIEW') && internal.json.report.projects.every((p) => p.rights === 'HOLD'),
-    '4h the internal view labels every record HOLD and reports itself not storable');
-  const cust = await call(fakes({ rights: { version: 1, cleared: [] } }).deps, REQ, AUTH);
-  ok(cust.json.report.projects.length === 0 && cust.json.coverage_state === 'LIMITED_COVERAGE', '4i with nothing cleared, the customer view is an honest LIMITED report with no records');
+  const internal = await call(fakes().deps, { ...REQ, view: 'internal' }, AUTH);
+  ok(internal.json.storable === false && internal.json.storage_blockers.includes('INTERNAL_VIEW') && internal.json.report.projects.length === 1 && internal.json.report.projects.every((p) => !('rights' in p)),
+    '4h the internal view carries the records with no rights label and reports itself not storable');
+  const UNTRACEABLE = { radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: null, provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false }], hydrate: async () => [proj('k1', { registry_id: null })] };
+  const cust = await call(fakes(UNTRACEABLE).deps, REQ, AUTH);
+  ok(cust.json.report.projects.length === 0 && cust.json.coverage_state === 'LIMITED_COVERAGE', '4i a record no connector stamped with a source family is left out: an honest LIMITED report with no records');
 
   // founder ruling R5: every answer carries the one credit decision, and nothing here charges anything
   const cr = (x) => x && [x.uses_report, x.reason, x.rule_version].join('|');
   ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-1' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
     '4k a customer report that shows development would use one free report, and says which rule decided it', r.json.credit);
   ok(cr(cust.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1' && cust.json.report.activity.label === 'No data ingested',
-    '4l the shipped state (nothing cleared): the customer report says "No data ingested" and would use no free report', cust.json.credit);
+    '4l with nothing traceable, the customer report says "No data ingested" and would use no free report', cust.json.credit);
   ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-1', '4m the operator\'s internal view is never charged', internal.json.credit);
-  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1', '4n an empty radius under a cleared source is still "No data ingested", not "No development activity"', dflt.json.credit);
+  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1', '4n an empty radius is still "No data ingested", not "No development activity"', dflt.json.credit);
   ok(r.json.stored === false && r.json.report_id === null && r.json.charged === false && !('trial' in r.json), '4o an admin report is never charged or stored, even when the rule would charge a customer');
   ok(H.capability().credit_rule === 'credit-rule-1', '4p the capability names the credit rule');
 }
@@ -235,7 +236,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const BASE = 'https://proj.supabase.co';
   const KEY = 'service-key-value';
   const reqs = [];
-  const mk = (handlers) => D.makeDeps({ url: BASE + '/', serviceKey: KEY, rights: RIGHTS }, async (url, init) => {
+  const mk = (handlers) => D.makeDeps({ url: BASE + '/', serviceKey: KEY, attribution: CREDITS }, async (url, init) => {
     reqs.push({ url, init: init || {} });
     for (const [re, fn] of handlers) if (re.test(url)) return fn(url, init || {});
     return new Response('[]', { status: 200 });
@@ -350,22 +351,22 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     for (const name of ['authenticate', 'isAdmin']) { const fn = f.deps[name]; f.deps[name] = rec(name, fn); }
     return f;
   };
-  const NONE = { version: 1, cleared: [] };
+  const NONE = { radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: null, provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false }], hydrate: async () => [proj('k1', { registry_id: null })] };
   const cr = (x) => x && [x.uses_report, x.reason].join('|');
 
-  // the shipped state: nothing is cleared, so a trial report is "No data ingested", free, and stored nowhere
-  let f = trialFakes({ rights: NONE });
+  // nothing traceable near the address: a trial report is "No data ingested", free, and stored nowhere
+  let f = trialFakes(NONE);
   let r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
   ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && cr(r.json.credit) === 'false|NO_DATA_INGESTED' && r.json.charged === false
     && r.json.stored === false && r.json.report_id === null && !f.calls.includes('issue'),
-    '8a a trial member today: "No data ingested", not charged, nothing stored, the ledger never called', [r.status, r.json.credit, f.calls]);
+    '8a a trial member, nothing traceable nearby: "No data ingested", not charged, nothing stored, the ledger never called', [r.status, r.json.credit, f.calls]);
   ok(JSON.stringify(r.json.trial) === '{"status":"active","credits_used":3,"credits_remaining":7}' && f.args.trialOf[0] === USER,
     '8a and the answer says how many free reports are left (asked of the database by the auth user\'s id, never the email)', r.json.trial);
   ok(JSON.stringify(r.json.plan) === '{"state":"none","role":"owner","credit_limit":100,"credits_used":0,"credits_remaining":0,"period_ends_at":null}' && f.args.planOf[0] === USER && !JSON.stringify(r.json).includes(BKID),
     '8a and the plan rides the answer (state, role and the month\'s figures), asked of the database by the auth user\'s id, and the brokerage id is never sent to the page', r.json.plan);
   ok(JSON.stringify(f.calls.slice(0, 6)) === '["authenticate","isAdmin","trialOf","planOf","rateClaim","geocode"]', '8a the order: who you are, the allow-list, the trial, the plan, the rate limit, and only then the address', f.calls);
 
-  // once a source is cleared and a record is shown, the report uses one free report: stored and charged in one call
+  // once a traceable record is shown, the report uses one free report: stored and charged in one call
   f = trialFakes();
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
   const a = f.args.issue || [];
@@ -461,7 +462,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
     ok(!everything.includes('Acme Realty') && !everything.includes('Pat Agent') && !JSON.stringify(r.json.report).includes('Pat Agent'),
       '8k2 neither the permanent body, the private context, the engine inputs nor the stored report carries the header: it is presentation, written nowhere');
   }
-  f = trialFakes({ rights: NONE });
+  f = trialFakes(NONE);
   r = await call(f.deps, { ...REQ, idempotency_key: KEY }, TAUTH);
   ok(r.json.stored === false && r.json.charged === false && JSON.stringify(r.json.header) === JSON.stringify(HEADER), '8k3 a "No data ingested" report (free, not stored) carries the header too');
   f = trialFakes({ issue: async () => replay });
@@ -563,7 +564,7 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
   const BASE = 'https://proj.supabase.co';
   const reqs = [];
   const json = (v, status = 200) => new Response(JSON.stringify(v), { status });
-  const mk = (handlers) => D.makeDeps({ url: BASE, serviceKey: 'svc', rights: RIGHTS }, async (url, init) => {
+  const mk = (handlers) => D.makeDeps({ url: BASE, serviceKey: 'svc', attribution: CREDITS }, async (url, init) => {
     reqs.push({ url, init: init || {} });
     for (const [re, fn] of handlers) if (re.test(url)) return fn(url, init || {});
     return json([]);

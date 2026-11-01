@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_AB, wire } from './lib/da-report-view-world.mjs';
+import { RICH, ATTRIBUTION_AB, wire } from './lib/da-report-view-world.mjs';
 
 const VH = await import('../supabase/functions/view-shared-report/handler.ts');
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -21,7 +21,7 @@ const VIEW_FN = 'https://qwnnmljucajnexpxdgxr.supabase.co/functions/v1/view-shar
 const LIVE = 'L'.repeat(42) + '1', RID = 'c0000000-0000-4000-8000-000000000001';
 const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
 const BROKERAGE = 'Acme Realty';
-const stored = (await wire(RICH, { view: 'customer', rights: RIGHTS_AB })).report;
+const stored = (await wire(RICH, { view: 'customer', attribution: ATTRIBUTION_AB })).report;
 let viewCalls = 0;
 const handler = VH.makeHandler({
   openShared: async (t) => { viewCalls++; return t === LIVE ? { report_id: RID, generated_at: '2026-10-03T12:00:00+00:00', body: JSON.stringify(stored), private_context_id: 'ctx', brokerage_name: BROKERAGE } : null; },

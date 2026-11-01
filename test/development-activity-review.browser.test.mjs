@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, RIGHTS_NONE, wire } from './lib/da-report-view-world.mjs';
+import { RICH, NO_FAMILY, wire } from './lib/da-report-view-world.mjs';
 
 const TH = await import('../supabase/functions/development-activity-trial/handler.ts');
 const E = await import('../supabase/functions/_shared/evaluation-reads.ts');
@@ -57,7 +57,7 @@ function trialWorld({ admin = true, create = 'ok' } = {}) {
 }
 const ADDRESS = '20 N Main St, Brigham City, UT 84302';
 const W_INTERNAL = await wire(RICH, { view: 'internal' });
-const W_CUSTOMER = await wire(RICH, { rights: RIGHTS_NONE });
+const W_CUSTOMER = await wire(NO_FAMILY(RICH));
 const W_CLEARED = await wire(RICH); // a customer view with sources cleared: what a trial report looks like once permissions arrive
 
 // supabase-js stand-in. window.__sb.session is the signed-in session, or null; verifyOtp signs in and tells every listener.
@@ -184,7 +184,7 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   await settle(page);
   ok(calls[0].body.view === 'customer', '3a choosing the customer view asks the function for it', calls[0].body);
   ok(JSON.stringify(await sections(page)) === JSON.stringify(['No data ingested', 'Official evidence & coverage']) && /Customer view/.test(await page.textContent('#viewnote')),
-    '3b with nothing cleared, the customer view says "No data ingested" over the coverage notice, and the page says which view it is', await sections(page));
+    '3b with no traceable record, the customer view says "No data ingested" over the coverage notice, and the page says which view it is', await sections(page));
   ok(W_CUSTOMER.credit.uses_report === false && (await page.textContent('#creditnote')) === 'For a trial customer, this report would not use a free report: No data ingested.',
     '3c the founder sees that today\'s customer report would not use a free report, and why (ruling R5)', await page.textContent('#creditnote'));
   const st3 = await status(page);
