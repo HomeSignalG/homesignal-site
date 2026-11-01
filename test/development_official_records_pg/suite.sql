@@ -127,6 +127,26 @@ select pg_temp.ck('propose: a second run proposes nothing new', (select count(*)
 select pg_temp.ck('propose: candidates are not in the published snapshot',
   not (public.development_dossier_snapshot()::text like '%Bull Pass%'));
 
+-- 5b. the protest window a dossier page shows (development_water_protest)
+set role service_role;
+select public.official_records_ingest(replace(:'payload', '"facts":{"status":"Unapproved"}',
+  '"facts":{"status":"Unapproved","protest_end":"2026-12-01","protested":"Protested"}')::jsonb) as r5 \gset
+reset role;
+select pg_temp.ck('protest: the window and the state form come from the change record',
+  (select p ->> 'protest_end' = '2026-12-01' and p ->> 'protested' = 'Protested'
+          and p ->> 'form_url' like 'https://waterrights.utah.gov/%' and p ->> 'record_url' like 'https://www.waterrights.utah.gov/%'
+     from (select public.development_water_protest('ut_dwr:a55167') as p) x), :'r5');
+select pg_temp.ck('protest: a filing with no change record has no window',
+  public.development_water_protest('ut_dwr:a00000') is null);
+insert into public.official_record (record_key, source, kind, subject_ref, title, url, facts)
+values ('xx_dwr_change:z1', 'xx_dwr', 'change_record', 'xx_dwr:z1', 'Change z1', 'https://records.example.gov/z1',
+        '{"protest_end":"2026-12-01"}');
+select pg_temp.ck('protest: a dated record from a source with no named form has no window',
+  public.development_water_protest('xx_dwr:z1') is null);
+select pg_temp.ck('protest: visitors cannot call it',
+  not has_function_privilege('anon', 'public.development_water_protest(text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.development_water_protest(text)', 'execute'));
+
 -- 6. a complete reading marks what left the source
 set role service_role;
 select public.official_records_ingest(

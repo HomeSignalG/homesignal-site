@@ -272,6 +272,8 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .actions{margin:1rem 0 0}.actions p{margin:.4rem 0}
 .btn{display:inline-block;font:inherit;font-weight:600;border-radius:10px;padding:.7rem 1.2rem;min-height:44px;
  background:var(--green);color:var(--on-green);border:1px solid var(--green);text-decoration:none}
+.protest{background:var(--tint);border:1px solid var(--green2);border-radius:12px;padding:.8rem 1rem;margin:1rem 0 0}
+.protest p{margin:.35rem 0}.protest .t{font-weight:700}
 .note{background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:.5rem .8rem;font-size:.875rem;color:var(--ink2)}
 .toc{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);margin-top:1.4rem;padding-block:.4rem}
 .toc ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:.2rem 1rem;font-size:.88rem}.toc a{text-decoration:none}
@@ -306,6 +308,38 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .method{border-top:1px solid var(--line);margin-top:2.5rem;padding-block:1rem 3rem}
 .method nav{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.9rem}
 """
+
+
+def _protests(d):
+    """Open protest windows of the linked water filings, from the state's own change record
+    (facts.protest, development_water_protest). A window is open while its protest end date is on
+    or after the build day (d["_today"], the real UTC date; the page is rebuilt at least daily, so
+    the box leaves the page the day after the window closes). An unknown build day, an undated
+    window or a form link that is not https shows nothing: the page never offers a form it cannot
+    say is open."""
+    today = str(d.get("_today") or "")
+    if not DAY_RE.match(today):
+        return ""
+    out = []
+    for l in _links(d, "water_filing"):
+        pr = (l.get("facts") or {}).get("protest") or {}
+        end, form = str(pr.get("protest_end") or ""), safe_url(pr.get("form_url"))
+        if not DAY_RE.match(end) or end < today or not form:
+            continue
+        f = l.get("facts") or {}
+        filing = f'{f.get("filing_type") or "Water-rights filing"} {f.get("filing_no") or ""}'.strip()
+        already = (f' The state\'s record lists it as {esc(str(pr["protested"]).lower())}.'
+                   if str(pr.get("protested") or "").strip() else "")
+        checked = day(pr.get("checked_at"))
+        out.append(
+            f'<div class="protest"><p class="t">Protest period open until {esc(day(end))}</p>'
+            f'<p>{esc(prose(filing))}. {esc(pr.get("who") or "")}{already}</p>'
+            f'<p class="small">{esc(pr.get("how") or "")}</p>'
+            f'<p><a class="btn" href="{esc(form)}" rel="nofollow noopener">{esc(pr.get("form_label") or "File a protest")}</a></p>'
+            + (f'<p class="small">{_src(pr.get("help_url"), pr.get("help_label")).strip()}</p>' if safe_url(pr.get("help_url")) else "")
+            + f'<p class="small">Dates from the{_src(pr.get("record_url"), "state change record").rstrip()}'
+            + (f', checked {esc(checked)}' if checked else "") + '. HomeSignal is not part of the protest process.</p></div>')
+    return "".join(out)
 
 
 def render(d, pages, built, head, crumb_place=None):
@@ -450,7 +484,7 @@ def render(d, pages, built, head, crumb_place=None):
         '<nav aria-label="Primary"><a href="/">Explore</a><a href="/properties.html">My Places</a></nav></div></header>'
         f'<main id="main" class="wrap">{crumb_nav}<section class="hero" aria-labelledby="h1">'
         f'<h1 id="h1">{esc(name)}</h1>'
-        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}</section>{toc}'
+        + (f'<p class="where">{esc(where)}</p>' if where else "") + f'{note}{defin}{follow}{_protests(d)}</section>{toc}'
         + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
@@ -524,7 +558,7 @@ def build(dossiers, pages, out_dir, built, head, state=None, base=""):
     import page_semantics as ps
     paths = []
     for key in sorted(dossiers):
-        d = dict(dossiers[key], _base=base)
+        d = dict(dossiers[key], _base=base, _today=built)
         if not PATH_RE.match(d["path"]):
             sys.exit(f"ERROR: dossier path refused: {d['path']!r}")
         doc = render(d, pages, ps.BUILD_DAY_TOKEN, head)

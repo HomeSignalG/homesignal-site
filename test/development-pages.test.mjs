@@ -241,6 +241,25 @@ ok(z.includes(`href="${A}"`) && z.includes(`href="${B}"`), 'the ZIP page links t
 const proj = man.project_pages.find((p) => p.startsWith('/project/town-permits/bld-2026-0001-'));
 ok(proj && read(out, proj).includes(`Part of <a href="${B}">Olympia mixed-use building</a>`), 'the defining /project/ page says Part of');
 
+// 3c. a water filing's open protest window: the agency's form, only while the window is open
+const PF = 'https://agency.example.gov/protest-form', PH = 'https://agency.example.gov/protest-guide.pdf';
+const withProtest = (end, form = PF) => {
+  const x = dossiers();
+  x.dossiers['valley-campus'].links[2].facts.protest = { protest_end: end, protested: 'Protested', record_url: W,
+    checked_at: '2026-10-28T12:29:08Z', agency: 'Example Water Agency', form_url: form, form_label: 'File a protest with the agency',
+    help_url: PH, help_label: 'Protest guide', who: 'Anyone affected may file a protest.', how: 'The form asks for your reasons.' };
+  return x;
+};
+const pOpen = read(build(withProtest('2026-12-01')).out, A);
+ok(pOpen.includes('<p class="t">Protest period open until Dec 1, 2026</p>') && pOpen.includes(`<a class="btn" href="${PF}"`)
+   && pOpen.includes(`href="${PH}"`) && pOpen.includes('lists it as protested'), 'an open protest window shows the agency\'s form');
+ok(pOpen.indexOf('class="protest"') < pOpen.indexOf('<nav class="toc"'), 'the protest box sits in the page header');
+ok(read(build(withProtest('2026-12-01'), { now: '2026-12-01T20:00:00' }).out, A).includes(`href="${PF}"`), 'the last day still shows it');
+ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="protest"'), 'a closed window shows no form');
+ok(!read(build(withProtest('2026-12-01', 'http://agency.example.gov/f')).out, A).includes('class="protest"'), 'a form link that is not https is not shown');
+ok(!read(build(withProtest('soon')).out, A).includes('class="protest"'), 'an undated window is not shown');
+ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no box');
+
 // 6. one code path
 const src = readFileSync(join(root, 'scripts', 'development_pages.py'), 'utf8').toLowerCase();
 ok(!/stratos|proctor|a55167|84336|box elder|tacoma|eagle mountain/.test(src), 'the renderer names no project, place or filing');
