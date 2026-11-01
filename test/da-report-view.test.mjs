@@ -86,13 +86,13 @@ const rowNamed = (h, n) => rowsOf(h).find((r) => r.name === n);
 
 // ---- 1. the layout: header, briefing, ONE three-column table, the map, change history, evidence ---------------------------------------------------
 try {
-  ok(keysOf(html) === 'filters,records,map,history,evidence', '1a the sections, in order: the screen-only filters, the records table, the map, Change History, Official evidence & coverage', keysOf(html));
-  ok(sections(html).map((s) => s.label).join(' | ') === 'Type and stage | Nearby Development | Development Activity Map | Change History | Official evidence & coverage', '1b the section titles', sections(html).map((s) => s.label));
+  ok(keysOf(html) === 'filters,map,records,history,evidence', '1a the sections, in order: the filters with the map right under them (founder, 2026-11-01), the records table, Change History, Official evidence & coverage', keysOf(html));
+  ok(sections(html).map((s) => s.label).join(' | ') === 'Type and stage | Development Activity Map | Nearby Development | Change History | Official evidence & coverage', '1b the section titles', sections(html).map((s) => s.label));
   ok(keysOf(htmlNone) === 'outcome,evidence', '1c an empty report renders only its outcome and Official evidence & coverage', keysOf(htmlNone));
-  ok(keysOf(htmlCold) === 'filters,records,map,history,evidence', '1d the cold start (no ledger) has the same layout', keysOf(htmlCold));
+  ok(keysOf(htmlCold) === 'filters,map,records,history,evidence', '1d the cold start (no ledger) has the same layout', keysOf(htmlCold));
   const idx = (t) => html.indexOf(t);
-  const order = ['<header class="da-rv-head">', 'data-da-briefing', '<table class="da-rv-table"', 'aria-label="Development Activity Map"', 'aria-label="Change History"', 'aria-label="Official evidence &amp; coverage"', 'aria-label="Report actions"'];
-  ok(order.every((t, i) => idx(t) > 0 && (i === 0 || idx(t) > idx(order[i - 1]))), '1e header, briefing, table, map, history, evidence, actions: read off the markup positions', order.map(idx));
+  const order = ['<header class="da-rv-head">', 'data-da-briefing', 'aria-label="Type and stage"', 'aria-label="Development Activity Map"', '<table class="da-rv-table"', 'aria-label="Change History"', 'aria-label="Official evidence &amp; coverage"', 'aria-label="Report actions"'];
+  ok(order.every((t, i) => idx(t) > 0 && (i === 0 || idx(t) > idx(order[i - 1]))), '1e header, briefing, filters, map, table, history, evidence, actions: read off the markup positions', order.map(idx));
   ok(!/What Changed Around|Recent Official Activity|Things to Review With Your Client|Approved \/ Coming<\/h2>|Proposed \/ Under Review<\/h2>/.test(html) && (html.match(/<table\b/g) || []).length === 1,
     '1f the duplicated summaries are gone: no What Changed / Recent Activity / Things to Review / per-stage card sections, and exactly ONE table');
   ok(!/<article class="da-rv-card"/.test(html), '1g there are no record cards');
@@ -588,7 +588,8 @@ try {
   ok(['approved', 'proposed', 'permitted'].every((k) => stageN[k] === rowsByStage(k)) && stageN.all === rowsOf(hp).length, '14j each Stage chip count equals the number of table rows with that stage', [stageN, rowsOf(hp).length]);
   const typeN = Object.fromEntries(chips.filter((c) => c.startsWith('type:')).map((c) => { const f = c.split(':'); return [f[1], Number(f[4])]; }));
   ok(Object.keys(typeN).filter((k) => k !== 'all').every((k) => typeN[k] === rowsOf(hp).filter((r) => new RegExp('data-da-type="' + k + '"').test(r.attrs)).length) && typeN.all === 4, '14k each Type chip count equals the number of rows of that Type');
-  ok(/The filters change what is shown in the table and on the map\. They do not change the report\./.test(textOf(sec(hp, 'filters').html)), '14l the filters say they change what is shown, never the report');
+  ok(/The filters change what is shown in the table, on the map and in the PDF\. They do not change the saved report\./.test(textOf(sec(hp, 'filters').html)), '14l the filters say they change what is shown (PDF included), never the saved report');
+  ok(/Showing all 4 records\./.test(textOf(sec(hp, 'filters').html)), '14l2 the filters say what they show, in words that print: "Showing all 4 records." before any is pressed');
   // lifecycle shapes (Change History badges): four keys, four drawings, proposed is hollow and dashed
   const shapes = {};
   for (const m of html.matchAll(/data-lifecycle="(\w+)"><svg class="da-rv-shape"[^>]*>(.*?)<\/svg>/g)) (shapes[m[1]] = shapes[m[1]] || new Set()).add(m[2]);
