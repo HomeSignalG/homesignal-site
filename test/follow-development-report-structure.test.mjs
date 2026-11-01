@@ -134,8 +134,8 @@ const mine = [c.handler, c.data, c.index, c.reader].join('\n');
     '3k2 every entry carries when the ledger recorded it and whether its source predates the report, and the answer says so when one does');
   ok(/class EventRowUnreadable/.test(c.reader) && /throw new EventRowUnreadable/.test(c.reader) && /EventRowUnreadable/.test(c.handler) && /class ReportUnreadable/.test(c.reader) && /throw new ReportUnreadable\('a detected change in the report cannot be read'\)/.test(c.reader),
     '3k3 an unreadable ledger event or an unreadable detected change in the stored body is refused (502 / 422), never dropped');
-  ok(!/rights_class/.test(mine + c.reads), '3l no rights decision is read from the ledger: rights are the registry\'s, read at answer time');
-  ok(/validateRights\(/.test(c.handler) && /validateRights\(input\.rights\)/.test(c.reader), '3m the registry is validated by the handler and again by the reader');
+  ok(!/rights_class/.test(mine + c.reads), '3l no rights decision is read from the ledger');
+  ok(/validateAttribution\(/.test(c.handler) && /validateAttribution\(input\.attribution\)/.test(c.reader) && !/validateRights|\bcleared\b/.test(c.reader), '3m the credit lines are validated by the handler and again by the reader, and no clearance list is read');
 }
 
 // ---- 4. the only writes are two locked database functions, with a fixed kind --------------------------------------------------------------

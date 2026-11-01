@@ -198,28 +198,30 @@ ok(refused === 'NotEntitled' && Number(one('select count(*) from public.evaluati
 
 // ---- the engine's inputs, as in test/national_report_pg ------------------------------------------------------------------------
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'round-trip fixture', attribution: 'Data: WSDOT' }] };
-const NONE = { version: 1, cleared: [] };
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } };
+// the record's source family: FAM (a wired connector stamped it) or null (it cannot be traced, so it is left out: national source policy, 2026-11-01)
+const CLEARED = { attribution: CREDITS, fam: FAM };
+const NONE = { attribution: CREDITS, fam: null };
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0' };
 const HOME = LOC.address, NEIGHBOUR = OTHER_PROPERTY; // the launch test location: Brigham City, UT 84302 (test/lib/launch-test-location.mjs)
-function handlerFor(rights, userId) {
-  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', rights, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
+function handlerFor(mode, userId) {
+  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', attribution: mode.attribution, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
   return H.makeHandler({
     ...real,
     authenticate: async () => ({ email: 'agent@example.test', id: userId }),
     isAdmin: async () => false,
     geocode: async (a) => geocodeStandIn(a),
     zipSupported: async () => true,
-    radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
-    hydrate: async () => [proj], ledger: async () => [], events: async () => [], health: async () => [],
+    radius: async () => [{ source_key: 'k1', feature_id: 'pt:1', registry_id: mode.fam, provenance: 'proven_stored_point', distance_mi: 0.21, geometry_type: 'Point', has_more: false }],
+    hydrate: async () => [{ ...proj, registry_id: mode.fam }], ledger: async () => [], events: async () => [], health: async () => [],
   });
 }
 // This suite makes dozens of reports in seconds to test the ENTITLEMENT (the 10, the ledger, saved reports); the report rate limit has its own suites
 // (test/report_rate_limit_pg and section 15 of test/launch_gate_pg). So its counters are cleared before each request here, as the table's owner.
-async function ask(rights, userId, body) {
+async function ask(mode, userId, body) {
   one('truncate public.report_rate_window');
-  const res = await handlerFor(rights, userId)(new Request('https://x/functions/v1/get-development-activity-report',
+  const res = await handlerFor(mode, userId)(new Request('https://x/functions/v1/get-development-activity-report',
     { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   return { status: res.status, json: await res.json() };
 }
@@ -260,7 +262,7 @@ ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '3b and n
 // ---- 4. "No data ingested": free, and stored nowhere ------------------------------------------------------------------------------
 r = await ask(NONE, MEMBER, { address: NEIGHBOUR, idempotency_key: key(2) });
 ok(r.status === 200 && r.json.report.activity.outcome === 'NO_DATA_INGESTED' && r.json.charged === false && r.json.stored === false && r.json.trial.credits_used === 1,
-  '4a with nothing cleared the report is "No data ingested": not charged, not stored, still one used', [r.json.charged, r.json.trial]);
+  '4a with no traceable record the report is "No data ingested": not charged, not stored, still one used', [r.json.charged, r.json.trial]);
 ok(JSON.stringify(r.json.header) === '{"brokerage":"Round Trip Realty","agent":"Pat Agent"}', '4a2 and it carries the same header');
 ok(count('report_snapshot') === 1 && count('evaluation_credit') === 1, '4b the database is unchanged');
 ok(seen.some((s) => /rpc\/brokerage_report_issue$/.test(s)) && seen.some((s) => /rpc\/billing_usage$/.test(s)) && seen.some((s) => /rpc\/report_private_context_read$/.test(s)) && seen.some((s) => /report_snapshot\?select=body/.test(s)),
@@ -373,7 +375,7 @@ ok(t.json.trial.credits_used === 0 && count('evaluation_credit') === 10, '7l and
 const none = await savedAsk(STRANGER, { action: 'list' });
 const noneOpen = await savedAsk(STRANGER, { action: 'open', report_id: firstId });
 ok(none.status === 403 && noneOpen.status === 403 && none.json.error === 'forbidden', '7m a signed-in person with no trial can neither list nor open (403)', [none.json, noneOpen.json]);
-const real7 = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', rights: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
+const real7 = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'svc', attribution: CREDITS, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
 const adminH = H.makeHandler({ ...real7, authenticate: async () => ({ email: 'founder@example.test', id: ADMIN }), isAdmin: async () => true });
 const adminRes = await adminH(new Request('https://x/f', { method: 'POST', headers: { authorization: 'Bearer t', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'list' }) }));
 ok(adminRes.status === 403, '7n an admin has no brokerage\'s reports to list: 403 (an admin report is never stored)', adminRes.status);

@@ -2,7 +2,7 @@
 //
 // What is real here: the report function's request handler and its REAL data layer (get-development-activity-report/data.ts: the geocode call, the ZIP check
 // against the canonical registry, the canonical spatial read, the project hydration, the change-ledger reads), the engine (_shared/national-report.ts), the credit
-// rule, and the rights registry AS SHIPPED (supabase/functions/_shared/report-rights.json, read from disk). What is stood in: the network. A fetch stand-in answers
+// rule, and the credit-line file AS SHIPPED (supabase/functions/_shared/source-attribution.json, read from disk). What is stood in: the network. A fetch stand-in answers
 // exactly the requests that data layer makes, with the rows production holds for 84302 (read 2026-10-04: 2 `udot-active-projects` and 39
 // `udot-active-projects-lines` development rows, 22 EPA facility rows, ZIP 84302 in canonical_zip_registry: 1 of 12,722), and RECORDS every request, so the test can
 // say where the address was routed. The member's standing, plan and charge are in-memory fakes that record whether a report was ever charged.
@@ -10,16 +10,12 @@
 // WHAT IT PROVES
 //   * the location is accepted and ROUTED: typed address -> geocode -> ZIP 84302 asked of the canonical registry -> the 0.5-mile spatial read at that point;
 //   * an address outside the registry's ZIPs, and one that cannot be found, are named as such, free, and are not the "No data ingested" outcome;
-//   * with the rights registry AS SHIPPED (founder ruling R7, 2026-10-04: every registry source, including the UDOT lines family these rows belong to) the report for
-//     this location SHOWS the stored records: 200 OK, outcome "Development shown", the records by name with their official links, charged as one free report and
-//     stored (the issuing function is called once);
-//   * with NOTHING cleared (an explicit empty list, which is what the shipped file said until R7) the same journey says "No data ingested": 200 OK, not an error, not
-//     charged, not stored, and NONE of the stored records leaks into the answer. That state still exists for any source that is not on the list;
-//   * a covered ZIP is NOT a clearance: a list that names some other source leaves these records hidden;
-//   * (control) the very same journey with a FIXTURE source cleared shows development, so an empty answer is caused by the rights registry and not by the
-//     location or the routing failing.
-// WHAT IT DOES NOT PROVE: that the live geocoder resolves the street address (a person checks that: docs/development-activity-manual-test-brigham-city-84302.md),
-// or that any publisher permits its records in a paid report (R7 is the founder's decision to list them, not a publisher's grant).
+//   * under the national source policy (2026-11-01) the report for this location SHOWS the stored records, with no list naming their source: 200 OK, outcome
+//     "Development shown", the records by name with their official links, charged as one free report and stored (the issuing function is called once);
+//   * the same rows with NO source family (nothing a wired connector stamped) say "No data ingested": 200 OK, not an error, not charged, not stored, and NONE of
+//     the stored records leaks into the answer. Provenance is the one rule left;
+//   * (control) a source family no file has ever named shows development the same way, so inclusion does not depend on any list.
+// WHAT IT DOES NOT PROVE: that the live geocoder resolves the street address (a person checks that: docs/development-activity-manual-test-brigham-city-84302.md).
 // Run: node test/brigham-city-84302-journey.test.mjs
 import { readFileSync } from 'node:fs';
 import { LAUNCH_TEST_LOCATION as L, OTHER_PROPERTY, geocodeStandIn } from './lib/launch-test-location.mjs';
@@ -31,8 +27,7 @@ const M = await import('../supabase/functions/_shared/national-report.ts');
 let n = 0, bad = 0;
 const ok = (c, m, d) => { n++; if (c) console.log('PASS — ' + m); else { bad++; console.log('FAIL — ' + m + (d !== undefined ? '  [' + JSON.stringify(d).slice(0, 400) + ']' : '')); } };
 
-const SHIPPED = JSON.parse(readFileSync(new URL('../supabase/functions/_shared/report-rights.json', import.meta.url), 'utf8'));
-const NONE = { version: 1, cleared: [] }; // nothing cleared, named here: the empty state does not depend on what the shipped file says
+const SHIPPED = JSON.parse(readFileSync(new URL('../supabase/functions/_shared/source-attribution.json', import.meta.url), 'utf8'));
 const NOW = new Date('2026-10-04T12:00:00Z');
 const UDOT_LINES = 'udot-active-projects-lines';
 const USER = 'a1111111-1111-4111-8111-111111111111';
@@ -68,9 +63,9 @@ function world({ geocode = (a) => ({ match: { ...geocodeStandIn(a) } }), registr
 }
 
 /** A trial member asking for a report; every database function that would charge or store is a recorder. */
-function ask({ rights = SHIPPED, net = world(), body = { address: L.address }, used = 3 } = {}) {
+function ask({ attribution = SHIPPED, net = world(), body = { address: L.address }, used = 3 } = {}) {
   const calls = { issue: 0, trialOf: 0 };
-  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', rights, now: () => NOW }, net.fetchFn);
+  const real = D.makeDeps({ url: 'https://proj.supabase.co', serviceKey: 'fixture-service-key-not-real', attribution, now: () => NOW }, net.fetchFn);
   const trial = { status: 'active', credits_used: used, credits_remaining: 10 - used, expired: false };
   const deps = {
     ...real,
@@ -97,10 +92,8 @@ const asked = (net, path) => net.seen.filter((s) => s.path === path);
 
 // ---- 0. the fixtures say what they claim ------------------------------------------------------------------------------------------------------------
 ok(L.zip === '84302' && L.city === 'Brigham City' && L.state === 'UT' && L.county === 'Box Elder' && /Brigham City, UT 84302$/.test(L.address), '0a the test location is Brigham City, UT 84302 (Box Elder County)');
-// The shipped list is read from disk. It names the family these rows belong to (ruling R7); if that ever stops being true this control fails, and so does section 2, which
-// describes what a customer gets at this address. The empty state is tested separately, against an explicit empty list.
-const cleared = (fam) => SHIPPED.cleared.some((e) => e.registry_id === fam);
-ok(Array.isArray(SHIPPED.cleared) && cleared(UDOT_LINES) && cleared('udot-active-projects'), '0b (control) the rights registry as shipped lists the UDOT families the stored rows below belong to (ruling R7), so section 2 describes production, not a staged case');
+// The credit-line file is read from disk. It does not name the UDOT families, and it does not need to: inclusion depends on no list.
+ok(SHIPPED && typeof SHIPPED.attribution === 'object' && !(UDOT_LINES in SHIPPED.attribution), '0b (control) the shipped credit-line file is read and names no credit for the UDOT families, so section 2 shows they appear without being listed anywhere');
 ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id === UDOT_LINES), '0c (control) the stand-in holds stored UDOT records for this point, as production does for 84302: an empty report is not an empty database');
 
 // ---- 1. the location is accepted and routed -------------------------------------------------------------------------------------------------------
@@ -125,7 +118,7 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   ok(claims.length === 1 && JSON.stringify(claims[0].body) === JSON.stringify({ p_user: USER }), '1g the rate limit is asked once, for the signed-in person\'s id and nothing else (no address, no email)', claims.map((x) => x.body));
 }
 
-// ---- 2. as shipped (ruling R7): the stored records are SHOWN ---------------------------------------------------------------------------------------------
+// ---- 2. as shipped (national source policy): the stored records are SHOWN ---------------------------------------------------------------------------------------------
 {
   const t = ask({ used: 3 });
   const r = await t.go();
@@ -140,42 +133,36 @@ ok(stored().projects.length === 2 && stored().rows.every((r) => r.registry_id ==
   ok(rep.projects.every((p) => p.source.attribution === null) && rep.coverage && rep.coverage.state !== 'LIMITED_COVERAGE', '2.6 these sources require no credit line, and the report is not marked limited coverage', rep.coverage);
 }
 
-// ---- 2b. NOTHING cleared: the empty-source state, accurate, plain, and not an error ----------------------------------------------------------------
+// ---- 2b. NO source family: the provenance rule, accurate, plain, and not an error -----------------------------------------------------------------
 {
-  const t = ask({ used: 3, rights: NONE });
+  const t = ask({ used: 3, net: world({ rows: stored(null) }) });
   const r = await t.go();
   const rep = r.json.report;
   ok(r.status === 200 && r.json.status === 'OK' && r.json.error === undefined, '2a the answer is a normal 200 OK with no error field: "No data ingested" is a report, not a failure', [r.status, r.json.status, r.json.error]);
   ok(rep.activity.outcome === 'NO_DATA_INGESTED' && rep.activity.label === 'No data ingested', '2b the report says "No data ingested", in the founder\'s words, from the engine\'s outcome code', rep.activity);
   ok(Array.isArray(rep.projects) && rep.projects.length === 0, '2c it carries no project record');
   const blob = JSON.stringify(r.json);
-  ok(STORED_NAMES.every((nm) => !blob.includes(nm)) && !blob.includes('udot') && !blob.includes('SR-13'),
-    '2d and none of the 41 stored records (UDOT) leaks into the answer by name, family or address: an uncleared source shows nothing at all', blob.length);
+  ok(STORED_NAMES.every((nm) => !blob.includes(nm)) && !blob.includes('SR-13'),
+    '2d and none of the stored records leaks into the answer by name or address: a record that cannot be traced shows nothing at all', blob.length);
   ok(r.json.charged === false && r.json.stored === false && r.json.report_id === null && t.calls.issue === 0, '2e it is not charged, not stored and the issuing function is never called');
   ok(r.json.credit.uses_report === false && r.json.credit.reason === 'NO_DATA_INGESTED' && r.json.trial.credits_used === 3 && r.json.trial.credits_remaining === 7,
     '2f the credit decision says no free report is used, and the trial still reads 3 used / 7 left', [r.json.credit, r.json.trial]);
-  ok(r.json.coverage_state !== 'OUTSIDE_COVERAGE' && typeof r.json.coverage_state === 'string', '2g the coverage state is not "outside coverage": the place IS covered, the SOURCE is what is missing', r.json.coverage_state);
+  ok(r.json.coverage_state !== 'OUTSIDE_COVERAGE' && rep.coverage.limitations.some((l) => l.code === 'RECORDS_NOT_TRACEABLE'), '2g the place IS covered; the report says records could not be traced', rep.coverage);
 }
 
-// ---- 3. a covered ZIP is not a clearance -------------------------------------------------------------------------------------------------------------
+// ---- 3. the credit-line file cannot be malformed into dropping a credit -------------------------------------------------------------------------------
 {
-  // clearing some OTHER source leaves the Brigham City records exactly as hidden as before
-  const other = { version: 1, cleared: [{ registry_id: 'austin-site-plan-cases', cleared_on: '2026-10-04', audit_ref: 'launch-test fixture, not a clearance', attribution: '' }] };
-  const r = await ask({ rights: other }).go();
-  ok(r.json.report.activity.outcome === 'NO_DATA_INGESTED' && r.json.report.projects.length === 0, '3a clearing a different source changes nothing here: the covered ZIP is not a clearance', r.json.report.activity);
-  // the registry can never be "everything cleared" by being malformed (fail closed), even for the test location
-  const malformed = await ask({ rights: { version: 1, cleared: 'all' } }).go();
-  ok(malformed.status >= 400 && malformed.json.report === undefined, '3b a malformed rights registry fails the request instead of clearing everything', [malformed.status, malformed.json.error]);
+  const malformed = await ask({ attribution: { version: 1, attribution: 'all' } }).go();
+  ok(malformed.status >= 400 && malformed.json.report === undefined, '3a a malformed credit-line file fails the request instead of dropping a credit line', [malformed.status, malformed.json.error]);
 }
 
-// ---- 4. control: the same journey with a FIXTURE source cleared shows development -----------------------------------------------------------------
+// ---- 4. control: a source family no file names shows development the same way -----------------------------------------------------------------------
 {
   const FIXTURE = 'launch-test-fixture-family-not-a-real-source';
-  const rights = { version: 1, cleared: [{ registry_id: FIXTURE, cleared_on: '2026-10-04', audit_ref: 'launch-test fixture, not a clearance', attribution: 'Data: fixture' }] };
-  const t = ask({ rights, net: world({ rows: stored(FIXTURE) }) });
+  const t = ask({ net: world({ rows: stored(FIXTURE) }) });
   const r = await t.go();
   ok(r.status === 200 && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN' && r.json.report.projects.length === 2 && r.json.charged === true && t.calls.issue === 1,
-    '4a (control) with a fixture family cleared the same location, the same routing and the same rows show 2 projects and use one free report: the empty answer was the rights registry, not the location', [r.json.report.activity, r.json.charged]);
+    '4a (control) a family no list has ever named, at the same location with the same routing and rows, shows 2 projects and uses one free report', [r.json.report.activity, r.json.charged]);
 }
 
 // ---- 5. places that are not covered, and addresses that cannot be found ----------------------------------------------------------------------------

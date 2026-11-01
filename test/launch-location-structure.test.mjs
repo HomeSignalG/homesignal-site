@@ -30,8 +30,8 @@ ok(LOC.length > 400 && L && typeof L === 'object', '1a the definition is read an
 ok(L.label === 'Brigham City, UT 84302' && L.city === 'Brigham City' && L.state === 'UT' && L.zip === '84302' && L.county === 'Box Elder' && L.address === '20 N Main St, Brigham City, UT 84302',
   '1b it is Brigham City, UT 84302, Box Elder County, at 20 N Main St', L);
 ok(Object.isFrozen(L), '1c and it is frozen: no test can change the place for the others');
-ok(/PLACE/.test(LOCRAW) && /NOT a data source and NOT a clearance/.test(LOCRAW) && /report-rights\.json/.test(LOCRAW) && /build step 12/.test(LOCRAW),
-  '1d its own header says it is a place and not a source or a clearance, names the rights registry that decides clearance, and names step 12');
+ok(/PLACE/.test(LOCRAW) && /NOT a data source and NOT a clearance/.test(LOCRAW) && /national source policy of 2026-11-01/.test(LOCRAW),
+  '1d its own header says it is a place and not a source or a clearance, and names the national source policy that decides what a report may show');
 ok(/20 N Main St/.test(LOC) && (LOC.match(/Brigham City/g) || []).length >= 3 && !/\bimport\b/.test(LOC), '1e it imports nothing: the one place a person can read what the test location is');
 
 // ---- 2. every launch-path suite imports it ----------------------------------------------------------------------------------------------------------------------
@@ -53,19 +53,16 @@ ok(DOCS.every((f) => /Brigham City/.test(read(f)) && /84302/.test(read(f))), '3c
 // the harness that finds a forbidden place must be shown able to: the earlier fixture place IS still the fixture of the unit suites that are not launch-path
 ok(OUT.test(stripJs(read('test/national-report.test.mjs'))), '3d (control) the scan finds the earlier fixture place where it is still used (the engine\'s own unit suite, which is not a launch-path file)');
 
-// ---- 4. the ZIP is never a clearance ------------------------------------------------------------------------------------------------------------------------------
-const RIGHTS = JSON.parse(read('supabase/functions/_shared/report-rights.json') || '{}');
-ok(Array.isArray(RIGHTS.cleared) && Object.keys(RIGHTS).every((k) => ['version', 'cleared', '_note', 'note', 'notes', 'description'].includes(k) || typeof k === 'string'), '4a (control) the rights registry is read and has a `cleared` list', Object.keys(RIGHTS));
-ok(!JSON.stringify(RIGHTS).includes('84302') && !JSON.stringify(RIGHTS).toLowerCase().includes('brigham'), '4b nothing in the rights registry names Brigham City or 84302: a place is not in the list of what may be shown');
-const entryKeys = new Set((RIGHTS.cleared || []).flatMap((e) => Object.keys(e)));
-ok([...entryKeys].every((k) => !/zip|county|city|place|geograph/i.test(k)), '4c and a clearance entry is keyed by a source (registry_id), never by a place: no entry has a zip, county or city field', [...entryKeys]);
+// ---- 4. no place, and no list, decides what a report may show (national source policy, 2026-11-01) --------------------------------------------------------
+ok(!existsSync(join(ROOT, 'supabase/functions/_shared/report-rights.json')), '4a there is no per-source allowlist file');
+const CREDITS = JSON.parse(read('supabase/functions/_shared/source-attribution.json') || '{}');
+ok(CREDITS && typeof CREDITS.attribution === 'object' && !JSON.stringify(CREDITS).includes('84302') && !JSON.stringify(CREDITS).toLowerCase().includes('brigham'), '4b the credit-line file is read and names no place');
 const NATIONAL = stripJs(read('supabase/functions/_shared/national-report.ts'));
-ok(NATIONAL.length > 5000 && !/zip_supported[^;]*cleared|cleared[^;]*zip_supported/.test(NATIONAL), '4d the engine does not derive clearance from the covered-ZIP flag (positive control: the engine is read)', NATIONAL.length);
+ok(NATIONAL.length > 5000 && !/zip_supported[^;]*family|family[^;]*zip_supported/.test(NATIONAL), '4c the engine does not derive inclusion from the covered-ZIP flag (positive control: the engine is read)', NATIONAL.length);
 const JOURNEY = read('test/brigham-city-84302-journey.test.mjs');
-ok(/report-rights\.json/.test(JOURNEY) && /readFileSync/.test(JOURNEY) && /covered ZIP is not a clearance/.test(JOURNEY) && /clearing a different source|different source/i.test(JOURNEY),
-  '4e the journey test reads the rights registry from disk (not a copy), and carries the checks that a covered ZIP is not a clearance and that another source\'s clearance changes nothing');
-ok(/const NONE = \{ version: 1, cleared: \[\] \}/.test(JOURNEY) && /rights: NONE/.test(JOURNEY) && /0b \(control\) the rights registry as shipped lists the UDOT families/.test(JOURNEY),
-  '4f and it tests the empty state against an EXPLICIT empty list (not the shipped file), while its shipped-state control fails if the list stops naming the UDOT families the stored rows belong to');
+ok(/source-attribution\.json/.test(JOURNEY) && /readFileSync/.test(JOURNEY) && /stored\(null\)/.test(JOURNEY) && /RECORDS_NOT_TRACEABLE/.test(JOURNEY),
+  '4d the journey test reads the shipped credit lines from disk and tests the provenance rule (rows with no source family) against the same location');
+ok(/a family no list has ever named/.test(JOURNEY), '4e and its control shows a source no file names is shown, so inclusion depends on no list');
 
 // ---- 5. step 12 and step 13 stay open -------------------------------------------------------------------------------------------------------------------------------
 const MANUAL = read(DOCS[0]);

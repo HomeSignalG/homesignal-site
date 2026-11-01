@@ -16,11 +16,11 @@ const S = await import('../supabase/functions/_shared/report-snapshot.ts');
 
 // ---- fixtures: a real report from the real engine -----------------------------------------------------------------------------------
 const FAM = 'fam-a';
-const RIGHTS = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-09-29', audit_ref: 'fixture', attribution: 'Data: A' }] };
+const CREDITS = { version: 1, attribution: { [FAM]: 'Data: A' } };
 const SUBJECT = { address: '742 Evergreen Terrace, Springfield, OR 97477', matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477', label: 'Homer client' };
 const proj = (k, x = {}) => ({ source_key: k, registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised', developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://example.gov/r/1', ...x });
 const out = M.assemble({
-  now: new Date('2026-09-29T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: 1, rights: RIGHTS, subject: SUBJECT,
+  now: new Date('2026-09-29T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: 1, attribution: CREDITS, subject: SUBJECT,
   rows: [{ source_key: 'k1', feature_id: 'pt:1', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false },
          { source_key: 'k2', feature_id: 'pt:2', registry_id: FAM, provenance: 'proven_stored_point', distance_mi: 0.5, geometry_type: 'Point', has_more: false }],
   projects: [proj('k1'), proj('k2', { name: 'Weather Station' })],
@@ -49,7 +49,7 @@ function fakes(over = {}) {
   const rec = (name, fn) => async (...a) => { calls.push(name); asked[name] = a; return fn(...a); };
   const deps = {
     now: () => NOW,
-    rights: RIGHTS,
+    attribution: CREDITS,
     authenticate: rec('authenticate', async (t) => (t === 'user-token' ? { email: 'founder@example.com' } : null)),
     isAdmin: rec('isAdmin', async (e) => e === 'founder@example.com'),
     report: rec('report', async (id) => (id === REPORT_ID || id === HEX_REPORT_ID ? ROW : null)),
@@ -93,7 +93,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   ok(bad1.status === 401, '1e validation comes AFTER identity: an unauthenticated bad request is 401, not 400');
   // PARITY with the national report: the same seven sign-in scenarios get the same status and body from both functions
   const rf = (over = {}) => ({
-    now: () => NOW, rights: RIGHTS,
+    now: () => NOW, attribution: CREDITS,
     authenticate: async (t) => (t === 'user-token' ? { email: 'founder@example.com' } : null), isAdmin: async (e) => e === 'founder@example.com',
     geocode: async () => null, zipSupported: async () => true, radius: async () => [], hydrate: async () => [], ledger: async () => [], events: async () => [], health: async () => [], ...over,
   });
@@ -174,10 +174,10 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   ok(f.asked.eventsWrittenSince[1] === '2026-09-29T11:50:05.000Z', '3f the events are asked from ten minutes before the report was issued', f.asked.eventsWrittenSince[1]);
   ok(same(f.asked.health[0], [FAM]), '3g and the source health is asked for the report\'s source families only');
   ok(r.headers.get('cache-control') === 'no-store', '3h the response is never cacheable');
-  // the DEFAULT view is the customer's: no rights label, no internal field. An explicit internal view labels each project.
+  // no view carries a rights label: there is no rights decision (national source policy, 2026-11-01)
   ok(!('rights' in r.json.result.changed[0]), '3h2 with no view given the answer is the customer view: no internal rights label on a project', r.json.result.changed[0]);
   const ri = await call(fakes().deps, { ...CHANGES, view: 'internal' }, AUTH);
-  ok(ri.status === 200 && ri.json.result.changed[0].rights === 'CLEARED', '3h3 (control) an explicit internal view does label it, so the check above is real', ri.json.result.changed[0]);
+  ok(ri.status === 200 && ri.json.result.changed.length === 1 && !('rights' in ri.json.result.changed[0]), '3h3 an explicit internal view answers too, also with no rights label', ri.json.result.changed[0]);
   ok(!r.text.includes(CONTEXT_ID) && !/742 Evergreen|Homer client|44\.04612|122\.98123/.test(r.text), '3i the response carries no context id and nothing private');
   ok(r.json.result.report.content_hash === 'h'.repeat(64) && r.json.result.report.report_version === M.REPORT_VERSION && r.json.result.report.report_id === REPORT_ID && r.json.result.report.issued_at === ISSUED,
     '3i2 the answer names the report by its id, version, issue instant and content hash, exactly as stored', r.json.result.report);
@@ -215,7 +215,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   const boom = fakes({ ledger: async () => { throw new Error('secret 742 Evergreen'); } });
   const rb = await call(boom.deps, CHANGES, AUTH);
   ok(rb.status === 500 && rb.json.error === 'internal' && !rb.text.includes('Evergreen'), '3m an unexpected error is 500 with no message');
-  const noRights = fakes({ rights: { version: 1, cleared: [{ registry_id: '*', cleared_on: '2026-09-29', audit_ref: 'x', attribution: '' }] } });
+  const noRights = fakes({ attribution: { version: 1, attribution: { '*': 'x' } } });
   const rr2 = await call(noRights.deps, CHANGES, AUTH);
   ok(rr2.status === 500 && rr2.json.result === undefined, '3n a malformed rights registry fails the request');
   const none = fakes({ report: async () => ({ ...ROW, body: JSON.stringify({ ...JSON.parse(ROW.body), projects: [] }) }) });
@@ -249,7 +249,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   ok(other.headers.get('access-control-allow-origin') === null, '3s2 and an origin that is not the site is not allowed');
   // two source families in the report, listed out of order by project identity (k1 is fam-b, k2 is fam-a): health is asked for them sorted
   const two = M.assemble({
-    now: new Date('2026-09-29T12:00:00Z'), view: 'internal', zip_supported: true, radius_mi: 1, rights: RIGHTS, subject: SUBJECT,
+    now: new Date('2026-09-29T12:00:00Z'), view: 'internal', zip_supported: true, radius_mi: 1, attribution: CREDITS, subject: SUBJECT,
     rows: [{ source_key: 'k1', feature_id: 'pt:1', registry_id: 'fam-b', provenance: 'proven_stored_point', distance_mi: 0.31, geometry_type: 'Point', has_more: false },
            { source_key: 'k2', feature_id: 'pt:2', registry_id: 'fam-a', provenance: 'proven_stored_point', distance_mi: 0.5, geometry_type: 'Point', has_more: false }],
     projects: [proj('k1', { registry_id: 'fam-b' }), proj('k2', { registry_id: 'fam-a', name: 'Weather Station' })],
@@ -321,7 +321,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   const BASE = 'https://proj.supabase.co';
   const KEY = 'service-key-value';
   const reqs = [];
-  const mk = (handlers) => D.makeDeps({ url: BASE + '/', serviceKey: KEY, rights: RIGHTS, now: () => NOW }, async (url, init) => {
+  const mk = (handlers) => D.makeDeps({ url: BASE + '/', serviceKey: KEY, attribution: CREDITS, now: () => NOW }, async (url, init) => {
     reqs.push({ url, init: init || {} });
     for (const [re, fn] of handlers) if (re.test(url)) return fn(url, init || {});
     return new Response('[]', { status: 200 });
@@ -379,7 +379,7 @@ const CHANGES = { action: 'changes', report_id: REPORT_ID };
   await d.openFollow(CONTEXT_ID, FOLLOW_ID); await d.closeFollow(CONTEXT_ID, FOLLOW_ID);
   ok(reqs.length === 9 && reqs.every((r) => r.url.startsWith(BASE + '/')), '5i the service key is sent only to the project\'s own URL: every request went there', reqs.map((r) => r.url));
   ok(!reqs.some((r) => /report_private_context_read|report_private_context\?|report_private_context_purge|report_private_context_create/.test(r.url)), '5j and not one request touches the private context other than the need open and close: never the read, the table, the purge or the writer');
-  ok(!('newId' in d) && !('newId' in D.makeDeps({ url: BASE, serviceKey: KEY, rights: RIGHTS, newId: () => 'x' }, async () => new Response('[]'))), '5k the function mints no follow id: the data layer has none to give, even if one is offered');
+  ok(!('newId' in d) && !('newId' in D.makeDeps({ url: BASE, serviceKey: KEY, attribution: CREDITS, newId: () => 'x' }, async () => new Response('[]'))), '5k the function mints no follow id: the data layer has none to give, even if one is offered');
 
   // the ledger reads ask for the columns the shared rule decides on. A column missing from the SELECT arrives as undefined, and the rule
   // would read "not change-ready" for every project: an empty answer that looks like a quiet week.

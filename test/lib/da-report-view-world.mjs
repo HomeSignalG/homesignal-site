@@ -3,7 +3,7 @@
 // Every response comes from the REAL request handler (supabase/functions/get-development-activity-report/handler.ts), which runs the
 // real assemble() (_shared/national-report.ts), over rows shaped like the ones production returns (the spatial read, app_projects, the
 // change ledger, its reportable events and the source-health view). Nothing about the response shape is written by hand: what is
-// written by hand is the WORLD the engine reads, and the engine decides the rest. The rights file is the one that ships.
+// written by hand is the WORLD the engine reads, and the engine decides the rest. The credit-line file is the one that ships.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -14,12 +14,17 @@ const H = await import('../../supabase/functions/get-development-activity-report
 export const NOW = new Date('2026-09-29T12:00:00Z');
 export const FAM_A = 'wsdot-project-delivery-plan-proposed';
 export const FAM_B = 'austin-site-plan-cases';
-export const RIGHTS_SHIPPED = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/report-rights.json'), 'utf8')); // the list as it ships (ruling R7: every registry source)
-export const RIGHTS_NONE = { version: 1, cleared: [] }; // nothing cleared: the "No data ingested" state, named here rather than read from the shipped file
-export const RIGHTS_AB = { version: 1, cleared: [
-  { registry_id: FAM_A, cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: 'Data: WSDOT' },
-  { registry_id: FAM_B, cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: '' },
-] };
+export const ATTRIBUTION_SHIPPED = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/source-attribution.json'), 'utf8')); // the credit lines as they ship
+// The credit lines these fixtures use: FAM_A requires one, FAM_B requires none. Under the national source policy (2026-11-01) both are
+// in the report either way; the file only says which credit a record carries.
+export const ATTRIBUTION_AB = { version: 1, attribution: { [FAM_A]: 'Data: WSDOT' } };
+/** The same world with every record's source family removed: nothing can be traced to a wired source, so a customer report shows
+ *  no record and says "No data ingested". This is the state the old "nothing cleared" fixture stood for. */
+export const NO_FAMILY = (world) => ({
+  ...world,
+  rows: (world.rows ?? []).map((r) => ({ ...r, registry_id: null })),
+  projects: (world.projects ?? []).map((p) => ({ ...p, registry_id: null })),
+});
 export const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
 
 /** A spatial-read row. Its display point is `d` miles due north of the subject unless `x` says otherwise (the map's direction, 100526 step 2). */
@@ -60,9 +65,9 @@ export const RICH = {
 /** Same world, no ledger: the cold start (nothing is change-ready yet). */
 export const COLD = { ...RICH, ledger: [], events: [] };
 
-export async function wire(world, { view = 'customer', rights = RIGHTS_AB, address = ADDRESS } = {}) {
+export async function wire(world, { view = 'customer', attribution = ATTRIBUTION_AB, address = ADDRESS } = {}) {
   const deps = {
-    now: () => NOW, rights,
+    now: () => NOW, attribution,
     authenticate: async (t) => (t === 'user-token' ? { email: 'founder@example.com' } : null),
     isAdmin: async (e) => e === 'founder@example.com',
     geocode: async () => ({ matchedAddress: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' }),

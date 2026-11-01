@@ -4,7 +4,7 @@
 // PURE. This file reads no environment, calls no network and holds no client; the edge function hands it what the database
 // returned. And it has no handle on the PRIVATE CONTEXT at all: it is given the report's permanent body (which holds project
 // identities and no address), the ledger rows and events for those projects, the source health of the families in the report,
-// and the rights registry. That is the whole contract (§8.5), and it is why this works while a Follow keeps the context alive,
+// and the source attribution file. That is the whole contract (§8.5), and it is why this works while a Follow keeps the context alive,
 // and equally after the context is purged: with the same clock and the same ledger state the answer is the same either way, byte
 // for byte (test/changes_since_report_pg).
 //
@@ -12,8 +12,8 @@
 //   what a detected change is ...... national-report.ts `selectDetectedChanges` / `detectedChangeEntries`, the SAME functions the
 //                                    report itself uses (a project is change-ready; an event is material). Not restated here.
 //   which events may be shown ...... public.dev_change_event_reportable (the ledger's reader), through _shared/change-reads.ts
-//   which sources may be shown ..... _shared/report-rights.json, read NOW, not as it stood when the report was issued: a source whose
-//                                    clearance was withdrawn stops appearing in later answers
+//   which records may be shown ..... national source policy, 2026-11-01: a record with its source family (provenance); there is no
+//                                    per-source allowlist. Credit lines come from _shared/source-attribution.json, read NOW.
 //   whether sources were readable .. national-report.ts `sourcesNotFullyRead`, the same rule as the report
 // What it owns is the BOUNDARY IN TIME: which events count as "since".
 //
@@ -47,7 +47,7 @@
 // which keeps the context alive precisely so that the point can be used) and is not claimed here.
 import {
   dayOf, detectedChangeEntries, isChangeReady, materialEvents, PRODUCT_NAME, selectDetectedChanges, SOURCE_NOT_FULLY_READ, sourcesNotFullyRead,
-  validateRights,
+  RECORDS_NOT_TRACEABLE, validateAttribution,
 } from './national-report.ts';
 import { PUBLIC_NAME } from './brand-origins.generated.ts';
 import type { LedgerProject, ReportableEvent, SourceHealth, View, WrittenEvent } from './national-report.ts';
@@ -78,10 +78,6 @@ export const NEW_PROJECTS_NOT_COVERED = {
 export const RECORDED_AFTER_REPORT = {
   code: 'RECORDED_AFTER_REPORT',
   text: 'Some changes below were recorded by ' + PUBLIC_NAME + ' after the report was issued, from a source record that was retrieved before it. The report may already show the new state; compare with the report.',
-};
-export const SOURCES_NOT_INCLUDED_SINCE = {
-  code: 'SOURCES_NOT_INCLUDED',
-  text: 'Some projects in the report come from official sources that are not included in this answer.',
 };
 
 export type ReportedProject = {
@@ -147,19 +143,19 @@ export type ChangesSinceReport = {
   through: string;
   projects_in_report: number;
   changed: Array<Record<string, unknown> & { project_id: string }>;
-  excluded: { no_rights: Record<string, number>; not_change_ready: number };
+  excluded: { no_source_family: number; not_change_ready: number };
   limitations: Array<{ code: string; text: string }>;
 };
 
 export type ChangesInput = {
-  now: Date; view: View; rights: unknown; report: StoredReport; ledger: LedgerProject[]; events: WrittenEvent[]; health: SourceHealth[];
+  now: Date; view: View; attribution: unknown; report: StoredReport; ledger: LedgerProject[]; events: WrittenEvent[]; health: SourceHealth[];
 };
 
 const instant = (s: unknown) => Date.parse(String(s));
 
 /** The projects a comparison is made over, and the instant it starts from. Each project carries the changes the report ALREADY showed for it. */
 export type ProjectsInput = {
-  now: Date; view: View; rights: unknown;
+  now: Date; view: View; attribution: unknown;
   /** The stored report's issue instant: the comparison starts here (less the overlap). */
   issuedAt: string;
   /** The projects to look at. For Changes Since Report these are the report's own; for a Watch they are the projects near the property NOW. */
@@ -168,9 +164,9 @@ export type ProjectsInput = {
 };
 export type ProjectsResult = {
   changed: Array<Record<string, unknown> & { project_id: string }>;
-  excluded: { no_rights: Record<string, number>; not_change_ready: number };
+  excluded: { no_source_family: number; not_change_ready: number };
   /** What the caller turns into its own limitation text. This function owns the WHEN; the caller owns what it says to its reader. */
-  flags: { recordedAfterReport: boolean; sourcesNotIncluded: boolean; sourcesNotFullyRead: boolean };
+  flags: { recordedAfterReport: boolean; recordsNotTraceable: boolean; sourcesNotFullyRead: boolean };
 };
 
 /**
@@ -183,8 +179,7 @@ export type ProjectsResult = {
 export function changesForProjects(input: ProjectsInput): ProjectsResult {
   const { now, view } = input;
   if (view !== 'customer' && view !== 'internal') throw new Error('changesForProjects: view must be customer or internal');
-  const rights = validateRights(input.rights);
-  const cleared = new Map(rights.cleared.map((e) => [e.registry_id, e]));
+  const credits = validateAttribution(input.attribution).attribution;
   const ledger = new Map(input.ledger.map((l) => [l.identity_key, l]));
   const eventsByKey = new Map<string, WrittenEvent[]>();
   for (const e of input.events) {
@@ -199,7 +194,7 @@ export function changesForProjects(input: ProjectsInput): ProjectsResult {
   const lower = issued - SINCE_REPORT_OVERLAP_MS;
   const upper = now.getTime();
 
-  const excluded = { no_rights: {} as Record<string, number>, not_change_ready: 0 };
+  const excluded = { no_source_family: 0, not_change_ready: 0 };
   const changed: ProjectsResult['changed'] = [];
   const latest = new Map<string, string>();
   const familiesInAnswer = new Set<string>();
@@ -207,9 +202,9 @@ export function changesForProjects(input: ProjectsInput): ProjectsResult {
 
   for (const p of input.projects) {
     const family = p.source_family ?? '';
-    const grant = cleared.get(family);
-    if (!grant && view === 'customer') { excluded.no_rights[family || '(none)'] = (excluded.no_rights[family || '(none)'] ?? 0) + 1; continue; }
-    if (family) familiesInAnswer.add(family);
+    // provenance, not rights: a project with no source family cannot be traced to a wired source (founder, 2026-11-01)
+    if (!family) { excluded.no_source_family++; continue; }
+    familiesInAnswer.add(family);
 
     // what the report already showed for this project: the same instant and type are in its body
     const shown = new Set(p.homesignal_detected_changes.map((c) => instant(c.detected_at) + '|' + String(c.event_type)));
@@ -241,9 +236,8 @@ export function changesForProjects(input: ProjectsInput): ProjectsResult {
       source_family: p.source_family,
       type: p.type,
       lifecycle_at_report: p.lifecycle,
-      source: { url: p.source && typeof p.source.url === 'string' ? p.source.url : null, attribution: grant ? (grant.attribution || null) : null },
+      source: { url: p.source && typeof p.source.url === 'string' ? p.source.url : null, attribution: credits[family] ?? null },
       changes_since_report: entries,
-      ...(view === 'internal' ? { rights: grant ? 'CLEARED' : 'HOLD' } : {}),
     });
   }
   changed.sort((a, b) => {
@@ -255,7 +249,7 @@ export function changesForProjects(input: ProjectsInput): ProjectsResult {
     changed, excluded,
     flags: {
       recordedAfterReport,
-      sourcesNotIncluded: Object.keys(excluded.no_rights).length > 0,
+      recordsNotTraceable: excluded.no_source_family > 0,
       sourcesNotFullyRead: sourcesNotFullyRead(input.health, familiesInAnswer),
     },
   };
@@ -264,15 +258,15 @@ export function changesForProjects(input: ProjectsInput): ProjectsResult {
 export function changesSinceReport(input: ChangesInput): ChangesSinceReport {
   const { now, view, report } = input;
   if (view !== 'customer' && view !== 'internal') throw new Error('changesSinceReport: view must be customer or internal');
-  validateRights(input.rights);
+  validateAttribution(input.attribution);
   const parsed = parseStoredReport(report);
   const { changed, excluded, flags } = changesForProjects({
-    now, view, rights: input.rights, issuedAt: parsed.generated_at, projects: parsed.projects, ledger: input.ledger, events: input.events, health: input.health,
+    now, view, attribution: input.attribution, issuedAt: parsed.generated_at, projects: parsed.projects, ledger: input.ledger, events: input.events, health: input.health,
   });
 
   const limitations = [{ ...NEW_PROJECTS_NOT_COVERED }];
   if (flags.recordedAfterReport) limitations.push({ ...RECORDED_AFTER_REPORT });
-  if (flags.sourcesNotIncluded) limitations.push({ ...SOURCES_NOT_INCLUDED_SINCE });
+  if (flags.recordsNotTraceable) limitations.push({ ...RECORDS_NOT_TRACEABLE });
   if (flags.sourcesNotFullyRead) limitations.push({ ...SOURCE_NOT_FULLY_READ });
 
   return {

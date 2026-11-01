@@ -11,7 +11,7 @@
 //   rpc_rows.json   what the PREVIOUS DDL and the SHIPPED DDL (docs/n5-spatial-read-rpc.sql) returned over those rows in a real PostGIS,
 //                   at two CONSTRUCTED subject points ~0.45 and ~0.55 mile from the project. They are not customer properties.
 //                   Regenerate: test/n5_spatial_pg/gen_rpc_rows.py (and an identical regeneration is how this file was checked).
-// Those rows go through the REAL request handler (handler.ts -> assemble() in _shared/national-report.ts, with the rights file as it
+// Those rows go through the REAL request handler (handler.ts -> assemble() in _shared/national-report.ts, with the credit-line file as it
 // ships) and the REAL renderer (lib/da-report-view.js). What is NOT exercised here is the database: the PostGIS behaviour of the new
 // function is test/n5_spatial_pg/run_suite.py.
 // Run: node test/national-report-generation-points.test.mjs
@@ -30,7 +30,7 @@ const H = await import('../supabase/functions/get-development-activity-report/ha
 const sandbox = { window: {} };
 runInNewContext(readFileSync(join(root, 'lib/da-report-view.js'), 'utf8'), sandbox);
 const V = sandbox.window.HS.daReportView;
-const RIGHTS = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/report-rights.json'), 'utf8')); // the list as it ships
+const CREDITS = JSON.parse(readFileSync(join(root, 'supabase/functions/_shared/source-attribution.json'), 'utf8')); // the credit lines as they ship
 
 const realText = fx('real_rows.json');
 const real = JSON.parse(realText);
@@ -44,7 +44,7 @@ const decode = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&qu
 const text = (h) => decode(h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 async function report(rows, lat) {
   const deps = {
-    now: () => new Date('2026-10-10T18:00:00Z'), rights: RIGHTS,
+    now: () => new Date('2026-10-10T18:00:00Z'), attribution: CREDITS,
     authenticate: async (t) => (t === 't' ? { email: 'founder@example.com' } : null), isAdmin: async () => true,
     geocode: async () => ({ matchedAddress: 'CONSTRUCTED TEST SUBJECT', lat, lng: -97.77712356, zip: '78704' }),
     zipSupported: async () => true,

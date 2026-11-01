@@ -25,9 +25,9 @@ REST = 'supabase/functions/_shared/service-rest.ts'
 CHG = 'supabase/functions/_shared/change-reads.ts'
 CFG = 'supabase/config.toml'
 WF = '.github/workflows/deploy-edge-functions.yml'
-REG = 'supabase/functions/_shared/report-rights.json'
+REG = 'supabase/functions/_shared/source-attribution.json'
 GEN = 'supabase/functions/_shared/project-type.generated.js'
-TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs']
+TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs', 'test/no-source-allowlist.test.mjs']
 
 # name -> list of (file, old, new)
 M = {}
@@ -50,19 +50,13 @@ m('freshness_reason_never_filing_only', MOD, "reason: filingOnly ? 'filing_only'
 m('freshness_counts_observation_time', MOD, "verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today)", "verification(rd, stage, [ev?.date, led?.last_observed_at?.slice(0, 10), ...material.map((e) => e.publisher_event_date)], today)")
 m('freshness_counts_unproven_events', MOD, "...material.map((e) => e.publisher_event_date)], today)", "...(eventsByKey.get(p.source_key) ?? []).map((e) => e.publisher_event_date)], today)")
 
-# ---- the rights gate ----------------------------------------------------------------------------------------------------
-m('rights_gate_off', MOD, "if (view === 'customer') { excluded.no_rights", "if (false) { excluded.no_rights")
-m('unlisted_family_cleared', MOD, "const grant = cleared.get(family);", "const grant = cleared.get(family) ?? { registry_id: family, cleared_on: '2026-01-01', audit_ref: 'x', attribution: '' };")
-m('hold_not_labelled', MOD, "if (view === 'internal') entry.rights = grant ? 'CLEARED' : 'HOLD';", "void 0;")
+# ---- provenance (national source policy, 2026-11-01): no allowlist; a record without a source family is left out ----------------
+m('provenance_rule_off', MOD, "if (!family) { excluded.no_source_family++; continue; }", "void 0;")
 m('internal_view_storable', MOD, "if (view !== 'customer') blockers.push('INTERNAL_VIEW');", "void 0;")
-m('hold_blocker_removed', MOD, "if (anyHold) blockers.push('CONTAINS_UNCLEARED_SOURCE');", "void 0;")
-m('wildcard_registry_allowed', MOD, "if (/[*?%]/.test(e.registry_id)) throw", "if (false) throw")
-m('duplicate_registry_allowed', MOD, "if (seen.has(e.registry_id)) throw", "if (false) throw")
-m('audit_ref_optional', MOD, "for (const k of ['registry_id', 'cleared_on', 'audit_ref'])", "for (const k of ['registry_id', 'cleared_on'])")
-m('impossible_date_allowed', MOD, "if (!validDay(e.cleared_on)) throw", "if (false) throw")
-m('attribution_dropped', MOD, "attribution: grant ? (grant.attribution || null) : null", "attribution: null")
-m('empty_registry_not_limited', MOD, "if (rights.cleared.length === 0) {", "if (false) {")
-m('partial_exclusion_not_disclosed', MOD, "} else if (Object.keys(excluded.no_rights).length > 0) {", "} else if (false) {")
+m('credit_pattern_key_allowed', MOD, "if (!k.trim() || /[*?%]/.test(k)) throw", "if (false) throw")
+m('credit_blank_line_allowed', MOD, "if (typeof v !== 'string' || !v.trim()) throw", "if (false) throw")
+m('attribution_dropped', MOD, "attribution: credits[family] ?? null", "attribution: null")
+m('untraceable_not_disclosed', MOD, "if (excluded.no_source_family > 0) {", "if (false) {")
 # ---- the recent-activity window --------------------------------------------------------------------------------------------
 m('window_not_bounded_above', MOD, "if (date > today || date < addDays(today, -RECENT_DAYS)) return null;", "if (date < addDays(today, -RECENT_DAYS)) return null;")
 m('window_not_bounded_below', MOD, "if (date > today || date < addDays(today, -RECENT_DAYS)) return null;", "if (date > today) return null;")
@@ -159,7 +153,7 @@ m('service_key_to_third_party', REST, "try { r = await fetchFn(base + '/rest/v1/
 # ---- config, registry, generated copy ---------------------------------------------------------------------------------------------------------
 m('jwt_verification_off', CFG, "[functions.get-development-activity-report]\nverify_jwt = true", "[functions.get-development-activity-report]\nverify_jwt = false")
 m('deploy_exempts_it_from_jwt', WF, 'if [ "$FN" = "get-address-report" ]; then', 'if [ "$FN" = "get-address-report" ] || [ "$FN" = "get-development-activity-report" ]; then')
-m('a_source_is_cleared', REG, '"cleared": []', '"cleared": [{"registry_id": "x", "cleared_on": "2026-09-29", "audit_ref": "y", "attribution": ""}]')
+m('credit_line_without_evidence', REG, '"attribution": {\n', '"attribution": {\n    "x-not-a-source": "Data: none",\n')
 m('generated_copy_drifts', GEN, "// ==== BEGIN lib/project-type.js (verbatim) ====\n", "// ==== BEGIN lib/project-type.js (verbatim) ====\n// edited by hand\n")
 m('module_defines_its_own_type_rule', MOD, "export const LIFECYCLE_ORDER =", "const CATEGORY_REGISTRY = {}; void CATEGORY_REGISTRY;\nexport const LIFECYCLE_ORDER =")
 m('module_reads_the_environment', MOD, "export const PRODUCT_NAME =", "const _k = (globalThis as any).Deno?.env?.get('SUPABASE_URL'); void _k;\nexport const PRODUCT_NAME =")
@@ -227,7 +221,7 @@ RSW = '.github/workflows/report-snapshot-suite.yml'
 RUN = 'test/national_report_pg/run.sh'
 m('roundtrip_dropped_from_workflow', RSW, "bash test/national_report_pg/run.sh 2>&1", "echo skipped 2>&1")
 m('roundtrip_node_not_pinned', RSW, "node-version: '22'", "node-version: '20'")
-m('roundtrip_paths_forget_the_engine', RSW, "      - 'supabase/functions/_shared/national-report.ts'\n      - 'supabase/functions/_shared/project-type.generated.js'\n      - 'supabase/functions/_shared/report-rights.json'\n      - 'test/dev_change_ledger_pg/fixture.sql'\n      - 'test/changes_since_report_pg/**'\n      - 'supabase/functions/_shared/changes-since-report.ts'\n      - 'supabase/functions/_shared/change-reads.ts'\n      - 'supabase/functions/_shared/service-rest.ts'\n      - 'supabase/functions/_shared/admin-gate.ts'\n      - 'supabase/functions/follow-development-report/**'\n      - 'docs/report-share.sql'\n      - 'test/report_share_pg/**'\n      - 'test/report-share-structure.test.mjs'\n      - 'test/report-share.test.mjs'\n      - 'supabase/functions/_shared/report-share.ts'\n      - 'docs/dev-change-reportable.sql'\n      - 'docs/dev-change-ledger.sql'\n      - 'docs/dev-change-baseline.sql'\n      - 'test/trial_report_pg/**'\n      - 'test/evaluation_entitlement_pg/fixture.sql'\n      - 'docs/evaluation-entitlement.sql'\n      - 'docs/brokerage-account-spine.sql'\n      - 'supabase/functions/get-development-activity-report/**'\n      - 'supabase/functions/_shared/credit-rule.ts'\n      - 'supabase/functions/_shared/evaluation-reads.ts'\n      - 'supabase/functions/development-activity-trial/**'\n      - '.github/workflows/report-snapshot-suite.yml'\n  push:",
+m('roundtrip_paths_forget_the_engine', RSW, "      - 'supabase/functions/_shared/national-report.ts'\n      - 'supabase/functions/_shared/project-type.generated.js'\n      - 'supabase/functions/_shared/source-attribution.json'\n      - 'test/dev_change_ledger_pg/fixture.sql'\n      - 'test/changes_since_report_pg/**'\n      - 'supabase/functions/_shared/changes-since-report.ts'\n      - 'supabase/functions/_shared/change-reads.ts'\n      - 'supabase/functions/_shared/service-rest.ts'\n      - 'supabase/functions/_shared/admin-gate.ts'\n      - 'supabase/functions/follow-development-report/**'\n      - 'docs/report-share.sql'\n      - 'test/report_share_pg/**'\n      - 'test/report-share-structure.test.mjs'\n      - 'test/report-share.test.mjs'\n      - 'supabase/functions/_shared/report-share.ts'\n      - 'docs/dev-change-reportable.sql'\n      - 'docs/dev-change-ledger.sql'\n      - 'docs/dev-change-baseline.sql'\n      - 'test/trial_report_pg/**'\n      - 'test/evaluation_entitlement_pg/fixture.sql'\n      - 'docs/evaluation-entitlement.sql'\n      - 'docs/brokerage-account-spine.sql'\n      - 'supabase/functions/get-development-activity-report/**'\n      - 'supabase/functions/_shared/credit-rule.ts'\n      - 'supabase/functions/_shared/evaluation-reads.ts'\n      - 'supabase/functions/development-activity-trial/**'\n      - '.github/workflows/report-snapshot-suite.yml'\n  push:",
   "      - 'test/dev_change_ledger_pg/fixture.sql'\n      - 'test/changes_since_report_pg/**'\n      - 'supabase/functions/_shared/changes-since-report.ts'\n      - 'supabase/functions/_shared/change-reads.ts'\n      - 'supabase/functions/_shared/service-rest.ts'\n      - 'supabase/functions/_shared/admin-gate.ts'\n      - 'supabase/functions/follow-development-report/**'\n      - 'docs/report-share.sql'\n      - 'test/report_share_pg/**'\n      - 'test/report-share-structure.test.mjs'\n      - 'test/report-share.test.mjs'\n      - 'supabase/functions/_shared/report-share.ts'\n      - 'docs/dev-change-reportable.sql'\n      - 'docs/dev-change-ledger.sql'\n      - 'docs/dev-change-baseline.sql'\n      - 'test/trial_report_pg/**'\n      - 'test/evaluation_entitlement_pg/fixture.sql'\n      - 'docs/evaluation-entitlement.sql'\n      - 'docs/brokerage-account-spine.sql'\n      - 'supabase/functions/get-development-activity-report/**'\n      - 'supabase/functions/_shared/credit-rule.ts'\n      - 'supabase/functions/_shared/evaluation-reads.ts'\n      - 'supabase/functions/development-activity-trial/**'\n      - '.github/workflows/report-snapshot-suite.yml'\n  push:")
 m('roundtrip_runs_on_any_database', RUN, "case \"$PGDATABASE\" in *disposable*) ;; *) echo \"ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')\"; exit 1;; esac", "true")
 m('roundtrip_uses_a_copy_of_the_sql', RUN, 'P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1', 'P -f "$here/snapshot-copy.sql" >/dev/null 2>&1')

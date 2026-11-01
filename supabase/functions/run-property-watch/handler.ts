@@ -21,7 +21,7 @@
 //
 // WHAT IT NEVER DOES: write the address, the point, the label or the agent's email anywhere (not a row, not a log line, not the email, not the
 // response). The point lives in memory for the length of one watch's check. The response is counts.
-import { assemble, parseRadius, REPORT_RADIUS_MI, validateRights } from '../_shared/national-report.ts';
+import { assemble, parseRadius, REPORT_RADIUS_MI, validateAttribution } from '../_shared/national-report.ts';
 import type { LedgerProject, ProjectRow, RadiusRow, ReportableEvent, SourceHealth, WrittenEvent } from '../_shared/national-report.ts';
 import { readReportInputs } from '../_shared/report-run.ts';
 import { ReportUnreadable } from '../_shared/changes-since-report.ts';
@@ -42,7 +42,7 @@ export class NoRecipient extends Error {}
 
 export type Deps = {
   now: () => Date;
-  rights: unknown;
+  attribution: unknown;
   /** The project's private SIGNUP_HOOK_SECRET. Empty when it is not configured, which refuses every request. */
   secret: string;
   /** Whether the mail provider's key is configured. The key itself never reaches this file. */
@@ -119,13 +119,13 @@ export async function processWatch(deps: Deps, w: Claimed): Promise<Outcome> {
     try { stored = JSON.parse(opened.body); } catch { throw new ReportUnreadable('body is not JSON'); }
     if (!stored || typeof stored !== 'object' || typeof stored.zip !== 'string' || !/^\d{5}$/.test(stored.zip)) throw new ReportUnreadable('no zip');
     const radiusMi = parseRadius(stored.radius_mi) ?? REPORT_RADIUS_MI;
-    const rights = validateRights(deps.rights); // a malformed registry fails the check: never "everything is cleared"
+    const attribution = validateAttribution(deps.attribution); // a malformed file fails the check: a required credit is never dropped
     const now = deps.now();
     const inputs = await readReportInputs(deps, { lat: point.lat, lng: point.lng, radiusMi, now });
     // What a NEW report for this point would show a customer. The subject's address is a placeholder the assembly needs and nothing uses: the
     // result is read for its project list only and is never stored, returned or logged.
     const out = assemble({
-      now, view: 'customer', zip_supported: true, radius_mi: radiusMi, rights,
+      now, view: 'customer', zip_supported: true, radius_mi: radiusMi, attribution,
       subject: { address: 'watched property', matched_address: null, lat: point.lat, lng: point.lng, zip: stored.zip },
       ...inputs,
     });
@@ -134,7 +134,7 @@ export async function processWatch(deps: Deps, w: Claimed): Promise<Outcome> {
     const events = keys.length ? await deps.eventsWrittenSince(keys, lookBackInstant(opened.generated_at, now)) : [];
     const seen = await deps.seenOf(w.watch_id);
     const check = checkWatch({
-      now, rights, original: { generated_at: opened.generated_at, body: opened.body }, nearby,
+      now, attribution, original: { generated_at: opened.generated_at, body: opened.body }, nearby,
       ledger: inputs.ledger, events, health: inputs.health, seen,
     });
 

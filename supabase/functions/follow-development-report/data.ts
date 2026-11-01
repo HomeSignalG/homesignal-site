@@ -15,7 +15,7 @@ import { makeChangeReads } from '../_shared/change-reads.ts';
 import type { Deps, ReportContextRow } from './handler.ts';
 import type { StoredReport } from '../_shared/changes-since-report.ts';
 
-export type Config = { url: string; serviceKey: string; rights: unknown; now?: () => Date };
+export type Config = { url: string; serviceKey: string; attribution: unknown; now?: () => Date };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -37,7 +37,7 @@ export function makeDeps(cfg: Config, fetchFn: FetchFn): Deps {
 
   return {
     now: cfg.now ?? (() => new Date()),
-    rights: cfg.rights,
+    attribution: cfg.attribution,
     authenticate,
     isAdmin,
 

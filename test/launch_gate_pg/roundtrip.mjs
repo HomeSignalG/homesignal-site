@@ -151,12 +151,12 @@ async function hook(payload, { secret = BILLING.secret, sign = true, signature }
 
 // the engine's inputs, as in test/trial_report_pg and test/national_report_pg
 const FAM = 'wsdot-project-delivery-plan-proposed';
-const CLEARED = { version: 1, cleared: [{ registry_id: FAM, cleared_on: '2026-10-02', audit_ref: 'launch-gate fixture', attribution: 'Data: WSDOT' }] };
+const CLEARED = { version: 1, attribution: { [FAM]: 'Data: WSDOT' } }; // the credit lines (national source policy, 2026-11-01: no source has to be listed to appear)
 const proj = { source_key: 'k1', registry_id: FAM, record_kind: 'development', name: 'Ravenna Bridge Retrofit', type: 'Utility', type_raw: null, status: 'Approved', stage: 'Advertised',
   developer: null, size: null, investment: null, submitted_at: '2026-09-24', date_kind: 'issued', address: '005 King', source_ref: 'https://data.wsdot.wa.gov/arcgis/rest/services/Shared/WSDOTProjectDeliveryPlanCurrent/FeatureServer/0' };
 let geocodeCalls = 0; // how often the geocoder was asked (section 15: a request the rate limit refuses must never reach it)
 function handlerFor(userId) {
-  const real = D.makeDeps({ ...SUPABASE, rights: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
+  const real = D.makeDeps({ ...SUPABASE, attribution: CLEARED, now: () => new Date('2026-10-02T12:00:00Z') }, fetchToSql);
   return H.makeHandler({
     ...real,
     authenticate: async () => ({ email: emailOf(userId), id: userId }),

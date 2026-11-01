@@ -10,8 +10,11 @@
 //   what its canonical lifecycle is ........... lib/project-type.js (four keys; a publisher status is
 //                                                carried separately and never promoted)
 //   whether a change occurred ................. public.dev_change_event_reportable (the ledger's reader)
-//   whether a source may appear in a paid
-//   report .................................... _shared/report-rights.json (empty; a HOLD is never cleared)
+//   whether a record may appear ............... national source policy, 2026-11-01 (docs/national-source-policy-2026-11-01.md):
+//                                                any record a wired connector stamped with its source family and an official
+//                                                record link. There is no per-source allowlist; a new registry source is in
+//                                                reports the moment its records exist.
+//   which credit line a source requires ....... _shared/source-attribution.json, generated from the registry (absence = none)
 //   whether an address is in the product ...... public.canonical_zip_registry (12,722)
 // What it owns is only the COMPOSITION: which of those answers go in which section, with what wording, and
 // the split between what is kept forever and what is the customer's.
@@ -149,8 +152,15 @@ export type Lifecycle = 'proposed' | 'approved' | 'operating' | 'unknown';
 export type CoverageState = 'OUTSIDE_COVERAGE' | 'LIMITED_COVERAGE' | 'REPORT_READY' | 'CHANGE_READY';
 export type View = 'customer' | 'internal';
 
-export type RightsEntry = { registry_id: string; cleared_on: string; audit_ref: string; attribution: string };
-export type RightsRegistry = { version: number; cleared: RightsEntry[] };
+/** The credit lines publishers require, by source family. Generated from the registry; a family that is absent has none. */
+export type SourceAttribution = { version: number; attribution: Record<string, string> };
+/** Names the eligibility rule that produced a report (provenance), so a stored report says which policy built it. */
+export const SOURCE_POLICY = 'national-2026-11-01';
+/** The one limitation a provenance exclusion produces (shared with the changes-since view). */
+export const RECORDS_NOT_TRACEABLE = {
+  code: 'RECORDS_NOT_TRACEABLE',
+  text: 'Some records near this address are not included because their official source is not identified.',
+};
 
 /** One row of public.n5_projects_within_radius. A project may own several geometry instances. */
 export type RadiusRow = {
@@ -186,8 +196,8 @@ export type SourceHealth = {
 //   DEVELOPMENT_SHOWN        the report shows at least one development record;
 //   NO_DEVELOPMENT_ACTIVITY  HomeSignal can PROVE its official development data for this address is coming in, and it shows no
 //                            development within the report radius. A real answer: it uses one free report;
-//   NO_DATA_INGESTED         the report is empty and HomeSignal cannot prove its data is coming in (no source cleared for paying
-//                            customers, a source not read, no source covering the area, or no way to tell which). HomeSignal's gap,
+//   NO_DATA_INGESTED         the report is empty and HomeSignal cannot prove its data is coming in (a source not read, no
+//                            source covering the area, or no way to tell which). HomeSignal's gap,
 //                            not an answer about the area: it never uses a free report.
 // A query that returns no rows is not proof (plan line 1338). The proof is the Maps workbook's VERIFIED ZERO, whose inputs for the
 // development family are not defined yet (freshness SLA_UNDEFINED), so today an empty report is ALWAYS "No data ingested".
@@ -219,7 +229,7 @@ export type Subject = {
 };
 export type AssembleInput = {
   now: Date; subject: Subject; radius_mi: number; view: View; zip_supported: boolean;
-  rights: RightsRegistry; rows: RadiusRow[]; projects: ProjectRow[]; ledger: LedgerProject[];
+  attribution: SourceAttribution; rows: RadiusRow[]; projects: ProjectRow[]; ledger: LedgerProject[];
   events: ReportableEvent[]; health: SourceHealth[];
 };
 export type Assembled = {
@@ -262,27 +272,21 @@ export function addDays(day: string, n: number): string {
 }
 
 /**
- * The rights registry, validated strictly. An entry that is malformed, duplicated or uses a wildcard makes the whole
- * registry unusable and this throws: the caller must fail the request, never fall back to "everything is cleared".
+ * The attribution file, validated strictly. A malformed file throws and the caller fails the request: a credit line a
+ * publisher requires is never silently dropped. It decides nothing about inclusion.
  */
-export function validateRights(reg: unknown): RightsRegistry {
-  const r = reg as any;
-  if (!r || typeof r !== 'object' || !Number.isInteger(r.version) || !Array.isArray(r.cleared)) {
-    throw new Error('rights registry: expected { version, cleared[] }');
+export function validateAttribution(f: unknown): SourceAttribution {
+  const r = f as any;
+  if (!r || typeof r !== 'object' || !Number.isInteger(r.version) || !r.attribution || typeof r.attribution !== 'object' || Array.isArray(r.attribution)) {
+    throw new Error('source attribution: expected { version, attribution: { <registry_id>: <credit line> } }');
   }
-  const seen = new Set<string>();
-  for (const e of r.cleared) {
-    if (!e || typeof e !== 'object') throw new Error('rights registry: an entry is not an object');
-    for (const k of ['registry_id', 'cleared_on', 'audit_ref']) {
-      if (typeof e[k] !== 'string' || !e[k].trim()) throw new Error('rights registry: an entry has no ' + k);
-    }
-    if (typeof e.attribution !== 'string') throw new Error('rights registry: an entry has no attribution (use "" if none is required)');
-    if (/[*?%]/.test(e.registry_id)) throw new Error('rights registry: a registry_id may not be a pattern (' + e.registry_id + ')');
-    if (!validDay(e.cleared_on)) throw new Error('rights registry: cleared_on must be YYYY-MM-DD (' + e.registry_id + ')');
-    if (seen.has(e.registry_id)) throw new Error('rights registry: duplicate registry_id ' + e.registry_id);
-    seen.add(e.registry_id);
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(r.attribution)) {
+    if (!k.trim() || /[*?%]/.test(k)) throw new Error('source attribution: a key is blank or a pattern (' + k + ')');
+    if (typeof v !== 'string' || !v.trim()) throw new Error('source attribution: ' + k + ' has no credit line');
+    out[k] = v;
   }
-  return { version: r.version, cleared: r.cleared.map((e: RightsEntry) => ({ ...e })) };
+  return { version: r.version, attribution: out };
 }
 
 /** The most recent publisher event that HAPPENED inside the window, or null. Never a plan, never a sentinel. */
@@ -467,7 +471,7 @@ export function assemble(input: AssembleInput): Assembled {
   if (!/^\d{5}$/.test(subject.zip)) throw new Error('assemble: subject.zip must be five digits');
   if (!Number.isFinite(subject.lat) || !Number.isFinite(subject.lng)) throw new Error('assemble: the subject point is not finite');
   if (typeof subject.address !== 'string' || !subject.address.trim()) throw new Error('assemble: the subject address is blank');
-  const rights = validateRights(input.rights);
+  const credits = validateAttribution(input.attribution).attribution;
 
   if (!input.zip_supported) {
     return {
@@ -477,7 +481,6 @@ export function assemble(input: AssembleInput): Assembled {
   }
 
   const today = dayOf(now);
-  const cleared = new Map(rights.cleared.map((e) => [e.registry_id, e]));
   const truncated = input.rows.some((r) => r.has_more === true);
 
   // nearest distance per project (a project may own several geometry instances); its direction is taken from that instance's
@@ -496,7 +499,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   const windowStart = addDays(today, -RECENT_DAYS);
 
-  const excluded = { development_only: 0, no_rights: {} as Record<string, number>, no_source_url: 0, standing_inventory: 0, no_distance: 0 };
+  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0 };
   type Entry = Record<string, unknown> & { project_id: string };
   const projects: Entry[] = [];
   const whatChanged: Array<{ project_id: string; at: string }> = [];
@@ -507,17 +510,14 @@ export function assemble(input: AssembleInput): Assembled {
   const familiesIncluded = new Set<string>();
   const distances: Record<string, number> = {};
   let anyChangeReady = false;
-  let anyHold = false;
 
   for (const p of [...input.projects].sort((a, b) => (a.source_key < b.source_key ? -1 : 1))) {
     if (!distance.has(p.source_key)) { excluded.no_distance++; continue; }
     if (p.record_kind !== 'development') { excluded.development_only++; continue; }
     const family = p.registry_id ?? '';
-    const grant = cleared.get(family);
-    if (!grant) {
-      if (view === 'customer') { excluded.no_rights[family || '(none)'] = (excluded.no_rights[family || '(none)'] ?? 0) + 1; continue; }
-      anyHold = true;
-    }
+    // PROVENANCE, not rights: a record a wired connector produced carries its source family. One without it cannot be
+    // traced to a wired source and is left out (founder, 2026-11-01), and the report says so.
+    if (!family) { excluded.no_source_family++; continue; }
     if (!p.source_ref || !p.source_ref.trim()) { excluded.no_source_url++; continue; }
 
     const t = HS().canonicalProjectType({ type: p.type, name: p.name });
@@ -546,12 +546,11 @@ export function assemble(input: AssembleInput): Assembled {
       publisher_event: ev,
       record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(recordDate(p, today)),
       developer: p.developer, size: p.size, investment: p.investment,
-      source: { url: p.source_ref, attribution: grant ? (grant.attribution || null) : null },
+      source: { url: p.source_ref, attribution: credits[family] ?? null },
       homesignal_observation: led
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,
     };
-    if (view === 'internal') entry.rights = grant ? 'CLEARED' : 'HOLD';
     projects.push(entry);
     distances[p.source_key] = distance.get(p.source_key)!;
     const near = nearest.get(p.source_key);
@@ -582,11 +581,9 @@ export function assemble(input: AssembleInput): Assembled {
 
   // ── coverage: only what the inputs can support, and it says so ──
   const limitations: Array<{ code: string; text: string }> = [];
-  if (rights.cleared.length === 0) {
-    limitations.push({ code: 'NO_INCLUDED_SOURCE', text: 'No official development source for this area is included in this report.' });
-  } else if (Object.keys(excluded.no_rights).length > 0) {
-    // records were found near the subject and left out: the report is incomplete against the official record, and says so
-    limitations.push({ code: 'SOURCES_NOT_INCLUDED', text: 'Some official sources for this area are not included in this report.' });
+  if (excluded.no_source_family > 0) {
+    // records were found near the subject and left out because they carry no source family: the report says so
+    limitations.push({ ...RECORDS_NOT_TRACEABLE });
   }
   if (truncated) {
     limitations.push({ code: 'AREA_TRUNCATED', text: 'This area holds more records than one report can carry; the list is incomplete.' });
@@ -633,7 +630,6 @@ export function assemble(input: AssembleInput): Assembled {
 
   const blockers: string[] = [];
   if (view !== 'customer') blockers.push('INTERNAL_VIEW');
-  if (anyHold) blockers.push('CONTAINS_UNCLEARED_SOURCE');
   for (const f of boundaryFindings(intelligence, privateContext)) blockers.push('BOUNDARY:' + f);
 
   return {
@@ -642,7 +638,7 @@ export function assemble(input: AssembleInput): Assembled {
     privateContext,
     engineInputs: {
       engine: REPORT_VERSION, zip: subject.zip, radius_mi, recent_days: RECENT_DAYS, stage_rule_version: STAGE_RULE_VERSION,
-      activity_rule_version: ACTIVITY_RULE_VERSION, rights_registry_version: rights.version, cleared_families: rights.cleared.length,
+      activity_rule_version: ACTIVITY_RULE_VERSION, source_policy: SOURCE_POLICY, attribution_version: input.attribution.version,
     },
     renderOnly: {
       distances_mi: distances,

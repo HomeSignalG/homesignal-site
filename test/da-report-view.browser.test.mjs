@@ -19,7 +19,7 @@ import { createServer } from 'node:http';
 import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
-import { RICH, COLD, RIGHTS_NONE, ADDRESS, wire, clone, FAM_B } from './lib/da-report-view-world.mjs';
+import { RICH, COLD, NO_FAMILY, ADDRESS, wire, clone, FAM_B } from './lib/da-report-view-world.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let fails = 0, total = 0;
@@ -60,7 +60,7 @@ async function open(width, height) {
 const mount = (page, resp, subject) => page.evaluate(([r, s]) => window.HS.daReportView.mount(document.getElementById('host'), r, s === undefined ? {} : { subject: s }), [resp, subject]);
 
 const W = await wire(RICH);
-const WNONE = await wire(RICH, { rights: RIGHTS_NONE });
+const WNONE = await wire(NO_FAMILY(RICH));
 const WCOLD = await wire(COLD);
 
 // a report whose publisher text cannot wrap by itself, and whose text tries to run code
@@ -232,8 +232,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { sections: [...document.querySelectorAll('.da-rv-sec')].map((s) => s.getAttribute('aria-label')), text: li.textContent, size: parseFloat(cs.fontSize), weight: Number(cs.fontWeight), hasCards: document.querySelectorAll('.da-rv-card').length,
       outcome: h ? h.textContent : null, outcomeSize: ocs ? parseFloat(ocs.fontSize) : 0, outcomeVisible: !!(op && op.getBoundingClientRect().height > 0) };
   });
-  ok(e.sections.join() === 'No data ingested,Official evidence & coverage' && e.hasCards === 0 && e.text === 'No official development source for this area is included in this report.',
-    '5b the shipped state (nothing cleared) says "No data ingested" over the engine\'s limitation text, with no card (founder ruling R5)', e);
+  ok(e.sections.join() === 'No data ingested,Official evidence & coverage' && e.hasCards === 0 && e.text === 'Some records near this address are not included because their official source is not identified.',
+    '5b with no traceable record says "No data ingested" over the engine\'s limitation text, with no card (founder ruling R5)', e);
   ok(e.outcome === 'No data ingested' && e.outcomeVisible && e.outcomeSize >= 16, '5b2 the outcome is a visible heading and a readable sentence (16px or more)', [e.outcome, e.outcomeSize]);
   ok(e.size >= 16 && e.weight >= 600, '5c and that text is drawn prominently (16px or more, semibold), because it is all the page says', [e.size, e.weight]);
   const cold = await mount(page, WCOLD, undefined);

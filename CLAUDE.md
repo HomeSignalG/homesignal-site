@@ -216,6 +216,23 @@ the exact problem `QUEUE.md` exists to end.
 ---
 
 
+## NATIONAL SOURCE POLICY ⚖️ FOUNDER DECISION (2026-11-01) — NO PER-SOURCE APPROVAL, ANYWHERE
+
+**Official government development records flow into maps, feeds and Development Activity Reports without owner approval.**
+Record of the decision, in the founder's words: `docs/national-source-policy-2026-11-01.md`. Removal plan and audit:
+`docs/national-source-eligibility-architecture-2026-11-01.md`.
+- **A record needs its source family and its official record link**, plus the existing accuracy rules. A record with no
+  source family is left out (provenance) and the report says so; trace it and restore its family rather than dropping data.
+- ⛔ **Do not reintroduce** a per-source allowlist, a terms check, a "silent or permissive" check, a class approval or a
+  review queue. `supabase/functions/_shared/report-rights.json`, `scripts/build-report-rights.mjs` and the R7 tests are
+  deleted; `test/no-source-allowlist.test.mjs` fails if any comes back.
+- **Adding a source is its registry entry.** No rights file edit, no fingerprint, no founder approval.
+- **Credit lines** a publisher requires live in `supabase/functions/_shared/source-attribution.json` (3 today). Absence
+  means "no credit", never "excluded". Add a line only with the publisher's own evidence on file.
+- **Known legal restrictions still apply:** a source whose own written terms forbid commercial use is not wired (NDDOT work
+  zones). Nobody has to go looking for terms.
+- Superseded and kept as history, each with a notice: the R7 ruling, the September rights audit, the clearance template.
+
 ## INDEX-ALL POLICY ⚖️ FOUNDER RULING (2026-10-26) — SUPERSEDES RULE F / RULE D ROBOTS GATING
 
 **Every public page on JODY TRACKS is allowed to be indexed. No automated quality-based indexing exclusions.**

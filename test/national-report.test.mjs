@@ -1,6 +1,6 @@
 // THE NATIONAL DEVELOPMENT ACTIVITY REPORT — the assembly module (Development Activity plan, Order G).
 // supabase/functions/_shared/national-report.ts composes answers that other things own (the spatial read, the Type and
-// lifecycle authority, the change ledger's reader, the rights registry) and keeps the customer's address out of the
+// lifecycle authority, the change ledger's reader, the credit lines) and keeps the customer's address out of the
 // permanent report. This file proves the composition and the split. Fixtures have the shape of real production rows
 // (the WSDOT rows are read from public.dev_change_project, 2026-09-29); every expectation is written out by hand.
 // Run: node test/national-report.test.mjs
@@ -20,12 +20,7 @@ const M = await import('../supabase/functions/_shared/national-report.ts');
 const S = await import('../supabase/functions/_shared/report-snapshot.ts');
 
 const NOW = new Date('2026-09-29T12:00:00Z');
-const RIGHTS_NONE = { version: 1, cleared: [] };
-const RIGHTS_A = { version: 1, cleared: [{ registry_id: 'wsdot-project-delivery-plan-proposed', cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: 'Data: WSDOT' }] };
-const RIGHTS_AB = { version: 1, cleared: [
-  ...RIGHTS_A.cleared,
-  { registry_id: 'austin-site-plan-cases', cleared_on: '2026-09-29', audit_ref: 'test fixture', attribution: '' },
-] };
+const CREDITS = { version: 1, attribution: { 'wsdot-project-delivery-plan-proposed': 'Data: WSDOT' } };
 
 // ---- fixtures ---------------------------------------------------------------------------------------------
 const row = (k, d, extra = {}) => ({ source_key: k, feature_id: 'pt:1', registry_id: 'wsdot-project-delivery-plan-proposed', provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false, ...extra });
@@ -39,51 +34,50 @@ const led = (k, extra = {}) => ({ identity_key: k, registry_id: 'wsdot-project-d
 const ev = (k, extra = {}) => ({ identity_key: k, event_type: 'status_changed', material: true, observed_at: '2026-09-25T10:00:00Z', prev_facts: { status: 'Proposed', stage: 'Not Yet Advertised' }, new_facts: { status: 'Approved', stage: 'Advertised' }, changed_fields: ['status', 'stage'], publisher_event_type: 'issued', publisher_event_date: '2026-09-24', ...extra });
 const SUBJECT = { address: '742 Evergreen Terrace, Springfield, OR 97477', matched_address: '742 EVERGREEN TER, SPRINGFIELD, OR, 97477', lat: 44.04612, lng: -122.98123, zip: '97477' };
 const run = (o = {}) => M.assemble({
-  now: NOW, view: 'customer', zip_supported: true, radius_mi: 1, rights: RIGHTS_A, subject: SUBJECT,
+  now: NOW, view: 'customer', zip_supported: true, radius_mi: 1, attribution: CREDITS, subject: SUBJECT,
   rows: [], projects: [], ledger: [], events: [], health: [], ...o,
 });
 const body = (r) => S.snapshotBodyOf(r.intelligence);
 const ids = (list) => list.join(',');
 
-// ---- 1. the rights gate: nothing is cleared, and an unlisted family never appears ------------------------
+// ---- 1. provenance, not an allowlist (national source policy, 2026-11-01) --------------------------------
 {
   const projects = [proj('k1'), proj('k2', { registry_id: 'austin-site-plan-cases', name: 'Menchaca Apartments' })];
   const rows = [row('k1', 0.2), row('k2', 0.4, { registry_id: 'austin-site-plan-cases' })];
-  const none = run({ rights: RIGHTS_NONE, rows, projects });
-  ok(none.intelligence.projects.length === 0, '1a the shipped state (nothing cleared): a customer report carries no project at all');
-  ok(none.coverage_state === 'LIMITED_COVERAGE', '1a and it says LIMITED COVERAGE, not "no activity"', none.coverage_state);
-  ok(none.intelligence.coverage.limitations.some((l) => l.code === 'NO_INCLUDED_SOURCE'), '1a naming the limitation NO_INCLUDED_SOURCE');
+  const all = run({ rows, projects });
+  ok(ids(all.intelligence.projects.map((p) => p.project_id)) === 'k1,k2', '1a every record with a source family is in the report: no source has to be listed anywhere');
+  ok(!all.intelligence.coverage.limitations.some((l) => l.code === 'RECORDS_NOT_TRACEABLE'), '1a and nothing is disclosed as left out');
+  ok(all.intelligence.projects[0].source.attribution === 'Data: WSDOT', '1b a credit line the attribution file names rides with its record');
+  ok(all.intelligence.projects[1].source.attribution === null, '1b a source with no credit line carries null, and is still included');
 
-  const a = run({ rights: RIGHTS_A, rows, projects });
-  ok(ids(a.intelligence.projects.map((p) => p.project_id)) === 'k1', '1b one family cleared: only its project is in the report');
-  ok(!body(a).includes('Menchaca'), '1b the excluded family\'s content appears nowhere in the permanent body');
-  ok(a.intelligence.coverage.limitations.some((l) => l.code === 'SOURCES_NOT_INCLUDED'), '1b and the exclusion is disclosed as a coverage limitation');
-  ok(a.intelligence.projects[0].source.attribution === 'Data: WSDOT', '1b the cleared family\'s attribution rides with its record');
+  const fresh = run({ rows: [row('kn', 0.3, { registry_id: 'a-source-wired-today' })], projects: [proj('kn', { registry_id: 'a-source-wired-today' })] });
+  ok(fresh.intelligence.projects.length === 1 && fresh.intelligence.projects[0].source_family === 'a-source-wired-today',
+    '1c a source family no file has ever named appears with no other change (adding a city needs no list edit)');
 
-  const ab = run({ rights: RIGHTS_AB, rows, projects });
-  ok(ids(ab.intelligence.projects.map((p) => p.project_id)) === 'k1,k2', '1c both cleared: both appear, sorted by project id');
-  ok(ab.intelligence.projects[1].source.attribution === null, '1c an empty attribution is null, not an empty string');
+  const nullFam = run({ rows: [row('k3', 0.1, { registry_id: null }), row('k1', 0.2)], projects: [proj('k3', { registry_id: null }), proj('k1')] });
+  ok(ids(nullFam.intelligence.projects.map((p) => p.project_id)) === 'k1', '1d a record with no source family is left out (it cannot be traced to a wired source)');
+  ok(!body(nullFam).includes('k3') && nullFam.intelligence.coverage.limitations.some((l) => l.code === 'RECORDS_NOT_TRACEABLE'), '1d its content is nowhere in the body, and the exclusion is disclosed');
+  const nullInternal = run({ view: 'internal', rows: [row('k3', 0.1, { registry_id: null })], projects: [proj('k3', { registry_id: null })] });
+  ok(nullInternal.intelligence.projects.length === 0, '1d the internal view excludes it too: provenance is not a view setting');
 
-  const nullFam = run({ rights: RIGHTS_A, rows: [row('k3', 0.1, { registry_id: null })], projects: [proj('k3', { registry_id: null })] });
-  ok(nullFam.intelligence.projects.length === 0, '1d a record with no source family is never cleared');
+  const noUrl = run({ rows: [row('k4', 0.1)], projects: [proj('k4', { source_ref: '' })] });
+  ok(noUrl.intelligence.projects.length === 0, '1e a record with no official record link is still left out');
 
-  const internal = run({ view: 'internal', rights: RIGHTS_NONE, rows, projects });
-  ok(internal.intelligence.projects.length === 2 && internal.intelligence.projects.every((p) => p.rights === 'HOLD'), '1e the internal view shows uncleared records, each labelled HOLD');
-  ok(internal.storage_blockers.includes('INTERNAL_VIEW') && internal.storage_blockers.includes('CONTAINS_UNCLEARED_SOURCE'), '1e and can never be stored as a customer snapshot', internal.storage_blockers);
-  ok(a.intelligence.projects.every((p) => !('rights' in p)), '1e the customer view carries no rights label at all');
+  const internal = run({ view: 'internal', rows, projects });
+  ok(internal.intelligence.projects.length === 2 && internal.intelligence.projects.every((p) => !('rights' in p)), '1f no record carries a rights label in either view');
+  ok(internal.storage_blockers.includes('INTERNAL_VIEW') && !internal.storage_blockers.some((b) => /UNCLEARED/.test(b)), '1f the internal view is still never stored; there is no "uncleared" blocker', internal.storage_blockers);
+  ok(JSON.stringify(all.storage_blockers) === '[]', '1f a customer report with traceable records may be stored', all.storage_blockers);
 
   const leak = /rights|cleared|clearance|hold\b|audit|allowlist|not for resale|verdict/i;
-  const texts = [none, a, ab].flatMap((r) => r.intelligence.coverage.limitations.map((l) => l.text));
-  ok(texts.length === 2 && texts.every((t) => !leak.test(t)), '1f customer limitation text never uses the internal rights vocabulary', texts);
+  const texts = [all, nullFam].flatMap((r) => r.intelligence.coverage.limitations.map((l) => l.text));
+  ok(texts.length === 1 && texts.every((t) => !leak.test(t)), '1g customer limitation text never uses rights vocabulary', texts);
 
-  const bad1 = (x) => throws(() => M.validateRights(x));
-  ok(bad1({ version: 1, cleared: [{ registry_id: 'a*', cleared_on: '2026-09-29', audit_ref: 'x', attribution: '' }] }) !== null, '1g a wildcard registry_id is refused');
-  ok(bad1({ version: 1, cleared: [RIGHTS_A.cleared[0], RIGHTS_A.cleared[0]] }) !== null, '1g a duplicate is refused');
-  ok(bad1({ version: 1, cleared: [{ registry_id: 'a', cleared_on: '2026-09-29', audit_ref: '', attribution: '' }] }) !== null, '1g an entry with no audit reference is refused');
-  ok(bad1({ version: 1, cleared: [{ registry_id: 'a', cleared_on: '2026-02-30', audit_ref: 'x', attribution: '' }] }) !== null, '1g an impossible clearance date is refused');
-  ok(bad1({ version: 1, cleared: [{ registry_id: 'a', cleared_on: '2026-09-29', audit_ref: 'x' }] }) !== null, '1g a missing attribution is refused (use "" if none is required)');
-  ok(bad1(null) !== null && bad1({ cleared: [] }) !== null && bad1('all') !== null, '1g a registry that is not { version, cleared[] } is refused');
-  ok(throws(() => run({ rights: { version: 1, cleared: 'everything' } })) !== null, '1g assemble fails on a malformed registry, it never falls back to "all cleared"');
+  const bad1 = (x) => throws(() => M.validateAttribution(x));
+  ok(bad1({ version: 1, attribution: { 'a*': 'x' } }) !== null, '1h a pattern key is refused');
+  ok(bad1({ version: 1, attribution: { a: '' } }) !== null, '1h a blank credit line is refused (a source with none is simply absent)');
+  ok(bad1(null) !== null && bad1({ attribution: {} }) !== null && bad1('all') !== null && bad1({ version: 1, attribution: [] }) !== null, '1h a file that is not { version, attribution: {} } is refused');
+  ok(throws(() => run({ attribution: { version: 1, attribution: 'everything' } })) !== null, '1h assemble fails on a malformed attribution file rather than dropping a required credit');
+  ok(bad1({ version: 1, attribution: {} }) === null, '1h an empty file is valid: no source requires a credit');
 }
 
 // ---- 2. "recent official activity": what HAPPENED, inside a bounded window ----------------------------------
@@ -130,7 +124,7 @@ const ids = (list) => list.join(',');
   const statuses = ['Proposed', 'Approved', 'Operating', 'Active', 'Decided', 'On file', 'built', '', null, 'Some New Word'];
   let same = true, count = 0;
   for (const c of cases) for (const s of statuses) {
-    const out = run({ rights: RIGHTS_A, rows: [row('kx', 0.2)], projects: [proj('kx', { ...c, status: s, date_kind: 'issued', submitted_at: '2026-09-10' })] });
+    const out = run({ rows: [row('kx', 0.2)], projects: [proj('kx', { ...c, status: s, date_kind: 'issued', submitted_at: '2026-09-10' })] });
     const p = out.intelligence.projects[0];
     const wantT = AUTH.canonicalProjectType({ type: c.type, name: c.name });
     const wantL = AUTH.canonicalLifecycle({ status: s });
@@ -162,7 +156,7 @@ const ids = (list) => list.join(',');
   const ch = proven.intelligence.projects[0].homesignal_detected_changes;
   ok(ch.length === 1 && ch[0].changes.length === 2 && ch[0].changes[0].field === 'status' && ch[0].changes[0].from === 'Proposed' && ch[0].changes[0].to === 'Approved',
     '4a the change states what changed, from and to, taken from the event', ch);
-  ok(proven.coverage_state === 'LIMITED_COVERAGE' ? false : true, '4a a proven change with a cleared family is not limited');
+  ok(proven.coverage_state === 'LIMITED_COVERAGE' ? false : true, '4a a proven change with a traceable family is not limited');
   ok(proven.coverage_state === 'CHANGE_READY', '4b coverage is CHANGE_READY when a change-ready record is in the report', proven.coverage_state);
 
   const notReady = run({ ...base, ledger: [led('k1', { change_ready: false, observation_count: 1 })], events: [ev('k1')] });
@@ -188,7 +182,7 @@ const ids = (list) => list.join(',');
 
 // ---- 5. coverage states: only what the inputs support, and it says which ----------------------------------
 {
-  const out = M.assemble({ now: NOW, view: 'customer', zip_supported: false, radius_mi: 1, rights: RIGHTS_A, subject: { ...SUBJECT, zip: '00000' }, rows: [], projects: [], ledger: [], events: [], health: [] });
+  const out = M.assemble({ now: NOW, view: 'customer', zip_supported: false, radius_mi: 1, attribution: CREDITS, subject: { ...SUBJECT, zip: '00000' }, rows: [], projects: [], ledger: [], events: [], health: [] });
   ok(out.coverage_state === 'OUTSIDE_COVERAGE' && out.intelligence === null && out.privateContext === null && out.engineInputs === null, '5a a ZIP outside the 12,722 yields no report, no private context and nothing to store');
   ok(out.storage_blockers.length === 1 && out.storage_blockers[0] === 'OUTSIDE_COVERAGE', '5a and says why', out.storage_blockers);
 
@@ -201,7 +195,7 @@ const ids = (list) => list.join(',');
   const other = run({ ...base, health: [{ registry_id: 'some-other-family', fetch_failures_24h: 9, blocked_24h: 9, truncated_24h: 9 }] });
   ok(other.coverage_state === 'REPORT_READY', '5d a failure in a family that is not in the report does not limit it', other.coverage_state);
   const empty = run({ rows: [], projects: [] });
-  ok(empty.coverage_state === 'REPORT_READY' && empty.intelligence.projects.length === 0, '5e a cleared source that returns nothing is a valid, ready result: no activity is not no coverage');
+  ok(empty.coverage_state === 'REPORT_READY' && empty.intelligence.projects.length === 0, '5e a source that returns nothing is a valid, ready result: no activity is not no coverage');
   ok(empty.intelligence.coverage.assessment_basis === 'records_returned_for_this_radius', '5f the report states the basis of its coverage assessment (it cannot see what a source should have covered)');
   ok(empty.intelligence.coverage.source_families_in_report.length === 0, '5f and lists the families that contributed (none)');
 }
@@ -249,7 +243,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-3', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', rights_registry_version: 1, cleared_families: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-3', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-1', activity_rule_version: 'activity-outcome-1', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
 
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
@@ -340,12 +334,12 @@ const FIELD = {
 
   // the 84302 shape, read from production 2026-10-02 (app_projects, udot-active-projects-lines): two under construction, one closed out
   const UDOT = 'udot-active-projects-lines';
-  const R = { version: 1, cleared: [{ registry_id: UDOT, cleared_on: '2026-10-02', audit_ref: 'test fixture', attribution: '' }] };
+  const R = { version: 1, attribution: {} };
   const SUB = { address: '20 N Main St, Brigham City, UT 84302', matched_address: '20 N MAIN ST, BRIGHAM CITY, UT, 84302', lat: 41.51090028281, lng: -112.015646109683, zip: '84302' };
   const urow = (k, d, mlat, mlng) => ({ source_key: k, feature_id: k + '#1', registry_id: UDOT, provenance: 'recovered_authoritative', distance_mi: d, geometry_type: 'ST_MultiLineString', has_more: false, marker_lat: mlat, marker_lng: mlng });
   const uproj = (k, status, stage, name) => ({ source_key: k, registry_id: UDOT, record_kind: 'development', name, type: 'Utility', type_raw: 'Traffic and Safety', status, stage,
     developer: null, size: null, investment: null, submitted_at: '2024-08-26', date_kind: 'filed', address: 'SR-13', source_ref: 'https://data-uplan.opendata.arcgis.com/datasets/udot-projects-points' });
-  const out = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, rights: R, subject: SUB,
+  const out = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, attribution: R, subject: SUB,
     rows: [urow('u:22248', 0.1217, 41.5128578810083, -112.015662896203), urow('u:22250', 0.3195, 41.50607192187, -112.015813250643),
       urow('u:22013', 0.4068, 41.5168505941753, -112.015583906049), urow('u:p', 0.2, 41.5109, -112.0100), urow('u:nm', 0.3, null, null)],
     projects: [uproj('u:22248', 'Approved', 'Under Construction', 'SR-13 (Main St) & 100 North'), uproj('u:22250', 'Approved', 'Under Construction', 'SR-13 (Main St) & 200 South'),
@@ -370,7 +364,7 @@ const FIELD = {
   ok(M.bearingDeg(1, 1, 1, 1) === null && M.bearingDeg(NaN, 0, 1, 1) === null, '9m no direction from a point to itself, or from a non-finite point');
   ok(JSON.stringify(out.renderOnly.review) === '["u:22248","u:p","u:nm"]' && M.REVIEW_LIMIT === 3,
     '9n Things to Review: the three nearest projects in a stage section (0.12, 0.2, 0.3 mi; a missing map point does not matter); the fourth, at 0.32 mi, is left out', out.renderOnly.review);
-  const tie = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: 0.5, rights: R, subject: SUB,
+  const tie = M.assemble({ now: new Date('2026-10-02T12:00:00Z'), view: 'customer', zip_supported: true, radius_mi: 0.5, attribution: R, subject: SUB,
     rows: [urow('t:a', 0.2, 41.52, -112.0156), urow('t:b', 0.2, 41.52, -112.0156), urow('t:c', 0.2, 41.52, -112.0156), urow('t:d', 0.1, 41.52, -112.0156)],
     projects: [uproj('t:a', 'Proposed', null, 'A'), uproj('t:b', 'Approved', 'Issued', 'B'), uproj('t:c', 'Approved', null, 'C'), uproj('t:d', 'Operating', 'Close Out', 'D')],
     ledger: [], events: [], health: [] });
@@ -392,15 +386,15 @@ const FIELD = {
 
   const projects = [proj('k1'), proj('k2', { registry_id: 'austin-site-plan-cases', name: 'Menchaca Apartments' })];
   const rows = [row('k1', 0.2), row('k2', 0.4, { registry_id: 'austin-site-plan-cases' })];
-  const shipped = run({ rights: RIGHTS_NONE, rows, projects });
+  const shipped = run({ rows: rows.map((r) => ({ ...r, registry_id: null })), projects: projects.map((p) => ({ ...p, registry_id: null })) });
   ok(JSON.stringify(shipped.intelligence.activity) === JSON.stringify({ outcome: 'NO_DATA_INGESTED', label: 'No data ingested', rule_version: 'activity-outcome-1' }),
-    '10e the shipped state (nothing cleared): records exist nearby, the customer report shows none, and it says "No data ingested" — never "No development activity"', shipped.intelligence.activity);
-  const internal = run({ rights: RIGHTS_NONE, rows, projects, view: 'internal' });
-  ok(internal.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && internal.intelligence.projects.length === 2, '10f the internal view, which shows uncleared records, shows development');
-  const nothing = run({ rights: RIGHTS_A, rows: [], projects: [] });
+    '10e records exist nearby but none can be traced to a source: the customer report shows none, and it says "No data ingested" — never "No development activity"', shipped.intelligence.activity);
+  const internal = run({ rows, projects, view: 'internal' });
+  ok(internal.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && internal.intelligence.projects.length === 2, '10f the internal view shows development');
+  const nothing = run({ rows: [], projects: [] });
   ok(nothing.intelligence.activity.outcome === 'NO_DATA_INGESTED' && nothing.coverage_state === 'REPORT_READY',
-    '10g a cleared source with no record in the radius is still "No data ingested": a query that returns nothing is not proof (plan line 1338)', [nothing.intelligence.activity.outcome, nothing.coverage_state]);
-  const shown = run({ rights: RIGHTS_A, rows, projects });
+    '10g a source with no record in the radius is still "No data ingested": a query that returns nothing is not proof (plan line 1338)', [nothing.intelligence.activity.outcome, nothing.coverage_state]);
+  const shown = run({ rows: [...rows, row('k9', 0.3, { registry_id: null })], projects: [...projects, proj('k9', { registry_id: null })] });
   ok(shown.intelligence.activity.outcome === 'DEVELOPMENT_SHOWN' && shown.coverage_state === 'LIMITED_COVERAGE', '10h development shown with a coverage limitation is still development shown');
   ok(S.subjectRelativeKeys(JSON.parse(body(shipped))).length === 0 && Object.keys(shipped.intelligence.activity).join() === 'outcome,label,rule_version',
     '10i the outcome is part of the permanent report (a reopened report says the same words) and carries nothing about the subject');
@@ -429,14 +423,14 @@ const FIELD = {
   ok(strange.every((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true }) === 'false|UNRECOGNISED|credit-rule-1'),
     '11h an outcome the rule does not recognise, or one judged by another outcome rule, is never charged (fail closed toward the customer)', strange.map((a) => d({ status: 'OK', view: 'customer', activity: a, storable: true })));
   ok(d({ status: 'OK', view: 'staff', activity: act('DEVELOPMENT_SHOWN'), storable: true }) === 'false|INTERNAL_VIEW|credit-rule-1', '11i only the customer view can be charged');
-  // the engine and the rule agree end to end: the shipped state is never charged; a cleared record shown is
+  // the engine and the rule agree end to end: an empty report is never charged; a traceable record shown is
   const projects = [proj('k1')];
   const rows = [row('k1', 0.2)];
-  const today = run({ rights: RIGHTS_NONE, rows, projects });
-  const cleared = run({ rights: RIGHTS_A, rows, projects });
+  const today = run({ rows: [], projects: [] });
+  const cleared = run({ rows, projects });
   const ask = (r, view) => C.creditDecision({ status: 'OK', view, activity: r.intelligence.activity, storable: r.storage_blockers.length === 0 });
-  ok(ask(today, 'customer').uses_report === false && ask(today, 'customer').reason === 'NO_DATA_INGESTED', '11j today (nothing cleared) every customer report is free: "No data ingested"');
-  ok(ask(cleared, 'customer').uses_report === true && ask(cleared, 'customer').reason === 'DEVELOPMENT_SHOWN', '11k once a source is cleared and its record is shown, the report uses one free report');
+  ok(ask(today, 'customer').uses_report === false && ask(today, 'customer').reason === 'NO_DATA_INGESTED', '11j an empty customer report is free: "No data ingested"');
+  ok(ask(cleared, 'customer').uses_report === true && ask(cleared, 'customer').reason === 'DEVELOPMENT_SHOWN', '11k a report that shows a traceable record uses one free report');
   ok(Object.keys(C.creditDecision({ status: 'OK', view: 'customer', activity: act('DEVELOPMENT_SHOWN'), storable: true })).join() === 'uses_report,reason,rule_version',
     '11l the decision carries only whether, why and which rule');
 }

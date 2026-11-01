@@ -4,6 +4,11 @@
 # THE AUTHORITATIVE LIST of every data source the get-address-report engine uses,
 # plans to use, or has evaluated. Read this before writing any source adapter code.
 #
+# NATIONAL SOURCE POLICY (founder, 2026-11-01; docs/national-source-policy-2026-11-01.md): a wired source's
+# records appear on maps, feeds and Development Activity Reports with NO per-source approval. Do not edit a rights
+# file, record a clearance or ask for a ruling when wiring a source; none exists. Mentions of R7, report-rights.json
+# or "cleared for reports" further down are dated history.
+#
 # GOVERNANCE (development-tracker-source-of-truth.md):
 #   • Every source must have an entry here BEFORE any adapter code is written.
 #   • Coverage scope (which states/counties/ZIPs this source applies to) must be

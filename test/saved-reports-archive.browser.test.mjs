@@ -22,7 +22,7 @@ import { readFile } from './lib/serve-page.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, normalize } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import { RICH, RIGHTS_AB, NOW } from './lib/da-report-view-world.mjs';
+import { RICH, ATTRIBUTION_AB, NOW } from './lib/da-report-view-world.mjs';
 import { LAUNCH_TEST_LOCATION, geocodeStandIn } from './lib/launch-test-location.mjs';
 
 const RH = await import('../supabase/functions/get-development-activity-report/handler.ts');
@@ -78,7 +78,7 @@ async function makeWorld({ reportsA = 8 } = {}) {
     configured: () => false, checkoutEnabled: () => true, createCheckout: async () => { throw new Error('no'); }, checkoutClaim: async () => ({ outcome: 'CLAIMED' }), checkoutRelease: async () => undefined });
   const planOf = async (u) => (brokerageOf(u) ? { brokerage_id: 'b0b0b0b0-1111-4222-8333-444444444444', role: 'owner', state: 'none', credit_limit: 100, credits_used: 0, credits_remaining: 0, period_ends_at: null } : null);
   w.report = RH.makeHandler({
-    ...gate, now: () => NOW, rights: RIGHTS_AB, geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
+    ...gate, now: () => NOW, attribution: ATTRIBUTION_AB, geocode: async (a) => geocodeStandIn(a), zipSupported: async () => true,
     rateClaim: async () => ({ allowed: true }), radius: async () => RICH.rows, hydrate: async () => RICH.projects, ledger: async () => RICH.ledger ?? [], events: async () => RICH.events ?? [], health: async () => [],
     trialOf: async (u) => state(u), planOf,
     issue: async (u, k, intelligence, ctx) => {

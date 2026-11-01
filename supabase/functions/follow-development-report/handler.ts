@@ -3,7 +3,7 @@
 //
 // THREE ACTIONS on a STORED report, addressed by its report_id (never by an address, and never by the private context's id):
 //   changes   what the change ledger has learned about the projects in that report since it was issued. Reads the report's
-//             PERMANENT body, the ledger, source health and the rights registry. It never reads the report's private-context id
+//             PERMANENT body, the ledger, source health and the source attribution file. It never reads the report's private-context id
 //             (its report read does not select it), so it gives the same answer while a Follow keeps the context alive and
 //             after the context has been purged.
 //   follow    registers a `follow` need on the report's private context, so the context is kept (the 90-day clock stops) while
@@ -26,7 +26,7 @@ import { authorizeAdmin, corsFor, readBounded, reply, TOO_LARGE } from '../_shar
 import { changesSinceReport, EventRowUnreadable, parseStoredReport, ReportUnreadable, writtenSinceInstant } from '../_shared/changes-since-report.ts';
 import type { StoredReport, WrittenEvent } from '../_shared/changes-since-report.ts';
 import { DataUnavailable } from '../_shared/service-rest.ts';
-import { validateRights } from '../_shared/national-report.ts';
+import { validateAttribution } from '../_shared/national-report.ts';
 import type { LedgerProject, SourceHealth, View } from '../_shared/national-report.ts';
 
 export { DataUnavailable };
@@ -36,7 +36,7 @@ export type ReportContextRow = { private_context_id: string | null };
 
 export type Deps = {
   now: () => Date;
-  rights: unknown;
+  attribution: unknown;
   authenticate: (token: string) => Promise<{ email: string } | null>;
   isAdmin: (email: string) => Promise<boolean>;
   /** The permanent body and identity of a stored report. Selects no private-context column. For `changes`. */
@@ -127,11 +127,11 @@ export function makeHandler(deps: Deps) {
         return reply(req, { status: 'UNFOLLOW_REQUESTED', report_id: reportId, follow_id: followId });
       }
 
-      // ── changes: the permanent body, the ledger, source health, the rights. Never the private context.
+      // ── changes: the permanent body, the ledger, source health, the credit lines. Never the private context.
       // `now` is taken BEFORE the reads, so the answer's `through` and its upper bound are the instant the question was asked, not an
       // instant after reads that may have taken seconds. It is this function's clock, not the database's snapshot.
       const asked = deps.now();
-      const rights = validateRights(deps.rights); // a malformed registry fails the request: never "everything is cleared"
+      const attribution = validateAttribution(deps.attribution); // a malformed file fails the request: a required credit is never dropped
       const stored = await deps.report(reportId);
       if (!stored) return reply(req, { error: 'report_not_found' }, 404);
       const parsed = parseStoredReport(stored);
@@ -142,7 +142,7 @@ export function makeHandler(deps: Deps) {
         keys.length ? deps.eventsWrittenSince(keys, writtenSinceInstant(stored.generated_at)) : Promise.resolve([] as WrittenEvent[]),
         families.length ? deps.health(families) : Promise.resolve([] as SourceHealth[]),
       ]);
-      const result = changesSinceReport({ now: asked, view, rights, ledger, events, health, report: stored });
+      const result = changesSinceReport({ now: asked, view, attribution, ledger, events, health, report: stored });
       return reply(req, { status: 'OK', result });
     } catch (e) {
       // The caller gets a bare status; the operator gets the REASON, so a 502 can be told apart (row cap, http 500, network, unreadable

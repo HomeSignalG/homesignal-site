@@ -1,7 +1,6 @@
 # National source eligibility: removing the per-source approval gates — audit and removal plan (2026-11-01)
 
-**Status: PLAN FOR REVIEW. Nothing is implemented.** No code, test, workflow, rights file, registry entry, edge function
-or production data was changed to write this. Read-only against `main` (`1dfdcbc`) and the open PRs named below.
+**Status: steps 1, 2 and 4 IMPLEMENTED 2026-11-01 (founder "go"); step 3 (Map 1) follows in its own change.** The audit text below is as reviewed (written read-only against `main` `1dfdcbc`).
 
 **This replaces the first version of this document** (same file, same PR #2489, earlier commit). That version proposed
 per-source terms evidence, a policy evaluator, a class rule and a review queue. The founder's decision below rules all of
@@ -137,8 +136,9 @@ No verification step, no queue and no class rule is added. What is kept is only 
 carried as data on the registry entry:
 
 - **Publisher credit lines.** The 3 recorded requirements (NYC DOB ×2, Seattle) move from `build-report-rights.mjs`
-  into an optional registry field `attribution`. A small generated `_shared/source-attribution.json` (only the sources
-  that have one) is what the report functions import. **Absence means "no credit recorded", never "excluded".**
+  into `supabase/functions/_shared/source-attribution.json`, each naming its evidence file. (Built as a standalone file,
+  not a registry field, so registry PRs from the expansion sessions never touch it.) The report functions import it.
+  **Absence means "no credit recorded", never "excluded".**
 - **A known written prohibition** (the North Dakota DOT work-zone text) is handled the way it is today: that source is
   not wired. That is an onboarding fact recorded in `docs/source-registry.md`, not a check anyone must run.
 
