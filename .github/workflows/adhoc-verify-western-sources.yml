@@ -1,0 +1,17 @@
+name: adhoc-verify-western-sources
+# TEMPORARY (removed before merge): read-only verification of the 3101 Western Ave sample report's sources. No secrets.
+on:
+  push:
+    branches: [claude/clever-mayer-k9ixnh]
+    paths: ['scripts/adhoc/**', '.github/workflows/adhoc-verify-western-sources.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: node scripts/adhoc/verify-western-sources.mjs
