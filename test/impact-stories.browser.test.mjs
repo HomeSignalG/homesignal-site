@@ -373,8 +373,20 @@ await page.evaluate(() => {
 await page.waitForTimeout(150);
 const nApprove = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_visuals_approve').length);
 const vbt = await page.locator('#is-visbar').innerText(); ok(vbt.includes('4 of 5 parts approved'), 'visuals: the status bar counts approved parts (' + vbt.split('\n')[0] + ')');
-await page.click('#is [data-act=vtab][data-k=thumbnail]'); await page.waitForTimeout(80);
-await page.click('#is [data-act=vapprovegroup]'); await page.waitForTimeout(250);
+// The bar pinned to the bottom (founder, 2026-11-01: "something that tells me something is processing or what to do next")
+const dk = await page.locator('#is-vdock').innerText();
+ok(dk.includes('4 of 5 pictures approved') && dk.includes('Next: Thumbnail') && await page.locator('#is-vdock [data-act=vnext]').count() === 1
+   && await page.evaluate(() => getComputedStyle(document.getElementById('is-vdock')).position === 'sticky'),
+   'visuals: a bar pinned to the bottom says how many pictures are approved and names the next part, with a button to go there');
+await page.click('#is-vdock [data-act=vnext]'); await page.waitForTimeout(80);
+ok(await page.locator('#is-vgroup-thumbnail-0').count() === 1, 'visuals: the bar takes you to the next part still waiting');
+await page.evaluate(() => { const real = window.client.rpc; window.__go = null;
+  window.client.rpc = (n, a) => n === 'hs_impact_story_shots_approve' ? new Promise((r) => { window.__go = () => r(real(n, a)); }) : real(n, a); });
+await page.click('#is [data-act=vapprovegroup]'); await page.waitForTimeout(60);
+ok((await page.locator('#is-vdock').innerText()).includes('Saving Thumbnail') && await page.locator('#is-vdock .is-spin').count() === 1
+   && (await page.locator('#is [data-act=vapprovegroup]').innerText()).includes('Saving') && await page.locator('#is [data-act=vapprovegroup]').isDisabled(),
+   'visuals: while an act saves, its button reads Saving… and the bar says what is being saved, with a spinner');
+await page.evaluate(() => window.__go()); await page.waitForTimeout(250);
 ok(await page.evaluate((n) => window.calls.filter((c) => c[0] === 'hs_impact_story_visuals_approve').length === n + 1
    && window.calls.some((c) => c[0] === 'hs_impact_story_shots_approve' && c[1].p_asset === 'thumbnail'), nApprove),
    'visuals: approving the last part approves the whole set');

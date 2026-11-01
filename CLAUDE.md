@@ -5837,6 +5837,12 @@ Results.
       The per-shot Approve button is gone (Reject and Need new photo stay); "Approve everything at once" remains in the
       status bar.
     - Tests: pg 12V32-12V34 and the upgrade check in `run.sh`; `test/impact-stories.browser.test.mjs`.
+    - **A bar pinned to the bottom of Visuals says what is happening and what to click next (2026-11-01, founder: "there
+      need to be something that tells me something is processing or what to do next").** `visDock` (`#is-vdock`, sticky):
+      pictures approved of all, parts approved, the next part by name with a "Go to" button, "Approve the visuals" when every
+      part is done, "Render the videos" once approved, and a spinner with what is saving or how long previews take. While an act
+      saves, its button reads "Saving…" and is disabled (`setBusy`). After an act is approved, the page moves to the next part
+      still waiting. Measured on Stratos before this: the founder approved Acts 1-3 (9 of 33 pictures) and read it as everything.
     - **Rejecting asks in the page, never in a browser pop-up (2026-11-01).** Reject under a shot, and "Reject every photo
       in this act", open a note box in place (`S.vask`, `askBox`) with Reject and Cancel; nothing is saved until Reject is
       pressed. A shot with no photo needs a note, and the box says so. "Reject every photo in this act" saves through
