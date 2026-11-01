@@ -2300,6 +2300,24 @@ which carried `if not (ev ? 'project_id') then return v`.
 
 ---
 
+## 7.04b NATIONAL LIFECYCLE CLASSIFICATION: DIRECTION APPROVED, BUILT IN PARTS, NOT ENABLED ⚖️ FOUNDER (2026-11-01)
+
+Plan, founder decisions D1–D8 and the release gate: `docs/lifecycle-classification-audit-2026-11-01.md`. The four
+Map 1 columns stay exactly as they are. Each record gets a stage, an activity status (active / paused / inactive /
+undetermined), its evidence and an effective date, kept separate.
+- **Built (steps 1–3):**
+  - `HS.recordLifecycle` in `lib/project-type.js`: the one stage → column rule;
+  - `scripts/lifecycle-mapping-audit.mjs` → `docs/lifecycle-mapping-audit/`: a proposal for review;
+  - the per-source switch `stage_model` (`sources/lifecycle-stage.ts`, `socrata.ts::statusLookupFor`), used by all
+    five connectors. Default off, and off is byte-identical.
+- ⛔ **Do not set `stage_model` on a registry entry, or point a surface at `HS.recordLifecycle`,** until the founder has
+  reviewed the §10 gate: the mapping audit, before/after counts on a replica, impact tests, and a rehearsed rollback.
+  `test/lifecycle-stage-switch.test.ts` fails if any entry is switched on.
+- ⛔ **Do not write a second stage or lifecycle classifier.** The three existing ones are to be replaced by readers of the
+  stage (plan §1.3): MAPS `claim-contract.mjs` `recordStatus`, the report's `STAGE_EVIDENCE`, and Map 1's `STAGE_WORD`.
+
+---
+
 ## 7.05 A DENIED PROPOSAL IS KEPT, SOURCED, AND UNCOUNTED ⚖️ FOUNDER CONTRACT (2026-09-20)
 
 **A genuine proposal that was DENIED remains discoverable under Proposed, with a prominent

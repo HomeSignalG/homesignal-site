@@ -43,6 +43,8 @@ import {
   browsingBucketFor, decisionFor, decisionEvidenceLevel,
 } from "./decision.ts";
 import type { DecisionRecord, DecisionEvidenceLevel } from "./decision.ts";
+import { stageModelEnabled, stageBucketPairs, stageFieldsFor, type StageModelEntry } from "./lifecycle-stage.ts";
+export { stageModelEnabled, stageFieldsFor };
 export {
   browsingBucketFor, decisionFor, decisionEvidenceLevel,
   DECISION_OUTCOMES, DECISION_LABELS, DECISION_EVIDENCE_LEVELS,
@@ -430,7 +432,7 @@ async function runEntry(
   let lookup: NormalizedLookup<Bucket>;
   let typeLookup: NormalizedLookup<string> | null;
   try {
-    lookup = buildBucketLookup(entry.status_to_bucket, entry.registry_id);
+    lookup = statusLookupFor(entry);
     typeLookup = buildTypeLookup(entry.type_map, entry.registry_id);
   } catch (e) {
     report.quarantined.push({ reason: `registry map collision: ${(e as Error).message}`, sample: entry.dataset_id });
@@ -546,6 +548,12 @@ async function runEntry(
     }
 
     const rec = await normalizeRow(row, entry, statusRaw, bucket as Exclude<Bucket, "exclude">, deps, report, zip, typeLookup, caseFold);
+    // Stage model (lifecycle plan §6 step 3): only for an entry with stage_model:true, none today.
+    if (rec && stageModelEnabled(entry)) {
+      const sf = stageFieldsFor(entry as never, statusRaw, (c) => readCol(row, c as ColumnRef),
+        new Date().toISOString().slice(0, 10), rec.file_date ?? null);
+      if (sf) Object.assign(rec, sf);
+    }
     if (rec) records.push(rec);
   }
 
@@ -957,6 +965,16 @@ export function buildBucketLookup(s2b: StatusToBucket, registryId = "?"): Normal
     for (const status of s2b[b] ?? []) pairs.push([status, b]);
   });
   return buildNormalizedLookup(pairs, "status_to_bucket", registryId);
+}
+
+/** THE ONE status → bucket lookup every connector uses (lifecycle plan §6 step 3). Switch OFF (every entry
+ *  today): exactly buildBucketLookup(status_to_bucket), the same call the connectors made before. Switch ON
+ *  (`stage_model: true`): buckets from the national stage model (sources/lifecycle-stage.ts); an invalid
+ *  declaration throws, and each connector's existing catch quarantines that one entry. */
+export function statusLookupFor(entry: { registry_id: string; status_to_bucket: StatusToBucket; stage_model?: unknown }): NormalizedLookup<Bucket> {
+  if (!stageModelEnabled(entry)) return buildBucketLookup(entry.status_to_bucket, entry.registry_id);
+  const pairs = stageBucketPairs(entry as unknown as StageModelEntry) as [string, Bucket][];
+  return buildNormalizedLookup(pairs, "status_to_stage", entry.registry_id);
 }
 
 /** type_source value → use_type. null when the entry declares no type_map (→ unclassified). */

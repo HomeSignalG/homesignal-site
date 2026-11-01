@@ -37,7 +37,7 @@ import type {
   ExcludedStatus, UnmappedStatus, CaseFoldMatch, NormalizedLookup,
 } from "./socrata.ts";
 import {
-  buildBucketLookup, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
+  statusLookupFor, stageModelEnabled, stageFieldsFor, buildTypeLookup, resolveNormalized, noteCaseFold, caseFoldList,
 } from "./socrata.ts";
 import { browsingBucketFor, decisionFor, decisionEvidenceLevel } from "./decision.ts";
 import { fenceGeocode, noteFenceOutcome } from "./geo-fence.ts";
@@ -412,7 +412,7 @@ async function runEntry(
   let lookup: NormalizedLookup<Bucket>;
   let typeLookup: NormalizedLookup<string> | null;
   try {
-    lookup = buildBucketLookup(entry.status_to_bucket, entry.registry_id);
+    lookup = statusLookupFor(entry);
     typeLookup = buildTypeLookup(entry.type_map, entry.registry_id);
   } catch (e) {
     report.quarantined.push({ reason: `registry map collision: ${(e as Error).message}`, sample: entry.service_url });
@@ -512,6 +512,12 @@ async function runEntry(
     // attached. Counted here so the run report can distinguish surfaced from dropped.
     if (bucket === "denied" || bucket === "withdrawn") { decidedCount.set(statusRaw, (decidedCount.get(statusRaw) ?? 0) + 1); }
     const rec = await normalizeRow(row, entry, statusRaw, bucket, zip, deps, report, typeLookup, caseFold, aliasVerdict);
+    // Stage model (lifecycle plan §6 step 3): only for an entry with stage_model:true, none today.
+    if (rec && stageModelEnabled(entry)) {
+      const sf = stageFieldsFor(entry as never, statusRaw, (c) => readCol(row, c as ColumnRef),
+        new Date().toISOString().slice(0, 10), rec.file_date ?? null);
+      if (sf) Object.assign(rec, sf);
+    }
     if (rec) records.push(rec);
   }
 

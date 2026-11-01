@@ -617,6 +617,27 @@ National requirements from the same ruling, and where each is met:
 **Building may proceed (sections 6 steps 1–3: vocabulary module, report-only generator, connector
 switch defaulting off). Nothing is enabled nationwide until the founder has reviewed all four of these:**
 
+✅ **Steps 1–3 BUILT on 2026-11-01 (founder "go"). Nothing enabled.**
+
+| Step | What | Where | Proof |
+|---|---|---|---|
+| 1 | National vocabulary: classes, stages, activity, the one stage → column rule, evidence ladder, active predicate, verified dates, card / activity / link lines | `lib/project-type.js` `HS.recordLifecycle` (+ generated engine copy) | `test/record-lifecycle-vocabulary.test.mjs` |
+| 2 | Generated status-mapping audit (gate item 1) | `scripts/lifecycle-mapping-audit.mjs` → `docs/lifecycle-mapping-audit/` | `test/lifecycle-mapping-audit.test.mjs` |
+| 3 | Per-source switch `stage_model`, default off and byte-identical | `sources/lifecycle-stage.ts`, `socrata.ts::statusLookupFor`, all five connectors | `test/lifecycle-stage-switch.test.ts` |
+
+- No surface reads the vocabulary, and no registry entry sets `stage_model`. A test fails if one does.
+- **The audit is a proposal for review, not a classification.**
+  - Its 2,006 rows come from wording rules, each row naming its rule.
+  - 245 values need agency documentation (D5, D8). "None on file" for all of them: the sandbox cannot reach
+    agency websites.
+  - 250 are decided per record (D1, D3).
+  - 301 need a person's review, including every value that would move a record to an earlier column.
+- Writing the rules found and fixed more than a dozen misreads before commit. Examples: "Application Incomplete" read as
+  completion; "In force" caught by an "in for approval" guard; "Pending Site Approval" read as approved; short
+  words treated as codes.
+- Not yet built: gate item 2 (before/after record counts on a replica of production), items 3 and 4, and section 6
+  steps 4–7.
+
 1. **The generated status-mapping audit.** For every registry entry and every verbatim status:
    - old bucket, new stage, new activity, new column;
    - the documentation receipt behind each D5/D8 interpretation, or "none → undetermined";
