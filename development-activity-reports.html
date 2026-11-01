@@ -277,7 +277,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 .rail-sec>.sec-h{margin:0}
 #rail-actions{display:grid;gap:8px;--rv-ink:var(--ink);--rv-ink2:var(--muted);--rv-line:var(--line);--rv-green:var(--accent);--rv-deep:#0f5c37;--rv-tint:#e9f5ee}
 #rail-actions:empty{display:none}
-#rail-actions .da-rv-act[data-da-action="pdf"]{grid-column:1/-1}
+#rail-actions .da-rv-act[data-rail-key]{grid-column:1/-1}
 /* management is quiet: it opens from the action, never sits beside it */
 .mgmt{background:transparent;border:0;padding:0;font-size:13px;color:var(--muted)}
 .mgmt>summary{cursor:pointer;list-style:none;min-height:32px;padding:4px 2px;font-weight:600;color:var(--muted)}
@@ -292,9 +292,9 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
 #rail-actions .da-rv-act{min-height:44px;padding:10px 12px;font-size:14px;border-radius:10px}
 #rail-actions .da-rv-act--live{border-color:var(--line);color:var(--ink);background:#fff}
 #rail-actions .da-rv-act--live:hover{background:var(--panel2)}
-#rail-actions .da-rv-act[data-da-action="share"]{grid-column:1/-1;min-height:48px;background:var(--accent);border-color:var(--accent);color:#fff}
+#rail-actions .da-rv-act[data-da-action="share"]{min-height:48px;background:var(--accent);border-color:var(--accent);color:#fff}
 #rail-actions .da-rv-act[data-da-action="share"]:hover{background:#0f5c37}
-#rail-actions .da-rv-act[data-da-action="watch"]{grid-column:1/-1;border-color:var(--accent);color:var(--accent);background:#fff}
+#rail-actions .da-rv-act[data-da-action="watch"]{border-color:var(--accent);color:var(--accent);background:#fff}
 #rail-actions .da-rv-soon{grid-column:1/-1;font-size:12.5px;color:var(--muted)}
 .rail .card{padding:12px 14px}
 .rail .card,.rail-sec{gap:8px}
@@ -1694,7 +1694,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (!COMPARE_AT_LAUNCH) keys = keys.filter(function(k){ return k !== 'compare'; });
     if (buttons.length !== keys.length) return; // not the buttons this was written for: leave the view's bar exactly as it came
     buttons.forEach(function(b, i){ byKey[keys[i]] = b; });
-    ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; bar.appendChild(b); } });
+    // data-rail-key is the button's place, live or not: a disabled button carries no data-da-action, and the layout must not depend on that (Watch was half width when inert)
+    ACTION_ORDER.forEach(function(k){ var b = byKey[k]; if (b) { b.textContent = ACTION_WORDS[k]; b.setAttribute('data-rail-key', k); bar.appendChild(b); } });
     var note = bar.querySelector('.da-rv-soon'); if (note) bar.appendChild(note);
     rail.appendChild(bar); // the same <nav>, handled by the same click handler (onReportAction), now in the workspace rail
     $('rail-report').hidden = false;
