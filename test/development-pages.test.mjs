@@ -312,5 +312,26 @@ const h = (st, p) => (st.pages || st.entries || {})[p];
 ok(h(st1, A) && JSON.stringify(h(st1, A).h) === JSON.stringify(h(st2, A).h), 'a later build day does not move the fingerprint',
    JSON.stringify([h(st1, A), h(st2, A)]));
 
+// 3d. The header and footer are the site's own (founder, 2026-11-01: "they are not same as website").
+{
+  const shell = readFileSync(join(root, 'partials', 'shell.html'), 'utf8');
+  const hrefs = (t) => [...t.matchAll(/href="([^"]+)"/g)].map(m => m[1].replace(/^(?!https?:|\/)/, '/'));
+  const sHead = shell.match(/<header class="hs-header"[\s\S]*?<\/header>/)[0];
+  const sFoot = shell.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/)[0];
+  const pg = read(out, A);
+  const pHead = (pg.match(/<header class="hs-header"[\s\S]*?<\/header>/) || [''])[0];
+  const pFoot = (pg.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/) || [''])[0];
+  ok(pHead && JSON.stringify(hrefs(pHead)) === JSON.stringify(hrefs(sHead)), 'the header has the site header\'s links, in order',
+     JSON.stringify([hrefs(pHead), hrefs(sHead)]));
+  ok(pFoot && JSON.stringify(hrefs(pFoot)) === JSON.stringify(hrefs(sFoot)), 'the footer has the site footer\'s links, in order',
+     JSON.stringify([hrefs(pFoot), hrefs(sFoot)]));
+  ok(hrefs(sHead).length >= 8 && hrefs(sFoot).length >= 8, 'control: the site header and footer were read');
+  ok(!/HomeSignal home|How HomeSignal works|class="site"/.test(pg), 'the old hand-made header and footer are gone');
+  ok(!/onclick=|<script/.test(pHead + pFoot), 'the header and footer need no script');
+  ok(/@media \(max-width:1023px\)\{\.hs-menutoggle:checked~\.hs-nav\{display:flex\}\}/.test(pg)
+     && pHead.indexOf('id="hs-menutoggle"') < pHead.indexOf('<nav class="hs-nav"'), 'the narrow-screen menu opens without a script');
+  ok(pg.includes('.hs-header{position:sticky'), 'the site header styles are on the page');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
