@@ -21,7 +21,7 @@ const SAMPLE = process.env.SAMPLE ? parseInt(process.env.SAMPLE, 10) : 0;
 const NEWS_TOPICS = [
   'Water Quality', 'Air Quality', 'Soil Quality', 'Animal & Human Viruses / Diseases',
   'Infrastructure', 'EMF', 'Noise Pollution', 'Light Pollution',
-  'Livestock, Crops, Pets & Wildlife Health', 'Weather & Climate Hazards', 'Radiation', 'Data Centers',
+  'Livestock, Crops, Pets & Wildlife Health', 'Weather & Climate Hazards', 'Radiation', 'Data Centers', 'Development & Land Use',
 ];
 const STANDARD_GOV = [
   'County Commission & county business', 'Planning, zoning & development',
