@@ -537,19 +537,22 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const t = await shown();
     ok(t.rows.length === 2 && t.evCells === 2 && t.links === 2, `14d2 (${label}) Type and Stage filters combine on whole rows (2 commercial proposed records, 2 evidence cells)`, t);
     // print keeps what the filters show and says in words what was picked
-    // national-6 (2026-11-02): the chips themselves no longer print (docs/report-quality-national6-2026-11-02.md, "Branding / PDF"); the "Showing ..." line does.
-    // The pressed chips are still ticked and filled on screen.
+    // founder 2026-11-02 ("the type and status buttons are not there"): the chips print again, the two pressed ones ticked and filled on paper too,
+    // and the "Showing ..." line prints under them.
     const scr = await page.evaluate(() => ({ pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => [getComputedStyle(b, '::before').content, getComputedStyle(b).backgroundColor]),
       unpressed: getComputedStyle(document.querySelector('.da-rv-chip[aria-pressed="false"]')).backgroundColor }));
     await page.emulateMedia({ media: 'print' });
     const pf = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length,
       filters: document.querySelector('.da-rv-sec--filters').getBoundingClientRect().height > 0,
       chipsPrinted: [...document.querySelectorAll('.da-rv-chip')].filter((b) => b.getBoundingClientRect().height > 0).length,
+      chipsAll: document.querySelectorAll('.da-rv-chip').length,
+      pressedPrint: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => [getComputedStyle(b, '::before').content, getComputedStyle(b).backgroundColor, b.getBoundingClientRect().height > 0]),
+      rowsShown: [...document.querySelectorAll('.da-rv-frow')].filter((r) => r.getBoundingClientRect().height > 0).length,
       nowShown: document.querySelector('[data-da-fnow]').getBoundingClientRect().height > 0,
       now: document.querySelector('[data-da-fnow]').textContent,
       marks: [...document.querySelectorAll('.da-rv-mk')].filter((e) => e.getBoundingClientRect().height > 0).length }));
-    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.chipsPrinted === 0 && pf.nowShown && scr.pressed.length === 2 && scr.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== scr.unpressed)
-      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks and "Showing … : 2 of 8 records." (the chips do not print; on screen the two pressed ones are ticked and filled)`, [pf, scr]);
+    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.chipsAll > 0 && pf.chipsPrinted === pf.chipsAll && pf.rowsShown === 2 && pf.pressedPrint.length === 2 && pf.pressedPrint.every((x) => /\u2713/.test(x[0]) && x[1] === scr.pressed[0][1] && x[2]) && pf.nowShown && scr.pressed.length === 2 && scr.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== scr.unpressed)
+      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks and "Showing … : 2 of 8 records." (the Type and Stage chips print, the two pressed ones ticked and filled on paper as on screen)`, [pf, scr]);
     await page.emulateMedia({ media: 'screen' });
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="datacenter"]').catch(() => {});
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="operating"]');
@@ -558,7 +561,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     await page.emulateMedia({ media: 'print' });
     const pr = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length);
     ok(pr === 0, `14d4 (${label}) printing with a filter that matches nothing prints no rows (the PDF follows the filters)`, pr);
-    await page.emulateMedia({ media: 'screen' }); // national-6 (2026-11-02): the chips do not print, so they are pressed on screen
+    await page.emulateMedia({ media: 'screen' }); // chips are pressed on screen, then the page is printed
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="all"]');
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
     await page.emulateMedia({ media: 'print' });
