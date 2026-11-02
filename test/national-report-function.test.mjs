@@ -194,14 +194,14 @@ const spy = (k) => (...a) => { logged.push(a.map(String).join(' ')); };
 
   // founder ruling R5: every answer carries the one credit decision, and nothing here charges anything
   const cr = (x) => x && [x.uses_report, x.reason, x.rule_version].join('|');
-  ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-1' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
+  ok(cr(r.json.credit) === 'true|DEVELOPMENT_SHOWN|credit-rule-2' && r.json.report.activity.outcome === 'DEVELOPMENT_SHOWN',
     '4k a customer report that shows development would use one free report, and says which rule decided it', r.json.credit);
-  ok(cr(cust.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1' && cust.json.report.activity.label === 'No data ingested',
+  ok(cr(cust.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-2' && cust.json.report.activity.label === 'No data ingested',
     '4l with nothing traceable, the customer report says "No data ingested" and would use no free report', cust.json.credit);
-  ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-1', '4m the operator\'s internal view is never charged', internal.json.credit);
-  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-1', '4n an empty radius is still "No data ingested", not "No development activity"', dflt.json.credit);
+  ok(cr(internal.json.credit) === 'false|INTERNAL_VIEW|credit-rule-2', '4m the operator\'s internal view is never charged', internal.json.credit);
+  ok(cr(dflt.json.credit) === 'false|NO_DATA_INGESTED|credit-rule-2', '4n an empty radius is still "No data ingested", not "No development activity"', dflt.json.credit);
   ok(r.json.stored === false && r.json.report_id === null && r.json.charged === false && !('trial' in r.json), '4o an admin report is never charged or stored, even when the rule would charge a customer');
-  ok(H.capability().credit_rule === 'credit-rule-1', '4p the capability names the credit rule');
+  ok(H.capability().credit_rule === 'credit-rule-2', '4p the capability names the credit rule');
 }
 
 // ---- 5. cross-origin ----------------------------------------------------------------------------------------

@@ -338,8 +338,22 @@ try {
   // national-6 (2026-11-02): the customer-visible brand is Jody
   ok(textOf(out.html).includes('Jody cannot yet confirm it receives official development records for this address, so this report cannot say whether there is development nearby. It is not a finding that there is no development.'),
     '5k and says in plain words that it is HomeSignal\'s gap, not a finding about the area', textOf(out.html));
-  ok(JSON.stringify(Object.fromEntries(Object.entries(V.OUTCOMES).map(([k, o]) => [k, o.title]))) === JSON.stringify({ NO_DATA_INGESTED: M.ACTIVITY_LABELS.NO_DATA_INGESTED, NO_DEVELOPMENT_ACTIVITY: M.ACTIVITY_LABELS.NO_DEVELOPMENT_ACTIVITY }),
-    '5l the view\'s two titles are the engine\'s labels, word for word');
+  ok(JSON.stringify(Object.fromEntries(Object.entries(V.OUTCOMES).map(([k, o]) => [k, o.title]))) === JSON.stringify({ NO_DATA_INGESTED: M.ACTIVITY_LABELS.NO_DATA_INGESTED, NO_DEVELOPMENT_ACTIVITY: M.ACTIVITY_LABELS.NO_DEVELOPMENT_ACTIVITY, NO_SIGNIFICANT_CHANGES: M.ACTIVITY_LABELS.NO_SIGNIFICANT_CHANGES }),
+    '5l the view\'s three titles are the engine\'s labels, word for word');
+  { // activity-outcome-2 (founder 2026-11-02): records read and all left out
+    const q = (rj, lim) => { const x = clone(WNONE); x.report.activity = { outcome: 'NO_SIGNIFICANT_CHANGES', label: 'No significant nearby changes found', rule_version: 'activity-outcome-2', records_judged: rj };
+      if (lim) x.report.coverage = Object.assign({}, x.report.coverage, { limitations: [{ code: 'SOURCE_NOT_FULLY_READ', text: 'A source was not fully read.' }] }); return textOf(V.html(x, {})); };
+    const all = q({ total: 4, routine: 4, undescribed: 0, temporary_ended: 0 });
+    ok(/No significant nearby changes found/.test(all) && /Jody checked 4 official records (within [\d.]+ miles? of|near) this property\. All of them describe routine work, such as interior remodels, repairs and office fit-outs\. None documents a change the neighborhood would notice\./.test(all)
+      && !/No data ingested|Records left out of this report|could still matter/.test(all), '5l2 all routine: the founder\'s wording, with the count, and no "No data ingested"', all.slice(0, 500));
+    const mix = q({ total: 4, routine: 2, undescribed: 1, temporary_ended: 1 });
+    ok(/2 describe routine work, such as interior remodels, repairs and office fit-outs; 1 does not say what the work is, or when a temporary activity takes place; 1 was a temporary activity that has ended\. None documents/.test(mix)
+      && /could still matter: check it at its official source\./.test(mix), '5l3 mixed: each kind is counted, and an undescribed record is flagged as possibly mattering', mix.slice(0, 600));
+    const bad = q({ total: 4, routine: 3, undescribed: 0, temporary_ended: 0 });
+    ok(/Jody read the official records (within [\d.]+ miles? of|near) this property and left every one out\. None documents/.test(bad) && !/checked 4/.test(bad), '5l4 counts that do not add up are not printed', bad.slice(0, 400));
+    const lim = q({ total: 1, routine: 1, undescribed: 0, temporary_ended: 0 }, true);
+    ok(/It describes routine work/.test(lim) && /Not every source was read in full, so this is not a complete answer/.test(lim), '5l5 one record, singular; a limitation says the answer is not complete', lim.slice(0, 500));
+  }
   const proven = clone(WNONE); proven.report.activity = { outcome: 'NO_DEVELOPMENT_ACTIVITY', label: 'No development activity', rule_version: 'activity-outcome-1' };
   const hp = view(proven), op = sec(hp, 'outcome');
   ok(op && op.label === 'No development activity' && textOf(op.html) === 'No development activity Jody\'s official development records for this address are coming in, and they show no development within 0.5 miles of this property.',

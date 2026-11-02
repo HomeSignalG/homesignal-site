@@ -206,8 +206,8 @@ const all = Object.values(src).map(code).join('\n');
   ok(defines(/function activityOutcome\(/).join() === MOD, '9e activityOutcome is defined in one file', defines(/function activityOutcome\(/));
   ok(defines(/uses_report\s*:/).join() === CR, '9f nothing but the credit rule writes a uses_report answer', defines(/uses_report\s*:/));
   const mod = code(src.module);
-  ok((mod.match(/activityOutcome\(/g) || []).length === 2 && /const outcome = activityOutcome\(projects\.length\);/.test(mod),
-    '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the provenance rule), never the spatial answer');
+  ok((mod.match(/activityOutcome\(/g) || []).length === 2 && /const outcome = activityOutcome\(projects\.length, relevanceReview\.length\);/.test(mod),
+    '9g the engine asks activityOutcome once, with the number of projects in THIS report (after the provenance rule) and the number it read and left out (relevance_review), never the spatial answer');
   const fnBody = /export function activityOutcome\([\s\S]*?\n\}/.exec(mod);
   ok(!!fnBody && !/NO_DEVELOPMENT_ACTIVITY/.test(fnBody[0]), '9h today\'s outcome rule cannot return "No development activity": that needs the VERIFIED ZERO proof, which has no inputs yet');
   ok(/const credit = creditDecision\(\{ status: 'OK', view, activity: out\.intelligence\?\.activity, storable \}\);/.test(code(src.handler))

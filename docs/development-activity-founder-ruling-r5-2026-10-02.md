@@ -55,3 +55,13 @@ issued, and a report that cannot be issued because no rights-cleared input is av
    correct it.
 6. **One owner.** The decision lives in one versioned function used by the trial handler (build step 5) and
    tested with every case above. No page, email or other function decides it again.
+
+
+## Amendment, 2026-11-02: "No significant nearby changes found"
+
+National-7 added a relevance rule that leaves routine and undescribed records out of the report. A report whose records were ALL left out
+then said "No data ingested", which is false: data for the address is coming in. The founder approved a fourth outcome,
+`NO_SIGNIFICANT_CHANGES` ("No significant nearby changes found", `activity-outcome-2`), used when the report lists nothing but the
+relevance rule read and left out at least one record. It is not a measured zero of development (records that do not describe their
+work could still matter), so it does not use a free report (`credit-rule-2`), which keeps charging exactly as it was. "No data
+ingested" remains the outcome when nothing was read at all.

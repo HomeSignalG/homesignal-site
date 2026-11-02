@@ -376,6 +376,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "description",
         "title": [
           "permitclass",
           "description"
@@ -459,6 +460,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "description",
         "title": [
           "permittypemapped",
           "description"
@@ -541,6 +543,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "proposaldescription",
         "title": "proposalname",
         "type_source": "proposaltypename",
         "file_date": "publisheddate",
@@ -3562,6 +3565,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "WORK_DESCRIPTION",
         "title": [
           "PERMIT_SUBTYPE",
           "JOB_DESCRIPTION"
@@ -5663,6 +5667,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "WORKDESC",
         "title": [
           "SUBDESC",
           "FOLDERNAME"
@@ -7385,6 +7390,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "DESCRIPTION",
         "title": [
           "TYPE",
           "PROJECT_NAME"
@@ -7662,6 +7668,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "Description",
         "title": [
           "ProjectType",
           "ParcelAddress"
@@ -8080,6 +8087,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "WORKCLASS",
         "title": [
           "PERMITTYPE",
           "MAINADDRESS"
@@ -8924,6 +8932,7 @@
         }
       ],
       "column_map": {
+        "scope_text": "WORKDESC",
         "title": [
           "SUBDESC",
           "ADDRESS"
@@ -9040,7 +9049,8 @@
         "ADDRESS",
         "PERMITAPPROVAL",
         "ISSUEDATE",
-        "FOLDERNUM"
+        "FOLDERNUM",
+        "WORKDESC"
       ],
       "page_size": 2000,
       "recency_days": 365,

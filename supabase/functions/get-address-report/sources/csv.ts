@@ -33,6 +33,7 @@
 // runtime import and fails to resolve. Deno erases it either way.
 import { pointInBox, validBounds, widensLegacy, scopeBox, type ZipBounds } from "./scope-box.ts";
 import { dropNullIsland } from "./null-island.ts";
+import { scopeField } from "./scope-text.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import { keepMembers, newScopeMetrics, widenedBounds, ScopeMembershipError, SCOPE_ORIGIN_KEY, SCOPE_ORIGIN_MEMBER, type MembershipFn, type ScopeMetrics } from "./scope-members.ts";
 import type {
@@ -450,6 +451,7 @@ async function normalizeRow(
     case_number: caseNo,
     record_url: recordUrl,
     record_url_precision: precision,
+    ...scopeField(readCol(row, cm.scope_text), title),
     ...geoQuality,
   };
   if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;

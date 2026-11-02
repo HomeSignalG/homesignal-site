@@ -161,7 +161,9 @@ m('rights_class_column_read', CHG, "const cols = 'identity_key,registry_id,compa
 
 # ---- the report's outcome and the credit rule (founder ruling R5, 2026-10-02) ----------------------------------------------------------
 CR = 'supabase/functions/_shared/credit-rule.ts'
-m('outcome_counts_the_spatial_answer', MOD, "const outcome = activityOutcome(projects.length);", "const outcome = activityOutcome(input.rows.length);")
+m('outcome_counts_the_spatial_answer', MOD, "const outcome = activityOutcome(projects.length, relevanceReview.length);", "const outcome = activityOutcome(input.rows.length, relevanceReview.length);")
+m('outcome_ignores_judged_records', MOD, "const outcome = activityOutcome(projects.length, relevanceReview.length);", "const outcome = activityOutcome(projects.length);")
+m('judged_counts_dropped', MOD, "      ...(outcome === 'NO_SIGNIFICANT_CHANGES' ? { records_judged: {", "      ...(false ? { records_judged: {")
 m('empty_called_no_activity', MOD, "projectsInReport > 0 ? 'DEVELOPMENT_SHOWN' : 'NO_DATA_INGESTED';", "projectsInReport > 0 ? 'DEVELOPMENT_SHOWN' : 'NO_DEVELOPMENT_ACTIVITY';")
 m('fractional_count_shows_development', MOD, "return Number.isInteger(projectsInReport) && projectsInReport > 0", "return projectsInReport > 0")
 m('outcome_left_out_of_the_report', MOD, "    activity: { outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION },\n", "")

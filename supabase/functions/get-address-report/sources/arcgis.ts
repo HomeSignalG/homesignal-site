@@ -25,6 +25,7 @@
 
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
+import { scopeField } from "./scope-text.ts";
 import { cleanApplicantTitle, isMinorRepairNoise } from "./record-hygiene.ts";
 import { centroidSquare, scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
@@ -669,6 +670,7 @@ async function normalizeRow(
     case_number: caseNo,
     record_url: recordUrl,
     record_url_precision: precision,
+    ...scopeField(readCol(row, cm.scope_text), title),
     ...geoQuality,
   };
   if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;
