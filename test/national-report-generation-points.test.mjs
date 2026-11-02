@@ -86,8 +86,8 @@ ok(p && p.lifecycle.key === 'proposed' && p.stage && p.stage.key === 'proposed' 
 ok(p && p.type.key === 'residential' && p.publisher_stage === 'In Review' && p.source.url === real.find((r) => r.source_key === LIGHTSEY).source_ref, '2e verified Type, the publisher\'s own stage, and the official record link are carried');
 const row = after.rowOf('Lightsey Residences');
 ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
-// national-6 (2026-11-02): the note states what THIS record documents and what it does not state; no generic Type warning
-ok(row && /Quality-of-Life Impact: The record documents new residential development\./.test(row) && /The record states no schedule and no effect on nearby properties\./.test(row), '2g the Quality-of-Life wording is the record-specific note and claims no established effect', row);
+// national-7 (founder, 2026-11-02): the note states what THIS record documents, then the Type's own sentence, and claims no established effect
+ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*Potential construction noise and traffic, then added neighborhood activity or visual change\. Not site-verified; no effect is established\./.test(row), '2g the Quality-of-Life wording is the record-specific note plus the Type sentence, and claims no established effect', row);
 
 // ---- 3. the half-mile edge ----
 ok(!keys(rpc.new_055).includes(LIGHTSEY), '3a ~0.55 mi: excluded');

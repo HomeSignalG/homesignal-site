@@ -91,7 +91,7 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 7
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
     '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the one quality-of-life rule and its heavy-facility kind check); lifecycle only as the engine\'s key and label');
 }
@@ -258,9 +258,10 @@ const C = code(SRC);
 ok(/\.da-rv-table thead th\{overflow-wrap:normal;word-break:normal;hyphens:none;white-space:nowrap\}/.test(SRC), '5a a table column heading is never broken inside a word (the page-wide overflow-wrap:anywhere let a narrow print table squeeze "DISTANCE" into "DISTAN / CE" once a Direction column was added)');
 // ---- 8. the quality-of-life rule is ONE function in ONE file (2026-10-09) -------------------------------------------------------------------
 {
-  const rule = (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
-  // national-6 (2026-11-02): the rule is keyed by the engine's relevance basis (QOL_BY_BASIS), not by Type
-  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_BASIS/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
+  // national-7 (founder, 2026-11-02): the record line (recordNote, keyed on the engine's relevance basis) is followed by the Type's own sentence, so a
+  // note never names fewer impacts than the Type sentence it replaced
+  const rule = (C.match(/function recordNote\(p\) \{[\s\S]*?\n  \}/) || [''])[0] + (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_BASIS/.test(rule) && /QOL_BY_TYPE\[k\]/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
     '8a the impact rule is one function, called once (by the table), reading only the record: no clock, no network, no storage, no randomness, no distance');
   const dirs = ['lib', 'supabase/functions', 'scripts'], hits = [];
   const walk = (d) => { for (const f of readdirSync(join(root, d))) { const q = join(d, f); if (statSync(join(root, q)).isDirectory()) { if (f !== 'node_modules') walk(q); } else if (/\.(js|mjs|ts|html|py)$/.test(f) && q !== 'lib/da-report-view.js' && /cooling noise|traffic\/access disruption|Impact not determined/.test(read(q))) hits.push(q); } };

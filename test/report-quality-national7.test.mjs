@@ -159,7 +159,13 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
 {
   const qol = [...html.matchAll(/data-da-qol="[^"]+"><span class="da-rv-lab">Quality-of-Life Impact: <\/span>([^<]*)</g)].map((x) => x[1]);
   ok(qol.length === rep.projects.length && qol.every((t) => /^The record (documents|is)/.test(t)), 'E1 every quality-of-life note starts from what the record documents', qol.filter((t) => !/^The record/.test(t)));
-  ok(!qol.some((t) => /view|neighborhood activity|added neighborhood/i.test(t)) && !/Not site-verified; no effect is established/.test(html), 'E2 no generic view or neighborhood-activity warning is attached to every record');
+  // founder (2026-11-02, rejected the shorter notes): every note still names every impact its Type's sentence named, after the record-specific line
+  const TYPE_Q = { residential: 'Potential construction noise and traffic, then added neighborhood activity or visual change.', commercial: 'Potential construction and customer traffic, parking and noise, and change to the view.',
+    industrial: 'Potential noise, truck traffic, dust or air emissions, and change to the view.', civic: 'Potential construction disruption and possible change to public access or amenities.',
+    infrastructure: 'Potential construction noise and traffic/access disruption.', datacenter: 'Potential cooling noise, backup-generator operation, light pollution, construction traffic and water-demand considerations.' };
+  const missing = rep.projects.filter((p) => TYPE_Q[p.type.key] && !html.includes(TYPE_Q[p.type.key]));
+  ok(qol.filter((t) => Object.values(TYPE_Q).some((q) => t.includes(q))).length === rep.projects.filter((p) => TYPE_Q[p.type.key]).length && missing.length === 0 && qol.every((t) => /Not site-verified|Effects not verified|not stated|does not state/.test(t)),
+    'E2 no note names fewer impacts than its Type sentence: each keeps that sentence after the record-specific line', missing.map((p) => p.name));
   const titles = [...html.matchAll(/<span class="da-rv-name">([^<]*)</g)].map((x) => x[1]);
   // a title cut with an ellipsis ends where a whole word of the record's own text ends (the next character in the full text is not a letter or digit)
   const full = fx.projects.map((p) => String(p.name).replace(/\s+/g, ' '));

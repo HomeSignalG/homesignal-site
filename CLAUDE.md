@@ -5778,7 +5778,10 @@ Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality
 - **Stage wording:** "Permit issued" or "Under construction" from the agency's own word (never both on one record), "Approved" (not a construction
   permit), "Completed (agency record)" (not occupied/open). A stage the agency did not publish (a connector `status_const`) gives no stage unless the agency
   published an issue date; a temporary event gives no stage. The national lifecycle engine is unchanged.
-- **Quality-of-life notes are per record** (`qolImpact` keyed on `relevance.basis`); heavy-facility and data-center sentences stay.
+- **Quality-of-life notes are per record** (`recordNote` keyed on `relevance.basis`); heavy-facility sentences stay.
+  ⚖️ **Founder (2026-11-02): a note may never name fewer impacts than the Type sentence it replaced.** So `qolImpact` puts the record line first and
+  the Type's own sentence (`QOL_BY_TYPE`, unchanged from national-6) after it. A report saved before national-7 (no basis) reads the scope-only
+  sentence; the founder accepted that ("this is fine"). Pinned by national7 E2.
 - **Temporary activity is judged on its documented window** (`temporaryTiming`): earliest to latest date in the record's fields or text, set-up and removal
   included. Upcoming and under way are listed; ended is left out unless a separate continuing scope qualifies; `temporary_timing_not_stated` when the
   full record has no dates; `temporary_timing_not_captured` when ingestion cut the text and stored no description. Bumbershoot 2026 is the last kind:

@@ -117,7 +117,8 @@ try {
   // national-6 (2026-11-02): "Approved" (no prediction), with the note that approval is not a construction permit
   ok(/Stage: Approved Source agency status: Advertised Approval is not a construction permit or a start of work\./.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
   // national-6 (2026-11-02): the impact note says what THIS record documents (relevance basis new construction) and what it does not state; no generic warning
-  ok(/The record documents new construction\./.test(textOf(men.cells[2])) && /states no schedule and no effect on nearby properties/.test(textOf(men.cells[2])) && !/Not site-verified/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note, qualified');
+  // founder (2026-11-02): the record line is followed by the Type's own sentence, so no note names fewer impacts than before
+  ok(/The record documents new construction\. Construction activity at the site is possible once work starts\. Potential construction noise and traffic, then added neighborhood activity or visual change\. Not site-verified; no effect is established\.$/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note followed by the Type sentence, qualified', textOf(men.cells[2]));
   // the evidence is the fourth cell of the record's own row: one per record, no second list, no details block, no evidence card anywhere else
   ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8 && evOf(html).every((e) => e.html.length > 0), '2g one supporting-evidence cell per record, in that record\'s own row');
   ok(!/<details|<summary|da-rv-evrec|da-rv-evlist|da-rv-evtitle|Supporting evidence for each record/.test(html) && /Supporting Evidence/.test(html), '2g2 the separate expandable evidence section is gone: no details, no summary, no evidence cards or list, no duplicate evidence in the markup');
@@ -252,7 +253,7 @@ try {
   const qol = (n) => textOf(rowNamed(html, n).cells[2]).replace(/^Quality-of-Life Impact: /, '');
   const kinds = Object.fromEntries(rowsOf(html).map((r) => [r.name, (/data-da-qol="([^"]*)"/.exec(r.html) || [])[1]]));
   // national-6 (2026-11-02): a note is "documented" when it states what the record documents (the engine's relevance basis)
-  ok(kinds['Menchaca Apartments'] === 'documented' && kinds['Oak Grove Townhomes'] === 'denied_or_withdrawn' && Object.values(kinds).every(Boolean), '4a every row carries one impact kind, and a Decided record is "denied or withdrawn"', kinds);
+  ok(kinds['Menchaca Apartments'] === 'potential' && kinds['Oak Grove Townhomes'] === 'denied_or_withdrawn' && Object.values(kinds).every(Boolean), '4a every row carries one impact kind, and a Decided record is "denied or withdrawn"', kinds);
   ok(rowsOf(html).every((r) => /states no schedule and no effect on nearby properties|states no dates|not stated|does not state|Confirm the outcome|not site-verified|no effect is established/i.test(textOf(r.cells[2]))), '4b every impact text is qualified (says what the record does not state, or asks to confirm)');
   const joined = rowsOf(html).map((r) => textOf(r.cells[2])).join(' ');
   ok(!/\d/.test(joined) && !/property value|home value|price|appreciat|increase in value|score|rating|decibel|minutes|percent|%/i.test(joined), '4c no number, score, rating, measurement or property-value prediction appears in any impact cell', joined.match(/.{15}(\d|value|price|score).{15}/i));
