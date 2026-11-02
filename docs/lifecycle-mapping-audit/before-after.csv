@@ -1,0 +1,1061 @@
+registry_id,state,stored_status,stored_column_value,before,after,activity,needs,rule,placements
+adams-county-building-permits,CO,Approved Fees Due,Proposed,proposed,approved,active,,R15 permit approved or issued,58
+adams-county-building-permits,CO,C of O Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",41
+adams-county-building-permits,CO,Case Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),9
+adams-county-building-permits,CO,Case Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",481
+adams-county-building-permits,CO,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),30
+adams-county-building-permits,CO,"Closed, Approved",Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),254
+adams-county-building-permits,CO,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,661
+adams-county-building-permits,CO,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,5742
+adams-county-building-permits,CO,ProjectDox Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,89
+adams-county-building-permits,CO,Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,293
+adot-tip-fy2026-2030,AZ,Adopted in the FY2026-2030 Transportation Improvement Program,Approved,approved,proposed,active,review,R12 programmed / planned / funded transport or capital work,685
+albuquerque-building-permits,NM,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",3367
+aldot-atrip-ii-projects,AL,Y,Approved,approved,per_record,undetermined,receipt,R02 opaque code (D8),184
+aldot-rebuild-alabama-grant-projects,AL,Y,Approved,approved,per_record,undetermined,receipt,R02 opaque code (D8),227
+allegheny-county-asbestos-permits,PA,Active - Issued,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,183
+allegheny-county-asbestos-permits,PA,Approved - Demolition,Approved,approved,approved,active,,R15 permit approved or issued,45
+allegheny-county-asbestos-permits,PA,Approved - Renovation,Approved,approved,approved,active,,R15 permit approved or issued,77
+allegheny-county-asbestos-permits,PA,Closed - Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",116
+allentown-energov-building-permits,PA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1967
+allentown-energov-building-permits,PA,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+allentown-energov-building-permits,PA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,8
+allentown-energov-building-permits,PA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2709
+allentown-energov-building-permits,PA,Temporary CO,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",19
+anaheim-land-use-cases,CA,Adopted,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,1
+anaheim-land-use-cases,CA,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,735
+anaheim-land-use-cases,CA,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,8
+anaheim-land-use-cases,CA,Exercised,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,3
+anaheim-land-use-cases,CA,Hearing Scheduled,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+anaheim-land-use-cases,CA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,151
+anaheim-land-use-cases,CA,Incomplete,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,13
+anaheim-land-use-cases,CA,Incomplete Submittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+anaheim-land-use-cases,CA,Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,34
+anaheim-land-use-cases,CA,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,7
+ann-arbor-energov-permits,MI,Issued,Approved,approved,approved,active,,R15 permit approved or issued,1404
+ann-arbor-energov-permits,MI,Issued in Trakit,Approved,approved,approved,active,,R15 permit approved or issued,4
+ar-ardot-job-status-lines,AR,01,Proposed,proposed,per_record,undetermined,receipt,R02 opaque code (D8),334
+ar-ardot-job-status-lines,AR,02,Approved,approved,per_record,undetermined,receipt,R02 opaque code (D8),139
+ar-ardot-job-status-lines,AR,03,Operating,operating,per_record,undetermined,receipt,R02 opaque code (D8),1177
+ar-ardot-job-status-points,AR,01,Proposed,proposed,per_record,undetermined,receipt,R02 opaque code (D8),112
+ar-ardot-job-status-points,AR,02,Approved,approved,per_record,undetermined,receipt,R02 opaque code (D8),48
+ar-ardot-job-status-points,AR,03,Operating,operating,per_record,undetermined,receipt,R02 opaque code (D8),94
+arlington-issued-permits,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,9
+arlington-issued-permits,TX,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",43942
+arlington-issued-permits,TX,Issued,Approved,approved,approved,active,,R15 permit approved or issued,28092
+arlington-issued-permits,TX,Pending Inspection,Proposed,proposed,approved,active,,R14 construction under way / inspections / awarded or advertised contract,7
+arlington-issued-permits,TX,TCO Issued,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",56
+arlington-permit-applications,TX,Application Incomplete,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,452
+arlington-permit-applications,TX,Approved for Issue,Approved,approved,approved,active,,R15 permit approved or issued,388
+arlington-permit-applications,TX,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,76
+arlington-permit-applications,TX,Pre-Application,Proposed,proposed,per_record,per_record,per_record,R10 pre-application / consultation (D1),78
+arlington-planning-cases,TX,Additional Information Needed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,52
+arlington-planning-cases,TX,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,612
+arlington-planning-cases,TX,Awaiting Council,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,43
+arlington-planning-cases,TX,Awaiting P & Z,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,30
+arlington-planning-cases,TX,Continued by P&Z,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,21
+arlington-planning-cases,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,40
+arlington-planning-cases,TX,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,54
+arlington-planning-cases,TX,Pending Customer Response,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,112
+arlington-planning-cases,TX,Submittal Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,49
+arlington-planning-cases,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,47
+asheville-accela-permits,NC,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",69
+asheville-accela-permits,NC,Application Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,17
+asheville-accela-permits,NC,CC Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",978
+asheville-accela-permits,NC,CO Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",275
+asheville-accela-permits,NC,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),96
+asheville-accela-permits,NC,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,3
+asheville-accela-permits,NC,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",76
+asheville-accela-permits,NC,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+asheville-accela-permits,NC,Issued,Approved,approved,approved,active,,R15 permit approved or issued,1731
+asheville-accela-permits,NC,Pending Applicant Action,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,458
+asheville-accela-permits,NC,Pending Inspection,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,8
+asheville-accela-permits,NC,Pending Payment,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+asheville-accela-permits,NC,Plan Check,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,339
+asheville-accela-permits,NC,Reissued,Approved,approved,approved,active,,R15 permit approved or issued,356
+asheville-accela-permits,NC,TCC Issued 90 Days,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2
+asheville-accela-permits,NC,TCO Issued 90 Days,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",19
+aurora-building-permits,CO,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",20886
+austin-site-plan-cases,TX,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,281
+austin-site-plan-cases,TX,Approved and Released,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,11142
+austin-site-plan-cases,TX,Awaiting Update,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,89
+austin-site-plan-cases,TX,CC Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,31
+austin-site-plan-cases,TX,CC Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,33
+austin-site-plan-cases,TX,CC Pending - Fees Paid,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+austin-site-plan-cases,TX,CC Rejected,Decided,proposed,per_record,inactive,,R04 denied / disapproved,11
+austin-site-plan-cases,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,38
+austin-site-plan-cases,TX,Formal Intake Accepted - Fees Due,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+austin-site-plan-cases,TX,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,62
+austin-site-plan-cases,TX,Intake Accepted - Fees Due,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+austin-site-plan-cases,TX,Intake Pending,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,19
+austin-site-plan-cases,TX,Intake Rejected,Decided,proposed,per_record,inactive,,R04 denied / disapproved,2
+austin-site-plan-cases,TX,Internet Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+austin-site-plan-cases,TX,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,58
+austin-site-plan-cases,TX,Scheduled for Hearing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+austin-site-plan-cases,TX,Tolling - Hearing Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,4
+austin-site-plan-cases,TX,Waiting on Fiscal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,31
+austin-site-plan-cases,TX,Waiting on Legal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,52
+austin-site-plan-cases,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,1030
+austin-subdivision-cases,TX,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2091
+austin-subdivision-cases,TX,Approved and Released,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,260
+austin-subdivision-cases,TX,Awaiting Recordation,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,48
+austin-subdivision-cases,TX,Awaiting Update,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,61
+austin-subdivision-cases,TX,CC Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,8
+austin-subdivision-cases,TX,CC Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,10
+austin-subdivision-cases,TX,CC Rejected,Decided,proposed,per_record,inactive,,R04 denied / disapproved,3
+austin-subdivision-cases,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,8
+austin-subdivision-cases,TX,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,17
+austin-subdivision-cases,TX,Intake Accepted - Fees Due,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+austin-subdivision-cases,TX,Intake Pending,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+austin-subdivision-cases,TX,Internet Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+austin-subdivision-cases,TX,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,43
+austin-subdivision-cases,TX,Scheduled for Hearing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,11
+austin-subdivision-cases,TX,Subdivision Recorded,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,1971
+austin-subdivision-cases,TX,Waiting on Fiscal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,6
+austin-subdivision-cases,TX,Waiting on Legal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+austin-subdivision-cases,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,352
+austin-zoning-cases,TX,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,4375
+austin-zoning-cases,TX,Approved and Released,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,64
+austin-zoning-cases,TX,Awaiting Update,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,25
+austin-zoning-cases,TX,Case Assigned,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,158
+austin-zoning-cases,TX,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),47372
+austin-zoning-cases,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,2932
+austin-zoning-cases,TX,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1061
+austin-zoning-cases,TX,Notice Requested,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,18
+austin-zoning-cases,TX,Notice Sent,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,119
+austin-zoning-cases,TX,Partial Approval,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,22
+austin-zoning-cases,TX,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,574
+austin-zoning-cases,TX,Postponed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,122
+austin-zoning-cases,TX,Reading Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,32
+austin-zoning-cases,TX,Recommended for Approval,Approved,approved,proposed,active,review,"R11 recommendation, not a decision",971
+austin-zoning-cases,TX,Scheduled for Council Hearing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,409
+austin-zoning-cases,TX,Scheduled for Hearing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,927
+austin-zoning-cases,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,5868
+baltimore-city-housing-permits,MD,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2824
+baltimore-county-permits,MD,ISSUE,Approved,approved,per_record,undetermined,review,R99 no rule matched,1718
+baltimore-county-permits,MD,OPEN,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",339
+beaverton-or-site-development-permits,OR,Maintenance Period,Approved,approved,per_record,undetermined,review,R99 no rule matched,29
+beaverton-or-site-development-permits,OR,Pay Fees,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,5
+beaverton-or-site-development-permits,OR,Permit Readiness,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,5
+beaverton-or-site-development-permits,OR,Plan Rev Completeness Rev OTA,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,3
+beaverton-or-site-development-permits,OR,Plans and Documents Review OTA,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,28
+beaverton-or-site-development-permits,OR,Security Determination,Proposed,proposed,per_record,undetermined,receipt,R07 void / revoked / aborted / abandoned / terminated / rescinded / vacated / dismissed (D8),16
+beaverton-or-site-development-permits,OR,Security Determination OTA,Proposed,proposed,per_record,undetermined,receipt,R07 void / revoked / aborted / abandoned / terminated / rescinded / vacated / dismissed (D8),1
+beaverton-or-site-development-permits,OR,Site Inspection,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,136
+beaverton-or-site-development-permits,OR,Substantial Completion,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",7
+bellevue-permits,WA,Completeness Check,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,17
+bellevue-permits,WA,Incomplete,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+bellevue-permits,WA,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",209
+bellevue-permits,WA,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,52
+bellevue-permits,WA,Ready to Issue,Proposed,proposed,approved,active,,R15 permit approved or issued,4
+bellevue-permits,WA,Screening,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,32
+bellingham-trakit-permits,WA,AMENDMENT IN REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+bellingham-trakit-permits,WA,APPLIED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,4
+bellingham-trakit-permits,WA,FINALED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",54
+bellingham-trakit-permits,WA,IN REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,53
+bellingham-trakit-permits,WA,INCOMPLETE,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+bellingham-trakit-permits,WA,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,155
+bellingham-trakit-permits,WA,READY TO ISSUE,Proposed,proposed,approved,active,,R15 permit approved or issued,31
+bellingham-trakit-permits,WA,REQUEST FOR INFO,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,80
+bend-or-permit-applications,OR,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),4731
+bend-or-permit-applications,OR,Intake Pre-Screen,Proposed,proposed,per_record,per_record,per_record,R10 pre-application / consultation (D1),2
+bend-or-permit-applications,OR,Issued,Approved,approved,approved,active,,R15 permit approved or issued,13
+bend-or-permit-applications,OR,Permit(s) Issued,Approved,approved,approved,active,,R15 permit approved or issued,3054
+bend-or-permit-applications,OR,Preparing for Issuance,Approved,approved,approved,active,,R15 permit approved or issued,6
+bend-or-permit-applications,OR,Revision Correction,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,37
+bend-or-permit-applications,OR,Revision Submittals Incomplete,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+bend-or-permit-applications,OR,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,32
+bentonville-catalyst-permits,AR,APPROVED,Proposed,proposed,approved,active,,R15 permit approved or issued,48
+bentonville-catalyst-permits,AR,CLOSED,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),65
+bentonville-catalyst-permits,AR,CO ISSUED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3725
+bentonville-catalyst-permits,AR,FINALED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",19256
+bentonville-catalyst-permits,AR,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,8841
+bentonville-catalyst-permits,AR,RECEIVED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,9
+bismarck-building-permits,ND,APPROVED,Approved,approved,approved,active,,R15 permit approved or issued,30
+bismarck-building-permits,ND,CLOSED,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),6
+bismarck-building-permits,ND,DENIED,Decided,proposed,per_record,inactive,,R04 denied / disapproved,1
+bismarck-building-permits,ND,FINALED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",223
+bismarck-building-permits,ND,FINALED WITH CO,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",39
+bismarck-building-permits,ND,FINALED WITH TEMP CO,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+bismarck-building-permits,ND,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,483
+bismarck-building-permits,ND,RECEIVED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,93
+bismarck-building-permits,ND,SUBMITTED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,42
+bismarck-building-permits,ND,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,64
+bismarck-building-permits,ND,WITHDRAWN,Decided,proposed,per_record,inactive,,R03 withdrawn,28
+boone-county-ky-planning-board-actions,multi-state,APPROVAL,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,735
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 1 CONDITION,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,369
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 1 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,1
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 10 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,10
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 11 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,7
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 12 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 13 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,4
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 14 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 15 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 17 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 2 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,188
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 2 CONSITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,1
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 3 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,126
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 4 CONDITION,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,1
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 4 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,81
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 5 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,55
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 6 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,42
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 7 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,35
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 8 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,19
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH 9 CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,17
+boone-county-ky-planning-board-actions,multi-state,APPROVAL WITH CONDITIONS,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,20
+boone-county-ky-planning-board-actions,multi-state,DENIED,Decided,proposed,per_record,inactive,,R04 denied / disapproved,4
+boone-county-ky-planning-board-actions,multi-state,DISAPPROVAL,Decided,proposed,per_record,inactive,,R04 denied / disapproved,185
+boone-county-ky-planning-board-actions,multi-state,WITHDRAWN,Decided,proposed,per_record,inactive,,R03 withdrawn,20
+boston-approved-building-permits,MA,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),762
+boston-approved-building-permits,MA,Open,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1629
+boulder-construction-permits,CO,Certificate of Occupancy,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",5
+boulder-construction-permits,CO,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,145
+boulder-construction-permits,CO,Issued,Approved,approved,approved,active,,R15 permit approved or issued,447
+boulder-construction-permits,CO,Letter of Completion,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",338
+boulder-construction-permits,CO,Payment Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,52
+boulder-construction-permits,CO,Pending at Applicant,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,57
+boulder-construction-permits,CO,Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,40
+boulder-construction-permits,CO,Received - Online,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+boulder-construction-permits,CO,Revisions - Resubmit,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,108
+boulder-construction-permits,CO,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,13
+bozeman-building-permits,MT,Final Inspection Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",132
+bozeman-building-permits,MT,Permit Printed,Approved,approved,per_record,undetermined,review,R99 no rule matched,800
+bozeman-building-permits,MT,To Be Issued,Proposed,proposed,approved,active,,R15 permit approved or issued,226
+brunswick-county-permits,NC,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",110389
+brunswick-county-permits,NC,Corrective Action,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,8
+brunswick-county-permits,NC,Current,Approved,approved,per_record,undetermined,review,R99 no rule matched,43365
+brunswick-county-permits,NC,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,82
+buffalo-building-permits,NY,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",638
+burlington-vt-building-permits,VT,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),8485
+burlington-vt-building-permits,VT,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",9039
+burlington-vt-zoning-permits,VT,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),2574
+burlington-vt-zoning-permits,VT,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",2869
+butler-county-ks-permits,KS,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),70
+butler-county-ks-permits,KS,Completed (Cert. of Completion),Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",16
+butler-county-ks-permits,KS,Completed (Cert. of Occupancy),Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",39
+butler-county-ks-permits,KS,Final Inspection,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",497
+butler-county-ks-permits,KS,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,6
+butler-county-ks-permits,KS,In Review/Requested Info,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,28
+butler-county-ks-permits,KS,Inspector Review,Proposed,proposed,approved,active,review,"R14b inspection pending or required (issued, work not shown to have started)",58
+butler-county-ks-permits,KS,Issued,Approved,approved,approved,active,,R15 permit approved or issued,695
+butler-county-ks-permits,KS,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,254
+caltrans-sb1-projects,CA,In Progress,Approved,approved,per_record,undetermined,review,R99 no rule matched,7460
+caltrans-sb1-projects,CA,Planned,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,3340
+cambridge-building-permits-addition-alteration,MA,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",10607
+cambridge-building-permits-addition-alteration,MA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3092
+cambridge-building-permits-new-construction,MA,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",713
+cambridge-demolition-permits,MA,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",761
+cambridge-demolition-permits,MA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",130
+canyon-county-building-permits,ID,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1498
+canyon-county-building-permits,ID,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),4047
+canyon-county-building-permits,ID,WithDrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,82
+casa-grande-active-development-sites,AZ,Building / Construction Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,16
+casa-grande-active-development-sites,AZ,Construction Complete,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),4
+casa-grande-active-development-sites,AZ,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,15
+casa-grande-active-development-sites,AZ,Permit Issued / Construction Started,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,29
+casa-grande-active-development-sites,AZ,Site Plan Approved,Proposed,proposed,approved,active,,R16 entitlement approved / recorded / in force,21
+centre-county-pa-building-permits,PA,C,Operating,operating,per_record,undetermined,receipt,R02 opaque code (D8),6393
+centre-county-pa-building-permits,PA,O,Approved,approved,per_record,undetermined,receipt,R02 opaque code (D8),1867
+champaign-il-special-use-permits,IL,Conforming,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,255
+charleston-county-permits,SC,operating,Operating,operating,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",36773
+charlotte-land-dev-commercial-projects,NC,Approval Pending Payment,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,64
+charlotte-land-dev-commercial-projects,NC,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,7778
+charlotte-land-dev-commercial-projects,NC,Awaiting Plans,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,4
+charlotte-land-dev-commercial-projects,NC,Complete,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),5759
+charlotte-land-dev-commercial-projects,NC,Construction Completed,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),1141
+charlotte-land-dev-commercial-projects,NC,DONE,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),6
+charlotte-land-dev-commercial-projects,NC,In Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1011
+charlotte-land-dev-commercial-projects,NC,In Progress,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1770
+charlotte-land-dev-commercial-projects,NC,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,10
+charlotte-land-dev-commercial-projects,NC,OPEN,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",5
+charlotte-land-dev-commercial-projects,NC,Pending Additional Information,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,37
+charlotte-land-dev-commercial-projects,NC,Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,543
+charlotte-land-dev-commercial-projects,NC,Revisions Needed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,88
+charlotte-land-dev-commercial-projects,NC,Scheduled,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2035
+charlotte-land-dev-commercial-projects,NC,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,1829
+chattanooga-building-permits,TN,Issued,Approved,approved,approved,active,,R15 permit approved or issued,15026
+chattanooga-permits-archive,TN,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",26915
+chester-county-pa-act247-plans,PA,Submitted for county review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,2451
+chicago-building-permits,multi-state,ACTIVE,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",83343
+chicago-building-permits,multi-state,COMPLETE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",12619
+chicago-building-permits,multi-state,PHASED PERMITTING,Approved,approved,per_record,undetermined,review,R99 no rule matched,361
+cincinnati-building-permits,OH,Application Accepted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,385
+cincinnati-building-permits,OH,Approved,Proposed,proposed,approved,active,,R15 permit approved or issued,2
+cincinnati-building-permits,OH,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,446
+cincinnati-building-permits,OH,Permit Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",523
+cincinnati-building-permits,OH,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,1489
+cincinnati-building-permits,OH,Permit Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,22
+city-of-orange-active-planning-projects,CA,Active planning project,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1012
+clark-county-active-dev-permits,WA,Decision - Approved,Approved,approved,approved,active,,R15 permit approved or issued,54
+clark-county-active-dev-permits,WA,Findings,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,45
+clark-county-active-dev-permits,WA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,36
+clark-county-active-projects,NV,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,431
+clark-county-active-projects,NV,Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,449
+clarksville-montgomery-final-subdivisions,TN,APPROVED,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,36
+clarksville-montgomery-preliminary-subdivisions,TN,APPROVED,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,20
+cleveland-issued-building-permits,OH,Issued,Approved,approved,approved,active,,R15 permit approved or issued,86096
+clv-planning-cases,NV,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2502
+coconino-county-permits,AZ,1. PENDING,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,23
+coconino-county-permits,AZ,1. PENDING - INCOMPLETE APPLICATION,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,22
+coconino-county-permits,AZ,2. ADMINISTRATIVELY COMPLETE - INITIAL REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,87
+coconino-county-permits,AZ,2. RESUBMITTED - RESUB REVIEW,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,31
+coconino-county-permits,AZ,2. RFAI - WAITING FOR CUSTOMER,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,216
+coconino-county-permits,AZ,2. UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,13
+coconino-county-permits,AZ,3. ACTION NEEDED - CONTRACTOR,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+coconino-county-permits,AZ,4. READY,Approved,approved,per_record,undetermined,review,R99 no rule matched,4
+coconino-county-permits,AZ,4. READY TO ISSUE - FEES DUE,Approved,approved,approved,active,,R15 permit approved or issued,22
+coconino-county-permits,AZ,4. READY TO ISSUE - REVIEW COMPLETE,Approved,approved,approved,active,,R15 permit approved or issued,31
+coconino-county-permits,AZ,5. ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,564
+coconino-county-permits,AZ,5. RE-ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,15
+coconino-county-permits,AZ,6. FINALED - ALL APPLICABLE INSPECTIONS COMPLETE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",38
+coconino-county-permits,AZ,6. FINALED - NEEDS CUSTOMER'S FINAL DOCUMENTS,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+coconino-county-permits,AZ,7. CLOSED,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),850
+coconino-county-permits,AZ,WITHDRAWN,Decided,proposed,per_record,inactive,,R03 withdrawn,1
+colorado-springs-planning-applications,CO,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2870
+colorado-springs-planning-applications,CO,Corrections Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,479
+colorado-springs-planning-applications,CO,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,58
+colorado-springs-planning-applications,CO,Documents Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,104
+colorado-springs-planning-applications,CO,Hearing Scheduled,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+colorado-springs-planning-applications,CO,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,473
+colorado-springs-planning-applications,CO,Project Routing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,14
+colorado-springs-planning-applications,CO,Responses Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,22
+columbia-mo-capital-projects,MO,Bid,Approved,approved,per_record,undetermined,review,R99 no rule matched,22
+columbia-mo-capital-projects,MO,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,142
+columbia-mo-capital-projects,MO,Final Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,76
+columbia-mo-capital-projects,MO,In Service,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",53
+columbia-mo-capital-projects,MO,On-going,Approved,approved,per_record,undetermined,review,R99 no rule matched,274
+columbia-mo-capital-projects,MO,Preliminary Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,185
+columbia-mo-capital-projects,MO,Proposed,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,639
+columbia-mo-capital-projects,MO,Ready to Close,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),48
+columbia-mo-permits,MO,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",5
+columbia-mo-permits,MO,Approved,Proposed,proposed,approved,active,,R15 permit approved or issued,25
+columbia-mo-permits,MO,Certificate Of Occupancy,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",556
+columbia-mo-permits,MO,Certificate of Occupancy (Temporary),Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",6
+columbia-mo-permits,MO,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),1012
+columbia-mo-permits,MO,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3691
+columbia-mo-permits,MO,Created (Sub-Permit),Approved,approved,per_record,undetermined,review,R99 no rule matched,1167
+columbia-mo-permits,MO,Issued,Approved,approved,approved,active,,R15 permit approved or issued,3481
+columbia-mo-permits,MO,Plan Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+columbia-mo-permits,MO,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,7
+columbia-mo-permits,MO,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,54
+columbus-building-permits,OH,Certificate of Occupancy Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",264
+columbus-building-permits,OH,Final Inspection Approved,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",5252
+columbus-building-permits,OH,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,9924
+cook-county-il-highway-construction-program,IL,In the 2026 county construction program,Approved,approved,proposed,active,review,R12 programmed / planned / funded transport or capital work,459
+ctdot-project-work-areas,CT,01_Planning,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1452
+ctdot-project-work-areas,CT,02_Pre-Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,60
+ctdot-project-work-areas,CT,03_Final-Design,Approved,approved,proposed,active,review,R12 programmed / planned / funded transport or capital work,941
+ctdot-project-work-areas,CT,04_Contract-Processing,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,147
+ctdot-project-work-areas,CT,05_Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,3908
+ctdot-project-work-areas,CT,05_Construction (Pending),Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,67
+ctdot-project-work-areas,CT,06_Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3114
+ctdot-project-work-areas,CT,06_Completed (Closed),Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",10505
+ctdot-project-work-areas,CT,Construction (Missing Dates),Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,2918
+dallas-specific-use-permits,TX,In Force,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,1407
+dallas-specific-use-permits,TX,In force,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,15878
+dallas-specific-use-permits,TX,Permanent,Operating,operating,approved,active,review,R16 entitlement approved / recorded / in force,13889
+dekalb-county-building-permits,GA,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),165902
+dekalb-county-building-permits,GA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,124573
+dekalb-county-building-permits,GA,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1039
+delaware-county-pa-subdivisions-land-developments,PA,Submitted for county review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,5504
+denton-city-projects-annexation,TX,PUBLIC HEARING/MEETI,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+denton-city-projects-annexation,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,16
+denton-city-projects-decided,TX,APPROVED,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,149
+denton-city-projects-decided,TX,APPROVED W/CONDITION,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,12
+denton-city-projects-decided,TX,DENIED,Decided,proposed,per_record,inactive,,R04 denied / disapproved,32
+denton-city-projects-decided,TX,FILED,Approved,approved,proposed,active,review,R17 filed / submitted / received / intake,163
+denton-city-projects-decided,TX,WITHDRAWN,Decided,proposed,per_record,inactive,,R03 withdrawn,11
+denton-city-projects-planned-development,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,22
+denton-city-projects-site-plan,TX,RESUBMIT,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+denton-city-projects-site-plan,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,11
+denton-city-projects-specific-use,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,43
+denton-city-projects-subdivision,TX,EXTENSION 30,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,25
+denton-city-projects-subdivision,TX,SUBMITTED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+denton-city-projects-subdivision,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,16
+denton-city-projects-zoning,TX,PUBLIC HEARING/MEETI,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,8
+denton-city-projects-zoning,TX,RESUBMIT,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,16
+denton-city-projects-zoning,TX,SUBMITTED,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,5
+denton-city-projects-zoning,TX,UNDER REVIEW,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,22
+denver-commercial-construction-permits,CO,Addition,Approved,approved,per_record,undetermined,review,R99 no rule matched,141
+denver-commercial-construction-permits,CO,Alteration/Tenant Finish,Approved,approved,per_record,undetermined,review,R99 no rule matched,12571
+denver-commercial-construction-permits,CO,Foundation Only/Excavation,Approved,approved,per_record,undetermined,review,R99 no rule matched,38
+denver-commercial-construction-permits,CO,New Building,Approved,approved,per_record,undetermined,review,R99 no rule matched,607
+denver-commercial-construction-permits,CO,New Non-Building Structure,Approved,approved,per_record,undetermined,review,"R02b negated wording (""Not Issued"", ""Not Applicable"")",323
+denver-commercial-construction-permits,CO,Phased Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,59
+denver-residential-construction-permits,CO,Addition,Approved,approved,per_record,undetermined,review,R99 no rule matched,3017
+denver-residential-construction-permits,CO,Foundation Only/Excavation,Approved,approved,per_record,undetermined,review,R99 no rule matched,73
+denver-residential-construction-permits,CO,New Building,Approved,approved,per_record,undetermined,review,R99 no rule matched,6618
+denver-residential-construction-permits,CO,New Non-Building Structure,Approved,approved,per_record,undetermined,review,"R02b negated wording (""Not Issued"", ""Not Applicable"")",746
+denver-residential-construction-permits,CO,Phased Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,2377
+desoto-county-permits,MS,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",7230
+detroit-building-permits,MI,Issued,Approved,approved,approved,active,,R15 permit approved or issued,5885
+detroit-demolition-permits,MI,Issued,Approved,approved,approved,active,,R15 permit approved or issued,563
+detroit-trades-permits,MI,Issued,Approved,approved,approved,active,,R15 permit approved or issued,15508
+douglas-county-co-permits,CO,COMP,Operating,operating,per_record,undetermined,review,R99 no rule matched,1311
+douglas-county-co-permits,CO,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,1364
+durham-building-permits,NC,CO Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",25607
+durham-building-permits,NC,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",7
+durham-building-permits,NC,Cond. CO Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",219
+durham-building-permits,NC,Issued,Approved,approved,approved,active,,R15 permit approved or issued,15843
+durham-building-permits,NC,Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,3
+east-baton-rouge-building-permits,LA,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",1281
+el-paso-new-residential-permits,TX,Issued,Approved,approved,approved,active,,R15 permit approved or issued,4203
+eugene-or-current-capital-projects,OR,current,Approved,approved,per_record,undetermined,review,R99 no rule matched,82
+fairfax-active-site-construction,VA,Approved,Approved,approved,approved,active,,R15 permit approved or issued,4639
+fairfax-active-site-construction,VA,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),39
+fairfax-active-site-construction,VA,Revised,Approved,approved,per_record,undetermined,review,R99 no rule matched,3322
+fairfax-recent-building-permits,VA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,18988
+fairfax-recent-building-permits,VA,Issued - Amendment Pending,Approved,approved,approved,active,,R15 permit approved or issued,536
+fdot-active-construction-projects,FL,approved,Approved,approved,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",4394
+flathead-county-building-permits,MT,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",316
+forsyth-county-ga-building-permits,GA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",48
+forsyth-county-ga-building-permits,GA,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+forsyth-county-ga-building-permits,GA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+forsyth-county-ga-building-permits,GA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2257
+forsyth-county-ga-building-permits,GA,Released to Planning - Revision Requested,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1
+forsyth-county-ga-building-permits,GA,Revision In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+forsyth-county-ga-building-permits,GA,Revision Requested,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+fort-collins-building-permits,CO,Applied,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,6
+fort-collins-building-permits,CO,Issued Full,Approved,approved,approved,active,,R15 permit approved or issued,406
+fort-collins-building-permits,CO,Issued TCO,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",129
+fort-collins-building-permits,CO,Plan Check Fee Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+fort-collins-building-permits,CO,Re-Issued Full,Approved,approved,approved,active,,R15 permit approved or issued,22
+fort-collins-building-permits,CO,Ready to Issue,Proposed,proposed,approved,active,,R15 permit approved or issued,23
+fort-collins-building-permits,CO,Resubmittal Requested,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,21
+fort-collins-building-permits,CO,Routed for Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,90
+fort-worth-development-permits,TX,Accepted,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,47
+fort-worth-development-permits,TX,Administrative Approval,Approved,approved,approved,active,,R15 permit approved or issued,5
+fort-worth-development-permits,TX,Approved,Approved,approved,approved,active,,R15 permit approved or issued,283
+fort-worth-development-permits,TX,Awaiting Client Reply,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,970
+fort-worth-development-permits,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,1
+fort-worth-development-permits,TX,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",5915
+fort-worth-development-permits,TX,Incomplete Submittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,220
+fort-worth-development-permits,TX,Issued,Approved,approved,approved,active,,R15 permit approved or issued,5141
+fort-worth-development-permits,TX,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,540
+fort-worth-development-permits,TX,Pending HCLC Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+fort-worth-development-permits,TX,Plan Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,484
+fort-worth-development-permits,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,115
+fort-worth-zoning-cases,TX,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,325
+fort-worth-zoning-cases,TX,Approved as amended,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,6
+fort-worth-zoning-cases,TX,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,76
+fort-worth-zoning-cases,TX,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,34
+frisco-active-building-permits,TX,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,809
+georgia-dot-gpas-projects,GA,Construction Work Program,Approved,approved,proposed,active,review,R12 programmed / planned / funded transport or capital work,2873
+georgia-dot-gpas-projects,GA,Long Range Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,354
+georgia-dot-gpas-projects,GA,Rejected,Decided,proposed,per_record,inactive,,R04 denied / disapproved,7
+georgia-dot-gpas-projects,GA,Under Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,1001
+gilbert-energov-permits,AZ,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",219
+gilbert-energov-permits,AZ,Finaled  No Inspection Req'd,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",26
+gilbert-energov-permits,AZ,Issued,Approved,approved,approved,active,,R15 permit approved or issued,672
+hartford-building-permits,CT,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),437
+hartford-building-permits,CT,Closed - Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",27
+hartford-building-permits,CT,Closed - Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,5
+hartford-building-permits,CT,Closed - Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,15
+hartford-building-permits,CT,Final Inspection Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",635
+hartford-building-permits,CT,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+hartford-building-permits,CT,Inspection Phase,Proposed,proposed,approved,active,,R14 construction under way / inspections / awarded or advertised contract,4
+hartford-building-permits,CT,Inspection in Progress,Proposed,proposed,approved,active,,R14 construction under way / inspections / awarded or advertised contract,2
+hartford-building-permits,CT,Inspections In Progress,Proposed,proposed,approved,active,review,"R14b inspection pending or required (issued, work not shown to have started)",17
+hartford-building-permits,CT,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2614
+hdot-active-design-projects,HI,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,710
+hdot-active-design-projects,HI,Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,924
+hdot-active-design-projects,HI,Planning,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,193
+hdot-active-design-projects,HI,Right of Way,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,21
+henderson-commercial-permits,NV,Active - Issued,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,774
+henderson-commercial-permits,NV,Done,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2966
+henderson-commercial-permits,NV,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,660
+henderson-residential-permits,NV,Active - Issued,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,2253
+henderson-residential-permits,NV,Awaiting Final Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+henderson-residential-permits,NV,Done,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",9043
+henderson-residential-permits,NV,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,417
+huntsville-building-permits,AL,operating,Operating,operating,unmatched,unmatched,unmatched,,93411
+idot-annual-program-bridges,IL,Proposed Improvement,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,5749
+idot-annual-program-construction,IL,Proposed Improvement,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2066
+independence-twp-construction-permits,MI,FINALED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1777
+independence-twp-construction-permits,MI,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,833
+indot-spms-active-projects,IN,Const,Approved,approved,per_record,undetermined,review,R99 no rule matched,368
+indot-spms-active-projects,IN,Let,Approved,approved,per_record,undetermined,review,R99 no rule matched,67
+indot-spms-active-projects,IN,Plan,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,2032
+iowa-dot-bid-projects,IA,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,167
+iowa-dot-bid-projects,IA,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",56
+iowa-dot-bid-projects-lines,IA,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,57
+iowa-dot-bid-projects-lines,IA,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",55
+iowa-dot-five-year-program,IA,Programmed in the Iowa DOT 2027-2031 Five Year Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,468
+irving-development-permits,TX,APPLICATION,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,176
+irving-development-permits,TX,APPROVED,Approved,approved,approved,active,,R15 permit approved or issued,3
+irving-development-permits,TX,FINALED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",352
+irving-development-permits,TX,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,6
+irving-development-permits,TX,UNDER CONSTRUCTION,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,317
+itd-itip-projects,ID,Programmed in the Idaho Transportation Investment Program (FY2027–2033),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,291
+itd-itip-projects-lines,ID,Programmed in the Idaho Transportation Investment Program (FY2027–2033),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,376
+jackson-county-or-building-permits,OR,Approved,Approved,approved,approved,active,,R15 permit approved or issued,7532
+jackson-county-or-building-permits,OR,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1412
+jackson-county-or-building-permits,OR,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,632
+jackson-county-or-land-use-permits,OR,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,2923
+jackson-county-or-land-use-permits,OR,Denial,Decided,proposed,per_record,undetermined,review,R99 no rule matched,33
+jackson-county-or-land-use-permits,OR,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,888
+jackson-county-or-land-use-permits,OR,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,91
+johns-creek-building-permits,GA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3575
+johns-creek-building-permits,GA,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+johns-creek-building-permits,GA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,898
+kcmo-building-permits,MO,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),445
+kcmo-building-permits,MO,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2094
+kcmo-building-permits,MO,Open-Active,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,12
+kcmo-building-permits,MO,Ready For Issuance,Approved,approved,approved,active,,R15 permit approved or issued,4
+kcmo-development-cases,MO,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,5832
+kcmo-development-cases,MO,Approved Subject to Conditions,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,5584
+kcmo-development-cases,MO,Continued off-Docket,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,193
+kcmo-development-cases,MO,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,727
+kcmo-development-cases,MO,Recorded,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,470
+kcmo-development-cases,MO,Released,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,29
+kcmo-development-cases,MO,To BZA,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,11
+kcmo-development-cases,MO,To CPC,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,27
+kcmo-development-cases,MO,To Council,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,182
+kcmo-development-cases,MO,Under Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1007
+kdot-wincpms-project-locations,KS,ACTIV,Approved,approved,per_record,undetermined,review,R99 no rule matched,1172
+kdot-wincpms-project-locations,KS,CLOSE,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),371
+kdot-wincpms-project-locations,KS,COMPL,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",906
+kdot-wincpms-project-locations,KS,PLAN,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,18
+kent-county-de-building-permits,multi-state,Closed (Project Complete),Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",116
+kent-county-de-building-permits,multi-state,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,1590
+kent-county-de-building-permits,multi-state,Withdrawn by Applicant,Decided,proposed,per_record,inactive,,R03 withdrawn,2
+kenton-county-devtracking-permits,KY,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",218
+kenton-county-devtracking-permits,KY,Underway,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,155
+knoxville-building-permits,TN,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",6698
+kytc-syp-highway-plan,KY,A,Proposed,proposed,per_record,undetermined,receipt,R02 opaque code (D8),63
+kytc-syp-highway-plan,KY,AUTHORIZED A,Approved,approved,per_record,undetermined,review,R99 no rule matched,47
+kytc-syp-highway-plan,KY,AWARDED A,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,3
+kytc-syp-highway-plan,KY,AWARDED I,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,67
+kytc-syp-highway-plan,KY,ESTIMATED A,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1409
+kytc-syp-highway-plan,KY,ESTIMATED I,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,13
+kytc-syp-highway-plan,KY,ESTIMATED TentativeLetting,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,26
+kytc-syp-highway-plan,KY,REESTIMATED A,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,5
+lake-county-il-construction-program,IL,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",3
+lake-county-il-construction-program,IL,Planned,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,77
+lee-county-fl-development-orders,FL,Closed-Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,67
+lee-county-fl-development-orders,FL,Closed-Finaled,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),2556
+lee-county-fl-development-orders,FL,Closed-Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,378
+lee-county-fl-development-orders,FL,Documents Uploaded,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,7
+lee-county-fl-development-orders,FL,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,186
+lee-county-fl-development-orders,FL,Issued,Approved,approved,per_record,undetermined,review,R99 no rule matched,1859
+lee-county-fl-development-orders,FL,Issued-Extension Pending,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,10
+lee-county-fl-development-orders,FL,Payment Required,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,10
+lee-county-fl-development-orders,FL,Pending CC Issuance,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,1
+lee-county-fl-development-orders,FL,Waiting on Applicant,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,276
+lexington-row-permits,KY,Approved,Approved,approved,approved,active,,R15 permit approved or issued,2226
+lexington-row-permits,KY,Initiated,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2298
+lexington-row-permits,KY,Partially Completed,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4017
+lincoln-residential-new-construction-permits,NE,C of O Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2343
+lincoln-residential-new-construction-permits,NE,Issued,Approved,approved,approved,active,,R15 permit approved or issued,267
+little-rock-permits,AR,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),34731
+little-rock-permits,AR,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",14783
+loudoun-county-residential-permits,VA,operating,Operating,operating,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",45618
+louisville-active-construction-permits,KY,Issued,Approved,approved,approved,active,,R15 permit approved or issued,13631
+madison-planning-projects,WI,Additional Info Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+madison-planning-projects,WI,Application Under Review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,87
+madison-planning-projects,WI,"Approval Granted, Completed",Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),30
+madison-planning-projects,WI,Approved Preliminary Plat,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,23
+madison-planning-projects,WI,Approved and Recorded,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,96
+madison-planning-projects,WI,"Approved, Constructed",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",5
+madison-planning-projects,WI,"Approved, Demolished",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",8
+madison-planning-projects,WI,"Approved, Final Review Pending",Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,422
+madison-planning-projects,WI,"Approved, Under Final Review",Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,405
+madison-planning-projects,WI,Final Approval Granted,Approved,approved,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),695
+madison-planning-projects,WI,In Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,121
+madison-planning-projects,WI,Recorded,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,448
+madison-planning-projects,WI,Waiting for Fees,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,6
+maine-dot-public-projects,ME,2 - Design/Permitting Phase,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,308
+maine-dot-public-projects-lines,ME,2 - Design/Permitting Phase,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,311
+marin-county-building-permits,CA,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",706
+massdot-highway-projects,MA,COMPLETE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",24478
+massdot-highway-projects,MA,CONSTRUCTION,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,9278
+massdot-highway-projects,MA,DESIGN,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,58775
+mdot-sha-project-portal,MD,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,543
+mdot-sha-project-portal,MD,Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,324
+mdot-sha-project-portal,MD,Planning,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,19
+mdot-stip-projects,MI,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",3027
+mdot-stip-projects,MI,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",29
+mdot-stip-projects,MI,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,4283
+memphis-dpd-building-permits,TN,Issued,Approved,approved,approved,active,,R15 permit approved or issued,47487
+mesa-building-permits,AZ,C of C Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",625
+mesa-building-permits,AZ,C of O Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",541
+mesa-building-permits,AZ,Fees Paid,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,3
+mesa-building-permits,AZ,Finaled - C of C Required,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",7
+mesa-building-permits,AZ,Finaled – C of C Required,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",11
+mesa-building-permits,AZ,Finaled – C of O Required,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+mesa-building-permits,AZ,Issued,Approved,approved,approved,active,,R15 permit approved or issued,1771
+mesa-building-permits,AZ,Temporary C of O,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",7
+miami-building-permits,FL,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",20869
+miami-building-permits,FL,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",14839
+minneapolis-ccs-permits,MN,Issued,Approved,approved,approved,active,,R15 permit approved or issued,47950
+minneapolis-ccs-permits,MN,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",11
+missoula-addresses-with-permits,MT,Approved,Proposed,proposed,approved,active,,R15 permit approved or issued,1421
+missoula-addresses-with-permits,MT,Asphalt Warranty,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1820
+missoula-addresses-with-permits,MT,C of O,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",530
+missoula-addresses-with-permits,MT,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),3409
+missoula-addresses-with-permits,MT,Drawing,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,26
+missoula-addresses-with-permits,MT,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",34989
+missoula-addresses-with-permits,MT,Inspections Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4896
+missoula-addresses-with-permits,MT,Issued,Approved,approved,approved,active,,R15 permit approved or issued,16434
+missoula-addresses-with-permits,MT,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",5484
+missoula-addresses-with-permits,MT,Temporary C of O,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",15
+missoula-addresses-with-permits,MT,Waiting ACA Issuance,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,670
+missoula-addresses-with-permits,MT,Waiting Review Fee,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,65
+mndot-chip-roadway-projects,MN,Planned,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,367
+mndot-stip-roadway-projects,MN,Programmed,Approved,approved,proposed,active,review,R12 programmed / planned / funded transport or capital work,874
+modot-stip-locations-accepted,MO,ACCEPTED,Approved,approved,per_record,undetermined,review,R99 no rule matched,1611
+modot-stip-locations-accepted,MO,ONEDOT APPROVED,Approved,approved,approved,active,,R15 permit approved or issued,81
+montgomery-county-commercial-permits,MD,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",191
+montgomery-county-commercial-permits,MD,Issued,Approved,approved,approved,active,,R15 permit approved or issued,545
+montgomery-county-commercial-permits,MD,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",536
+montgomery-county-demolition-permits,MD,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",28
+montgomery-county-demolition-permits,MD,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",82
+montgomery-county-demolition-permits,MD,Issued,Approved,approved,approved,active,,R15 permit approved or issued,69
+montgomery-county-demolition-permits,MD,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",108
+montgomery-county-pa-act247-proposals,PA,Submitted for county review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,6052
+montgomery-county-residential-permits,MD,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2486
+montgomery-county-residential-permits,MD,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2523
+montgomery-county-residential-permits,MD,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1244
+mt-mdt-stip-lines,MT,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,202
+murfreesboro-building-permits,TN,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2458
+naperville-building-permits,IL,COMPLETE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",411
+naperville-building-permits,IL,FEES DUE,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,11
+naperville-building-permits,IL,FEES PAID,Approved,approved,per_record,undetermined,review,R99 no rule matched,4
+naperville-building-permits,IL,FINAL INSPECTION PASSED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+naperville-building-permits,IL,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,621
+nashville-building-permits-issued,TN,Issued,Approved,approved,approved,active,,R15 permit approved or issued,8864
+ncdot-stip-projects-lines,NC,Programmed in the NCDOT 2026-2035 State Transportation Improvement Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,794
+ncdot-stip-projects-points,NC,Programmed in the NCDOT 2026-2035 State Transportation Improvement Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,516
+nddot-special-road-fund-projects,ND,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,7
+ndot-program-book-points,NE,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,320
+ndot-program-book-segments,NE,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,459
+new-castle-county-permits,multi-state,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",11372
+new-hanover-county-building-permits,NC,Awaiting Payment,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+new-hanover-county-building-permits,NC,Certificate Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,13
+new-hanover-county-building-permits,NC,Certificate of Compliance (CC) Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2263
+new-hanover-county-building-permits,NC,Certificate of Occupancy (CO) Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2075
+new-hanover-county-building-permits,NC,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",24369
+new-hanover-county-building-permits,NC,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,54
+new-hanover-county-building-permits,NC,Issued,Approved,approved,approved,active,,R15 permit approved or issued,8381
+new-hanover-county-building-permits,NC,Partial Certificate of Compliance (PCC) Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3
+new-hanover-county-building-permits,NC,Partial Certificate of Occupancy (PCO) Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+new-hanover-county-building-permits,NC,Review Approved,Proposed,proposed,approved,active,,R15 permit approved or issued,1
+new-hanover-county-building-permits,NC,Temporary Certificate of Occupancy (TCO) Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4
+new-hanover-county-building-permits,NC,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,431
+new-orleans-permits,LA,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2107
+new-orleans-permits,LA,Inspection Required,Proposed,proposed,approved,active,review,"R14b inspection pending or required (issued, work not shown to have started)",4
+new-orleans-permits,LA,Inspections Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",72
+new-orleans-permits,LA,Permit Approved,Approved,approved,approved,active,,R15 permit approved or issued,33
+new-orleans-permits,LA,Permit Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,2
+new-orleans-permits,LA,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,8924
+new-orleans-permits,LA,Plan Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,11
+new-orleans-permits,LA,Plan Review Deficiencies,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+new-orleans-permits,LA,Sub-Permits Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",33
+new-orleans-permits,LA,Sub-Permits Issued,Approved,approved,approved,active,,R15 permit approved or issued,30
+new-orleans-permits,LA,Temporary Certificate of Occupancy,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",55
+new-orleans-permits,LA,Zoning Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+nhdot-ten-year-plan-projects,NH,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",325
+nhdot-ten-year-plan-projects,NH,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,88
+nhdot-ten-year-plan-projects,NH,Design,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,168
+nhdot-ten-year-plan-projects,NH,Planning,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,153
+nj-stip-projects,NJ,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,815
+nvdot-project-boundaries,NV,operating,Operating,operating,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",2928
+nyc-dob-permit-issuance,NY,ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,14583
+nyc-dob-permit-issuance,NY,RE-ISSUED,Approved,approved,approved,active,,R15 permit approved or issued,283
+nyc-dobnow-approved-permits,NY,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,54050
+nyc-dobnow-approved-permits,NY,Signed-off,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",13338
+nysdot-capital-program-projects,NY,Capital Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,17363
+nysdot-capital-program-projects-2,NY,Capital Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,13431
+nysdot-capital-program-projects-3,NY,Capital Program,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2694
+odot-current-projects,OH,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,580
+odot-current-projects,OH,Filed,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,2
+odot-current-projects-lines,OH,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,2390
+odot-current-projects-lines,OH,Filed,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,7
+okdot-workplan-roadways,OK,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1115
+oregon-dot-stip-projects,OR,Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,337
+oregon-dot-stip-projects-lines,OR,Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,577
+overland-park-building-permits,KS,Complete/Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",117366
+overland-park-building-permits,KS,Issued,Approved,approved,approved,active,,R15 permit approved or issued,47397
+overland-park-building-permits,KS,TCO,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",606
+penndot-transportation-projects,PA,FUTURE DEVELOPMENT,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,10994
+penndot-transportation-projects,PA,IN DEVELOPMENT,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,13621
+penndot-transportation-projects,PA,UNDER CONSTRUCTION,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,27115
+peoria-az-building-permits,AZ,ACA App,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,9
+peoria-az-building-permits,AZ,Admin Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,34
+peoria-az-building-permits,AZ,Admin Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,50
+peoria-az-building-permits,AZ,Applicant Contacted,Proposed,proposed,per_record,per_record,per_record,R10 pre-application / consultation (D1),203
+peoria-az-building-permits,AZ,Approved,Approved,approved,approved,active,,R15 permit approved or issued,58
+peoria-az-building-permits,AZ,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1660
+peoria-az-building-permits,AZ,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,129
+peoria-az-building-permits,AZ,In Revision,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+peoria-az-building-permits,AZ,Incomplete Submittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,121
+peoria-az-building-permits,AZ,Inspection Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2
+peoria-az-building-permits,AZ,Payment Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,52
+peoria-az-building-permits,AZ,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,7
+peoria-az-building-permits,AZ,Pending Issuance,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,25
+peoria-az-building-permits,AZ,Pending Renewal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+peoria-az-building-permits,AZ,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,1017
+philadelphia-li-permits,PA,Amendment Applicant Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,40
+philadelphia-li-permits,PA,Amendment Application Incomplete,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,67
+philadelphia-li-permits,PA,Amendment Ready For Issue,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,29
+philadelphia-li-permits,PA,Amendment Requested,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,13
+philadelphia-li-permits,PA,Amendment Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,49
+philadelphia-li-permits,PA,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2121
+philadelphia-li-permits,PA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,8554
+philadelphia-li-permits,PA,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,1
+phoenix-building-permits,AZ,DONE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",33983
+phoenix-building-permits,AZ,OPEN,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",33131
+phoenix-building-permits,AZ,OPEN,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",7322
+pierce-county-pals-permits,WA,Accepted,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1792
+pierce-county-pals-permits,WA,Approved,Approved,approved,approved,active,,R15 permit approved or issued,672
+pierce-county-pals-permits,WA,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,7
+pierce-county-pals-permits,WA,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4187
+pierce-county-pals-permits,WA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,5884
+pierce-county-pals-permits,WA,Issued (NCA),Approved,approved,approved,active,,R15 permit approved or issued,48
+pierce-county-pals-permits,WA,Pending Payment,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,7
+pittsburgh-pli-permits,PA,Amendment Applicant Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+pittsburgh-pli-permits,PA,Amendment Application Incomplete,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+pittsburgh-pli-permits,PA,Amendment Requested,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1
+pittsburgh-pli-permits,PA,Amendment Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,7
+pittsburgh-pli-permits,PA,Applicant Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+pittsburgh-pli-permits,PA,Application Finalization,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,11
+pittsburgh-pli-permits,PA,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1541
+pittsburgh-pli-permits,PA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,3438
+pittsburgh-pli-permits,PA,Ready For Issue,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,5
+portland-building-permits,OR,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+portland-building-permits,OR,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",51
+portland-building-permits,OR,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2086
+portland-building-permits,OR,Under Inspection,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,4900
+portland-neighborhood-contact-applications,OR,Neighborhood contact filed before a land-use or building application,Proposed,proposed,per_record,per_record,per_record,R10 pre-application / consultation (D1),910
+prince-georges-county-permits,MD,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",162
+provo-planning-applications,UT,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,68
+provo-planning-applications,UT,Approved w/ Conditions,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,3
+provo-planning-applications,UT,Awaiting Signatures,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,1
+provo-planning-applications,UT,Complete Application,Proposed,proposed,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),5
+provo-planning-applications,UT,Council,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,3
+provo-planning-applications,UT,Heritage Board,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1
+provo-planning-applications,UT,Incomplete Application,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,5
+provo-planning-applications,UT,Monitoring Conditions,Approved,approved,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),16
+provo-planning-applications,UT,Open,Proposed,proposed,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",13
+provo-planning-applications,UT,Planning Commission,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,5
+provo-planning-applications,UT,Reviews Complete,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+provo-planning-applications,UT,Under Appeal,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1
+provo-planning-applications,UT,Under Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+provo-planning-applications,UT,Waiting for Appeal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,2
+provo-planning-applications,UT,Waiting for Conditions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,6
+provo-planning-applications,UT,Waiting for Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,41
+provo-planning-applications,UT,Waiting for Submittals,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+raleigh-building-permits,NC,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1
+raleigh-building-permits,NC,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1731
+raleigh-building-permits,NC,Delayed Issuance,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,162
+raleigh-building-permits,NC,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,713
+raleigh-building-permits,NC,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2755
+raleigh-building-permits,NC,Ready for Issuance,Proposed,proposed,approved,active,,R15 permit approved or issued,407
+raleigh-building-permits,NC,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,44
+raleigh-building-permits,NC,Submitted - Online,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,348
+reno-ldc-projects,NV,In Progress,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,194
+reno-ldc-projects,NV,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,228
+ridot-rhode-restore-projects,RI,Approved,Approved,approved,approved,active,,R15 permit approved or issued,4577
+salem-structure-permits,OR,Issued,Approved,approved,approved,active,,R15 permit approved or issued,3391
+san-antonio-permits-issued,TX,Comm Finish Out Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,3
+san-antonio-permits-issued,TX,Comm New Building Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,4
+san-antonio-permits-issued,TX,Comm Sitework Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,6
+san-antonio-permits-issued,TX,Demolition Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,1
+san-antonio-permits-issued,TX,Home Addition Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,2
+san-antonio-permits-issued,TX,Res Accessory Dwelling Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,6
+san-antonio-permits-issued,TX,Res Accessory-Addition Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,17
+san-antonio-permits-issued,TX,Res New Building Permit,Approved,approved,per_record,undetermined,review,R99 no rule matched,139
+san-diego-approved-permits,CA,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),8461
+san-diego-approved-permits,CA,Final Closed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",309
+san-diego-approved-permits,CA,Inspecting,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,411
+san-diego-approved-permits,CA,Inspection Followup,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,12272
+san-diego-approved-permits,CA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,10211
+san-diego-approved-permits,CA,Pending Invoice Payment,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,120
+san-jose-permits,CA,"B-2. Fnd only, E-2. Fnd only, P-2. Fnd only, M-2. Fnd only",Approved,approved,per_record,undetermined,review,R99 no rule matched,38
+san-jose-permits,CA,B-4. Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4077
+san-jose-permits,CA,"B-4. Complete, E-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2571
+san-jose-permits,CA,"B-4. Complete, E-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",992
+san-jose-permits,CA,"B-4. Complete, E-4. Complete, P-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",187
+san-jose-permits,CA,"B-4. Complete, E-4. Complete, P-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3138
+san-jose-permits,CA,"B-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",97
+san-jose-permits,CA,"B-4. Complete, P-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",271
+san-jose-permits,CA,"B-4. Complete, P-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",15
+san-jose-permits,CA,B-Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",9204
+san-jose-permits,CA,"B-Complete, E-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",6524
+san-jose-permits,CA,"B-Complete, E-Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",116
+san-jose-permits,CA,"B-Complete, E-Complete, M-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",10449
+san-jose-permits,CA,"B-Complete, E-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",390
+san-jose-permits,CA,"B-Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",28
+san-jose-permits,CA,"B-Complete, M-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",15
+san-jose-permits,CA,"B-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",158
+san-jose-permits,CA,E-4. Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",3114
+san-jose-permits,CA,"E-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",908
+san-jose-permits,CA,"E-4. Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",52
+san-jose-permits,CA,"E-4. Complete, P-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",214
+san-jose-permits,CA,"E-4. Complete, P-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",464
+san-jose-permits,CA,"E-4. Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",9
+san-jose-permits,CA,E-Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",10266
+san-jose-permits,CA,"E-Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4988
+san-jose-permits,CA,"E-Complete, M-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2201
+san-jose-permits,CA,"E-Complete, P-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+san-jose-permits,CA,"E-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1198
+san-jose-permits,CA,"E-Complete, P-Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",126
+san-jose-permits,CA,M-4. Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",150
+san-jose-permits,CA,M-Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1720
+san-jose-permits,CA,"M-Complete, P-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",100
+san-jose-permits,CA,P-4. Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",965
+san-jose-permits,CA,"P-4. Complete, M-4. Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",70
+san-jose-permits,CA,P-Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",8712
+san-jose-permits,CA,"P-Complete, M-Complete",Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",7
+san-marcos-planning-cases,TX,Awaiting Completion,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,63
+san-marcos-planning-cases,TX,Awaiting Revision,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,27
+san-marcos-planning-cases,TX,Completed,Approved,approved,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),177
+san-marcos-planning-cases,TX,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,43
+san-marcos-planning-cases,TX,Incomplete,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+savannah-commercial-building-permits,GA,Approved,Approved,approved,approved,active,,R15 permit approved or issued,240
+savannah-commercial-building-permits,GA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,521
+savannah-commercial-building-permits,GA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2650
+scdot-project-viewer-lines,SC,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,1392
+scdot-project-viewer-lines,SC,Design/Development,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2302
+scdot-project-viewer-lines,SC,Pre-Award,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,107
+scottsdale-building-permits,AZ,ACTIVE,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",153
+scottsdale-building-permits,AZ,FINALLED,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",34
+sd-stip-construction-reconstruction,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,55
+sd-stip-pavement-preservation,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,189
+sd-stip-resurfacing,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,46
+sd-stip-safety-lines,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,111
+sd-stip-safety-points,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,20
+sd-stip-structures,SD,Programmed,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,69
+seattle-building-permits,WA,Additional Info Requested,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,4
+seattle-building-permits,WA,Application Completed,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,327
+seattle-building-permits,WA,Approved to Occupy,Approved,approved,approved,active,,R15 permit approved or issued,3
+seattle-building-permits,WA,Awaiting Information,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,160
+seattle-building-permits,WA,Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1027
+seattle-building-permits,WA,Corrections Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,685
+seattle-building-permits,WA,Corrections Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,3
+seattle-building-permits,WA,Initiated,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1
+seattle-building-permits,WA,Inspections Completed,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",24
+seattle-building-permits,WA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2862
+seattle-building-permits,WA,Phase Issued,Approved,approved,approved,active,,R15 permit approved or issued,1
+seattle-building-permits,WA,Ready for Intake,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,2
+seattle-building-permits,WA,Ready for Issuance,Proposed,proposed,approved,active,,R15 permit approved or issued,258
+seattle-building-permits,WA,Reviews Completed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+seattle-building-permits,WA,Reviews In Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,390
+seattle-building-permits,WA,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,56
+seattle-land-use-permits,WA,Application Completed,Proposed,proposed,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),13
+seattle-land-use-permits,WA,Completed,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),80
+seattle-land-use-permits,WA,Corrections Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,108
+seattle-land-use-permits,WA,Final Reviews Completed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,15
+seattle-land-use-permits,WA,Issued,Approved,approved,per_record,undetermined,review,R99 no rule matched,16
+seattle-land-use-permits,WA,Published,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,42
+seattle-land-use-permits,WA,Ready for Intake,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,1
+seattle-land-use-permits,WA,Ready for Publication,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,12
+seattle-land-use-permits,WA,Reviews Completed,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+seattle-land-use-permits,WA,Reviews In Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,64
+seattle-land-use-permits,WA,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,12
+sheridan-county-building-permits,WY,operating,Operating,operating,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",6492
+sioux-falls-building-permits,SD,Approved,Approved,approved,approved,active,,R15 permit approved or issued,92
+sioux-falls-building-permits,SD,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",73878
+sioux-falls-building-permits,SD,Issued,Approved,approved,approved,active,,R15 permit approved or issued,40462
+sioux-falls-building-permits,SD,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,1744
+skagit-county-active-permits,WA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,405
+slo-county-planning-permits,CA,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,18835
+sonoma-county-fire-rebuild-permits,CA,Application Accepted/In Review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,2
+sonoma-county-fire-rebuild-permits,CA,Awaiting Applicant Response,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+sonoma-county-fire-rebuild-permits,CA,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2248
+sonoma-county-fire-rebuild-permits,CA,Issued,Approved,approved,approved,active,,R15 permit approved or issued,250
+sonoma-county-fire-rebuild-permits,CA,Payment Due,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,4
+sonoma-county-fire-rebuild-permits,CA,Plan Check Approved,Approved,approved,approved,active,,R15 permit approved or issued,4
+sonoma-county-fire-rebuild-permits,CA,Plan Check Comments Sent,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,4
+sonoma-county-fire-rebuild-permits,CA,Pre-Issue/Payment Due,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,7
+sonoma-county-fire-rebuild-permits,CA,Resubmittal Requested,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,15
+sonoma-county-fire-rebuild-permits,CA,Waiting for Other Approvals,Proposed,proposed,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),2
+stamford-major-developments,CT,Approved - FSP,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,209
+stamford-major-developments,CT,Approved - GDP,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,7
+stamford-major-developments,CT,Completed,Operating,operating,unknown,undetermined,receipt,R09c case completed on a land-use record (D5),84
+stamford-major-developments,CT,Under Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,47
+stlouis-county-mo-subdivisions,MO,Boundary Adjustment,Approved,approved,per_record,undetermined,review,R99 no rule matched,21
+stlouis-county-mo-subdivisions,MO,Major Land Disturbance,Approved,approved,per_record,undetermined,review,R99 no rule matched,1
+stlouis-county-mo-subdivisions,MO,Preliminary,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,13
+stlouis-county-mo-subdivisions,MO,Record,Approved,approved,per_record,undetermined,review,R99 no rule matched,6
+summit-county-oh-planning-commission-items,OH,Submitted for county review,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,38
+sussex-county-de-conditional-use,DE,APPROVED,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,95
+sussex-county-de-conditional-use,DE,Approval,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,25
+sussex-county-de-conditional-use,DE,Approved,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,343
+sussex-county-de-conditional-use,DE,Approved with Conditions,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,7
+sussex-county-de-conditional-use,DE,Approved with revised conditiona,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,5
+sussex-county-de-conditional-use,DE,DENIED,Decided,proposed,per_record,inactive,,R04 denied / disapproved,10
+sussex-county-de-conditional-use,DE,Denied,Decided,proposed,per_record,inactive,,R04 denied / disapproved,28
+sussex-county-de-conditional-use,DE,WITHDRAWN,Decided,proposed,per_record,inactive,,R03 withdrawn,121
+sussex-county-de-conditional-use,DE,WITHDRAWN BY APPLICANT,Decided,proposed,per_record,inactive,,R03 withdrawn,2
+sussex-county-de-conditional-use,DE,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,8
+tacoma-accela-permits,WA,Approved,Approved,approved,approved,active,,R15 permit approved or issued,1
+tacoma-accela-permits,WA,Awaiting Resubmittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,14
+tacoma-accela-permits,WA,Awaiting Resubmittal/Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,375
+tacoma-accela-permits,WA,C of O Issued,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2
+tacoma-accela-permits,WA,Complete Application,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,10
+tacoma-accela-permits,WA,Decision Issued,Approved,approved,per_record,undetermined,review,"R09b decision issued, outcome not stated",14
+tacoma-accela-permits,WA,Field Revisions,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,4
+tacoma-accela-permits,WA,Final Decision,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1
+tacoma-accela-permits,WA,Final Determination Complete,Operating,operating,per_record,undetermined,receipt,R07 void / revoked / aborted / abandoned / terminated / rescinded / vacated / dismissed (D8),1
+tacoma-accela-permits,WA,Final Inspection,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",34
+tacoma-accela-permits,WA,Finaled,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",838
+tacoma-accela-permits,WA,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,7
+tacoma-accela-permits,WA,Incomplete Application,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,9
+tacoma-accela-permits,WA,Incomplete Resubmittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,7
+tacoma-accela-permits,WA,Missing Required Documents,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,110
+tacoma-accela-permits,WA,Missing or Incorrect Info,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,15
+tacoma-accela-permits,WA,Pending Intake Screening,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,46
+tacoma-accela-permits,WA,Pending Internal Action,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,25
+tacoma-accela-permits,WA,Permit Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,46
+tacoma-accela-permits,WA,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,1179
+tacoma-accela-permits,WA,Permit Ready to Issue,Approved,approved,approved,active,,R15 permit approved or issued,1
+tacoma-accela-permits,WA,Plan Review in Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,137
+tacoma-accela-permits,WA,Plans Routed for Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,9
+tacoma-accela-permits,WA,Precon Meeting Required,Proposed,proposed,approved,active,,R15 permit approved or issued,21
+tacoma-accela-permits,WA,Ready to Issue,Approved,approved,approved,active,,R15 permit approved or issued,133
+tacoma-accela-permits,WA,Recording Complete,Approved,approved,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",14
+tacoma-accela-permits,WA,Recording Revisions Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+tacoma-accela-permits,WA,Review Complete,Proposed,proposed,approved,active,,R15 permit approved or issued,1
+tacoma-accela-permits,WA,Revision Review in Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,60
+tacoma-accela-permits,WA,Revisions Required,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,14
+tacoma-accela-permits,WA,Revisions Routed for Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+tacoma-accela-permits,WA,Revisons Required,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,2
+tacoma-accela-permits,WA,Staff Report Complete,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,4
+tacoma-accela-permits,WA,Staff Report In Process,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+tacoma-accela-permits,WA,Waiting for Information,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,5
+tdlr-tabs,not in registry,Inspection Complete,Active,operating,unmatched,unmatched,unmatched,,2
+tdlr-tabs,not in registry,Project Closed,Active,operating,unmatched,unmatched,unmatched,,1
+tdlr-tabs,not in registry,Review Complete,Active,operating,unmatched,unmatched,unmatched,,2
+tempe-building-permits,AZ,Applied,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,2
+tempe-building-permits,AZ,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),4
+tempe-building-permits,AZ,CofO Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",218
+tempe-building-permits,AZ,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",1891
+tempe-building-permits,AZ,Issued,Approved,approved,approved,active,,R15 permit approved or issued,1574
+tempe-building-permits,AZ,Ready for Issuance,Approved,approved,approved,active,,R15 permit approved or issued,1
+tempe-building-permits,AZ,Ready to Issue,Approved,approved,approved,active,,R15 permit approved or issued,1
+tempe-building-permits,AZ,TCO Issued,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",16
+tennessee-dot-projects,TN,ACTIVE,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",1767
+tennessee-dot-projects,TN,LET,Approved,approved,per_record,undetermined,review,R99 no rule matched,450
+thurston-county-residential-permits,WA,approved,Approved,approved,approved,active,,"R00a issuance-ledger constant (registry: file_date_kind=issued, §7.12a)",1088
+tigard-or-active-building-permits,OR,Application Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,18
+tigard-or-active-building-permits,OR,Permit Issued,Approved,approved,approved,active,,R15 permit approved or issued,612
+tigard-or-active-building-permits,OR,Under Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,104
+tigard-or-active-planning-cases,OR,Application Received,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,6
+tigard-or-active-planning-cases,OR,Public Hearing,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,12
+tigard-or-active-planning-cases,OR,Under Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,91
+tucson-commercial-building-permits,AZ,Approved,Approved,approved,approved,active,,R15 permit approved or issued,46
+tucson-commercial-building-permits,AZ,Approved - Awaiting Customer Attention,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,62
+tucson-commercial-building-permits,AZ,Awaiting Customer Attention,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1
+tucson-commercial-building-permits,AZ,Awaiting Submittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,19
+tucson-commercial-building-permits,AZ,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,53
+tucson-commercial-building-permits,AZ,Fees Paid,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,6
+tucson-commercial-building-permits,AZ,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,158
+tucson-commercial-building-permits,AZ,In Revision,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,16
+tucson-commercial-building-permits,AZ,Inspections,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,363
+tucson-commercial-building-permits,AZ,Inspections Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",225
+tucson-commercial-building-permits,AZ,Issued,Approved,approved,approved,active,,R15 permit approved or issued,259
+tucson-commercial-building-permits,AZ,Needs Resubmittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,236
+tucson-commercial-building-permits,AZ,Revision Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,6
+tucson-commercial-building-permits,AZ,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,11
+tucson-commercial-building-permits,AZ,Submitted - Online,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,10
+tucson-residential-building-permits,AZ,Approved,Approved,approved,approved,active,,R15 permit approved or issued,234
+tucson-residential-building-permits,AZ,Approved - Awaiting Customer Attention,Approved,approved,proposed,active,review,R18 under review / pending / scheduled / hearing,677
+tucson-residential-building-permits,AZ,Awaiting Customer Attention,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,8
+tucson-residential-building-permits,AZ,Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,511
+tucson-residential-building-permits,AZ,Fees Paid,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,34
+tucson-residential-building-permits,AZ,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,239
+tucson-residential-building-permits,AZ,In Revision,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,8
+tucson-residential-building-permits,AZ,Inspections,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,3337
+tucson-residential-building-permits,AZ,Inspections Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2754
+tucson-residential-building-permits,AZ,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2041
+tucson-residential-building-permits,AZ,Needs Resubmittal,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1943
+tucson-residential-building-permits,AZ,Revision Fees Due,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,33
+tucson-residential-building-permits,AZ,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,61
+tucson-residential-building-permits,AZ,Submitted - Online,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,125
+txdot-projects-info-all,TX,Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,13511
+txdot-projects-info-all,TX,Design and Construct,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,475
+txdot-projects-info-all,TX,Dual,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,101
+txdot-projects-info-all,TX,Execute,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,347
+txdot-projects-info-all,TX,Initiate,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,625
+txdot-projects-info-all,TX,Letting,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,446
+txdot-projects-info-all,TX,Operations and Maint,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",371
+txdot-projects-info-all,TX,PE,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,470
+txdot-projects-info-all,TX,PS&E,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,3211
+txdot-projects-info-all,TX,Planning,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,7383
+txdot-projects-info-all,TX,Pre Procurement,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,48
+txdot-projects-info-all,TX,Procurement,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,40
+txdot-projects-info-all,TX,Ready to Let,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,175
+udot-active-projects,UT,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",83
+udot-active-projects,UT,Close Out,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),94
+udot-active-projects,UT,Physically Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",8
+udot-active-projects,UT,Proposed,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,110
+udot-active-projects,UT,Region Review,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,13
+udot-active-projects,UT,STIP,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,244
+udot-active-projects,UT,Scoping,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,230
+udot-active-projects,UT,Substantially Compl,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",6
+udot-active-projects,UT,Under Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,45
+udot-active-projects-lines,UT,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",642
+udot-active-projects-lines,UT,Advertised,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,64
+udot-active-projects-lines,UT,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,52
+udot-active-projects-lines,UT,Close Out,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),1884
+udot-active-projects-lines,UT,Concept Scoping,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,22
+udot-active-projects-lines,UT,Contract Closed Out,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),276
+udot-active-projects-lines,UT,Contract Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",47
+udot-active-projects-lines,UT,Funding,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,232
+udot-active-projects-lines,UT,Physically Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",110
+udot-active-projects-lines,UT,Proposed,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,1059
+udot-active-projects-lines,UT,Region Review,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,95
+udot-active-projects-lines,UT,STIP,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,825
+udot-active-projects-lines,UT,Scoping,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2051
+udot-active-projects-lines,UT,Substantially Compl,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",71
+udot-active-projects-lines,UT,Under Construction,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,1524
+vdot-syip-approved-projects,VA,Activity Dates Set,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,24
+vdot-syip-approved-projects,VA,Activity Dates Set - RW Started,Approved,approved,per_record,undetermined,review,R99 no rule matched,9
+vdot-syip-approved-projects,VA,Advertised,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,9
+vdot-syip-approved-projects,VA,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,12
+vdot-syip-approved-projects,VA,Construction Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",4
+vdot-syip-approved-projects,VA,Construction Started,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,33
+vdot-syip-approved-projects,VA,Monitoring Funds,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),38
+vdot-syip-approved-projects,VA,No Dates Set Yet,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,8
+vdot-syip-approved-projects,VA,No Dates Set Yet - PE Open,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,9
+vdot-syip-approved-projects,VA,Waiting Financial Closure,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",23
+vdot-syip-approved-projects-lines,VA,Activity Dates Set,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,320
+vdot-syip-approved-projects-lines,VA,Activity Dates Set - RW Started,Approved,approved,per_record,undetermined,review,R99 no rule matched,232
+vdot-syip-approved-projects-lines,VA,Advertised,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,189
+vdot-syip-approved-projects-lines,VA,Awarded,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,109
+vdot-syip-approved-projects-lines,VA,Construction Completed,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",422
+vdot-syip-approved-projects-lines,VA,Construction Started,Approved,approved,approved,active,,R14 construction under way / inspections / awarded or advertised contract,514
+vdot-syip-approved-projects-lines,VA,Critical Decision Needed,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,45
+vdot-syip-approved-projects-lines,VA,Monitoring Funds,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),127
+vdot-syip-approved-projects-lines,VA,No Dates Set Yet,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,318
+vdot-syip-approved-projects-lines,VA,No Dates Set Yet - PE Open,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,303
+vdot-syip-approved-projects-lines,VA,Waiting Financial Closure,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",212
+virginia-beach-building-permits,VA,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",7575
+virginia-beach-building-permits,VA,Closed,Operating,operating,unknown,undetermined,receipt,R09 closed / inactive / archived without a stated reason (D5),35
+virginia-beach-building-permits,VA,Final,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",9319
+virginia-beach-building-permits,VA,Pending,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,3
+virginia-beach-building-permits,VA,Pre-Issuance,Proposed,proposed,per_record,undetermined,review,R99 no rule matched,4
+vtrans-project-locations,VT,ACTIVE,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",359
+vtrans-project-locations,VT,COMPLETE,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2
+vtrans-project-locations-lines,VT,ACTIVE,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",560
+wa-ecology-sepa-register,WA,proposed,Proposed,proposed,unknown,active,review,"R00 bucket name used as a dataset-wide constant, no publisher term",1163
+wake-county-building-permits,NC,Application Incomplete,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,5
+wake-county-building-permits,NC,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2563
+wake-county-building-permits,NC,Disapproved,Decided,proposed,per_record,inactive,,R04 denied / disapproved,1
+wake-county-building-permits,NC,In Review,Proposed,proposed,proposed,active,,R18 under review / pending / scheduled / hearing,1032
+wake-county-building-permits,NC,Issued,Approved,approved,approved,active,,R15 permit approved or issued,2881
+wake-county-building-permits,NC,Submitted,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,11
+wake-county-building-permits,NC,Submitted - Online,Proposed,proposed,proposed,active,,R17 filed / submitted / received / intake,38
+wake-county-building-permits,NC,Withdrawn,Decided,proposed,per_record,inactive,,R03 withdrawn,1790
+weld-county-site-plan-review,CO,Recorded,Approved,approved,approved,active,,R16 entitlement approved / recorded / in force,27
+wisdot-highway-program-6yr,WI,Programmed in WisDOT's 6-Year Highway Improvement Program — contract not yet let,Proposed,proposed,per_record,undetermined,review,"R02b negated wording (""Not Issued"", ""Not Applicable"")",1877
+worcester-building-permits,MA,Active,Approved,approved,unknown,active,review,"R19 bare ""Active"" / ""Open"" on a permit (stage not stated)",5524
+worcester-building-permits,MA,Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2878
+wsdot-project-delivery-plan-complete,WA,Operationally Complete,Operating,operating,per_record,per_record,per_record,"R13 completion (operation vs completed work decided per record, D3)",2456
+wsdot-project-delivery-plan-proposed,WA,Not Yet Advertised,Proposed,proposed,per_record,undetermined,review,"R02b negated wording (""Not Issued"", ""Not Applicable"")",600
+wsdot-project-delivery-plan-under-construction,WA,"Advertised, Not Yet Complete",Approved,approved,per_record,undetermined,review,"R02b negated wording (""Not Issued"", ""Not Applicable"")",809
+wvdoh-active-projects,WV,Planned,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,1208
+wydot-stip-projects,WY,Programmed in the WYDOT State Transportation Improvement Program (STIP),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,153
+wydot-stip-projects-lines,WY,Programmed in the WYDOT State Transportation Improvement Program (STIP),Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,265
+york-county-pa-planning-subdivisions,PA,Submitted for county planning review,Proposed,proposed,proposed,active,,R12 programmed / planned / funded transport or capital work,2425
