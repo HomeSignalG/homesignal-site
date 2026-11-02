@@ -5731,6 +5731,26 @@ The report page only renders them, and a report saved before national-4 renders 
   - Roads & infrastructure is never minor.
   - Measured on a national 1% sample (28,301 records): 605 flagged (2.1%), and all 45 sampled hits were genuinely minor.
 
+## DEVELOPMENT ACTIVITY REPORT, national-5 (2026-11-02): FIXES FROM THE 3101 WESTERN AUDIT
+
+All 47 records were re-checked against live agency data on a runner. Addresses, distances, directions, agency stages, record numbers and links all
+matched. Five presentation errors were fixed universally. Test: `test/report-quality-national5.test.mjs`.
+- **A status the agency did not publish is never printed as the agency's.** A source with no status column stores its connector's `status_const`
+  as the stage. The generated publisher file now carries that constant, and `agencyStage()` withholds it (`publisher_stage` null,
+  `publisher_stage_unpublished` true). The card then says "The agency publishes no status for this record." Example: the WA SEPA Register showed
+  "Source agency status: proposed".
+- **A date says what it is when the registry says so** (`file_date_label`, carried to the report as `date_label`). The SEPA Register's only date is
+  `publisheddate`, so it reads "Published in the SEPA Register", not "Filed".
+  - ⛔ **Do not change `file_date_kind` to fix a label.** A `date_kind` change is a material ledger change, so it would fire "Status changed" on
+    every record of that source.
+- **"Phase Issued" is an issued permit** (stage-evidence-2). "Approved to Occupy" is unchanged, deliberately.
+- **Seattle's "Institutional" permit class maps to Civic/Public** in both Seattle entries. It was Commercial on 171 rows in 24 ZIPs, e.g. the
+  Pacific NW Ballet's Phelps Center and the Monorail station. The stored rows change when `get-address-report` is next deployed and each ZIP
+  refreshes. A type change is not a material ledger event.
+- **Change History shows the same stage words as the record's card**, and labels HomeSignal's own status "HomeSignal status".
+- **Map markers that would overlap are set apart** (`spreadMarks`), each with a thin line to its true spot. Measured on the sample: 7 numbers were
+  unreadable before the fix and none after.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are

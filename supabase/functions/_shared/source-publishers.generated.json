@@ -7,7 +7,8 @@
   },
   "adot-tip-fy2026-2030": {
    "agency": "Arizona Department of Transportation (ADOT) — adopted FY2026-2030 Transportation Improvement Program",
-   "dataset": "services6.arcgis.com, service lyrTIPAdoptions_Final2630_view"
+   "dataset": "services6.arcgis.com, service lyrTIPAdoptions_Final2630_view",
+   "status_const": "Adopted in the FY2026-2030 Transportation Improvement Program"
   },
   "akdot-stip-24-27": {
    "agency": "Alaska Department of Transportation & Public Facilities (AKDOT&PF) — STIP FFY 2024-2027 (Approved Final)",
@@ -15,7 +16,8 @@
   },
   "albuquerque-building-permits": {
    "agency": "City of Albuquerque, New Mexico",
-   "dataset": "coageo.cabq.gov, service agis/City_Building_Permits"
+   "dataset": "coageo.cabq.gov, service agis/City_Building_Permits",
+   "status_const": "approved"
   },
   "aldot-atrip-ii-projects": {
    "agency": "Alabama Department of Transportation (ALDOT) — ATRIP-II",
@@ -75,7 +77,8 @@
   },
   "aurora-building-permits": {
    "agency": "City of Aurora, Colorado",
-   "dataset": "ags.auroragov.org, service OpenData"
+   "dataset": "ags.auroragov.org, service OpenData",
+   "status_const": "approved"
   },
   "austin-issued-construction-permits": {
    "agency": "City of Austin",
@@ -95,7 +98,8 @@
   },
   "baltimore-city-housing-permits": {
    "agency": "City of Baltimore",
-   "dataset": "baltegis.baltimorecity.gov, service Housing/DHCD_Open_Baltimore_Datasets"
+   "dataset": "baltegis.baltimorecity.gov, service Housing/DHCD_Open_Baltimore_Datasets",
+   "status_const": "Issued"
   },
   "baltimore-county-permits": {
    "agency": "Baltimore County",
@@ -147,7 +151,8 @@
   },
   "buffalo-building-permits": {
    "agency": "City of Buffalo",
-   "dataset": "data.buffalony.gov, dataset 9p2d-f3yt"
+   "dataset": "data.buffalony.gov, dataset 9p2d-f3yt",
+   "status_const": "approved"
   },
   "burlington-vt-building-permits": {
    "agency": "City of Burlington, Vermont — Department of Permitting & Inspections",
@@ -199,7 +204,8 @@
   },
   "charleston-county-permits": {
    "agency": "Charleston County, South Carolina",
-   "dataset": "gisccapps.charlestoncounty.org, service ENERGOV/energov_history"
+   "dataset": "gisccapps.charlestoncounty.org, service ENERGOV/energov_history",
+   "status_const": "operating"
   },
   "charlotte-land-dev-commercial-projects": {
    "agency": "City of Charlotte",
@@ -207,15 +213,18 @@
   },
   "chattanooga-building-permits": {
    "agency": "Chattanooga-Hamilton County Regional Planning Agency",
-   "dataset": "services2.arcgis.com, service Building_Permits_to_April_2021"
+   "dataset": "services2.arcgis.com, service Building_Permits_to_April_2021",
+   "status_const": "Issued"
   },
   "chattanooga-permits-archive": {
    "agency": "City of Chattanooga / Hamilton County, Tennessee",
-   "dataset": "services2.arcgis.com, service Chatt_permits_to_12_31_2025"
+   "dataset": "services2.arcgis.com, service Chatt_permits_to_12_31_2025",
+   "status_const": "approved"
   },
   "chester-county-pa-act247-plans": {
    "agency": "Chester County, Pennsylvania",
-   "dataset": "gisprodops.chesco.org, service Planning_Services/Plan_Act247_AGOL_D"
+   "dataset": "gisprodops.chesco.org, service Planning_Services/Plan_Act247_AGOL_D",
+   "status_const": "Submitted for county review"
   },
   "chicago-building-permits": {
    "agency": "City of Chicago",
@@ -227,7 +236,8 @@
   },
   "city-of-orange-active-planning-projects": {
    "agency": "City of Orange, California",
-   "dataset": "services5.arcgis.com, service Active_Planning_Projects_view"
+   "dataset": "services5.arcgis.com, service Active_Planning_Projects_view",
+   "status_const": "Active planning project"
   },
   "clark-county-active-dev-permits": {
    "agency": "Clark County",
@@ -247,7 +257,8 @@
   },
   "cleveland-issued-building-permits": {
    "agency": "City of Cleveland",
-   "dataset": "services3.arcgis.com, service Building_Permits"
+   "dataset": "services3.arcgis.com, service Building_Permits",
+   "status_const": "Issued"
   },
   "clv-planning-cases": {
    "agency": "City of Las Vegas",
@@ -275,7 +286,8 @@
   },
   "cook-county-il-highway-construction-program": {
    "agency": "Cook County Department of Transportation and Highways",
-   "dataset": "services2.arcgis.com, service DOTH_Construction_Projects_2026"
+   "dataset": "services2.arcgis.com, service DOTH_Construction_Projects_2026",
+   "status_const": "In the 2026 county construction program"
   },
   "ctdot-project-work-areas": {
    "agency": "Connecticut Department of Transportation (CTDOT)",
@@ -291,7 +303,8 @@
   },
   "delaware-county-pa-subdivisions-land-developments": {
    "agency": "Delaware County, Pennsylvania",
-   "dataset": "gis.delcopa.gov, service SLD_Review/Delaware_County_Subdivisions_and_Land_Developments"
+   "dataset": "gis.delcopa.gov, service SLD_Review/Delaware_County_Subdivisions_and_Land_Developments",
+   "status_const": "Submitted for county review"
   },
   "denton-city-projects-annexation": {
    "agency": "City of Denton",
@@ -335,19 +348,23 @@
   },
   "desoto-county-permits": {
    "agency": "DeSoto County, Mississippi",
-   "dataset": "gis.desotocountyms.gov, service Permits_Energov"
+   "dataset": "gis.desotocountyms.gov, service Permits_Energov",
+   "status_const": "approved"
   },
   "detroit-building-permits": {
    "agency": "City of Detroit",
-   "dataset": "services2.arcgis.com, service bseed_building_permits"
+   "dataset": "services2.arcgis.com, service bseed_building_permits",
+   "status_const": "Issued"
   },
   "detroit-demolition-permits": {
    "agency": "City of Detroit",
-   "dataset": "services2.arcgis.com, service bseed_demolition_permits"
+   "dataset": "services2.arcgis.com, service bseed_demolition_permits",
+   "status_const": "Issued"
   },
   "detroit-trades-permits": {
    "agency": "City of Detroit",
-   "dataset": "services2.arcgis.com, service bseed_trades_permits"
+   "dataset": "services2.arcgis.com, service bseed_trades_permits",
+   "status_const": "Issued"
   },
   "douglas-county-co-permits": {
    "agency": "Douglas County",
@@ -359,11 +376,13 @@
   },
   "east-baton-rouge-building-permits": {
    "agency": "City of Baton Rouge / Parish of East Baton Rouge",
-   "dataset": "data.brla.gov, dataset 7fq7-8j7r"
+   "dataset": "data.brla.gov, dataset 7fq7-8j7r",
+   "status_const": "approved"
   },
   "el-paso-new-residential-permits": {
    "agency": "City of El Paso",
-   "dataset": "gis.elpasotexas.gov, service Planning/NewResidential"
+   "dataset": "gis.elpasotexas.gov, service Planning/NewResidential",
+   "status_const": "Issued"
   },
   "eugene-or-current-capital-projects": {
    "agency": "City of Eugene, Oregon",
@@ -379,11 +398,13 @@
   },
   "fdot-active-construction-projects": {
    "agency": "Florida Department of Transportation",
-   "dataset": "gis.fdot.gov, service Active_Construction_Projects"
+   "dataset": "gis.fdot.gov, service Active_Construction_Projects",
+   "status_const": "approved"
   },
   "flathead-county-building-permits": {
    "agency": "Flathead County, Montana",
-   "dataset": "services6.arcgis.com, service Building_Permits"
+   "dataset": "services6.arcgis.com, service Building_Permits",
+   "status_const": "approved"
   },
   "forsyth-county-ga-building-permits": {
    "agency": "Forsyth County, Georgia",
@@ -443,15 +464,18 @@
   },
   "huntsville-building-permits": {
    "agency": "City of Huntsville, Alabama",
-   "dataset": "maps.huntsvilleal.gov, service Licenses/BuildingPermits"
+   "dataset": "maps.huntsvilleal.gov, service Licenses/BuildingPermits",
+   "status_const": "approved"
   },
   "idot-annual-program-bridges": {
    "agency": "Illinois Department of Transportation",
-   "dataset": "services2.arcgis.com, service Annual_Highway_Improvement_Program"
+   "dataset": "services2.arcgis.com, service Annual_Highway_Improvement_Program",
+   "status_const": "Proposed Improvement"
   },
   "idot-annual-program-construction": {
    "agency": "Illinois Department of Transportation",
-   "dataset": "services2.arcgis.com, service Annual_Highway_Improvement_Program"
+   "dataset": "services2.arcgis.com, service Annual_Highway_Improvement_Program",
+   "status_const": "Proposed Improvement"
   },
   "independence-twp-construction-permits": {
    "agency": "Independence Township (Oakland County)",
@@ -471,7 +495,8 @@
   },
   "iowa-dot-five-year-program": {
    "agency": "Iowa Department of Transportation",
-   "dataset": "services.arcgis.com, service Iowa_DOT_Five_Year_Program_Project_Data_V2_Public_VIEW"
+   "dataset": "services.arcgis.com, service Iowa_DOT_Five_Year_Program_Project_Data_V2_Public_VIEW",
+   "status_const": "Programmed in the Iowa DOT 2027-2031 Five Year Program"
   },
   "irving-development-permits": {
    "agency": "City of Irving",
@@ -479,11 +504,13 @@
   },
   "itd-itip-projects": {
    "agency": "Idaho Transportation Department (ITD) — Idaho Transportation Investment Program (ITIP), FY2027–2033",
-   "dataset": "services1.arcgis.com, service ITIP_2025"
+   "dataset": "services1.arcgis.com, service ITIP_2025",
+   "status_const": "Programmed in the Idaho Transportation Investment Program (FY2027–2033)"
   },
   "itd-itip-projects-lines": {
    "agency": "Idaho Transportation Department (ITD) — Idaho Transportation Investment Program (ITIP), FY2027–2033",
-   "dataset": "services1.arcgis.com, service ITIP_2025"
+   "dataset": "services1.arcgis.com, service ITIP_2025",
+   "status_const": "Programmed in the Idaho Transportation Investment Program (FY2027–2033)"
   },
   "jackson-county-or-building-permits": {
    "agency": "Jackson County, Oregon",
@@ -519,7 +546,8 @@
   },
   "knoxville-building-permits": {
    "agency": "City of Knoxville / Knox County, Tennessee",
-   "dataset": "services8.arcgis.com, service BuildingPermits"
+   "dataset": "services8.arcgis.com, service BuildingPermits",
+   "status_const": "approved"
   },
   "kytc-syp-highway-plan": {
    "agency": "Kentucky Transportation Cabinet (KYTC) — Six-Year Highway Plan (SYP), 2026 enacted plan. KENTUCKY: the agency is the Transportation CABINET, not a DOT; KDOT is KANSAS.",
@@ -547,7 +575,8 @@
   },
   "loudoun-county-residential-permits": {
    "agency": "Loudoun County, Virginia",
-   "dataset": "logis.loudoun.gov, service Projects/ResBuildingPermits"
+   "dataset": "logis.loudoun.gov, service Projects/ResBuildingPermits",
+   "status_const": "operating"
   },
   "louisville-active-construction-permits": {
    "agency": "Louisville Metro, Kentucky",
@@ -567,7 +596,8 @@
   },
   "marin-county-building-permits": {
    "agency": "County of Marin",
-   "dataset": "data.marincounty.gov, dataset mkbn-caye"
+   "dataset": "data.marincounty.gov, dataset mkbn-caye",
+   "status_const": "approved"
   },
   "massdot-highway-projects": {
    "agency": "Massachusetts Department of Transportation",
@@ -583,7 +613,8 @@
   },
   "memphis-dpd-building-permits": {
    "agency": "City of Memphis Division of Planning & Development",
-   "dataset": "services2.arcgis.com, service DPD_Building_Permits"
+   "dataset": "services2.arcgis.com, service DPD_Building_Permits",
+   "status_const": "Issued"
   },
   "mesa-building-permits": {
    "agency": "City of Mesa",
@@ -603,11 +634,13 @@
   },
   "mndot-chip-roadway-projects": {
    "agency": "Minnesota Department of Transportation (MnDOT)",
-   "dataset": "services.arcgis.com, service 2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view"
+   "dataset": "services.arcgis.com, service 2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view",
+   "status_const": "Planned"
   },
   "mndot-stip-roadway-projects": {
    "agency": "Minnesota Department of Transportation (MnDOT)",
-   "dataset": "services.arcgis.com, service 2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view"
+   "dataset": "services.arcgis.com, service 2026_2035_Capital_Highway_Investment_Plan_Feature_Layers_view",
+   "status_const": "Programmed"
   },
   "modot-stip-locations-accepted": {
    "agency": "Missouri Department of Transportation (MoDOT)",
@@ -623,7 +656,8 @@
   },
   "montgomery-county-pa-act247-proposals": {
    "agency": "Montgomery County Planning Commission",
-   "dataset": "gis.montcopa.org, service Planning/Montgomery_County_Act247_Proposals"
+   "dataset": "gis.montcopa.org, service Planning/Montgomery_County_Act247_Proposals",
+   "status_const": "Submitted for county review"
   },
   "montgomery-county-residential-permits": {
    "agency": "Montgomery County",
@@ -631,11 +665,13 @@
   },
   "mt-mdt-stip-lines": {
    "agency": "Montana Department of Transportation",
-   "dataset": "gis.mtmdt.us, service MDTGIS/State_Transportation_Improvement_Program"
+   "dataset": "gis.mtmdt.us, service MDTGIS/State_Transportation_Improvement_Program",
+   "status_const": "Programmed"
   },
   "murfreesboro-building-permits": {
    "agency": "City of Murfreesboro, Tennessee",
-   "dataset": "services5.arcgis.com, service Buiilding_Permits"
+   "dataset": "services5.arcgis.com, service Buiilding_Permits",
+   "status_const": "Issued"
   },
   "naperville-building-permits": {
    "agency": "City of Naperville, Illinois",
@@ -643,31 +679,38 @@
   },
   "nashville-building-permits-issued": {
    "agency": "Metro Nashville-Davidson County",
-   "dataset": "services2.arcgis.com, service Building_Permits_Issued_2"
+   "dataset": "services2.arcgis.com, service Building_Permits_Issued_2",
+   "status_const": "Issued"
   },
   "ncdot-stip-projects-lines": {
    "agency": "North Carolina Department of Transportation (NCDOT) — 2026-2035 State Transportation Improvement Program (STIP)",
-   "dataset": "gis11.services.ncdot.gov, service NCDOT_STIP"
+   "dataset": "gis11.services.ncdot.gov, service NCDOT_STIP",
+   "status_const": "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program"
   },
   "ncdot-stip-projects-points": {
    "agency": "North Carolina Department of Transportation (NCDOT) — 2026-2035 State Transportation Improvement Program (STIP)",
-   "dataset": "gis11.services.ncdot.gov, service NCDOT_STIP"
+   "dataset": "gis11.services.ncdot.gov, service NCDOT_STIP",
+   "status_const": "Programmed in the NCDOT 2026-2035 State Transportation Improvement Program"
   },
   "nddot-special-road-fund-projects": {
    "agency": "North Dakota Department of Transportation (NDDOT)",
-   "dataset": "services1.arcgis.com, service Special_Road_Fund_2026_WFL1"
+   "dataset": "services1.arcgis.com, service Special_Road_Fund_2026_WFL1",
+   "status_const": "Programmed"
   },
   "ndot-program-book-points": {
    "agency": "Nebraska Department of Transportation (NDOT) — NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
-   "dataset": "gis.ne.gov, service ProgramBookDOT"
+   "dataset": "gis.ne.gov, service ProgramBookDOT",
+   "status_const": "Programmed"
   },
   "ndot-program-book-segments": {
    "agency": "Nebraska Department of Transportation (NDOT) — NEBRASKA, not North Dakota (NDDOT) and not Nevada (NVDOT)",
-   "dataset": "gis.ne.gov, service ProgramBookDOT"
+   "dataset": "gis.ne.gov, service ProgramBookDOT",
+   "status_const": "Programmed"
   },
   "new-castle-county-permits": {
    "agency": "New Castle County, Delaware",
-   "dataset": "gis.nccde.org, service CustomMaps/Permits"
+   "dataset": "gis.nccde.org, service CustomMaps/Permits",
+   "status_const": "approved"
   },
   "new-hanover-county-building-permits": {
    "agency": "New Hanover County, North Carolina",
@@ -683,11 +726,13 @@
   },
   "nj-stip-projects": {
    "agency": "New Jersey Department of Transportation",
-   "dataset": "services.arcgis.com, service Statewide_Transportation_Improvement_Program_STIP_Project_Locations"
+   "dataset": "services.arcgis.com, service Statewide_Transportation_Improvement_Program_STIP_Project_Locations",
+   "status_const": "Programmed"
   },
   "nvdot-project-boundaries": {
    "agency": "Nevada Department of Transportation (NVDOT; self-abbreviates \"NDOT\") — NEVADA, not Nebraska and not North Dakota",
-   "dataset": "gis.dot.nv.gov, service Project_Boundaries"
+   "dataset": "gis.dot.nv.gov, service Project_Boundaries",
+   "status_const": "operating"
   },
   "nyc-dob-permit-issuance": {
    "agency": "New York City (DOB BIS legacy)",
@@ -699,15 +744,18 @@
   },
   "nysdot-capital-program-projects": {
    "agency": "New York State Department of Transportation",
-   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects"
+   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects",
+   "status_const": "Capital Program"
   },
   "nysdot-capital-program-projects-2": {
    "agency": "New York State Department of Transportation",
-   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects"
+   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects",
+   "status_const": "Capital Program"
   },
   "nysdot-capital-program-projects-3": {
    "agency": "New York State Department of Transportation",
-   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects"
+   "dataset": "gisportalny.dot.ny.gov, service Projects/CapitalProgramProjects",
+   "status_const": "Capital Program"
   },
   "odot-current-projects": {
    "agency": "Ohio Department of Transportation",
@@ -719,15 +767,18 @@
   },
   "okdot-workplan-roadways": {
    "agency": "Oklahoma Department of Transportation",
-   "dataset": "services6.arcgis.com, service ODOT_Workplan_Roads_2026to2033"
+   "dataset": "services6.arcgis.com, service ODOT_Workplan_Roads_2026to2033",
+   "status_const": "Programmed"
   },
   "oregon-dot-stip-projects": {
    "agency": "Oregon Department of Transportation (ODOT)",
-   "dataset": "gis.odot.state.or.us, service facs_stip/data_catalog"
+   "dataset": "gis.odot.state.or.us, service facs_stip/data_catalog",
+   "status_const": "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)"
   },
   "oregon-dot-stip-projects-lines": {
    "agency": "Oregon Department of Transportation (ODOT)",
-   "dataset": "gis.odot.state.or.us, service facs_stip/data_catalog"
+   "dataset": "gis.odot.state.or.us, service facs_stip/data_catalog",
+   "status_const": "Programmed in the ODOT 2024-2027 Statewide Transportation Improvement Program (STIP)"
   },
   "overland-park-building-permits": {
    "agency": "City of Overland Park, Kansas",
@@ -763,11 +814,13 @@
   },
   "portland-neighborhood-contact-applications": {
    "agency": "City of Portland",
-   "dataset": "www.portlandmaps.com, service COP_OpenData_PlanningDevelopment"
+   "dataset": "www.portlandmaps.com, service COP_OpenData_PlanningDevelopment",
+   "status_const": "Neighborhood contact filed before a land-use or building application"
   },
   "prince-georges-county-permits": {
    "agency": "Prince George's County",
-   "dataset": "data.princegeorgescountymd.gov, dataset weik-ttee"
+   "dataset": "data.princegeorgescountymd.gov, dataset weik-ttee",
+   "status_const": "approved"
   },
   "provo-planning-applications": {
    "agency": "Provo",
@@ -795,7 +848,8 @@
   },
   "san-antonio-prelim-plan-review": {
    "agency": "City of San Antonio",
-   "dataset": "services.arcgis.com, service Preliminary_Plan_Review_Meetings"
+   "dataset": "services.arcgis.com, service Preliminary_Plan_Review_Meetings",
+   "status_const": "Scheduled for preliminary plan review"
   },
   "san-diego-approved-permits": {
    "agency": "City of San Diego",
@@ -823,31 +877,38 @@
   },
   "sd-stip-construction-reconstruction": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-pavement-preservation": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-railroad-crossings": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-resurfacing": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-safety-lines": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-safety-points": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "sd-stip-structures": {
    "agency": "South Dakota Department of Transportation",
-   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved"
+   "dataset": "dotgis.sd.gov, service STIP/DOT_STIP_Approved",
+   "status_const": "Programmed"
   },
   "seattle-building-permits": {
    "agency": "City of Seattle",
@@ -859,7 +920,8 @@
   },
   "sheridan-county-building-permits": {
    "agency": "Sheridan County, Wyoming",
-   "dataset": "services5.arcgis.com, service Building_Permits_view"
+   "dataset": "services5.arcgis.com, service Building_Permits_view",
+   "status_const": "operating"
   },
   "sioux-falls-building-permits": {
    "agency": "City of Sioux Falls, South Dakota",
@@ -867,7 +929,8 @@
   },
   "skagit-county-active-permits": {
    "agency": "Skagit County, Washington",
-   "dataset": "geo.skagitcountywa.gov, service Planning/Active_Permits_Last_5_Years"
+   "dataset": "geo.skagitcountywa.gov, service Planning/Active_Permits_Last_5_Years",
+   "status_const": "Issued"
   },
   "slc-planning-petitions": {
    "agency": "Salt Lake City",
@@ -875,7 +938,8 @@
   },
   "slo-county-planning-permits": {
    "agency": "San Luis Obispo County Department of Planning & Building",
-   "dataset": "gis.slocounty.ca.gov, service PLN/PLN_EG_SERVICES_DATA"
+   "dataset": "gis.slocounty.ca.gov, service PLN/PLN_EG_SERVICES_DATA",
+   "status_const": "Submitted"
   },
   "sonoma-county-fire-rebuild-permits": {
    "agency": "County of Sonoma — Permit Sonoma",
@@ -899,7 +963,8 @@
   },
   "summit-county-oh-planning-commission-items": {
    "agency": "Summit County Planning Commission",
-   "dataset": "services3.arcgis.com, service SCPC_Items_Public_View"
+   "dataset": "services3.arcgis.com, service SCPC_Items_Public_View",
+   "status_const": "Submitted for county review"
   },
   "sussex-county-de-conditional-use": {
    "agency": "Sussex County, Delaware",
@@ -919,7 +984,8 @@
   },
   "thurston-county-residential-permits": {
    "agency": "Thurston County, Washington",
-   "dataset": "services1.arcgis.com, service Residential_Building_Permits"
+   "dataset": "services1.arcgis.com, service Residential_Building_Permits",
+   "status_const": "approved"
   },
   "tigard-or-active-building-permits": {
    "agency": "City of Tigard, Oregon",
@@ -975,7 +1041,9 @@
   },
   "wa-ecology-sepa-register": {
    "agency": "Washington State Department of Ecology (SEPA Register)",
-   "dataset": "data.wa.gov, dataset mmcb-z6jf"
+   "dataset": "data.wa.gov, dataset mmcb-z6jf",
+   "status_const": "proposed",
+   "date_label": "Published in the SEPA Register"
   },
   "wake-county-building-permits": {
    "agency": "Wake County",
@@ -987,7 +1055,8 @@
   },
   "wisdot-highway-program-6yr": {
    "agency": "Wisconsin Department of Transportation (WisDOT) — 6-Year Highway Improvement Program",
-   "dataset": "dotmaps.wi.gov, service agohub/HIGHWAY_PROGRAM_2_4_6_YEAR"
+   "dataset": "dotmaps.wi.gov, service agohub/HIGHWAY_PROGRAM_2_4_6_YEAR",
+   "status_const": "Programmed in WisDOT's 6-Year Highway Improvement Program — contract not yet let"
   },
   "worcester-building-permits": {
    "agency": "City of Worcester, Massachusetts",
@@ -995,15 +1064,18 @@
   },
   "wsdot-project-delivery-plan-complete": {
    "agency": "Washington State Department of Transportation (WSDOT)",
-   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent"
+   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent",
+   "status_const": "Operationally Complete"
   },
   "wsdot-project-delivery-plan-proposed": {
    "agency": "Washington State Department of Transportation (WSDOT)",
-   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent"
+   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent",
+   "status_const": "Not Yet Advertised"
   },
   "wsdot-project-delivery-plan-under-construction": {
    "agency": "Washington State Department of Transportation (WSDOT)",
-   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent"
+   "dataset": "data.wsdot.wa.gov, service Shared/WSDOTProjectDeliveryPlanCurrent",
+   "status_const": "Advertised, Not Yet Complete"
   },
   "wvdoh-active-projects": {
    "agency": "West Virginia Division of Highways (WVDOT)",
@@ -1011,15 +1083,18 @@
   },
   "wydot-stip-projects": {
    "agency": "Wyoming Department of Transportation (WYDOT) — State Transportation Improvement Program (STIP)",
-   "dataset": "services2.arcgis.com, service ITSM_STIP_Data_Layers"
+   "dataset": "services2.arcgis.com, service ITSM_STIP_Data_Layers",
+   "status_const": "Programmed in the WYDOT State Transportation Improvement Program (STIP)"
   },
   "wydot-stip-projects-lines": {
    "agency": "Wyoming Department of Transportation (WYDOT) — State Transportation Improvement Program (STIP)",
-   "dataset": "services2.arcgis.com, service ITSM_STIP_Data_Layers"
+   "dataset": "services2.arcgis.com, service ITSM_STIP_Data_Layers",
+   "status_const": "Programmed in the WYDOT State Transportation Improvement Program (STIP)"
   },
   "york-county-pa-planning-subdivisions": {
    "agency": "York County, Pennsylvania",
-   "dataset": "arcweb1.ycpc.org, service OPEN_DATA/PLANNING_Subdivisions"
+   "dataset": "arcweb1.ycpc.org, service OPEN_DATA/PLANNING_Subdivisions",
+   "status_const": "Submitted for county planning review"
   }
  }
 }
