@@ -56,9 +56,9 @@ ok(/\.home-index__map-preview\.is-sample iframe\{pointer-events:none\}/.test(css
 const imgs = tpl.match(/<img\b[^>]*>/g) || [];
 ok(imgs.length === 1 && /src="assets\/home-report-example-desktop\.webp\?v=\d{8}"/.test(imgs[0]),
   'the only image is the example-report preview (desktop asset)', imgs);
-ok(/alt="Example property report for 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335, as of Oct 15, 2026: 2 official records[^"]*not site-verified/.test(imgs[0] || '') && /width="1600"/.test(imgs[0] || '')
-   && /height="1464"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || '') && /loading="lazy"/.test(imgs[0] || ''),
-  'the report image has a descriptive alt (real address, counts, not site-verified), width, height, decoding and lazy loading');
+ok(/alt="Example property report for 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335, as of Oct 15, 2026: 2 official records[^"]*what the record documents/.test(imgs[0] || '') && /width="1600"/.test(imgs[0] || '')
+   && /height="1656"/.test(imgs[0] || '') && /decoding="async"/.test(imgs[0] || '') && /loading="lazy"/.test(imgs[0] || ''),
+  'the report image has a descriptive alt (real address, counts, what the record documents), width, height, decoding and lazy loading');
 ok(/<source media="\(max-width: 560px\)" srcset="assets\/home-report-example-mobile\.webp\?v=\d{8}" width="688" height="\d+">/.test(tpl),
   'a phone gets the mobile crop of the same report');
 ok(/\.webp/.test(read('scripts/stage_site.py')), 'the production artifact ships .webp assets');

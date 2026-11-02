@@ -1,5 +1,5 @@
 {
- "view_sha256": "3df241db329b08f0d7ab4840214315f22a7e6015c78f410e0fe2d62854c539f1",
+ "view_sha256": "d4426116c4c2684e74c0f46c9db61c22f38d1ee53f7df651afc18839ede4654b",
  "fixture_md5": "f04579a6f3adfc15f4f7ab3300e884c3",
  "subject": "4700 Point Fosdick Dr NW, Gig Harbor, WA 98335",
  "caption": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source.",
@@ -13,7 +13,7 @@
  "frames": {
   "desktop": {
    "width": 1600,
-   "height": 1464,
+   "height": 1656,
    "layout": "four-column",
    "headers": [
     "Development",
@@ -27,22 +27,22 @@
      "name": "Construction Residential Long Acres, Lot 20",
      "type": "residential",
      "stage": "proposed",
-     "stage_text": "Proposed / Under Review Source agency status: Accepted"
+     "stage_text": "Proposed / Under review Source agency status: Accepted"
     },
     {
      "project_id": "arcgis:pierce-county-pals-permits:1072432",
      "name": "Construction Residential Long Acres, Lot 15",
      "type": "residential",
      "stage": "permitted",
-     "stage_text": "Permitted / Under Construction Source agency status: Issued"
+     "stage_text": "Permit issued Source agency status: Issued An issued permit does not confirm that construction has started."
     }
    ],
-   "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property: 1 permitted / under construction · 1 proposed / under review. Types: 2 Residential. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Construction Residential Long Acres, Lot 20 Residential Proposed / Under Review Source agency status: Accepted Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Construction Residential Long Acres, Lot 15 Residential Permitted / Under Construction Source agency status: Issued Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "ef69319287b7f910f95ed1829371f8a17125a54ad578314154ea31e355055fd9"
+   "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property document a nearby change: 1 with a permit issued · 1 proposed / under review. Types: 2 Residential. These are counts of records, not of separate developments; one development can have several records. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Construction Residential Long Acres, Lot 20 2518 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Proposed / Under review Source agency status: Accepted The record documents the work it describes. It states no schedule and no effect on nearby properties. Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Construction Residential Long Acres, Lot 15 2318 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Permit issued Source agency status: Issued An issued permit does not confirm that construction has started. The record documents the work it describes. It states no schedule and no effect on nearby properties. Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
+   "asset_sha256": "3e97b1f1e72255e75ee28a1ce747058151d2ce61a114a79831a0eb8022cbae5b"
   },
   "mobile": {
    "width": 688,
-   "height": 2440,
+   "height": 2888,
    "layout": "stacked",
    "headers": [
     "Development",
@@ -56,18 +56,18 @@
      "name": "Construction Residential Long Acres, Lot 20",
      "type": "residential",
      "stage": "proposed",
-     "stage_text": "Proposed / Under Review Source agency status: Accepted"
+     "stage_text": "Proposed / Under review Source agency status: Accepted"
     },
     {
      "project_id": "arcgis:pierce-county-pals-permits:1072432",
      "name": "Construction Residential Long Acres, Lot 15",
      "type": "residential",
      "stage": "permitted",
-     "stage_text": "Permitted / Under Construction Source agency status: Issued"
+     "stage_text": "Permit issued Source agency status: Issued An issued permit does not confirm that construction has started."
     }
    ],
-   "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property: 1 permitted / under construction · 1 proposed / under review. Types: 2 Residential. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Development: Construction Residential Long Acres, Lot 20 Residential Stage: Proposed / Under Review Source agency status: Accepted Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Supporting Evidence: Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Development: Construction Residential Long Acres, Lot 15 Residential Stage: Permitted / Under Construction Source agency status: Issued Quality-of-Life Impact: Potential construction noise and traffic, then added neighborhood activity or visual change. Not site-verified; no effect is established. Supporting Evidence: Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
-   "asset_sha256": "f769074876969e99ab09c2b0ae91d5fb78b4ac22df5996159ef0f57dff455bac"
+   "text": "Example property report · real records, as of Oct 15, 2026. Both of the report’s 2 official records are shown. In the full report each record links to its official source. JODY Development Activity 4700 Point Fosdick Dr NW, Gig Harbor, WA 98335 Search radius 0.5 miles · ZIP 98335 Generated Oct 15, 2026 As of Oct 15, 2026, 2 official records within 0.5 miles of this property document a nearby change: 1 with a permit issued · 1 proposed / under review. Types: 2 Residential. These are counts of records, not of separate developments; one development can have several records. DEVELOPMENT STAGE QUALITY-OF-LIFE IMPACT SUPPORTING EVIDENCE Development: Construction Residential Long Acres, Lot 20 2518 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Stage: Proposed / Under review Source agency status: Accepted Quality-of-Life Impact: The record documents the work it describes. It states no schedule and no effect on nearby properties. Supporting Evidence: Official record: Filed · Aug 21, 2026 Official source → for Construction Residential Long Acres, Lot 20 (opens in a new tab) Development: Construction Residential Long Acres, Lot 15 2318 50TH STCT NW Jody type: Residential Not on the map: no direction is available for this record. Stage: Permit issued Source agency status: Issued An issued permit does not confirm that construction has started. Quality-of-Life Impact: The record documents the work it describes. It states no schedule and no effect on nearby properties. Supporting Evidence: Official record: Filed · Jun 23, 2026 Official source → for Construction Residential Long Acres, Lot 15 (opens in a new tab)",
+   "asset_sha256": "f7907b4f16e673cc408f7f11b8bfca4da38039260e1cefff6fb6e5ea4c7e98d2"
   }
  }
 }
