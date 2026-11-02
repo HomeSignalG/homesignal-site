@@ -137,9 +137,9 @@ m('distance_without_render', "  function distanceOf(response, id) {\n    var r =
 m('map_invents_positions', "if (d === null || b === null) return;", "if (d === null) d = 0.25; if (b === null) b = 0;")
 m('map_drawn_with_nothing', "    if (!drawn) return '';\n", "")
 m('map_not_to_scale', "var rr = Math.min(d / radius, 1) * R,", "var rr = R * 0.6,")
-m('map_north_flipped', "py = C - rr * Math.cos(rad);", "py = C + rr * Math.cos(rad);")
+m('map_north_flipped', "y0: C - rr * Math.cos(rad) });", "y0: C + rr * Math.cos(rad) });")  # re-anchored 2026-11-02 (national-5: markers keep their true spot in x0/y0)
 m('map_number_off_by_one', "'<text class=\"da-rv-mnum\" text-anchor=\"middle\" dy=\"4\">' + x.n + '</text></g>'", "'<text class=\"da-rv-mnum\" text-anchor=\"middle\" dy=\"4\">' + (x.n + 1) + '</text></g>'")
-m('map_permitted_drawn_as_circle', "var k = x.k, shape = k === 'permitted'", "var k = x.k, shape = k === 'never'")
+m('map_permitted_drawn_as_circle', "var shape = k === 'permitted'", "var shape = k === 'never'")  # re-anchored 2026-11-02 (national-5)
 m('map_bearing_defaulted', "if (!m || !has(m, id)) return null;", "if (!m || !has(m, id)) return 0;")
 # ---- filters: two dimensions, presentation only --------------------------------------------------------------------------------------------------------
 m('type_chip_label_is_key', "return reg && isObj(reg[k]) && !reg[k].isFacility ? txt(reg[k].label) : (seen[k] ? seen[k].label : '');", 'return k;')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
