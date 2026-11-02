@@ -68,6 +68,28 @@ const txt = await page.locator(T).textContent();
 ok(txt.includes('Rebuilt from the current script') && !txt.includes('Corrected from your note'), '7 the new version says it was rebuilt');
 ok(txt.includes('Fixes that no longer apply') && txt.includes('The old sentence.') && txt.includes('no longer in the script'), '8 a fix the script lost is named');
 
+// 9-11: a plan waiting for Confirm must not hide Full rebuild (founder, 2026-11-01: "there is no full rebuild on
+// main"). The server cancels that plan when a rebuild starts; while Claude is still reading it refuses, so no button then.
+await page.evaluate(() => {
+  window.row.revisions = []; window.calls = [];
+  window.plans = [
+    { id: 'p1', slug: 's', file_key: 'final', status: 'ready', note: 'check the images', created_at: '2026-10-31T10:00:00Z',
+      plan: { corrections: [], steps: [], not_done: [{ from_note: 'check the images', reason: 'no form fits' }] } },
+    { id: 'p2', slug: 's', file_key: 'short1', status: 'ready', note: 'lower the voice', created_at: '2026-10-31T10:00:00Z',
+      plan: { corrections: [{ kind: 'x' }], steps: [{ instruction: 'x', changes: ['x'] }], not_done: [] } },
+    { id: 'p3', slug: 's', file_key: 'short2', status: 'planning', note: 'fix it', created_at: '2026-10-31T10:00:00Z' }
+  ];
+  const rpc = window.client.rpc;
+  window.client.rpc = (n, a) => n === 'hs_youtube_video_plans' ? Promise.resolve({ data: window.plans, error: null }) : rpc(n, a);
+});
+await load();
+ok(await page.locator('.yv-file[data-key="final"] .yv-rebuild').count() === 1, '9 a plan with nothing it can change still shows Full rebuild');
+ok(await page.locator('.yv-file[data-key="short1"] .yv-rebuild').count() === 1, '10 a plan waiting for Confirm still shows Full rebuild');
+ok(await page.locator('.yv-file[data-key="short2"] .yv-rebuild').count() === 0, '11 no Full rebuild while Claude is still reading');
+await page.click('.yv-file[data-key="final"] .yv-rebuild');
+await page.waitForFunction(() => window.calls.some((c) => c[0] === 'hs_youtube_video_rebuild'));
+ok(await page.evaluate(() => window.calls.find((c) => c[0] === 'hs_youtube_video_rebuild')[1].p_key === 'final'), '12 it rebuilds that file');
+
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all rebuild page checks passed');
