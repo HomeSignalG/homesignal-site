@@ -603,6 +603,10 @@ try {
   const noDir = clone(WP); noDir.render.bearings_deg = {};
   ok(!sec(V.html(noDir, {}), 'map') && rowsOf(V.html(noDir, {})).length >= 4, '14g with no directions in the response the map is left out (never drawn from a guess) and the table still lists every record');
   ok(['N', 'E', 'S', 'W'].every((l) => new RegExp('class="da-rv-ringlab">' + l + '</text>').test(mp)), '14h the map carries all four compass letters');
+  { const oneDir = clone(WP), ids = Object.keys(oneDir.render.bearings_deg), gone = ids[0]; delete oneDir.render.bearings_deg[gone];
+    const ho = V.html(oneDir, {});
+    const nums = rowsOf(ho).map((r) => (/Map (\d+)/.exec(r.cells[0]) || [])[1]).filter(Boolean);
+    ok(nums.length === ids.length - 1 && nums.every((n, i) => n === String(i + 1)), '14g2 a record with no direction gets no Map number, and the other numbers stay 1..n with no gap', nums); }
   // chips: counts are the rows each chip leaves; All is pressed
   const chips = [...sec(hp, 'filters').html.matchAll(/data-da-filter="(\w+)" data-da-value="(\w+)" aria-pressed="(\w+)">([^<]*?) <span class="da-rv-chipn">(\d+)<\/span>/g)].map((m) => m[1] + ':' + m[2] + ':' + m[3] + ':' + decode(m[4]) + ':' + m[5]);
   ok(chips.join('|') === 'type:all:true:All:4|type:residential:false:Residential:1|type:commercial:false:Commercial:1|type:infrastructure:false:Roads & infrastructure:2|stage:all:true:All:4|stage:approved:false:Approved:1|stage:proposed:false:Proposed / Under review:1|stage:permitted:false:Permit issued / Under construction:2',
