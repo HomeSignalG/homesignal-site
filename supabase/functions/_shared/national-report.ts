@@ -247,6 +247,10 @@ export type SourceHealth = {
 //   DEVELOPMENT_SHOWN        the report shows at least one development record;
 //   NO_DEVELOPMENT_ACTIVITY  HomeSignal can PROVE its official development data for this address is coming in, and it shows no
 //                            development within the report radius. A real answer: it uses one free report;
+//   NO_SIGNIFICANT_CHANGES   (activity-outcome-2, founder 2026-11-02) the report lists nothing, but Jody READ official records within the
+//                            radius and judged every one of them: routine work, a record that does not say what its work is, or a
+//                            temporary activity that has ended. Data is coming in, so "No data ingested" would be false; it is still
+//                            not a measured zero of development, so it never uses a free report (credit-rule.ts, unchanged charging);
 //   NO_DATA_INGESTED         the report is empty and HomeSignal cannot prove its data is coming in (a source not read, no
 //                            source covering the area, or no way to tell which). HomeSignal's gap,
 //                            not an answer about the area: it never uses a free report.
@@ -255,19 +259,23 @@ export type SourceHealth = {
 // NO_DEVELOPMENT_ACTIVITY becomes reachable only through a reviewed change to activityOutcome() with its own tests, never a setting.
 
 /** Bump whenever activityOutcome() or the labels change: the report carries it, so a stored report says which rule judged it. */
-export const ACTIVITY_RULE_VERSION = 'activity-outcome-1';
-export const ACTIVITY_OUTCOMES = ['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_DATA_INGESTED'] as const;
+export const ACTIVITY_RULE_VERSION = 'activity-outcome-2';
+export const ACTIVITY_OUTCOMES = ['DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_SIGNIFICANT_CHANGES', 'NO_DATA_INGESTED'] as const;
 export type ActivityOutcome = typeof ACTIVITY_OUTCOMES[number];
 /** The founder's words, exactly ("lets be more clear and write \"no devlopment activity\" vs \"no data ingested\""). */
 export const ACTIVITY_LABELS: Readonly<Record<ActivityOutcome, string>> = Object.freeze({
   DEVELOPMENT_SHOWN: 'Development shown',
   NO_DEVELOPMENT_ACTIVITY: 'No development activity',
+  NO_SIGNIFICANT_CHANGES: 'No significant nearby changes found',
   NO_DATA_INGESTED: 'No data ingested',
 });
 
-/** THE one decision of what a report's outcome is. Today it has no proof of ingestion to read, so an empty report is "No data ingested". */
-export function activityOutcome(projectsInReport: number): ActivityOutcome {
-  return Number.isInteger(projectsInReport) && projectsInReport > 0 ? 'DEVELOPMENT_SHOWN' : 'NO_DATA_INGESTED';
+/** THE one decision of what a report's outcome is. `recordsJudged` is how many official records in this radius the relevance rule read and
+ *  left out (the report's relevance_review). Today there is no proof of ingestion beyond that, so an empty report with nothing judged is
+ *  "No data ingested". */
+export function activityOutcome(projectsInReport: number, recordsJudged: number = 0): ActivityOutcome {
+  if (Number.isInteger(projectsInReport) && projectsInReport > 0) return 'DEVELOPMENT_SHOWN';
+  return Number.isInteger(recordsJudged) && recordsJudged > 0 ? 'NO_SIGNIFICANT_CHANGES' : 'NO_DATA_INGESTED';
 }
 
 export type Subject = {
@@ -581,7 +589,8 @@ export function titleCut(name: string | null): boolean { return typeof name === 
  * The rule never includes on a word alone that can mean routine work ("remodel", "repair", "alteration", "tenant improvement"), never on a permit value, and
  * never on the commercial Type. One normalisation (normalizeWords): lower case, non-alphanumerics to spaces, padded, so ' deck ' cannot match 'decker'.
  */
-export const RELEVANCE_RULE_VERSION = 'relevance-1';
+// relevance-2 (2026-11-02): "change in use" (Sioux Falls WORKCLASS) is the same fact as "change of use".
+export const RELEVANCE_RULE_VERSION = 'relevance-2';
 export function normalizeWords(s: string): string {
   return ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
 }
@@ -597,7 +606,7 @@ const any = (w: string, list: string[]) => list.find((x) => w.includes(x)) ?? nu
 const INTERIOR_DEMOLITION = [' interior demolition ', ' interior demo ', ' selective demolition ', ' non structural demolition ', ' demolition of interior '];
 const TEMPORARY = [' temporary '];
 const TEMPORARY_EVENT = [' event ', ' events ', ' stage ', ' festival ', ' concert ', ' fair ', ' tent ', ' tents ', ' bleachers ', ' outdoor '];
-const CHANGE_OF_USE = [' change of use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
+const CHANGE_OF_USE = [' change of use ', ' change in use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
 const DEMOLITION = [' demolish ', ' demolition ', ' demo of ', ' raze '];
 const SITE_WORK = [' shoring ', ' excavation ', ' excavate ', ' grading ', ' clearing and grading ', ' mass grading ', ' earthwork '];
 const NEW_CONSTRUCTION = [' new construction ', ' new single family ', ' new multifamily ', ' erect ', ' high rise ', ' mid rise ',
@@ -945,7 +954,7 @@ export function assemble(input: AssembleInput): Assembled {
   }
   if (sourcesNotFullyRead(input.health, familiesIncluded)) limitations.push({ ...SOURCE_NOT_FULLY_READ });
   const state: CoverageState = limitations.length > 0 ? 'LIMITED_COVERAGE' : anyChangeReady ? 'CHANGE_READY' : 'REPORT_READY';
-  const outcome = activityOutcome(projects.length);
+  const outcome = activityOutcome(projects.length, relevanceReview.length);
 
   const intelligence: Record<string, unknown> = {
     product: PRODUCT_NAME,
@@ -956,7 +965,13 @@ export function assemble(input: AssembleInput): Assembled {
     recent_days: RECENT_DAYS,
     stage_rule_version: STAGE_RULE_VERSION,
     relevance_rule_version: RELEVANCE_RULE_VERSION,
-    activity: { outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION },
+    activity: {
+      outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION,
+      // what Jody read and left out, by kind: only on the outcome that rests on it (the view words it; nothing else reads it)
+      ...(outcome === 'NO_SIGNIFICANT_CHANGES' ? { records_judged: {
+        total: relevanceReview.length, routine: excluded.routine_work, undescribed: excluded.relevance_not_established, temporary_ended: excluded.temporary_ended,
+      } } : {}),
+    },
     coverage: {
       zip_supported: true,
       state,

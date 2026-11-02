@@ -147,7 +147,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
 </div>
 
 <script src="lib/project-type.js?v=ed9e58be"></script>
-<script src="lib/da-report-view.js?v=2bcbebe1"></script>
+<script src="lib/da-report-view.js?v=12be10b7"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -274,6 +274,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     }
     if (c.reason === 'INTERNAL_VIEW') return 'The internal view is never charged. Choose \u201cWhat a paying customer sees today\u201d to see whether a client\u2019s report would use a free report.';
     if (c.reason === 'NO_DATA_INGESTED') return 'For a trial customer, this report would not use a free report: No data ingested.';
+    if (c.reason === 'NO_SIGNIFICANT_CHANGES') return 'For a trial customer, this report would not use a free report: no significant nearby changes found.';
     if (c.reason === 'NOT_STORABLE') return 'For a trial customer, this report would not use a free report: it could not be saved.';
     return 'For a trial customer, this report would not use a free report.';
   }
@@ -315,6 +316,7 @@ fieldset label{display:flex;gap:6px;align-items:center;font-weight:500;color:var
     // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
     var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
     if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    else if (outcome === 'NO_SIGNIFICANT_CHANGES') say('Report ready: no significant nearby changes found. Jody read the official records near this address and all of them describe routine work, do not say what the work is, or have ended.', false);
     else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('viewnote').textContent = view === 'internal'
       ? 'Internal view: it includes records from sources that are not yet cleared for paying customers, so a client would see fewer.'

@@ -103,3 +103,33 @@ of the nearby records; the report says so (see "empty report" below) and never p
    and temporary-event handling in the report changed.
 9. **Not deployed.** The engine (`get-development-activity-report`) deploys only by manual dispatch. The view goes live with
    Pages on merge and re-renders saved reports (their routine work is hidden and the new labels apply).
+
+
+## Follow-up, 2026-11-02 evening (founder "agree do all")
+
+1. **Empty-report outcome: decided.** A fourth outcome, "No significant nearby changes found" (`NO_SIGNIFICANT_CHANGES`,
+   `activity-outcome-2`), replaces "No data ingested" when the relevance rule read and left out every nearby record. It says how
+   many records Jody checked and why each kind was left out. It does not use a free report (`credit-rule-2`), so charging is
+   unchanged.
+2. **Sources that publish a description column we never read: wired.** A shared connector helper
+   (`get-address-report/sources/scope-text.ts`) carries a source's own work description as `scope_text`, which the relevance rule
+   already reads and the change ledger ignores. Fields checked on each publisher's own layer through `pg_net` the same day:
+
+   | Source family | description column | sample |
+   |---|---|---|
+   | brunswick-county-permits | `Description` | "New Home Stories: 1 … Sq. Ft. Under Roof: 3854" |
+   | durham-building-permits | `DESCRIPTION` (not `COMMENTS`, which carries emails and owner names) | "SMPR: Kitchen remodel" |
+   | cleveland-issued-building-permits | `WORK_DESCRIPTION` | "861 sq ft - Buildout of existing building." |
+   | sioux-falls-building-permits | `WORKCLASS` | "Change in Use", "Reshingle" |
+   | san-jose-permits | `WORKDESC` (added to `out_fields`) | "Additions/Alterations", "Sub-Trades Only" |
+   | arlington-issued-permits | `WORKDESC` | "New Construction", "Demolition" |
+   | seattle-building-permits, seattle-land-use-permits | `description` (the full text; the label stays cut at 120) | Bumbershoot: "…removed by 9/8" |
+   | wa-ecology-sepa-register | `proposaldescription` | "Divide 14.12 acres into 34 lots …" |
+
+   Descriptions are cut at a word at 300 characters (Cleveland's cached rows were already ~6 MB), and emails and "User: …" account
+   names are removed. "Change in use" is now read as a change of use (`relevance-2`). **Not wireable:** Loudoun publishes no work
+   description at all (unit type and land use only); Huntsville's layer did not answer.
+3. **Where it takes effect:** a ZIP's stored records gain their descriptions when the rolling refresh next rewrites that ZIP
+   (about 53 hours for the whole country) after `get-address-report` is deployed. Reports made before then judge the old rows.
+4. **The reader is already told** when nearby records do not describe their work ("Records left out of this report", and the
+   new empty outcome's counts), so no further wording was added.

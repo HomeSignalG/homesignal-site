@@ -5787,9 +5787,17 @@ Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality
   full record has no dates; `temporary_timing_not_captured` when ingestion cut the text and stored no description. Bumbershoot 2026 is the last kind:
   its official record says removal by 9/8, the stored title is cut before that. The fix is connectors emitting the full description as `scope_text`.
 - **Occupancy (#2526) runs after relevance**: an occupancy approval for routine work is not listed; TCO / Temporary C of O keep "Temporary".
+- **Sources that publish a work description in a column the title never read now carry it as `scope_text`** (2026-11-02, `sources/scope-text.ts`,
+  one helper used by all five connectors; `column_map.scope_text` on Brunswick, Durham, Cleveland, Sioux Falls, San Jose, Arlington TX, both Seattle
+  permit datasets and the WA SEPA register). Cut at a word at 300 characters; emails and "User: …" account names removed; never a comments, notes,
+  conditions or party column (test 3c). The ledger ignores `scope_text`, so no change events. Takes effect per ZIP on its next rolling refresh.
 - ⚠️ **Measured on a 5,000-record national sample: 34% included, 23% routine, 43% relevance not established**, mostly families that publish no work
   description (Brunswick NC, Sioux Falls, San Jose, Loudoun ...). Areas served only by those sources get thin reports until ingest adds a description column.
-- ⚠️ **Open founder decision:** when every nearby record is excluded the outcome is still "No data ingested" (ruling R5), which is not accurate then.
+- ⚖️ **Decided 2026-11-02 (founder "agree do all"): a fourth outcome, `NO_SIGNIFICANT_CHANGES`, "No significant nearby changes found"** (`activity-outcome-2`).
+  An empty report whose records were all read and left out by the relevance rule says what Jody checked ("Jody checked N official records within R of
+  this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would
+  notice."), counted by kind from `activity.records_judged`. Nothing judged stays "No data ingested". **It never uses a free report** (`credit-rule-2`):
+  these reports were "No data ingested" before, so charging did not change; making it charged is a separate founder call. Tests: national-report 10a2/11d2, the report view's tests 5l2-5l5, national7 R3.
 
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 

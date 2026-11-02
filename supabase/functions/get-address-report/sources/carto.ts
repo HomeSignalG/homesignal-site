@@ -28,6 +28,7 @@
 // runtime import and fails to resolve. Deno erases it either way.
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
+import { scopeField } from "./scope-text.ts";
 import type {
   Bucket, ColumnMap, ColumnRef, FileDateKind, ExcludedStatus, NormalizedRecord, StatusToBucket,
   UnmappedStatus, CaseFoldMatch, NormalizedLookup,
@@ -343,6 +344,7 @@ async function normalizeRow(
     case_number: caseNo,
     record_url: recordUrl,
     record_url_precision: precision,
+    ...scopeField(readCol(row, cm.scope_text), title),
     ...geoQuality,
   };
   return rec;

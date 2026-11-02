@@ -635,8 +635,8 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
   </div>
 </div>
 <script src="lib/project-type.js?v=ed9e58be"></script>
-<script src="lib/da-report-view.js?v=2bcbebe1"></script>
-<script src="lib/da-report-compare.js?v=5c0ad395"></script>
+<script src="lib/da-report-view.js?v=12be10b7"></script>
+<script src="lib/da-report-compare.js?v=a97e336e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script>
 // ============================================================================
@@ -1949,6 +1949,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     if (body.charged === true) return paid ? 'This report used 1 of your brokerage’s 100 reports this month.' : 'This report used 1 of your brokerage’s free reports.';
     var c = body.credit;
     if (c && c.reason === 'NO_DATA_INGESTED') return 'This report did not use ' + oneOf() + ': No data ingested.';
+    if (c && c.reason === 'NO_SIGNIFICANT_CHANGES') return 'This report did not use ' + oneOf() + ': no significant nearby changes found.';
     return 'This report did not use ' + oneOf() + '.';
   }
   async function run(){
@@ -1993,6 +1994,7 @@ input[type=search]:focus-visible{outline:3px solid var(--accent);outline-offset:
     // receives official records for the address, so "0 official records within 0.5 miles" would read as a measured zero (founder ruling R5, 2026-10-02).
     var outcome = body.report && body.report.activity ? body.report.activity.outcome : null;
     if (outcome === 'NO_DATA_INGESTED') say('Report ready: No data ingested for this address. It is not a finding that there is no development nearby.', false);
+    else if (outcome === 'NO_SIGNIFICANT_CHANGES') say('Report ready: no significant nearby changes found. Jody read the official records near this address and all of them describe routine work, do not say what the work is, or have ended.', false);
     else say('Report ready: ' + n + (n === 1 ? ' official record' : ' official records') + ' within 0.5 miles.', false);
     $('creditnote').textContent = chargeLine(body); $('creditnote').hidden = false;
     if (body.stored === true) { savedFresh = false; showSaved(true); logReportCreated(); } // a report that was just saved joins the list

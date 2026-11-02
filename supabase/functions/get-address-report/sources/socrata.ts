@@ -29,6 +29,7 @@
 
 import { attemptFetch } from "./fetch-retry.ts";
 import { dropNullIsland } from "./null-island.ts";
+import { scopeField } from "./scope-text.ts";
 import { scopeBox, widensLegacy, type ZipBounds } from "./scope-box.ts";
 import { buildScopeReceipt, receiptVersion, type ScopeReceipt } from "./scope-receipt.ts";
 import {
@@ -91,6 +92,8 @@ export interface ColumnMap {
   zip?: ColumnRef;
   /** A column carrying a per-row official URL (string, or an object with a `.url`). */
   record_url?: ColumnRef;
+  /** Optional: the publisher's own work description, emitted as `scope_text` (sources/scope-text.ts). Never part of the title. */
+  scope_text?: ColumnRef;
 }
 
 export interface StatusToBucket {
@@ -685,6 +688,7 @@ async function normalizeRow(
     case_number: caseNo,
     record_url: recordUrl,
     record_url_precision: precision,
+    ...scopeField(readCol(row, cm.scope_text), title),
     ...geoQuality,
   };
   if (row[SCOPE_ORIGIN_KEY] === SCOPE_ORIGIN_MEMBER) rec.scope_origin = SCOPE_ORIGIN_MEMBER;

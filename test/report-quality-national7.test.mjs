@@ -248,8 +248,11 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
   const onlyRoutine = fx.projects.filter((p) => /kitchen remodel|interior alterations to condo unit/i.test(p.name));
   const e = assembleWith(onlyRoutine).intelligence;
   const he = V.html({ status: 'OK', report: e, render: {} }, {});
-  ok(e.projects.length === 0 && /describe routine work/.test(he) && /not a finding that there is no development nearby/.test(he) && !/Other nearby records do not describe/.test(he),
-    'R3 an empty report of routine work says so, and that it is not a finding of no development');
+  const n3 = onlyRoutine.length;
+  ok(e.projects.length === 0 && e.activity.outcome === 'NO_SIGNIFICANT_CHANGES' && /<h2 class="da-rv-h2">No significant nearby changes found<\/h2>/.test(he)
+    && he.includes('Jody checked ' + n3 + ' official records within 0.5 miles of this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would notice.')
+    && !/No data ingested/.test(he) && !/Records left out of this report/.test(he),
+    'R3 an empty report of routine work says "No significant nearby changes found" (founder 2026-11-02), with the count of records Jody checked, never "No data ingested"', he.replace(/<[^>]+>/g, ' ').slice(0, 600));
   // the test world's default agency class ('New Construction') does not bypass relevance: without it a generic record is left out
   const W = await import('./lib/da-report-view-world.mjs');
   const g = M.assemble({ now: W.NOW, subject: { address: W.ADDRESS, matched_address: null, lat: 44.04612, lng: -122.98123, zip: '97477' }, radius_mi: 0.5, view: 'customer', zip_supported: true, attribution: W.ATTRIBUTION_AB,

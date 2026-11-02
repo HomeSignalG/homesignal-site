@@ -5,7 +5,8 @@
 // function decides it again. The record of the ruling, in the founder's words: docs/development-activity-founder-ruling-r5-2026-10-02.md.
 //
 //   uses a free report ...... DEVELOPMENT_SHOWN, NO_DEVELOPMENT_ACTIVITY (a real answer about the area)
-//   never uses one .......... NO_DATA_INGESTED (HomeSignal's gap), the internal view, anything that is not an issued report
+//   never uses one .......... NO_DATA_INGESTED (HomeSignal's gap), NO_SIGNIFICANT_CHANGES (records were read and all left out: not a
+//                             measured zero, and before 2026-11-02 these reports were NO_DATA_INGESTED, so charging is unchanged), the internal view, anything that is not an issued report
 //                             (address not found, ZIP not covered, a report that cannot be stored), and anything this rule does
 //                             not recognise. Unknown never charges: charging for a report HomeSignal cannot vouch for is the
 //                             error the ruling forbids.
@@ -16,10 +17,10 @@
 import { ACTIVITY_OUTCOMES, ACTIVITY_RULE_VERSION } from './national-report.ts';
 
 /** Bump whenever creditDecision() changes: the response and the credit ledger carry it, so a charge says which rule made it. */
-export const CREDIT_RULE_VERSION = 'credit-rule-1';
+export const CREDIT_RULE_VERSION = 'credit-rule-2';
 
 export const CREDIT_REASONS = [
-  'DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_DATA_INGESTED', 'INTERNAL_VIEW', 'NOT_A_REPORT', 'NOT_STORABLE', 'UNRECOGNISED',
+  'DEVELOPMENT_SHOWN', 'NO_DEVELOPMENT_ACTIVITY', 'NO_SIGNIFICANT_CHANGES', 'NO_DATA_INGESTED', 'INTERNAL_VIEW', 'NOT_A_REPORT', 'NOT_STORABLE', 'UNRECOGNISED',
 ] as const;
 export type CreditReason = typeof CREDIT_REASONS[number];
 export type CreditDecision = { uses_report: boolean; reason: CreditReason; rule_version: string };

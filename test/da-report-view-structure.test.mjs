@@ -57,11 +57,11 @@ const C = code(SRC);
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
   // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
   // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
-  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
+  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'records_judged', 'temporary_ended', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
     'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-one (a new one must be added here on purpose)', snake);
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-three (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
@@ -130,10 +130,11 @@ const C = code(SRC);
     '3g the only wording that says there was no activity is the title for the engine\'s own "No development activity" outcome (plan hard rule 66; ruling R5)', absHits);
   // build step 10 moved the read of the engine's outcome code into outcomeKeyOf(), so the report and the comparison read it from one function
   const okf = (C.match(/function outcomeKeyOf\(report\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok((C.match(/report\.activity/g) || []).length === 2 && okf.length > 100 && (okf.match(/report\.activity/g) || []).length === 2
+  const jof = (C.match(/function judgedOf\(report\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok((C.match(/report\.activity/g) || []).length === 4 && (jof.match(/report\.activity/g) || []).length === 2 && /records_judged/.test(jof) && okf.length > 100 && (okf.match(/report\.activity/g) || []).length === 2
     && /return a && typeof a\.outcome === 'string' && has\(OUTCOMES, a\.outcome\) \? a\.outcome : '';/.test(okf)
-    && (C.match(/outcomeKeyOf\(report\)/g) || []).length === 2 && /var o = outcomeText\(report\);\s*if \(!o \|\| report\.projects\.length !== 0\) return '';/.test(C) && !/a\.label|activity\.label|\.rule_version/.test(C),
-    '3g2 the outcome is read in ONE function (outcomeKeyOf), from the engine\'s code only (never its label), and the report shows it only when it carries no projects');
+    && (C.match(/outcomeKeyOf\(report\)/g) || []).length === 3 && /var o = outcomeText\(report\);\s*if \(!o \|\| report\.projects\.length !== 0\) return '';/.test(C) && !/a\.label|activity\.label|\.rule_version/.test(C),
+    '3g2 the outcome is read in ONE function (outcomeKeyOf), from the engine\'s code only (never its label), and the report shows it only when it carries no projects; the counts behind "No significant nearby changes found" are read in ONE function (judgedOf)');
   ok(!/projects\.length === 0 \?|NO_DATA_INGESTED['"]?\s*[:=]\s*report|outcome\s*=\s*['"]/.test(C), '3g3 the view never assigns an outcome itself');
   ok(!/\.coverage_state\b|\.stored\b|LIMITED_COVERAGE|REPORT_READY|CHANGE_READY/.test(C), '3h it never reads or prints the coverage state: the report speaks through the engine\'s limitation text');
 }
