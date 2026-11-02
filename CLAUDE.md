@@ -5751,6 +5751,26 @@ matched. Five presentation errors were fixed universally. Test: `test/report-qua
 - **Map markers that would overlap are set apart** (`spreadMarks`), each with a thin line to its true spot. Measured on the sample: 7 numbers were
   unreadable before the fix and none after.
 
+## DEVELOPMENT ACTIVITY REPORT, national-6 (2026-11-02): ONLY DOCUMENTED NEIGHBORHOOD-FACING CHANGES ARE LISTED
+
+Founder brief "Universal Development Activity Report corrections". Jody is not a permit inventory. Record: `docs/report-quality-national6-2026-11-02.md`.
+Tests: `test/report-quality-national6.test.mjs` on `test/fixtures/report-quality/seattle-3101-western-2026-11-02.json` (a read-only production capture).
+- **`relevance()` in `_shared/national-report.ts` judges every record BEFORE anything is built** (sections, counts, map, history, the Watch, which reads
+  `assemble().intelligence.projects`). Included records carry `relevance.basis` (new construction, demolition, site work, change of use, land use,
+  addition, substantial or building-wide exterior work, street access, public facility, nightlife use, temporary event, or a Type that is itself the use).
+  Routine work and records whose words establish nothing are left out and kept in `relevance_review` (no customer surface reads it). A bare "remodel",
+  "repair" or "alteration" decides nothing on its own; significance outranks routine words.
+- **Residential records consume `lib/residential-qualify.js`** through `_shared/residential-qualify.generated.js` (`node scripts/gen-residential-qualify-module.mjs`;
+  the test fails when the copy differs). Do not restate residential rules in the report.
+- **The Minor Building Work section is gone**; the view also hides an older saved report's `minor_work` records.
+- **Stage wording:** "Permit issued" or "Under construction" from the agency's own word (never both on one record), "Approved" (not a construction
+  permit), "Completed (agency record)" (not occupied/open). A stage the agency did not publish (a connector `status_const`) gives no stage unless the agency
+  published an issue date; a temporary event gives no stage. The national lifecycle engine is unchanged.
+- **Quality-of-life notes are per record** (`qolImpact` keyed on `relevance.basis`); heavy-facility and data-center sentences stay.
+- ⚠️ **Measured on a 5,000-record national sample: 33% included, 23% routine, 44% relevance not established**, mostly families that publish no work
+  description (Brunswick NC, Sioux Falls, San Jose, Loudoun ...). Areas served only by those sources get thin reports until ingest adds a description column.
+- ⚠️ **Open founder decision:** when every nearby record is excluded the outcome is still "No data ingested" (ruling R5), which is not accurate then.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are

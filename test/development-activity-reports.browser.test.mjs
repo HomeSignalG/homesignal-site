@@ -1400,10 +1400,10 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   for (const num of [3, 2, 1]) {
     await page.click('#saved-list li:nth-child(' + (4 - num) + ') .sv-open');
     await page.waitForFunction((k) => new RegExp('Saved report ' + k).test(document.getElementById('saved-status').textContent), num, { timeout: 8000 }).catch(() => {});
-    own.push(await page.evaluate(() => { const t = document.getElementById('report').textContent.replace(/\s+/g, ' '); const f = /As of [^:]*: ([^.]*)\./.exec(t); if (!f) return null; const g = (re) => { const x = re.exec(f[1]); return x ? x[1] : '0'; }; return [g(/(\d+) permitted \/ under construction/), g(/(\d+) approved \/ coming/), g(/(\d+) proposed \/ under review/)]; }));
+    own.push(await page.evaluate(() => { const t = document.getElementById('report').textContent.replace(/\s+/g, ' '); const f = /As of [^:]*: ([^.]*)\./.exec(t); if (!f) return null; const g = (re) => { const x = re.exec(f[1]); return x ? x[1] : '0'; }; return [String(+g(/(\d+) with a permit issued/) + +g(/(\d+) under construction/)), g(/(\d+) approved\b/), g(/(\d+) proposed \/ under review/)]; })); // national-6 (2026-11-02): the briefing's stage words
   }
-  ok(own.every((o2) => o2 && o2.join() === '0,2,3') && [0, 1, 2].every((i) => rowCells(t, 'Permitted / Under Construction')[i] === own[i][0] && rowCells(t, 'Approved / Coming')[i] === own[i][1] && rowCells(t, 'Proposed / Under Review')[i] === own[i][2]),
-    '11m each column\'s stage counts are exactly what that report prints for itself when opened on its own (0 / 2 / 3; the fourth saved Proposed record is Decided and is counted on its own row)', [own, rowCells(t, 'Approved / Coming')]);
+  ok(own.every((o2) => o2 && o2.join() === '0,2,3') && [0, 1, 2].every((i) => rowCells(t, 'Permit issued / Under construction')[i] === own[i][0] && rowCells(t, 'Approved')[i] === own[i][1] && rowCells(t, 'Proposed / Under review')[i] === own[i][2]),
+    '11m each column\'s stage counts are exactly what that report prints for itself when opened on its own (0 / 2 / 3; the fourth saved Proposed record is Decided and is counted on its own row)', [own, rowCells(t, 'Approved')]);
   ok(foreign.length === 0 && errors.length === 0, '11n no page error, and nothing fetched but the page, its libraries, the sign-in stand-in and the functions', { foreign, errors });
   await ctx.close();
 }
@@ -1456,10 +1456,11 @@ const WNONE_REPORT = (await wire(NO_FAMILY(RICH))).report;   // the engine's rep
   await page.click('#compare-go');
   await waitCompared(page);
   const t = await tableOf(page);
-  ok(['Records with a recent official event', 'Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'].every((l) => rowCells(t, l)[1] === 'No data ingested' && rowCells(t, l)[0] !== 'No data ingested'),
+  // national-6 (2026-11-02): the stage row labels
+  ok(['Records with a recent official event', 'Permit issued / Under construction', 'Approved', 'Proposed / Under review'].every((l) => rowCells(t, l)[1] === 'No data ingested' && rowCells(t, l)[0] !== 'No data ingested'),
     '11r the report with "No data ingested" says so in every count cell and is not a zero; the report beside it still has its numbers', t.rows.map((r) => r.label + '=' + r.cells.join('/')));
   const notes = await page.$eval('#compare-result', (e) => e.textContent.replace(/\s+/g, ' '));
-  ok(/No data ingested\. HomeSignal cannot yet confirm it receives official development records for this address/.test(notes), '11s the engine\'s own words for it appear under the table');
+  ok(/No data ingested\. Jody cannot yet confirm it receives official development records for this address/ /* national-6 (2026-11-02): Jody branding */.test(notes), '11s the engine\'s own words for it appear under the table');
   await ctx.close();
 }
 {

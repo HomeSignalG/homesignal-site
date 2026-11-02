@@ -94,10 +94,13 @@ const entry = (id) => ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) 
     '1f the SEPA row says the agency publishes no status, once, and never prints the constant as the agency\'s');
   ok(/Source agency status: Corrections Required/.test(text(rec)), '1g a row whose agency did publish a status still shows it');
   ok(/Official record: Published in the SEPA Register · May 14, 2026/.test(text(rec)) && !/Filed · May 14, 2026/.test(text(rec)), '2d the SEPA date reads as a publication, not a filing');
-  ok(/<h3 class="da-rv-title">Construct alterations to a commercial building<\/h3><span class="da-rv-stage da-rv-stage--permitted"[^>]*>[\s\S]*?Permitted \/ Under Construction/.test(hist),
-    '5a Change History shows the stage the card shows (Permitted / Under Construction), not the bare lifecycle word', hist.slice(0, 400));
-  ok(/HomeSignal status: Proposed → Approved/.test(text(hist)) && /Publisher stage: Awaiting Information → Issued/.test(text(hist)) && !/ Status: Proposed/.test(text(hist).replace('HomeSignal status', '')),
-    '5b HomeSignal\'s own status is labelled as HomeSignal\'s, beside the publisher\'s stage');
+  // national-6 (2026-11-02): the stage reads from the record's own evidence ("Permit issued", not "Permitted / Under Construction"), and the
+  // status Jody keeps is labelled "Jody status". The rule is unchanged: Change History shows the same stage words as the card.
+  ok(/<h3 class="da-rv-title">Construct alterations to a commercial building<\/h3><span class="da-rv-stage da-rv-stage--permitted"[^>]*>[\s\S]*?<span class="da-rv-lifetext">Permit issued<\/span>/.test(hist)
+    && /Permit issued/.test(text(rec)) && !/Permitted \/ Under Construction/.test(text(hist)),
+    '5a Change History shows the stage the card shows (Permit issued), not the bare lifecycle word', hist.slice(0, 400));
+  ok(/Jody status: Proposed → Approved/.test(text(hist)) && /Publisher stage: Awaiting Information → Issued/.test(text(hist)) && !/ Status: Proposed/.test(text(hist).replace('Jody status', '')),
+    '5b Jody\'s own status is labelled as Jody\'s, beside the publisher\'s stage');
   // the map: every pair of markers at least a marker apart, every marker inside the plot, and each moved one draws a line to its true spot
   const svg = (h.match(/<svg class="da-rv-plot[\s\S]*?<\/svg>/) || [''])[0];
   const mk = [...svg.matchAll(/<g class="da-rv-mk [^"]*"[^>]*transform="translate\(([\d.-]+) ([\d.-]+)\)">[\s\S]*?>(\d+)<\/text><\/g>/g)].map((m) => ({ x: +m[1], y: +m[2], n: m[3] }));
@@ -120,9 +123,11 @@ const entry = (id) => ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) 
     what_changed_recently: ['Napproved', 'Nproposed'], sections: { by_stage: { approved: [], proposed: [], permitted: [] }, by_lifecycle: { approved: ['Napproved'], proposed: ['Nproposed'], operating: [], unknown: [] },
       what_changed_recently: ['Napproved', 'Nproposed'], recent_official_activity: [] } }) }), {});
   const fbh = (fb.match(/<section class="da-rv-sec da-rv-sec--history"[\s\S]*?<\/section>/) || [''])[0];
-  const badge = (k) => (fbh.match(new RegExp('<span class="da-rv-life da-rv-life--' + k + '" data-lifecycle="' + k + '">([\\s\\S]*?)<span class="da-rv-lifetext">([^<]*)</span>')) || []);
-  ok(badge('approved')[2] === 'Approved' && badge('proposed')[2] === 'Proposed', '5c with no stage, Change History shows the lifecycle badge with its word', fbh.slice(0, 500));
-  ok(badge('approved')[1] && badge('proposed')[1] && badge('approved')[1] !== badge('proposed')[1], '5d and Approved and Proposed are drawn differently there');
+  // national-6 (2026-11-02): a record with no stage of its own no longer falls back to a lifecycle word; Change History says "Stage not stated"
+  // (one badge, data-lifecycle="none", no drawing), as the card does. Same rule: test/da-report-view.test.mjs 14m.
+  const none = [...fbh.matchAll(/<span class="da-rv-life da-rv-life--unknown" data-lifecycle="none">([\s\S]*?)<span class="da-rv-lifetext">([^<]*)<\/span>/g)];
+  ok(none.length === 2 && none.every((m) => m[2] === 'Stage not stated'), '5c with no stage, Change History says "Stage not stated" for each record', fbh.slice(0, 500));
+  ok(none.every((m) => !/<svg/.test(m[1])) && !/data-lifecycle="(approved|proposed)"/.test(fbh), '5d and it draws no stage shape and claims no lifecycle the record does not state');
   const again = V.html(response, { subject: '3101 Western Ave, Seattle, WA 98121' });
   ok(again === h, '6h the same report draws the same map every time');
 }
