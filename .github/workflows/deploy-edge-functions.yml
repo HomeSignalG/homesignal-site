@@ -91,18 +91,18 @@ jobs:
           if [ "$FN" = "get-address-report" ]; then
             supabase functions deploy "$FN" \
               --project-ref "$SUPABASE_PROJECT_REF" \
-              --no-verify-jwt
+              --no-verify-jwt --yes
           elif [ "$FN" = "view-shared-report" ]; then
             supabase functions deploy "$FN" \
               --project-ref "$SUPABASE_PROJECT_REF" \
-              --no-verify-jwt
+              --no-verify-jwt --yes
           elif [ "$FN" = "development-activity-billing-webhook" ]; then
             supabase functions deploy "$FN" \
               --project-ref "$SUPABASE_PROJECT_REF" \
-              --no-verify-jwt
+              --no-verify-jwt --yes
           else
             supabase functions deploy "$FN" \
-              --project-ref "$SUPABASE_PROJECT_REF"
+              --project-ref "$SUPABASE_PROJECT_REF" --yes
           fi
 
       # Recompute the live-metric exclusion list FROM the registry JSON just deployed and
