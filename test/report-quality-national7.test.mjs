@@ -181,7 +181,9 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
   ok(/Some official records near this property do not describe their work/.test(html) && rep.coverage.undescribed_records === true, 'E9 records whose work is not described are disclosed without a count');
   ok(/https:\/\/jodytracks\.com/.test(html) && !/HomeSignal/.test(html.replace(/<style[\s\S]*?<\/style>/g, '')), 'E10 the report carries https://jodytracks.com and no HomeSignal branding');
   ok(/Most significant nearby changes/.test(html) && /data-da-overview/.test(html), 'E11 the report opens with the most significant documented changes');
-  ok(/\.da-rv-frow,\.da-rv-sec--filters \.da-rv-quiet\{display:none!important\}/.test(V.CSS) && /\.da-rv-fnow\{font-size:11\.5px/.test(V.CSS), 'E12 print drops the filter chips and on-screen instructions but keeps the line saying what is shown');
+  { const pr = V.CSS.slice(V.CSS.indexOf('@media print{'));
+    ok(/\.da-rv-sec--filters \.da-rv-quiet\{display:none!important\}/.test(pr) && !/\.da-rv-frow[^{]*\{display:none/.test(pr) && !/\.da-rv-chips?[^{]*\{display:none/.test(pr) && !/\.da-rv-sec--filters[^{]*\.da-rv-h2[^{]*\{display:none/.test(pr) && /\.da-rv-fnow\{font-size:11\.5px/.test(pr),
+      'E12 print keeps the Type and Stage chips (founder 2026-11-02), drops only the on-screen instructions, and keeps the line saying what is shown'); }
   ok(a.storage_blockers.length === 0, 'E13 the body holds nothing private (boundary check passes)', a.storage_blockers);
 }
 

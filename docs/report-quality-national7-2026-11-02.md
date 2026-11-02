@@ -22,7 +22,7 @@ own words say, never on a place or a source. The Seattle sample (3101 Western Av
 | Map | Legend listed every stage; unmapped records unexplained | Legend lists drawn stages only; numbers run 1..N after filtering; each unmapped row says why |
 | Freshness | Generation day only | Generation day and, separately, when Jody last read the records |
 | Coverage note | none | The founder's sentence, word for word, plus a note that some nearby records did not describe their work |
-| Branding / PDF | "HomeSignal" in disclosure, outcomes, print footer; filter chips printed | Jody throughout, `https://jodytracks.com` on screen and paper; chips and on-screen instructions do not print, the "Showing ..." line does |
+| Branding / PDF | "HomeSignal" in disclosure, outcomes, print footer; filter chips printed | Jody throughout, `https://jodytracks.com` on screen and paper; the Type and Stage chips print (pressed ones ticked; founder 2026-11-02 reversed a national-7 change that hid them), the on-screen instructions do not, the "Showing ..." line does |
 
 ## Seattle sample, before and after (same captured inputs)
 
