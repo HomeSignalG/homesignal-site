@@ -88,20 +88,22 @@ jobs:
           # Every OTHER function keeps JWT verification ON —
           # the edge-probe reachability preflight (an arbitrary-URL fetcher) must never deploy as
           # an unauthenticated open endpoint; its callers pass the public anon key as a Bearer.
+          # --yes: the Supabase CLI (version: latest) began asking for confirmation on 2026-11-02 and, with no
+          # terminal, refused and deployed nothing ("Re-run with --yes to confirm"). Running this workflow IS the confirmation.
           if [ "$FN" = "get-address-report" ]; then
-            supabase functions deploy "$FN" \
+            supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
           elif [ "$FN" = "view-shared-report" ]; then
-            supabase functions deploy "$FN" \
+            supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
           elif [ "$FN" = "development-activity-billing-webhook" ]; then
-            supabase functions deploy "$FN" \
+            supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF" \
               --no-verify-jwt
           else
-            supabase functions deploy "$FN" \
+            supabase functions deploy "$FN" --yes \
               --project-ref "$SUPABASE_PROJECT_REF"
           fi
 
