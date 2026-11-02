@@ -243,7 +243,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-5', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-2', activity_rule_version: 'activity-outcome-1', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-6', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-3', activity_rule_version: 'activity-outcome-1', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
 
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
@@ -303,7 +303,7 @@ const FIELD = {
   ok(ids(r.intelligence.projects.map((p) => p.project_id)) === 'ka,kb', '8a projects are sorted by project id; a project not in the spatial answer is not added', ids(r.intelligence.projects.map((p) => p.project_id)));
   const r2 = run({ rows: [row('kc', 0.2), row('kd', 0.2), row('ke', 0.2)], projects: [proj('kc', { source_ref: '' }), proj('kd', { source_ref: null }), proj('ke', { record_kind: 'facility' })] });
   ok(r2.intelligence.projects.length === 0, '8b a record with no source URL, or that is not a development record, is not in the report');
-  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-5' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
+  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-6' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
   ok(M.parseRadius(0.5) === 0.5 && M.parseRadius('2') === 2 && M.parseRadius(3) === null && M.parseRadius('') === null && M.parseRadius(null) === null && M.parseRadius('x') === null, '8d only the four canonical radii parse');
   ok(throws(() => run({ radius_mi: 3 })) !== null && throws(() => run({ view: 'staff' })) !== null && throws(() => run({ subject: { ...SUBJECT, zip: '9747' } })) !== null && throws(() => run({ subject: { ...SUBJECT, address: '  ' } })) !== null
     && throws(() => run({ subject: { ...SUBJECT, lat: NaN } })) !== null, '8e a bad radius, view, ZIP, blank address or non-finite point is refused');
@@ -328,9 +328,9 @@ const FIELD = {
     && M.presentationStage('proposed', 'Issued') === 'proposed' && M.presentationStage('proposed', null) === 'proposed'
     && M.presentationStage('operating', 'Construction') === null && M.presentationStage('unknown', 'On file') === null,
     '9d one assignment: evidence makes an approved or unknown record Permitted; approved without it is Approved; proposed stays Proposed; operating and quiet unknown have no stage');
-  ok(JSON.stringify(M.STAGE_LABELS) === JSON.stringify({ approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction' })
+  ok(JSON.stringify(M.STAGE_LABELS) === JSON.stringify({ approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction', occupancy: 'Approved for occupancy — business opening not verified' })
     && !('permitted' in { proposed: 1, approved: 1, operating: 1, unknown: 1 }) && JSON.stringify([...M.LIFECYCLE_ORDER]) === '["approved","proposed","operating","unknown"]',
-    '9e the three stage labels are the plan\'s, and the lifecycle keys are still exactly four (ruling 2)');
+    '9e the three stage labels are the plan\'s, plus occupancy approved (national-6), and the lifecycle keys are still exactly four (ruling 2)');
 
   // the 84302 shape, read from production 2026-10-02 (app_projects, udot-active-projects-lines): two under construction, one closed out
   const UDOT = 'udot-active-projects-lines';
@@ -346,7 +346,7 @@ const FIELD = {
       uproj('u:22013', 'Operating', 'Close Out', 'SR-13 (Main Street) & 300 North'), uproj('u:p', 'Proposed', 'Concept', 'A proposed road'), uproj('u:nm', 'Approved', 'Advertised', 'No marker')],
     ledger: [], events: [], health: [] });
   const I = out.intelligence;
-  ok(JSON.stringify(I.sections.by_stage) === JSON.stringify({ approved: ['u:nm'], proposed: ['u:p'], permitted: ['u:22248', 'u:22250'] }),
+  ok(JSON.stringify(I.sections.by_stage) === JSON.stringify({ approved: ['u:nm'], proposed: ['u:p'], permitted: ['u:22248', 'u:22250'], occupancy: [] }),
     '9f 84302: the two Under Construction records are Permitted / Under Construction, the Advertised one is Approved / Coming, the closed-out one is in no section', I.sections.by_stage);
   ok(JSON.stringify(I.sections.by_lifecycle.approved) === '["u:22248","u:22250","u:nm"]' && I.projects.every((p) => p.lifecycle.key !== 'permitted'),
     '9g the canonical lifecycle is untouched: Permitted records are still lifecycle approved');
@@ -356,7 +356,7 @@ const FIELD = {
     '9h each record carries its stage, the evidence that put it there, and the publisher\'s own stage word', pp['u:22248'].stage);
   const all = Object.values(I.sections.by_stage).flat();
   ok(all.length === new Set(all).size, '9i a project is in at most one stage section');
-  ok(I.stage_rule_version === 'stage-evidence-2' && out.engineInputs.stage_rule_version === 'stage-evidence-2' && I.radius_mi === 0.5, '9j the report says which stage rule judged it, and that it is 0.5 mile');
+  ok(I.stage_rule_version === 'stage-evidence-3' && out.engineInputs.stage_rule_version === 'stage-evidence-3' && I.radius_mi === 0.5, '9j the report says which stage rule judged it, and that it is 0.5 mile');
   const B = out.renderOnly.bearings_deg;
   ok(B['u:22248'] === 0 && B['u:22250'] === 181 && B['u:p'] === 90 && !('u:nm' in B) && !('u:22013' in B),
     '9k map directions: north 0, a hair west of south 181 (the real 200 South point), east 90; none for a record with no display point or not in the report', B);

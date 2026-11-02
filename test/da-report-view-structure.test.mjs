@@ -160,7 +160,7 @@ const C = code(SRC);
     '5a the landing page holds no stage labels of its own: its sample is mounted through the view');
   ok(landingTest.includes('no hand-built report layout remains on this page'), '5b and the landing page test still fails if a hand-built layout comes back');
   ok(C.includes("approved: 'Approved / Coming'") && C.includes("proposed: 'Proposed / Under Review'"), '5c the view carries the first two stage labels');
-  ok(C.includes("permitted: 'Permitted / Under Construction'") && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
+  ok(C.includes("permitted: 'Permitted / Under Construction'") && /var STAGES = \['approved', 'proposed', 'permitted', 'occupancy'\];/.test(C),
     '5d the third label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
   ok(C.includes("var EYEBROW = 'JODY Development Activity';"), '5e the eyebrow is the Jody name (founder 2026-10-14, audit F4; supersedes R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
@@ -207,7 +207,7 @@ const C = code(SRC);
     // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
     'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md',
     // 2026-11-01 (national-4): the report-quality suite renders the view to prove the agency, record-number, shortened-title and minor-work rules
-    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs']);
+    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs', 'test/report-quality-national6.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);

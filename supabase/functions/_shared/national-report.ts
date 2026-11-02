@@ -41,8 +41,10 @@ export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
  * national-5 (2026-11-02, audit of the 3101 Western sample): a stage word the AGENCY did not publish (a connector's `status_const`) is no
  *   longer shown as the agency's status (`publisher_stage` null, `publisher_stage_unpublished` true); a date carries the source's own words for
  *   what it means when the registry states them (`file_date_label`); "Phase Issued" counts as an issued permit (stage-evidence-2).
+ * national-6 (2026-11-02, founder): a record whose agency stage says occupancy was approved ("Approved to Occupy", "TCO Issued",
+ * "Temporary C of O") is in its own stage, "Approved for occupancy — business opening not verified", never Approved / Coming (stage-evidence-3).
  */
-export const REPORT_VERSION = 'development-activity-national-5';
+export const REPORT_VERSION = 'development-activity-national-6';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -75,7 +77,7 @@ export const LIFECYCLE_ORDER = ['approved', 'proposed', 'operating', 'unknown'] 
 // Never inferred from a type, a date or an approval: only the words below, after normaliseStage(), count.
 
 /** Bump whenever STAGE_EVIDENCE changes: the report carries it, so a stored report says which list judged it. */
-export const STAGE_RULE_VERSION = 'stage-evidence-2';
+export const STAGE_RULE_VERSION = 'stage-evidence-3';
 /**
  * The publisher stage values that SAY a permit was issued or construction is under way. A closed list, taken from the
  * stage values in a 3% sample of production `app_projects` development rows on 2026-10-02
@@ -110,11 +112,26 @@ export const STAGE_EVIDENCE: Readonly<Record<string, 'permit_issued' | 'under_co
   'permit issued / construction started': 'under_construction',
 });
 export const STAGE_EVIDENCE_LABELS = { permit_issued: 'Permit issued', under_construction: 'Under construction' } as const;
-export const STAGE_ORDER = ['approved', 'proposed', 'permitted'] as const;
+/**
+ * stage-evidence-3 (founder, 2026-11-02): the publisher stage values that say the AGENCY AUTHORIZED OCCUPANCY of the work while HomeSignal's
+ * lifecycle bucket for the source still reads Approved. Such a record is not "coming": construction reached occupancy approval. It is also not
+ * shown as operating, because an occupancy approval does not show that a business opened. A closed list, measured on production app_projects
+ * (all development rows, 2026-11-02): the ONLY occupancy words filed under Approved were Seattle SDCI "Approved to Occupy" (3), Arlington TX
+ * "TCO Issued" (56, a temporary certificate of occupancy) and Mesa AZ "Temporary C of O" (7). Every other occupancy word ("Certificate of
+ * Occupancy Issued", "CO Final", "Finaled with CO" ...) is already filed under Operating by its source's own status map.
+ */
+export const OCCUPANCY_EVIDENCE: ReadonlySet<string> = Object.freeze(new Set(['approved to occupy', 'tco issued', 'temporary c of o']));
+export const OCCUPANCY_EVIDENCE_LABEL = 'Occupancy approved';
+export const STAGE_ORDER = ['approved', 'proposed', 'permitted', 'occupancy'] as const;
 export type Stage = typeof STAGE_ORDER[number];
 export const STAGE_LABELS: Record<Stage, string> = {
   approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction',
+  occupancy: 'Approved for occupancy — business opening not verified',
 };
+/** True when the publisher's own stage says occupancy was approved (OCCUPANCY_EVIDENCE). */
+export function occupancyEvidence(publisherStage: unknown): boolean {
+  return OCCUPANCY_EVIDENCE.has(normaliseStage(publisherStage));
+}
 
 /** Lower case, trimmed, a leading phase number removed ("05_Construction", "5. ISSUED", "2 - Design"), spaces collapsed. */
 export function normaliseStage(raw: unknown): string {
@@ -132,6 +149,7 @@ export function stageEvidence(publisherStage: unknown): { kind: 'permit_issued' 
 
 /** THE one assignment of a current project to a Stage. Null means it is in no stage section. */
 export function presentationStage(lifecycleKey: string, publisherStage: unknown): Stage | null {
+  if (occupancyEvidence(publisherStage) && (lifecycleKey === 'approved' || lifecycleKey === 'unknown')) return 'occupancy';
   const ev = stageEvidence(publisherStage);
   if (ev && (lifecycleKey === 'approved' || lifecycleKey === 'unknown')) return 'permitted';
   if (lifecycleKey === 'approved') return 'approved';
@@ -145,7 +163,7 @@ export function presentationStage(lifecycleKey: string, publisherStage: unknown)
  * lives in the response-only block: a stored report carries no distance and therefore no such list.
  */
 export const REVIEW_LIMIT = 3;
-const STAGE_STRENGTH: Record<Stage, number> = { permitted: 0, approved: 1, proposed: 2 };
+const STAGE_STRENGTH: Record<Stage, number> = { permitted: 0, approved: 1, proposed: 2, occupancy: 3 };
 
 /** Initial compass bearing, in whole degrees, from one point to another. For the response only, never stored. */
 export function bearingDeg(fromLat: number, fromLng: number, toLat: number, toLng: number): number | null {
@@ -596,7 +614,7 @@ export function assemble(input: AssembleInput): Assembled {
   const whatChanged: Array<{ project_id: string; at: string }> = [];
   const recentOfficial: Array<{ project_id: string; at: string }> = [];
   const byLifecycle: Record<Lifecycle, string[]> = { approved: [], proposed: [], operating: [], unknown: [] };
-  const byStage: Record<Stage, string[]> = { approved: [], proposed: [], permitted: [] };
+  const byStage: Record<Stage, string[]> = { approved: [], proposed: [], permitted: [], occupancy: [] };
   const bearings: Record<string, number> = {};
   const familiesIncluded = new Set<string>();
   const distances: Record<string, number> = {};
@@ -624,7 +642,7 @@ export function assemble(input: AssembleInput): Assembled {
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
     const stage = presentationStage(lc.key, p.stage);
-    const evidence = stage === 'permitted' ? stageEvidence(p.stage) : null;
+    const evidence = stage === 'permitted' ? stageEvidence(p.stage) : stage === 'occupancy' ? { label: OCCUPANCY_EVIDENCE_LABEL } : null;
     const entry: Entry = {
       project_id: p.source_key,
       source_family: family || null,
