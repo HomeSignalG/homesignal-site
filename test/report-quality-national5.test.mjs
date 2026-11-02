@@ -113,6 +113,16 @@ const entry = (id) => ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) 
   const lone = V.html(Object.assign({}, response, { report: Object.assign({}, response.report, { projects: [projects[0]], sections: Object.assign({}, response.report.sections, { by_stage: { approved: [], proposed: [], permitted: ['S1'] } }) }) }), {});
   ok(!/da-rv-mklead/.test(lone) && /translate\(203\.0 180\.0\)|translate\(210\.0 180\.0\)/.test(lone), '6f a marker with room is drawn exactly at its spot, with no line', (lone.match(/translate\([^)]*\)/) || [])[0]);
   ok(/Markers that would overlap are set apart; a thin line points to each one’s spot\./.test(h), '6g the map note says markers may be set apart');
+  // a record with no stage of its own: Change History falls back to the lifecycle badge, which keeps its word and its own drawing
+  const nost = (key, label) => P('N' + key, 'Record without a stage ' + key, { stage: null, lifecycle: { key, label },
+    homesignal_detected_changes: [{ event_type: 'status_changed', detected_at: '2026-10-30T12:00:00Z', changes: [{ field: 'status', from: 'Proposed', to: label }] }] });
+  const fb = V.html(Object.assign({}, response, { report: Object.assign({}, response.report, { projects: [nost('approved', 'Approved'), nost('proposed', 'Proposed')],
+    what_changed_recently: ['Napproved', 'Nproposed'], sections: { by_stage: { approved: [], proposed: [], permitted: [] }, by_lifecycle: { approved: ['Napproved'], proposed: ['Nproposed'], operating: [], unknown: [] },
+      what_changed_recently: ['Napproved', 'Nproposed'], recent_official_activity: [] } }) }), {});
+  const fbh = (fb.match(/<section class="da-rv-sec da-rv-sec--history"[\s\S]*?<\/section>/) || [''])[0];
+  const badge = (k) => (fbh.match(new RegExp('<span class="da-rv-life da-rv-life--' + k + '" data-lifecycle="' + k + '">([\\s\\S]*?)<span class="da-rv-lifetext">([^<]*)</span>')) || []);
+  ok(badge('approved')[2] === 'Approved' && badge('proposed')[2] === 'Proposed', '5c with no stage, Change History shows the lifecycle badge with its word', fbh.slice(0, 500));
+  ok(badge('approved')[1] && badge('proposed')[1] && badge('approved')[1] !== badge('proposed')[1], '5d and Approved and Proposed are drawn differently there');
   const again = V.html(response, { subject: '3101 Western Ave, Seattle, WA 98121' });
   ok(again === h, '6h the same report draws the same map every time');
 }

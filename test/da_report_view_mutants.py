@@ -24,6 +24,8 @@ BEHAVIOUR = 'test/da-report-view.test.mjs'
 STRUCTURE = 'test/da-report-view-structure.test.mjs'
 BROWSER = 'test/da-report-view.browser.test.mjs'
 NODE_TESTS = [BEHAVIOUR, STRUCTURE]
+# national-5: Change History shows the stage badge; the lifecycle badge is its fallback for a record with no stage, tested there
+NATIONAL5 = 'test/report-quality-national5.test.mjs'
 
 # name -> (old, new, tests)
 M = {}
@@ -48,7 +50,7 @@ m('detected_date_is_publisher_date', "line('HomeSignal detected', eventText(even
 m('proposed_labelled_coming',
   "function lifeLabel(p) { return (isObj(p.lifecycle) ? txt(p.lifecycle.label) : '') || 'Lifecycle unknown'; }",
   "function lifeLabel(p) { return lifeKey(p) === 'proposed' ? 'Approved / Coming' : (isObj(p.lifecycle) ? txt(p.lifecycle.label) : '') || 'Lifecycle unknown'; }")
-m('lifecycle_text_dropped', "'<span class=\"da-rv-lifetext\">' + esc(lifeLabel(p)) + '</span></span>';", "'<span class=\"da-rv-lifetext\"></span></span>';")
+m('lifecycle_text_dropped', "'<span class=\"da-rv-lifetext\">' + esc(lifeLabel(p)) + '</span></span>';", "'<span class=\"da-rv-lifetext\"></span></span>';", NODE_TESTS + [NATIONAL5])
 m('lifecycle_shape_dropped', "data-lifecycle=\"' + k + '\">' + SHAPES[k]", "data-lifecycle=\"' + k + '\">'")
 m('lifecycle_rederived_from_publisher_status',
   "function lifeKey(p) { var k = isObj(p.lifecycle) ? p.lifecycle.key : '';",
@@ -124,7 +126,7 @@ m('sorts_stage_cards', "      var all = pick(byStage[k]).filter(", "      var al
 m('stage_label_from_lifecycle', "    return (isObj(p.stage) && p.stage.key === k ? txt(p.stage.label) : '') ||", '    return lifeLabel(p) ||')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('proposed_shape_equals_approved',
   "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"3 2.5\"/></svg>',",
-  "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',")
+  "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',", NODE_TESTS + [NATIONAL5])
 # ---- a stage card shows the stage, the lifecycle and the publisher's own words, each labelled ------------------------------------------------
 m('stage_card_lifecycle_dropped', "      + (showLifecycle ? line('HomeSignal lifecycle', lifeLabel(p)) : '')\n", '')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('first_detected_is_publisher_date', "function ledgerFirstRead(p) { return isObj(p.homesignal_observation) ? day(p.homesignal_observation.first_observed_at) : ''; }", "function ledgerFirstRead(p) { var pe = publisherEvent(p); return pe ? pe.date : ''; }")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
