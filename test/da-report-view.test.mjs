@@ -490,8 +490,8 @@ try {
   ok(V.SCOPE_LINE === jody(quote('Planned, approved, permitted and changing development found in')), '9b the scope line is the plan\'s, with the Jody name (line 1261)');
   ok(V.SCOPE_NOTE === quote('This report focuses on development activity and change.'), '9c the supporting scope note is the plan\'s (line 1265)');
   ok(V.EYEBROW === 'JODY Development Activity' && M.PRODUCT_NAME === 'HOMESIGNAL DEVELOPMENT ACTIVITY', '9d the eyebrow is the Jody name; the engine\'s product identifier is unchanged until the next edge-function deploy (audit F4)');
-  // national-6 (2026-11-02): the overview is added; the stage titles no longer predict ("Coming") or pair an issued permit with started work; Minor Building Work is gone
-  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['Nearby Development', 'Type and stage', 'Development Activity Map', 'Most significant nearby changes', 'Approved', 'Proposed / Under review', 'Permit issued / Under construction', 'Completed (agency record)', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']),
+  // national-7 (2026-11-02): the overview is added; the stage titles no longer predict ("Coming") or pair an issued permit with started work; Minor Building Work is gone; national-6 added occupancy
+  ok(JSON.stringify(Object.values(V.TITLES)) === JSON.stringify(['Nearby Development', 'Type and stage', 'Development Activity Map', 'Most significant nearby changes', 'Approved', 'Proposed / Under review', 'Permit issued / Under construction', 'Approved for occupancy', 'Completed (agency record)', 'Stage not stated', 'Change History', 'Official evidence & coverage', 'Report actions']),
     '9e the section titles (the final layout pass, 2026-10-09, replaced the per-stage card sections, What Changed, Recent Official Activity and Things to Review with one table)', Object.values(V.TITLES));
   const p100526 = readFileSync(join(root, 'docs/development-activity-plan-100526.md'), 'utf8');
   // national-6 (2026-11-02): the stage titles were changed on purpose by the universal report corrections; the map and history titles are still the plan's

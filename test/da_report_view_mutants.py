@@ -26,6 +26,7 @@ BROWSER = 'test/da-report-view.browser.test.mjs'
 NODE_TESTS = [BEHAVIOUR, STRUCTURE]
 # national-5: Change History shows the stage badge; the lifecycle badge is its fallback for a record with no stage, tested there
 NATIONAL5 = 'test/report-quality-national5.test.mjs'
+NATIONAL6 = 'test/report-quality-national6.test.mjs'
 
 # name -> (old, new, tests)
 M = {}
@@ -109,8 +110,8 @@ m('css_empty_report_not_prominent', "'.da-rv--empty .da-rv-lims{font-size:16px;f
 
 
 # ---- the 100526 layout (build step 3): section order, the three stages, and what each section may claim -----------------------------------
-m('swap_two_sections', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['proposed', 'approved', 'permitted'];")
-m('permitted_stage_dropped', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['approved', 'proposed'];")
+m('swap_two_sections', "var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "var STAGES = ['proposed', 'approved', 'permitted', 'occupancy'];")  # re-anchored 2026-11-02 (national-6)
+m('permitted_stage_dropped', "var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "var STAGES = ['approved', 'proposed', 'occupancy'];")  # re-anchored 2026-11-02 (national-6)
 m('actions_before_evidence', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', '    if (some) parts.push(actionsBar(opts));\n    parts.push(evidenceSection(report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('history_shown_when_empty', "    if (some) parts.push(historySection(history, report, m.dup));", "    parts.push(historySection(history, report, m.dup));")
 m('actions_on_empty_report', '    if (some) parts.push(actionsBar(opts));', '    parts.push(actionsBar(opts));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
@@ -237,6 +238,11 @@ m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'N
 m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\', \'da-rv-hero\');', "return section('outcome', o.title, '', 'da-rv-hero');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('outcome_block_not_rendered', "    if (!report.projects.length) parts.push(outcomeSection(report));\n", "")  # re-anchored 2026-11-02 (national-6)
 m('outcome_radius_invented', "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' near this property.';", "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' within 0.5 miles of this property.';")
+# ---- national-6: occupancy approved is its own stage ------------------------------------------------------------------------------------------
+m('occupancy_stage_dropped', "  var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "  var STAGES = ['approved', 'proposed', 'permitted'];", NODE_TESTS + [NATIONAL6])
+m('occupancy_drawn_as_circle', "      var shape = k === 'permitted' || k === 'occupancy'", "      var shape = k === 'permitted'", NODE_TESTS + [NATIONAL6])
+m('occupancy_chip_always_shown', "      if (k === 'occupancy' && !m.staged[k].length) return '';", "", NODE_TESTS + [NATIONAL6])
+m('occupancy_briefing_dropped', "    if (s.occupancy && s.occupancy.length) stageBits.push(s.occupancy.length + ' approved for occupancy (business opening not verified)');\n", "", NODE_TESTS + [NATIONAL6])
 m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])
 
 def run_tests(tests):

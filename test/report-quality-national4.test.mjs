@@ -75,6 +75,9 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
     'Building relocation of the gas meter',
   ];
   const development = [
+    // national-7: road and utility work is a neighborhood-facing change whatever its Type (national7 I1)
+    'SR 7/S 100th St to S of S 38th St - Paving & ADA Compliance HMA Inlay',
+    'Hwys. 96 & 255 Flood Repairs (Sebastian Co.) (S)',
     'Master Use Permit Land Use Application to allow an 8-story, 254-unit apartment building. Parking for 163 vehicles propos',
     'Multifamily Phased Permit: Construct a residential high rise building  occupy per plan. Mechanical included.',
     'Commercial PHASED PERMIT: Construct substantial alterations to a commercial office building for a mixed use -  multi-fam',
@@ -93,10 +96,8 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
   const unstated = [
     'Residential construction: Toohey Plat, Lot 5',
     'Commercial construction',
-    'SR 7/S 100th St to S of S 38th St - Paving & ADA Compliance HMA Inlay',
     '315 1ST AVE N',
     'Auto & Boat Repair',
-    'Hwys. 96 & 255 Flood Repairs (Sebastian Co.) (S)',
   ];
   const R = (n, t) => M.relevance({ name: n, type_raw: null }, t);
   const wrongM = minor.filter((n) => R(n).reason !== 'routine_work');

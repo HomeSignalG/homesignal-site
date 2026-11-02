@@ -5751,10 +5751,22 @@ matched. Five presentation errors were fixed universally. Test: `test/report-qua
 - **Map markers that would overlap are set apart** (`spreadMarks`), each with a thin line to its true spot. Measured on the sample: 7 numbers were
   unreadable before the fix and none after.
 
-## DEVELOPMENT ACTIVITY REPORT, national-6 (2026-11-02): ONLY DOCUMENTED NEIGHBORHOOD-FACING CHANGES ARE LISTED
+## DEVELOPMENT ACTIVITY REPORT, national-6 (2026-11-02): OCCUPANCY APPROVED IS ITS OWN STAGE ⚖️ FOUNDER
 
-Founder brief "Universal Development Activity Report corrections". Jody is not a permit inventory. Record: `docs/report-quality-national6-2026-11-02.md`.
-Tests: `test/report-quality-national6.test.mjs` on `test/fixtures/report-quality/seattle-3101-western-2026-11-02.json` (a read-only production capture).
+An agency stage that says occupancy was approved is shown as **"Approved for occupancy — business opening not verified"** (chip and legend:
+"Approved for Occupancy", hollow square on the map), never Approved / Coming and never Operating / Built. Found on the 3101 Western sample:
+Seattle record 7108878-CN, agency status "Approved to Occupy", read as Approved / Coming.
+- **Decided in the report engine** (`national-report.ts` `OCCUPANCY_EVIDENCE`, `presentationStage`, stage-evidence-3), not in the registry's
+  status map: moving the stored status would make the change ledger record a "status changed" event for each record that never happened.
+- **A closed list, measured on all production development rows (2026-11-02):** the only occupancy words filed under Approved were Seattle
+  "Approved to Occupy" (3), Arlington TX "TCO Issued" (56) and Mesa AZ "Temporary C of O" (7). Every other occupancy word is already Operating.
+- The chip and legend entry appear only in a report that has such a record; a report saved before national-6 renders as saved.
+- Map 1 still draws these records as Approved (its lifecycle is unchanged). Test: `test/report-quality-national6.test.mjs`.
+
+## DEVELOPMENT ACTIVITY REPORT, national-7 (2026-11-02): ONLY DOCUMENTED NEIGHBORHOOD-FACING CHANGES ARE LISTED
+
+Founder brief "Universal Development Activity Report corrections". Jody is not a permit inventory. Record: `docs/report-quality-national7-2026-11-02.md`.
+Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality/seattle-3101-western-2026-11-02.json` (a read-only production capture).
 - **`relevance()` in `_shared/national-report.ts` judges every record BEFORE anything is built** (sections, counts, map, history, the Watch, which reads
   `assemble().intelligence.projects`). Included records carry `relevance.basis` (new construction, demolition, site work, change of use, land use,
   addition, substantial or building-wide exterior work, street access, public facility, nightlife use, temporary event, or a Type that is itself the use).
@@ -5767,7 +5779,12 @@ Tests: `test/report-quality-national6.test.mjs` on `test/fixtures/report-quality
   permit), "Completed (agency record)" (not occupied/open). A stage the agency did not publish (a connector `status_const`) gives no stage unless the agency
   published an issue date; a temporary event gives no stage. The national lifecycle engine is unchanged.
 - **Quality-of-life notes are per record** (`qolImpact` keyed on `relevance.basis`); heavy-facility and data-center sentences stay.
-- ⚠️ **Measured on a 5,000-record national sample: 33% included, 23% routine, 44% relevance not established**, mostly families that publish no work
+- **Temporary activity is judged on its documented window** (`temporaryTiming`): earliest to latest date in the record's fields or text, set-up and removal
+  included. Upcoming and under way are listed; ended is left out unless a separate continuing scope qualifies; `temporary_timing_not_stated` when the
+  full record has no dates; `temporary_timing_not_captured` when ingestion cut the text and stored no description. Bumbershoot 2026 is the last kind:
+  its official record says removal by 9/8, the stored title is cut before that. The fix is connectors emitting the full description as `scope_text`.
+- **Occupancy (#2526) runs after relevance**: an occupancy approval for routine work is not listed; TCO / Temporary C of O keep "Temporary".
+- ⚠️ **Measured on a 5,000-record national sample: 34% included, 23% routine, 43% relevance not established**, mostly families that publish no work
   description (Brunswick NC, Sioux Falls, San Jose, Loudoun ...). Areas served only by those sources get thin reports until ingest adds a description column.
 - ⚠️ **Open founder decision:** when every nearby record is excluded the outcome is still "No data ingested" (ruling R5), which is not accurate then.
 

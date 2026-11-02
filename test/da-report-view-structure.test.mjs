@@ -57,11 +57,11 @@ const C = code(SRC);
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
   // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
   // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
-  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'undescribed_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
+  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
     'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty (a new one must be added here on purpose)', snake);
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-one (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
@@ -86,7 +86,7 @@ const C = code(SRC);
   // national-6 (2026-11-02): the record's own street address is now shown (and cross-referenced), so `address` left this list; the agency's class arrives as publisher_type, never type_raw
   ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|feature_id)\b/.test(C) && /txt\(p\.address\)/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, dates, raw type, ids), and reads the address it now shows');
   ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
-  ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
+  ok((C.replace(/\bw\.status\b/g, '').match(/\.status\b/g) || []).length === 1 && (C.match(/\bw\.status\b/g) || []).length === 2 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status (national-7: the activity window\'s own status, read twice in stageNote, is the engine\'s upcoming/active/ended word for the dates)');
   // audit 2026-10-07 (finding 1): a third read, isDecided(), exists so a denied or withdrawn application is never labelled "under review".
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
@@ -171,9 +171,9 @@ const C = code(SRC);
   ok(!/\{ key: '(approved|proposed|permitted)',\s+label: '/.test(landing) && /HS\.daReportView/.test(landing) && /\.mount\(host, sampleResponse\(\)/.test(landing),
     '5a the landing page holds no stage labels of its own: its sample is mounted through the view');
   ok(landingTest.includes('no hand-built report layout remains on this page'), '5b and the landing page test still fails if a hand-built layout comes back');
-  // national-6 (2026-11-02): the stage labels no longer predict ("Coming") or pair an issued permit with started work
+  // national-7 (2026-11-02): the stage labels no longer predict ("Coming") or pair an issued permit with started work; national-6 adds occupancy
   ok(C.includes("approved: 'Approved'") && C.includes("proposed: 'Proposed / Under review'") && !/Approved \/ Coming/.test(C), '5c the view carries the first two stage labels');
-  ok(C.includes("permitted: 'Permit issued / Under construction'") && /var STAGES = \['approved', 'proposed', 'permitted'\];/.test(C),
+  ok(C.includes("permitted: 'Permit issued / Under construction'") && /var STAGES = \['approved', 'proposed', 'permitted', 'occupancy'\];/.test(C),
     '5d the third label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
   ok(C.includes("var EYEBROW = 'JODY Development Activity';"), '5e the eyebrow is the Jody name (founder 2026-10-14, audit F4; supersedes R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
@@ -220,9 +220,9 @@ const C = code(SRC);
     // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
     'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md',
     // 2026-11-01 (national-4): the report-quality suite renders the view to prove the agency, record-number, shortened-title and minor-work rules
-    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs',
-    // national-6 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
-    'test/report-quality-national6.test.mjs']);
+    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs', 'test/report-quality-national6.test.mjs',
+    // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
+    'test/report-quality-national7.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
