@@ -5751,6 +5751,18 @@ matched. Five presentation errors were fixed universally. Test: `test/report-qua
 - **Map markers that would overlap are set apart** (`spreadMarks`), each with a thin line to its true spot. Measured on the sample: 7 numbers were
   unreadable before the fix and none after.
 
+## DEVELOPMENT ACTIVITY REPORT, national-6 (2026-11-02): OCCUPANCY APPROVED IS ITS OWN STAGE ⚖️ FOUNDER
+
+An agency stage that says occupancy was approved is shown as **"Approved for occupancy — business opening not verified"** (chip and legend:
+"Approved for Occupancy", hollow square on the map), never Approved / Coming and never Operating / Built. Found on the 3101 Western sample:
+Seattle record 7108878-CN, agency status "Approved to Occupy", read as Approved / Coming.
+- **Decided in the report engine** (`national-report.ts` `OCCUPANCY_EVIDENCE`, `presentationStage`, stage-evidence-3), not in the registry's
+  status map: moving the stored status would make the change ledger record a "status changed" event for each record that never happened.
+- **A closed list, measured on all production development rows (2026-11-02):** the only occupancy words filed under Approved were Seattle
+  "Approved to Occupy" (3), Arlington TX "TCO Issued" (56) and Mesa AZ "Temporary C of O" (7). Every other occupancy word is already Operating.
+- The chip and legend entry appear only in a report that has such a record; a report saved before national-6 renders as saved.
+- Map 1 still draws these records as Approved (its lifecycle is unchanged). Test: `test/report-quality-national6.test.mjs`.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are

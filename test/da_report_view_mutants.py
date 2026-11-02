@@ -26,6 +26,7 @@ BROWSER = 'test/da-report-view.browser.test.mjs'
 NODE_TESTS = [BEHAVIOUR, STRUCTURE]
 # national-5: Change History shows the stage badge; the lifecycle badge is its fallback for a record with no stage, tested there
 NATIONAL5 = 'test/report-quality-national5.test.mjs'
+NATIONAL6 = 'test/report-quality-national6.test.mjs'
 
 # name -> (old, new, tests)
 M = {}
@@ -241,6 +242,11 @@ m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'N
 m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\', \'da-rv-hero\');', "return section('outcome', o.title, '', 'da-rv-hero');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('outcome_block_not_rendered', "    if (!some) parts.push(outcomeSection(report));\n", "")
 m('outcome_radius_invented', "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' near this property.';", "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' within 0.5 miles of this property.';")
+# ---- national-6: occupancy approved is its own stage ------------------------------------------------------------------------------------------
+m('occupancy_stage_dropped', "  var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "  var STAGES = ['approved', 'proposed', 'permitted'];", NODE_TESTS + [NATIONAL6])
+m('occupancy_drawn_as_circle', "      var shape = k === 'permitted' || k === 'occupancy'", "      var shape = k === 'permitted'", NODE_TESTS + [NATIONAL6])
+m('occupancy_chip_always_shown', "      if (k === 'occupancy' && !m.staged[k].length) return '';", "", NODE_TESTS + [NATIONAL6])
+m('occupancy_briefing_dropped', "    if (s.occupancy && s.occupancy.length) stageBits.push(s.occupancy.length + ' approved for occupancy (business opening not verified)');\n", "", NODE_TESTS + [NATIONAL6])
 m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])
 
 def run_tests(tests):

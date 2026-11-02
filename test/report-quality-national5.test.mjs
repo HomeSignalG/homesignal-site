@@ -49,8 +49,8 @@ const entry = (id) => ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) 
 
 // ---- 3. Phase Issued -------------------------------------------------------------------------------------------------------------------------
 {
-  ok(M.STAGE_RULE_VERSION === 'stage-evidence-2' && M.stageEvidence('Phase Issued') && M.stageEvidence('Phase Issued').kind === 'permit_issued', '3a "Phase Issued" is an issued permit');
-  ok(M.presentationStage('approved', 'Phase Issued') === 'permitted' && M.presentationStage('approved', 'Approved to Occupy') === 'approved'
+  ok(M.stageEvidence('Phase Issued') && M.stageEvidence('Phase Issued').kind === 'permit_issued', '3a "Phase Issued" is an issued permit');
+  ok(M.presentationStage('approved', 'Phase Issued') === 'permitted' && M.stageEvidence('Approved to Occupy') === null
     && M.stageEvidence('phased permitting') === null, '3b a control: "Approved to Occupy" and "phased permitting" are still not issued-permit evidence');
 }
 
