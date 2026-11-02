@@ -1,0 +1,93 @@
+name: lifecycle-before-after
+
+# Release gate item 2 of docs/lifecycle-classification-audit-2026-11-01.md §10: count every Development record
+# placement on the ZIP pages by (source, stored status, stored column), so the generated mapping audit can be
+# measured against what production actually holds. REPORT-ONLY: it reads, it changes nothing.
+#
+# collect: environment `production` (main only), the canonical boundary step first, then
+#   scripts/lifecycle-before-after.mjs collect, which reads through the Management API's READ-ONLY endpoint in
+#   100 ZIP-prefix slices, one at a time (a national read is ~10 minutes of heap I/O; CLAUDE.md §5: full-corpus
+#   reads run one at a time). Any slice that still fails after retries fails the run: no partial count is written.
+# publish: holds NO secret. It commits the counts JSON (aggregate numbers per source and status; no addresses, no
+#   people) to the branch lifecycle-before-after-results, which has no pull request, so the push guard allows it. The report itself is written offline: node scripts/lifecycle-before-after.mjs report <file>.
+#
+# Run one at a time; do not start it while another full-corpus verifier is running.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifecycle-before-after
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    environment: { name: production, deployment: false }
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SUPABASE_PROJECT_REF: qwnnmljucajnexpxdgxr
+    steps:
+      - name: 'Production boundary: refuse a dispatch the operator did not start'
+        id: boundary
+        # FIRST step, before any step that holds a secret. The production environment admits only
+        # ref main, but a workflow_dispatch's INPUTS are chosen by whoever dispatched it; another
+        # run's GITHUB_TOKEN (github-actions[bot]) or an installed app (<app>[bot]) would let branch
+        # code choose them. github.actor is the original dispatcher and github.triggering_actor the
+        # re-runner (a re-run replays the original inputs), so both must be the operator.
+        # Canonical text: test/lib/production-boundary.mjs (BOUNDARY_STEP); the tests compare this
+        # step to it byte for byte, comment lines excluded.
+        if: github.event_name == 'workflow_dispatch' && (github.actor != 'HomeSignalG' || github.triggering_actor != 'HomeSignalG')
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          echo "::error::Production credentials are not issued to this dispatch (actor=$ACTOR, triggering_actor=$TRIGGERING_ACTOR). Only HomeSignalG may start or re-run a production dispatch, from main."
+          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Count placements through the read-only endpoint
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.PROD_SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/lifecycle-before-after.mjs collect "$RUNNER_TEMP/lifecycle-counts.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lifecycle-counts
+          path: ${{ runner.temp }}/lifecycle-counts.json
+          retention-days: 30
+
+  publish:
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read   # guard_bot_push.sh asks whether the branch has an open PR
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lifecycle-counts
+          path: ${{ runner.temp }}/counts
+      - name: Commit the counts to the results branch
+        env:
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          # One fixed branch with no pull request; each run adds its own file on top, so the push is a
+          # fast-forward. The scan in test/no-deploy-key-push.test.mjs needs the destination named literally.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git fetch -q origin lifecycle-before-after-results 2>/dev/null; then git checkout -q -B results FETCH_HEAD; else git checkout -q -B results; fi
+          mkdir -p docs/lifecycle-mapping-audit/counts
+          cp "$RUNNER_TEMP/counts/lifecycle-counts.json" "docs/lifecycle-mapping-audit/counts/run-$RUN_ID.json"
+          git add "docs/lifecycle-mapping-audit/counts/run-$RUN_ID.json"
+          git commit -q -m "lifecycle before/after counts, run $RUN_ID"
+          GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/scripts/guard_bot_push.sh" "lifecycle-before-after-results" || { [ $? -eq 4 ] && exit 0; exit 1; }
+          git push origin HEAD:lifecycle-before-after-results
+          echo "counts pushed to lifecycle-before-after-results as docs/lifecycle-mapping-audit/counts/run-$RUN_ID.json"

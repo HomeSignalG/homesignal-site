@@ -19,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 COPY = [  # relative paths copied into the scratch tree
     'supabase/functions/get-address-report',
+    'supabase/functions/_shared/project-type.generated.js',  # imported by the connectors' stage switch
     'scripts',
     'fixtures',
     'test/identity-alias-parity.test.mjs',

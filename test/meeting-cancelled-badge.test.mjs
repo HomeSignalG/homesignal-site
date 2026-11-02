@@ -49,7 +49,14 @@ for (const f of fs.readdirSync(ROOT)) if (f.endsWith('.html') || f === 'shell.js
 for (const f of fs.readdirSync(path.join(ROOT, 'scripts'))) if (/\.(py|mjs|js)$/.test(f)) files.push('scripts/' + f);
 ok(files.length > 40 && files.includes('lib/data.js') && files.includes('scripts/gen_zip_pages.py') && files.includes('alerts.html'),
   '1f the scan covers lib/, scripts/ and the pages (' + files.length + ' files)');
-const offenders = files.filter((f) => detects(read(f), f.endsWith('.py') ? 'py' : 'js'));
+// ONE named exemption, and it is not about meetings. scripts/lifecycle-mapping-audit.mjs proposes, for review, how a
+// DEVELOPMENT record's own registry status word ("Cancelled", "Permit Cancelled") maps to the national activity
+// vocabulary (docs/lifecycle-classification-audit-2026-11-01.md, founder decisions D2/D8). It reads no meeting and no
+// title, and nothing reads its output: the runtime decision for a development source is the registry's explicit
+// status_to_activity, never a pattern. The list may only shrink; the file must exist so a stale entry cannot linger.
+const NOT_MEETINGS = ['scripts/lifecycle-mapping-audit.mjs'];
+ok(NOT_MEETINGS.every((f) => files.includes(f)), '1f2 every exemption names a file that exists (' + NOT_MEETINGS.length + ')');
+const offenders = files.filter((f) => !NOT_MEETINGS.includes(f) && detects(read(f), f.endsWith('.py') ? 'py' : 'js'));
 ok(offenders.length === 0, '1g no site file decides "cancelled" from text; the flag comes from is_cancelled' + (offenders.length ? ' — offenders: ' + offenders.join(', ') : ''));
 
 // ── 2. every meetings reader selects is_cancelled ────────────────────────────────────────────
