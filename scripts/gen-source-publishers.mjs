@@ -40,7 +40,13 @@ export function build(registry) {
       if (!e || typeof e.registry_id !== 'string') continue;
       const agency = typeof e.jurisdiction === 'string' && e.jurisdiction.trim() ? e.jurisdiction.trim() : null;
       if (out[e.registry_id]) throw new Error('duplicate registry_id ' + e.registry_id);
-      out[e.registry_id] = { agency, dataset: datasetRef(conn, e) };
+      const rec = { agency, dataset: datasetRef(conn, e) };
+      // A source with no status column stores its connector's CONSTANT (status_const) as the record's stage. That word is ours, not the
+      // agency's, so the report must not print it as the agency's status: it needs to know the constant.
+      if (typeof e.status_const === 'string' && e.status_const) rec.status_const = e.status_const;
+      // What the source's one date MEANS, in words, when the date kind alone would mislead (e.g. a register's publication date is not a filing date).
+      if (typeof e.file_date_label === 'string' && e.file_date_label.trim()) rec.date_label = e.file_date_label.trim();
+      out[e.registry_id] = rec;
     }
   }
   const sorted = {};

@@ -395,7 +395,7 @@
         "Single Family/Duplex": "Residential",
         "Multifamily": "Residential",
         "Commercial": "Commercial",
-        "Institutional": "Commercial",
+        "Institutional": "Civic/Public",
         "Industrial": "Industrial",
         "Vacant Land": "Development"
       },
@@ -478,7 +478,7 @@
         "Single Family/Duplex": "Residential",
         "Multifamily": "Residential",
         "Commercial": "Commercial",
-        "Institutional": "Commercial",
+        "Institutional": "Civic/Public",
         "Industrial": "Industrial",
         "Vacant Land": "Development"
       },
@@ -563,6 +563,7 @@
       "status_const": "proposed",
       "record_url_precision": "record",
       "file_date_kind": "filed",
+      "file_date_label": "Published in the SEPA Register",
       "extra_where": "proposaltypename = 'Project' AND documenttypecode != 'CANADA' AND (documentsubtypecode IS NULL OR documentsubtypecode != 'WITHDRAWN') AND leadagencyname NOT IN ('WA Department of Natural Resources','Washington State Pollution Liability Insurance Agency') AND (sitelatitudedecimal IS NULL OR (sitelatitudedecimal between 45.5 and 49.1 AND sitelongitudedecimal between -124.9 and -116.8))",
       "incremental_field": "publisheddate",
       "recency_days": 365,

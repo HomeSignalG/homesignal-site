@@ -106,8 +106,10 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   });
   const worst = contrast.reduce((m, c) => (c[1] < m[1] ? c : m), ['', 99]);
   ok(contrast.length > 60 && worst[1] >= 4.5, '1f every text colour measured (' + contrast.length + ' elements: lifecycle labels, counts, lines, links, evidence copy) has at least 4.5:1 contrast; the lowest is ' + worst[0] + ' at ' + worst[1], worst);
+  // national-5: Change History badges show a staged record's STAGE (the card's words) and keep the lifecycle badge only for a record with no stage
   const lifeColours = await page.evaluate(() => [...new Set([...document.querySelectorAll('.da-rv-life')].map((e) => e.className.match(/da-rv-life--(\w+)/)[1]))].sort());
-  ok(lifeColours.join() === 'approved,operating,proposed,unknown', '1g all four lifecycle labels were on the page and measured (control)', lifeColours);
+  const stageColours = await page.evaluate(() => [...new Set([...document.querySelectorAll('.da-rv-hist .da-rv-stage')].map((e) => e.className.match(/da-rv-stage--(\w+)/)[1]))].sort());
+  ok(lifeColours.join() === 'operating,unknown' && ['approved', 'proposed'].every((k) => stageColours.includes(k)), '1g every badge colour (lifecycle and stage) was on the page and measured (control)', [lifeColours, stageColours]);
   await ctx.close();
   ok(errors.length === 0, '1h no page error and no console error', errors);
 }

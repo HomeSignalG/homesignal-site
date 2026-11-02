@@ -38,8 +38,11 @@ export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
  * national-4 (2026-11-01): every record names its publishing agency and dataset (`source.agency`, `source.feed_ref`) and, when the official
  *   link carries it, the agency's own record number (`source.record_id`); `title_cut` marks a title the source feed shortened; `scope` separates
  *   minor building work from development; `coverage.source_agencies` lists the agencies in the report.
+ * national-5 (2026-11-02, audit of the 3101 Western sample): a stage word the AGENCY did not publish (a connector's `status_const`) is no
+ *   longer shown as the agency's status (`publisher_stage` null, `publisher_stage_unpublished` true); a date carries the source's own words for
+ *   what it means when the registry states them (`file_date_label`); "Phase Issued" counts as an issued permit (stage-evidence-2).
  */
-export const REPORT_VERSION = 'development-activity-national-4';
+export const REPORT_VERSION = 'development-activity-national-5';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -72,7 +75,7 @@ export const LIFECYCLE_ORDER = ['approved', 'proposed', 'operating', 'unknown'] 
 // Never inferred from a type, a date or an approval: only the words below, after normaliseStage(), count.
 
 /** Bump whenever STAGE_EVIDENCE changes: the report carries it, so a stored report says which list judged it. */
-export const STAGE_RULE_VERSION = 'stage-evidence-1';
+export const STAGE_RULE_VERSION = 'stage-evidence-2';
 /**
  * The publisher stage values that SAY a permit was issued or construction is under way. A closed list, taken from the
  * stage values in a 3% sample of production `app_projects` development rows on 2026-10-02
@@ -93,6 +96,8 @@ export const STAGE_EVIDENCE: Readonly<Record<string, 'permit_issued' | 'under_co
   'active - issued': 'permit_issued',
   'issued full': 'permit_issued',
   'issued (nca)': 'permit_issued',
+  // A phased permit's phase (Seattle SDCI "Phase Issued": the permit for one phase, e.g. shoring and excavation, is issued). Added 2026-11-02.
+  'phase issued': 'permit_issued',
   'issued - amendment pending': 'permit_issued',
   'reissued': 'permit_issued',
   're-issued': 'permit_issued',
@@ -474,11 +479,25 @@ export function detectedChangeEntries(events: ReportableEvent[]) {
 //
 // THE PUBLISHER. source-publishers.generated.json is derived mechanically from the development source registry (the one place a
 // source's agency is written down) by scripts/gen-source-publishers.mjs. A record whose source is not in the registry names no agency.
-type Publisher = { agency: string | null; dataset: string | null };
+type Publisher = { agency: string | null; dataset: string | null; status_const?: string | null; date_label?: string | null };
 const PUBLISHERS: Record<string, Publisher> = ((publishersFile as unknown as { publishers?: Record<string, Publisher> }).publishers) ?? {};
+const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 export function publisherOf(family: string | null): Publisher {
   const p = family ? PUBLISHERS[family] : undefined;
-  return { agency: p && typeof p.agency === 'string' && p.agency.trim() ? p.agency.trim() : null, dataset: p && typeof p.dataset === 'string' && p.dataset.trim() ? p.dataset.trim() : null };
+  return { agency: str(p?.agency), dataset: str(p?.dataset), status_const: str(p?.status_const), date_label: str(p?.date_label) };
+}
+/**
+ * Whether the record's stored stage is a word the AGENCY published. A source with no status column stores its connector's constant
+ * (the registry's `status_const`) as the stage; that word is HomeSignal's, so it is never shown as the agency's status (audit 2026-11-02:
+ * the Washington SEPA Register publishes no status, and the report printed "Source agency status: proposed").
+ */
+export function agencyStage(stage: string | null, pub: Publisher): string | null {
+  if (typeof stage !== 'string' || !stage.trim()) return null;
+  return pub.status_const && stage.trim() === pub.status_const ? null : stage;
+}
+/** A date's label: the source's own words for what its one date means when the registry states them (`file_date_label`), else the kind's label. */
+function withDateLabel<T extends { label: string } | null>(d: T, pub: Publisher): T {
+  return d && pub.date_label ? { ...d, label: pub.date_label } : d;
 }
 /**
  * The agency's own record number, from the provenance the ingest stored (`case_number`), ONLY when the record's official link carries that
@@ -594,7 +613,8 @@ export function assemble(input: AssembleInput): Assembled {
 
     const t = HS().canonicalProjectType({ type: p.type, name: p.name });
     const lc = HS().canonicalLifecycle({ status: p.status });
-    const ev = recentPublisherEvent(p, today);
+    const pub = publisherOf(family || null);
+    const ev = withDateLabel(recentPublisherEvent(p, today), pub);
     const led = ledger.get(p.source_key);
     const material = selectDetectedChanges(led, eventsByKey.get(p.source_key) ?? [],
       (e) => String(e.observed_at).slice(0, 10) >= windowStart && String(e.observed_at).slice(0, 10) <= today);
@@ -614,14 +634,14 @@ export function assemble(input: AssembleInput): Assembled {
       lifecycle: { key: lc.key, label: lc.label },
       stage: stage ? { key: stage, label: STAGE_LABELS[stage], ...(evidence ? { evidence: evidence.label } : {}) } : null,
       publisher_status: p.status,
-      publisher_stage: p.stage,
+      publisher_stage: agencyStage(p.stage, pub),
+      ...(pub.status_const && agencyStage(p.stage, pub) === null && p.stage ? { publisher_stage_unpublished: true } : {}),
       publisher_event: ev,
-      record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(recordDate(p, today)),
+      record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(withDateLabel(recordDate(p, today), pub)),
       developer: p.developer, size: p.size, investment: p.investment,
       ...(titleCut(p.name) ? { title_cut: true } : {}),
       scope: workScope(p, t ? t.typeKey : null),
-      source: ((pub: Publisher) => ({ url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset,
-        record_id: recordIdOf(p) }))(publisherOf(family || null)),
+      source: { url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset, record_id: recordIdOf(p) },
       homesignal_observation: led
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
         : null,

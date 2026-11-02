@@ -156,6 +156,9 @@ export interface SocrataRegistryEntry {
    *  "filed" | "issued" | "scheduled" | "estimated" | "decided". Absent ⇒ "filed".
    *  Declared, never inferred; it is what the page labels the date with. */
   file_date_kind?: FileDateKind;
+  /** The source's own words for what its one date means, for READERS of the record (the Development Activity Report reads it through
+   *  _shared/source-publishers.generated.json). The connector does not use it: what it stores is unchanged, so no ledger event is made. */
+  file_date_label?: string;
   recency_days?: number;
   /** Optional VERBATIM SoQL predicate replacing the default recency comparison, for datasets
    *  whose date column is TEXT rather than a floating_timestamp. The default clause emits an

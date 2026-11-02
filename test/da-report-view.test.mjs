@@ -429,10 +429,10 @@ try {
     '7e Change History lists the records that have a detected change or a publisher event, in the engine\'s order', items.length);
   const men = items[0];
   ok(/<h4 class="da-rv-h4">Official record<\/h4><p class="da-rv-p">Issued · Sep 24, 2026<\/p>/.test(men) && /<h4 class="da-rv-h4">HomeSignal detected<\/h4>/.test(men), '7f a record with both has two separate, labelled lanes: Official record, and HomeSignal detected');
-  ok(textOf(men).includes('Status changed · detected Sep 27, 2026') && textOf(men).includes('Publisher stage: Pending → Advertised') && textOf(men).includes('Status: Proposed → Approved'),
+  ok(textOf(men).includes('Status changed · detected Sep 27, 2026') && textOf(men).includes('Publisher stage: Pending → Advertised') && textOf(men).includes('HomeSignal status: Proposed → Approved'),
     '7g the detected change states from and to, in plain field names, in the order the ledger gave them', textOf(men));
   const fst = items[1];
-  ok(!/Official record/.test(fst) && /First detected by HomeSignal · detected Sep 26, 2026/.test(textOf(fst)) && /Status: not stated → Proposed/.test(textOf(fst)), '7h a record with only a detected change has only that lane, and an unstated prior value reads "not stated"');
+  ok(!/Official record/.test(fst) && /First detected by HomeSignal · detected Sep 26, 2026/.test(textOf(fst)) && /HomeSignal status: not stated → Proposed/.test(textOf(fst)), '7h a record with only a detected change has only that lane, and an unstated prior value reads "not stated"');
   ok(!/HomeSignal detected/.test(items[2]) && /Official record/.test(items[2]), '7i a record with only a publisher event has only the Official record lane');
   const h7j = sec(view(await wire({ rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01' })] })), 'history');
   ok(h7j && !/da-rv-hist/.test(h7j.html) && textOf(h7j.html) === 'Change History Change history begins once HomeSignal has observed these records at least twice.',
@@ -590,14 +590,19 @@ try {
   ok(Object.keys(typeN).filter((k) => k !== 'all').every((k) => typeN[k] === rowsOf(hp).filter((r) => new RegExp('data-da-type="' + k + '"').test(r.attrs)).length) && typeN.all === 4, '14k each Type chip count equals the number of rows of that Type');
   ok(/The filters change what is shown in the table, on the map and in the PDF\. They do not change the saved report\./.test(textOf(sec(hp, 'filters').html)), '14l the filters say they change what is shown (PDF included), never the saved report');
   ok(/Showing all 4 records\./.test(textOf(sec(hp, 'filters').html)), '14l2 the filters say what they show, in words that print: "Showing all 4 records." before any is pressed');
-  // lifecycle shapes (Change History badges): four keys, four drawings, proposed is hollow and dashed
-  const shapes = {};
+  // Change History badges (national-5, 2026-11-02): a staged record shows the SAME stage words its card shows, so one record never reads two ways;
+  // a record with no stage keeps its lifecycle badge. Each key is one drawing; proposed is hollow and dashed.
+  const shapes = {}, stageShapes = {};
   for (const m of html.matchAll(/data-lifecycle="(\w+)"><svg class="da-rv-shape"[^>]*>(.*?)<\/svg>/g)) (shapes[m[1]] = shapes[m[1]] || new Set()).add(m[2]);
-  const one = Object.values(shapes).map((x) => [...x]);
-  ok(Object.keys(shapes).sort().join() === 'approved,operating,proposed,unknown' && one.every((x) => x.length === 1) && new Set(one.map((x) => x[0])).size === 4, '14m the four lifecycle shapes on the page are four different drawings, one per key', Object.keys(shapes));
-  ok(/stroke-dasharray/.test([...shapes.proposed][0]) && /fill="none"/.test([...shapes.proposed][0]) && !/fill="none"/.test([...shapes.approved][0]), '14n Proposed is a dashed hollow outline and Approved is solid');
-  const histLabel = (t) => decode((new RegExp('<h3 class="da-rv-title">' + t + '</h3><span class="da-rv-life[^>]*><svg[^>]*>.*?</svg><span class="da-rv-lifetext">([^<]*)</span>').exec(sec(html, 'history').html) || [, ''])[1]);
-  ok(histLabel('Menchaca Apartments') === 'Approved' && histLabel('Lakeline Medical Office') === 'Proposed' && !/coming/i.test(histLabel('Lakeline Medical Office')), '14o Change History states the engine\'s own lifecycle label: Proposed is never called "coming"');
+  for (const m of html.matchAll(/data-stage="(\w+)"><svg class="da-rv-shape"[^>]*>(.*?)<\/svg>/g)) (stageShapes[m[1]] = stageShapes[m[1]] || new Set()).add(m[2]);
+  const one = Object.values(shapes).concat(Object.values(stageShapes)).map((x) => [...x]);
+  ok(Object.keys(shapes).sort().join() === 'operating,unknown' && ['approved', 'proposed'].every((k) => stageShapes[k]) && one.every((x) => x.length === 1)
+    && new Set([...shapes.operating, ...shapes.unknown, ...stageShapes.approved, ...stageShapes.proposed]).size === 4, '14m every badge key is one drawing, and four keys are four drawings', [Object.keys(shapes), Object.keys(stageShapes)]);
+  ok(/stroke-dasharray/.test([...stageShapes.proposed][0]) && /fill="none"/.test([...stageShapes.proposed][0]) && !/fill="none"/.test([...stageShapes.approved][0]), '14n Proposed is a dashed hollow outline and Approved is solid');
+  const histLabel = (t) => decode((new RegExp('<h3 class="da-rv-title">' + t + '</h3><span class="da-rv-(?:life|stage)[^>]*><svg[^>]*>.*?</svg><span class="da-rv-lifetext">([^<]*)</span>').exec(sec(html, 'history').html) || [, ''])[1]);
+  const cardStage = (t) => decode((new RegExp('<span class="da-rv-name">' + t + '</span>[\\s\\S]*?<span class="da-rv-lifetext">([^<]*)</span>').exec(html) || [, ''])[1]);
+  ok(histLabel('Menchaca Apartments') !== '' && histLabel('Menchaca Apartments') === cardStage('Menchaca Apartments') && histLabel('Lakeline Medical Office') === 'Proposed / Under Review' && !/coming/i.test(histLabel('Lakeline Medical Office')),
+    '14o Change History states the same stage words as the record\'s card: Proposed is never called "coming"', [histLabel('Menchaca Apartments'), cardStage('Menchaca Apartments'), histLabel('Lakeline Medical Office')]);
   // the evidence entry's dates
   const evMen = evOf(html).find((e) => e.name === 'Menchaca Apartments').html;
   ok(/HomeSignal detected:<\/span> Status changed · Sep 27, 2026/.test(evMen) && !/HomeSignal detected:<\/span>[^<]*Sep 24, 2026/.test(evMen), '14p the detected-change date is the date HomeSignal detected it (not the publisher\'s event date)');
