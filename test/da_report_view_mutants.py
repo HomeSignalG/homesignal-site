@@ -111,8 +111,8 @@ m('css_empty_report_not_prominent', "'.da-rv--empty .da-rv-lims{font-size:16px;f
 
 
 # ---- the 100526 layout (build step 3): section order, the three stages, and what each section may claim -----------------------------------
-m('swap_two_sections', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['proposed', 'approved', 'permitted'];")
-m('permitted_stage_dropped', "var STAGES = ['approved', 'proposed', 'permitted'];", "var STAGES = ['approved', 'proposed'];")
+m('swap_two_sections', "var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "var STAGES = ['proposed', 'approved', 'permitted', 'occupancy'];")  # re-anchored 2026-11-02 (national-6)
+m('permitted_stage_dropped', "var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "var STAGES = ['approved', 'proposed', 'occupancy'];")  # re-anchored 2026-11-02 (national-6)
 m('actions_before_evidence', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', '    if (some) parts.push(actionsBar(opts));\n    parts.push(evidenceSection(report));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('history_shown_when_empty', "    if (some) parts.push(historySection(history, report, m.dup));", "    parts.push(historySection(history, report, m.dup));")
 m('actions_on_empty_report', '    if (some) parts.push(actionsBar(opts));', '    parts.push(actionsBar(opts));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
