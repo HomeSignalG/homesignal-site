@@ -27,7 +27,7 @@ CFG = 'supabase/config.toml'
 WF = '.github/workflows/deploy-edge-functions.yml'
 REG = 'supabase/functions/_shared/source-attribution.json'
 GEN = 'supabase/functions/_shared/project-type.generated.js'
-TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs', 'test/no-source-allowlist.test.mjs']
+TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs', 'test/no-source-allowlist.test.mjs', 'test/report-overview-scale.test.mjs']
 
 # name -> list of (file, old, new)
 M = {}
@@ -228,6 +228,9 @@ m('roundtrip_paths_forget_the_engine', RSW, "      - 'supabase/functions/_shared
 m('roundtrip_runs_on_any_database', RUN, "case \"$PGDATABASE\" in *disposable*) ;; *) echo \"ABORT: PGDATABASE must name a disposable database (got '$PGDATABASE')\"; exit 1;; esac", "true")
 m('roundtrip_uses_a_copy_of_the_sql', RUN, 'P -f "$root/docs/report-snapshot.sql" >/dev/null 2>&1', 'P -f "$here/snapshot-copy.sql" >/dev/null 2>&1')
 
+# ---- documented scale (founder 2026-11-02, "rank biggest impact developments first") ----------------------------------------------------------------------
+m('scale_reads_existing_building', MOD, ".replace(EXISTING_SCALE_RE, ' ');", ";")
+m('scale_not_carried', MOD, ", ...(rel.scale ? { scale: rel.scale } : {}), rule_version: rel.rule_version },", ", rule_version: rel.rule_version },")
 
 def run_tests():
     for t in TESTS:
