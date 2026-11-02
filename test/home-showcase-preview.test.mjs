@@ -29,10 +29,11 @@ const view = readFileSync(join(root, 'lib/da-report-view.js'), 'utf8');
 const qol = [...view.matchAll(/(?:infrastructure|commercial|residential|civic): '([^']+)'/g)].map((m) => m[1]);
 for (const name of ['desktop', 'mobile']) {
   const t = receipt.frames[name].text;
-  ok(t.includes(view.match(/residential: '([^']+)'/)[1]), '8 ' + name + ': the Quality-of-Life sentence in the image is the view\'s own, word for word');
-  ok(/2 official records within 0\.5 miles[^.]*1 permitted \/ under construction · 1 proposed \/ under review/.test(t) && /Both of the report’s 2 official records are shown/.test(t) && !/Frisco|Touraine|75034/.test(t), '9 ' + name + ': counts and the "both of 2" disclosure are in the image; no Frisco content');
+  // national-7: the note is per record; a report saved before national-7 carries no relevance basis, so its records read the view's own scope-only sentence
+  ok(t.includes(view.match(/var QOL_SCOPE_ONLY = '([^']+)'/)[1]), '8 ' + name + ': the Quality-of-Life sentence in the image is the view\'s own, word for word');
+  ok(/2 official records within 0\.5 miles[^.]*1 with a permit issued · 1 proposed \/ under review/.test(t) && /Both of the report’s 2 official records are shown/.test(t) && !/Frisco|Touraine|75034/.test(t), '9 ' + name + ': counts and the "both of 2" disclosure are in the image; no Frisco content');
   ok(!/Founder Test|\bct\b|@|Test Workspace/i.test(t), '10 ' + name + ': no test-account identity or email in the image text');
-  ok(/Proposed \/ Under Review/.test(t) && /Permitted \/ Under Construction/.test(t), '11 ' + name + ': both stages shown with the report\'s own labels');
+  ok(/Proposed \/ Under review/.test(t) && /Permit issued Source agency status: Issued/.test(t) && !/Permitted \/ Under Construction/.test(t), '11 ' + name + ': both stages shown in the view\'s national-7 words, beside the agency\'s own status');
 }
 const idx = rd('index.html').toString('utf8');
 ok(!/Founder Test Workspace|test workspace/i.test(idx + JSON.stringify(receipt)), '12 no internal test-account label on the homepage or in the receipt');
@@ -60,7 +61,7 @@ r2 = withDamage([DESK, REC], () => {
 ok(r2.status !== 0 && /committed image differs from a fresh render/.test(r2.stdout), '17 with --strict-pixels (same fonts), a same-size image that does not match a fresh render fails even when the receipt is made consistent with it', r2.stdout);
 r2 = withDamage([REC], () => { const rc = JSON.parse(rd(REC).toString('utf8')); rc.view_sha256 = '0'.repeat(64); writeFileSync(join(root, REC), JSON.stringify(rc, null, 1) + '\n'); }, checkRun);
 ok(r2.status !== 0 && /da-report-view\.js changed since the images were built/.test(r2.stdout), '17b images built from an older report view fail --check on any machine, whatever fonts it has', r2.stdout);
-r2 = withDamage([IDX], () => writeFileSync(join(root, IDX), rd(IDX).toString('utf8').replace('width="1600" height="1464"', 'width="1400" height="1900"')), checkRun);
+r2 = withDamage([IDX], () => writeFileSync(join(root, IDX), rd(IDX).toString('utf8').replace('width="1600" height="1656"', 'width="1400" height="1900"')), checkRun);
 ok(r2.status !== 0 && /index\.html does not reference/.test(r2.stdout), '18 the homepage referencing the preview at a stale size fails --check', r2.stdout);
 const post = checkRun();
 ok(post.status === 0, '19 after the damage tests the committed files are restored and --check passes again', post.stdout);

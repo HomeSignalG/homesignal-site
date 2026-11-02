@@ -141,7 +141,7 @@ ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="type"
   JSON.stringify(['All', 'Residential', 'Commercial', 'Industrial', 'Data center', 'Roads & infrastructure', 'Civic & public']),
   'the Type row is the canonical Type authority\'s labels, in the plan\'s order');
 ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="stage"]', (b) => b.map((x) => x.firstChild.textContent.trim()))) ===
-  JSON.stringify(['All', 'Approved / Coming', 'Proposed / Under Review', 'Permitted / Under Construction']), 'the Stage row is the three approved stages');
+  JSON.stringify(['All', 'Approved', 'Proposed / Under review', 'Permit issued / Under construction']), 'the Stage row is the three approved stages'); // national-6 (2026-11-02): the stage titles
 ok(initial.pressed.join() === 'type:all,stage:all', 'All is selected first on both rows', initial.pressed);
 ok(initial.rows === 9 && initial.shown.length === 9 && initial.markers === 9 && initial.hiddenMarkers === 0, 'all 9 entries are in the table and on the map', initial);
 const stageCount = (k) => initial.shown.filter((x) => x.startsWith(k + ':')).length;
@@ -158,7 +158,7 @@ for (const [label, key] of Object.entries(KEYS)) {
   ok(s.hiddenMarkers === 9 - wantRows.length, label + ': the same projects leave the map (' + (9 - wantRows.length) + ')', s.hiddenMarkers);
 }
 await page.click(chipSel('type', 'Residential'));
-await page.click(chipSel('stage', 'Permitted / Under Construction'));
+await page.click(chipSel('stage', 'Permit issued / Under construction')); // national-6 (2026-11-02)
 const both = await shape(page);
 ok(JSON.stringify(both.shown) === JSON.stringify(['permitted:residential']), 'Type and Stage combine, and neither changes the other', both.shown);
 await page.click(chipSel('type', 'Commercial'));

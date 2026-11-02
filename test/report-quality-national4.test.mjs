@@ -59,6 +59,9 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
 }
 
 // ---- 3. minor building work: positive evidence required, significance always wins ---------------------------------------------------------------
+// national-6 (2026-11-02): M.workScope() is retired. Its successor is M.relevance(), which keeps the same evidence words: minor work is now
+// reason 'routine_work' and is left out of the report (kept in intelligence.relevance_review), and a record whose words establish no
+// neighborhood-facing change is 'not_established' (also left out, never called routine). Full rule: test/report-quality-national6.test.mjs.
 {
   const minor = [
     'Single Family/Duplex Construct bathroom remodel in unit 1B1B in a mixed use building  subject to field inspection (STFI)',
@@ -72,6 +75,9 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
     'Building relocation of the gas meter',
   ];
   const development = [
+    // national-7: road and utility work is a neighborhood-facing change whatever its Type (national7 I1)
+    'SR 7/S 100th St to S of S 38th St - Paving & ADA Compliance HMA Inlay',
+    'Hwys. 96 & 255 Flood Repairs (Sebastian Co.) (S)',
     'Master Use Permit Land Use Application to allow an 8-story, 254-unit apartment building. Parking for 163 vehicles propos',
     'Multifamily Phased Permit: Construct a residential high rise building  occupy per plan. Mechanical included.',
     'Commercial PHASED PERMIT: Construct substantial alterations to a commercial office building for a mixed use -  multi-fam',
@@ -80,27 +86,34 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
     'Master Use Permit Shoreline Substantial Development application to allow installation of electrical vehicle chargers and',
     'Commercial Change of use to drinking establishment. Construct tenant improvement for bar (Saanj Wine Bar) at ground floo',
     'Building Construction of new duplex residential building. Each unit ap',
-    'Residential construction: Toohey Plat, Lot 5',
-    'Commercial construction',
-    'SR 7/S 100th St to S of S 38th St - Paving & ADA Compliance HMA Inlay',
-    '315 1ST AVE N',
-    // a bare "repair" is not minor work: a business named for it, and a road or bridge repair (sampled nationally, 2026-11-01)
-    'Auto & Boat Repair',
-    'Hwys. 96 & 255 Flood Repairs (Sebastian Co.) (S)',
     // significance outranks a minor word in the same title
     'Construct new building addition and interior alterations to unit 4',
     'Demolish existing building and repair retaining wall',
   ];
-  const wrongM = minor.filter((n) => M.workScope({ name: n, type_raw: null }).key !== 'minor_work');
-  const wrongD = development.filter((n) => M.workScope({ name: n, type_raw: null }).key !== 'development');
-  ok(wrongM.length === 0, '3a interior, single-unit and like-for-like repair permits are minor building work (' + minor.length + ')', wrongM);
-  ok(wrongD.length === 0, '3b development, land-use, demolition, change-of-use, road and unstated records stay development, even when they also name a repair or an interior (' + development.length + ')', wrongD);
-  ok(M.workScope({ name: 'SR-266; 200 W. Bridge Collision Repair, repairs to deck', type_raw: null }, 'infrastructure').key === 'development'
-    && M.workScope({ name: 'Construct repairs to exterior of existing building', type_raw: null }, 'commercial').key === 'minor_work', '3c2 a road or bridge project is never minor building work, whatever its words; the same words on a building are');
-  ok(M.workScope({ name: null, type_raw: null }).key === 'development' && M.workScope({ name: 'Water heater', type_raw: 'Mechanical' }).key === 'minor_work', '3c no words: development (positive evidence is required); the class field counts as the record\'s own words');
+  // national-6 (2026-11-02): these named no minor-work evidence and so were 'development' under workScope. Under relevance() their words
+  // establish no nearby change on their own, so they are 'not_established' (left out, flagged for review). What still holds is the
+  // national-4 point: a bare "repair", an address or an unstated record is never called minor/routine work.
+  const unstated = [
+    'Residential construction: Toohey Plat, Lot 5',
+    'Commercial construction',
+    '315 1ST AVE N',
+    'Auto & Boat Repair',
+  ];
+  const R = (n, t) => M.relevance({ name: n, type_raw: null }, t);
+  const wrongM = minor.filter((n) => R(n).reason !== 'routine_work');
+  const wrongD = development.filter((n) => R(n).include !== true);
+  const wrongU = unstated.filter((n) => R(n).reason === 'routine_work' || R(n).include === true);
+  ok(wrongM.length === 0, '3a interior, single-unit and like-for-like repair permits are routine work (' + minor.length + ')', wrongM);
+  ok(wrongD.length === 0, '3b development, land-use, demolition and change-of-use records are included, even when they also name a repair or an interior (' + development.length + ')', wrongD);
+  ok(wrongU.length === 0 && unstated.every((n) => R(n).reason === 'not_established'), '3b2 a bare "repair", an address or an unstated record is never called routine work: its relevance is not established (' + unstated.length + ')', wrongU);
+  ok(R('SR-266; 200 W. Bridge Collision Repair, repairs to deck', 'infrastructure').include === true
+    && R('Construct repairs to exterior of existing building', 'commercial').include === false, '3c2 a road or bridge project is never minor building work, whatever its words; the same words on a building are not included');
+  ok(R(null).reason === 'not_established' && M.relevance({ name: 'Water heater', type_raw: 'Mechanical' }).reason === 'routine_work', '3c no words: not established (positive evidence is required); the class field counts as the record\'s own words');
   ok(M.normalizeWords('Re-Roof, deck!') === ' re roof deck ' && !M.normalizeWords('decker').includes(' deck '), '3d one normalisation: phrases match whole words only');
-  const fn = M.workScope.toString() + M.normalizeWords.toString();
-  ok(!/zip|county|state|registry|source|seattle|tacoma|Date|now/i.test(fn), '3e the rule reads only the record\'s own words: no place, ZIP, source or clock', fn.length);
+  // national-6 (2026-11-02): relevance() passes registry_id through to the canonical residential rule (a founder-bounded development-class
+  // source family, 2026-09-06), so "registry" and "source" now appear by design; the place / ZIP / clock half of the check still holds.
+  const fn = (M.relevance.toString() + M.normalizeWords.toString()).replace(/\/\/[^\n]*/g, '');
+  ok(!/zip|county|seattle|tacoma|Date|now\(/i.test(fn), '3e the rule reads only the record\'s own words (and the residential rule\'s source family): no place, ZIP or clock', fn.match(/zip|county|seattle|tacoma|Date|now\(/i));
 }
 
 // ---- 4. the view: whose record, which record, shortened titles, and a separate minor section that keeps every record ----------------------------
@@ -118,21 +131,24 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
     coverage: { source_feed_count: 1, limitations: [] }, sections: { by_stage: { approved: projects.map((p) => p.project_id), proposed: [], permitted: [] }, by_lifecycle: { approved: [], proposed: [], operating: [], unknown: [] }, what_changed_recently: [], recent_official_activity: [] } },
     render: { distances_mi: { A1: 0.1, A2: 0.2, A3: 0.2, A4: 0.3, A5: 0.4 }, bearings_deg: { A1: 0, A2: 90, A3: 90, A4: 180, A5: 270 } } };
   const m = V.read(response);
-  ok(m && m.total === 5 && m.development === 4 && m.minor.length === 1 && m.minor[0].p.project_id === 'A4' && !m.nums.A4 && m.nums.A1 === 1, '4a the minor record leaves the development list and the map numbering, and stays in the report (total 5 = 4 + 1)', m && { total: m.total, dev: m.development, minor: m.minor.length });
+  // national-6 (2026-11-02): a routine (minor_work) record is no longer listed apart: it is hidden from every section, the map and the counts
+  // (the engine keeps it in intelligence.relevance_review). Was: a separate "minor building work" section. See test/report-quality-national6.test.mjs.
+  ok(m && m.total === 4 && m.development === 4 && m.hiddenRoutine === 1 && !m.nums.A4 && m.nums.A1 === 1, '4a the routine record leaves the list, the map numbering and the counts (4 shown, 1 hidden)', m && { total: m.total, dev: m.development, hidden: m.hiddenRoutine });
   const h = V.html(response, { subject: '1 Main St, Example, WA 98121' });
-  const minorSec = (h.match(/<section class="da-rv-sec da-rv-sec--minor"[\s\S]*?<\/section>/) || [''])[0];
   const devSec = (h.match(/<section class="da-rv-sec da-rv-sec--records"[\s\S]*?<\/section>/) || [''])[0];
-  ok(minorSec.includes('Construct bathroom remodel in unit 2 STFI') && minorSec.includes('https://example.gov/r/A4') && !devSec.includes('bathroom remodel'), '4b the minor record is in its own section with its official link, and not in Nearby Development');
-  ok(/5 official records within 0\.5 miles of this property\. 4 are development: /.test(h) && /The other 1 is minor building work \(interior, single-unit or like-for-like repair permits\), listed separately\./.test(h), '4c the briefing counts development and minor building work separately and the total is every record');
+  ok(!/da-rv-sec--minor/.test(h) && !h.includes('bathroom remodel') && !h.includes('https://example.gov/r/A4') && devSec.includes('https://example.gov/r/A1'), '4b the routine record appears nowhere in the report (no minor section, no title, no link)');
+  ok(/4 official records within 0\.5 miles of this property document a nearby change: /.test(h) && !/minor building work/.test(h), '4c the briefing counts only the records that document a nearby change');
   ok(devSec.includes('315 1ST AVE N (record A2)') && devSec.includes('315 1ST AVE N (record A3)') && devSec.includes('Construct a 10-story apartment building</span>'), '4d records that share a title are told apart by the agency\'s record number; a unique title is left alone');
-  ok(devSec.includes('x'.repeat(119) + 'y…') && /The source feed shortens this title\. The full description is in the official record\./.test(devSec), '4e a shortened title ends in an ellipsis and says the full description is in the official record');
+  // national-6 (2026-11-02): the view shortens long titles at a word (TITLE_MAX) and the note says "description"
+  ok(/<span class="da-rv-name">Xx+…<\/span>/.test(devSec) && /The source feed shortens this description\. The full description is in the official record\./.test(devSec), '4e a shortened title ends in an ellipsis and says the full description is in the official record');
   ok((devSec.match(/City of Example \(data\.example\.gov, dataset abcd-1234\)\./g) || []).length === 4 && /Agency record number:<\/span> A1/.test(devSec), '4f every row names its agency and dataset, and its agency record number');
   ok(/Official agency data in this report:<\/span> City of Example \(data\.example\.gov, dataset abcd-1234\)\./.test(h), '4g the coverage note names the agency');
   // an older saved report (no national-4 fields) reads exactly as before: no minor section, no record numbers, no shortened-title note
   const old = JSON.parse(JSON.stringify(response));
   old.report.projects.forEach((p) => { delete p.scope; delete p.title_cut; p.source = { url: p.source.url, attribution: 'Old credit.' }; });
   const ho = V.html(old, { subject: '1 Main St, Example, WA 98121' });
-  ok(!/da-rv-sec--minor|Agency record number|shortens this title|\(record A2\)/.test(ho) && V.read(old).minor.length === 0 && V.read(old).total === 5, '4h a report saved before national-4 renders as it did');
+  // national-6 (2026-11-02): with no scope field nothing is hidden as routine, so all 5 show (there is no minor section in any report now)
+  ok(!/da-rv-sec--minor|Agency record number|shortens this|\(record A2\)/.test(ho) && V.read(old).hiddenRoutine === 0 && V.read(old).total === 5, '4h a report saved before national-4 renders as it did');
 }
 
 console.log(`\n${total - fails} passed, ${fails} failed of ${total}`);

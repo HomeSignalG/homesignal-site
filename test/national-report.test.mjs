@@ -124,7 +124,8 @@ const ids = (list) => list.join(',');
   const statuses = ['Proposed', 'Approved', 'Operating', 'Active', 'Decided', 'On file', 'built', '', null, 'Some New Word'];
   let same = true, count = 0;
   for (const c of cases) for (const s of statuses) {
-    const out = run({ rows: [row('kx', 0.2)], projects: [proj('kx', { ...c, status: s, date_kind: 'issued', submitted_at: '2026-09-10' })] });
+    // national-6 (2026-11-02): an agency class that documents the work ('New Construction') keeps every case in the report, so the check is about Type and lifecycle, not relevance
+    const out = run({ rows: [row('kx', 0.2)], projects: [proj('kx', { ...c, type_raw: 'New Construction', status: s, date_kind: 'issued', submitted_at: '2026-09-10' })] });
     const p = out.intelligence.projects[0];
     const wantT = AUTH.canonicalProjectType({ type: c.type, name: c.name });
     const wantL = AUTH.canonicalLifecycle({ status: s });
@@ -243,8 +244,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-6', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-3', activity_rule_version: 'activity-outcome-1', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
-
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-7', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-3', activity_rule_version: 'activity-outcome-1', relevance_rule_version: 'relevance-1', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
   const rpc = async (fn, args) => { sent.push({ fn, args }); return { data: [{ report_id: '3f1b2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', generated_at: '2026-09-29T12:00:00Z', private_context_id: '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d' }], error: null }; };
@@ -303,7 +303,7 @@ const FIELD = {
   ok(ids(r.intelligence.projects.map((p) => p.project_id)) === 'ka,kb', '8a projects are sorted by project id; a project not in the spatial answer is not added', ids(r.intelligence.projects.map((p) => p.project_id)));
   const r2 = run({ rows: [row('kc', 0.2), row('kd', 0.2), row('ke', 0.2)], projects: [proj('kc', { source_ref: '' }), proj('kd', { source_ref: null }), proj('ke', { record_kind: 'facility' })] });
   ok(r2.intelligence.projects.length === 0, '8b a record with no source URL, or that is not a development record, is not in the report');
-  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-6' && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
+  ok(r.intelligence.product === 'HOMESIGNAL DEVELOPMENT ACTIVITY' && r.intelligence.report_version === 'development-activity-national-7' /* national-7 (2026-11-02) */ && r.intelligence.as_of === '2026-09-29', '8c product name, version and as-of day', [r.intelligence.product, r.intelligence.report_version, r.intelligence.as_of]);
   ok(M.parseRadius(0.5) === 0.5 && M.parseRadius('2') === 2 && M.parseRadius(3) === null && M.parseRadius('') === null && M.parseRadius(null) === null && M.parseRadius('x') === null, '8d only the four canonical radii parse');
   ok(throws(() => run({ radius_mi: 3 })) !== null && throws(() => run({ view: 'staff' })) !== null && throws(() => run({ subject: { ...SUBJECT, zip: '9747' } })) !== null && throws(() => run({ subject: { ...SUBJECT, address: '  ' } })) !== null
     && throws(() => run({ subject: { ...SUBJECT, lat: NaN } })) !== null, '8e a bad radius, view, ZIP, blank address or non-finite point is refused');
@@ -328,7 +328,11 @@ const FIELD = {
     && M.presentationStage('proposed', 'Issued') === 'proposed' && M.presentationStage('proposed', null) === 'proposed'
     && M.presentationStage('operating', 'Construction') === null && M.presentationStage('unknown', 'On file') === null,
     '9d one assignment: evidence makes an approved or unknown record Permitted; approved without it is Approved; proposed stays Proposed; operating and quiet unknown have no stage');
-  ok(JSON.stringify(M.STAGE_LABELS) === JSON.stringify({ approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction', occupancy: 'Approved for occupancy — business opening not verified' })
+  // national-7 (2026-11-02): the labels no longer predict ("Coming") or pair an issued permit with started work; one record's label follows its evidence (stageLabel);
+  // national-6 occupancy keeps its label, and a TEMPORARY occupancy authorization says temporary
+  ok(JSON.stringify(M.STAGE_LABELS) === JSON.stringify({ approved: 'Approved', proposed: 'Proposed / Under review', permitted: 'Permit issued or under construction', occupancy: 'Approved for occupancy — business opening not verified' })
+    && M.stageLabel('permitted', { kind: 'permit_issued' }) === 'Permit issued' && M.stageLabel('permitted', { kind: 'under_construction' }) === 'Under construction'
+    && M.stageLabel('occupancy', null, 'TCO Issued') === 'Temporary occupancy approved — business opening not verified' && M.stageLabel('occupancy', null, 'Approved to Occupy') === 'Approved for occupancy — business opening not verified'
     && !('permitted' in { proposed: 1, approved: 1, operating: 1, unknown: 1 }) && JSON.stringify([...M.LIFECYCLE_ORDER]) === '["approved","proposed","operating","unknown"]',
     '9e the three stage labels are the plan\'s, plus occupancy approved (national-6), and the lifecycle keys are still exactly four (ruling 2)');
 
@@ -351,8 +355,9 @@ const FIELD = {
   ok(JSON.stringify(I.sections.by_lifecycle.approved) === '["u:22248","u:22250","u:nm"]' && I.projects.every((p) => p.lifecycle.key !== 'permitted'),
     '9g the canonical lifecycle is untouched: Permitted records are still lifecycle approved');
   const pp = Object.fromEntries(I.projects.map((p) => [p.project_id, p]));
-  ok(JSON.stringify(pp['u:22248'].stage) === JSON.stringify({ key: 'permitted', label: 'Permitted / Under Construction', evidence: 'Under construction' })
-    && JSON.stringify(pp['u:nm'].stage) === JSON.stringify({ key: 'approved', label: 'Approved / Coming' }) && pp['u:22248'].publisher_stage === 'Under Construction',
+  // national-6 (2026-11-02): the per-record label is what the agency's word supports ("Under construction"); approved is "Approved"
+  ok(JSON.stringify(pp['u:22248'].stage) === JSON.stringify({ key: 'permitted', label: 'Under construction', evidence: 'Under construction' })
+    && JSON.stringify(pp['u:nm'].stage) === JSON.stringify({ key: 'approved', label: 'Approved' }) && pp['u:22248'].publisher_stage === 'Under Construction',
     '9h each record carries its stage, the evidence that put it there, and the publisher\'s own stage word', pp['u:22248'].stage);
   const all = Object.values(I.sections.by_stage).flat();
   ok(all.length === new Set(all).size, '9i a project is in at most one stage section');
@@ -369,7 +374,11 @@ const FIELD = {
     projects: [uproj('t:a', 'Proposed', null, 'A'), uproj('t:b', 'Approved', 'Issued', 'B'), uproj('t:c', 'Approved', null, 'C'), uproj('t:d', 'Operating', 'Close Out', 'D')],
     ledger: [], events: [], health: [] });
   ok(JSON.stringify(tie.renderOnly.review) === '["t:b","t:c","t:a"]', '9o a tie in distance goes to the stronger stage (Permitted, Approved, Proposed); a record in no stage section is never listed', tie.renderOnly.review);
-  ok(!JSON.stringify(out.intelligence).includes('review'), '9p the review list is response-only: it is measured from the subject');
+  // national-6 (2026-11-02): the permanent body carries `relevance_review` (records left out, kept for traceability); the subject-measured review list is still absent
+  const { relevance_review: _rr, ...noRelevanceReview } = out.intelligence;
+  // (the stage label "Proposed / Under review" now contains the word in lower case, so the check looks for a "review" KEY and the review list's ids, not the word)
+  ok(!/"review"\s*:/.test(JSON.stringify(noRelevanceReview))
+    && Array.isArray(_rr) && !('review' in out.intelligence) && Array.isArray(out.renderOnly.review) && out.renderOnly.review.length > 0, '9p the review list is response-only: it is measured from the subject (the only "review" in the body is relevance_review)');
 }
 
 // ---- 10. the report's outcome: "No development activity" vs "No data ingested" (founder ruling R5, 2026-10-02) -----------------

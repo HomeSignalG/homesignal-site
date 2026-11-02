@@ -54,7 +54,8 @@ const CREDITS = JSON.parse(read('supabase/functions/_shared/source-attribution.j
 const NOW = new Date('2026-11-01T12:00:00Z');
 const SUBJECT = { address: '1 Test Way, Testville, UT 84302', matched_address: '1 TEST WAY, TESTVILLE, UT, 84302', lat: 41.51, lng: -112.01, zip: '84302' };
 const row = (k, fam) => ({ source_key: k, feature_id: 'pt:' + k, registry_id: fam, provenance: 'proven_stored_point', distance_mi: 0.2, geometry_type: 'Point', has_more: false });
-const proj = (k, fam, x = {}) => ({ source_key: k, registry_id: fam, record_kind: 'development', name: 'Record ' + k, type: 'Residential', type_raw: null, status: 'Proposed', stage: null,
+// national-6 (2026-11-02): a record must document a nearby change to be in a report, so the fixture's agency class says what the work is.
+const proj = (k, fam, x = {}) => ({ source_key: k, registry_id: fam, record_kind: 'development', name: 'Record ' + k, type: 'Residential', type_raw: 'New Construction', status: 'Proposed', stage: null,
   developer: null, size: null, investment: null, submitted_at: '2026-10-20', date_kind: 'filed', address: 'SR-13', source_ref: 'https://example.gov/record/' + k, ...x });
 const run = (rows, projects, view = 'customer') => M.assemble({ now: NOW, view, zip_supported: true, radius_mi: 0.5, attribution: CREDITS, subject: SUBJECT, rows, projects, ledger: [], events: [], health: [] });
 ok(!files.some((f) => read(f).includes(NEW)), '3a (control) the new family is named in no file');

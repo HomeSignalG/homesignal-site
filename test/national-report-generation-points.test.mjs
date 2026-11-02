@@ -72,7 +72,8 @@ const keys = (rows) => rows.map((r) => r.source_key);
 ok(!keys(rpc.old_045).includes(LIGHTSEY), '1a BEFORE: the previous function does not return Lightsey Residences at ~0.45 mi');
 const before = await report(rpc.old_045, rpc.subject_045);
 ok(before.status === 200 && before.rep.projects.every((p) => p.project_id !== LIGHTSEY), '1b BEFORE: it is not in the report either');
-ok(before.headline && /4 official records/.test(before.headline) && /2 proposed \/ under review/.test(before.headline), '1c BEFORE: the briefing counts 2 proposed / under review', before.headline);
+// national-6 (2026-11-02): one of the four nearby records does not document a neighborhood-facing change, so relevance() leaves it out: 3 records
+ok(before.headline && /3 official records/.test(before.headline) && /2 proposed \/ under review/.test(before.headline) && before.rep.relevance_review.length >= 1, '1c BEFORE: the briefing counts 2 proposed / under review', before.headline);
 
 // ---- 2. the fix, on the shipped function's output ----
 ok(keys(rpc.new_045).includes(LIGHTSEY), '2a AFTER: the shipped function returns Lightsey Residences at ~0.45 mi');
@@ -81,11 +82,12 @@ ok(lr && lr.provenance === 'proven_stored_point' && lr.feature_id === 'pt:1' && 
 ok(keys(rpc.old_045).every((k) => keys(rpc.new_045).includes(k)), '2c ADDITIVE: every row the previous function returned is still returned');
 const after = await report(rpc.new_045, rpc.subject_045);
 const p = after.rep.projects.find((x) => x.project_id === LIGHTSEY);
-ok(p && p.lifecycle.key === 'proposed' && p.stage && p.stage.key === 'proposed' && p.stage.label === 'Proposed / Under Review', '2d the report places it in Proposed / Under Review (the existing Stage authority, no new vocabulary)', p && p.stage);
+ok(p && p.lifecycle.key === 'proposed' && p.stage && p.stage.key === 'proposed' && p.stage.label === 'Proposed / Under review', '2d the report places it in Proposed / Under review (national-6 wording) (the existing Stage authority, no new vocabulary)', p && p.stage);
 ok(p && p.type.key === 'residential' && p.publisher_stage === 'In Review' && p.source.url === real.find((r) => r.source_key === LIGHTSEY).source_ref, '2e verified Type, the publisher\'s own stage, and the official record link are carried');
 const row = after.rowOf('Lightsey Residences');
-ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under Review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
-ok(row && /Quality-of-Life Impact: Potential construction noise and traffic/.test(row) && /Not site-verified; no effect is established\./.test(row), '2g the Quality-of-Life wording is the existing evidence-aware text and claims no established effect', row);
+ok(row && /Residential/.test(row) && /Stage: Proposed \/ Under review/.test(row) && /Source agency status: In Review/.test(row) && /Official source/.test(row), '2f the rendered row shows project, Type, Stage and source', row);
+// national-7 (founder, 2026-11-02): the note states what THIS record documents, then the Type's own sentence, and claims no established effect
+ok(row && /Quality-of-Life Impact: The record documents new residential development\. .*Potential construction noise and traffic, then added neighborhood activity or visual change\. Not site-verified; no effect is established\./.test(row), '2g the Quality-of-Life wording is the record-specific note plus the Type sentence, and claims no established effect', row);
 
 // ---- 3. the half-mile edge ----
 ok(!keys(rpc.new_055).includes(LIGHTSEY), '3a ~0.55 mi: excluded');
@@ -101,7 +103,7 @@ ok(den && /Stage: Decided \(denied or withdrawn\)/.test(den) && /Source agency s
 
 // ---- 5. unresolved Type is not invented ----
 const unres = after.rowOf('South Lamar Blvd Street and Utility Improvements Plan');
-ok(unres && /Other project/.test(unres) && /Stage: Proposed \/ Under Review/.test(unres), '5 an unclassified Type shows the existing Other project fallback and the project is still reported', unres);
+ok(unres && /Other project/.test(unres) && /Stage: Proposed \/ Under review/.test(unres), '5 an unclassified Type shows the existing Other project fallback and the project is still reported', unres);
 
 console.log('\n' + (bad ? bad + ' of ' + n + ' FAILED' : 'All ' + n + ' checks passed'));
 process.exit(bad ? 1 : 0);

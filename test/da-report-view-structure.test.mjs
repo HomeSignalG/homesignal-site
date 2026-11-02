@@ -30,7 +30,8 @@ const C = code(SRC);
 
 // ---- 1. pure: no network, no storage, no location, no clock, no dynamic code -------------------------------------------------------------
 {
-  const IMPURE = ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'WebSocket', 'EventSource', 'localStorage', 'sessionStorage', 'indexedDB', 'document.cookie', 'location', 'history.pushState',
+  // national-6 (2026-11-02): 'location' is matched as a property ('.location', 'location.'), so the impact note's words "at this location" are not read as a location read
+  const IMPURE = ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'WebSocket', 'EventSource', 'localStorage', 'sessionStorage', 'indexedDB', 'document.cookie', '.location', 'location.', 'history.pushState',
     'navigator', 'window.open', 'import(', 'require(', 'importScripts', '.rpc(', 'functions.invoke', 'hsClient', 'HS.data', 'HS.sb', 'eval(', 'new Function', 'insertAdjacentHTML', 'document.write'];
   const hits = IMPURE.filter((t) => C.includes(t));
   ok(hits.length === 0, '1a the module makes no network call, reads no storage or location, and runs no dynamic code', hits);
@@ -43,17 +44,24 @@ const C = code(SRC);
   const attrWrites = [...C.matchAll(/(setAttribute|removeAttribute)\('([^']+)'/g)].map((m) => m[2]);
   ok(enh.length > 200 && attrWrites.length === 7 && attrWrites.every((a) => a === 'hidden' || a === 'aria-pressed') && [...C.matchAll(/setAttribute|removeAttribute/g)].length === 7
     && attrWrites.every((a, i) => enh.includes(a)), '1e2 the filters (enhance) change only two attributes, hidden and aria-pressed, and nothing else on the page', attrWrites);
+  // national-6 (2026-11-02): the report carries the brand URL https://jodytracks.com (the brand line and the print footer); that one URL, exactly twice, is the only web address
+  // written into the module: with it removed, no http(s):// remains (the validating pattern is written with escaped slashes, so it does not count)
+  const brandFree = C.split('https://jodytracks.com').join('');
+  ok((C.match(/https:\/\/jodytracks\.com/g) || []).length === 2 && /var BRAND_LINE = 'JODY Tracks \\u00b7 https:\/\/jodytracks\.com';/.test(C) && /@bottom-left\{content:"JODY Tracks Development Activity report \\u00b7 https:\/\/jodytracks\.com"/.test(C)
+    && !/https?:\/\//.test(brandFree), '1f2 the only web address in the module is the brand URL https://jodytracks.com, in the brand line and the print footer');
   ok(!/url\(|@import/.test(C) && !/['"]https?:/.test(C), '1f the stylesheet and the markup fetch nothing, and no http URL is written into the module (only the pattern that validates one)');
 }
 
 // ---- 2. it reads a CLOSED set of response keys, and none of the internal ones -------------------------------------------------------------
 {
   const snake = [...new Set([...C.matchAll(/\.([a-z]+_[a-z_]+)\b/g)].map((m) => m[1]))].sort();
-  const EXPECT = ['as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
+  // national-6 (2026-11-02): adds activity_window, publisher_type, records_checked and undescribed_records (the record's activity dates, the agency's own class, source freshness, the
+  // undescribed-records note); `relevance`, `description` and `address` are read as plain keys (relField / p.description / p.address)
+  const EXPECT = ['activity_window', 'publisher_type', 'records_checked', 'undescribed_records', 'routine_records', 'as_of', 'bearings_deg', 'by_lifecycle', 'by_stage', 'change_ready', 'detected_at', 'distances_mi', 'event_type', 'first_observed_at', 'homesignal_detected_changes', 'homesignal_observation', 'older_than_a_year', 'project_id',
     'publisher_event', 'publisher_stage', 'publisher_status', 'radius_mi', 'recent_days', 'recent_official_activity', 'record_date', 'record_id', 'source_feed_count', 'title_cut', 'what_changed_recently'].concat(['feed_ref', 'publisher_stage_unpublished']).sort();
   // national-5 (2026-11-02) adds one, on purpose: publisher_stage_unpublished (the source publishes no status, so none is printed as the agency's)
   // national-4 (2026-11-01) adds three, on purpose: feed_ref (where the agency publishes the data), record_id (the agency's record number) and title_cut (the source feed shortened the title)
-  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these twenty-six (a new one must be added here on purpose)', snake);
+  ok(JSON.stringify(snake) === JSON.stringify(EXPECT), '2a the snake_case response keys it reads are exactly these thirty-one (a new one must be added here on purpose)', snake);
   // The ledger's first observation is NOT printed as "First detected" (for a baseline read it is a refresh sweep's time before the ledger existed).
   // The per-record observation is read in ONE function, changeBasis, only to say WHEN the history behind a "no status change" sentence starts and how
   // many records it covers; the engine's coverage flag is read once, in changeReady; and noChangeMessage joins them.
@@ -75,14 +83,15 @@ const C = code(SRC);
   const named = INTERNAL.filter((t) => new RegExp('(^|[^A-Za-z_])' + t + '($|[^A-Za-z_])').test(C));
   ok(named.length === 0, '2b the code names no private-context or snapshot symbol, and none of the internal keys the engine carries (storage_blockers, rights, registry ids, change_ready, hashes, report ids)', named);
   ok(INTERNAL.every((t) => new RegExp('(^|[^A-Za-z_])' + t + '($|[^A-Za-z_])').test(' ' + INTERNAL.join(' ') + ' ')), '2b (control) the matcher finds each of those names when it is present');
-  ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|address|feature_id)\b/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, address, dates, raw type, ids)');
+  // national-6 (2026-11-02): the record's own street address is now shown (and cross-referenced), so `address` left this list; the agency's class arrives as publisher_type, never type_raw
+  ok(!/\.(stored|source_key|record_kind|submitted_at|date_kind|type_raw|developer|size|investment|feature_id)\b/.test(C) && /txt\(p\.address\)/.test(C), '2c it reads none of the record fields it does not show (developer, size, investment, dates, raw type, ids), and reads the address it now shows');
   ok([...C.matchAll(/p\.stage\b/g)].length >= 3 && [...C.matchAll(/p\.stage\.(\w+)/g)].every((m) => ['key', 'label', 'evidence'].includes(m[1])), '2c2 it reads the engine\'s stage object only for its key, label and evidence');
-  ok((C.match(/\.status\b/g) || []).length === 1 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status');
+  ok((C.replace(/\bw\.status\b/g, '').match(/\.status\b/g) || []).length === 1 && (C.match(/\bw\.status\b/g) || []).length === 2 && /response\.status === 'OK'/.test(C), '2d it reads the response\'s own status once, to decide whether a report is there, and nothing else called status (national-7: the activity window\'s own status, read twice in stageNote, is the engine\'s upcoming/active/ended word for the dates)');
   // audit 2026-10-07 (finding 1): a third read, isDecided(), exists so a denied or withdrawn application is never labelled "under review".
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 7
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
     '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the one quality-of-life rule and its heavy-facility kind check); lifecycle only as the engine\'s key and label');
 }
@@ -103,16 +112,19 @@ const C = code(SRC);
     '3b no publisher status word is mapped to a lifecycle or a stage: the only one named is "decided", once, in isDecided, to label it');
   ok(/var SHAPES = \{\s*approved:[\s\S]*proposed:[\s\S]*operating:[\s\S]*unknown:[\s\S]*\};/.test(C) && /['"](decided|on file|built|active)['"]/i.test("x 'Decided' y"),
     '3b (control) the only lifecycle words in the code are the four keys of the shape table, and the status-word scan can see a status word');
-  ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),
+  // national-6 (2026-11-02): TITLE_MAX = 90 is a title length in characters, not a day-count; it is removed before the day-count scan
+  ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && /var TITLE_MAX = 90;/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C.replace('var TITLE_MAX = 90;', '')),
     '3c the module owns no change rule and no window: it does not decide what changed or what is recent (and carries no day-count of its own)');
   ok(!/validateRights|report-rights|cleared\b|attribution\s*[:=]\s*['"]/.test(C) && !/rights/i.test(C), '3d it owns no rights rule: it cannot say whether a source may appear, and invents no attribution');
   ok(!/\b(rank|ranked|ranking|score|priority|sortBy|closest|nearest)\b/i.test(C) && !/\.sort\(/.test(C) && !/render\.review/.test(C), '3e it ranks nothing and sorts nothing: records appear in the engine\'s own order, and the engine\'s review list is no longer read (the table is the one list)');
-  ok(/Nearby Development/.test(C) && /Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
-    '3f the 100526 sections are written (Nearby Development, Permitted / Under Construction, the map, the action bar) and What Exists Today is not (ruling 3)');
+  // national-6 (2026-11-02): the permitted stage's title is "Permit issued / Under construction" (an issued permit is not started work)
+  ok(/Nearby Development/.test(C) && /Permit issued \/ Under construction/.test(C) && !/Permitted \/ Under Construction/.test(C) && /Development Activity Map/.test(C) && /'Compare property', 'Watch property', 'Share report', 'Download PDF'/.test(C) && !/What Exists Today/.test(C),
+    '3f the 100526 sections are written (Nearby Development, Permit issued / Under construction, the map, the action bar) and What Exists Today is not (ruling 3)');
   ok((C.match(/aria-disabled="true"/g) || []).length === 1 && !/addEventListener\('click'[\s\S]{0,200}da-rv-act/.test(C), '3f2 the action bar\'s buttons are switched off, and nothing listens to them');
   // Founder ruling R5 (2026-10-02): "No development activity" is a real answer when the ENGINE can prove it. The view may write those words
   // exactly once, as the title it shows for the engine's own NO_DEVELOPMENT_ACTIVITY outcome; any other absence wording is still refused.
-  const ABS = /\bno (recent |new |official )*(development )?activity|nothing (found|nearby|to report)|no development (was )?found/gi;
+  // national-6 (2026-11-02): "states no activity dates" (a temporary event's note) describes the record's dates, not an absence of activity, so it is not matched
+  const ABS = /\bno (recent |new |official )*(development )?activity(?! dates)|nothing (found|nearby|to report)|no development (was )?found/gi;
   const absHits = [...C.matchAll(ABS)].map((m) => m[0]);
   ok(absHits.length === 1 && /NO_DEVELOPMENT_ACTIVITY: \{\n\s*title: 'No development activity',/.test(C),
     '3g the only wording that says there was no activity is the title for the engine\'s own "No development activity" outcome (plan hard rule 66; ruling R5)', absHits);
@@ -159,8 +171,9 @@ const C = code(SRC);
   ok(!/\{ key: '(approved|proposed|permitted)',\s+label: '/.test(landing) && /HS\.daReportView/.test(landing) && /\.mount\(host, sampleResponse\(\)/.test(landing),
     '5a the landing page holds no stage labels of its own: its sample is mounted through the view');
   ok(landingTest.includes('no hand-built report layout remains on this page'), '5b and the landing page test still fails if a hand-built layout comes back');
-  ok(C.includes("approved: 'Approved / Coming'") && C.includes("proposed: 'Proposed / Under Review'"), '5c the view carries the first two stage labels');
-  ok(C.includes("permitted: 'Permitted / Under Construction'") && /var STAGES = \['approved', 'proposed', 'permitted', 'occupancy'\];/.test(C),
+  // national-7 (2026-11-02): the stage labels no longer predict ("Coming") or pair an issued permit with started work; national-6 adds occupancy
+  ok(C.includes("approved: 'Approved'") && C.includes("proposed: 'Proposed / Under review'") && !/Approved \/ Coming/.test(C), '5c the view carries the first two stage labels');
+  ok(C.includes("permitted: 'Permit issued / Under construction'") && /var STAGES = \['approved', 'proposed', 'permitted', 'occupancy'\];/.test(C),
     '5d the third label is carried as a Stage (a presentation of publisher evidence, decided by the engine), never as a lifecycle key (R2)');
   ok(C.includes("var EYEBROW = 'JODY Development Activity';"), '5e the eyebrow is the Jody name (founder 2026-10-14, audit F4; supersedes R6)');
   ok(/word-for-word|plan lines/.test(SRC) && /1763/.test(SRC), '5f the disclosure is attributed to its plan line in the module, and test/da-report-view.test.mjs 9a checks it against the plan');
@@ -207,7 +220,9 @@ const C = code(SRC);
     // 2026-10-12: the build-time tool that renders the homepage's real example report mounts the real view (no second renderer); its test and design note name it
     'scripts/build-home-showcase-preview.mjs', 'test/home-showcase-preview.test.mjs', 'docs/homepage-index-design-assets-2026-09-30.md',
     // 2026-11-01 (national-4): the report-quality suite renders the view to prove the agency, record-number, shortened-title and minor-work rules
-    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs', 'test/report-quality-national6.test.mjs']);
+    'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs', 'test/report-quality-national6.test.mjs',
+    // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
+    'test/report-quality-national7.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
@@ -243,9 +258,11 @@ const C = code(SRC);
 ok(/\.da-rv-table thead th\{overflow-wrap:normal;word-break:normal;hyphens:none;white-space:nowrap\}/.test(SRC), '5a a table column heading is never broken inside a word (the page-wide overflow-wrap:anywhere let a narrow print table squeeze "DISTANCE" into "DISTAN / CE" once a Direction column was added)');
 // ---- 8. the quality-of-life rule is ONE function in ONE file (2026-10-09) -------------------------------------------------------------------
 {
-  const rule = (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_TYPE/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
-    '8a the Type-to-impact rule is one function, called once (by the table), reading only the record: no clock, no network, no storage, no randomness, no distance');
+  // national-7 (founder, 2026-11-02): the record line (recordNote, keyed on the engine's relevance basis) is followed by the Type's own sentence, so a
+  // note never names fewer impacts than the Type sentence it replaced
+  const rule = (C.match(/function recordNote\(p\) \{[\s\S]*?\n  \}/) || [''])[0] + (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
+  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_BASIS/.test(rule) && /QOL_BY_TYPE\[k\]/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
+    '8a the impact rule is one function, called once (by the table), reading only the record: no clock, no network, no storage, no randomness, no distance');
   const dirs = ['lib', 'supabase/functions', 'scripts'], hits = [];
   const walk = (d) => { for (const f of readdirSync(join(root, d))) { const q = join(d, f); if (statSync(join(root, q)).isDirectory()) { if (f !== 'node_modules') walk(q); } else if (/\.(js|mjs|ts|html|py)$/.test(f) && q !== 'lib/da-report-view.js' && /cooling noise|traffic\/access disruption|Impact not determined/.test(read(q))) hits.push(q); } };
   dirs.forEach((d) => existsSync(join(root, d)) && walk(d));

@@ -18,7 +18,8 @@ const LABEL = 'Approved for occupancy — business opening not verified';
 
 // ---- 1. the rule ---------------------------------------------------------------------------------------------------------------------------------
 {
-  ok(M.REPORT_VERSION === 'development-activity-national-6' && M.STAGE_RULE_VERSION === 'stage-evidence-3', '1a the report and the stage rule carry new versions');
+  // national-7 (2026-11-02) builds on this version; the stage rule is unchanged
+  ok(/^development-activity-national-[6-9]$/.test(M.REPORT_VERSION) && M.STAGE_RULE_VERSION === 'stage-evidence-3', '1a the report and the stage rule carry new versions');
   ok(M.STAGE_LABELS.occupancy === LABEL, '1b the stage label is the founder\'s wording');
   // the three values measured on production 2026-11-02, in the agencies' own spelling
   for (const v of ['Approved to Occupy', 'TCO Issued', 'Temporary C of O']) {
@@ -43,11 +44,13 @@ const LABEL = 'Approved for occupancy — business opening not verified';
   const SUB = { address: '3101 Western Ave, Seattle, WA 98121', matched_address: '3101 WESTERN AVE, SEATTLE, WA, 98121', lat: 47.616, lng: -122.354, zip: '98121' };
   const out = M.assemble({ now: new Date('2026-11-02T18:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, attribution: { version: 1, attribution: {} }, subject: SUB,
     rows: [row('7108878-CN', 0.1), row('7000001-CN', 0.2)],
-    projects: [proj('7108878-CN', 'Approved to Occupy', 'Commercial Construct initial tenant improvement'), proj('7000001-CN', 'Approved', 'Commercial Construct a new office')],
+    // national-7 (2026-11-02): a record must document a neighborhood-facing change to be listed, so the occupancy record here is new construction; the
+    // sample's own record (an initial tenant improvement) is routine work and is checked separately in 2k
+    projects: [proj('7108878-CN', 'Approved to Occupy', 'Commercial Construct a new office building'), proj('7000001-CN', 'Approved', 'Commercial Construct a new medical office building')],
     ledger: [], events: [], health: [] });
   const I = out.intelligence;
   ok(JSON.stringify(I.sections.by_stage.occupancy) === '["7108878-CN"]' && JSON.stringify(I.sections.by_stage.approved) === '["7000001-CN"]',
-    '2a the occupancy record is in its own stage, and the plain approval stays Approved / Coming', I.sections.by_stage);
+    '2a the occupancy record is in its own stage, and the plain approval stays Approved', I.sections.by_stage);
   const p = I.projects.find((x) => x.project_id === '7108878-CN');
   ok(p.stage.key === 'occupancy' && p.stage.label === LABEL && p.stage.evidence === 'Occupancy approved' && p.lifecycle.key === 'approved' && p.publisher_stage === 'Approved to Occupy',
     '2b the record keeps its lifecycle and the agency\'s own words; only the stage changes', p);
@@ -57,22 +60,27 @@ const LABEL = 'Approved for occupancy — business opening not verified';
   const text = (x) => x.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
   const rec = (h.match(/<section class="da-rv-sec da-rv-sec--records"[\s\S]*?<\/section>/) || [''])[0];
   ok(text(rec).includes(LABEL) && /Source agency status: Approved to Occupy/.test(text(rec)), '2c the card says the occupancy label beside the agency\'s own status');
-  const row1 = (rec.match(/<tr[^>]*>(?:(?!<\/tr>)[\s\S])*Construct initial tenant improvement[\s\S]*?<\/tr>/) || [''])[0];
+  const row1 = (rec.match(/<tr[^>]*>(?:(?!<\/tr>)[\s\S])*Construct a new office building[\s\S]*?<\/tr>/) || [''])[0];
   ok(row1 && !/Approved \/ Coming/.test(text(row1)) && !/Operating/.test(text(row1)), '2d the occupancy row says neither Approved / Coming nor Operating', text(row1).slice(0, 300));
-  ok(/data-da-filter="stage" data-da-value="occupancy" aria-pressed="false">Approved for Occupancy <span class="da-rv-chipn">1<\/span>/.test(h), '2e the Stage filter has an Approved for Occupancy chip counting it');
+  ok(/data-da-filter="stage" data-da-value="occupancy" aria-pressed="false">Approved for occupancy <span class="da-rv-chipn">1<\/span>/.test(h), '2e the Stage filter has an Approved for occupancy chip counting it');
   const svg = (h.match(/<svg class="da-rv-plot[\s\S]*?<\/svg>/) || [''])[0];
   ok(/<g class="da-rv-mk da-rv-mk--occupancy"[^>]*>[\s\S]*?<rect /.test(svg), '2f on the map it is a square (its own hollow style), not a circle');
-  ok(/<li class="da-rv-stage--occupancy">[\s\S]*?Approved for Occupancy<\/li>/.test(h), '2g the map legend names it');
-  ok(/1 approved for occupancy \(business opening not verified\)/.test(text(h)) && /1 approved \/ coming/.test(text(h)), '2h the briefing counts it on its own', text(h).slice(0, 600));
+  ok(/<li class="da-rv-stage--occupancy">[\s\S]*?Approved for occupancy<\/li>/.test(h), '2g the map legend names it');
+  ok(/1 approved for occupancy \(business opening not verified\)/.test(text(h)) && /1 approved ·/.test(text(h)), '2h the briefing counts it on its own', text(h).slice(0, 600));
   // without such a record, the report has no occupancy chip or legend entry (every other report is unchanged)
   const plain = M.assemble({ now: new Date('2026-11-02T18:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, attribution: { version: 1, attribution: {} }, subject: SUB,
-    rows: [row('7000001-CN', 0.2)], projects: [proj('7000001-CN', 'Approved', 'Commercial Construct a new office')], ledger: [], events: [], health: [] }).intelligence;
+    rows: [row('7000001-CN', 0.2)], projects: [proj('7000001-CN', 'Approved', 'Commercial Construct a new medical office building')], ledger: [], events: [], health: [] }).intelligence;
   const hp = V.html({ status: 'OK', report: Object.assign({}, plain, { zip: '98121' }), render: { distances_mi: { '7000001-CN': 0.2 }, bearings_deg: { '7000001-CN': 180 } } }, {});
   ok(!/occupancy/i.test(hp.replace(/<style[\s\S]*?<\/style>/g, '')), '2i a report with no occupancy record shows no occupancy chip, legend entry or briefing words');
   // a report saved before national-6 has no occupancy key at all and still renders
   const old = JSON.parse(JSON.stringify(response)); delete old.report.sections.by_stage.occupancy; old.report.projects.forEach((x) => { if (x.stage && x.stage.key === 'occupancy') x.stage = { key: 'approved', label: 'Approved / Coming' }; });
   const ho = V.html(old, {});
-  ok(/Approved \/ Coming/.test(ho) && !/data-da-value="occupancy"/.test(ho), '2j a report saved before national-6 renders as it was saved');
+  // national-7: the view words every stage itself, so an older report's stored "Approved / Coming" reads "Approved"; it still has no occupancy chip
+  ok(/Approved/.test(ho) && !/Approved \/ Coming/.test(ho) && !/data-da-value="occupancy"/.test(ho), '2j a report saved before national-6 renders without an occupancy stage');
+  // national-7: the sample's own occupancy record is an initial tenant improvement, which is routine work: it is left out, whatever its stage says
+  const ti = M.assemble({ now: new Date('2026-11-02T18:00:00Z'), view: 'customer', zip_supported: true, radius_mi: M.REPORT_RADIUS_MI, attribution: { version: 1, attribution: {} }, subject: SUB,
+    rows: [row('7108878-CN', 0.1)], projects: [proj('7108878-CN', 'Approved to Occupy', 'Commercial Construct initial tenant improvement to existing mixed use building on ground level suite (201) occupy per plan')], ledger: [], events: [], health: [] }).intelligence;
+  ok(ti.projects.length === 0 && ti.relevance_review.length === 1 && ti.relevance_review[0].reason === 'routine_work', '2k an occupancy approval for routine work is not listed (relevance runs first)');
 }
 
 console.log(`\n${total - fails} passed, ${fails} failed of ${total}`);

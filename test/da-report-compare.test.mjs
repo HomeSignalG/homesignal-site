@@ -92,7 +92,9 @@ const html3 = cmp(E3);
 {
   const own = (response) => V.html(response, { subject: 'x' });
   // the report's own stage counts are in its briefing's first line (a stage with none is not listed there, so it reads as 0)
-  const stageLine = (h) => { const t = textOf(h); const first = /data-da-briefing/.test(h) ? (/As of [^:]*: ([^.]*)\./.exec(t) || [])[1] : null; if (first === null || first === undefined) return null; const g = (re) => { const m = re.exec(first); return m ? m[1] : '0'; }; return [g(/(\d+) permitted \/ under construction/), g(/(\d+) approved \/ coming/), g(/(\d+) proposed \/ under review/)]; };
+  // national-6 (2026-11-02): the briefing counts issued permits and work under construction apart ("N with a permit issued", "N under construction"); together
+  // they are the Permit issued / Under construction stage. Approved is "N approved" (no "coming").
+  const stageLine = (h) => { const t = textOf(h); const first = /data-da-briefing/.test(h) ? (/As of [^:]*: ([^.]*)\./.exec(t) || [])[1] : null; if (first === null || first === undefined) return null; const g = (re) => { const m = re.exec(first); return m ? m[1] : '0'; }; return [String(Number(g(/(\d+) with a permit issued/)) + Number(g(/(\d+) under construction/))), g(/(\d+) approved\b/), g(/(\d+) proposed \/ under review/)]; };
   const sectionHtml = (h, key) => { const m = new RegExp('<section class="da-rv-sec da-rv-sec--' + key + '[^"]*"[^>]*>([\\s\\S]*?)</section>').exec(h); return m ? m[1] : ''; };
   const metricSum = (h) => [...h.matchAll(/<div class="da-rv-metric"><b>(\d+)<\/b>/g)].reduce((a, m) => a + Number(m[1]), 0);
   const chips = (h) => Object.fromEntries([...h.matchAll(/data-da-filter="type" data-da-value="(\w+)" aria-pressed="false">([^<]*?) <span class="da-rv-chipn">(\d+)<\/span>/g)].map((m) => [decode(m[2]), m[3]]));
@@ -100,34 +102,34 @@ const html3 = cmp(E3);
   [[W, 0], [WCOLD, 1]].forEach(([resp, col]) => {
     const h = own(resp), line = stageLine(h);
     ok(line !== null, '2a the report prints its own stage counts in its briefing — column ' + (col + 1), textOf(h).slice(0, 200));
-    ok(rowOf(two, 'Permitted / Under Construction')[col] === line[0] && rowOf(two, 'Approved / Coming')[col] === line[1] && rowOf(two, 'Proposed / Under Review')[col] === line[2],
-      '2b the three stage cells equal the report\'s own stage line ' + JSON.stringify(line) + ' (column ' + (col + 1) + ')', [rowOf(two, 'Permitted / Under Construction')[col], rowOf(two, 'Approved / Coming')[col], rowOf(two, 'Proposed / Under Review')[col]]);
+    ok(rowOf(two, 'Permit issued / Under construction')[col] === line[0] && rowOf(two, 'Approved')[col] === line[1] && rowOf(two, 'Proposed / Under review')[col] === line[2],
+      '2b the three stage cells equal the report\'s own stage line ' + JSON.stringify(line) + ' (column ' + (col + 1) + ')', [rowOf(two, 'Permit issued / Under construction')[col], rowOf(two, 'Approved')[col], rowOf(two, 'Proposed / Under review')[col]]);
     const ch = chips(h), typeRows = rowsOf(two).filter((r) => ch[r.label] !== undefined);
     ok(Object.keys(ch).length > 0 && Object.keys(ch).filter((l) => ch[l] !== '0').every((l) => (rowOf(two, l)[col] || '') === ch[l]), '2c every Type with a record on the report is the same count in the comparison as on the report\'s own Type chip (column ' + (col + 1) + ')', [ch, typeRows]);
     const mm = V.read(resp), changedCmp = rowOf(two, 'Records with a change HomeSignal detected')[col];
-    const briefChanged = (/(\d+) records? shows? a recent change in HomeSignal/.exec(textOf(h)) || [])[1] || '0';
+    const briefChanged = (/(\d+) records? shows? a recent change in Jody/.exec(textOf(h)) || [])[1] || '0'; // national-6 (2026-11-02): the briefing's brand is Jody
     ok(String(mm.activity.length) === rowOf(two, 'Records with a recent official event')[col], '2d the recent-official-event count is the length of the view\'s own list (' + mm.activity.length + ', column ' + (col + 1) + ')');
     ok(resp === W ? changedCmp === briefChanged : (briefChanged === '0' && changedCmp === 'Not yet measured'), '2e the detected-change count equals the number the report\'s briefing states (' + briefChanged + '), and is not shown as a zero where the report has no history yet (column ' + (col + 1) + ')', [changedCmp, briefChanged]);
   });
   // the report's own lists, through the shared read()
   const m = V.read(W);
-  ok(rowOf(two, 'Approved / Coming')[0] === String(m.staged.approved.length) && rowOf(two, 'Proposed / Under Review')[0] === String(V.util.openProposed(m.staged.proposed).length)
+  ok(rowOf(two, 'Approved')[0] === String(m.staged.approved.length) && rowOf(two, 'Proposed / Under review')[0] === String(V.util.openProposed(m.staged.proposed).length)
     && rowOf(two, 'Records with a change HomeSignal detected')[0] === String(m.changed.length), '2f the cells are the lengths of the view\'s own lists (read()), not a second derivation');
   ok(rowOf(two, 'Decided (denied or withdrawn)')[0] === String(m.staged.proposed.length - V.util.openProposed(m.staged.proposed).length) && Number(rowOf(two, 'Decided (denied or withdrawn)')[0]) >= 1,
     '2g a Decided application is counted on its own row, so "Proposed / Under Review" is only what is open (audit 2026-10-07)');
   ok(rowOf(two, 'Residential')[0] === '3' && rowOf(two, 'Commercial')[0] === '2' && rowOf(two, 'Roads & infrastructure')[0] === '2', '2g anchor: the rich fixture is 3 residential, 2 commercial, 2 roads & infrastructure (every record in the report\'s table)', rowsOf(two).map((r) => r.label + '=' + r.cells[0]));
   // the labels of the three stages are the view's own titles
-  ok(['Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'].every((l) => rowsOf(two).some((r) => r.label === l)) && V.TITLES.approved === 'Approved / Coming', '2h the stage rows carry the view\'s own titles');
+  ok(['Permit issued / Under construction', 'Approved', 'Proposed / Under review'].every((l) => rowsOf(two).some((r) => r.label === l)) && V.TITLES.approved === 'Approved' /* national-6 (2026-11-02): no longer "Approved / Coming" */, '2h the stage rows carry the view\'s own titles');
 }
 
 // ---- 3. a column never reads as a zero when the report cannot say ----------------------------------------------------------------------------------------
 {
-  const COUNT_ROWS = ['Records with a change HomeSignal detected', 'Records with a recent official event', 'Permitted / Under Construction', 'Approved / Coming', 'Proposed / Under Review'];
+  const COUNT_ROWS = ['Records with a change HomeSignal detected', 'Records with a recent official event', 'Permit issued / Under construction', 'Approved', 'Proposed / Under review'];
   const mixed = cmp([entry(2, W), entry(1, WNONE)]);
   ok(COUNT_ROWS.every((l) => rowOf(mixed, l)[1] === 'No data ingested') && rowOf(mixed, 'Residential')[1] === 'No data ingested', '3a a report whose engine outcome is "No data ingested" says so in EVERY count cell, and shows no 0', COUNT_ROWS.map((l) => rowOf(mixed, l)[1]));
   const col1 = rowsOf(mixed).map((r) => r.cells[1]);
   ok(!col1.some((c) => /^0$/.test(c)), '3b ... and no cell in that column is a bare 0');
-  ok(textOf(mixed).includes('HomeSignal cannot yet confirm it receives official development records for this address') && textOf(mixed).includes('It is not a finding that there is no development.'), '3c the engine\'s own words for that outcome appear under the table, so the column is explained');
+  ok(textOf(mixed).includes('Jody cannot yet confirm it receives official development records for this address') && textOf(mixed).includes('It is not a finding that there is no development.'), '3c the engine\'s own words for that outcome appear under the table, so the column is explained');
   ok(rowOf(mixed, 'Most recent official record')[1] === 'No data ingested' && rowOf(mixed, 'Most recent change HomeSignal detected')[1] === 'No data ingested', '3d the timeline rows say it too');
   const zero = cmp([entry(2, W), entry(1, WZERO)]);
   ok(COUNT_ROWS.slice(1).every((l) => rowOf(zero, l)[1] === '0') && rowOf(zero, 'Residential')[1] === '0',
@@ -139,14 +141,14 @@ const html3 = cmp(E3);
   const cold = cmp([entry(2, W), entry(1, WCOLD)]);
   ok(rowOf(cold, 'Records with a change HomeSignal detected').join('|') === '2|Not yet measured' && rowOf(cold, 'Most recent change HomeSignal detected')[1] === 'Not yet measured',
     '3h a report HomeSignal has not observed long enough does not show "0 changes": it says Not yet measured', rowOf(cold, 'Records with a change HomeSignal detected'));
-  ok(textOf(cold).includes(V.CHANGE_NOT_READY) && V.CHANGE_NOT_READY === 'Change history begins once HomeSignal has observed these records at least twice.', '3i ... and the view\'s own sentence for it appears under the table');
+  ok(textOf(cold).includes(V.CHANGE_NOT_READY) && V.CHANGE_NOT_READY === 'Change history begins once Jody has observed these records at least twice.', '3i ... and the view\'s own sentence for it appears under the table');
   const ready = cmp([entry(2, W), entry(1, WREADY)]);
   ok(rowOf(ready, 'Records with a change HomeSignal detected')[1] === '0' && rowOf(ready, 'Most recent change HomeSignal detected')[1] === 'None in this report' && !textOf(ready).includes(V.CHANGE_NOT_READY),
     '3j once the engine says change history is ready, no change IS a measured 0 and no note is added');
   ok(rowOf(cmp([entry(2, W), entry(1, WCOLD)]), 'Records with a recent official event')[1] === '5', '3k a publisher\'s own events are counted even where HomeSignal has no history (they are the publisher\'s, not HomeSignal\'s)');
   const leg = cmp([entry(2, W), entry(1, WLEGACY)]);
-  ok(rowOf(leg, 'Permitted / Under Construction')[1] === 'Not in this report\'s version' && rowOf(leg, 'Residential')[1] === 'Not in this report\'s version' && rowOf(leg, 'Approved / Coming')[1] !== 'Not in this report\'s version',
-    '3l a report from before the Permitted stage existed says so for Permitted and for the Type breakdown, and still compares the stages it has', rowOf(leg, 'Permitted / Under Construction'));
+  ok(rowOf(leg, 'Permit issued / Under construction')[1] === 'Not in this report\'s version' && rowOf(leg, 'Residential')[1] === 'Not in this report\'s version' && rowOf(leg, 'Approved')[1] !== 'Not in this report\'s version',
+    '3l a report from before the Permitted stage existed says so for Permitted and for the Type breakdown, and still compares the stages it has', rowOf(leg, 'Permit issued / Under construction'));
 }
 
 // ---- 4. it ranks nothing ------------------------------------------------------------------------------------------------------------------------------
@@ -163,7 +165,7 @@ const html3 = cmp(E3);
   ok(C.NOT_A_SCORE === 'This sets facts from official records side by side. It is not a score or a recommendation, and HomeSignal does not rank properties.' && textOf(html3).includes(C.NOT_A_SCORE), '4f the page says in one fixed sentence that it is not a score or a recommendation');
   // the rows are the plan's factual items, nothing else
   ok(groupsOf(html3).join(' | ') === 'What changed | By stage | By type | Timeline | Coverage and freshness', '4g the groups are the plan\'s factual items: recent changes, stages, Types, timeline, coverage and freshness', groupsOf(html3));
-  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permitted / Under Construction | Approved / Coming | Proposed / Under Review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Civic & public | Most recent change HomeSignal detected | Most recent official record | Report as of (UTC day) | What "recent" means | Limits the report states',
+  ok(rowsOf(html3).map((r) => r.label).join(' | ') === 'Records with a change HomeSignal detected | Records with a recent official event | Permit issued / Under construction | Approved | Proposed / Under review | Decided (denied or withdrawn) | Residential | Commercial | Roads & infrastructure | Civic & public | Most recent change HomeSignal detected | Most recent official record | Report as of (UTC day) | What "recent" means | Limits the report states',
     '4h the rows, in order', rowsOf(html3).map((r) => r.label));
 }
 
@@ -212,7 +214,7 @@ const html3 = cmp(E3);
   ok(rowOf(noas, 'Report as of (UTC day)').join('|') === 'Not stated|Sep 29, 2026' && rowOf(noas, 'What "recent" means').join('|') === 'Not stated|The last 90 days', '8b2 a report that does not state its day or its window says "Not stated", never a blank or a guess');
   const lims = rowOf(html3, 'Limits the report states');
   ok(lims[0] === 'None stated. Which agencies are covered is not measured.' && /their official source is not identified/.test(lims[2]), '8c each report\'s own limitation text is shown verbatim, and "None stated" where it has none', lims);
-  ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Status changed, detected Sep 27, 2026'),
+  ok(rowOf(html3, 'Most recent official record')[0].startsWith('Roads & infrastructure — Highway 99 Widening') && rowOf(html3, 'Most recent change HomeSignal detected')[0].startsWith('Menchaca Apartments · Agency status change, detected Sep 27, 2026'), // national-6 (2026-11-02): the ledger's status_changed reads "Agency status change"
     '8d the timeline rows describe the engine\'s first record the way the report does', [rowOf(html3, 'Most recent official record')[0], rowOf(html3, 'Most recent change HomeSignal detected')[0]]);
   ok(textOf(html3).includes(V.DISCLOSURE) && textOf(html3).includes('Counted as official records: a record is a source record, not a proven separate project.'), '8e the standard disclosure and the unit of counting are on every comparison');
   ok(/<caption class="da-cmp-vh">Compare properties: 3 reports side by side<\/caption>/.test(html3) && /<th scope="col"><span class="da-cmp-vh">Fact<\/span><\/th>/.test(html3), '8f the table has a caption and a heading for its first column, for a screen reader');

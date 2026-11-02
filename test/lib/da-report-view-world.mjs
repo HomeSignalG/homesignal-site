@@ -30,9 +30,12 @@ export const ADDRESS = '742 Evergreen Terrace, Springfield, OR 97477';
 /** A spatial-read row. Its display point is `d` miles due north of the subject unless `x` says otherwise (the map's direction, 100526 step 2). */
 export const row = (k, d, fam, x = {}) => ({ source_key: k, feature_id: 'pt:' + k, registry_id: fam, provenance: 'proven_stored_point', distance_mi: d, geometry_type: 'Point', has_more: false,
   marker_lat: 44.04612 + d / 69.05, marker_lng: -122.98123, ...x });
+// national-6 (2026-11-02): a record must document a neighborhood-facing change to be in a report, so the world's records carry an agency class that says
+// what the work is ('New Construction'); a test about relevance itself overrides it. Each record has its own address, so the view's "Also at this address"
+// cross-reference (national-6) appears only where a test puts two records at one address.
 export const proj = (k, fam, x = {}) => ({
-  source_key: k, registry_id: fam, record_kind: 'development', name: 'Record ' + k, type: 'Residential', type_raw: null, status: 'Proposed',
-  stage: null, developer: null, size: null, investment: null, submitted_at: '2026-09-10', date_kind: 'filed', address: '005 King',
+  source_key: k, registry_id: fam, record_kind: 'development', name: 'Record ' + k, type: 'Residential', type_raw: 'New Construction', status: 'Proposed',
+  stage: null, developer: null, size: null, investment: null, submitted_at: '2026-09-10', date_kind: 'filed', address: '005 King ' + k,
   source_ref: 'https://example.gov/records/' + k, ...x,
 });
 export const led = (k, fam) => ({ identity_key: k, registry_id: fam, comparable: true, change_ready: true, observation_count: 2, first_observed_at: '2026-09-20T19:00:00Z', last_observed_at: '2026-09-28T19:30:00Z' });

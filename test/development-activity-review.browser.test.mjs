@@ -160,7 +160,8 @@ const settle = (page) => page.waitForFunction(() => !document.getElementById('go
   ok(JSON.stringify(calls[0].body) === JSON.stringify({ address: ADDRESS, view: 'internal' }),
     '2b it sends only the address and the view (no radius: a report is always 0.5 mile; the label, brokerage and agent stay on the page)', calls[0].body);
   const secs = await sections(page);
-  ok(secs[0] === 'Type and stage' && secs.includes('Nearby Development') && secs.includes('Development Activity Map') && secs[secs.length - 1] === 'Official evidence & coverage',
+  // national-6 (2026-11-02): the overview of the most significant changes comes first, then the filters
+  ok(secs[0] === 'Most significant nearby changes' && secs[1] === 'Type and stage' && secs.includes('Nearby Development') && secs.includes('Development Activity Map') && secs[secs.length - 1] === 'Official evidence & coverage',
     '2c the report is drawn by the shared view, in the plan\'s order', secs);
   const head = await page.$eval('#report .da-rv-head', (e) => e.textContent.replace(/\s+/g, ' ').trim());
   ok(head.includes(ADDRESS) && head.includes('Smith buyers') && head.includes('ABC Realty · Pat Agent'), '2d the header carries the typed address, client label, brokerage and agent', head);

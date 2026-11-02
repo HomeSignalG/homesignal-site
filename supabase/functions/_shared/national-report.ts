@@ -27,6 +27,7 @@
 // They are built separately and never split afterwards, so there is no step at which the address was ever
 // inside the permanent object.
 import './project-type.generated.js';
+import './residential-qualify.generated.js';
 import publishersFile from './source-publishers.generated.json' with { type: 'json' };
 import { snapshotBodyOf, subjectRelativeKeys } from './report-snapshot.ts';
 import type { PrivateContext } from './report-snapshot.ts';
@@ -43,8 +44,14 @@ export const PRODUCT_NAME = 'HOMESIGNAL DEVELOPMENT ACTIVITY';
  *   what it means when the registry states them (`file_date_label`); "Phase Issued" counts as an issued permit (stage-evidence-2).
  * national-6 (2026-11-02, founder): a record whose agency stage says occupancy was approved ("Approved to Occupy", "TCO Issued",
  * "Temporary C of O") is in its own stage, "Approved for occupancy — business opening not verified", never Approved / Coming (stage-evidence-3).
+ * national-7 (2026-11-02, universal report corrections): every record is judged by `relevance()` before anything is built; routine work and records
+ *   whose words establish no neighborhood-facing change leave the customer report (kept in `relevance_review` for traceability) and the Minor Building
+ *   Work section is gone; each included record carries its `relevance` basis, the agency's own class (`publisher_type`), its fuller description when the
+ *   ingest stored one (`description`) and any activity dates the source stated (`activity_window`); a stage the agency did not publish, or a temporary
+ *   event, is given no stage; the stage labels no longer pair "permitted" with "under construction" on one record; `coverage.records_checked` says when
+ *   Jody last read the included records and `coverage.undescribed_records` that some nearby records did not describe their work.
  */
-export const REPORT_VERSION = 'development-activity-national-6';
+export const REPORT_VERSION = 'development-activity-national-7';
 /** Default, not a founder-set value: the plan's "last 90 days" example. Defined once, here. */
 export const RECENT_DAYS = 90;
 /** The radii the canonical spatial read accepts. Anything else is refused there, so it is refused here first. */
@@ -124,14 +131,27 @@ export const OCCUPANCY_EVIDENCE: ReadonlySet<string> = Object.freeze(new Set(['a
 export const OCCUPANCY_EVIDENCE_LABEL = 'Occupancy approved';
 export const STAGE_ORDER = ['approved', 'proposed', 'permitted', 'occupancy'] as const;
 export type Stage = typeof STAGE_ORDER[number];
+/** national-6: "Approved / Coming" predicted that approved work will happen, and "Permitted / Under Construction" put an issued permit and started work in
+ *  one label. A record in the permitted stage now carries the label its own evidence supports (`stageLabel`). */
 export const STAGE_LABELS: Record<Stage, string> = {
-  approved: 'Approved / Coming', proposed: 'Proposed / Under Review', permitted: 'Permitted / Under Construction',
+  approved: 'Approved', proposed: 'Proposed / Under review', permitted: 'Permit issued or under construction',
   occupancy: 'Approved for occupancy — business opening not verified',
 };
 /** True when the publisher's own stage says occupancy was approved (OCCUPANCY_EVIDENCE). */
 export function occupancyEvidence(publisherStage: unknown): boolean {
   return OCCUPANCY_EVIDENCE.has(normaliseStage(publisherStage));
 }
+/** national-7: a TEMPORARY occupancy authorization ("TCO Issued", "Temporary C of O") keeps the word temporary; the agency's own word stays on the card. */
+export function temporaryOccupancy(publisherStage: unknown): boolean {
+  const k = normaliseStage(publisherStage);
+  return OCCUPANCY_EVIDENCE.has(k) && (/\btco\b/.test(k) || /\btemporary\b/.test(k));
+}
+/** The label ONE record's stage carries: in the permitted stage, what the agency's word actually says (an issued permit is not started work); in the
+ *  occupancy stage, whether the authorization is temporary. Neither says a business is open. */
+export function stageLabel(stage: Stage, evidence: { kind: 'permit_issued' | 'under_construction' } | null, publisherStage?: unknown): string {
+  if (stage === 'permitted' && evidence) return evidence.kind === 'under_construction' ? 'Under construction' : 'Permit issued';
+  if (stage === 'occupancy' && temporaryOccupancy(publisherStage)) return 'Temporary occupancy approved — business opening not verified';
+  return STAGE_LABELS[stage];}
 
 /** Lower case, trimmed, a leading phase number removed ("05_Construction", "5. ISSUED", "2 - Design"), spaces collapsed. */
 export function normaliseStage(raw: unknown): string {
@@ -204,6 +224,8 @@ export type ProjectRow = {
   source_ref: string | null;
   /** app_projects.provenance as the ingest wrote it; the report reads only `case_number` from it (the agency's own record number). */
   provenance?: Record<string, unknown> | null;
+  /** national-6: the fuller description some connectors store, and the activity dates the source stated. Absent from older reads. */
+  scope_text?: string | null; start_date?: string | null; end_date?: string | null;
 };
 export type LedgerProject = {
   identity_key: string; registry_id: string | null; comparable: boolean; change_ready: boolean;
@@ -539,38 +561,209 @@ export const SOURCE_TITLE_CAP = 120;
 export function titleCut(name: string | null): boolean { return typeof name === 'string' && name.length >= SOURCE_TITLE_CAP; }
 
 /**
- * MINOR BUILDING WORK — a presentation scope, never an exclusion. A record whose own words say the work is inside an existing building, on
- * one unit, or a like-for-like repair of a thing or a small fixture is listed in its own section; it stays in the report, with its stage, distance and
- * official link. Positive evidence is required: a record that says nothing either way is development. Any significance phrase (new
- * construction, demolition, a change of use, a land-use, shoreline or subdivision action, a size in stories or units, an addition...) wins
- * over every minor phrase, so a large project that also mentions an interior or a repair is never demoted. One normalisation: lower case,
- * every character outside a-z and 0-9 becomes a space, runs collapse, padded with spaces, so ' deck ' cannot match 'decker'.
+ * RELEVANCE (national-6, 2026-11-02, "Universal Development Activity Report corrections"). Jody reports documented nearby changes that matter to
+ * everyday living; it is not a permit inventory. Every record is judged ONCE, here, BEFORE any section, count, map, history, alert or export is built,
+ * so an excluded record cannot reach a customer by any indirect path (property-watch reads `assemble(...).intelligence.projects`, and Changes Since Report
+ * reads the stored report's project list, so both see only included records).
+ *
+ *   include, with a BASIS ......... the record's own words (its description, the agency's class field, and the fuller scope text when the ingest stored
+ *                                   one) document a neighborhood-facing change: new construction, demolition, site work, a change of use, an addition,
+ *                                   substantial or building-wide exterior work, a land-use action, a change to street access or to a public facility, a
+ *                                   nightlife use, a temporary event; or the canonical Type itself is the documented use (a road or utility project, a data
+ *                                   center, a heavy facility).
+ *   exclude, `routine_work` ....... the words say the work is interior, on one unit, a like-for-like repair or small fixture, or a tenant improvement that
+ *                                   states no change of use, and nothing above is documented.
+ *   exclude, `not_established` .... the words establish neither. The record is left out of the customer report and listed for internal review
+ *                                   (`relevance_review`), never guessed into either side.
+ * Excluded records are RETAINED in the permanent report body (`relevance_review`: identity, family, reason, the words that decided it) for traceability;
+ * no customer surface reads that key (pinned by the view's structure test). A later record whose words document a substantive change is judged again on
+ * every assembly (a Watch re-assembles), so a scope change re-includes it.
+ * The rule never includes on a word alone that can mean routine work ("remodel", "repair", "alteration", "tenant improvement"), never on a permit value, and
+ * never on the commercial Type. One normalisation (normalizeWords): lower case, non-alphanumerics to spaces, padded, so ' deck ' cannot match 'decker'.
  */
+export const RELEVANCE_RULE_VERSION = 'relevance-1';
 export function normalizeWords(s: string): string {
   return ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
 }
-export const SIGNIFICANT_WORK = [
-  ' new ', ' construct a ', ' construction of ', ' new construction ', ' demolish ', ' demolition ', ' demo ', ' shoring ', ' excavation ',
-  ' grading ', ' high rise ', ' story ', ' stories ', ' apartments ', ' townhouses ', ' townhomes ', ' dwelling units ',
-  ' change of use ', ' change use ', ' establish use ', ' master use permit ', ' land use ', ' shoreline ', ' subdivision ', ' short plat ',
-  ' plat ', ' rezone ', ' zoning ', ' variance ', ' conditional use ', ' site plan ', ' site development ', ' addition ', ' additions ',
-  ' phased permit ', ' substantial alterations ', ' substantial alteration ', ' mixed use development ', ' sepa ',
-];
-export const MINOR_WORK = [
-  ' stfi ', ' subject to field inspection ', ' interior alteration ', ' interior alterations ', ' interior remodel ', ' interior remodeling ',
-  ' bathroom remodel ', ' bath remodel ', ' kitchen remodel ', ' in kind ', ' like for like ', ' repair to ', ' repairs to ', ' repair of ',
-  ' repairs of ', ' damage repair ', ' facade repair ', ' facade repairs ', ' reroof ', ' re roof ',
-  ' window replacement ', ' replace windows ', ' replace 2 windows ', ' replace 3 windows ', ' replace 4 windows ', ' water heater ',
-  ' gas meter ', ' pergola ', ' to unit ', ' condo unit ', ' in unit ',
-];
-export type WorkScope = { key: 'development' } | { key: 'minor_work'; evidence: string };
-export function workScope(p: { name: string | null; type_raw: string | null }, typeKey?: string | null): WorkScope {
-  // a road, bridge or utility project is never "minor building work": its repairs close lanes and reroute traffic
-  if (typeKey === 'infrastructure') return { key: 'development' };
-  const words = normalizeWords((p.type_raw ?? '') + ' ' + (p.name ?? ''));
-  if (SIGNIFICANT_WORK.some((w) => words.includes(w))) return { key: 'development' };
-  const hit = MINOR_WORK.find((w) => words.includes(w));
-  return hit ? { key: 'minor_work', evidence: hit.trim() } : { key: 'development' };
+export type RelevanceBasis =
+  | 'residential_development' | 'development_record' | 'infrastructure' | 'facility_use' | 'temporary_event' | 'change_of_use' | 'demolition' | 'site_work' | 'new_construction'
+  | 'land_use' | 'addition' | 'substantial_alteration' | 'exterior_building_wide' | 'public_access' | 'public_facility' | 'nightlife_use';
+export type Relevance =
+  | { include: true; basis: RelevanceBasis; evidence: string; use?: string; proposes?: 'new_construction' | 'demolition' | 'site_work'; rule_version: string }
+  | { include: false; reason: 'routine_work' | 'not_established'; evidence: string | null; rule_version: string };
+
+const any = (w: string, list: string[]) => list.find((x) => w.includes(x)) ?? null;
+/** Phrases that mean the demolition or work is INSIDE a building; removed before the significance phrases are looked for. */
+const INTERIOR_DEMOLITION = [' interior demolition ', ' interior demo ', ' selective demolition ', ' non structural demolition ', ' demolition of interior '];
+const TEMPORARY = [' temporary '];
+const TEMPORARY_EVENT = [' event ', ' events ', ' stage ', ' festival ', ' concert ', ' fair ', ' tent ', ' tents ', ' bleachers ', ' outdoor '];
+const CHANGE_OF_USE = [' change of use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
+const DEMOLITION = [' demolish ', ' demolition ', ' demo of ', ' raze '];
+const SITE_WORK = [' shoring ', ' excavation ', ' excavate ', ' grading ', ' clearing and grading ', ' mass grading ', ' earthwork '];
+const NEW_CONSTRUCTION = [' new construction ', ' new single family ', ' new multifamily ', ' erect ', ' high rise ', ' mid rise ',
+  ' story ', ' stories ', ' dwelling units ', ' townhouses ', ' townhomes ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use '];
+/** "new" counts only before a building noun ("new 4-unit townhouse building"), so "new curb cut" or "new tenant" is not new construction. */
+const NEW_BUILDING_RE = / new( [a-z0-9]+){0,3}? (building|buildings|structure|structures|residence|residences|dwelling|dwellings|duplex|triplex|fourplex|house|houses|home|homes|warehouse|hotel|school|tower) /;
+/** "existing 3-story apartment building" describes what is there, not what is proposed: collapsed before the size and building words are read. */
+const EXISTING_RE = / existing( [a-z0-9]+){0,8}? (building|buildings|structure|residence|house|home|facility|condominium) /g;
+const LAND_USE = [' land use ', ' master use permit ', ' shoreline ', ' subdivision ', ' short plat ', ' preliminary plat ', ' final plat ', ' rezone ',
+  ' rezoning ', ' zoning change ', ' zone change ', ' variance ', ' conditional use ', ' special use ', ' site plan ', ' site development ',
+  ' planned unit development ', ' design review ', ' annexation ', ' comprehensive plan ', ' sepa '];
+const ADDITION = [' addition ', ' additions '];
+const SUBSTANTIAL = [' substantial alteration ', ' substantial alterations ', ' phased permit ', ' mixed use development ', ' major renovation ', ' gut renovation '];
+const EXTERIOR = [' exterior ', ' facade ', ' balconies ', ' balcony ', ' decks ', ' envelope ', ' cladding ', ' siding ', ' windows '];
+const BUILDING_WIDE = [' building wide ', ' entire building ', ' whole building ', ' all balconies ', ' all units ', ' all floors ', ' throughout the building '];
+const BUILDING_WIDE_RE = /( floors? \d+ (to |through |thru )?\d+ | \d{2,} (balconies|decks|windows|units) )/;
+/** Public-works wording, for a road or utility project the canonical Type did not file as Roads & infrastructure ("HMA Inlay", "Hwys. 96 & 255 Flood
+ *  Repairs"). Not applied to a Residential record: a driveway "paving" or "overlay" on one house is routine. */
+const PUBLIC_WORKS = [' inlay ', ' overlay ', ' resurfacing ', ' repaving ', ' paving ', ' pavement ', ' bridge ', ' culvert ', ' highway ', ' hwy ', ' hwys ',
+  ' roadway ', ' water main ', ' sewer main ', ' storm drain ', ' traffic signal ', ' state route '];
+const ROUTE_RE = / (sr|us|hwy|hwys|i|state route) \d{1,3} /;
+const PUBLIC_ACCESS = [' curb cut ', ' street use ', ' use of street ', ' street improvement ', ' street improvements ', ' street vacation ', ' right of way ', ' sidewalk '];
+const RENOVATION = [' renovate ', ' renovation ', ' renovations ', ' expansion ', ' expand '];
+const NIGHTLIFE = [' nightclub ', ' night club ', ' bar ', ' tavern ', ' brewery ', ' brewpub ', ' distillery ', ' taproom ', ' lounge ', ' event venue ', ' music venue '];
+const TENANT_IMPROVEMENT = [' tenant improvement ', ' tenant improvements ', ' ti '];
+/** The routine-work phrases. Each needs nothing above it to have matched. A bare "repair", "remodel" or "alteration" is NOT here: alone it establishes nothing. */
+const ROUTINE = [' stfi ', ' subject to field inspection ', ' interior alteration ', ' interior alterations ', ' interior remodel ', ' interior remodeling ',
+  ' interior repairs ', ' finishes ', ' bathroom remodel ', ' bath remodel ', ' kitchen remodel ', ' in kind ', ' like for like ', ' repairs to unit ',
+  ' to unit ', ' condo unit ', ' in unit ', ' damage repair ', ' reroof ', ' re roof ', ' roof replacement ', ' window replacement ', ' replace windows ',
+  ' water heater ', ' furnace ', ' gas meter ', ' pergola ', ' small cell ', ' minor communication ', ' antenna ', ' fire rated ', ' fire alarm ',
+  ' sprinkler ', ' signage ', ' sign ', ' fence ', ' shed ', ' blanket permit ', ' initial tenant improvement ', ' tenant finish ', ' tenant finishes ',
+  // trade and small-object permits (measured on a 5,000-record national sample, 2026-11-02): they only decide a record nothing above included
+  ' electrical ', ' mechanical ', ' plumbing ', ' hvac ', ' air conditioning ', ' heat pump ', ' roof ', ' roofing ', ' siding ', ' door ', ' doors ',
+  ' retaining wall ', ' solar ', ' pool ', ' spa ', ' deck ', ' porch ', ' patio '];
+const ONE_UNIT_RE = / (unit|suite|apt|apartment) [a-z]?\d+[a-z]? /;
+
+/** The use a change of use or an established use names, in the record's own words, when it can be read cleanly; otherwise undefined. */
+export function documentedUse(text: string): string | undefined {
+  const t = String(text).replace(/\s+/g, ' ');
+  const m = /(?:change (?:of )?use|establish use|convert(?:ing)?)\b[^.;]*?\b(?:to|as|into) (?:an? )?([a-z][a-z /&-]{2,40}?)(?=\s*(?:[.,;:(]|\bper\b|\bin\b|\bat\b|\bon\b|\bfor\b|\bwith\b|$))/i.exec(t);
+  if (!m) return undefined;
+  const use = m[1].trim().replace(/\s+/g, ' ').toLowerCase();
+  return use.length >= 3 && !/^(the|a|an|existing)$/.test(use) ? use : undefined;
+}
+
+/** THE one relevance decision. Pure: reads the record's own words, its canonical Type key and facility kind; no source name, place, clock or value. */
+export function relevance(
+  p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null }, typeKey?: string | null, facilityKind?: string | null,
+): Relevance {
+  const V = RELEVANCE_RULE_VERSION;
+  const inc = (basis: RelevanceBasis, evidence: string, use?: string): Relevance => ({ include: true, basis, evidence: evidence.trim(), ...(use ? { use } : {}), rule_version: V });
+  const raw = [p.type_raw ?? '', p.name ?? '', p.scope_text ?? ''].join(' ');
+  let w = normalizeWords(raw);
+  // the Type itself is the documented use: a road, bridge or utility project; a data center; a heavy facility (landfill, quarry, burning, transfer)
+  if (typeKey === 'infrastructure') return inc('infrastructure', 'road, utility or public-works project');
+  if (typeKey === 'datacenter') return inc('facility_use', 'data center');
+  if (facilityKind) return inc('facility_use', facilityKind);
+  for (const x of INTERIOR_DEMOLITION) w = w.split(x).join(' interior work ');
+  w = w.replace(EXISTING_RE, ' existing building ');
+  let hit: string | null;
+  if (any(w, TEMPORARY) && (hit = any(w, TEMPORARY_EVENT))) return inc('temporary_event', 'temporary' + hit.trimEnd());
+  if ((hit = any(w, CHANGE_OF_USE))) return inc('change_of_use', hit, documentedUse(raw));
+  // a land-use application or decision is framed as one, never as construction: what it would allow is carried as `proposes`
+  const wl = w.split(' land use code ').join(' code ');
+  const demo = any(w, DEMOLITION), site = any(w, SITE_WORK), build = any(w, NEW_CONSTRUCTION) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null);
+  if ((hit = any(wl, LAND_USE))) {
+    const r = inc('land_use', hit);
+    const proposes = build ? 'new_construction' : demo ? 'demolition' : site ? 'site_work' : null;
+    return proposes ? { ...r, proposes } as Relevance : r;
+  }
+  if ((hit = demo)) return inc('demolition', hit);
+  if ((hit = site)) return inc('site_work', hit);
+  if ((hit = build)) return inc('new_construction', hit);
+  if ((hit = any(w, ADDITION))) return inc('addition', hit);
+  if ((hit = any(w, SUBSTANTIAL))) return inc('substantial_alteration', hit);
+  const ext = any(w, EXTERIOR);
+  if (ext) {
+    const wide = any(w, BUILDING_WIDE) ?? (BUILDING_WIDE_RE.exec(w)?.[0] ?? null);
+    if (wide) return inc('exterior_building_wide', (ext.trim() + ',' + wide).replace(/\s+/g, ' '));
+  }
+  if ((hit = any(w, PUBLIC_ACCESS))) return inc('public_access', hit);
+  if (typeKey !== 'residential' && (hit = any(w, PUBLIC_WORKS) ?? (ROUTE_RE.exec(w)?.[0] ?? null))) return inc('infrastructure', hit);
+  if (typeKey === 'civic' && (hit = any(w, RENOVATION)) && !w.includes(' interior ')) return inc('public_facility', hit);
+  const ti = any(w, TENANT_IMPROVEMENT);
+  const night = any(w, NIGHTLIFE);
+  if (night && ti && !w.includes(' existing' + night)) return inc('nightlife_use', night, night.trim());
+  // THE CANONICAL RESIDENTIAL ANSWER (lib/residential-qualify.js, through its generated copy): Map 1's own rule for whether a record is new residential
+  // development or routine work on an existing home, including the founder's bounded development-class source families (2026-09-06). It is asked, never
+  // restated. For a record of another Type only its source-class answers are taken (a bounded development corpus; a subdivision, plat or site-plan record).
+  const ra = HS().residentialActivity ? HS().residentialActivity({ name: p.name, type_raw: p.type_raw, registry_id: p.registry_id ?? null }) : null;
+  if (ra && ra.verdict === 'DEVELOPMENT' && (typeKey === 'residential' || ra.rule === 'DEV_PROVENANCE' || ra.rule === 'DEV_ANYWHERE')) {
+    return inc(typeKey === 'residential' ? 'residential_development' : 'development_record', String(ra.evidence ?? ra.rule));
+  }
+  if (ra && ra.verdict === 'ROUTINE' && typeKey === 'residential') return { include: false, reason: 'routine_work', evidence: String(ra.evidence ?? ra.rule), rule_version: V };
+  // routine work: positive evidence of interior, single-unit, like-for-like or small-fixture work, or a tenant improvement that states no change of use
+  const routine = any(w, ROUTINE) ?? (ONE_UNIT_RE.exec(w)?.[0] ?? null) ?? ti;
+  if (routine) return { include: false, reason: 'routine_work', evidence: routine.trim(), rule_version: V };
+  return { include: false, reason: 'not_established', evidence: null, rule_version: V };
+}
+
+/**
+ * Activity dates the SOURCE stated (app_projects.start_date / end_date). Only real calendar days are kept; an end before today says the activity is over, so a
+ * record whose administrative status is still open is not presented as upcoming. Null when the source states neither.
+ */
+export function activityWindow(p: { start_date?: string | null; end_date?: string | null }, today: string) {
+  const s = validDay(p.start_date) && p.start_date! >= RECORD_DATE_FLOOR ? p.start_date! : null;
+  const e = validDay(p.end_date) && p.end_date! >= RECORD_DATE_FLOOR ? p.end_date! : null;
+  if (!s && !e) return null;
+  return { start: s, end: e, ended: !!e && e < today };
+}
+
+// ── TEMPORARY ACTIVITY TIMING (national-7, 2026-11-02, founder) ────────────────────────────────────────────────────────────────────────────────────
+// A temporary installation or event is reported only while its DOCUMENTED activity is upcoming or under way. The window is the whole documented span,
+// installation through removal (the earliest and latest day the source states), never only the public dates. It is read from the source's own date
+// fields and from the record's own words (its description, and the fuller scope text when the ingest stored one), so a reusable path, not a list of events.
+//   upcoming .................. the window starts after today                     -> included
+//   active .................... today is inside the window                         -> included
+//   ended ..................... the window ended before today                      -> excluded, unless the record also documents a continuing scope
+//   timing_not_captured ....... no date found AND the ingested text was cut short  -> excluded, flagged: the source may state dates ingestion did not keep
+//   timing_not_stated ......... no date found in the complete ingested text         -> excluded, flagged
+// A day without a year ("9/5") takes its year only from the one four-digit year the same text states; with none, or two different ones, it is not read.
+const MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+function ymdDay(y: number, m: number, d: number): string | null {
+  const s = String(y).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  return validDay(s) && s >= RECORD_DATE_FLOOR ? s : null;
+}
+/** Every calendar day a text states, as ISO days, with the words each came from. Pure. */
+export function documentedDates(text: string): Array<{ day: string; words: string }> {
+  const t = String(text ?? '');
+  const out: Array<{ day: string; words: string }> = [];
+  const push = (d: string | null, words: string) => { if (d && !out.some((o) => o.day === d)) out.push({ day: d, words: words.trim() }); };
+  const years = [...new Set([...t.matchAll(/\b(20\d{2})\b/g)].map((m) => Number(m[1])))];
+  const year = years.length === 1 ? years[0] : null;
+  for (const m of t.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) push(ymdDay(+m[1], +m[2], +m[3]), m[0]);
+  for (const m of t.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?\b/g)) {
+    const y = m[3] ? (m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3])) : year;
+    if (y) push(ymdDay(y, +m[1], +m[2]), m[0]);
+  }
+  const mn = MONTH_NAMES.join('|') + '|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec';
+  for (const m of t.matchAll(new RegExp('\\b(' + mn + ')\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b', 'gi'))) {
+    const k = m[1].toLowerCase().slice(0, 3), mi = MONTH_NAMES.findIndex((x) => x.startsWith(k));
+    const y = m[3] ? Number(m[3]) : year;
+    if (mi >= 0 && y) push(ymdDay(y, mi + 1, +m[2]), m[0]);
+  }
+  return out;
+}
+export type TemporaryTiming = {
+  status: 'upcoming' | 'under_way' | 'ended' | 'timing_not_captured' | 'timing_not_stated';
+  start: string | null; end: string | null; source: 'source_fields' | 'record_text' | 'both' | null; evidence: string[];
+};
+export function temporaryTiming(
+  p: { name: string | null; scope_text?: string | null; start_date?: string | null; end_date?: string | null }, today: string, textCut: boolean,
+): TemporaryTiming {
+  const days: string[] = [], evidence: string[] = [];
+  const f = activityWindow(p, today);
+  if (f) { if (f.start) { days.push(f.start); evidence.push('start date ' + f.start); } if (f.end) { days.push(f.end); evidence.push('end date ' + f.end); } }
+  const fromText = documentedDates([p.name ?? '', p.scope_text ?? ''].join(' \n '));
+  for (const d of fromText) { days.push(d.day); evidence.push('"' + d.words + '"'); }
+  const source: TemporaryTiming['source'] = f && fromText.length ? 'both' : f ? 'source_fields' : fromText.length ? 'record_text' : null;
+  if (!days.length) {
+    const cut = textCut && !(typeof p.scope_text === 'string' && p.scope_text.trim());
+    return { status: cut ? 'timing_not_captured' : 'timing_not_stated', start: null, end: null, source: null, evidence: [] };
+  }
+  const start = days.reduce((a, b) => (a <= b ? a : b)), end = days.reduce((a, b) => (a >= b ? a : b));
+  const status = end < today ? 'ended' : start > today ? 'upcoming' : 'under_way';
+  return { status, start, end, source, evidence };
 }
 
 export function assemble(input: AssembleInput): Assembled {
@@ -608,7 +801,10 @@ export function assemble(input: AssembleInput): Assembled {
   }
   const windowStart = addDays(today, -RECENT_DAYS);
 
-  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0 };
+  const excluded = { development_only: 0, no_source_family: 0, no_source_url: 0, standing_inventory: 0, no_distance: 0, routine_work: 0, relevance_not_established: 0, temporary_ended: 0 };
+  // national-6: what relevance() left out, kept in the permanent body for traceability and internal review. No customer surface reads it.
+  const relevanceReview: Array<{ project_id: string; source_family: string; reason: string; evidence: string | null; rule_version: string }> = [];
+  const checked: string[] = [];
   type Entry = Record<string, unknown> & { project_id: string };
   const projects: Entry[] = [];
   const whatChanged: Array<{ project_id: string; at: string }> = [];
@@ -641,8 +837,50 @@ export function assemble(input: AssembleInput): Assembled {
     // R3 / default D-4: an operating record is not a standing inventory. It appears only when it carries an event in the window.
     if (lc.key === 'operating' && !ev && !changeCounts) { excluded.standing_inventory++; continue; }
 
-    const stage = presentationStage(lc.key, p.stage);
-    const evidence = stage === 'permitted' ? stageEvidence(p.stage) : stage === 'occupancy' ? { label: OCCUPANCY_EVIDENCE_LABEL } : null;
+    // RELEVANCE, before the record reaches any section, count, map, history, alert or export (national-7)
+    let rel = relevance(p, t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+    let timing: TemporaryTiming | null = null;
+    if (rel.include && rel.basis === 'temporary_event') {
+      timing = temporaryTiming(p, today, titleCut(p.name));
+      if (timing.status === 'ended') {
+        // a separate, documented continuing scope still qualifies (the same words with the temporary activity taken out)
+        const cont = relevance({ ...p, name: (p.name ?? '').replace(/\btemporary\b/gi, ' '), scope_text: (p.scope_text ?? '').replace(/\btemporary\b/gi, ' ') },
+          t ? t.typeKey : null, t && t.facilityKind ? t.facilityKind : null);
+        if (cont.include && cont.basis !== 'temporary_event') rel = cont;
+        else {
+          excluded.temporary_ended++;
+          relevanceReview.push({ project_id: p.source_key, source_family: family, reason: 'temporary_activity_ended', evidence: timing.evidence.join('; ') || null, rule_version: RELEVANCE_RULE_VERSION });
+          continue;
+        }
+      } else if (timing.status === 'timing_not_captured' || timing.status === 'timing_not_stated') {
+        excluded.relevance_not_established++;
+        relevanceReview.push({ project_id: p.source_key, source_family: family, reason: timing.status === 'timing_not_captured' ? 'temporary_timing_not_captured' : 'temporary_timing_not_stated', evidence: rel.evidence, rule_version: RELEVANCE_RULE_VERSION });
+        continue;
+      }
+    }
+    if (!rel.include) {
+      if (rel.reason === 'routine_work') excluded.routine_work++; else excluded.relevance_not_established++;
+      relevanceReview.push({ project_id: p.source_key, source_family: family, reason: rel.reason, evidence: rel.evidence, rule_version: rel.rule_version });
+      continue;
+    }
+
+    // A STAGE THE AGENCY STATED. A source with no status column stores its connector's constant as the stage, and the canonical lifecycle then comes
+    // from that constant too, so neither is the agency's: such a record is given no stage, except that an issue date the agency published IS evidence
+    // the permit was issued. A temporary event is given no stage either: its administrative status says nothing about whether the event is still ahead.
+    const unpublished = !!(pub.status_const && p.stage && agencyStage(p.stage, pub) === null);
+    const rdRaw = recordDate(p, today);
+    let stage = presentationStage(lc.key, unpublished ? null : p.stage);
+    let evidence: { kind: 'permit_issued' | 'under_construction'; label: string } | null = stage === 'permitted' ? stageEvidence(p.stage) : null;
+    const occLabel = stage === 'occupancy' ? (temporaryOccupancy(p.stage) ? 'Temporary occupancy approved' : OCCUPANCY_EVIDENCE_LABEL) : null;
+    if (unpublished) {
+      stage = rdRaw && rdRaw.kind === 'issued' && (lc.key === 'approved' || lc.key === 'unknown') ? 'permitted' : null;
+      evidence = stage ? { kind: 'permit_issued', label: STAGE_EVIDENCE_LABELS.permit_issued } : null;
+    }
+    if (rel.basis === 'temporary_event') { stage = null; evidence = null; }
+    const actWin = timing && (timing.start || timing.end)
+      ? { start: timing.start, end: timing.end, ended: timing.status === 'ended', status: timing.status, from: timing.source }
+      : activityWindow(p, today);
+    const description = typeof p.scope_text === 'string' && p.scope_text.trim() && p.scope_text.trim() !== (p.name ?? '').trim() ? p.scope_text.trim() : null;
     const entry: Entry = {
       project_id: p.source_key,
       source_family: family || null,
@@ -650,7 +888,7 @@ export function assemble(input: AssembleInput): Assembled {
       address: p.address,
       type: t ? { key: t.typeKey, label: t.label, ...(t.facilityKind ? { kind: t.facilityKind } : {}) } : null,
       lifecycle: { key: lc.key, label: lc.label },
-      stage: stage ? { key: stage, label: STAGE_LABELS[stage], ...(evidence ? { evidence: evidence.label } : {}) } : null,
+      stage: stage ? { key: stage, label: stageLabel(stage, evidence, p.stage), ...(evidence ? { evidence: evidence.label } : occLabel ? { evidence: occLabel } : {}) } : null,
       publisher_status: p.status,
       publisher_stage: agencyStage(p.stage, pub),
       ...(pub.status_const && agencyStage(p.stage, pub) === null && p.stage ? { publisher_stage_unpublished: true } : {}),
@@ -658,7 +896,10 @@ export function assemble(input: AssembleInput): Assembled {
       record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(withDateLabel(recordDate(p, today), pub)),
       developer: p.developer, size: p.size, investment: p.investment,
       ...(titleCut(p.name) ? { title_cut: true } : {}),
-      scope: workScope(p, t ? t.typeKey : null),
+      relevance: { basis: rel.basis, evidence: rel.evidence, ...(rel.use ? { use: rel.use } : {}), ...(rel.proposes ? { proposes: rel.proposes } : {}), rule_version: rel.rule_version },
+      publisher_type: typeof p.type_raw === 'string' && p.type_raw.trim() ? p.type_raw.trim() : null,
+      ...(description ? { description } : {}),
+      ...(actWin ? { activity_window: actWin } : {}),
       source: { url: p.source_ref, attribution: credits[family] ?? null, agency: pub.agency, feed_ref: pub.dataset, record_id: recordIdOf(p) },
       homesignal_observation: led
         ? { first_observed_at: led.first_observed_at, last_observed_at: led.last_observed_at, observation_count: led.observation_count, change_ready: led.change_ready }
@@ -672,6 +913,7 @@ export function assemble(input: AssembleInput): Assembled {
       if (b !== null) bearings[p.source_key] = b;
     }
     familiesIncluded.add(family);
+    if (led && typeof led.last_observed_at === 'string' && led.last_observed_at) checked.push(led.last_observed_at);
     if (led && led.change_ready) anyChangeReady = true;
     byLifecycle[lc.key as Lifecycle].push(p.source_key);
     if (stage) byStage[stage].push(p.source_key);
@@ -713,6 +955,7 @@ export function assemble(input: AssembleInput): Assembled {
     radius_mi,
     recent_days: RECENT_DAYS,
     stage_rule_version: STAGE_RULE_VERSION,
+    relevance_rule_version: RELEVANCE_RULE_VERSION,
     activity: { outcome, label: ACTIVITY_LABELS[outcome], rule_version: ACTIVITY_RULE_VERSION },
     coverage: {
       zip_supported: true,
@@ -724,6 +967,12 @@ export function assemble(input: AssembleInput): Assembled {
       // the publishing agency and dataset of each source in the report, in the families' order: the coverage note names all of them
       source_agencies: [...familiesIncluded].filter(Boolean).sort().map((f) => ({ source_family: f, agency: publisherOf(f).agency, feed_ref: publisherOf(f).dataset })),
       assessment_basis: 'records_returned_for_this_radius',
+      // when Jody last read the records in this report (the ledger's last observation of each): a retrieval time, never a project date
+      records_checked: checked.length ? { earliest: checked.reduce((a, b) => (a <= b ? a : b)), latest: checked.reduce((a, b) => (a >= b ? a : b)) } : null,
+      // some nearby records did not describe their work, so Jody cannot tell whether they are a meaningful change: the report says so, without a count
+      undescribed_records: excluded.relevance_not_established > 0,
+      // confirmed routine work was found and left out (a separate fact from "not described"; neither is a count)
+      routine_records: excluded.routine_work > 0,
       limitations,
     },
     sections: {
@@ -733,6 +982,7 @@ export function assemble(input: AssembleInput): Assembled {
       by_stage: byStage,
     },
     projects,
+    relevance_review: relevanceReview,
   };
 
   const privateContext: PrivateContext = {
@@ -753,7 +1003,7 @@ export function assemble(input: AssembleInput): Assembled {
     privateContext,
     engineInputs: {
       engine: REPORT_VERSION, zip: subject.zip, radius_mi, recent_days: RECENT_DAYS, stage_rule_version: STAGE_RULE_VERSION,
-      activity_rule_version: ACTIVITY_RULE_VERSION, source_policy: SOURCE_POLICY, attribution_version: input.attribution.version,
+      activity_rule_version: ACTIVITY_RULE_VERSION, relevance_rule_version: RELEVANCE_RULE_VERSION, source_policy: SOURCE_POLICY, attribution_version: input.attribution.version,
     },
     renderOnly: {
       distances_mi: distances,

@@ -39,19 +39,18 @@ def m(name, old, new, tests=None):
 
 # ---- section order, and only sections that have data ----------------------------------------------------------------------------------
 m('evidence_moved_to_top', "    parts.push(evidenceSection(report));", "    parts.splice(1, 0, evidenceSection(report));")
-m('stage_label_changed', "approved: 'Approved / Coming',", "approved: 'Approved / Coming Soon',")
+m('stage_label_changed', "var STAGE_WORDS = { approved: 'Approved',", "var STAGE_WORDS = { approved: 'Approved / Coming Soon',")  # re-anchored 2026-11-02 (national-6)
 m('things_to_review_invented',
   "    parts.push(evidenceSection(report));",
   "    parts.push('<section class=\"da-rv-sec da-rv-sec--review\" aria-label=\"Things to Review\"><h2 class=\"da-rv-h2\">Things to Review With Your Client</h2></section>');\n    parts.push(evidenceSection(report));")
 # ---- the hero is a change claim only where the ledger proved one ------------------------------------------------------------------------
 m('publisher_event_filed_as_change', "line('Official record', eventText(pe.label, pe.date))", "line('HomeSignal detected', eventText(pe.label, pe.date))")
-m('detected_date_is_publisher_date', "line('HomeSignal detected', eventText(eventLabel(dc.event_type), day(dc.detected_at)))",
-  "line('HomeSignal detected', eventText(eventLabel(dc.event_type), day(dc.publisher_event && dc.publisher_event.date)))")
+m('detected_date_is_publisher_date', "line('Jody detected', eventText(eventLabel(dc.event_type), day(dc.detected_at)))", "line('Jody detected', eventText(eventLabel(dc.event_type), day(dc.publisher_event && dc.publisher_event.date)))")  # re-anchored 2026-11-02 (national-6)
 # ---- lifecycle: text AND shape, the engine's own key and label ---------------------------------------------------------------------------
 m('proposed_labelled_coming',
   "function lifeLabel(p) { return (isObj(p.lifecycle) ? txt(p.lifecycle.label) : '') || 'Lifecycle unknown'; }",
   "function lifeLabel(p) { return lifeKey(p) === 'proposed' ? 'Approved / Coming' : (isObj(p.lifecycle) ? txt(p.lifecycle.label) : '') || 'Lifecycle unknown'; }")
-m('lifecycle_text_dropped', "'<span class=\"da-rv-lifetext\">' + esc(lifeLabel(p)) + '</span></span>';", "'<span class=\"da-rv-lifetext\"></span></span>';", NODE_TESTS + [NATIONAL5])
+m('lifecycle_text_dropped', "'<span class=\"da-rv-lifetext\">' + esc(k === 'operating' ? TITLES.operating : lifeLabel(p)) + '</span></span>';", "'<span class=\"da-rv-lifetext\"></span></span>';", NODE_TESTS + [NATIONAL5])  # re-anchored 2026-11-02 (national-6)
 m('lifecycle_shape_dropped', "data-lifecycle=\"' + k + '\">' + SHAPES[k]", "data-lifecycle=\"' + k + '\">'")
 m('lifecycle_rederived_from_publisher_status',
   "function lifeKey(p) { var k = isObj(p.lifecycle) ? p.lifecycle.key : '';",
@@ -59,9 +58,9 @@ m('lifecycle_rederived_from_publisher_status',
 m('lifecycle_key_unvalidated', "return typeof k === 'string' && has(SHAPES, k) ? k : 'unknown'; }", "return k; }")
 m('type_shown_as_key', "return isObj(p.type) ? txt(p.type.label) : ''; }", "return isObj(p.type) ? txt(p.type.key) : ''; }")
 # ---- nothing internal reaches the page ------------------------------------------------------------------------------------------------------
-m('render_storage_blockers', "parts.join('') + '</article>'", "parts.join('') + esc(JSON.stringify(response.storage_blockers)) + '</article>'")
+m('render_storage_blockers', "parts.join('') + '<p class=\"da-rv-brand\"", "parts.join('') + esc(JSON.stringify(response.storage_blockers)) + '<p class=\"da-rv-brand\"")  # re-anchored 2026-11-02 (national-6)
 m('render_limitation_code', "return txt(l.text); }", "return txt(l.code) + ' ' + txt(l.text); }")
-m('coverage_state_printed', "+ '\" aria-label=\"HomeSignal Development Activity report\">'", "+ '\" aria-label=\"HomeSignal Development Activity report\" data-state=\"' + esc(response.coverage_state) + '\">'")
+m('coverage_state_printed', "+ '\" aria-label=\"JODY Development Activity report\">'", "+ '\" aria-label=\"JODY Development Activity report\" data-state=\"' + esc(response.coverage_state) + '\">'")  # re-anchored 2026-11-02 (national-6)
 # ---- coverage: the engine's words, never "no activity" -----------------------------------------------------------------------------------------
 m('limitation_text_dropped',
   "(lims.length ? '<ul class=\"da-rv-lims\">' + lims.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '')", "''")
@@ -118,25 +117,22 @@ m('history_shown_when_empty', "    if (some) parts.push(historySection(history, 
 m('actions_on_empty_report', '    if (some) parts.push(actionsBar(opts));', '    parts.push(actionsBar(opts));')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('absence_claim_added', '    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));', "    if (!some) parts.push('<p>No development activity found near this address.</p>');\n    parts.push(evidenceSection(report));\n    if (some) parts.push(actionsBar(opts));")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 m('empty_report_unmarked', "(some ? '' : ' da-rv--empty')", "''")
-m('permitted_title_changed', "permitted: 'Permitted / Under Construction',", "permitted: 'Under Construction',")
+m('permitted_title_changed', "permitted: 'Permit issued / Under construction',", "permitted: 'Under construction',")  # re-anchored 2026-11-02 (national-6)
 # ---- the stage is the ENGINE's; the view never re-derives it ----------------------------------------------------------------------------
-m('operating_listed_in_stage_section',
-  "var all = pick(byStage[k]).filter(function (p) { return !stageFor[p.project_id] && (legacy || stageKey(p) === k); });",
-  "var all = pick(k === 'approved' && isObj(sec.by_lifecycle) ? arr(byStage[k]).concat(arr(sec.by_lifecycle.operating)) : byStage[k]).filter(function (p) { return !stageFor[p.project_id]; });")
-m('sorts_stage_cards', "      var all = pick(byStage[k]).filter(", "      var all = pick(byStage[k]).sort(function (a, b) { return titleOf(a) < titleOf(b) ? -1 : 1; }).filter(")
-m('stage_label_from_lifecycle', "    return (isObj(p.stage) && p.stage.key === k ? txt(p.stage.label) : '') ||", '    return lifeLabel(p) ||')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
-m('proposed_shape_equals_approved',
-  "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"3 2.5\"/></svg>',",
-  "  var SHAPES = {\n    approved: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',\n    proposed: SVG_OPEN + '<circle cx=\"7\" cy=\"7\" r=\"5.5\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>',", NODE_TESTS + [NATIONAL5])
+m('operating_listed_in_stage_section', "staged[k] = pick(byStage[k]).filter(function (p) { return !stageFor[p.project_id] && (legacy || stageKey(p) === k); });", "staged[k] = pick(k === 'approved' && isObj(sec.by_lifecycle) ? arr(byStage[k]).concat(arr(sec.by_lifecycle.operating)) : byStage[k]).filter(function (p) { return !stageFor[p.project_id]; });")  # re-anchored 2026-11-02 (national-6)
+m('sorts_stage_cards', "      staged[k] = pick(byStage[k]).filter(", "      staged[k] = pick(byStage[k]).sort(function (a, b) { return titleOf(a) < titleOf(b) ? -1 : 1; }).filter(")  # re-anchored 2026-11-02 (national-6)
+m('stage_label_from_lifecycle', "    return STAGE_WORDS[k] || TITLES[k] || '';", "    return lifeLabel(p) || STAGE_WORDS[k] || '';")  # re-anchored 2026-11-02 (national-6)
+m('proposed_shape_equals_approved', '  var STAGE_SHAPES = {\n    approved: SVG_OPEN + \'<circle cx="7" cy="7" r="5.5" fill="currentColor" stroke="currentColor" stroke-width="1.5"/></svg>\',\n    proposed: SVG_OPEN + \'<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2.5"/></svg>\',', '  var STAGE_SHAPES = {\n    approved: SVG_OPEN + \'<circle cx="7" cy="7" r="5.5" fill="currentColor" stroke="currentColor" stroke-width="1.5"/></svg>\',\n    proposed: SVG_OPEN + \'<circle cx="7" cy="7" r="5.5" fill="currentColor" stroke="currentColor" stroke-width="1.5"/></svg>\',', NODE_TESTS + [NATIONAL5])  # re-anchored 2026-11-02 (national-6): the drawn stage shapes; the lifecycle SHAPES approved/proposed are no longer drawn
 # ---- a stage card shows the stage, the lifecycle and the publisher's own words, each labelled ------------------------------------------------
-m('stage_card_lifecycle_dropped', "      + (showLifecycle ? line('HomeSignal lifecycle', lifeLabel(p)) : '')\n", '')  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
+m('stage_card_lifecycle_dropped', "      + (showLifecycle ? line('Jody lifecycle', lifeLabel(p)) : '')\n", '')  # re-anchored 2026-11-02 (national-6)
 m('first_detected_is_publisher_date', "function ledgerFirstRead(p) { return isObj(p.homesignal_observation) ? day(p.homesignal_observation.first_observed_at) : ''; }", "function ledgerFirstRead(p) { var pe = publisherEvent(p); return pe ? pe.date : ''; }")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
 # ---- Things to Review: the engine's list, a neutral prompt, never a prediction ----------------------------------------------------------------
 # ---- the map: response-only positions, to scale, numbered like the cards, no basemap -----------------------------------------------------------------
 m('distance_without_render', "  function distanceOf(response, id) {\n    var r = isObj(response.render) ? response.render : null;",
   "  function distanceOf(response, id) {\n    var r = isObj(response.render) ? response.render : { distances_mi: { 'k-approved': 0.2 } };")
-m('map_invents_positions', "if (d === null || b === null) return;", "if (d === null) d = 0.25; if (b === null) b = 0;")
-m('map_drawn_with_nothing', "    if (!drawn) return '';\n", "")
+m('map_invents_positions', "        if (milesOf(response, p.project_id) === null || bearingOf(response, p.project_id) === null) return;\n", "")  # re-anchored 2026-11-02 (national-6): read() now decides which records are drawn and numbered
+# map_drawn_with_nothing: retired 2026-11-02 (national-6). html() only calls mapSection when read() numbered a drawable record, so the inner
+# `if (!drawn) return '';` is unreachable and removing it changes nothing; "no map without a drawn record" is pinned in test/da-report-view.test.mjs.
 m('map_not_to_scale', "var rr = Math.min(d / radius, 1) * R,", "var rr = R * 0.6,")
 m('map_north_flipped', "y0: C - rr * Math.cos(rad) });", "y0: C + rr * Math.cos(rad) });")  # re-anchored 2026-11-02 (national-5: markers keep their true spot in x0/y0)
 m('map_number_off_by_one', "'<text class=\"da-rv-mnum\" text-anchor=\"middle\" dy=\"4\">' + x.n + '</text></g>'", "'<text class=\"da-rv-mnum\" text-anchor=\"middle\" dy=\"4\">' + (x.n + 1) + '</text></g>'")
@@ -168,22 +164,22 @@ m('address_not_escaped', "esc(subject ? displayAddress(subject) : NO_ADDRESS)", 
 m('address_placeholder_dropped', "esc(subject ? displayAddress(subject) : NO_ADDRESS)", "esc(displayAddress(subject))")
 m('limitation_not_escaped', "lims.map(function (t) { return '<li>' + esc(t) + '</li>'; })", "lims.map(function (t) { return '<li>' + t + '</li>'; })")
 m('attribution_not_escaped', "'<p class=\"da-rv-attr\">' + esc(att) + '</p>'", "'<p class=\"da-rv-attr\">' + att + '</p>'")
-m('type_label_not_escaped', "'<span class=\"da-rv-sub da-rv-sub--type\">' + esc(type) + '</span>'", "'<span class=\"da-rv-sub da-rv-sub--type\">' + type + '</span>'")
-m('row_type_dropped', "(type ? '<span class=\"da-rv-sub da-rv-sub--type\">'", "(false ? '<span class=\"da-rv-sub da-rv-sub--type\">'")
+m('type_label_not_escaped', "'<span class=\"da-rv-sub da-rv-sub--type\">' + esc(typeLine) + '</span>'", "'<span class=\"da-rv-sub da-rv-sub--type\">' + typeLine + '</span>'")  # re-anchored 2026-11-02 (national-6)
+m('row_type_dropped', "(typeLine ? '<span class=\"da-rv-sub da-rv-sub--type\">'", "(false ? '<span class=\"da-rv-sub da-rv-sub--type\">'")  # re-anchored 2026-11-02 (national-6)
 m('row_map_number_dropped', "n !== '' ? 'Map ' + n : ''].filter(Boolean)", "''].filter(Boolean)")
 m('row_distance_dropped', "var where = [dist ? dist + (dir ? ' ' + dir : '') : '',", "var where = ['',")
 m('row_agency_stage_dropped', "(pstage && !sameWords(pstage, shownStageText(p, k)) ? '<span", "(false ? '<span")
 m('stale_warning_dropped', "(rd && rd.old ? '<span class=\"da-rv-sub da-rv-stale\"", "(false && rd.old ? '<span class=\"da-rv-sub da-rv-stale\"")
 m('stale_warning_on_every_row', "(rd && rd.old ? '<span class=\"da-rv-sub da-rv-stale\"", "(rd ? '<span class=\"da-rv-sub da-rv-stale\"")
 m('decided_impact_dropped', "if (isDecided(p)) return { kind: 'denied_or_withdrawn', text: QOL_DECIDED };", "")
-m('impact_ignores_type', "var k = typeKeyOf(p);\n    return has(QOL_BY_TYPE, k)", "var k = 'civic';\n    return has(QOL_BY_TYPE, k)")
+m('impact_ignores_basis', "if (b && has(QOL_BY_BASIS, b)) return { kind: 'documented', text: QOL_BY_BASIS[b] };", "if (b && has(QOL_BY_BASIS, b)) return { kind: 'documented', text: QOL_BY_BASIS.public_facility };")  # national-6: the impact sentence is keyed by the record's relevance basis, no longer by its Type  # re-anchored 2026-11-02 (national-6)
 m('source_link_shows_address', "'\" target=\"_blank\" rel=\"noopener noreferrer\">Official source '", "'\" target=\"_blank\" rel=\"noopener noreferrer\">' + esc(href) + ' '")
 m('evidence_repeats_impact', "      + (att ? '<p class=\"da-rv-attr\">'", "      + line('Impact', qolImpact(p).text)\n      + (att ? '<p class=\"da-rv-attr\">'")
 # WHOSE WORD IS WHOSE (2026-10-11): the Stage cell's agency line is the source agency's own word; the card's bucket line is HomeSignal's lifecycle
 m('agency_label_reverted', "var AGENCY_LABEL = 'Source agency status';", "var AGENCY_LABEL = 'Agency stage';")
 m('agency_word_hidden_when_part_of_stage', "!sameWords(pstage, shownStageText(p, k))", "wordsOf(shownStageText(p, k)).indexOf(wordsOf(pstage)) < 0")
 m('agency_word_never_deduped', "pstage && !sameWords(pstage, shownStageText(p, k)) ?", "pstage ?")
-m('bucket_line_back_on_customer_card', "      + (dc ? line('HomeSignal detected'", "      + (txt(p.publisher_status) ? line('Status in HomeSignal\\'s record', txt(p.publisher_status)) : '')\n      + (dc ? line('HomeSignal detected'")
+m('bucket_line_back_on_customer_card', "      + (dc ? line('Jody detected'", "      + (txt(p.publisher_status) ? line('Status in Jody\\'s record', txt(p.publisher_status)) : '')\n      + (dc ? line('Jody detected'")  # re-anchored 2026-11-02 (national-6)
 # the Verify line follows the engine's freshness verdict (audit 2026-10-11)
 m('verify_verdict_ignored', "old: judged ? isObj(v) : e.older_than_a_year === true,", "old: e.older_than_a_year === true,")
 m('malformed_verify_silences_warning', "judged = v === null || isObj(v);", "judged = v !== undefined;")
@@ -193,8 +189,8 @@ m('unknown_reason_read_as_filing_only', "filingOnly: isObj(v) && v.reason === 'f
 m('words_match_substring', "return !!x && x === wordsOf(b); }", "return !!x && wordsOf(b).indexOf(x) >= 0; }")
 m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])
 m('two_tables', "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); }); });", "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); items.push({ p: p, k: k }); }); });")
-m('records_before_briefing', "    if (m.total) parts.push(briefing(report, m, response));\n    if (!some) parts.push(outcomeSection(report));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    var showLc = opts.showLifecycle === true;\n    if (current.length) parts.push(mapSection(m.numbered, response, report));\n    if (m.total) parts.push(recordsSection(m, response, showLc));", "    var showLc = opts.showLifecycle === true;\n    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (m.total) parts.push(briefing(report, m, response));\n    if (!some) parts.push(outcomeSection(report));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    if (current.length) parts.push(mapSection(m.numbered, response, report));")  # re-anchored 2026-11-01 (map under the filters)
-m('map_below_table', "    if (current.length) parts.push(mapSection(m.numbered, response, report));\n    if (m.total) parts.push(recordsSection(m, response, showLc));", "    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (current.length) parts.push(mapSection(m.numbered, response, report));")
+m('records_before_briefing', '    if (m.total) parts.push(briefing(report, m, response));\n    if (!report.projects.length) { parts.push(outcomeSection(report)); parts.push(excludedNote(report)); }\n    else if (!some) parts.push(section(\'outcome\', TITLES.records, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(NONE_RELEVANT) + \'</p>\', \'da-rv-hero\'));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    var showLc = opts.showLifecycle === true;\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));\n', '    if (!report.projects.length) { parts.push(outcomeSection(report)); parts.push(excludedNote(report)); }\n    else if (!some) parts.push(section(\'outcome\', TITLES.records, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(NONE_RELEVANT) + \'</p>\', \'da-rv-hero\'));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    var showLc = opts.showLifecycle === true;\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (m.total) parts.push(briefing(report, m, response));\n')  # re-anchored 2026-11-02 (national-6)
+m('map_below_table', "    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));", "    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));")  # re-anchored 2026-11-02 (national-6)
 # founder 2026-11-01: the Type/Stage filters print, the PDF follows them, and a line says what was picked
 m('print_hides_filters', "    '.da-rv-actions{display:none!important}',", "    '.da-rv-actions,.da-rv-sec--filters{display:none!important}',", [BROWSER])
 m('print_ignores_filters', "    '.da-rv-actions{display:none!important}',", "    '.da-rv-actions{display:none!important}.da-rv tr[data-da-stage][hidden]{display:table-row!important}',", [BROWSER])
@@ -215,7 +211,7 @@ m('raw_url_printed_again', "link + '</p>'", "link + '<span class=\"da-rv-url\">'
 m('evidence_cell_empty', "evidenceCell(it, showLifecycle) + '</div></td>';", "'</div></td>';")
 m('evidence_from_neighbouring_row', "evidenceCell(it, showLifecycle) + '</div></td>';", "evidenceCell(items[(items.indexOf(it) + 1) % items.length], showLifecycle) + '</div></td>';")
 m('evidence_source_link_dropped', "      + (link ? '<p class=\"da-rv-src\">' + link + '</p>' : '');\n    return lines ||", "      + '';\n    return lines ||")
-m('source_link_duplicated_in_development', "+ (where ? '<span class=\"da-rv-sub\">' + esc(where) + '</span>' : '') + '</th>';", "+ (where ? '<span class=\"da-rv-sub\">' + esc(where) + '</span>' : '') + sourceLink(p) + '</th>';")
+m('source_link_duplicated_in_development', "+ (also ? '<span class=\"da-rv-sub\" data-da-also>' + esc(also) + '</span>' : '') + '</th>';", "+ (also ? '<span class=\"da-rv-sub\" data-da-also>' + esc(also) + '</span>' : '') + sourceLink(p) + '</th>';")  # re-anchored 2026-11-02 (national-6)
 m('evidence_column_dropped', ", ['evid', 'Supporting Evidence']];", "];")
 m('missing_evidence_invented', "return lines || '<p class=\"da-rv-quiet da-rv-noev\">' + NO_EVIDENCE + '</p>';", "return lines || line('Official record', 'Verified');")
 m('evidence_cell_not_in_row_filter', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + evid + '</tr>'", "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + '</tr>' + evid")
@@ -240,7 +236,7 @@ m('outcome_inferred_from_an_empty_list', "return a && typeof a.outcome === 'stri
 m('empty_report_claims_no_activity', "    var o = OUTCOMES[key], body = o.body;", "    key = 'NO_DEVELOPMENT_ACTIVITY'; var o = OUTCOMES[key], body = o.body;")
 m('outcome_titles_swapped', "      title: 'No data ingested',", "      title: 'No development activity',")
 m('no_data_ingested_explanation_dropped', 'return section(\'outcome\', o.title, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(o.body) + \'</p>\', \'da-rv-hero\');', "return section('outcome', o.title, '', 'da-rv-hero');")  # re-anchored 2026-10-07 (audit fix 10): the anchor no longer matched the shipped code
-m('outcome_block_not_rendered', "    if (!some) parts.push(outcomeSection(report));\n", "")
+m('outcome_block_not_rendered', "    if (!report.projects.length) { parts.push(outcomeSection(report)); parts.push(excludedNote(report)); }\n", "    if (!report.projects.length) { parts.push(excludedNote(report)); }\n")  # re-anchored 2026-11-02 (national-6)
 m('outcome_radius_invented', "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' near this property.';", "' within ' + r + (r === 1 ? ' mile' : ' miles') + ' of this property.' : ' within 0.5 miles of this property.';")
 # ---- national-6: occupancy approved is its own stage ------------------------------------------------------------------------------------------
 m('occupancy_stage_dropped', "  var STAGES = ['approved', 'proposed', 'permitted', 'occupancy'];", "  var STAGES = ['approved', 'proposed', 'permitted'];", NODE_TESTS + [NATIONAL6])

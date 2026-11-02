@@ -88,7 +88,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     addr: document.querySelector('.da-rv-addr').textContent,
     cards: document.querySelectorAll('.da-rv-table tbody tr').length,
   }));
-  ok(info.h2.join('|') === 'Type and stage|Development Activity Map|Nearby Development|Change History|Official evidence & coverage',
+  // national-6 (2026-11-02): the overview of the most significant changes comes first, then the filters with the map under them
+  ok(info.h2.join('|') === 'Most significant nearby changes|Type and stage|Development Activity Map|Nearby Development|Change History|Official evidence & coverage',
     '1c the sections render as headings in order: the filters with the map under them, then the records table, history and evidence', info.h2);
   ok(info.styleTags === 1 && info.overflow <= 0 && info.addr === ADDRESS && info.cards === 8, '1d one stylesheet, no horizontal overflow at 1280px, the address as header text, eight table rows', info);
   await mount(page, W, ADDRESS); await mount(page, W, ADDRESS);
@@ -135,7 +136,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     return { secs, cols, cardW, headBottom: head.bottom + scrollY, viewport: innerWidth };
   });
   ok(lay.secs.every((s, i) => i === 0 || s.top > lay.secs[i - 1].top) && lay.secs[0].top >= lay.headBottom - 1, '2b the sections are stacked top to bottom in order, below the property header', lay.secs.map((s) => s.label + '@' + Math.round(s.top)));
-  const PLAN_MOBILE = ['Type and stage', 'Development Activity Map', 'Nearby Development', 'Change History', 'Official evidence & coverage'];
+  const PLAN_MOBILE = ['Most significant nearby changes', 'Type and stage', 'Development Activity Map', 'Nearby Development', 'Change History', 'Official evidence & coverage'];
   ok(lay.secs.map((s) => s.label).join('|') === PLAN_MOBILE.join('|'), '2c and that order is the page order: the filters, the map, the one records table, history, evidence', lay.secs.map((s) => s.label));
   const bar = await page.evaluate(() => { const b = document.querySelector('.da-rv-actions').getBoundingClientRect(), ev = document.querySelector('.da-rv-sec--evidence').getBoundingClientRect(); return [b.top > ev.top, b.right <= innerWidth + 0.5]; });
   ok(bar[0] && bar[1], '2c2 the action bar comes last and fits the phone screen', bar);
@@ -148,7 +149,7 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   ok(vis.length === 8 && vis.every(Boolean), '2f every record\'s Supporting Evidence cell is visible on a phone with nothing to open (8 of 8), each with its source link', vis);
   const order = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((row) => [...row.children].map((c) => c.className.match(/da-rv-td--(\w+)/)[1] + '@' + Math.round(c.getBoundingClientRect().top)).join(' ')));
   ok(order.length === 8 && order.every((r) => { const t = r.split(' '); return t.map((x) => x.split('@')[0]).join() === 'dev,stage,qol,evid' && t.every((x, i) => i === 0 || +x.split('@')[1] >= +t[i - 1].split('@')[1]); }), '2f3 on a phone the four fields run top to bottom in the required order: Development, Stage, Quality-of-Life Impact, Supporting Evidence', order[0]);
-  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('.da-rv-td--stage svg'), st = r.querySelector('.da-rv-td--stage .da-rv-stage, .da-rv-td--stage .da-rv-life'), n = r.querySelector('.da-rv-td--dev .da-rv-sub:not(.da-rv-sub--type):not(.da-rv-sub--src)'); const b = n && n.getBoundingClientRect(); const cs = st && getComputedStyle(st); const bw = cs ? ['Top', 'Right', 'Bottom', 'Left'].map((s) => parseFloat(cs['border' + s + 'Width']) || 0).reduce((x, y) => x + y, 0) : 1; const plain = !!cs && !sv && bw === 0 && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(cs.borderTopLeftRadius) === 0 && parseInt(cs.fontWeight, 10) === 600; const op = r.getAttribute('data-da-stage') === 'operating'; const mapOk = !!(b && b.width > 4 && (op || /Map \d+/.test(n.textContent))); return { plain, mapOk }; }));
+  const rowsVis = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].map((r) => { const sv = r.querySelector('.da-rv-td--stage svg'), st = r.querySelector('.da-rv-td--stage .da-rv-stage, .da-rv-td--stage .da-rv-life'), n = r.querySelector('.da-rv-td--dev .da-rv-sub:not(.da-rv-sub--type):not(.da-rv-sub--src):not([data-da-addr])'); /* national-6 (2026-11-02): the address line comes first */ const b = n && n.getBoundingClientRect(); const cs = st && getComputedStyle(st); const bw = cs ? ['Top', 'Right', 'Bottom', 'Left'].map((s) => parseFloat(cs['border' + s + 'Width']) || 0).reduce((x, y) => x + y, 0) : 1; const plain = !!cs && !sv && bw === 0 && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && parseFloat(cs.borderTopLeftRadius) === 0 && parseInt(cs.fontWeight, 10) === 600; const op = r.getAttribute('data-da-stage') === 'operating'; const mapOk = !!(b && b.width > 4 && (op || /Map \d+/.test(n.textContent))); return { plain, mapOk }; }));
   ok(rowsVis.length === 8 && rowsVis.every((r) => r.plain) && rowsVis.filter((r) => r.mapOk).length === 7 && rowsVis[7].mapOk === false, '2f2 every Stage cell is plain semibold text (no shape, fill, border, radius or pill), and every staged row shows its "Map N" number without opening anything (7 of 8; the eighth says "Stage not stated" and has no number)', rowsVis);
   const links = await page.evaluate(() => [...document.querySelectorAll('.da-rv-link')].map((a) => { const r = a.getBoundingClientRect(); return [Math.round(r.height), Math.round(r.width)]; }));
   const tableLinks = await page.evaluate(() => document.querySelectorAll('.da-rv-table .da-rv-link').length);
@@ -396,12 +397,12 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const tOpen = tClosed;
       ok(n(tClosed, /Official record:/g) >= 7 && !/Supporting evidence for each record/.test(tClosed) && HDR4.test(tClosed),
         '12k the printed report carries every record\'s Supporting Evidence in the table (no toggle, no second list, nothing to open first)', { records: n(tClosed, /Official record:/g) });
-      ok(n(tClosed, /Official source/g) === 8 && n(tClosed, /Potential|Denied or withdrawn:/g) >= 7 && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
+      ok(n(tClosed, /Official source/g) === 8 && n(tClosed, /The record documents|Denied or withdrawn:/g) >= 7 /* national-6 (2026-11-02): record-specific impact sentences */ && n(tClosed, /https:\/\/example\.gov\/records\//g) === 0,
         '12l the printed report carries the four-column table and exactly one "Official source" link per record (8 of 8), with no raw web address printed', { src: n(tClosed, /Official source/g), urls: n(tClosed, /https:\/\/example\.gov\/records\//g) });
       const ann = links(fReport);
       if (ann === null) console.log('SKIP — 12l2 PDF link annotations: python3 with pypdf is not available on this machine');
       else ok(ann.length === 8 && new Set(ann.map((a) => a[1])).size === 8 && ann.every((a) => /^https:\/\/example\.gov\/records\/k-/.test(a[1])), '12l1 the saved PDF holds eight real link annotations, one per record, each to that record\'s own official address', ann);
-      ok(/Page 1 of \d/.test(tClosed) && /HomeSignal Development Activity report/.test(tClosed), '12l2 each printed page carries HomeSignal\'s own footer and "Page N of M"');
+      ok(/Page 1 of \d/.test(tClosed) && /JODY Tracks Development Activity report/.test(tClosed), '12l2 each printed page carries Jody\'s own footer and "Page N of M"');
       // the 3-record road corridor (the Brigham City sample shape) is a short report: two pages
       const { proj, row, FAM_A: FA } = await import('./lib/da-report-view-world.mjs');
       const sr = (id, nm) => proj(id, FA, { name: nm, type: 'Utility', status: 'Approved', stage: 'Under Construction', date_kind: 'filed', submitted_at: '2024-08-26' });
@@ -409,7 +410,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       await page.evaluate(([r, a]) => window.HS.daReportView.mount(document.getElementById('host'), r, { subject: a, brokerage: 'Summit Realty', agent: 'Jordan Lee' }), [BRIG, '20 N MAIN ST, BRIGHAM CITY, UT 84302']);
       const fb = await pdf('brigham.pdf', page), tb = text(fb), pcb = pages(fb);
       const pagesText = tb.split('\f');
-      const firstPage = (re) => pagesText.findIndex((t) => re.test(t));
+      // national-6 (2026-11-02): the overview lists record names on the first page, so a row's page is the LAST page that names it (the table comes after)
+      const firstPage = (re) => pagesText.map((t) => re.test(t)).lastIndexOf(true);
       ok(pcb <= 3, '12m the three-record sample prints in no more than three pages (target two): ' + pcb, pcb);
       ok(/20 N Main St, Brigham City, UT 84302/.test(tb) && !/20 N MAIN ST/.test(tb), '12m2 the printed address uses display capitalization only', tb.slice(0, 200));
       const verifyPages = [...tb.split('\f').entries()].flatMap(([i, t]) => [...t.matchAll(/Verify:/g)].map(() => i));
@@ -423,12 +425,13 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       const BIG = await wire(many);
       await page.evaluate(([r, a]) => window.HS.daReportView.mount(document.getElementById('host'), r, { subject: a }), [BIG, ADDRESS]);
       const fl = await pdf('large.pdf', page), pcl = pages(fl), tl = text(fl).split('\f');
-      const withRows = tl.filter((t) => /Project \d\d Long Descriptive/.test(t) && /Potential (construction|disruption)/.test(t));
+      const withRows = tl.filter((t) => /Project \d\d Long Descriptive/.test(t) && /The record documents/.test(t) /* national-6 (2026-11-02) */);
       const annL = links(fl);
       ok(pcl > pcb && pcl <= 14 && withRows.length >= 2 && withRows.every((t) => HDR4.test(t)),
         '12p a 40-record report paginates (' + pcl + ' pages) and the table header repeats on every page that carries rows', { pcl, withRows: withRows.length });
       let split = 0;
-      for (let i = 0; i < 40; i++) { const nm = 'Project ' + String(i).padStart(2, '0') + ' Long'; const pg = tl.findIndex((t) => t.includes(nm)); const lines = tl[pg].split('\n'); const li = lines.findIndex((l) => l.includes(nm)); const rest = lines.slice(li, li + 6).join(' '); if (!/Official source/.test(rest)) split++; }
+      for (let i = 0; i < 40; i++) { const nm = 'Project ' + String(i).padStart(2, '0') + ' Long'; /* national-6 (2026-11-02): the overview and Change History also name records; the table's own row is the occurrence that carries its link */
+        const inRow = tl.some((t) => { const lines = t.split('\n'); return lines.some((l, li) => l.includes(nm) && /Official source/.test(lines.slice(li, li + 8).join(' '))); }); if (!inRow) split++; }
       ok(split === 0, '12q in a 40-record report no row is stranded: each record\'s name has its "Official source" link on the same page', split);
       ok(n(tl.join('\f'), /Official source/g) === 40 && (annL === null || (annL.length === 40 && annL.every((a) => /^https:\/\//.test(a[1])))), '12q2 in a 40-record report every one of the 40 records keeps its own clickable "Official source" link in the PDF', { text: n(tl.join('\f'), /Official source/g), annotations: annL && annL.length });
     }
@@ -442,13 +445,13 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     const { ctx, page, errors } = await open(width, 900);
     await mount(page, W, ADDRESS);
     const m = await page.evaluate(() => {
-      const b = document.querySelector('.da-rv-brief'), h = document.querySelector('.da-rv-head'), f = document.querySelector('.da-rv-sec');
+      const b = document.querySelector('.da-rv-brief'), h = document.querySelector('.da-rv-sec--overview') || document.querySelector('.da-rv-head'), f = document.querySelector('.da-rv-sec--filters'); /* national-6 (2026-11-02): the briefing sits between the overview and the filters */
       if (!b) return null;
       const r = b.getBoundingClientRect(), hr = h.getBoundingClientRect(), fr = f.getBoundingClientRect();
       return { w: Math.round(r.width), vw: document.documentElement.clientWidth, below: r.top >= hr.bottom - 1, above: r.bottom <= fr.top + 1, scrollW: document.documentElement.scrollWidth, text: b.textContent.length, items: b.querySelectorAll('li').length,
         life: [...document.querySelectorAll('.da-rv-td--evid')].filter((c) => /HomeSignal lifecycle/.test(c.textContent)).length };
     });
-    ok(m && m.below && m.above && m.w <= m.vw && m.scrollW <= m.vw && m.text > 100 && m.items >= 3 && m.items <= 6, '11-' + label + 'a the briefing sits between the header and the first section, fits the ' + label + ' width, and is a short list', m);
+    ok(m && m.below && m.above && m.w <= m.vw && m.scrollW <= m.vw && m.text > 100 && m.items >= 3 && m.items <= 6, '11-' + label + 'a the briefing sits between the overview and the filters, fits the ' + label + ' width, and is a short list', m);
     ok(m && m.life === 0, '11-' + label + 'b no Supporting Evidence cell in the customer view carries a "HomeSignal lifecycle" line', m);
     if (width === 390) {
       await page.emulateMedia({ media: 'print' });
@@ -533,16 +536,20 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="commercial"]');
     const t = await shown();
     ok(t.rows.length === 2 && t.evCells === 2 && t.links === 2, `14d2 (${label}) Type and Stage filters combine on whole rows (2 commercial proposed records, 2 evidence cells)`, t);
-    // print keeps what the filters show, prints the filters with the pressed ones ticked, and says in words what was picked
+    // print keeps what the filters show and says in words what was picked
+    // national-6 (2026-11-02): the chips themselves no longer print (docs/report-quality-national6-2026-11-02.md, "Branding / PDF"); the "Showing ..." line does.
+    // The pressed chips are still ticked and filled on screen.
+    const scr = await page.evaluate(() => ({ pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => [getComputedStyle(b, '::before').content, getComputedStyle(b).backgroundColor]),
+      unpressed: getComputedStyle(document.querySelector('.da-rv-chip[aria-pressed="false"]')).backgroundColor }));
     await page.emulateMedia({ media: 'print' });
     const pf = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length,
       filters: document.querySelector('.da-rv-sec--filters').getBoundingClientRect().height > 0,
-      pressed: [...document.querySelectorAll('.da-rv-chip[aria-pressed="true"]')].map((b) => [getComputedStyle(b, '::before').content, getComputedStyle(b).backgroundColor]),
-      unpressed: getComputedStyle(document.querySelector('.da-rv-chip[aria-pressed="false"]')).backgroundColor,
+      chipsPrinted: [...document.querySelectorAll('.da-rv-chip')].filter((b) => b.getBoundingClientRect().height > 0).length,
+      nowShown: document.querySelector('[data-da-fnow]').getBoundingClientRect().height > 0,
       now: document.querySelector('[data-da-fnow]').textContent,
       marks: [...document.querySelectorAll('.da-rv-mk')].filter((e) => e.getBoundingClientRect().height > 0).length }));
-    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.pressed.length === 2 && pf.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== pf.unpressed)
-      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks, the filters themselves with the two pressed ones ticked and filled, and "Showing … : 2 of 8 records."`, pf);
+    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.chipsPrinted === 0 && pf.nowShown && scr.pressed.length === 2 && scr.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== scr.unpressed)
+      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks and "Showing … : 2 of 8 records." (the chips do not print; on screen the two pressed ones are ticked and filled)`, [pf, scr]);
     await page.emulateMedia({ media: 'screen' });
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="datacenter"]').catch(() => {});
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="operating"]');
@@ -551,8 +558,10 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
     await page.emulateMedia({ media: 'print' });
     const pr = await page.evaluate(() => [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length);
     ok(pr === 0, `14d4 (${label}) printing with a filter that matches nothing prints no rows (the PDF follows the filters)`, pr);
+    await page.emulateMedia({ media: 'screen' }); // national-6 (2026-11-02): the chips do not print, so they are pressed on screen
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="all"]');
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="all"]');
+    await page.emulateMedia({ media: 'print' });
     const pa = await page.evaluate(() => ({ rows: [...document.querySelectorAll('.da-rv-table tbody tr')].filter((r) => r.getBoundingClientRect().height > 0).length, now: document.querySelector('[data-da-fnow]').textContent }));
     ok(pa.rows === 8 && pa.now === 'Showing all 8 records.', `14d5 (${label}) with "All" pressed on both, the PDF prints all 8 records and says so`, pa);
     await ctx.close();

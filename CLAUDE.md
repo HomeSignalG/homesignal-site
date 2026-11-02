@@ -5763,6 +5763,34 @@ Seattle record 7108878-CN, agency status "Approved to Occupy", read as Approved 
 - The chip and legend entry appear only in a report that has such a record; a report saved before national-6 renders as saved.
 - Map 1 still draws these records as Approved (its lifecycle is unchanged). Test: `test/report-quality-national6.test.mjs`.
 
+## DEVELOPMENT ACTIVITY REPORT, national-7 (2026-11-02): ONLY DOCUMENTED NEIGHBORHOOD-FACING CHANGES ARE LISTED
+
+Founder brief "Universal Development Activity Report corrections". Jody is not a permit inventory. Record: `docs/report-quality-national7-2026-11-02.md`.
+Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality/seattle-3101-western-2026-11-02.json` (a read-only production capture).
+- **`relevance()` in `_shared/national-report.ts` judges every record BEFORE anything is built** (sections, counts, map, history, the Watch, which reads
+  `assemble().intelligence.projects`). Included records carry `relevance.basis` (new construction, demolition, site work, change of use, land use,
+  addition, substantial or building-wide exterior work, street access, public facility, nightlife use, temporary event, or a Type that is itself the use).
+  Routine work and records whose words establish nothing are left out and kept in `relevance_review` (no customer surface reads it). A bare "remodel",
+  "repair" or "alteration" decides nothing on its own; significance outranks routine words.
+- **Residential records consume `lib/residential-qualify.js`** through `_shared/residential-qualify.generated.js` (`node scripts/gen-residential-qualify-module.mjs`;
+  the test fails when the copy differs). Do not restate residential rules in the report.
+- **The Minor Building Work section is gone**; the view also hides an older saved report's `minor_work` records.
+- **Stage wording:** "Permit issued" or "Under construction" from the agency's own word (never both on one record), "Approved" (not a construction
+  permit), "Completed (agency record)" (not occupied/open). A stage the agency did not publish (a connector `status_const`) gives no stage unless the agency
+  published an issue date; a temporary event gives no stage. The national lifecycle engine is unchanged.
+- **Quality-of-life notes are per record** (`recordNote` keyed on `relevance.basis`); heavy-facility sentences stay.
+  ⚖️ **Founder (2026-11-02): a note may never name fewer impacts than the Type sentence it replaced.** So `qolImpact` puts the record line first and
+  the Type's own sentence (`QOL_BY_TYPE`, unchanged from national-6) after it. A report saved before national-7 (no basis) reads the scope-only
+  sentence; the founder accepted that ("this is fine"). Pinned by national7 E2.
+- **Temporary activity is judged on its documented window** (`temporaryTiming`): earliest to latest date in the record's fields or text, set-up and removal
+  included. Upcoming and under way are listed; ended is left out unless a separate continuing scope qualifies; `temporary_timing_not_stated` when the
+  full record has no dates; `temporary_timing_not_captured` when ingestion cut the text and stored no description. Bumbershoot 2026 is the last kind:
+  its official record says removal by 9/8, the stored title is cut before that. The fix is connectors emitting the full description as `scope_text`.
+- **Occupancy (#2526) runs after relevance**: an occupancy approval for routine work is not listed; TCO / Temporary C of O keep "Temporary".
+- ⚠️ **Measured on a 5,000-record national sample: 34% included, 23% routine, 43% relevance not established**, mostly families that publish no work
+  description (Brunswick NC, Sioux Falls, San Jose, Loudoun ...). Areas served only by those sources get thin reports until ingest adds a description column.
+- ⚠️ **Open founder decision:** when every nearby record is excluded the outcome is still "No data ingested" (ruling R5), which is not accurate then.
+
 ## INDEXNOW / EVENT-DRIVEN SEO FRESHNESS — ONE SEMANTIC PAGE AUTHORITY (2026-10-07)
 
 **Notify a search engine only when a public page meaningfully changed, only after the new bytes are
