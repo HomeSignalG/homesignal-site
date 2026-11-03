@@ -6073,6 +6073,22 @@ Results.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
   - pg checks 12V1-12V16 plus 12r4b, 8 mutations caught.
 
+## IMPACT STORIES, TAB 17: ONE "YOUR NEXT STEP" ANSWER (UI audit, 2026-11-03; founder: "I have no idea what is needed from me")
+
+- **Videos are current only when made from the approved script AND the approved picture set** (`_hs_is_media`: the render
+  job's `input.visual_manifest.hash` must equal the approved set's hash; `stale_reason` = `narrative` | `pictures`). Before
+  this, Stratos (rendered Oct 29, pictures approved Nov 2) told the founder to review three failed, out-of-date videos.
+- **Videos rendered by a job that started before 2026-10-30 17:31:56Z carry the old background hum** (homesignal-ingest
+  #980 removed it then). `_hs_is_media` flags them (`hum`); Media Review says so and makes Render the main button.
+- **`_hs_is_status.owner`** = `you` | `working` | `done` | `archived`. The workspace shows ONE box (`nextBox`): "Your next
+  step" with one button, "Working on it" (nothing needed), "Something went wrong" with Retry, or "Done". A finished job is
+  not shown. The header has no second next-step button. The library groups cards by owner, above Hot Topics, one label each.
+- Media Review: one plain sentence, Watch, Approve / Request a fix (a greyed Approve says why); sizes, checks and stills
+  fold under Details; out-of-date videos fold under "The old videos". Media Review is red only when the founder has
+  something to fix there. Source chips show the record's first words, not ids.
+- Tests: `test/impact_stories_pg` 12e2, 12i2-12i4; `test/impact-stories.browser.test.mjs` (the Stratos case; 11 checks fail on
+  the pre-audit page).
+
 ## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
 
 Media review lists every fix request; **Fix** (`hs_impact_story_fix_start`) sends the open ones as one batch and, through

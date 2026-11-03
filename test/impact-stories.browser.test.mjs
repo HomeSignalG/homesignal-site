@@ -86,7 +86,7 @@ await page.evaluate(() => window.HS.acqImpactStories.load(window.client, documen
 await page.waitForTimeout(50);
 let txt = await page.locator('#is').innerText();
 ok(txt.includes('Gig Harbor <dock>') && !txt.includes('Old story'), 'library: a story card is shown, archived ones are filtered out by default');
-ok(txt.includes('Next: Review and approve'), 'library: the card says the NEXT action');
+ok(txt.includes('Your next step: Review and approve'), 'library: the card says the NEXT action');
 ok(await page.locator('#is [data-act=dup]').count() === 1 && await page.locator('#is [data-act=archive]').count() === 1, 'library: Duplicate and Archive exist');
 ok((await page.innerHTML('#is')).includes('Gig Harbor &lt;dock&gt;'), 'library: titles are escaped');
 await page.click('#is [data-act=filter][data-f=archived]');
@@ -597,6 +597,7 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(80);
 await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+await page.evaluate(() => document.querySelectorAll('#is details').forEach((d) => { d.open = true; }));   // the report sits under Details
 txt = await page.locator('#is').innerText();
 ok(txt.includes('Visual quality: FAILED') && txt.includes('Too many documents and cards') && txt.includes('Show the subject; quote the record over its photo.')
    && txt.includes('Real-world pictures') && txt.includes('46%') && txt.includes('checked frame by frame (66 frames)'), 'media: the visual quality report shows failures, actions and metrics against targets');
@@ -709,6 +710,56 @@ for (const [step, want] of [['angles', 'outline'], ['nope', 'script']]) {
   await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
   ok(await page.locator('#is [data-step=' + want + '][aria-current=step]').count() === 1, 'old or unknown step "' + step + '" opens ' + want + ' instead of a blank tab');
 }
+// UI audit 2026-11-03 (founder: "I have no idea what is needed from me"), on the Stratos situation: pictures approved AFTER
+// the videos were made, the old videos failed their checks and still carry the background hum.
+await page.setViewportSize({ width: 1440, height: 1000 });
+await page.evaluate(() => {
+  window.db.nstate = 'approved'; window.db.nwhy = 'Approved on version 8.';
+  window.db.job = { id: 'jv', kind: 'visuals', status: 'complete', attempts: 1, created_at: '2026-10-30T21:14:13Z', completed_at: '2026-10-30T21:22:13Z' };
+  window.db.status = ((st) => () => Object.assign(st(), { stage: 'media', next: 'Render the videos', library: 'needs_review', owner: 'you' }))(window.db.baseStatus || window.db.status);
+  window.db.visuals = { state: 'approved', why: 'Approved.', counts: { clear: 25, blocked: 0, flagged: 8 }, current: true, manifest: null };
+  const f = (id, asset, state) => ({ id, asset, state, hum: asset !== 'thumbnail', path: 's1/r/' + asset + '.mp4', width: 1920, height: 1080, bytes: 1e6, preset: 'impact-x', duration_s: 60,
+    why: 'Made before you approved the current pictures. Render the videos again.', qc: { ok: true, checks: [], quality: { ok: false, failures: [{ label: 'Weak opening' }] } }, stills: [], shots: [] });
+  window.db.media = { render_job: 'r1', current: false, stale_reason: 'pictures', hum: true, version: 2, rendered_at: '2026-10-29T19:07:08Z', complete: false,
+    files: [f(1, 'main', 'stale'), f(2, 'short_a', 'stale'), f(3, 'thumbnail', 'stale')], fix_requests: [], choices: [] };
+  location.hash = '#impact=s1&step=media'; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null;
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+txt = await page.locator('#is').innerText();
+const box = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Your next step/i.test(box) && box.includes('Render the videos') && await page.locator('#is #is-next-box [data-act=render].primary').count() === 1,
+   'next step: one box says "Your next step" with one main button, and it is Render');
+ok(await page.locator('#is .is-head [data-act]').count() === 1, 'next step: the header carries only "Library", not a second, competing next-step button');
+ok(!txt.includes('Prepare visuals:'), 'next step: a finished job is not shown as news');
+ok(txt.includes('before you approved the current pictures, so they are out of date') && txt.includes('still have the old background hum')
+   && await page.locator('#is .is-panel [data-act=render].primary').count() === 1 && (await page.evaluate(() => (document.querySelector('#is .is-panel [data-act=render]') || {}).innerText || '')).includes('Render the videos again'),
+   'media: out-of-date videos say why, mention the hum, and Render is the main button');
+ok(await page.locator('#is details:not([open]) [data-act=mdecide]').count() === 0 && await page.locator('#is [data-act=mdecide]').count() === 0
+   && await page.locator('#is details summary:has-text("The old videos")').count() === 1,
+   'media: the old videos fold away under "The old videos", with nothing to approve on them');
+await page.evaluate(() => document.querySelectorAll('#is details').forEach((d) => { d.open = true; }));
+ok(await page.locator('#is .is-badge:has-text("Has the old background hum")').count() === 2, 'media: each video made before Oct 30 is marked as having the hum; the thumbnail is not');
+ok(await page.locator('#is [data-step=media] .n').innerText() !== '!' && !(await page.getAttribute('#is [data-act=step][data-step=media]', 'class')).includes('blocked'),
+   'steps: out-of-date videos do not paint Media Review red (nothing for you to fix there)');
+// working: nothing for you to do
+await page.evaluate(() => {
+  window.db.job = { id: 'jr', kind: 'render', status: 'running', attempts: 1, created_at: '2026-11-03T23:10:00Z', started_at: '2026-11-03T23:11:00Z' };
+  window.db.status = ((st) => () => Object.assign(st(), { next: 'Rendering the videos (about 1 to 3 hours)…', owner: 'working', library: 'rendering' }))(window.db.status);
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const wbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Working on it/i.test(wbox) && wbox.includes('Nothing is needed from you') && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
+   'next step: while the videos render the box says nothing is needed, with no button');
+// library: grouped by whose turn it is, stories above Hot Topics, one label per card
+await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(120);
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Working on it — nothing needed from you') && txt.includes('Now: Rendering the videos'), 'library: stories are grouped by whose turn it is');
+ok(await page.evaluate(() => { const c = document.querySelector('#is .is-libcards'), h = document.querySelector('#is #is-hot'); return !!c && !!h && !!(c.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING); }),
+   'library: your stories come before Hot Topics');
+ok(await page.locator('#is .is-card').first().locator('.is-badge').count() === 1 && !txt.includes('Auto-discovered — Ready'), 'library: one label per card');
 await browser.close();
 console.log(fails ? '\n' + fails + ' FAILED' : '\nall passed');
 process.exit(fails ? 1 : 0);
