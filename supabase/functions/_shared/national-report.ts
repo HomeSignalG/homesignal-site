@@ -590,7 +590,9 @@ export function titleCut(name: string | null): boolean { return typeof name === 
  * never on the commercial Type. One normalisation (normalizeWords): lower case, non-alphanumerics to spaces, padded, so ' deck ' cannot match 'decker'.
  */
 // relevance-2 (2026-11-02): "change in use" (Sioux Falls WORKCLASS) is the same fact as "change of use".
-export const RELEVANCE_RULE_VERSION = 'relevance-2';
+// relevance-3 (2026-11-03): a change of use that also builds a new building is new construction (Seattle 7118487-CN, 83 units). A temporary structure, market, booth, kiosk, canopy, exhibit, platform, seating or inflated structure is temporary
+//   activity, judged on its documented dates, never new construction ("Erect (6) temporary structures for 2026 Christmas Market", Seattle).
+export const RELEVANCE_RULE_VERSION = 'relevance-3';
 export function normalizeWords(s: string): string {
   return ' ' + String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
 }
@@ -608,6 +610,9 @@ const any = (w: string, list: string[]) => list.find((x) => w.includes(x)) ?? nu
 const INTERIOR_DEMOLITION = [' interior demolition ', ' interior demo ', ' selective demolition ', ' non structural demolition ', ' demolition of interior '];
 const TEMPORARY = [' temporary '];
 const TEMPORARY_EVENT = [' event ', ' events ', ' stage ', ' festival ', ' concert ', ' fair ', ' tent ', ' tents ', ' bleachers ', ' outdoor '];
+/** "temporary" followed closely by what is put up for a while: the thing named is the temporary object, so "erect" or "new construction" around it
+ *  is not a new building. Adjacent only, so "temporary shoring", "temporary power" or "temporary hoist" for a real building is not read as an event. */
+const TEMPORARY_INSTALLATION_RE = / temporary( [a-z0-9]+){0,3}? (structure|structures|market|markets|booth|booths|kiosk|kiosks|canopy|canopies|exhibit|exhibits|exhibition|platform|platforms|display|displays|seating|grandstand|grandstands|inflated) /;
 const CHANGE_OF_USE = [' change of use ', ' change in use ', ' change use ', ' establish use ', ' change of occupancy ', ' convert ', ' conversion ', ' converting '];
 const DEMOLITION = [' demolish ', ' demolition ', ' demo of ', ' raze '];
 const SITE_WORK = [' shoring ', ' excavation ', ' excavate ', ' grading ', ' clearing and grading ', ' mass grading ', ' earthwork '];
@@ -687,7 +692,14 @@ export function relevance(
   w = w.replace(EXISTING_RE, ' existing building ');
   let hit: string | null;
   if (any(w, TEMPORARY) && (hit = any(w, TEMPORARY_EVENT))) return inc('temporary_event', 'temporary' + hit.trimEnd());
-  if ((hit = any(w, CHANGE_OF_USE))) return inc('change_of_use', hit, documentedUse(raw));
+  const tmp = TEMPORARY_INSTALLATION_RE.exec(w);
+  if (tmp) return inc('temporary_event', 'temporary ' + tmp[2]);
+  // a change of use that also builds a new building ("Establish use as permanent supportive housing for 83 stacked dwelling units ... Construct new
+  // mixed-use building") is new construction of that use; a conversion of an existing building stays a change of use
+  if ((hit = any(w, CHANGE_OF_USE))) {
+    const nb = any(w, [' new construction ', ' erect ', ' construct a residential ', ' construct a commercial ', ' construct a mixed use ']) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null);
+    return nb ? inc('new_construction', nb.trim(), documentedUse(raw)) : inc('change_of_use', hit, documentedUse(raw));
+  }
   // a land-use application or decision is framed as one, never as construction: what it would allow is carried as `proposes`
   const wl = w.split(' land use code ').join(' code ');
   const demo = any(w, DEMOLITION), site = any(w, SITE_WORK), build = any(w, NEW_CONSTRUCTION) ?? (NEW_BUILDING_RE.exec(w)?.[0] ?? null);
@@ -904,7 +916,7 @@ export function assemble(input: AssembleInput): Assembled {
       stage = rdRaw && rdRaw.kind === 'issued' && (lc.key === 'approved' || lc.key === 'unknown') ? 'permitted' : null;
       evidence = stage ? { kind: 'permit_issued', label: STAGE_EVIDENCE_LABELS.permit_issued } : null;
     }
-    if (rel.basis === 'temporary_event') { stage = null; evidence = null; }
+    // (relevance-3, 2026-11-03) a temporary installation keeps its agency stage: how long it lasts and where its permit stands are separate facts
     const actWin = timing && (timing.start || timing.end)
       ? { start: timing.start, end: timing.end, ended: timing.status === 'ended', status: timing.status, from: timing.source }
       : activityWindow(p, today);

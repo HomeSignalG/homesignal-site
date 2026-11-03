@@ -180,9 +180,9 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   const reached = inside.filter((s) => s.kind === 'link');
   const kinds = inside.map((s) => s.kind);
   const expect = await page.evaluate(() => ({ table: document.querySelectorAll('.da-rv-table .da-rv-link').length, inEvidenceCell: document.querySelectorAll('.da-rv-table td.da-rv-td--evid .da-rv-link').length, details: document.querySelectorAll('details, summary').length }));
-  ok(expect.table === 8 && expect.inEvidenceCell === 8 && expect.details === 0 && reached.length === 8 && kinds.filter((k) => k === 'chip').length === 10 && kinds.filter((k) => k === 'action').length === 4
+  ok(expect.table === 8 && expect.inEvidenceCell === 8 && expect.details === 0 && reached.length === 8 && kinds.filter((k) => k === 'chip').length === 11 && kinds.filter((k) => k === 'action').length === 4
     && kinds.every((k) => ['link', 'chip', 'action'].includes(k)) && left.inReport === false,
-    '3a Tab reaches every filter chip (10), the eight source links (one per record, each in its Supporting Evidence cell) and the four actions, one per press, then leaves the report; there is no toggle and no hidden entry to tab past', [expect, kinds.join()]);
+    '3a Tab reaches every filter chip (11 since 2026-11-03: Stage not stated has its own chip), the eight source links (one per record, each in its Supporting Evidence cell) and the four actions, one per press, then leaves the report; there is no toggle and no hidden entry to tab past', [expect, kinds.join()]);
   ok(inside.every((s) => s.outline !== 'none' && s.outlineWidth >= 2), '3b every focused link, chip and action shows a visible focus ring of at least 2px', inside.filter((s) => !(s.outline !== 'none' && s.outlineWidth >= 2)).map((s) => s.kind));
   ok(inside.every((s, i) => i === 0 || s.top >= inside[i - 1].top - 1), '3c focus follows reading order, top to bottom (items in one row share a top)', inside.map((s) => s.top));
   ok(reached.every((s) => s.inView), '3d each focused link was scrolled into view', reached.filter((s) => !s.inView));
@@ -279,7 +279,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
   const s2 = await state();
   ok(s2.rows === 1 && s2.marks === 1 && s2.pressed === 'stage:proposed,type:residential', '7c Type and Stage combine: Residential + Proposed leaves the one proposed residential record, in the table and on the map', s2);
   ok(s2.briefing === s0.briefing, '7d filtering changes what is shown, never the report: the briefing is unchanged', [s2.briefing.length, s0.briefing.length]);
-  await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="permitted"]');
+  // 2026-11-03: an issued permit and work under way are separate chips; the first of them is pressed
+  await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="permit_issued"], .da-rv-chip[data-da-filter="stage"][data-da-value="under_construction"]');
   const s2b = await state();
   ok(s2b.rows === 0 && s2b.noMatch === 1, '7d2 when the filters match nothing the section says so, and draws no empty table', s2b);
   await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="all"]');
@@ -551,8 +552,8 @@ HP('k-first').source.attribution = '<iframe srcdoc="<script>parent.__pwned=4</sc
       nowShown: document.querySelector('[data-da-fnow]').getBoundingClientRect().height > 0,
       now: document.querySelector('[data-da-fnow]').textContent,
       marks: [...document.querySelectorAll('.da-rv-mk')].filter((e) => e.getBoundingClientRect().height > 0).length }));
-    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.chipsAll > 0 && pf.chipsPrinted === pf.chipsAll && pf.rowsShown === 2 && pf.pressedPrint.length === 2 && pf.pressedPrint.every((x) => /\u2713/.test(x[0]) && x[1] === scr.pressed[0][1] && x[2]) && pf.nowShown && scr.pressed.length === 2 && scr.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== scr.unpressed)
-      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks and "Showing … : 2 of 8 records." (the Type and Stage chips print, the two pressed ones ticked and filled on paper as on screen)`, [pf, scr]);
+    ok(pf.rows === 2 && pf.marks === 2 && pf.filters && pf.chipsAll > 0 && pf.chipsPrinted === 0 && pf.rowsShown === 0 && pf.pressedPrint.length === 2 && pf.pressedPrint.every((x) => !x[2]) && pf.nowShown && scr.pressed.length === 2 && scr.pressed.every((x) => /\u2713/.test(x[0]) && x[1] !== scr.unpressed)
+      && /Showing .*Commercial.* \u00b7 .*Proposed.*: 2 of 8 records\./.test(pf.now), `14d2p (${label}) printing with filters on prints the 2 filtered records and marks and "Showing … : 2 of 8 records." (since 2026-11-03 a static PDF prints no filter chips; the line says what is shown)`, [pf, scr]);
     await page.emulateMedia({ media: 'screen' });
     await page.click('.da-rv-chip[data-da-filter="type"][data-da-value="datacenter"]').catch(() => {});
     await page.click('.da-rv-chip[data-da-filter="stage"][data-da-value="operating"]');

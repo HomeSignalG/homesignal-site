@@ -141,7 +141,7 @@ ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="type"
   JSON.stringify(['All', 'Residential', 'Commercial', 'Industrial', 'Data center', 'Roads & infrastructure', 'Civic & public']),
   'the Type row is the canonical Type authority\'s labels, in the plan\'s order');
 ok(JSON.stringify(await page.$$eval('#daReport .da-rv-chip[data-da-filter="stage"]', (b) => b.map((x) => x.firstChild.textContent.trim()))) ===
-  JSON.stringify(['All', 'Approved', 'Proposed / Under review', 'Permit issued / Under construction']), 'the Stage row is the three approved stages'); // national-6 (2026-11-02): the stage titles
+  JSON.stringify(['All', 'Approved', 'Proposed / Under review', 'Permit issued']), 'the Stage row is the approved stages, an issued permit on its own (2026-11-03)', await page.$$eval('#daReport .da-rv-chip[data-da-filter="stage"]', (b) => b.map((x) => x.firstChild.textContent.trim()))); // national-6 (2026-11-02): the stage titles
 ok(initial.pressed.join() === 'type:all,stage:all', 'All is selected first on both rows', initial.pressed);
 ok(initial.rows === 9 && initial.shown.length === 9 && initial.markers === 9 && initial.hiddenMarkers === 0, 'all 9 entries are in the table and on the map', initial);
 const stageCount = (k) => initial.shown.filter((x) => x.startsWith(k + ':')).length;

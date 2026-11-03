@@ -55,10 +55,11 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const html = V.html({ status: 'OK', coverage_state: a.coverage_state, report: a.intelligence, render: a.renderOnly }, { subject: SUBJECT.address });
   const ov = (html.match(/data-da-overview>([\s\S]*?)<\/ol>/) || ['', ''])[1];
   const lines = [...ov.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&'));
-  ok(lines.length === 6 && /254-unit apartment building/.test(lines[0]) && /10-story/.test(lines[1]) && /residential high rise/.test(lines[2]) && /83 stacked dwelling units/.test(lines[3]),
-    '3a Seattle: the 254-unit building leads, then the 10-story building, the high rise that states no size, then the 83-unit supportive housing', lines);
-  ok(/Shoreline/.test(lines[4]) && /^Demolition/.test(lines[5]), '3b the last two lines still cover other kinds of change (land use, demolition), one per kind', lines.slice(4));
-  ok(/new buildings first, largest first by the units, stories or floor area the record states/.test(html) && /Not by any predicted effect/.test(html),
+  ok(lines.length === 6 && /254-unit apartment building/.test(lines[0]) && /10-story/.test(lines[1]) && /83 stacked dwelling units/.test(lines[2]) && /Shoreline/.test(lines[3])
+    && !lines.some((l) => /residential high rise/.test(l)),
+    '3a Seattle: the 254-unit building leads, then the 10-story building, then the 83-unit supportive housing; the high rise permit at 400 4th Ave W (same address as the 10-story application) is not listed twice', lines);
+  ok(/^Demolition/.test(lines[4]) && /^Change of use/.test(lines[5]), '3b the last lines still cover other kinds of change (demolition, change of use), one per kind', lines.slice(4));
+  ok(/How this list is chosen: new buildings first, largest first by the number of units the record states, then stories, then floor area/.test(html) && /One line per address/.test(html) && /Not by any predicted effect/.test(html),
     '3c the note under the list says how it is ordered, and that it predicts nothing');
 }
 

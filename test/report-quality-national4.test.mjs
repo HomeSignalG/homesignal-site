@@ -140,7 +140,7 @@ const read = (f) => readFileSync(join(root, f), 'utf8');
   ok(/4 official records within 0\.5 miles of this property document a nearby change: /.test(h) && !/minor building work/.test(h), '4c the briefing counts only the records that document a nearby change');
   ok(devSec.includes('315 1ST AVE N (record A2)') && devSec.includes('315 1ST AVE N (record A3)') && devSec.includes('Construct a 10-story apartment building</span>'), '4d records that share a title are told apart by the agency\'s record number; a unique title is left alone');
   // national-6 (2026-11-02): the view shortens long titles at a word (TITLE_MAX) and the note says "description"
-  ok(/<span class="da-rv-name">Xx+…<\/span>/.test(devSec) && /The source feed shortens this description\. The full description is in the official record\./.test(devSec), '4e a shortened title ends in an ellipsis and says the full description is in the official record');
+  ok(/<span class="da-rv-name">Xx+y?…<\/span>/.test(devSec) && /The source feed shortens this description\. The full description is in the official record\./.test(devSec), '4e a shortened title ends in an ellipsis and says the full description is in the official record');
   ok((devSec.match(/City of Example \(data\.example\.gov, dataset abcd-1234\)\./g) || []).length === 4 && /Agency record number:<\/span> A1/.test(devSec), '4f every row names its agency and dataset, and its agency record number');
   ok(/Official agency data in this report:<\/span> City of Example \(data\.example\.gov, dataset abcd-1234\)\./.test(h), '4g the coverage note names the agency');
   // an older saved report (no national-4 fields) reads exactly as before: no minor section, no record numbers, no shortened-title note

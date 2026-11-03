@@ -244,7 +244,7 @@ const FIELD = {
   ok(pc.address === SUBJECTS[0].address && pc.normalized_address === SUBJECTS[0].matched_address && pc.latitude === 44.04612 && pc.longitude === -122.98123 && pc.label === 'Homer client',
     '6j the private context carries exactly what the customer entered and what derives from it', pc);
   ok(Object.keys(pc).sort().join(',') === 'address,label,latitude,longitude,normalized_address', '6j and nothing else (no client name, email or phone field exists)', Object.keys(pc));
-  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-7', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-3', activity_rule_version: 'activity-outcome-2', relevance_rule_version: 'relevance-2', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
+  ok(JSON.stringify(outs[0].engineInputs) === JSON.stringify({ engine: 'development-activity-national-7', zip: '97477', radius_mi: 1, recent_days: 90, stage_rule_version: 'stage-evidence-3', activity_rule_version: 'activity-outcome-2', relevance_rule_version: 'relevance-3', source_policy: 'national-2026-11-01', attribution_version: 1 }), '6k the engine inputs hold the ZIP, radius and versions, and no private value', outs[0].engineInputs);
   // the hand-off through the real module: what would be sent to the database
   const sent = [];
   const rpc = async (fn, args) => { sent.push({ fn, args }); return { data: [{ report_id: '3f1b2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', generated_at: '2026-09-29T12:00:00Z', private_context_id: '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d' }], error: null }; };

@@ -27,7 +27,7 @@ CFG = 'supabase/config.toml'
 WF = '.github/workflows/deploy-edge-functions.yml'
 REG = 'supabase/functions/_shared/source-attribution.json'
 GEN = 'supabase/functions/_shared/project-type.generated.js'
-TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs', 'test/no-source-allowlist.test.mjs', 'test/report-overview-scale.test.mjs']
+TESTS = ['test/national-report.test.mjs', 'test/national-report-function.test.mjs', 'test/national-report-structure.test.mjs', 'test/report-snapshot.test.mjs', 'test/follow-development-report.test.mjs', 'test/no-source-allowlist.test.mjs', 'test/report-overview-scale.test.mjs', 'test/temporary-installation.test.mjs']
 
 # name -> list of (file, old, new)
 M = {}
@@ -230,6 +230,8 @@ m('roundtrip_uses_a_copy_of_the_sql', RUN, 'P -f "$root/docs/report-snapshot.sql
 
 # ---- documented scale (founder 2026-11-02, "rank biggest impact developments first") ----------------------------------------------------------------------
 m('scale_reads_existing_building', MOD, ".replace(EXISTING_SCALE_RE, ' ');", ";")
+m('temporary_installation_dropped', MOD, "  if (tmp) return inc('temporary_event', 'temporary ' + tmp[2]);", "")
+m('temporary_installation_any_word', MOD, "const tmp = TEMPORARY_INSTALLATION_RE.exec(w);", "const tmp = any(w, TEMPORARY) ? [null, null, 'x'] : null;")
 m('scale_not_carried', MOD, ", ...(rel.scale ? { scale: rel.scale } : {}), rule_version: rel.rule_version },", ", rule_version: rel.rule_version },")
 
 def run_tests():

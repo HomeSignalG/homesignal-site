@@ -91,9 +91,9 @@ const C = code(SRC);
   ok((C.match(/publisher_status/g) || []).length === 1 && !/line\(\w+, status\)/.test(C)
     && /function isDecided\(p\) \{ return txt\(p\.publisher_status\)\.toLowerCase\(\) === 'decided'; \}/.test(C),
     '2e the engine\'s publisher_status (HomeSignal\'s lifecycle bucket, measured on production) is read in ONE function, isDecided, that only asks whether it is Decided; it is never printed as a line of its own');
-  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 7
+  ok((C.match(/\.type\.key/g) || []).length === 1 && /function typeKeyOf\(p\) \{ var k = isObj\(p\.type\) \? p\.type\.key : ''/.test(C) && [...C.matchAll(/typeKeyOf\(/g)].length === 6
     && /p\.type\.label/.test(C) && /p\.lifecycle\.key/.test(C) && /p\.lifecycle\.label/.test(C),
-    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row, the one quality-of-life rule and its heavy-facility kind check); lifecycle only as the engine\'s key and label');
+    '2f it reads Type as the engine\'s label, and its key in ONE function (typeKeyOf) used only to match a record to a Type filter (the card, the filter chip count, the map marker, the table row and the heavy-facility kind check; since 2026-11-03 the impact note no longer reads the Type); lifecycle only as the engine\'s key and label');
 }
 
 // ---- 3. no Type rule, no lifecycle rule, no change rule, no rights rule -----------------------------------------------------------------
@@ -113,7 +113,7 @@ const C = code(SRC);
   ok(/var SHAPES = \{\s*approved:[\s\S]*proposed:[\s\S]*operating:[\s\S]*unknown:[\s\S]*\};/.test(C) && /['"](decided|on file|built|active)['"]/i.test("x 'Decided' y"),
     '3b (control) the only lifecycle words in the code are the four keys of the shape table, and the status-word scan can see a status word');
   // national-6 (2026-11-02): TITLE_MAX = 90 is a title length in characters, not a day-count; it is removed before the day-count scan
-  ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && /var TITLE_MAX = 90;/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C.replace('var TITLE_MAX = 90;', '')),
+  ok(!/isChangeReady|selectDetectedChanges|materialEvents|RECENT_DAYS|EVENT_KINDS|recentPublisherEvent|dayOf|addDays|windowStart/.test(C) && /var TITLE_MAX = 140;/.test(C) && !/(86400|24 \* 60|\b90\b|\b365\b)/.test(C),
     '3c the module owns no change rule and no window: it does not decide what changed or what is recent (and carries no day-count of its own)');
   ok(!/validateRights|report-rights|cleared\b|attribution\s*[:=]\s*['"]/.test(C) && !/rights/i.test(C), '3d it owns no rights rule: it cannot say whether a source may appear, and invents no attribution');
   ok(!/\b(rank|ranked|ranking|score|priority|sortBy|closest|nearest)\b/i.test(C) && !/\.sort\(/.test(C) && !/render\.review/.test(C), '3e it ranks nothing and sorts nothing: records appear in the engine\'s own order, and the engine\'s review list is no longer read (the table is the one list)');
@@ -160,7 +160,7 @@ const C = code(SRC);
      && (C.match(/opts\.showLifecycle/g) || []).length === 1 && /opts\.showLifecycle === true/.test(C) && !head.includes('opts.showLifecycle') && !bar.includes('opts.showLifecycle'),
     '4g opts carries the address, the client label, the brokerage and the agent, read in header() only; and, from build step 8, the live and hidden report actions, read in actionsBar() only', optReads);
   const dataNames = [...new Set([...C.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]))].sort();
-  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-qol', 'da-stage', 'da-type', 'da-value', 'lifecycle', 'stage']),
+  ok(!/\bid="|dataset/.test(C) && JSON.stringify(dataNames) === JSON.stringify(['da-action', 'da-filter', 'da-qol', 'da-stage', 'da-sub', 'da-type', 'da-value', 'lifecycle', 'stage']),
     '4h the markup writes no id (two reports may share a page) and only these data-* names: the lifecycle, the stage, the filter keys and (build step 8) the action a live button stands for', dataNames);
   ok(/data-lifecycle="' \+ k \+ '"/.test(C) && /var k = lifeKey\(p\);/.test(C) && /has\(SHAPES, k\)/.test(C), '4i the one data-* value, and the one class suffix, come from a key that must be one of the four in the shape table');
 }
@@ -223,7 +223,9 @@ const C = code(SRC);
     // 2026-11-01 (national-4): the report-quality suite renders the view to prove the agency, record-number, shortened-title and minor-work rules
     'test/report-quality-national4.test.mjs', 'test/report-quality-national5.test.mjs', 'test/report-quality-national6.test.mjs',
     // national-7 (2026-11-02): the universal report corrections suite renders the view on the Seattle sample
-    'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs']);
+    'test/report-quality-national7.test.mjs', 'test/report-overview-scale.test.mjs',
+    // 2026-11-03: the partner-sample review and the temporary-installation rule render the view on the Seattle sample
+    'test/report-partner-review.test.mjs', 'test/temporary-installation.test.mjs']);
   const stray = hits.filter((f) => !ALLOWED.has(f));
   ok(hits.includes(MOD) && hits.includes('test/da-report-view.test.mjs'), '6a (control) the walk sees the module and its own tests (' + hits.length + ' files name it)');
   ok(stray.length === 0, '6b no page, lib, script, workflow or edge function names the view except its three callers (the private review page, build step 4; the customer page, 5c; the client\'s page for a share link, 8) and the side-by-side comparison module that reads its functions (build step 10)', stray);
@@ -262,7 +264,7 @@ ok(/\.da-rv-table thead th\{overflow-wrap:normal;word-break:normal;hyphens:none;
   // national-7 (founder, 2026-11-02): the record line (recordNote, keyed on the engine's relevance basis) is followed by the Type's own sentence, so a
   // note never names fewer impacts than the Type sentence it replaced
   const rule = (C.match(/function recordNote\(p\) \{[\s\S]*?\n  \}/) || [''])[0] + (C.match(/function qolImpact\(p\) \{[\s\S]*?\n  \}/) || [''])[0];
-  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_BASIS/.test(rule) && /QOL_BY_TYPE\[k\]/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
+  ok(rule.length > 100 && (C.match(/qolImpact\(/g) || []).length === 2 && /QOL_BY_BASIS/.test(rule) && !/QOL_BY_TYPE/.test(rule) && !/Date|fetch|XMLHttp|localStorage|Math\.random|distanceOf|milesOf|response/.test(rule),
     '8a the impact rule is one function, called once (by the table), reading only the record: no clock, no network, no storage, no randomness, no distance');
   const dirs = ['lib', 'supabase/functions', 'scripts'], hits = [];
   const walk = (d) => { for (const f of readdirSync(join(root, d))) { const q = join(d, f); if (statSync(join(root, q)).isDirectory()) { if (f !== 'node_modules') walk(q); } else if (/\.(js|mjs|ts|html|py)$/.test(f) && q !== 'lib/da-report-view.js' && /cooling noise|traffic\/access disruption|Impact not determined/.test(read(q))) hits.push(q); } };
