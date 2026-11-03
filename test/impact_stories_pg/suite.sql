@@ -473,6 +473,9 @@ select pg_temp.chk('12d render is its own job, dispatched to the render workflow
    and (pg_temp.lastjob()).input->>'narrative_hash' = public._hs_is_artifact_state(pg_temp.id('s')::uuid, 'narrative')->>'hash');
 select pg_temp.chk('12e a second click returns the same render', (public.hs_impact_story_render(pg_temp.id('s')::uuid, 7)->>'existing')::boolean
    and pg_temp.nxt() like 'Rendering the videos%');
+select pg_temp.chk('12e2 while the videos render it is the engine''s turn, and the library says Rendering',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working'
+   and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'rendering');
 insert into _ids select 'r1', (pg_temp.lastjob()).id;
 select pg_temp.chk('12f the worker gets the approved body', (public.hs_impact_story_job_claim(pg_temp.id('r1')::uuid)->'base_body'->>'schema') = 'impact-story/2');
 select public.hs_impact_story_job_complete(pg_temp.id('r1')::uuid, jsonb_build_object('assets',
@@ -491,6 +494,31 @@ select pg_temp.chk('12i four files recorded, each pending review', (select count
    and pg_temp.fst('main') = 'pending' and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Review each video and the thumbnail'
    and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'needs_review'
    and jsonb_array_length(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'media'->'files') = 4);
+select pg_temp.chk('12i2 finished videos are the founder''s turn; made with today''s engine, so no hum',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you'
+   and (public._hs_is_media(pg_temp.id('s')::uuid)->>'current')::boolean
+   and public._hs_is_media(pg_temp.id('s')::uuid)->>'stale_reason' is null
+   and not (public._hs_is_media(pg_temp.id('s')::uuid)->>'hum')::boolean
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where (x->>'hum')::boolean));
+-- 12i3 / 12i4 change state, so they run in a transaction that is rolled back
+begin;
+update public.impact_story_jobs set started_at = timestamptz '2026-10-29 16:58:00+00' where id = pg_temp.id('r1')::uuid;
+select pg_temp.chk('12i3 videos rendered before the hum was removed (2026-10-30 17:31:56Z) are flagged; the thumbnail is not',
+   (public._hs_is_media(pg_temp.id('s')::uuid)->>'hum')::boolean
+   and (select bool_and((x->>'hum')::boolean) from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' <> 'thumbnail')
+   and (select not (x->>'hum')::boolean from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'thumbnail'));
+rollback;
+begin;
+select pg_temp.approve_visuals();
+select pg_temp.chk('12i4 pictures approved AFTER the videos were made: the videos are out of date, the next step is Render, and they cannot be approved',
+   not (public._hs_is_media(pg_temp.id('s')::uuid)->>'current')::boolean
+   and public._hs_is_media(pg_temp.id('s')::uuid)->>'stale_reason' = 'pictures'
+   and pg_temp.fst('main') = 'stale'
+   and (select x->>'why' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'files') x where x->>'asset' = 'main') like 'Made before you approved the current pictures%'
+   and pg_temp.stage() = 'media' and pg_temp.nxt() = 'Render the videos'
+   and public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'you'
+   and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'approved')) like '55000%');
+rollback;
 select pg_temp.chk('12j a rejection needs a note; a bad timecode is refused',
    pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L)', pg_temp.id('s'), pg_temp.fid('thumbnail'), 'rejected')) like '%Say what to fix%'
    and pg_temp.err(format('select public.hs_impact_story_media_decide(%L, %s, %L, %L, %L)', pg_temp.id('s'), pg_temp.fid('main'), 'rejected', 'x', '1:75')) like '23514%');

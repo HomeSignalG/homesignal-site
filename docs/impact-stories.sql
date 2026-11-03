@@ -535,6 +535,7 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 declare na jsonb := public._hs_is_artifact_state(p_story, 'narrative'); j public.impact_story_jobs%rowtype;
         files jsonb := '[]'::jsonb; r record; d public.impact_story_media_decisions%rowtype; st text; why text;
         cur boolean; n int := 0; nok int := 0; b public.impact_story_jobs%rowtype; blocked jsonb; choices jsonb; fixes jsonb;
+        vs jsonb := public._hs_is_visuals(p_story); stale_reason text; hum boolean;
 begin
   select * into j from public.impact_story_jobs where story_id = p_story and kind = 'render' and status = 'complete'
    order by completed_at desc limit 1;
@@ -590,11 +591,24 @@ begin
     return jsonb_build_object('render_job', null, 'current', false, 'complete', false, 'files', '[]'::jsonb,
       'blocked', blocked, 'choices', choices, 'fix_requests', fixes, 'fix_batch', public._hs_is_fix_batch(p_story));
   end if;
-  cur := na->>'state' = 'approved' and j.input->>'narrative_hash' = na->>'hash';
+  -- Videos are current only when they were made from BOTH the approved narrative AND the approved picture set (UI audit
+  -- 2026-11-03: Stratos was rendered Oct 29, its pictures approved Nov 2, and the page still sent the founder to review the
+  -- old videos). The render job records the picture set it used (input.visual_manifest.hash, hs_impact_story_render).
+  stale_reason := case
+    when not (na->>'state' = 'approved' and j.input->>'narrative_hash' = na->>'hash') then 'narrative'
+    when not (vs->>'state' = 'approved' and j.input#>>'{visual_manifest,hash}' is not distinct from vs->>'manifest_hash'
+              and j.input#>>'{visual_manifest,hash}' is not null) then 'pictures'
+    end;
+  cur := stale_reason is null;
+  -- The background hum was removed from the engine on 2026-10-30 17:31:56Z (homesignal-ingest #980). A render job that
+  -- started before then checked out the old code, so its videos still carry the hum (founder: never hum).
+  hum := coalesce(j.started_at, j.created_at) < timestamptz '2026-10-30 17:31:56+00';
   for r in select * from public.impact_story_assets where job_id = j.id
            order by array_position(array['main', 'short_a', 'short_b', 'thumbnail'], asset) loop
     select * into d from public.impact_story_media_decisions where asset_id = r.id order by id desc limit 1;
-    if not cur then st := 'stale'; why := 'Rendered from an earlier narrative. Render again.';
+    if not cur then st := 'stale';
+      why := case stale_reason when 'pictures' then 'Made before you approved the current pictures. Render the videos again.'
+                               else 'Made from an earlier script. Render the videos again.' end;
     elsif not coalesce((r.qc->>'ok')::boolean, r.asset = 'thumbnail') then st := 'blocked'; why := 'The media checks failed: see the checks below.';
     elsif (r.qc->'quality'->>'ok') = 'false' then   -- the storyboard and frame gates (impact/visual_gate.py)
       st := 'blocked';
@@ -609,12 +623,13 @@ begin
     files := files || jsonb_build_object('id', r.id, 'asset', r.asset, 'path', r.path, 'captions_path', r.captions_path,
       'bytes', r.bytes, 'sha256', r.sha256, 'width', r.width, 'height', r.height, 'duration_s', r.duration_s,
       'preset', r.preset, 'qc', r.qc, 'stills', r.stills, 'shots', r.shots, 'version', r.version, 'renderer', r.renderer,
-      'created_at', r.created_at, 'state', st, 'why', why,
+      'created_at', r.created_at, 'state', st, 'why', why, 'hum', hum and r.asset <> 'thumbnail',
       'last_decision', case when d.id is null then null else jsonb_build_object('decision', d.decision, 'note', d.note,
         'timecode', d.timecode, 'actor', d.actor, 'at', d.at) end);
   end loop;
   return jsonb_build_object('render_job', j.id, 'rendered_at', j.completed_at, 'version', j.base_version,
-    'renderer', j.input->>'renderer', 'current', cur, 'complete', cur and n > 0 and nok = n, 'files', files,
+    'renderer', j.input->>'renderer', 'current', cur, 'stale_reason', stale_reason, 'hum', hum,
+    'complete', cur and n > 0 and nok = n, 'files', files,
     'quality', j.result->'quality', 'currency', j.result->'currency', 'blocked', blocked, 'choices', choices,
     'fix_requests', fixes, 'fix_batch', public._hs_is_fix_batch(p_story));
 end $$;
@@ -624,6 +639,7 @@ create or replace function public._hs_is_status(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; j public.impact_story_jobs%rowtype;
         arts jsonb := '{}'::jsonb; k text; stage text; nxt text; lib text; all_ok boolean := true; m jsonb; vs jsonb;
+        owner text := 'you';
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
@@ -642,9 +658,9 @@ begin
   else
     m := public._hs_is_media(p_story);
     vs := public._hs_is_visuals(p_story);
-    if (m->>'complete')::boolean then stage := 'distribution'; nxt := 'Ready to export. Publishing is not built yet.'; lib := 'ready';
+    if (m->>'complete')::boolean then stage := 'distribution'; nxt := 'Ready to export. Publishing is not built yet.'; lib := 'ready'; owner := 'done';
     elsif (m->>'current')::boolean then stage := 'media'; nxt := 'Review each video and the thumbnail'; lib := 'needs_review';
-    elsif vs->>'state' = 'approved' then stage := 'media'; nxt := 'Render the videos'; lib := 'ready';
+    elsif vs->>'state' = 'approved' then stage := 'media'; nxt := 'Render the videos'; lib := 'needs_review';
     else
       stage := 'visuals'; lib := 'needs_review';
       nxt := case vs->>'state' when 'ready' then 'Review the visuals, then Approve all visuals'
@@ -653,14 +669,18 @@ begin
                                 else 'Prepare the visuals' end;
     end if;
   end if;
+  if stage = 'archived' then owner := 'archived'; end if;
   if j.status in ('queued', 'running') and public._hs_is_not_started(j) is not null then
-    nxt := 'The job did not start. Press Retry.';
+    nxt := 'The job did not start. Press Retry.'; owner := 'you';
   elsif j.status in ('queued', 'running') then
+    owner := 'working';
+    if j.kind = 'render' then lib := 'rendering'; end if;
     nxt := case j.kind when 'pack' then 'Checking sources…' when 'analyze' then 'Analyzing…' when 'generate' then 'Writing the story…'
-                       when 'render' then 'Rendering the videos (about 30 to 60 minutes)…'
+                       when 'render' then 'Rendering the videos (about 1 to 3 hours)…'
                        when 'visuals' then 'Preparing the preview stills (about 10 to 20 minutes)…' else 'Running checks…' end;
   end if;
-  return jsonb_build_object('stage', stage, 'next', nxt, 'library', lib, 'artifacts', arts,
+  -- owner: whose turn it is (UI audit 2026-11-03), so the page can say "Your next step", "Working on it" or "Done".
+  return jsonb_build_object('stage', stage, 'next', nxt, 'library', lib, 'owner', owner, 'artifacts', arts,
     'fresh', public._hs_is_fresh(s), 'job', case when j.id is null then null else jsonb_build_object(
       'id', j.id, 'kind', j.kind, 'status', j.status, 'error', coalesce(j.error, public._hs_is_not_started(j)), 'attempts', j.attempts,
       'created_at', j.created_at, 'started_at', j.started_at, 'completed_at', j.completed_at,
