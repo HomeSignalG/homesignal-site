@@ -30,6 +30,8 @@ await page.evaluate(() => {
     }
     if (n === 'hs_youtube_video_suggestion_make') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'picked';
       r.run = { status: 'queued' }; return Promise.resolve({ data: { existing: false, run: r.run }, error: null }); }
+    if (n === 'hs_youtube_video_suggestion_retry') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'waiting'; r.status_note = null;
+      r.links = (r.links || []).concat(a.p_more.links); r.run = { status: 'queued' }; return Promise.resolve({ data: { existing: false, run: r.run }, error: null }); }
     if (n === 'hs_youtube_video_suggestion_withdraw') { const r = window.rows.find((x) => x.id === a.p_id); r.status = 'withdrawn'; return Promise.resolve({ data: r, error: null }); }
     return Promise.resolve({ data: null, error: { code: 'x' } });
   } };
@@ -83,6 +85,20 @@ ok(html.includes('Video made') && html.includes('Made from &lt;16&gt; documents.
 await page.click('.vs-item[data-id="n1"] .vs-withdraw');
 await page.waitForFunction(() => /Withdrawn/.test(document.querySelector('.vs-item[data-id="n1"]').textContent));
 ok(true, '2h Withdraw closes the suggestion');
+
+// 2j: a suggestion that was not made has Try again (with optional extra links) and Remove
+await page.evaluate(() => { window.rows.push({ id: 'd1', title: 'EPA methane rule', status: 'declined', status_note: 'No fetcher.', links: [],
+  created_at: '2026-11-03T00:00:00Z', run: { status: 'declined', summary: 'No fetcher.' } }); });
+await page.evaluate(() => window.HS.acqVideoSuggest.mount(window.client, document.getElementById('host')));
+html = await page.innerHTML('.vs-item[data-id="d1"]');
+ok(html.includes('vs-retry') && html.includes('vs-more') && html.includes('>Remove<') && !html.includes('vs-make'),
+  '2j a suggestion that was not made shows Try again, a box for more links, and Remove');
+await page.fill('.vs-item[data-id="d1"] .vs-more', 'https://www.federalregister.gov/d/2025-21788 the 2024 rule');
+await page.click('.vs-item[data-id="d1"] .vs-retry');
+await page.waitForFunction(() => /Starting the video run/.test(document.querySelector('.vs-item[data-id="d1"]').textContent));
+const rt = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_youtube_video_suggestion_retry').pop()[1]);
+ok(rt.p_id === 'd1' && rt.p_more.links.join() === 'https://www.federalregister.gov/d/2025-21788' && rt.p_more.note === 'the 2024 rule',
+  '2k Try again sends the extra link and words, and the run starts');
 
 await page.setViewportSize({ width: 390, height: 800 });
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= 390), '2i no sideways scroll at phone width');

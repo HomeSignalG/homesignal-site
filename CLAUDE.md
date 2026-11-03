@@ -6115,6 +6115,11 @@ format (homesignal-ingest `video/`: one development record told from its own doc
   `video/MAKE_VIDEO.md`; a keyless job validates it; it lands on main, is built and uploaded to Tab 16 for review).
   The run records made / declined (with the reason) / failed (back to waiting). Apply order: ingest workflow on main
   first, then the SQL, then the page.
+- **Try again and Remove on a suggestion that was not made (founder, 2026-11-03: "you need buttons for this type of
+  situation").** `hs_youtube_video_suggestion_retry(id, {links, note})` reopens a declined suggestion with the extra
+  links/notes (same link rule as Add suggestion, `_hs_yvs_clean_links`) and starts Make video; the earlier decline stays
+  in the run history. Withdraw also removes a declined one. Applied 2026-11-03 (migration
+  `youtube_video_suggestion_retry_20261103`, live bodies md5-equal to the file). Tests: pg §6, browser 2j/2k.
 
 ## IMPACT STORIES AUTO-DISCOVERY, TAB 17 "HOT TOPICS" (2026-10-27): Bluesky is a lead, never evidence
 
