@@ -27,6 +27,7 @@ NODE_TESTS = [BEHAVIOUR, STRUCTURE]
 # national-5: Change History shows the stage badge; the lifecycle badge is its fallback for a record with no stage, tested there
 NATIONAL5 = 'test/report-quality-national5.test.mjs'
 NATIONAL6 = 'test/report-quality-national6.test.mjs'
+SCALE = 'test/report-overview-scale.test.mjs'
 
 # name -> (old, new, tests)
 M = {}
@@ -247,6 +248,14 @@ m('occupancy_drawn_as_circle', "      var shape = k === 'permitted' || k === 'oc
 m('occupancy_chip_always_shown', "      if (k === 'occupancy' && !m.staged[k].length) return '';", "", NODE_TESTS + [NATIONAL6])
 m('occupancy_briefing_dropped', "    if (s.occupancy && s.occupancy.length) stageBits.push(s.occupancy.length + ' approved for occupancy (business opening not verified)');\n", "", NODE_TESTS + [NATIONAL6])
 m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])
+
+# ---- founder 2026-11-02: the overview leads with the largest new buildings, by the scale the record states ------------------------------------------------
+m('scale_lead_dropped', "    lead.forEach(function (p) { if (picked.length < OVERVIEW_SCALE_SLOTS) picked.push(p); });\n", "", [SCALE])
+m('scale_smallest_first', "function scaleAbove(a, b) { for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; }", "function scaleAbove(a, b) { for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; }", [SCALE])
+m('scale_cap_fills_list', "var OVERVIEW_SCALE_SLOTS = 4;", "var OVERVIEW_SCALE_SLOTS = 6;", [SCALE])
+m('scale_housing_dropped', ".concat(largestFirst(all.filter(function (p) { return basisOf(p) === 'change_of_use' && scaleOf(p)[0] > 0; })))", "", [SCALE])
+m('scale_text_accepted', "return typeof v === 'number' && isFinite(v) && v > 0 ? v : 0;", "return Number(v) > 0 ? Number(v) : 1;", [SCALE])
+
 
 def run_tests(tests):
     """-> (passed, which, first failing line). Stops at the first failing suite."""

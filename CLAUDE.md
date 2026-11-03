@@ -5793,6 +5793,10 @@ Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality
   conditions or party column (test 3c). The ledger ignores `scope_text`, so no change events. Takes effect per ZIP on its next rolling refresh.
 - ⚠️ **Measured on a 5,000-record national sample: 34% included, 23% routine, 43% relevance not established**, mostly families that publish no work
   description (Brunswick NC, Sioux Falls, San Jose, Loudoun ...). Areas served only by those sources get thin reports until ingest adds a description column.
+- ⚖️ **The overview puts the largest new buildings first (founder 2026-11-02, "rank biggest impact developments first", "yes build nationally").** The engine
+  reads each record's documented scale (`documentedScale`: units, stories, square feet, from the record's own words; never estimated, never from an existing
+  building, never an address like "28467 Unit 1517") into `relevance.scale`. The view gives up to 4 of the 6 lines to new buildings largest first (units, then
+  stories, then floor area; no stated size goes last), then changes of use that state units; the last lines stay one per kind. Test: `test/report-overview-scale.test.mjs`.
 - ⚖️ **Decided 2026-11-02 (founder "agree do all"): a fourth outcome, `NO_SIGNIFICANT_CHANGES`, "No significant nearby changes found"** (`activity-outcome-2`).
   An empty report whose records were all read and left out by the relevance rule says what Jody checked ("Jody checked N official records within R of
   this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would

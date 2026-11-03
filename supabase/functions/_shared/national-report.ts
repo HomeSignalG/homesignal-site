@@ -597,8 +597,10 @@ export function normalizeWords(s: string): string {
 export type RelevanceBasis =
   | 'residential_development' | 'development_record' | 'infrastructure' | 'facility_use' | 'temporary_event' | 'change_of_use' | 'demolition' | 'site_work' | 'new_construction'
   | 'land_use' | 'addition' | 'substantial_alteration' | 'exterior_building_wide' | 'public_access' | 'public_facility' | 'nightlife_use';
+/** A record's documented scale: the numbers its own words state for what it proposes. Never estimated, never read from an existing building. */
+export type DocumentedScale = { units?: number; stories?: number; sqft?: number };
 export type Relevance =
-  | { include: true; basis: RelevanceBasis; evidence: string; use?: string; proposes?: 'new_construction' | 'demolition' | 'site_work'; rule_version: string }
+  | { include: true; basis: RelevanceBasis; evidence: string; use?: string; proposes?: 'new_construction' | 'demolition' | 'site_work'; scale?: DocumentedScale; rule_version: string }
   | { include: false; reason: 'routine_work' | 'not_established'; evidence: string | null; rule_version: string };
 
 const any = (w: string, list: string[]) => list.find((x) => w.includes(x)) ?? null;
@@ -652,13 +654,30 @@ export function documentedUse(text: string): string | undefined {
   return use.length >= 3 && !/^(the|a|an|existing)$/.test(use) ? use : undefined;
 }
 
+/** "existing 12-story building", "existing multifamily building (floors 2-12, 55 balconies)": what is already there, cut before any number is read. */
+const EXISTING_SCALE_RE = /\bexisting\b(?:[\s,()-]+[\w-]+){0,8}?[\s,()-]+(?:building|buildings|structure|structures|residence|house|home|facility|condominium|tower)s?\b(?:\s*\([^)]*\))?/gi;
+/** "254-unit" or "83 stacked dwelling units": a count. "28467 Unit 1517" or "1605 UNIT" is an address, so a bare singular "unit" never counts. */
+const UNITS_RE = /\b(\d{1,3}(?:,\d{3})+|\d{1,5})(?:-units?\b|[\s-]+(?:(?:stacked|dwelling|residential|apartment|housing|condominium|condo|townhouse|townhome|hotel|guest|live[\s-]work|affordable|market[\s-]rate|senior|new|additional|rental|multifamily)[\s-]+){0,3}units\b)/i;
+const STORIES_RE = /\b(\d{1,3})[\s-]*(?:story|stories|storey|storeys)\b/i;
+const SQFT_RE = /\b(\d{1,3}(?:,\d{3})+|\d{3,7})\s*(?:sq\.?\s*ft\.?|square[\s-]f(?:ee|oo)t|sf)\b/i;
+/** The scale a record's own words state (units, stories, square feet), or undefined. A number about something already standing is not read. */
+export function documentedScale(text: string): DocumentedScale | undefined {
+  const t = String(text ?? '').replace(/\s+/g, ' ').replace(EXISTING_SCALE_RE, ' ');
+  const num = (re: RegExp, lo: number, hi: number) => { const m = re.exec(t); const n = m ? Number(m[1].replace(/,/g, '')) : NaN; return Number.isFinite(n) && n >= lo && n <= hi ? n : undefined; };
+  const units = num(UNITS_RE, 2, 50000), stories = num(STORIES_RE, 1, 200), sqft = num(SQFT_RE, 500, 50000000);
+  const out: DocumentedScale = { ...(units ? { units } : {}), ...(stories ? { stories } : {}), ...(sqft ? { sqft } : {}) };
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** THE one relevance decision. Pure: reads the record's own words, its canonical Type key and facility kind; no source name, place, clock or value. */
 export function relevance(
   p: { name: string | null; type_raw: string | null; scope_text?: string | null; registry_id?: string | null }, typeKey?: string | null, facilityKind?: string | null,
 ): Relevance {
   const V = RELEVANCE_RULE_VERSION;
-  const inc = (basis: RelevanceBasis, evidence: string, use?: string): Relevance => ({ include: true, basis, evidence: evidence.trim(), ...(use ? { use } : {}), rule_version: V });
   const raw = [p.type_raw ?? '', p.name ?? '', p.scope_text ?? ''].join(' ');
+  const scale = documentedScale([p.name ?? '', p.scope_text ?? ''].join(' '));
+  const inc = (basis: RelevanceBasis, evidence: string, use?: string): Relevance =>
+    ({ include: true, basis, evidence: evidence.trim(), ...(use ? { use } : {}), ...(scale ? { scale } : {}), rule_version: V });
   let w = normalizeWords(raw);
   // the Type itself is the documented use: a road, bridge or utility project; a data center; a heavy facility (landfill, quarry, burning, transfer)
   if (typeKey === 'infrastructure') return inc('infrastructure', 'road, utility or public-works project');
@@ -905,7 +924,7 @@ export function assemble(input: AssembleInput): Assembled {
       record_date: ((rd: ReturnType<typeof recordDate>) => (rd ? { ...rd, verify: verification(rd, stage, [ev?.date, ...material.map((e) => e.publisher_event_date)], today) } : null))(withDateLabel(recordDate(p, today), pub)),
       developer: p.developer, size: p.size, investment: p.investment,
       ...(titleCut(p.name) ? { title_cut: true } : {}),
-      relevance: { basis: rel.basis, evidence: rel.evidence, ...(rel.use ? { use: rel.use } : {}), ...(rel.proposes ? { proposes: rel.proposes } : {}), rule_version: rel.rule_version },
+      relevance: { basis: rel.basis, evidence: rel.evidence, ...(rel.use ? { use: rel.use } : {}), ...(rel.proposes ? { proposes: rel.proposes } : {}), ...(rel.scale ? { scale: rel.scale } : {}), rule_version: rel.rule_version },
       publisher_type: typeof p.type_raw === 'string' && p.type_raw.trim() ? p.type_raw.trim() : null,
       ...(description ? { description } : {}),
       ...(actWin ? { activity_window: actWin } : {}),
