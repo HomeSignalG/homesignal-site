@@ -22,8 +22,8 @@ ok(/acqVideoSuggest\.mount\(window\.hsClient, sg\)/.test(page0) && /getElementBy
   '1c the tab mounts the box and loads the list into its own host');
 ok(!/yv-suggest|acqImpactDiscovery|impactstories/.test(yv), '1d Tab 16 no longer jumps to Tab 17');
 const rpcs = (lib.match(/rpc\('([a-z_]+)'/g) || []).map((s) => s.slice(5, -1)).sort();
-ok(JSON.stringify(rpcs) === JSON.stringify(['hs_youtube_video_suggest', 'hs_youtube_video_suggestion_make', 'hs_youtube_video_suggestion_withdraw', 'hs_youtube_video_suggestions_list']),
-  '1e the box calls only its four functions: ' + rpcs.join(', '));
+ok(JSON.stringify(rpcs) === JSON.stringify(['hs_youtube_video_suggest', 'hs_youtube_video_suggestion_make', 'hs_youtube_video_suggestion_retry', 'hs_youtube_video_suggestion_withdraw', 'hs_youtube_video_suggestions_list']),
+  '1e the box calls only its five functions: ' + rpcs.join(', '));
 ok(/workflows\/video-suggestion-run\.yml\/dispatches/.test(sql) && /'ref', 'main'/.test(sql),
   '1h Make video starts the ingest workflow from main');
 ok(/grant execute on function public\.youtube_video_suggestion_claim\(uuid\) to service_role/.test(sql)

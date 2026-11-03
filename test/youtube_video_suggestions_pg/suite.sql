@@ -116,5 +116,35 @@ select pg_temp.chk('5m with no GitHub credential, the run is failed with a reaso
    join public.youtube_video_suggestions s on s.id = r.suggestion_id where s.title = 'One more project to film'));
 insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
 
+-- 6. Try again on a suggestion that was not made
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('6a a non-admin cannot try again',
+  pg_temp.err(format('select public.hs_youtube_video_suggestion_retry(%L::uuid)', (select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'))) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('6b a bad link is refused and nothing changes',
+  pg_temp.err(format($q$select public.hs_youtube_video_suggestion_retry(%L::uuid, '{"links":["not a link"]}')$q$, (select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'))) like '22023%'
+  and (select status from public.youtube_video_suggestions where title = 'A record with no fetcher yet') = 'declined');
+create temp table _rt as select public.hs_youtube_video_suggestion_retry(
+  (select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'),
+  '{"links":["https://www.federalregister.gov/d/2025-21788"],"note":"Federal Register 2025-21788"}') r;
+select pg_temp.chk('6c try again reopens it with the new link and note and starts a run',
+  (select status = 'waiting' and status_note is null and links @> '["https://www.federalregister.gov/d/2025-21788"]'
+          and note like '%Federal Register 2025-21788' from public.youtube_video_suggestions where title = 'A record with no fetcher yet')
+  and (select (r->'run'->>'status') = 'queued' from _rt)
+  and (select count(*) from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions x on x.id = r.suggestion_id
+       where x.title = 'A record with no fetcher yet' and r.status = 'queued') = 1);
+select pg_temp.chk('6d the earlier decline stays in the run history',
+  exists (select 1 from public.youtube_video_suggestion_runs r join public.youtube_video_suggestions x on x.id = r.suggestion_id
+          where x.title = 'A record with no fetcher yet' and r.status = 'declined'));
+select pg_temp.chk('6e an open suggestion cannot be tried again',
+  pg_temp.err(format('select public.hs_youtube_video_suggestion_retry(%L::uuid)', (select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'))) like '55000%');
+select pg_temp.chk('6f a made suggestion cannot be tried again',
+  pg_temp.err(format('select public.hs_youtube_video_suggestion_retry(%L::uuid)', (select id from _ids))) like '55000%');
+-- a declined one can be removed
+update public.youtube_video_suggestion_runs set status = 'failed', completed_at = now(), summary = 'x' where status = 'queued';
+update public.youtube_video_suggestions set status = 'declined' where title = 'A record with no fetcher yet';
+select pg_temp.chk('6g a suggestion that was not made can be removed',
+  (public.hs_youtube_video_suggestion_withdraw((select id from public.youtube_video_suggestions where title = 'A record with no fetcher yet'))->>'status') = 'withdrawn');
+
 \o
 select count(*) || ' checks passed' from _res where ok;

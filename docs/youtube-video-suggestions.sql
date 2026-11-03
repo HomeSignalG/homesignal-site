@@ -12,7 +12,7 @@
 --
 -- Status: waiting (new) -> picked (a session took it) -> made (its project slug is filled) | declined (with a
 -- reason, e.g. the record has no documents) | withdrawn (the founder took it back). Sessions update a row with
--- the service role; the page can only add and withdraw.
+-- the service role; the page can add, withdraw, start (Make video) and try again (Try again, on one that was not made).
 --
 -- Make video (founder, 2026-10-30: "is a button missing to have it generate?"): the button queues ONE run per
 -- suggestion and starts homesignal-ingest video-suggestion-run.yml at once. Claude Code on the founder's Claude plan
@@ -47,12 +47,30 @@ create unique index if not exists youtube_video_suggestions_open_title
 alter table public.youtube_video_suggestions enable row level security;
 revoke all on public.youtube_video_suggestions from public, anon, authenticated;
 
+-- The links a suggestion may carry: web addresses only, each at most 1,000 characters, at most 20, no duplicates.
+-- Shared by Add suggestion and Try again, so the two can never accept different links.
+create or replace function public._hs_yvs_clean_links(p_links jsonb)
+returns jsonb language plpgsql immutable set search_path = public as $$
+declare links jsonb := '[]'::jsonb; u text;
+begin
+  if p_links is not null and jsonb_typeof(p_links) <> 'array' then raise exception 'Links must be a list.' using errcode = '22023'; end if;
+  for u in select distinct btrim(x) from jsonb_array_elements_text(coalesce(p_links, '[]'::jsonb)) x where btrim(x) <> '' loop
+    if u !~* '^https?://[^\s/?#]+\.[^\s/?#]+(/\S*)?$' or char_length(u) > 1000 then
+      raise exception 'This is not a web link (it must start with http:// or https://): %', left(u, 120) using errcode = '22023';
+    end if;
+    links := links || to_jsonb(u);
+  end loop;
+  if jsonb_array_length(links) > 20 then raise exception 'At most 20 links per suggestion.' using errcode = '22023'; end if;
+  return links;
+end $$;
+revoke all on function public._hs_yvs_clean_links(jsonb) from public, anon, authenticated;
+
 -- Add a suggestion (admin only).
 create or replace function public.hs_youtube_video_suggest(p_topic jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'title', ''));
         pl text := nullif(btrim(coalesce(p_topic->>'place', '')), '');
-        note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); links jsonb := '[]'::jsonb; u text;
+        note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); links jsonb;
         r public.youtube_video_suggestions%rowtype;
 begin
   if char_length(t) < 5 or char_length(t) > 300 then
@@ -60,14 +78,7 @@ begin
   end if;
   if pl is not null and char_length(pl) > 200 then raise exception 'The place is longer than 200 characters.' using errcode = '22023'; end if;
   if note is not null and char_length(note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
-  if p_topic ? 'links' and jsonb_typeof(p_topic->'links') <> 'array' then raise exception 'Links must be a list.' using errcode = '22023'; end if;
-  for u in select distinct btrim(x) from jsonb_array_elements_text(coalesce(p_topic->'links', '[]'::jsonb)) x where btrim(x) <> '' loop
-    if u !~* '^https?://[^\s/?#]+\.[^\s/?#]+(/\S*)?$' or char_length(u) > 1000 then
-      raise exception 'This is not a web link (it must start with http:// or https://): %', left(u, 120) using errcode = '22023';
-    end if;
-    links := links || to_jsonb(u);
-  end loop;
-  if jsonb_array_length(links) > 20 then raise exception 'At most 20 links per suggestion.' using errcode = '22023'; end if;
+  links := public._hs_yvs_clean_links(p_topic->'links');
   if exists (select 1 from public.youtube_video_suggestions s
              where lower(btrim(s.title)) = lower(t) and s.status in ('waiting', 'picked')) then
     raise exception 'You already suggested this video and it is still open.' using errcode = '23505';
@@ -77,14 +88,14 @@ begin
   return to_jsonb(r);
 end $$;
 
--- Withdraw an open suggestion (admin only). A suggestion already made or declined stays as it is.
+-- Withdraw an open suggestion, or remove one that was not made (admin only). A made suggestion stays as it is.
 create or replace function public.hs_youtube_video_suggestion_withdraw(p_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); r public.youtube_video_suggestions%rowtype;
 begin
   update public.youtube_video_suggestions
      set status = 'withdrawn', updated_at = now()
-   where id = p_id and status in ('waiting', 'picked')
+   where id = p_id and status in ('waiting', 'picked', 'declined')
   returning * into r;
   if r.id is null then
     raise exception 'That suggestion is not open any more.' using errcode = '22023';
@@ -248,3 +259,39 @@ grant execute on function public.hs_youtube_video_suggestion_make(uuid) to authe
 grant execute on function public.hs_youtube_video_suggestions_list() to authenticated;
 grant execute on function public.youtube_video_suggestion_claim(uuid) to service_role;
 grant execute on function public.youtube_video_suggestion_complete(uuid, jsonb) to service_role;
+
+
+-- ── Try again (founder, 2026-11-03: "you need buttons for this type of situation") ─────────────────────────────
+-- A suggestion that was not made (declined) can be tried again, optionally with more links and a note (for example the
+-- record numbers the decline asked for, or after a new kind of record was added to the fetcher). Its earlier reason is
+-- kept in the run history; the suggestion goes back to waiting and Make video starts at once. Links are checked by the
+-- same rule as Add suggestion. A made suggestion is never tried again (its video exists).
+create or replace function public.hs_youtube_video_suggestion_retry(p_id uuid, p_more jsonb default '{}'::jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.youtube_video_suggestions%rowtype;
+        more jsonb := coalesce(p_more, '{}'::jsonb); add_links jsonb; add_note text; v_links jsonb; v_note text;
+begin
+  if jsonb_typeof(more) <> 'object' then raise exception 'bad request' using errcode = '22023'; end if;
+  select * into s from public.youtube_video_suggestions where id = p_id for update;
+  if not found then raise exception 'no such suggestion' using errcode = 'P0002'; end if;
+  if s.status <> 'declined' then
+    raise exception 'Only a suggestion that was not made can be tried again (this one is %).', s.status using errcode = '55000';
+  end if;
+  add_links := public._hs_yvs_clean_links(more->'links');
+  v_links := public._hs_yvs_clean_links(s.links || coalesce((select jsonb_agg(x) from jsonb_array_elements(add_links) x
+                                                            where not s.links @> jsonb_build_array(x)), '[]'::jsonb));
+  add_note := nullif(btrim(coalesce(more->>'note', '')), '');
+  v_note := case when add_note is null then s.note when s.note is null then add_note else s.note || E'\n' || add_note end;
+  if v_note is not null and char_length(v_note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
+  if exists (select 1 from public.youtube_video_suggestions o
+             where o.id <> s.id and lower(btrim(o.title)) = lower(btrim(s.title)) and o.status in ('waiting', 'picked')) then
+    raise exception 'Another open suggestion has the same subject. Withdraw one of them first.' using errcode = '23505';
+  end if;
+  update public.youtube_video_suggestions
+     set status = 'waiting', status_note = null, links = v_links, note = v_note, updated_at = now()
+   where id = s.id;
+  return public.hs_youtube_video_suggestion_make(s.id);
+end $$;
+
+revoke all on function public.hs_youtube_video_suggestion_retry(uuid, jsonb) from public, anon;
+grant execute on function public.hs_youtube_video_suggestion_retry(uuid, jsonb) to authenticated;
