@@ -90,15 +90,26 @@ const P = (id) => rep.projects.find((p) => p.project_id.endsWith(id) || (p.sourc
 // ---- 6. print and header cleanup --------------------------------------------------------------------------------------------------------------
 {
   ok(/<p class="da-rv-addr">3101 Western Ave, Seattle<\/p>/.test(html), '6a the subject address carries no trailing comma', (html.match(/<p class="da-rv-addr">[^<]*/) || [''])[0]);
-  ok(!/ between [A-Z][a-z]{2} \d{1,2}, \d{4};/.test(plain(html)), '6b the freshness sentence names one date, or a full range');
+  const fresh = (plain(html).match(/Jody last read the official records in this report ([^;]*);/) || [])[1] || '';
+  const D = '[A-Z][a-z]{2} \\d{1,2}, \\d{4}', one = new RegExp('^on ' + D + '$'), range = new RegExp('^between (' + D + ') and (' + D + ')$');
+  const rm = fresh.match(range);
+  ok(one.test(fresh) || (rm && rm[1] !== rm[2]), '6b the freshness sentence names one date, or a full range', fresh);
+  // the same report with every record read on one day: one date, never "between" a single day
+  const sameDay = JSON.parse(JSON.stringify(resp));
+  sameDay.report.coverage.records_checked = { ...sameDay.report.coverage.records_checked, earliest: '2026-11-01T09:00:00Z', latest: '2026-11-01T18:00:00Z' };
+  const f1 = (plain(V.html(sameDay, { subject: SUBJECT.address })).match(/Jody last read the official records in this report ([^;]*);/) || [])[1] || '';
+  ok(one.test(f1) && !/between/.test(f1), '6b2 records all read on one day give that one date', f1);
   ok(/@top-left\{content:"JODY Development Activity report"/.test(V.CSS), '6c the page defines its own header, so the browser prints no URL or title there');
 }
 // ---- 7. readable titles from the full description ---------------------------------------------------------------------------------------------
 {
   const t = plain(html);
   ok(/electrical vehicle chargers/.test(t) && !/allow installation of…/.test(t), '7a the EV-charger title keeps its subject', (t.match(/Shoreline Substantial[^.]{0,140}/) || [''])[0]);
-  ok(/change of use from apartments to lodging \(floors 5-6\)/i.test(t) && /change of use from apartments to lodging \(floors 1-4\)/i.test(t) && !/>315 1ST AVE N</.test(html),
-    '7b the lodging records are titled by what they propose, not by their address');
+  const names = [...html.matchAll(/<span class="da-rv-name">([^<]*)</g)].map((m) => m[1]);
+  const lodging = names.filter((n) => /lodging/i.test(n));
+  ok(lodging.length === 3 && lodging.some((n) => /floors 5-6/.test(n)) && !names.some((n) => /^315 1st ave n$/i.test(n.trim())),
+    '7b the lodging records are titled by what they propose, not by their address', names.filter((n) => /lodging|315 1/i.test(n)));
+  ok(names.some((n) => /electrical vehicle chargers/.test(n)), '7c the EV-charger row is titled by its subject', names.filter((n) => /Shoreline|charger/i.test(n)));
 }
 console.log(`\n${total - fails} passed, ${fails} failed of ${total}`);
 process.exit(fails ? 1 : 0);

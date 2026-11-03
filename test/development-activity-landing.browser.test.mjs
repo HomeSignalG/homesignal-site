@@ -158,7 +158,7 @@ for (const [label, key] of Object.entries(KEYS)) {
   ok(s.hiddenMarkers === 9 - wantRows.length, label + ': the same projects leave the map (' + (9 - wantRows.length) + ')', s.hiddenMarkers);
 }
 await page.click(chipSel('type', 'Residential'));
-await page.click(chipSel('stage', 'Permit issued / Under construction')); // national-6 (2026-11-02)
+await page.click(chipSel('stage', 'Permit issued')); // 2026-11-03: the legend and chips name an issued permit on its own
 const both = await shape(page);
 ok(JSON.stringify(both.shown) === JSON.stringify(['permitted:residential']), 'Type and Stage combine, and neither changes the other', both.shown);
 await page.click(chipSel('type', 'Commercial'));
