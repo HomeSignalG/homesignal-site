@@ -164,14 +164,15 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
     industrial: 'Potential noise, truck traffic, dust or air emissions, and change to the view.', civic: 'Potential construction disruption and possible change to public access or amenities.',
     infrastructure: 'Potential construction noise and traffic/access disruption.', datacenter: 'Potential cooling noise, backup-generator operation, light pollution, construction traffic and water-demand considerations.' };
   const missing = rep.projects.filter((p) => TYPE_Q[p.type.key] && !html.includes(TYPE_Q[p.type.key]));
-  ok(qol.filter((t) => Object.values(TYPE_Q).some((q) => t.includes(q))).length === rep.projects.filter((p) => TYPE_Q[p.type.key]).length && missing.length === 0 && qol.every((t) => /Not site-verified|Effects not verified|not stated|does not state/.test(t)),
-    'E2 no note names fewer impacts than its Type sentence: each keeps that sentence after the record-specific line', missing.map((p) => p.name));
+  // founder (2026-11-03, partner-sample review; supersedes the 2026-11-02 rule above): the Type sentence is no longer appended to any note
+  ok(missing.length === rep.projects.filter((p) => TYPE_Q[p.type.key]).length && qol.every((t) => !Object.values(TYPE_Q).some((q) => t.includes(q))) && qol.every((t) => /Not site-verified|Effects not verified|not stated|does not st|states no|does not say/.test(t)),
+    'E2 each note is the record\'s own scope: no category Type sentence is appended, and every note says what it does not establish', [missing.length, qol.filter((t) => !/Not site-verified|Effects not verified|not stated|does not st|states no|does not say/.test(t))]);
   const titles = [...html.matchAll(/<span class="da-rv-name">([^<]*)</g)].map((x) => x[1]);
   // a title cut with an ellipsis ends where a whole word of the record's own text ends (the next character in the full text is not a letter or digit)
   const full = fx.projects.map((p) => String(p.name).replace(/\s+/g, ' '));
   const cut = titles.map((t) => t.replace(/ \(record [^)]+\)$/, '')).filter((t) => t.endsWith('…')).map((t) => t.slice(0, -1).replace(/&amp;/g, '&'));
   const midWord = cut.filter((pre) => { const f = full.find((n) => n.includes(pre)); if (!f) return true; const nx = f[f.indexOf(pre) + pre.length]; return nx !== undefined && /[A-Za-z0-9]/.test(nx); });
-  ok(cut.length > 0 && midWord.length === 0 && titles.every((t) => t.length <= 110), 'E3 concise titles are at most ~90 characters and a cut title ends at a whole word', midWord);
+  ok(cut.length > 0 && midWord.length === 0 && titles.every((t) => t.length <= 160), 'E3 concise titles are at most ~140 characters and a cut title ends at a whole word', midWord);
   ok(titles.every((t) => !/^(Commercial|Multifamily|Single Family\/Duplex) /.test(t)), 'E4 a title does not repeat the agency\'s class word, which has its own line');
   ok(/Jody type: Residential · Agency category: Multifamily/.test(html), 'E5 the agency\'s category and Jody\'s type are labelled separately');
   ok(/Agency record number:<\/span> 7086944-DM/.test(html) && /Seattle Department of Construction &amp; Inspections/.test(html), 'E6 each record names its agency and record number');
@@ -182,8 +183,9 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
   ok(/https:\/\/jodytracks\.com/.test(html) && !/HomeSignal/.test(html.replace(/<style[\s\S]*?<\/style>/g, '')), 'E10 the report carries https://jodytracks.com and no HomeSignal branding');
   ok(/Most significant nearby changes/.test(html) && /data-da-overview/.test(html), 'E11 the report opens with the most significant documented changes');
   { const pr = V.CSS.slice(V.CSS.indexOf('@media print{'));
-    ok(/\.da-rv-sec--filters \.da-rv-quiet\{display:none!important\}/.test(pr) && !/\.da-rv-frow[^{]*\{display:none/.test(pr) && !/\.da-rv-chips?[^{]*\{display:none/.test(pr) && !/\.da-rv-sec--filters[^{]*\.da-rv-h2[^{]*\{display:none/.test(pr) && /\.da-rv-fnow\{font-size:11\.5px/.test(pr),
-      'E12 print keeps the Type and Stage chips (founder 2026-11-02), drops only the on-screen instructions, and keeps the line saying what is shown'); }
+    // 2026-11-03 partner-sample review (supersedes 2026-11-02): a static PDF shows no filter controls; the line saying what is shown stays
+    ok(/\.da-rv-sec--filters \.da-rv-frow,\.da-rv-sec--filters \.da-rv-quiet,\.da-rv-sec--filters \.da-rv-h2\{display:none!important\}/.test(pr) && /\.da-rv-fnow\{font-size:11\.5px/.test(pr),
+      'E12 print drops the filter chips, their heading and the on-screen instructions, and keeps the line saying what is shown'); }
   ok(a.storage_blockers.length === 0, 'E13 the body holds nothing private (boundary check passes)', a.storage_blockers);
 }
 
@@ -207,7 +209,7 @@ const rel = (name, type_raw = null, typeKey = null, registry_id = null) => M.rel
   const variant = (x) => assembleWith(fx.projects.map((p) => p.source_key === base.source_key ? { ...p, ...x } : p)).intelligence;
   const inUp = variant({ name: 'Commercial Temporary stage for outdoor festival', start_date: '2026-11-20', end_date: '2026-11-23' });
   const pUp = inUp.projects.find((p) => p.project_id === base.source_key);
-  ok(pUp && pUp.activity_window.status === 'upcoming' && pUp.stage === null && V.html({ status: 'OK', report: inUp, render: a.renderOnly }, {}).includes('Upcoming temporary activity'), 'T6 upcoming temporary activity is listed, with its documented dates and no administrative stage');
+  ok(pUp && pUp.activity_window.status === 'upcoming' && pUp.stage !== undefined && V.html({ status: 'OK', report: inUp, render: a.renderOnly }, {}).includes('Upcoming temporary activity'), 'T6 upcoming temporary activity is listed with its documented dates (since 2026-11-03 it keeps whatever agency stage it has)');
   ok(!!variant({ name: 'Commercial Temporary stage for outdoor concert series, Oct 30 - Nov 4, 2026' }).projects.find((p) => p.project_id === base.source_key), 'T7 active temporary activity is listed');
   const vEnd = variant({ name: OFFICIAL.slice(0, 120), scope_text: OFFICIAL });
   ok(!vEnd.projects.some((p) => p.project_id === base.source_key) && vEnd.relevance_review.find((r) => r.project_id === base.source_key).reason === 'temporary_activity_ended',

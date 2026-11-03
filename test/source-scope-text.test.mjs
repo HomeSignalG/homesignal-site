@@ -67,7 +67,7 @@ const bumb = 'Temporary installation of mobile stage   3 Geodesic Domes and skat
   ok(!before.include && before.reason === 'not_established' && brNew.include && brNew.basis === 'new_construction', '4a a Brunswick new home could not be judged from its title; with its description it is new construction', [before, brNew]);
   ok(rel('RESI', 'RESI', 'SMPR: Kitchen remodel', 'residential', 'durham-building-permits').reason === 'routine_work', '4b a Durham kitchen remodel is routine work');
   const cu = rel('Commercial Building', 'Commercial Building', 'Change in Use', 'commercial', 'sioux-falls-building-permits');
-  ok(cu.include && cu.basis === 'change_of_use' && M.RELEVANCE_RULE_VERSION === 'relevance-2', '4c "Change in Use" (Sioux Falls) is a change of use (relevance-2)', cu);
+  ok(cu.include && cu.basis === 'change_of_use' && M.RELEVANCE_RULE_VERSION === 'relevance-3', '4c "Change in Use" (Sioux Falls) is a change of use (relevance-2)', cu);
   ok(rel('Single-Family', 'Single-Family', 'Demolition', 'residential', 'arlington-issued-permits').basis === 'demolition', '4d an Arlington demolition is listed as one');
   ok(rel('Apartment', 'Apartment', 'Additions/Alterations', 'residential', 'san-jose-permits').basis === 'addition', '4e a San Jose apartment addition is listed as one');
   ok(!rel('Single-Family', 'Single-Family', 'Sub-Trades Only', 'residential', 'san-jose-permits').include, '4f trade-only work stays out');

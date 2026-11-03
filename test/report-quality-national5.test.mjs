@@ -99,7 +99,8 @@ const entry = (id) => ['socrata', 'arcgis', 'ckan', 'csv', 'carto'].flatMap((c) 
   ok(/<h3 class="da-rv-title">Construct alterations to a commercial building<\/h3><span class="da-rv-stage da-rv-stage--permitted"[^>]*>[\s\S]*?<span class="da-rv-lifetext">Permit issued<\/span>/.test(hist)
     && /Permit issued/.test(text(rec)) && !/Permitted \/ Under Construction/.test(text(hist)),
     '5a Change History shows the stage the card shows (Permit issued), not the bare lifecycle word', hist.slice(0, 400));
-  ok(/Jody status: Proposed → Approved/.test(text(hist)) && /Publisher stage: Awaiting Information → Issued/.test(text(hist)) && !/ Status: Proposed/.test(text(hist).replace('Jody status', '')),
+  // 2026-11-03: Jody's stage history is printed in the report's own words; the newest change ends at the stage the row shows
+  ok(/Jody stage: Proposed \/ Under review → Permit issued/.test(text(hist)) && /Source agency status: Awaiting Information → Issued/.test(text(hist)) && !/Jody status/.test(text(hist)),
     '5b Jody\'s own status is labelled as Jody\'s, beside the publisher\'s stage');
   // the map: every pair of markers at least a marker apart, every marker inside the plot, and each moved one draws a line to its true spot
   const svg = (h.match(/<svg class="da-rv-plot[\s\S]*?<\/svg>/) || [''])[0];

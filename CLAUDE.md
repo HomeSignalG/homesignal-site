@@ -5797,6 +5797,19 @@ Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality
   reads each record's documented scale (`documentedScale`: units, stories, square feet, from the record's own words; never estimated, never from an existing
   building, never an address like "28467 Unit 1517") into `relevance.scale`. The view gives up to 4 of the 6 lines to new buildings largest first (units, then
   stories, then floor area; no stated size goes last), then changes of use that state units; the last lines stay one per kind. Test: `test/report-overview-scale.test.mjs`.
+- ⚖️ **PARTNER-SAMPLE REVIEW, 2026-11-03 (founder, on the site-generated 3101 Western Ave PDF): applied in the shared code, `relevance-3`.**
+  - Impact notes are the record's own scope only; the Type sentence (`QOL_BY_TYPE`) is no longer appended (supersedes the 2026-11-02 rule). A completed
+    record says the work is recorded as completed, never "while the work is under way".
+  - A temporary structure/market/booth/kiosk/canopy/exhibit/platform/seating/inflated structure is temporary activity (`TEMPORARY_INSTALLATION_RE`), never
+    new construction; temporary activity keeps its agency stage (duration and stage are separate). The overview gives its documented window, the agency
+    status and "Not confirmed: whether or when the installation or activity takes place".
+  - A change of use that also builds a new building ("Construct new mixed-use building") is `new_construction` with its use and scale.
+  - Change History prints Jody's stage in the report's words (Operating → "Completed (agency record)"); the ledger keeps the internal values. The legend and
+    Stage chips split "Permit issued" and "Under construction"; a "Stage not stated" chip makes the chips add up. The printed PDF shows no filter chips.
+  - The overview lists each street address once and its note states the selection method. Titles use the agency's full description when the feed cut the
+    name or the name is only the address (SEPA). `@page` defines its own header; the subject loses a trailing comma; one read date is "on <date>".
+  - Not changed: Jody Type labels (one classifier, `lib/project-type.js`, shared with Map 1) and the workspace name in the header (the account's own).
+  - Tests: `test/report-partner-review.test.mjs`, `test/temporary-installation.test.mjs`.
 - ⚖️ **Decided 2026-11-02 (founder "agree do all"): a fourth outcome, `NO_SIGNIFICANT_CHANGES`, "No significant nearby changes found"** (`activity-outcome-2`).
   An empty report whose records were all read and left out by the relevance rule says what Jody checked ("Jody checked N official records within R of
   this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would

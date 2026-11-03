@@ -117,8 +117,8 @@ try {
   // national-6 (2026-11-02): "Approved" (no prediction), with the note that approval is not a construction permit
   ok(/Stage: Approved Source agency status: Advertised Approval is not a construction permit or a start of work\./.test(textOf(men.cells[1])), '2e the Stage cell: HomeSignal\'s stage, then the publisher\'s own stage under its own label', textOf(men.cells[1]));
   // national-6 (2026-11-02): the impact note says what THIS record documents (relevance basis new construction) and what it does not state; no generic warning
-  // founder (2026-11-02): the record line is followed by the Type's own sentence, so no note names fewer impacts than before
-  ok(/The record documents new construction\. Construction activity at the site is possible once work starts\. Potential construction noise and traffic, then added neighborhood activity or visual change\. Not site-verified; no effect is established\.$/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note followed by the Type sentence, qualified', textOf(men.cells[2]));
+  // founder (2026-11-03, partner-sample review; supersedes 2026-11-02): the note is the record's own scope only, with no Type sentence after it
+  ok(/The record documents new construction\. Construction activity at the site is possible once work starts\. The record states no schedule and no effect on nearby properties\.$/.test(textOf(men.cells[2])), '2f the impact cell is the record-specific note only, qualified (no Type sentence)', textOf(men.cells[2]));
   // the evidence is the fourth cell of the record's own row: one per record, no second list, no details block, no evidence card anywhere else
   ok(evOf(html).length === 8 && new Set(evOf(html).map((e) => e.name)).size === 8 && evOf(html).every((e) => e.html.length > 0), '2g one supporting-evidence cell per record, in that record\'s own row');
   ok(!/<details|<summary|da-rv-evrec|da-rv-evlist|da-rv-evtitle|Supporting evidence for each record/.test(html) && /Supporting Evidence/.test(html), '2g2 the separate expandable evidence section is gone: no details, no summary, no evidence cards or list, no duplicate evidence in the markup');
@@ -253,13 +253,16 @@ try {
   const qol = (n) => textOf(rowNamed(html, n).cells[2]).replace(/^Quality-of-Life Impact: /, '');
   const kinds = Object.fromEntries(rowsOf(html).map((r) => [r.name, (/data-da-qol="([^"]*)"/.exec(r.html) || [])[1]]));
   // national-6 (2026-11-02): a note is "documented" when it states what the record documents (the engine's relevance basis)
-  ok(kinds['Menchaca Apartments'] === 'potential' && kinds['Oak Grove Townhomes'] === 'denied_or_withdrawn' && Object.values(kinds).every(Boolean), '4a every row carries one impact kind, and a Decided record is "denied or withdrawn"', kinds);
-  ok(rowsOf(html).every((r) => /states no schedule and no effect on nearby properties|states no dates|not stated|does not state|Confirm the outcome|not site-verified|no effect is established/i.test(textOf(r.cells[2]))), '4b every impact text is qualified (says what the record does not state, or asks to confirm)');
+  ok(kinds['Menchaca Apartments'] === 'documented' && kinds['Oak Grove Townhomes'] === 'denied_or_withdrawn' && Object.values(kinds).every(Boolean), '4a every row carries one impact kind, and a Decided record is "denied or withdrawn"', kinds);
+  ok(rowsOf(html).every((r) => /states no schedule and no effect on nearby properties|states no dates|not stated|does not state|Confirm the outcome|not site-verified|no effect is established/i.test(textOf(r.cells[2]))), '4b every impact text is qualified (says what the record does not state, or asks to confirm)', rowsOf(html).map((r) => textOf(r.cells[2])));
   const joined = rowsOf(html).map((r) => textOf(r.cells[2])).join(' ');
   ok(!/\d/.test(joined) && !/property value|home value|price|appreciat|increase in value|score|rating|decibel|minutes|percent|%/i.test(joined), '4c no number, score, rating, measurement or property-value prediction appears in any impact cell', joined.match(/.{15}(\d|value|price|score).{15}/i));
   // national-6 (2026-11-02): the note is keyed by what the record documents (relevance basis), never by stage; a record with no basis gets the scope-only sentence, never a Type warning
-  ok(V.qolImpact({ type: { key: 'residential' }, relevance: { basis: 'demolition' }, lifecycle: { key: 'approved' } }).text === V.qolImpact({ type: { key: 'residential' }, relevance: { basis: 'demolition' }, lifecycle: { key: 'operating' } }).text
-    && V.qolImpact({ type: { key: 'commercial' } }).kind === 'unknown' && !/noise|traffic|view/i.test(V.qolImpact({ type: { key: 'commercial' } }).text), '4d the note is keyed by the documented basis only (stage does not change it); without a basis no generic warning is attached');
+  // 2026-11-03: a record the agency completed says so and gets no "while the work is under way"
+  const done = V.qolImpact({ type: { key: 'residential' }, relevance: { basis: 'demolition' }, lifecycle: { key: 'operating' } }).text;
+  ok(V.qolImpact({ type: { key: 'residential' }, relevance: { basis: 'demolition' }, lifecycle: { key: 'approved' } }).text === V.qolImpact({ type: { key: 'commercial' }, relevance: { basis: 'demolition' }, lifecycle: { key: 'proposed' } }).text
+    && /completed or closed/.test(done) && !/under way/.test(done)
+    && V.qolImpact({ type: { key: 'commercial' } }).kind === 'unknown' && !/noise|traffic|view/i.test(V.qolImpact({ type: { key: 'commercial' } }).text), '4d the note is keyed by the documented basis only (not the Type; a completed record says so); without a basis no generic warning is attached');
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
 // ---- 5b. source links and long text ---------------------------------------------------------------------------------------------------------------
@@ -268,13 +271,13 @@ try {
   ok(!/https?:\/\//.test(textOf(links)) && !/example\.gov/.test(textOf(links)) && (links.match(/class="da-rv-link"/g) || []).length === 8, '5b-a the table shows a short "Official source" label, never a raw address (8 links, 0 visible URLs)');
   ok(/Official source/.test(textOf(links)) && [...links.matchAll(/class="da-rv-link" href="([^"]*)"/g)].every((m) => /^https:\/\/example\.gov\/records\/k-/.test(m[1])), '5b-b each link still points at that record\'s own address');
   ok(!/da-rv-url/.test(html + V.CSS) && !/example\.gov/.test(textOf(html)), '5b-c no raw web address is printed anywhere: every record shows only the short "Official source" link, which stays clickable in a saved PDF');
-  const longName = 'The Extraordinarily Long Named Mixed-Use Redevelopment Of The Former Downtown Industrial Warehouse District And Adjacent Parcels Phase 2B';
+  const longName = 'The Extraordinarily Long Named Mixed-Use Redevelopment Of The Former Downtown Industrial Warehouse District And Adjacent Waterfront Parcels Along The River Phase 2B';
   const ln = clone(W); ln.report.projects.find((p) => p.project_id === 'k-approved').name = longName;
   ln.report.projects.find((p) => p.project_id === 'k-approved').source.url = 'https://example.gov/' + 'very-long-path-segment/'.repeat(12) + 'record?id=1';
   const hl = view(ln);
   // national-6 (2026-11-02): the row leads with a concise title cut at a whole word, and the full name is kept, whole, as the row's "Documented scope"
   const lr = rowsOf(hl).find((r) => r.name.endsWith('\u2026') && longName.startsWith(r.name.slice(0, -1)));
-  ok(lr && lr.name.length <= 91 && /[\s]/.test(longName[lr.name.length - 1] || ' ') && decode(lr.cells[3]).includes('Documented scope:</span> ' + longName) && /overflow-wrap:anywhere|word-break/.test(V.CSS),
+  ok(lr && lr.name.length <= 141 && /[\s]/.test(longName[lr.name.length - 1] || ' ') && decode(lr.cells[3]).includes('Documented scope:</span> ' + longName) && /overflow-wrap:anywhere|word-break/.test(V.CSS),
     '5b-e a very long name is shown as a concise title cut at a whole word, the full name is kept in Documented scope, and the stylesheet lets long text wrap', lr && lr.name);
 } catch (e) { ok(false, 'a block threw: ' + String((e && e.message) || e) + ' @' + ((e.stack||'').match(/test.da-report-view.test.mjs:(\d+)/)||[])[1]); }
 
@@ -459,10 +462,10 @@ try {
   const men = items[0];
   // national-6 (2026-11-02): lanes read "Recent official activity" (or "Recent filing" for a filing) and "Jody detected"; the ledger's event is "Agency status change"
   ok(/<h4 class="da-rv-h4">Recent official activity<\/h4><p class="da-rv-p">Issued · Sep 24, 2026<\/p>/.test(men) && /<h4 class="da-rv-h4">Jody detected<\/h4>/.test(men), '7f a record with both has two separate, labelled lanes: the official record, and Jody detected');
-  ok(textOf(men).includes('Agency status change · detected Sep 27, 2026') && textOf(men).includes('Publisher stage: Pending → Advertised') && textOf(men).includes('Jody status: Proposed → Approved'),
+  ok(textOf(men).includes('Agency status change · detected Sep 27, 2026') && textOf(men).includes('Source agency status: Pending → Advertised') && textOf(men).includes('Jody stage: Proposed / Under review → Approved'),
     '7g the detected change states from and to, in plain field names, in the order the ledger gave them', textOf(men));
   const fst = items[1];
-  ok(!/Recent official activity|Recent filing/.test(fst) && /Newly detected record · detected Sep 26, 2026/.test(textOf(fst)) && /Jody status: not stated → Proposed/.test(textOf(fst)), '7h a record with only a detected change has only that lane, and an unstated prior value reads "not stated"');
+  ok(!/Recent official activity|Recent filing/.test(fst) && /Newly detected record · detected Sep 26, 2026/.test(textOf(fst)) && /Jody stage: not stated → Proposed \/ Under review/.test(textOf(fst)), '7h a record with only a detected change has only that lane, and an unstated prior value reads "not stated"');
   ok(!/Jody detected/.test(items[2]) && /Recent official activity|Recent filing/.test(items[2]), '7i a record with only a publisher event has only the official-record lane');
   const h7j = sec(view(await wire({ rows: [row('q1', 0.4, FAM_A)], projects: [proj('q1', FAM_A, { status: 'Approved', date_kind: 'issued', submitted_at: '2025-02-01' })] })), 'history');
   ok(h7j && !/da-rv-hist/.test(h7j.html) && textOf(h7j.html) === 'Change History Change history begins once Jody has observed these records at least twice.',
@@ -603,7 +606,7 @@ try {
   const WP = await wire(PERMIT);
   const hp = V.html(WP, { subject: '20 N Main St, Brigham City, UT 84302' });
   const mp = sec(hp, 'map').html;
-  const marks = [...mp.matchAll(/<g class="da-rv-mk da-rv-mk--(\w+)" data-da-type="(\w+)" data-da-stage="(\w+)" transform="translate\(([\d.]+) ([\d.]+)\)"><title>([^<]*)<\/title>[\s\S]*?<text[^>]*>(\d+)<\/text><\/g>/g)]
+  const marks = [...mp.matchAll(/<g class="da-rv-mk da-rv-mk--(\w+)" data-da-type="(\w+)" data-da-stage="(\w+)"(?: data-da-sub="\w+")? transform="translate\(([\d.]+) ([\d.]+)\)"><title>([^<]*)<\/title>[\s\S]*?<text[^>]*>(\d+)<\/text><\/g>/g)]
     .map((m) => ({ k: m[1], x: Number(m[4]), y: Number(m[5]), title: decode(m[6]), n: m[7] }));
   ok(marks.length === 4 && marks.map((m) => m.n).join() === '1,2,3,4', '14a the map marks every staged record with a number, in the order of the table', marks.map((m) => m.n + ':' + m.title));
   const byN = Object.fromEntries(marks.map((m) => [m.title.replace(/^\d+: /, '').split(' · ')[0], m]));
@@ -623,11 +626,12 @@ try {
     ok(nums.length === ids.length - 1 && nums.every((n, i) => n === String(i + 1)), '14g2 a record with no direction gets no Map number, and the other numbers stay 1..n with no gap', nums); }
   // chips: counts are the rows each chip leaves; All is pressed
   const chips = [...sec(hp, 'filters').html.matchAll(/data-da-filter="(\w+)" data-da-value="(\w+)" aria-pressed="(\w+)">([^<]*?) <span class="da-rv-chipn">(\d+)<\/span>/g)].map((m) => m[1] + ':' + m[2] + ':' + m[3] + ':' + decode(m[4]) + ':' + m[5]);
-  ok(chips.join('|') === 'type:all:true:All:4|type:residential:false:Residential:1|type:commercial:false:Commercial:1|type:infrastructure:false:Roads & infrastructure:2|stage:all:true:All:4|stage:approved:false:Approved:1|stage:proposed:false:Proposed / Under review:1|stage:permitted:false:Permit issued / Under construction:2',
+  ok(chips.join('|') === 'type:all:true:All:4|type:residential:false:Residential:1|type:commercial:false:Commercial:1|type:infrastructure:false:Roads & infrastructure:2|stage:all:true:All:4|stage:approved:false:Approved:1|stage:proposed:false:Proposed / Under review:1|stage:under_construction:false:Under construction:2',
     '14i the chips: All is pressed on both rows, each Type and Stage chip counts the records it leaves (the quiet closed-out record is not in the report, so there is no Operating chip)', chips);
   const stageN = Object.fromEntries(chips.filter((c) => c.startsWith('stage:')).map((c) => { const f = c.split(':'); return [f[1], Number(f[4])]; }));
-  const rowsByStage = (k) => rowsOf(hp).filter((r) => new RegExp('data-da-stage="' + k + '"').test(r.attrs)).length;
-  ok(['approved', 'proposed', 'permitted'].every((k) => stageN[k] === rowsByStage(k)) && stageN.all === rowsOf(hp).length, '14j each Stage chip count equals the number of table rows with that stage', [stageN, rowsOf(hp).length]);
+  // 2026-11-03: an issued permit and work under way are separate chips (the row's data-da-sub)
+  const rowsByStage = (k) => rowsOf(hp).filter((r) => new RegExp('data-da-(stage|sub)="' + k + '"').test(r.attrs)).length;
+  ok(['approved', 'proposed', 'under_construction'].every((k) => stageN[k] === rowsByStage(k)) && stageN.all === rowsOf(hp).length, '14j each Stage chip count equals the number of table rows with that stage', [stageN, rowsOf(hp).length]);
   const typeN = Object.fromEntries(chips.filter((c) => c.startsWith('type:')).map((c) => { const f = c.split(':'); return [f[1], Number(f[4])]; }));
   ok(Object.keys(typeN).filter((k) => k !== 'all').every((k) => typeN[k] === rowsOf(hp).filter((r) => new RegExp('data-da-type="' + k + '"').test(r.attrs)).length) && typeN.all === 4, '14k each Type chip count equals the number of rows of that Type');
   ok(/The filters change what is shown in the table, on the map and in the PDF\. They do not change the saved report\./.test(textOf(sec(hp, 'filters').html)), '14l the filters say they change what is shown (PDF included), never the saved report');

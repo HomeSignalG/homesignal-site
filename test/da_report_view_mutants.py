@@ -28,6 +28,9 @@ NODE_TESTS = [BEHAVIOUR, STRUCTURE]
 NATIONAL5 = 'test/report-quality-national5.test.mjs'
 NATIONAL6 = 'test/report-quality-national6.test.mjs'
 SCALE = 'test/report-overview-scale.test.mjs'
+REVIEW = 'test/report-partner-review.test.mjs'
+NATIONAL7 = 'test/report-quality-national7.test.mjs'
+NATIONAL5 = 'test/report-quality-national5.test.mjs'
 
 # name -> (old, new, tests)
 M = {}
@@ -78,7 +81,7 @@ m('escape_quote_dropped', ".replace(/\"/g, '&quot;')", "")
 m('escape_ampersand_dropped', ".replace(/&/g, '&amp;')", "")
 m('escape_angle_dropped', ".replace(/</g, '&lt;').replace(/>/g, '&gt;')", "")
 m('line_value_not_escaped', "':</span> ' + esc(text) + '</p>'", "':</span> ' + text + '</p>'")
-m('change_values_not_escaped', "esc(fieldLabel(c.field) + ': ' + value(c.from) + ' → ' + value(c.to))", "(fieldLabel(c.field) + ': ' + value(c.from) + ' → ' + value(c.to))")
+m('change_values_not_escaped', "esc(fieldLabel(c.field) + ': ' + changeValue(c, 'from', p, ei === 0) + ' → ' + changeValue(c, 'to', p, ei === 0))", "(fieldLabel(c.field) + ': ' + changeValue(c, 'from', p, ei === 0) + ' → ' + changeValue(c, 'to', p, ei === 0))")
 # ---- links ------------------------------------------------------------------------------------------------------------------------------------------------
 m('javascript_url_accepted', "return s.length <= 2000 && HTTP_URL.test(s) ? s : '';", "return s.length <= 2000 && /^[a-z]+:/i.test(s) ? s : '';")
 m('ftp_url_accepted', "var HTTP_URL = /^https?:\\/\\/", "var HTTP_URL = /^(https?|ftp):\\/\\/")
@@ -144,7 +147,7 @@ m('type_chip_label_is_key', "return reg && isObj(reg[k]) && !reg[k].isFacility ?
 m('type_chip_count_wrong', "return chip('type', k, label, seen[k] ? seen[k].n : 0, false);", "return chip('type', k, label, current.length, false);")
 m('all_chip_not_pressed', "var types = chip('type', 'all', 'All', current.length, true)", "var types = chip('type', 'all', 'All', current.length, false)")
 m('filter_ignores_type', "(state.type === 'all' || it.getAttribute('data-da-type') === state.type)", "true", [BROWSER])
-m('filter_ignores_stage', "(state.stage === 'all' || it.getAttribute('data-da-stage') === state.stage)", "true", [BROWSER])
+m('filter_ignores_stage', "(state.stage === 'all' || it.getAttribute('data-da-stage') === state.stage || it.getAttribute('data-da-sub') === state.stage)", "true", [BROWSER])
 m('filter_deletes_cards', "if (on) it.removeAttribute('hidden'); else it.setAttribute('hidden', '');", "if (!on && it.parentNode) it.parentNode.removeChild(it);", [BROWSER])
 m('filter_aria_pressed_stale', "for (var m = 0; m < same.length; m++) same[m].setAttribute('aria-pressed', same[m] === b ? 'true' : 'false');", "", [BROWSER])
 m('mount_does_not_enhance', "    el.innerHTML = html(response, opts);\n    enhance(el);", "    el.innerHTML = html(response, opts);", [BROWSER])
@@ -188,12 +191,12 @@ m('saved_report_never_flagged', ": e.older_than_a_year === true,\n      filingOn
 m('filing_only_wording_dropped', "(rd.filingOnly ? '. No later official date is on record.", "(false ? '. No later official date is on record.")
 m('unknown_reason_read_as_filing_only', "filingOnly: isObj(v) && v.reason === 'filing_only'", "filingOnly: isObj(v) && v.reason !== 'old_date'")
 m('words_match_substring', "return !!x && x === wordsOf(b); }", "return !!x && wordsOf(b).indexOf(x) >= 0; }")
-m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])
+m('unstaged_row_not_filterable', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || (lifeKey(p) === 'operating' ? 'operating' : 'none')) + '\"' + subAttr(p, k) + '>'", "'<tr role=\"row\"' + (k ? ' data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + k + '\"' : '') + '>'", [BROWSER])
 m('two_tables', "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); }); });", "var items = [];\n    STAGES.forEach(function (k) { m.staged[k].forEach(function (p) { items.push({ p: p, k: k }); items.push({ p: p, k: k }); }); });")
 m('records_before_briefing', '    if (m.total) parts.push(briefing(report, m, response));\n    if (!report.projects.length) { parts.push(outcomeSection(report)); if (outcomeKeyOf(report) !== \'NO_SIGNIFICANT_CHANGES\') parts.push(excludedNote(report)); }\n    else if (!some) parts.push(section(\'outcome\', TITLES.records, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(NONE_RELEVANT) + \'</p>\', \'da-rv-hero\'));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    var showLc = opts.showLifecycle === true;\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));\n', '    if (!report.projects.length) { parts.push(outcomeSection(report)); if (outcomeKeyOf(report) !== \'NO_SIGNIFICANT_CHANGES\') parts.push(excludedNote(report)); }\n    else if (!some) parts.push(section(\'outcome\', TITLES.records, \'<p class="da-rv-p da-rv-outcome-p">\' + esc(NONE_RELEVANT) + \'</p>\', \'da-rv-hero\'));\n    if (m.total) parts.push(filtersSection(current.concat(m.operating, m.unstaged), m));\n    var showLc = opts.showLifecycle === true;\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (m.total) parts.push(briefing(report, m, response));\n')  # re-anchored 2026-11-02 (national-6)
 m('map_below_table', "    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));\n    if (m.total) parts.push(recordsSection(m, response, showLc));", "    if (m.total) parts.push(recordsSection(m, response, showLc));\n    if (m.numbered.length) parts.push(mapSection(m.numbered, response, report, m));")  # re-anchored 2026-11-02 (national-6)
 # founder 2026-11-01: the Type/Stage filters print, the PDF follows them, and a line says what was picked
-m('print_hides_chips', "'.da-rv-sec--filters{break-inside:avoid;page-break-inside:avoid;padding:2px 0!important}.da-rv-sec--filters .da-rv-quiet{display:none!important}", "'.da-rv-sec--filters{break-inside:avoid;page-break-inside:avoid;padding:2px 0!important}.da-rv-frow,.da-rv-sec--filters .da-rv-quiet{display:none!important}", [BROWSER])
+m('print_shows_chips', "'.da-rv-sec--filters .da-rv-frow,.da-rv-sec--filters .da-rv-quiet,.da-rv-sec--filters .da-rv-h2{display:none!important}", "'.da-rv-sec--filters .da-rv-quiet{display:none!important}", [BROWSER, NATIONAL7, REVIEW])
 m('print_hides_filters', "    '.da-rv-actions{display:none!important}',", "    '.da-rv-actions,.da-rv-sec--filters{display:none!important}',", [BROWSER])
 m('print_ignores_filters', "    '.da-rv-actions{display:none!important}',", "    '.da-rv-actions{display:none!important}.da-rv tr[data-da-stage][hidden]{display:table-row!important}',", [BROWSER])
 m('pressed_chip_untick', "    '.da-rv-chip[aria-pressed=\"true\"]::before{content:\"\\\\2713\\\\00a0\"}',", "", [BROWSER])
@@ -216,7 +219,7 @@ m('evidence_source_link_dropped', "      + (link ? '<p class=\"da-rv-src\">' + l
 m('source_link_duplicated_in_development', "+ (also ? '<span class=\"da-rv-sub\" data-da-also>' + esc(also) + '</span>' : '') + '</th>';", "+ (also ? '<span class=\"da-rv-sub\" data-da-also>' + esc(also) + '</span>' : '') + sourceLink(p) + '</th>';")  # re-anchored 2026-11-02 (national-6)
 m('evidence_column_dropped', ", ['evid', 'Supporting Evidence']];", "];")
 m('missing_evidence_invented', "return lines || '<p class=\"da-rv-quiet da-rv-noev\">' + NO_EVIDENCE + '</p>';", "return lines || line('Official record', 'Verified');")
-m('evidence_cell_not_in_row_filter', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + evid + '</tr>'", "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || 'none') + '\">' + dev + stage + qol + '</tr>' + evid")
+m('evidence_cell_not_in_row_filter', "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || (lifeKey(p) === 'operating' ? 'operating' : 'none')) + '\"' + subAttr(p, k) + '>' + dev + stage + qol + evid + '</tr>'", "'<tr role=\"row\" data-da-type=\"' + esc(typeKeyOf(p)) + '\" data-da-stage=\"' + (k || (lifeKey(p) === 'operating' ? 'operating' : 'none')) + '\"' + subAttr(p, k) + '>' + dev + stage + qol + '</tr>' + evid")
 m('evidence_attribution_dropped', "+ (att ? '<p class=\"da-rv-attr\">' + esc(att) + '</p>' : '')\n      + (recordIdOf(p) ?", "+ (recordIdOf(p) ?")
 m('print_evidence_hidden', "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}',", "'.da-rv-table thead th{font-size:9.5px;letter-spacing:.03em}.da-rv-td--evid{display:none}',", [BROWSER])
 m('print_table_loses_widths', "'.da-rv-table{table-layout:fixed;font-size:11px}.da-rv-th--dev{width:24%}", "'.da-rv-table{table-layout:auto;font-size:11px}.da-rv-th--dev{width:24%}")
@@ -250,7 +253,18 @@ m('occupancy_briefing_dropped', "    if (s.occupancy && s.occupancy.length) stag
 m('outcome_text_not_readable', "    '.da-rv-outcome-p{font-size:16px;max-width:65ch}',", "    '.da-rv-outcome-p{font-size:11px;max-width:65ch}',", [BROWSER])
 
 # ---- founder 2026-11-02: the overview leads with the largest new buildings, by the scale the record states ------------------------------------------------
-m('scale_lead_dropped', "    lead.forEach(function (p) { if (picked.length < OVERVIEW_SCALE_SLOTS) picked.push(p); });\n", "", [SCALE])
+m('scale_lead_dropped', "    lead.forEach(function (p) { if (picked.length < OVERVIEW_SCALE_SLOTS) take(p); });\n", "", [SCALE])
+# 2026-11-03 partner-sample review
+m('qol_type_sentence_back', "    return rec;\n  }", "    return { kind: 'potential', text: rec.text + ' ' + (QOL_BY_TYPE[typeKeyOf(p)] || '') };\n  }", [REVIEW, NATIONAL7])
+m('completed_note_dropped', "    if (lifeKey(p) === 'operating' && !stageKey(p)) return", "    if (false) return", [REVIEW])
+m('overview_repeats_address', "if (a && addrs.indexOf(a) >= 0) return false;", "", [REVIEW, SCALE])
+m('temporary_window_dropped', "(tw ? 'Documented activity window: ' + tw", "(false ? 'Documented activity window: ' + tw", [REVIEW])
+m('history_internal_words', "    return has(STATUS_WORDS, key) ? STATUS_WORDS[key] : v;", "    return v;", [REVIEW, NATIONAL5])
+m('legend_combined', "      if (k !== 'permitted') return", "      if (true) return", [REVIEW])
+m('no_unstaged_chip', "      + (m.unstaged.length ? chip('stage', 'none', TITLES.unstaged, m.unstaged.length, false) : '');", "      ;", [REVIEW])
+m('title_ignores_description', "    if (d && (p.title_cut === true || !t || wordsOf(t) === wordsOf(p.address))) return d;", "", [REVIEW])
+m('address_keeps_comma', ".trim().replace(/[\\s,;]+$/, '') : '';", ".trim() : '';", [REVIEW])
+m('freshness_between_one_date', "(b && b !== a ? 'between ' + a + ' and ' + b : 'on ' + a)", "('between ' + a + (b && b !== a ? ' and ' + b : ''))", [REVIEW])
 m('scale_smallest_first', "function scaleAbove(a, b) { for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i]; return false; }", "function scaleAbove(a, b) { for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; }", [SCALE])
 m('scale_cap_fills_list', "var OVERVIEW_SCALE_SLOTS = 4;", "var OVERVIEW_SCALE_SLOTS = 6;", [SCALE])
 m('scale_housing_dropped', ".concat(largestFirst(all.filter(function (p) { return basisOf(p) === 'change_of_use' && scaleOf(p)[0] > 0; })))", "", [SCALE])
