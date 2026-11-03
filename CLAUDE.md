@@ -5810,7 +5810,7 @@ Tests: `test/report-quality-national7.test.mjs` on `test/fixtures/report-quality
     name or the name is only the address (SEPA). `@page` defines its own header; the subject loses a trailing comma; one read date is "on <date>".
   - Not changed: Jody Type labels (one classifier, `lib/project-type.js`, shared with Map 1) and the workspace name in the header (the account's own).
   - Tests: `test/report-partner-review.test.mjs`, `test/temporary-installation.test.mjs`.
-, `NO_SIGNIFICANT_CHANGES`, "No significant nearby changes found"** (`activity-outcome-2`).
+- ⚖️ **Decided 2026-11-02 (founder "agree do all"): a fourth outcome, `NO_SIGNIFICANT_CHANGES`, "No significant nearby changes found"** (`activity-outcome-2`).
   An empty report whose records were all read and left out by the relevance rule says what Jody checked ("Jody checked N official records within R of
   this property. All of them describe routine work, such as interior remodels, repairs and office fit-outs. None documents a change the neighborhood would
   notice."), counted by kind from `activity.records_judged`. Nothing judged stays "No data ingested". **It never uses a free report** (`credit-rule-2`):
