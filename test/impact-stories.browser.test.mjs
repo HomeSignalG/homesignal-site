@@ -811,10 +811,10 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(120);
 const bbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
-ok(/a photo is needed/i.test(bbox) && bbox.includes('Farmland like the 320 acres the council rezoned (place) and Homes and farms beside the site (neighborhood) have no photo yet')
-   && !/Something went wrong/i.test(bbox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
-   && await page.locator('#is #is-next-box [data-act=step][data-step=visuals].primary').count() === 1,
-   'next step: a Prepare stopped for a missing photo names the subjects and opens Visuals, with no Retry');
+ok(/no photo found/i.test(bbox) && bbox.includes('no usable licensed photo of Farmland like the 320 acres the council rezoned (place) or Homes and farms beside the site (neighborhood)')
+   && !/upload/i.test(bbox) && !/Something went wrong/i.test(bbox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
+   'next step: a Prepare stopped for no photo names the subjects, never asks for an upload, and offers no Retry');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
