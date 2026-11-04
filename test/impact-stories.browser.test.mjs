@@ -798,6 +798,24 @@ await page.waitForTimeout(120);
 const wbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
 ok(/Working on it/i.test(wbox) && wbox.includes('Nothing is needed from you') && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
    'next step: while the videos render the box says nothing is needed, with no button');
+// a Prepare that stopped for a missing photo is the founder's step, not a crash (Menomonie, 2026-11-04)
+await page.evaluate(() => {
+  window.__beforeBlocked = { job: window.db.job, status: window.db.status, visuals: window.db.visuals };
+  window.db.job = { id: 'jvb', kind: 'visuals', status: 'failed', attempts: 1, created_at: '2026-11-04T18:18:44Z',
+    error: 'Nothing was rendered: Missing essential image: Farmland like the 320 acres the council rezoned (place): no licensed photo yet.' };
+  window.db.status = ((st) => () => Object.assign(st(), { stage: 'visuals', next: 'Prepare the visuals', owner: 'you' }))(window.db.status);
+  window.db.visuals = { state: 'none', counts: {}, manifest: null, blocked: { job_id: 'jvb', blocked: true, at: '2026-11-04T18:20:00Z', error: 'Nothing was rendered',
+    failures: [{ code: 'missing_essential_image', label: 'Missing essential image', detail: 'Farmland like the 320 acres the council rezoned (place): no licensed photo yet.' },
+               { code: 'missing_essential_image', label: 'Missing essential image', detail: 'Homes and farms beside the site (neighborhood): no licensed photo yet.' }], candidates: [] } };
+  location.hash = '#impact=s1&step=media'; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const bbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/a photo is needed/i.test(bbox) && bbox.includes('Farmland like the 320 acres the council rezoned (place) and Homes and farms beside the site (neighborhood) have no photo yet')
+   && !/Something went wrong/i.test(bbox) && await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box [data-act=step][data-step=visuals].primary').count() === 1,
+   'next step: a Prepare stopped for a missing photo names the subjects and opens Visuals, with no Retry');
+await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
