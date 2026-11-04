@@ -18,13 +18,14 @@ await page.evaluate(() => {
   window.row = { slug: 's', title: '3009 Test', status: 'pending', created_at: '2026-10-28T00:00:00Z', files, meta: {},
     file_decisions: { final: { status: 'approved', version: 1 } }, versions: [], revisions: [] };
   window.calls = [];
+  window.plans = [];
   window.confirms = [];
   window.answer = true;
   window.confirm = (m) => { window.confirms.push(m); return window.answer; };
   window.client = {
     rpc: (n, a) => {
       if (n === 'hs_youtube_videos_list') return Promise.resolve({ data: [JSON.parse(JSON.stringify(window.row))], error: null });
-      if (n === 'hs_youtube_video_plans') return Promise.resolve({ data: [], error: null });
+      if (n === 'hs_youtube_video_plans') return Promise.resolve({ data: JSON.parse(JSON.stringify(window.plans)), error: null });
       window.calls.push([n, a]);
       if (n === 'hs_youtube_video_rebuild') {
         window.row.revisions.push({ id: 'r1', file_key: a.p_key, parent_version: 1, status: 'queued', attempts: 1,
@@ -67,6 +68,25 @@ await load();
 const txt = await page.locator(T).textContent();
 ok(txt.includes('Rebuilt from the current script') && !txt.includes('Corrected from your note'), '7 the new version says it was rebuilt');
 ok(txt.includes('Fixes that no longer apply') && txt.includes('The old sentence.') && txt.includes('no longer in the script'), '8 a fix the script lost is named');
+
+// A note Claude could not turn into a change (the 3011 Short 2 case, 2026-11-04): the plan waits with only Cancel.
+// Full rebuild must be there too, without pressing Cancel first; the database closes the waiting plan itself.
+const S2 = '.yv-file[data-key="short2"] ';
+await page.evaluate(() => {
+  window.plans = [{ id: 'p9', slug: 's', file_key: 'short2', status: 'ready', note: 'who are the cost savings going to?',
+    plan_md5: 'm9', created_at: '2026-11-04T14:00:00Z', plan: { steps: [], corrections: [], not_done: [{ text: 'who?', reason: 'This is a question.' }] } }];
+});
+await load();
+ok((await page.locator(S2).textContent()).includes('Nothing in this note is a change I can make'), '9 the empty plan is shown');
+ok(await page.locator(S2 + '.yv-rebuild').count() === 1, '10 Full rebuild is shown beside a plan waiting for Confirm');
+await page.click(S2 + '.yv-rebuild');
+await page.waitForFunction(() => window.calls.some((x) => x[0] === 'hs_youtube_video_rebuild' && x[1].p_key === 'short2'));
+ok(!(await page.evaluate(() => window.calls.some((x) => x[0] === 'hs_youtube_video_plan_cancel'))), '11 no Cancel is needed first');
+// while Claude is still reading a note the database refuses a rebuild, so the button is not offered
+await page.evaluate(() => { window.row.revisions = window.row.revisions.filter((r) => r.file_key !== 'short2');
+  window.plans = [{ id: 'p10', slug: 's', file_key: 'short1', status: 'planning', note: 'x', created_at: '2026-11-04T14:00:00Z' }]; });
+await load();
+ok(await page.locator('.yv-file[data-key="short1"] .yv-rebuild').count() === 0, '12 no Full rebuild while Claude is reading a note');
 
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
