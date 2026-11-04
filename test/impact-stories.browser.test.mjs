@@ -579,6 +579,52 @@ await page.evaluate(() => { window.db.media.fix_batch = { status: 'stalled', req
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
 ok(await page.locator('#is [data-act=fixstart]', { hasText: 'Fix again' }).count() === 1, 'fixes: a stalled batch offers Fix again');
+// One status at the top of Media review (founder, 2026-11-04: "is it rendering or has it stopped i have no idea"):
+// the Stratos case. A render running, an older failed fix run, two hum requests and a main-video request.
+const statusSave = await page.evaluate(() => { window.__st = window.db.status; return true; });
+await page.evaluate(() => {
+  const m = window.db.media;
+  m.current = false; m.stale_reason = 'pictures'; m.hum = true;
+  m.fix_batch = { status: 'failed', requests: 3, requested_at: '2026-11-03T23:18:05Z', claimed_at: '2026-11-03T23:18:40Z', completed_at: '2026-11-03T23:22:04Z',
+    summary: 'The fix run stopped before it could report.', next_step: 'Press Fix again. If it fails again, the note above says why.' };
+  const fb = { status: 'failed', outcome: 'not_changed', note: 'Not worked: the fix run stopped.', completed_at: '2026-11-03T23:22:04Z' };
+  m.fix_requests = [
+    { id: 8, asset: 'short_a', note: 'remove humming sound', at: '2026-11-03T23:15:59Z', status: 'rendering', batch: fb },
+    { id: 7, asset: 'short_a', note: 'remove the humming sound in background from everything', at: '2026-11-03T23:15:36Z', status: 'rendering', batch: fb },
+    { id: 6, asset: 'main', note: 'Discuss what the developer states vs the engineering evidence', at: '2026-11-03T23:14:23Z', status: 'rendering', batch: fb }];
+  const base = window.__st;
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'working', next: 'Rendering the videos (about 1 to 3 hours)…',
+    job: { id: 'jr', kind: 'render', status: 'queued', created_at: '2026-11-04T14:26:37Z', not_started: false, stuck: false } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+txt = await page.locator('#is-media-now').innerText();
+const mediaTxt = await page.locator('#is').innerText();
+ok(/rendering now/i.test(txt) && txt.includes('Nothing is needed from you'), 'media now: a running render is the one status at the top');
+ok(!mediaTxt.includes('so they are out of date') && !mediaTxt.includes('still have the old background hum') && !mediaTxt.includes('Press Fix again'),
+   'media now: while it renders, no "out of date", hum or "Press Fix again" note contradicts it');
+ok((await page.locator('#is').textContent()).includes('Earlier fix run') && await page.locator('#is details.is-panel:not([open])', { hasText: 'Fix requests (3)' }).count() === 1,
+   'media now: a fix run older than the render is history, and the requests are folded away');
+await page.evaluate(() => document.querySelectorAll('#is details').forEach((d) => { d.open = true; }));
+ok((await page.locator('#is .is-badge.ok', { hasText: 'the hum was removed on Oct 30' }).count()) === 2, 'media now: hum requests read as done for every new video');
+// the render then stops on a status check: the top says so and says what to do
+await page.evaluate(() => {
+  const base = window.__st;
+  window.db.media.blocked = { job_id: 'jr', at: '2026-11-04T14:28:28Z', error: 'Nothing was rendered: Outdated status: October 30, 2026',
+    failures: [{ code: 'excessive_documents', label: 'Too many documents and cards', fixable: true, detail: 'cards 49%' },
+               { code: 'outdated_status', label: 'Outdated status', fixable: false, detail: 'October 30, 2026', action: 'Check sources again.' }], candidates: [] };
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'you', next: 'Render the videos',
+    job: { id: 'jr', kind: 'render', status: 'failed', created_at: '2026-11-04T14:26:37Z', completed_at: '2026-11-04T14:28:28Z', error: 'Nothing was rendered' } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+txt = await page.locator('#is-media-now').innerText();
+ok(/the last render stopped/i.test(txt) && txt.includes('Outdated status') && txt.includes('Next: Check sources again.') && txt.includes('1 more item'),
+   'media now: a stopped render says so, names the reason that needs a person, and the next step');
+ok(!/rendering now/i.test(await page.locator('#is').innerText()), 'media now: nothing says it is rendering once it stopped');
+await page.evaluate(() => { window.db.status = window.__st; const m = window.db.media; delete m.blocked; m.current = true; m.hum = false; m.stale_reason = null; m.fix_requests = []; m.fix_batch = null; });
 // the quality gates (2026-10-27): a file the visual gate failed, a blocked render with licensed candidates, the status check
 await page.evaluate(() => {
   const m = window.db.media;
