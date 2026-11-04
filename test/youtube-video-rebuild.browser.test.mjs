@@ -68,6 +68,20 @@ const txt = await page.locator(T).textContent();
 ok(txt.includes('Rebuilt from the current script') && !txt.includes('Corrected from your note'), '7 the new version says it was rebuilt');
 ok(txt.includes('Fixes that no longer apply') && txt.includes('The old sentence.') && txt.includes('no longer in the script'), '8 a fix the script lost is named');
 
+// a plan Claude could not use (the note was a question) is waiting: Full rebuild is still offered on that file
+await page.evaluate(() => {
+  window.row.files.short1.version = 1;
+  window.planRows = [{ id: 'p1', slug: 's', file_key: 'short1', status: 'ready', parent_version: 1, note: 'who are the cost savings going to?',
+    plan: { corrections: [], not_done: [{ note: 'who are the cost savings going to?', reason: 'This is a question, not a change request.' }] },
+    plan_md5: 'x', created_at: '2026-11-03T00:00:00Z' }];
+  const orig = window.client.rpc;
+  window.client.rpc = (n, a) => n === 'hs_youtube_video_plans' ? Promise.resolve({ data: window.planRows, error: null }) : orig(n, a);
+});
+await load();
+const S = '.yv-file[data-key="short1"] ';
+ok((await page.locator(S).textContent()).includes('who are the cost savings going to?'), '9 the unusable plan is on screen');
+ok(await page.locator(S + '.yv-rebuild').count() === 1, '10 Full rebuild is offered beside a plan waiting for Confirm');
+
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all rebuild page checks passed');
