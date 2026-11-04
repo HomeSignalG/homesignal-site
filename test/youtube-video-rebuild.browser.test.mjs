@@ -88,6 +88,17 @@ await page.evaluate(() => { window.row.revisions = window.row.revisions.filter((
 await load();
 ok(await page.locator('.yv-file[data-key="short1"] .yv-rebuild').count() === 0, '12 no Full rebuild while Claude is reading a note');
 
+// A note that asks a question says a script change is needed, not "change the wording" (2026-11-04).
+await page.evaluate(() => {
+  window.plans = [{ id: 'p11', slug: 's', file_key: 'short2', status: 'ready', note: 'who are the cost savings going to?',
+    plan_md5: 'm11', created_at: '2026-11-04T15:00:00Z', plan: { steps: [], corrections: [],
+      not_done: [{ text: 'who are the cost savings going to?', kind: 'question', reason: 'This is a question.' }] } }];
+});
+await load();
+const q = await page.locator(S2).textContent();
+ok(q.includes('Your note asks a question') && !q.includes('Change the wording'), '13 a question says a script change is needed');
+ok(await page.locator(S2 + '.yv-rebuild').count() === 1, '14 and Full rebuild is right there');
+
 await browser.close();
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all rebuild page checks passed');
