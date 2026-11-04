@@ -446,6 +446,31 @@ select pg_temp.chk('12V35e neither can be run by visitors',
   not has_function_privilege('anon', 'public.hs_impact_story_shots_approve(uuid, bigint, text, text, text[])', 'execute')
   and not has_function_privilege('anon', 'public.hs_impact_story_photos_reject(uuid, bigint, text[], text)', 'execute')
   and has_function_privilege('authenticated', 'public.hs_impact_story_shots_approve(uuid, bigint, text, text, text[])', 'execute'));
+-- 12V36 (founder, 2026-11-04: "i never upload. the code is responsible for finding pics"): photos the engine found and
+-- used for an essential subject with none are recorded as the story's photos, so the previews stay current
+insert into public.impact_story_photo_rejections (story_id, photo_id, decision, entry, actor)
+  values (pg_temp.id('s')::uuid, 'flare-rejected', 'rejected', '{"id":"flare-rejected"}'::jsonb, 'founder@example.com');
+select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
+insert into _ids select 'va', (pg_temp.lastjob()).id;
+select public.hs_impact_story_job_claim(pg_temp.id('va')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('va')::uuid, jsonb_build_object('manifest',
+  pg_temp.vman(pg_temp.id('va')::uuid) || jsonb_build_object('auto_choices', jsonb_build_array(
+    jsonb_build_object('subject_id', 'gas-flare', 'candidate_id', 'flare-1', 'entry', jsonb_build_object('id', 'flare-1',
+      'title', 'File:Flare.jpg', 'license', 'CC BY 2.0', 'file_url', 'https://upload.wikimedia.org/f.jpg', 'sha256', repeat('f', 64))),
+    jsonb_build_object('subject_id', 'gas-flare', 'candidate_id', 'flare-2', 'entry', jsonb_build_object('id', 'flare-2',
+      'title', 'File:Flare2.jpg', 'license', 'CC BY 2.0', 'file_url', 'https://upload.wikimedia.org/g.jpg', 'sha256', 'not-a-checksum')),
+    jsonb_build_object('subject_id', 'gas-flare', 'candidate_id', 'flare-rejected', 'entry', jsonb_build_object('id', 'flare-rejected',
+      'title', 'File:Flare3.jpg', 'license', 'CC BY 2.0', 'file_url', 'https://upload.wikimedia.org/h.jpg', 'sha256', repeat('a', 64)))))));
+select pg_temp.chk('12V36 the engine''s found photos become the story''s photos (complete, never rejected), and the previews read current',
+  (pg_temp.lastjob()).status = 'complete'
+  and (select count(*) from public._hs_is_choices(pg_temp.id('s')::uuid) where subject_id = 'gas-flare') = 1
+  and (select actor from public._hs_is_choices(pg_temp.id('s')::uuid) where candidate_id = 'flare-1') = 'system:auto-photo'
+  and (select choices_key from public.impact_story_visual_manifests order by id desc limit 1) = public._hs_is_choice_key(pg_temp.id('s')::uuid)->>'key'
+  and pg_temp.vis()->>'state' <> 'stale'
+  and (select (detail->>'photos_found')::int from public.impact_story_events where kind = 'visuals_prepared' order by id desc limit 1) = 1);
+insert into public.impact_story_photo_rejections (story_id, photo_id, decision, entry, actor)
+  values (pg_temp.id('s')::uuid, 'flare-rejected', 'restored', '{"id":"flare-rejected"}'::jsonb, 'founder@example.com');
+select public.hs_impact_story_unchoose_asset(pg_temp.id('s')::uuid, 'gas-flare', 'flare-1');   -- a found photo comes out like any other
 -- 12V30 (founder, 2026-10-30: no drawings): previews that still carry a drawn shot are out of date and never approvable
 select public.hs_impact_story_visuals_prepare(pg_temp.id('s')::uuid, pg_temp.cur(), true);
 select public.hs_impact_story_job_claim((pg_temp.lastjob()).id);

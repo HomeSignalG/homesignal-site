@@ -1547,6 +1547,7 @@ end $$;
 create or replace function public.hs_impact_story_job_complete(p_job_id uuid, p_result jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare j public.impact_story_jobs%rowtype; s public.impact_stories%rowtype; nv int; d jsonb; vman jsonb; pfx text; mid bigint;
+        ac jsonb; nauto int := 0; ck_before text; vkey text;
 begin
   select * into j from public.impact_story_jobs where id = p_job_id for update;
   if not found or j.status <> 'running' then
@@ -1611,17 +1612,40 @@ begin
                   where x->'preview' is not null and left(coalesce(x->'preview'->>'path', ''), length(pfx)) <> pfx) then
       return public.hs_impact_story_job_fail(p_job_id, 'The visuals job returned a preview outside this job''s folder.');
     end if;
+    -- Photos the engine found and used itself for an essential subject with none (founder, 2026-11-04: "i never upload.
+    -- the code is responsible for finding pics"). Recorded as the story's photos, like a person's choice, so the render
+    -- plans with exactly them; Reject / Remove work on them as on any photo. Only a complete licensed entry, never a
+    -- photo the founder rejected, never one already chosen. The previews were made with them: when the founder changed
+    -- nothing while the job ran, the previews' key is the key with them, so the previews read current.
+    ck_before := public._hs_is_choice_key(j.story_id)->>'key';
+    for ac in select x from jsonb_array_elements(coalesce(vman->'auto_choices', '[]'::jsonb)) x loop
+      if coalesce(ac->>'subject_id', '') = '' or coalesce(ac->>'candidate_id', '') = ''
+         or coalesce(ac->'entry'->>'sha256', '') !~ '^[0-9a-f]{64}$' or coalesce(ac->'entry'->>'license', '') = ''
+         or coalesce(ac->'entry'->>'file_url', '') = '' or ac->'entry'->>'id' is distinct from ac->>'candidate_id' then
+        continue;
+      end if;
+      if exists (select 1 from public._hs_is_rejections(j.story_id) r where r.photo_id = ac->>'candidate_id'
+                   or r.entry->>'file_url' = ac->'entry'->>'file_url' or r.entry->>'sha256' = ac->'entry'->>'sha256')
+         or exists (select 1 from public._hs_is_choices(j.story_id) c where c.subject_id = ac->>'subject_id' and c.candidate_id = ac->>'candidate_id') then
+        continue;
+      end if;
+      insert into public.impact_story_asset_choices (story_id, subject_id, candidate_id, job_id, entry, actor)
+      values (j.story_id, ac->>'subject_id', ac->>'candidate_id', j.id, ac->'entry', 'system:auto-photo');
+      nauto := nauto + 1;
+    end loop;
+    vkey := case when nauto > 0 and coalesce(j.input->>'choices_key', '') = ck_before
+                 then public._hs_is_choice_key(j.story_id)->>'key' else coalesce(j.input->>'choices_key', '') end;
     insert into public.impact_story_visual_manifests (story_id, job_id, version, narrative_hash, pack_hash, renderer, manifest_hash,
       choices_key, opts, counts, approvable, manifest)
     values (j.story_id, j.id, j.base_version, j.input->>'narrative_hash', vman->>'pack_hash', coalesce(vman->>'renderer', j.input->>'renderer'),
-      vman->>'hash', coalesce(j.input->>'choices_key', ''), coalesce(vman->'opts', '{}'::jsonb), coalesce(vman->'counts', '{}'::jsonb),
+      vman->>'hash', vkey, coalesce(vman->'opts', '{}'::jsonb), coalesce(vman->'counts', '{}'::jsonb),
       coalesce((vman->>'approvable')::boolean, false) and coalesce((vman->'identity'->>'same')::boolean, false), vman)
     returning id into mid;
     update public.impact_story_jobs set status = 'complete', completed_at = now(),
            result = jsonb_build_object('manifest_id', mid, 'hash', vman->>'hash', 'counts', vman->'counts', 'timing', vman->'timing')
      where id = p_job_id;
     perform public._hs_is_event(j.story_id, 'visuals_prepared', jsonb_build_object('job_id', j.id, 'manifest_id', mid,
-      'counts', vman->'counts'), 'worker');
+      'counts', vman->'counts', 'photos_found', nauto), 'worker');
     perform public._hs_is_followup(s.id, 'worker');   -- a save made while the previews were prepared is checked now
     return jsonb_build_object('ok', true, 'manifest_id', mid);
   end if;

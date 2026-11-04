@@ -6068,6 +6068,13 @@ Results.
       pressed. A shot with no photo needs a note, and the box says so. "Reject every photo in this act" saves through
       `hs_impact_story_photos_reject` in one transaction. Both new functions fall back to the one-at-a-time calls if the
       database does not have them yet (PostgREST `PGRST202`). Other steps still use the browser's dialogs. pg 12V35a-e.
+  - ⚖️ **THE CODE FINDS THE PHOTOS (founder, 2026-11-04: "i never upload. the code is responsible for finding pics").**
+    A visuals job whose manifest carries `auto_choices` (photos the engine found and used for an essential subject with none,
+    homesignal-ingest `job.py::_prepare_with_found_photos`) has them recorded by `hs_impact_story_job_complete` as the story's
+    photos (actor `system:auto-photo`; only complete licensed entries, never a rejected or already-chosen photo). When the
+    founder changed nothing while the job ran, the manifest's `choices_key` is the key WITH them, so the previews read current.
+    A stop for a missing photo now means the search found nothing usable: the page says so and asks for no upload. pg 12V36.
+    **Apply order: this SQL before the ingest engine merges.**
   - **Not built yet** (P2 follow-ups): crop.
   - Hot Topics' "Create video" now says to approve the visuals first.
   - **Apply order:** merge the ingest engine, then apply this SQL, then deploy the page.
