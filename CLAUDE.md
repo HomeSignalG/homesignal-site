@@ -6105,6 +6105,20 @@ key, checks the change, lands it on ingest main and records Done / Needs you / f
 disabled. A missing credential fails the batch with a readable reason. Apply order: merge the ingest workflow first (a dispatch to a
 workflow not on main is refused), then apply `docs/impact-stories.sql`, then deploy the page. pg checks 12f4b, 12f4c.
 
+## IMPACT STORIES, TAB 17: "FIX THIS LINE" ON EVERY SCRIPT LINE (2026-11-05)
+
+Founder: *"a fix on each narration ... that can accept abstract fixes like look up the EPA legal obligation"*. Under every
+line in Script & Shorts (narration, on-screen text, QOL, Shorts, packaging) a "Fix this line" box saves a note
+(`hs_impact_story_line_note`, table `impact_story_line_notes`, append-only; "Take back" = `hs_impact_story_line_note_withdraw`).
+A "Look this up first in official records" tick makes it a research note. The note stores the line's path and its saved
+text; it changes nothing until **Fix** (top of Script & Shorts, the same `hs_impact_story_fix_start`) sends every open note
+with the video fix requests. Line-note ids come from the media decisions' sequence, so one batch's outcomes name one request.
+- The fixer (homesignal-ingest `impact/fixes/FIXES.md`) answers a research note from official documents only, adds them to
+  that story's source pack with verbatim quotes, rewrites the line, and puts its answer in the outcome note shown under the
+  line. A batch that changed the pack completes with `regenerate: 'pack'`: a source check queued with `then: 'generate'`,
+  and the finished check starts Generate (`hs_impact_story_job_complete`; a refusal is a `followup_failed` event).
+- Apply order: ingest change on main, then `docs/impact-stories.sql`, then this page. Tests: pg 12L1-12L7, browser "line notes".
+
 ### Plan first, then confirm (2026-11-05, founder: "is there a way i can write the fixes in the tab and they will be done correctly")
 - **Fix starts a PLAN run** (`hs_impact_story_fix_start` → batch `plan_queued` → dispatch `mode=plan`): Claude reads the notes
   and the newest render's checks (`_hs_is_fix_checks`, sent with the claim) and writes, per request, what it understood, the

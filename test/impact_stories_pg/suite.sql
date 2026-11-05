@@ -661,6 +661,62 @@ select pg_temp.chk('12f8 done: each request shows its outcome, the batch says th
    and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'outcome' <> 'fixed')
    and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 0
    and pg_temp.err(format('select public.hs_impact_story_fix_start(%L)', pg_temp.id('s'))) like '%no open fix requests%');
+-- 12L. a fix note on ONE script line (founder, 2026-11-05), including a research note, goes out in the same Fix batch.
+begin;
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('12L1 non-admin cannot add a line note',
+   pg_temp.err(format('select public.hs_impact_story_line_note(%L, %L, %L, %L)', pg_temp.id('s'), 'main.acts.2.scenes.0.narration.1', 'x', 'y')) like '42501%');
+select pg_temp.as_user('founder@example.com');
+select pg_temp.chk('12L2 an empty note, a path that is not a line, and a missing story are refused; the table is not readable by visitors',
+   pg_temp.err(format('select public.hs_impact_story_line_note(%L, %L, %L, %L)', pg_temp.id('s'), 'main.acts.2.scenes.0.narration.1', 'x', '  ')) like '%Say what to fix%'
+   and pg_temp.err(format('select public.hs_impact_story_line_note(%L, %L, %L, %L)', pg_temp.id('s'), 'main; drop table x', 'x', 'y')) like '%not a line%'
+   and pg_temp.err(format('select public.hs_impact_story_line_note(%L, %L, %L, %L)', gen_random_uuid(), 'main.acts.0.scenes.0.narration.0', 'x', 'y')) like 'P0002%'
+   and not has_table_privilege('authenticated', 'public.impact_story_line_notes', 'select')
+   and has_function_privilege('authenticated', 'public.hs_impact_story_line_note(uuid, text, text, text, boolean)', 'execute')
+   and not has_function_privilege('anon', 'public.hs_impact_story_line_note(uuid, text, text, text, boolean)', 'execute'));
+insert into _ids select 'ln1', public.hs_impact_story_line_note(pg_temp.id('s')::uuid, 'main.acts.2.scenes.0.narration.1',
+   'EPA found comments unpersuasive.', 'Look up EPA''s legal duty to consider health studies, and whether this rule meets it.', true)->>'id';
+insert into _ids select 'ln2', public.hs_impact_story_line_note(pg_temp.id('s')::uuid, 'main.acts.2.scenes.1.narration.0', 'x', 'Shorter, please.')->>'id';
+select pg_temp.chk('12L3 both notes are listed open on the story and both are eligible for Fix, the research one marked research',
+   (select count(*) from jsonb_array_elements(public.hs_impact_story_get(pg_temp.id('s')::uuid)->'line_notes') x where x->>'status' = 'open') = 2
+   and (select (x->>'research')::boolean from jsonb_array_elements(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) x where (x->>'id') = pg_temp.id('ln1'))
+   and (select x->>'kind' from jsonb_array_elements(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) x where (x->>'id') = pg_temp.id('ln1')) = 'line'
+   and not exists (select 1 from public.impact_story_media_decisions where id in (pg_temp.id('ln1')::bigint, pg_temp.id('ln2')::bigint)));
+select public.hs_impact_story_line_note_withdraw(pg_temp.id('s')::uuid, pg_temp.id('ln2')::bigint);
+select pg_temp.chk('12L4 a withdrawn note is not sent; notes are append-only',
+   (select x->>'status' from jsonb_array_elements(public._hs_is_line_notes(pg_temp.id('s')::uuid)) x where x->>'id' = pg_temp.id('ln2')) = 'withdrawn'
+   and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 1
+   and pg_temp.err('update public.impact_story_line_notes set note = ''x''') like '42501%');
+insert into _ids select 'fb2', public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->'batch'->>'id';
+select pg_temp.chk('12L5 Fix sends the line note with its line and path; it reads sending and cannot be withdrawn',
+   (select requests->0->>'path' from public.impact_story_fix_batches where id = pg_temp.id('fb2')::uuid) = 'main.acts.2.scenes.0.narration.1'
+   and (select requests->0->>'line' from public.impact_story_fix_batches where id = pg_temp.id('fb2')::uuid) = 'EPA found comments unpersuasive.'
+   and (select x->>'status' from jsonb_array_elements(public._hs_is_line_notes(pg_temp.id('s')::uuid)) x where x->>'id' = pg_temp.id('ln1')) = 'sending'
+   and pg_temp.err(format('select public.hs_impact_story_line_note_withdraw(%L, %s)', pg_temp.id('s'), pg_temp.id('ln1'))) like '%already working%');
+select public.impact_fix_batch_claim(pg_temp.id('fb2')::uuid);   -- plan first, then confirm (#2598)
+select public.impact_fix_batch_plan(pg_temp.id('fb2')::uuid, jsonb_build_object('summary', 'Look up the duty, then rewrite the line.',
+   'items', jsonb_build_array(jsonb_build_object('decision_id', pg_temp.id('ln1')::bigint, 'understood', 'You want the legal duty checked first.',
+   'changes', jsonb_build_array('Add the executive order and rewrite the line from it.')))));
+select pg_temp.chk('12L5b a planned line note still reads sending',
+   (select x->>'status' from jsonb_array_elements(public._hs_is_line_notes(pg_temp.id('s')::uuid)) x where x->>'id' = pg_temp.id('ln1')) = 'sending');
+select public.hs_impact_story_fix_confirm(pg_temp.id('s')::uuid, pg_temp.id('fb2')::uuid, (select plan_md5 from public.impact_story_fix_batches where id = pg_temp.id('fb2')::uuid));
+select public.impact_fix_batch_claim(pg_temp.id('fb2')::uuid);
+select public.impact_fix_batch_complete(pg_temp.id('fb2')::uuid, jsonb_build_object('status', 'done', 'summary', 'Added the statute and rewrote the line.',
+   'regenerate', 'pack', 'outcomes', jsonb_build_array(jsonb_build_object('decision_id', pg_temp.id('ln1')::bigint, 'outcome', 'fixed',
+   'note', 'EPA must consider children''s health under EO 13045 only for economically significant rules.'))));
+select pg_temp.chk('12L6 done: the note shows fixed with the fixer''s answer, and a source check is queued that writes the new version after it',
+   (select x->>'status' from jsonb_array_elements(public._hs_is_line_notes(pg_temp.id('s')::uuid)) x where x->>'id' = pg_temp.id('ln1')) = 'fixed'
+   and (select x->>'answer' from jsonb_array_elements(public._hs_is_line_notes(pg_temp.id('s')::uuid)) x where x->>'id' = pg_temp.id('ln1')) like 'EPA must%'
+   and exists (select 1 from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and kind = 'pack' and status = 'queued'
+                 and input->>'then' = 'generate' and requested_by = 'fixer')
+   and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 0);
+insert into _ids select 'pj', id::text from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and kind = 'pack' and status = 'queued';
+select public.hs_impact_story_job_claim(pg_temp.id('pj')::uuid);
+select public.hs_impact_story_job_complete(pg_temp.id('pj')::uuid, jsonb_build_object('pack', (select pack from public.impact_stories where id = pg_temp.id('s')::uuid)));
+select pg_temp.chk('12L7 the finished source check starts Generate (or records why it could not)',
+   exists (select 1 from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid and kind = 'generate' and status = 'queued'
+             and requested_by = 'worker'));
+rollback;
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid(a), 'approved') from unnest(array['main', 'short_a', 'short_b']) a;
 select pg_temp.chk('12k3 approving a file later closes only its own request, and the request stays listed',
    (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'main') = 'closed'

@@ -59,7 +59,7 @@ await page.evaluate(() => {
       hs_impact_story_list: [{ id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', primary_emotion: 'MOTIVATION', updated_at: '2026-10-25T10:00:00Z', verified_at: '2026-10-24T21:43:29Z', archived: false, status: window.db.status() },
         { id: 's2', title: 'Old story', video_slug: 'x', archived: true, updated_at: '2026-10-01T00:00:00Z', status: { library: 'archived', next: 'Archived.' } }],
       hs_impact_story_catalog: [{ slug: 'gig-harbor-fishing-homeport-dock', title: '3003 Gig Harbor' }],
-      hs_impact_story_get: { media: window.db.media || { render_job: null, files: [] }, visuals: window.db.visuals || { state: 'none', why: 'Prepare the visuals.' }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
+      hs_impact_story_get: { line_notes: window.db.lineNotes || [], media: window.db.media || { render_job: null, files: [] }, visuals: window.db.visuals || { state: 'none', why: 'Prepare the visuals.' }, story: { id: 's1', title: 'Gig Harbor <dock>', video_slug: 'gig-harbor-fishing-homeport-dock', current_version: window.db.version }, pack, status: window.db.status(),
         version: { version: window.db.version, body: Object.assign(JSON.parse(JSON.stringify(body)), (window.db.extra || {}).body || {}), checked: true, derived,
           validation: { arc: { fear: { ok: true, blocking: [], warnings: [] }, anger: { ok: true, blocking: [] }, motivation: { ok: false, blocking: ['MOTIVATION: none of its counterevidence (cost_none) is spoken.'] } },
             outline: { ok: true, blocking: [] }, short_a: { ok: false, blocking: ['Short A next line 1: promises a link.'] }, main: { ok: true, blocking: [], warnings: [] },
@@ -75,6 +75,8 @@ await page.evaluate(() => {
       hs_impact_story_visuals_approve: { ok: true },
     }[n];
     if (n === 'hs_impact_story_save') window.db.version = 8;
+    if (n === 'hs_impact_story_line_note') (window.db.lineNotes = window.db.lineNotes || []).unshift({ id: 900 + window.db.lineNotes.length, path: a.p_path, line: a.p_line, note: a.p_note, research: a.p_research, status: 'open' });
+    if (n === 'hs_impact_story_line_note_withdraw') window.db.lineNotes = (window.db.lineNotes || []).map((x) => x.id === a.p_note ? Object.assign({}, x, { status: 'withdrawn' }) : x);
     return Promise.resolve({ data: d === undefined ? {} : d, error: null });
   } };
   window.client.storage = { from: (b) => ({ download: (p) => { window.calls.push(['download', b, p]); return Promise.resolve({ data: new Blob(['x'], { type: 'video/mp4' }), error: null }); } }) };
@@ -146,6 +148,31 @@ await page.click('#is .is-panel [data-act=save]'); await page.waitForTimeout(80)
 const save = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_save').pop());
 ok(save && save[1].p_expected_version === 7 && save[1].p_body.main.acts[0].scenes[0].narration[0].text === 'Edited first line.', 'save: the edit is sent with the expected version (optimistic lock)');
 ok((await page.locator('#is').innerText()).includes('Saved as version 8'), 'save: visible confirmation');
+
+// a fix note on ONE line (founder, 2026-11-05), including "look this up first"
+const P3 = 'main.acts.2.scenes.0.narration.0';
+ok(await page.locator('#is [data-act=lnform]').count() >= 8, 'line notes: every narration line has Fix this line');
+await page.click(`#is [data-act=lnform][data-path="${P3}"]`);
+ok(await page.evaluate((p) => document.activeElement && document.activeElement.getAttribute('data-lnt') === p, P3), 'line notes: the note box opens under the line, focused');
+await page.fill(`#is textarea[data-lnt="${P3}"]`, 'Look up EPA\u2019s legal duty to weigh health studies and whether this rule meets it.');
+await page.check(`#is input[data-lnr="${P3}"]`);
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is'))); await page.waitForTimeout(80);
+ok((await page.locator(`#is textarea[data-lnt="${P3}"]`).inputValue()).startsWith('Look up EPA') && await page.locator(`#is input[data-lnr="${P3}"]`).isChecked(),
+   'line notes: a refresh keeps what was typed and the look-up box');
+const savesBefore = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_save').length);
+await page.click(`#is [data-act=lnsend][data-path="${P3}"]`); await page.waitForTimeout(80);
+const ln = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_story_line_note').pop());
+ok(ln && ln[1].p_path === P3 && ln[1].p_research === true && ln[1].p_note.startsWith('Look up EPA') && ln[1].p_line === 'Line of act 3.',
+   'line notes: the note is sent with its line, the saved text, and the look-up flag');
+ok(await page.evaluate((b) => window.calls.filter((c) => c[0] === 'hs_impact_story_save').length === b, savesBefore), 'line notes: a note does not save or change the script');
+txt = await page.locator('#is').innerText();
+ok(txt.includes('Line notes: 1') && txt.includes('Not sent yet') && txt.includes('Look up first') && await page.locator('#is [data-act=fixstart]').count() === 1,
+   'line notes: the note shows under its line, and Script & Shorts offers Fix');
+await page.click('#is [data-act=fixstart]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_start')), 'line notes: Fix sends them');
+await page.click('#is [data-act=lnwithdraw]'); await page.waitForTimeout(80);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_line_note_withdraw' && c[1].p_note === 900)) && !(await page.locator('#is').innerText()).includes('Line notes:'),
+   'line notes: Take back withdraws a note that was not sent');
 
 await page.click('#is [data-act=doc][data-doc=short_a]');
 ok((await page.locator('#is').innerText()).includes('promises a link'), 'Short A: its blocking check is shown');
