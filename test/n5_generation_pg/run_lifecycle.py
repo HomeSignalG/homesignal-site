@@ -417,6 +417,33 @@ def main():
     ok("E27 prove_dry against a non-serving baseline passes and records nothing",
        dry == 0 and R.q1(c, "select count(*) from geo.n5_generation_proof") == proofs, why)
 
+    # ------------------------------------------------ A ZIP WHOSE PAGE DRAWS NO MAP IS NEVER SAMPLED
+    # A coverage-limited ZIP (lib/zip-coverage.json page_mode other than "standard") shows the
+    # coverage panel instead of Map 1, so the browser proof waits for a map until it times out.
+    # n5-national-2026-11-04 drew 11240 that way and failed 48 proofs in a row (2026-11-05).
+    import tempfile
+    def unmeasured(O, gen):
+        return [z for z in O.proof_sample(gen, R.LEGACY)
+                if R.q1(c, "select status from geo.maps_zip_geography_status where generation_id=%s and zip=%s",
+                        (gen, z)) != "boundary_complete"]
+    plain = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY,
+                             ZIP_COVERAGE_JSON=os.path.join(ROOT, "lib", "zip-coverage.json"))
+    picked = unmeasured(plain, g4)
+    ok("E27b control: with the committed coverage model, the sample holds an unmeasured ZIP", len(picked) >= 1, picked)
+    cov = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    json.dump({"zips": {picked[0]: {"zip_code": picked[0], "page_mode": "verification_pending"},
+                        "00000": {"zip_code": "00000", "page_mode": "standard"}}}, cov); cov.close()
+    lim = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY, ZIP_COVERAGE_JSON=cov.name)
+    ok("E27b a ZIP the coverage model marks as coverage-limited is left out of the sample",
+       picked[0] not in lim.proof_sample(g4, R.LEGACY), (picked[0], lim.proof_sample(g4, R.LEGACY)))
+    ok("E27b a standard entry in the coverage model is not treated as limited", lim.coverage_limited_zips() == [picked[0]])
+    gone = env.orchestrator("prove_dry", GENERATION=g4, BASELINE=R.LEGACY,
+                            ZIP_COVERAGE_JSON=os.path.join(tempfile.gettempdir(), "no-such-coverage.json"))
+    ok("E27b an unreadable coverage model stops the sample (it never guesses)",
+       _raises(lambda: gone.proof_sample(g4, R.LEGACY), "cannot read the ZIP coverage model"))
+    os.environ.pop("ZIP_COVERAGE_JSON", None)
+    os.unlink(cov.name)
+
     # ------------------------------------------------ THE NEGATIVE CONTROL, AND THAT IT IS NOT VACUOUS
     # prove_negative runs the data check with wrong declared lists on a generation that passed it
     # and fails unless the check refuses each. It must write nothing; and it must FAIL when the
