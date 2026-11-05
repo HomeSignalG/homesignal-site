@@ -140,6 +140,11 @@ export interface SocrataRegistryEntry {
    *  `upper(zip)='<zip>'` (upper() on a numeric column is a Socrata type-mismatch 400). Absent/
    *  false ⇒ prior text behavior. Only affects entries with a native zip column (not spatial). */
   zip_numeric?: boolean;
+  /** true → the zip column is ADDRESS TEXT that ENDS with the ZIP ("Kansas City, MO 64156", optionally
+   *  "…64156-1234"): filter with `(upper(col) like '% <zip>' OR upper(col) like '% <zip>-%')` instead of an
+   *  exact match. The record's filed ZIP is already read from that text by its 5-digit token (geo-input.ts),
+   *  so only the query changes. Absent/false ⇒ prior behavior. Not combinable with zip_numeric. */
+  zip_text_suffix?: boolean;
   /** e.g. "https://…/{case_number}". Used only when column_map.record_url is absent. */
   record_url_template?: string;
   /** Columns whose values (joined with "|") form the source_id record segment,
@@ -776,7 +781,9 @@ function buildWhere(
         : `within_circle(${entry.spatial_point_col}, ${centroid.lat}, ${centroid.lng}, ${Math.round((entry.spatial_zip_radius_mi as number) * 1609.34)})`)
     : (entry.zip_numeric
         ? `${zipCol}=${zip.replace(/[^0-9]/g, "")}`               // numeric zip column: no upper(), no quotes
-        : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`)];
+        : entry.zip_text_suffix
+          ? zipSuffixClause(zipCol, zip)                           // ZIP at the end of an address-text column
+          : `upper(${zipCol})='${zip.replace(/'/g, "''")}'`)];
   // extra_where (additive, data-driven — the arcgis connector's twin): a VERBATIM SoQL
   // clause ANDed into every query, used to drop noise types AT SOURCE (e.g. Seattle's
   // ECA/street-exception and roof permits). The connector never inspects it.
@@ -800,6 +807,13 @@ function buildWhere(
     }
   }
   return clauses.join(" AND ");
+}
+
+/** The zip_text_suffix filter. Only the 5 digits of the report ZIP are used, so nothing else reaches the
+ *  SoQL string; a leading space keeps 64101 from matching "164101". */
+export function zipSuffixClause(zipCol: string, zip: string): string {
+  const z = (zip.match(/\d{5}/)?.[0]) ?? "00000";
+  return `(upper(${zipCol}) like '% ${z}' OR upper(${zipCol}) like '% ${z}-%')`;
 }
 
 /** `{typeCol} IN ('a','b',…)` for an entry's include_types, or null when it does not apply.

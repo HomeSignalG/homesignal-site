@@ -1760,6 +1760,85 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-28 Phase 4 recon (recon-fetch runs 30384902474 / 30385163406 / 30385625756): data.princegeorgescountymd.gov Socrata 'Permits' weik-ttee. FRESH \u2014 max(permit_issuance_date) 2026-07-24, 461,508 rows. NATIVE zip_code column, NO geometry (the 12 columns are permit_category, county_agency, permit_case_id, permit_case_year, permit_type, case_name, street_address, city, zip_code, permit_issuance_date, expected_construction_cost, location) -> records place by GEOCODING the assembled address (geocode_assemble: street_address + city, then the shared geo-input helper appends 'MD <zip>'; the engine's unchanged geofence still applies). zip_code IS A NUMBER: the connector's default upper(zip_code)='20772' returns HTTP 400 query.soql.type-mismatch 'Type mismatch for upper, is number' (verified live, run 30385461375) -> zip_numeric: true, the east-baton-rouge option. NO status column -> status_const='operating' per the packet, guarded by a non-empty permit_issuance_date; status_to_bucket [] x4 for schema completeness only (status_const bypasses the lookup). CATEGORY VOCABULARY IS COMPLETE \u2014 3 verbatim permit_category values summing to EXACTLY 461,508: Building Permit 419,296 + Site Road Permit 10,215 (both kept) + Health Permit 31,997 (DROPPED at source \u2014 food-service licences, pool-operator licences, well/septic and scavenger-vehicle permits, not construction). permit_type has 115 verbatim values (also summing to exactly 461,508) but is overwhelmingly opaque in-house codes with no published legend (DPIE ER 120,393 \u00b7 DPIE EC 56,386 \u00b7 R 38,090 \u00b7 RW 34,017 \u00b7 FIRW 15,931 \u2026), so type_map maps ONLY the 8 values that STATE their own meaning (9,017 rows of the kept 429,511); every other value stays use_type:'unclassified' (logged) rather than being inferred from a guessed legend. No per-row URL column -> dataset precision. CONNECTOR-SHAPED SMOKE (run 30385625756, zip_code=<n> AND (extra_where) AND recency): 20772 -> 33 rows, 20740 -> 13, 20785 -> 7, samples carry street_address/city/zip_code/permit_issuance_date. Coverage gated to MD/Prince George's. || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `permit_issuance_date` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
+    },
+    {
+      "registry_id": "kcmo-building-permits",
+      "platform": "socrata",
+      "domain": "data.kcmo.org",
+      "dataset_id": "w8jz-wjgn",
+      "dataset_url": "https://data.kcmo.org/Permits/City-Issued-Permits/w8jz-wjgn",
+      "jurisdiction": "City of Kansas City, Missouri",
+      "geocode_assemble": true,
+      "coverage": [
+        {
+          "state": "MO",
+          "county": "Jackson"
+        },
+        {
+          "state": "MO",
+          "county": "Clay"
+        },
+        {
+          "state": "MO",
+          "county": "Platte"
+        }
+      ],
+      "column_map": {
+        "title": [
+          "work_class",
+          "project"
+        ],
+        "status_raw": "permit_status",
+        "type_source": "permit_type",
+        "file_date": "issue_date",
+        "address": "main_address_line1",
+        "zip": "main_address_line2",
+        "case_number": "permit_number",
+        "scope_text": "project"
+      },
+      "zip_text_suffix": true,
+      "file_date_kind": "issued",
+      "extra_where": "(starts_with(permit_type, 'CPPU - Building') OR starts_with(permit_type, 'CPPU - Demolition'))",
+      "type_map": {
+        "CPPU - Building (Residential)": "Development",
+        "CPPU - Building (Commercial)": "Development",
+        "CPPU - Demolition (Residential)": "Development",
+        "CPPU - Demolition (Commercial)": "Development"
+      },
+      "status_to_bucket": {
+        "proposed": [
+          "In Review",
+          "Pending"
+        ],
+        "approved": [
+          "Issued",
+          "Issued - Subject To Conditions",
+          "Issued With Unpaid Fees",
+          "Ready For Issuance",
+          "Open-Active",
+          "Extended",
+          "Renewed"
+        ],
+        "operating": [
+          "Closed",
+          "Work Completed"
+        ],
+        "denied": [
+          "Denied"
+        ],
+        "exclude": [
+          "Cancelled",
+          "Hold",
+          "Suspended",
+          "Voided-City",
+          "Expired",
+          "Revoked",
+          "Stop Work"
+        ]
+      },
+      "recency_days": 365,
+      "record_url_precision": "dataset",
+      "_receipts": "2026-11-05 REPLACEMENT (founder lead). The ArcGIS extract this entry read (Building_Permits_2020__to_2025_Q3) ends 2025-06-30, so the 365-day window returned 0 records. The City of Kansas City, Missouri publishes 'City Issued Permits' (Socrata w8jz-wjgn, attribution 'City of Kansas City, Missouri', provenance official, public read). Measured through pg_net 2026-11-05 (requests 24526-24534): 42,661 permits with issue_date 2025-11-05..2026-11-05, newest 2026-11-02 (the dataset has bad future dates up to 3036, so freshness was read inside a bounded window, never as an unbounded max). Restricted (extra_where, a prefix match, so a NEW building or demolition subtype arrives as unclassified instead of being dropped at the query) to the permit_type values that match the old entry's scope (new construction, demolition, additions/alterations/repairs): CPPU - Building (Residential/Commercial) and CPPU - Demolition (Residential/Commercial) = 4,108 in that window, newest 2026-10-30; every one carries main_address_line1 and main_address_line2 (4,108/4,108), 1,064 carry a project name. Status vocabulary in that subset is 13 values summing to 4,108 (Issued 2587, Closed 1364, Open-Active 55, Cancelled 53, Hold 21, Suspended 9, Voided-City 9, Expired 4, Issued - Subject To Conditions 2, Revoked 1, Stop Work 1, In Review 1, Extended 1), all mapped; Pending/Denied/Renewed (seen in the whole dataset) are mapped too and every other value fails closed. NO COORDINATES: the view has no geometry column, so each permit is placed by geocoding its own street address (geocode_assemble; the engine's geocode fence checks the filed ZIP and distance). The ZIP is the 5-digit tail of main_address_line2 ('Kansas City, MO 64156'), queried with zip_text_suffix. 56 distinct line2 values in the window, all 'Kansas City, MO 64xxx' except 'City, MO 64126', 'Kansas city, MO 64155', 'Kansas City, KS 64126' (1 each). No per-record public link exists in the dataset, so record_url_precision is dataset (the dataset page). Coverage MO Jackson/Clay/Platte unchanged. || Previous entry (2026-07-25 .. 2026-11-05): ArcGIS 'All_Permits_2020_to_2025' / 'Building_Permits_2020__to_2025_Q3' on KCMO org 4o5uMWTHuOhUVJPd, a lagging periodic extract, retired here."
     }
   ],
   "arcgis": [
@@ -4277,72 +4356,6 @@
       "recency_days": 365,
       "record_url_precision": "dataset",
       "_receipts": "2026-07-25 pg_net recon (ids 109083/109089/109090/109091/109092): City of Hartford open-data 'Building Permits 20200101 to Current' (owner HartfordData - authoritative first-party). FRESH max DateIssued 2026-06-29 over 35,691 rows - this SUPERSEDES the CT wire pass's rejection, which was based on Hartford's decommissioned SOCRATA portal, not this ArcGIS service. 36 verbatim RECORD_STATUS values via groupBy (Issued 14,547 / Closed-Complete 6,145 / Closed 5,209 / Final Inspection Complete 5,144 / Closed-Denied 1,258 / ...) all mapped explicitly; 7 verbatim RECORD_TYPE_TYPE values, whitelist keeps Commercial 23,369 + Residential 10,438 and drops FMO 1,215 fire-marshal records, Temporary Structure 583, Inspection 52, Miscellaneous Fees 28, Amendment 6. Real per-record DESCRIPTION text and Total_Construction_Cost. Geometry-less TABLE (geom=NONE) with no lat/lng, so records geocode from the already-complete PROPERTY_ADDRESS ('282 WASHINGTON ST, HARTFORD, CT 06106') under GEOCODE_FENCE_MI; native PROPERTY_ZIP for deterministic routing. Coverage CT/Hartford (60 dev-empty ZIP pages). || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `DateIssued` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
-    },
-    {
-      "registry_id": "kcmo-building-permits",
-      "geocode_assemble": true,
-      "platform": "arcgis",
-      "service_url": "https://services.arcgis.com/4o5uMWTHuOhUVJPd/arcgis/rest/services/Building_Permits_2020__to_2025_Q3/FeatureServer/0",
-      "dataset_url": "https://data.kcmo.org/",
-      "jurisdiction": "City of Kansas City, Missouri",
-      "coverage": [
-        {
-          "state": "MO",
-          "county": "Jackson"
-        },
-        {
-          "state": "MO",
-          "county": "Clay"
-        },
-        {
-          "state": "MO",
-          "county": "Platte"
-        }
-      ],
-      "column_map": {
-        "title": [
-          "USER_derived_workclass",
-          "USER_Work_Done"
-        ],
-        "status_raw": "USER_per_stat",
-        "type_source": "USER_derived_workclass",
-        "file_date": "USER_Issue_Date",
-        "address": "USER_Address1",
-        "lat": "__lat",
-        "lng": "__lng",
-        "case_number": "USER_Permit_Number"
-      },
-      "file_date_kind": "issued",
-      "zip_where_template": "USER_Zip = {zip}",
-      "type_map": {
-        "NEW CONSTRUCTION": "Development",
-        "DEMOLITION": "Development",
-        "ADDITIONS/ALTERATIONS/REPAIRS": "Development",
-        "ADDITIONS/ ALTERATIONS/ REPAIRS": "Development"
-      },
-      "status_to_bucket": {
-        "proposed": [],
-        "approved": [
-          "Issued",
-          "Issued With Unpaid Fees",
-          "Ready For Issuance",
-          "Open-Active"
-        ],
-        "operating": [
-          "Closed",
-          "Work Completed"
-        ],
-        "exclude": [
-          "Cancelled",
-          "Hold",
-          "Suspended",
-          "Voided-City"
-        ]
-      },
-      "extra_where": "USER_derived_workclass in ('NEW CONSTRUCTION','DEMOLITION','ADDITIONS/ALTERATIONS/REPAIRS','ADDITIONS/ ALTERATIONS/ REPAIRS')",
-      "recency_days": 365,
-      "record_url_precision": "dataset",
-      "_receipts": "2026-07-25 pg_net recon (ids 109077/109078/109093/109094/109095): City of Kansas City MO 'All_Permits_2020_to_2025' (KCMO org 4o5uMWTHuOhUVJPd, authoritative first-party). Point geometry (geocoded by the city, Score/Match_addr present) + numeric native USER_Zip. Real per-record USER_Work_Done text, USER_Permit_Value, USER_Class_Description. 7 verbatim USER_derived_workclass values via returnDistinctValues; whitelist keeps NEW CONSTRUCTION / DEMOLITION / BOTH SPACING VARIANTS of ADDITIONS/ALTERATIONS/REPAIRS (the source carries 'ADDITIONS/ALTERATIONS/REPAIRS' AND 'ADDITIONS/ ALTERATIONS/ REPAIRS' - Mesa en-dash precedent) and drops 'B', 'UNDETERMINED' and null. 11 verbatim USER_per_stat values, all mapped. USER_Zip is NUMERIC so routing uses zip_where_template 'USER_Zip = {zip}' - an exact upper() match would be a Socrata/ArcGIS type-mismatch on a number (East Baton Rouge precedent). STALENESS CAVEAT: max USER_Issue_Date is 2025-12-31 (service modified 2026-03-04) - this is a lagging periodic extract, roughly 7 months behind, so the 365-day window surfaces ~5 months of real records rather than a live feed. Wired because the records are genuine, first-party, dated per-record and honestly labelled, but this source belongs on the reprobe list. Coverage MO/Jackson (57 dev-empty ZIP pages). This SUPERSEDES the MO wire pass's rejection, which was based on KCMO's stalled BLDS/Socrata ledger, not this ArcGIS service. | 2026-07-27 icon-completeness pass: live groupBy over the whole layer returned 11 USER_per_stat values (Issued 57,586 / Closed 12,136 / Open-Active 154 / Suspended 80 / Cancelled 78 / Ready For Issuance 32 / Hold 8 / Voided-City 6 / Work Completed 1 / 'Issued With Unpaid Fees' 1 / null), all mapped \u2014 Open-Active and Ready For Issuance are deliberately kept in approved by the existing entry, leaving no value for proposed -> []. | 2026-08-01 coverage extension -> MO Clay + MO Platte (Kansas City straddles all three counties). Config only. Positive control IN THE SAME QUERY: USER_Zip IN (64155,64154,64012,64083,64701) -> 64155 4,969 / 64154 4,106, the three Cass ZIPs absent. Go-live: 17 dark pages lifted, 1,414 records, 0 missing record_url / coords / use_type; gate proof MO Jackson+Clay+Platte only. Cass County MO REJECTED on that same control (0 rows for all 14 Cass ZIPs). || file_date_kind 'issued' \u2014 SWEPT AND CONFIRMED 2026-08-09 against the live source, not inferred from the column name. The mapped column `USER_Issue_Date` was verified to exist and to be the issue-dated one, and production confirms it PARSES (the entry emits dates). Method + per-entry verdict: docs/accuracy-audit-2026-08.md \u00a7Y6/\u00a7Y7/\u00a7Y8."
     },
     {
       "registry_id": "fairfax-active-site-construction",
