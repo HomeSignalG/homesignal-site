@@ -651,6 +651,13 @@ ok(txt.includes('stopped before rendering anything') && txt.includes('Missing es
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
 ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file the visual gate failed cannot be approved');
 ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+// founder 2026-11-05: "i pressed request fix, but i do not know what fix is" — the box starts filled in with what failed
+ok(txt.includes('Rendering again will not change it') && txt.includes('already filled in with what failed'), 'media: a failed check says to request a fix, not to render again');
+await page.click('#is [data-act=fixform][data-id="2"]'); await page.waitForTimeout(50);
+const draft = await page.inputValue('#fx-note-2');
+ok(draft.startsWith('Short A (9:16) failed these checks') && draft.includes('Too many documents and cards (documents, cards and maps fill 54% <b>)') && draft.includes('Show the subject; quote the record over its photo.')
+   && draft.length <= 1000, 'media: the fix box is pre-filled with each failed check, its detail and its action');
+await page.click('#is [data-act=fixcancel][data-id="2"]'); await page.waitForTimeout(50);
 await page.click('#is [data-act=choose][data-id="oak-1"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jb' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-1')),
    'media: choosing a photo sends the render, subject and candidate');
