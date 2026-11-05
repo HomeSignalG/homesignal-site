@@ -204,6 +204,29 @@ create unique index if not exists impact_story_fix_batches_one_active
 alter table public.impact_story_fix_batches enable row level security;
 revoke all on public.impact_story_fix_batches from public, anon, authenticated;
 
+-- A note on ONE script line (founder, 2026-11-05: "a fix on each narration ... that can accept abstract fixes like look up
+-- the EPA legal obligation"). kind 'fix' asks for a change to that line; 'research' asks the fixer to find the official
+-- documents first (a statute, a rule, an order, an agency policy), add them to the story's source pack with verbatim
+-- quotes, and only then change the line. 'withdraw' takes an earlier note back. Append-only. The id comes from the same
+-- sequence as the media fix requests, so one Fix batch can carry both and every outcome names exactly one request.
+create table if not exists public.impact_story_line_notes (
+  id         bigint primary key default nextval('public.impact_story_media_decisions_id_seq'::regclass),
+  story_id   uuid not null references public.impact_stories(id),
+  version    integer not null,
+  path       text not null check (path ~ '^(main|qol|shorts|packaging)(\.([a-z_]{1,20}|[0-9]{1,3})){1,10}$'),
+  line_text  text check (line_text is null or char_length(line_text) <= 2000),
+  kind       text not null check (kind in ('fix', 'research', 'withdraw')),
+  note       text check (note is null or char_length(note) between 1 and 1000),
+  withdraws  bigint references public.impact_story_line_notes(id),
+  actor      text not null,
+  at         timestamptz not null default now(),
+  check ((kind = 'withdraw') = (withdraws is not null)),
+  check (kind = 'withdraw' or note is not null)
+);
+create index if not exists impact_story_line_notes_story on public.impact_story_line_notes (story_id, id);
+alter table public.impact_story_line_notes enable row level security;
+revoke all on public.impact_story_line_notes from public, anon, authenticated;
+
 -- A licensed photo a person chose for a subject the render could not show (impact/assets/acquire.py found the
 -- candidates; the blocked render job carries them). Append-only: the newest choice per subject is the one used, and
 -- it is frozen into the next render job's input, so a render always says which photos it was given.
@@ -397,6 +420,9 @@ create trigger impact_story_visual_manifests_append_only before update or delete
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_visual_events_append_only on public.impact_story_visual_events;
 create trigger impact_story_visual_events_append_only before update or delete on public.impact_story_visual_events
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_line_notes_append_only on public.impact_story_line_notes;
+create trigger impact_story_line_notes_append_only before update or delete on public.impact_story_line_notes
   for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_media_decisions_append_only on public.impact_story_media_decisions;
 create trigger impact_story_media_decisions_append_only before update or delete on public.impact_story_media_decisions
@@ -811,7 +837,7 @@ begin
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
   return jsonb_build_object(
     'story', to_jsonb(s) - 'pack', 'pack', s.pack, 'status', public._hs_is_status(p_story), 'media', public._hs_is_media(p_story),
-    'visuals', public._hs_is_visuals(p_story),
+    'visuals', public._hs_is_visuals(p_story), 'line_notes', public._hs_is_line_notes(p_story),
     'version', case when v.version is null then null else jsonb_build_object('version', v.version, 'parent', v.parent,
       'origin', v.origin, 'body', v.body, 'validation', v.validation, 'derived', v.derived,
       'checked', v.validated_pack_hash is not distinct from s.pack_hash and v.validation is not null,
@@ -1569,6 +1595,13 @@ begin
     if s.current_version > 0 and s.pack_hash is distinct from p_result->'pack'->>'hash' then   -- new evidence
       perform public._hs_is_event(s.id, 'freshness_warning', jsonb_build_object('reason', 'The source pack changed. Dependent claims must be re-checked.'), 'worker');
     end if;
+    if j.input->>'then' in ('generate', 'analyze') then   -- a Fix batch that added sources: write the new version from them
+      begin
+        perform public._hs_is_request(s.id, j.input->>'then', 'all', true, 'worker');
+      exception when others then
+        perform public._hs_is_event(s.id, 'followup_failed', jsonb_build_object('then', j.input->>'then', 'reason', sqlerrm), 'worker');
+      end;
+    end if;
     perform public._hs_is_followup(s.id, 'worker');
     return jsonb_build_object('ok', true);
   end if;
@@ -1692,18 +1725,85 @@ $$;
 
 -- The fix requests a new batch would carry: rejected decisions nothing has acted on (no later approval of that file, no
 -- render since), not already in an active batch, and not already fixed by an earlier batch.
+-- Every note on a script line, newest first, and where it stands: open (not sent) · sending (in a batch the fixer has
+-- not finished) · fixed / not_changed / needs_you (what the fixer said, in a finished batch) · withdrawn. A note whose
+-- batch failed is open again.
+create or replace function public._hs_is_line_notes(p_story uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(x order by (x->>'id')::bigint desc), '[]'::jsonb) from (
+    select jsonb_build_object('id', n.id, 'path', n.path, 'line', n.line_text, 'note', n.note, 'research', n.kind = 'research',
+             'version', n.version, 'actor', n.actor, 'at', n.at,
+             'status', case
+               when exists (select 1 from public.impact_story_line_notes w where w.withdraws = n.id) then 'withdrawn'
+               when fb.status in ('queued', 'working') then 'sending'
+               when fb.status in ('done', 'needs_you') then coalesce(fo.o->>'outcome', 'needs_you')
+               else 'open' end,
+             'answer', case when fb.status in ('done', 'needs_you') then fo.o->>'note' end,
+             'batch', case when fb.id is null then null else jsonb_build_object('id', fb.id, 'status', fb.status,
+                        'completed_at', fb.completed_at, 'next_step', fb.next_step) end) x
+      from public.impact_story_line_notes n
+      left join lateral (select b.* from public.impact_story_fix_batches b where b.story_id = p_story
+                          and b.requests @> jsonb_build_array(jsonb_build_object('id', n.id))
+                          order by b.requested_at desc limit 1) fb on true
+      left join lateral (select o from jsonb_array_elements(fb.outcomes) o where (o->>'decision_id')::bigint = n.id limit 1) fo(o) on true
+     where n.story_id = p_story and n.kind <> 'withdraw') q
+$$;
+
+-- The fix requests a new batch would carry: rejected decisions nothing has acted on (no later approval of that file, no
+-- render since), not already in an active batch, and not already fixed by an earlier batch; plus every open note on a
+-- script line (kind 'line', with the line's path and text, and whether research comes first).
 create or replace function public._hs_is_fix_eligible(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', (x->>'id')::bigint, 'asset', x->>'asset', 'note', x->>'note',
-           'timecode', x->>'timecode', 'at', x->>'at') order by (x->>'id')::bigint), '[]'::jsonb)
-    from jsonb_array_elements(public._hs_is_media(p_story)->'fix_requests') x
-   where x->>'status' = 'open'
-     and not exists (select 1 from public.impact_story_fix_batches b where b.story_id = p_story
-                       and b.requests @> jsonb_build_array(jsonb_build_object('id', (x->>'id')::bigint))
-                       and (b.status in ('queued', 'working')
-                            or exists (select 1 from jsonb_array_elements(b.outcomes) o
-                                        where (o->>'decision_id')::bigint = (x->>'id')::bigint and o->>'outcome' = 'fixed')))
+  select coalesce(jsonb_agg(r order by (r->>'id')::bigint), '[]'::jsonb) from (
+    select jsonb_build_object('id', (x->>'id')::bigint, 'kind', 'media', 'asset', x->>'asset', 'note', x->>'note',
+             'timecode', x->>'timecode', 'at', x->>'at') r
+      from jsonb_array_elements(public._hs_is_media(p_story)->'fix_requests') x
+     where x->>'status' = 'open'
+       and not exists (select 1 from public.impact_story_fix_batches b where b.story_id = p_story
+                         and b.requests @> jsonb_build_array(jsonb_build_object('id', (x->>'id')::bigint))
+                         and (b.status in ('queued', 'working')
+                              or exists (select 1 from jsonb_array_elements(b.outcomes) o
+                                          where (o->>'decision_id')::bigint = (x->>'id')::bigint and o->>'outcome' = 'fixed')))
+    union all
+    select jsonb_build_object('id', (l->>'id')::bigint, 'kind', 'line', 'asset', 'script', 'path', l->>'path', 'line', l->>'line',
+             'note', l->>'note', 'research', (l->>'research')::boolean, 'version', (l->>'version')::int, 'at', l->>'at')
+      from jsonb_array_elements(public._hs_is_line_notes(p_story)) l
+     where l->>'status' = 'open') q
 $$;
+
+-- Save a note on one script line. p_research = true asks the fixer to look up the official documents first.
+create or replace function public.hs_impact_story_line_note(p_story uuid, p_path text, p_line text, p_note text, p_research boolean default false)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; nid bigint;
+begin
+  if nullif(btrim(p_note), '') is null then raise exception 'Say what to fix or what to look up.' using errcode = '22023'; end if;
+  if char_length(btrim(p_note)) > 1000 then raise exception 'Keep the note under 1000 characters.' using errcode = '22023'; end if;
+  if p_path is null or p_path !~ '^(main|qol|shorts|packaging)(\.([a-z_]{1,20}|[0-9]{1,3})){1,10}$' then
+    raise exception 'That is not a line of this story.' using errcode = '22023';
+  end if;
+  select * into s from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  insert into public.impact_story_line_notes (story_id, version, path, line_text, kind, note, actor)
+  values (p_story, s.current_version, p_path, left(p_line, 2000), case when p_research then 'research' else 'fix' end, btrim(p_note), e)
+  returning id into nid;
+  perform public._hs_is_event(p_story, 'line_note', jsonb_build_object('id', nid, 'path', p_path, 'research', coalesce(p_research, false)), e);
+  return jsonb_build_object('id', nid, 'line_notes', public._hs_is_line_notes(p_story));
+end $$;
+
+-- Take a note back before it is sent. A note already in a batch the fixer is working on cannot be taken back.
+create or replace function public.hs_impact_story_line_note_withdraw(p_story uuid, p_note bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); st text;
+begin
+  select x->>'status' into st from jsonb_array_elements(public._hs_is_line_notes(p_story)) x where (x->>'id')::bigint = p_note;
+  if st is null then raise exception 'No such note on this story.' using errcode = 'P0002'; end if;
+  if st = 'withdrawn' then return jsonb_build_object('line_notes', public._hs_is_line_notes(p_story)); end if;
+  if st = 'sending' then raise exception 'The fixer is already working on this note.' using errcode = '55000'; end if;
+  insert into public.impact_story_line_notes (story_id, version, path, kind, withdraws, actor)
+  select n.story_id, n.version, n.path, 'withdraw', n.id, e from public.impact_story_line_notes n where n.id = p_note;
+  return jsonb_build_object('line_notes', public._hs_is_line_notes(p_story));
+end $$;
 
 -- Starts the Fix job for a batch (homesignal-ingest impact-fix-run.yml, on main). Never raises on a missing credential:
 -- the batch is recorded failed with a readable reason, so the page shows it instead of a batch that never moves.
@@ -1782,7 +1882,7 @@ begin
   return jsonb_build_object('ok', true, 'batch', b.id, 'story_id', b.story_id, 'requests', b.requests);
 end $$;
 
--- Finish a batch. p_payload: {status: done|needs_you|failed, summary, next_step, pr_url, regenerate: generate|analyze|null,
+-- Finish a batch. p_payload: {status: done|needs_you|failed, summary, next_step, pr_url, regenerate: generate|analyze|pack|null,
 -- outcomes: [{decision_id, outcome: fixed|needs_you|not_changed, note}]}. done/needs_you must account for every request.
 -- regenerate queues that job on the story (as the Generate / Analyze buttons do) so the fixed script becomes a new version;
 -- approving it and rendering stay with the founder.
@@ -1796,7 +1896,7 @@ begin
   if b.status <> 'working' then raise exception 'batch is %, not working', b.status using errcode = '55000'; end if;
   if st not in ('done', 'needs_you', 'failed') then raise exception 'bad status' using errcode = '22023'; end if;
   if nullif(btrim(p_payload->>'summary'), '') is null then raise exception 'say what was done' using errcode = '22023'; end if;
-  if regen is not null and regen not in ('generate', 'analyze') then raise exception 'bad regenerate' using errcode = '22023'; end if;
+  if regen is not null and regen not in ('generate', 'analyze', 'pack') then raise exception 'bad regenerate' using errcode = '22023'; end if;
   if jsonb_typeof(outs) <> 'array' or exists (select 1 from jsonb_array_elements(outs) o
        where o->>'outcome' not in ('fixed', 'needs_you', 'not_changed')
           or not (b.requests @> jsonb_build_array(jsonb_build_object('id', (o->>'decision_id')::bigint)))) then
@@ -1809,7 +1909,10 @@ begin
   if st = 'done' and exists (select 1 from jsonb_array_elements(outs) o where o->>'outcome' = 'needs_you') then
     raise exception 'a request that needs the founder makes the batch needs_you' using errcode = '22023';
   end if;
-  if regen is not null then
+  if regen = 'pack' then
+    -- research added documents to the source pack: check the sources again, then write the new version from them
+    job := public._hs_is_queue(b.story_id, 'pack', jsonb_build_object('scope', 'all', 'then', 'generate'), 'fixer', true);
+  elsif regen is not null then
     job := public._hs_is_request(b.story_id, regen, 'all', true, 'fixer');
   end if;
   update public.impact_story_fix_batches set status = st, completed_at = now(), summary = left(p_payload->>'summary', 2000),
@@ -1831,7 +1934,7 @@ begin
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
-    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)',
+    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)', 'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
@@ -1846,6 +1949,7 @@ begin
     'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)',
     'public.hs_impact_story_unchoose_asset(uuid, text, text)',
     'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
+    'public.hs_impact_story_line_note(uuid, text, text, text, boolean)', 'public.hs_impact_story_line_note_withdraw(uuid, bigint)',
     'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',
     'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'public.hs_impact_story_photo_restore(uuid, text)',
