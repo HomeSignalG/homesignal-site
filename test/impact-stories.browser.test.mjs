@@ -129,6 +129,24 @@ ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_
 ok((await page.locator('#is').innerText()).includes('Revision note saved'), 'outline: the revision note is confirmed');
 
 await page.click('#is [data-act=step][data-step=script]');
+// the storyboard workspace (2026-11-05): navigator, selected scene, production intelligence; read mode; full screen; gates
+ok(await page.locator('#is .is-sb .is-sbnav .is-sbitem').count() >= 8, 'storyboard: the navigator lists every scene');
+ok(await page.locator('#is .is-sbitem.on[data-key="a1-s1"]').count() === 1, 'storyboard: the first scene is selected by default');
+ok(await page.locator('#is .is-sbside').innerText().then((t) => t.includes('Records this scene cites') && t.includes('Pictures and rights') && t.includes('Open issues')),
+   'storyboard: the right panel shows records, pictures and rights, and issues');
+txt = await page.locator('#is .is-gates').innerText();
+ok(['Evidence verified', 'Script editorial review', 'Visual rights cleared', 'Required assets acquired', 'Production audit', 'Production ready'].every((g) => txt.includes(g)),
+   'gates: the five gates and Production ready are shown separately');
+ok(!/✓ Production ready/.test(txt), 'gates: never Production ready while an earlier gate is open');
+await page.click('#is [data-act=sbsel][data-key="a3-s1"]');
+ok(await page.locator('#is .is-sbitem.on[data-key="a3-s1"]').count() === 1 && (await page.locator('#is .is-sbmain h4').innerText()).includes('Act 3'), 'storyboard: choosing a scene shows it');
+ok(await page.locator('#is .is-sbmain textarea[data-ed^="main.acts.2.scenes.0.narration"]').count() >= 1, 'storyboard: the selected scene is edited in place');
+await page.click('#is [data-act=sbfull] >> nth=0');
+ok(await page.locator('#is .is-panel.is-full').count() === 1, 'storyboard: full-screen mode');
+await page.click('#is [data-act=sbfull] >> nth=0');
+await page.click('#is [data-act=doc][data-doc=read]');
+ok(await page.locator('#is .is-read h4').count() === 8, 'read mode: the whole script, act by act');
+await page.click('#is [data-act=doc][data-doc=main]');
 txt = await page.locator('#is').innerText();
 ok(txt.includes('First 30 seconds') && txt.includes('Act 8'), 'script: eight acts and the first 30 seconds');
 ok(await page.locator('#is [data-act=decide][data-a=narrative][data-d=approved]').count() === 1 && await page.locator('#is [data-act=decide]:not([data-a=narrative])').count() === 0,
