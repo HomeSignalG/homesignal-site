@@ -96,6 +96,21 @@ const pages = readFileSync('.github/workflows/pages.yml', 'utf8');
 const calls = pages.split('\n').filter((l) => !/^\s*#/.test(l) && /brand_stage\.py/.test(l));
 check('5b pages.yml calls the overlay exactly once, with the contract-reported identity, never a literal and never --staging',
   calls.length === 1 && /--identity "\$\(python3 scripts\/brand_host\.py --identity\)"/.test(calls[0]) && !/--staging|--identity (jody|homesignal)\b/.test(calls[0]), JSON.stringify(calls));
+// 6. a page that copies the site footer at build time (development dossier pages) gets the same tagline, once
+{
+  const d = join(base, 'd'); cpSync(st, d, { recursive: true });
+  const shellSrc = readFileSync(join(d, 'partials/shell.html'), 'utf8');
+  const footer = (shellSrc.match(/<footer class="hs-footer" id="hs-footer">[\s\S]*?<\/footer>/) || [''])[0];
+  check('6a0 the shell carries the site footer (positive control)', footer.length > 0, 'no footer');
+  const page = join(d, 'development/ut/test-project/index.html');
+  execFileSync('mkdir', ['-p', join(d, 'development/ut/test-project')]);
+  writeFileSync(page, `<!doctype html><html><head><title>Test</title></head><body><main>x</main>${footer}</body></html>`);
+  const r = brand(d, '--identity', 'jody', '--staging');
+  const out = readFileSync(page, 'utf8');
+  check('6a a dossier-like page gets the footer tagline exactly once', r.status === 0 && (out.match(/hs-footer__tagline/g) || []).length === 1, r.stderr + out.slice(-300));
+  check('6b the shell still has it exactly once', (readFileSync(join(d, 'partials/shell.html'), 'utf8').match(/hs-footer__tagline/g) || []).length === 1, 'shell');
+}
+
 rmSync(base, { recursive: true, force: true });
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

@@ -158,7 +158,9 @@ def apply_tagline(rel: str, s: str) -> tuple[str, int]:
         s2 = re.sub(r'(name="twitter:title" content=")[^"]*(")', rf"\1Jody — {TAGLINE}\2", s, count=1)
         hits += int(s2 != s)
         s = s2
-    if rel == "partials/shell.html":
+    # The site footer (partials/shell.html) and every page that copies it at build time (the development dossier
+    # pages, scripts/development_pages.py) get the same tagline, so their footers match.
+    if '<footer class="hs-footer" id="hs-footer">' in s and "hs-footer__tagline" not in s:
         s2 = re.sub(r'(<footer class="hs-footer" id="hs-footer">)',
                     rf'\1\n  <p class="hs-footer__tagline">{TAGLINE}</p>', s, count=1)
         hits += int(s2 != s)
