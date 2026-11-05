@@ -567,27 +567,80 @@ select pg_temp.chk('12f2 the fixer door is service-role only, Start fixes is for
    and has_function_privilege('authenticated', 'public.hs_impact_story_fix_start(uuid)', 'execute')
    and not has_function_privilege('anon', 'public.hs_impact_story_fix_start(uuid)', 'execute'));
 insert into _ids select 'fb', public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->'batch'->>'id';
-select pg_temp.chk('12f3 Start fixes queues one batch carrying both open requests, and the page sees it',
-   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'queued'
+select pg_temp.chk('12f3 Fix queues one batch carrying both open requests, PLAN first, and the page sees it',
+   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'plan_queued'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'phase' = 'plan'
    and (public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'requests')::int = 2
-   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'status' <> 'queued'));
+   and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'status' <> 'plan_queued'));
 select pg_temp.chk('12f4 a second press returns the same batch', (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
    and (select count(*) from public.impact_story_fix_batches) = 1);
-select pg_temp.chk('12f4b the Fix button starts the Fix job on main for this batch, and a second press while queued starts it again',
+select pg_temp.chk('12f4b Fix starts the PLAN run on main for this batch, and a second press while waiting starts it again',
    (select url from net.requests order by id desc limit 1) like '%/homesignal-ingest/actions/workflows/impact-fix-run.yml/dispatches'
-   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb')))
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'plan'))
    and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2);
 delete from vault.decrypted_secrets;
-select public._hs_is_fix_dispatch(pg_temp.id('fb')::uuid);
+select public._hs_is_fix_dispatch(pg_temp.id('fb')::uuid, 'plan');
 select pg_temp.chk('12f4c no GitHub credential: the batch is failed with a readable reason, nothing is sent',
    (select status from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 'failed'
    and (select summary from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) like '%no GitHub credential%'
    and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2
-   and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid)', 'execute'));
+   and not has_function_privilege('authenticated', 'public._hs_is_fix_dispatch(uuid, text)', 'execute'));
 insert into vault.decrypted_secrets values ('github_actions_pat', 'test-pat');
-update public.impact_story_fix_batches set status = 'queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
-select pg_temp.chk('12f5 the fixer lists it, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
+update public.impact_story_fix_batches set status = 'plan_queued', completed_at = null, summary = null where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12f5 the fixer lists it as a plan run, with the story slug', public.impact_fix_batches_list()->0->>'id' = pg_temp.id('fb')
+   and public.impact_fix_batches_list()->0->>'phase' = 'plan'
    and public.impact_fix_batches_list()->0->>'video_slug' is not null);
+select pg_temp.chk('12P1 the plan doors are service-role only; confirm and cancel are for signed-in admins',
+   not has_function_privilege('authenticated', 'public.impact_fix_batch_plan(uuid, jsonb)', 'execute')
+   and has_function_privilege('service_role', 'public.impact_fix_batch_plan(uuid, jsonb)', 'execute')
+   and has_function_privilege('authenticated', 'public.hs_impact_story_fix_confirm(uuid, uuid, text)', 'execute')
+   and has_function_privilege('authenticated', 'public.hs_impact_story_fix_cancel(uuid, uuid)', 'execute')
+   and not has_function_privilege('anon', 'public.hs_impact_story_fix_confirm(uuid, uuid, text)', 'execute')
+   and not has_function_privilege('authenticated', 'public._hs_is_fix_checks(uuid)', 'execute'));
+create temp table _claim as select public.impact_fix_batch_claim(pg_temp.id('fb')::uuid) c;
+select pg_temp.chk('12P2 claimed for planning: phase plan, no plan to carry out yet, the checks of the newest render come with it',
+   (select c->>'phase' from _claim) = 'plan' and (select c->'plan' from _claim) = 'null'::jsonb
+   and jsonb_typeof((select c->'checks' from _claim)) = 'array'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'planning');
+select pg_temp.chk('12P3 a plan run cannot report the changes as made, and cannot confirm itself',
+   pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","outcomes":[]}')) like '%plan run can only finish as failed%'
+   and pg_temp.err(format('select public.hs_impact_story_fix_confirm(%L, %L, %L)', pg_temp.id('s'), pg_temp.id('fb'), 'x')) like '%nothing to confirm%');
+select pg_temp.chk('12P4 a plan must answer every request exactly once, in words, with changes or a reason',
+   pg_temp.err(format('select public.impact_fix_batch_plan(%L, %L)', pg_temp.id('fb'), '{"items":[]}')) like '%summary%'
+   and pg_temp.err(format('select public.impact_fix_batch_plan(%L, %L)', pg_temp.id('fb'), '{"summary":"x","items":[]}')) like '%exactly one item per request%'
+   and pg_temp.err(format('select public.impact_fix_batch_plan(%L, %L)', pg_temp.id('fb'), '{"summary":"x","items":[{"decision_id":999999,"understood":"y","changes":["z"]}]}')) like '%each plan item%'
+   and pg_temp.err(format('select public.impact_fix_batch_plan(%L, %L::jsonb)', pg_temp.id('fb'),
+         (select jsonb_build_object('summary','x','items', jsonb_agg(jsonb_build_object('decision_id', r->'id', 'understood', 'y', 'changes', '[]'::jsonb))) from jsonb_array_elements((select requests from public.impact_story_fix_batches)) r)::text)) like '%each plan item%');
+select public.impact_fix_batch_plan(pg_temp.id('fb')::uuid, (select jsonb_build_object('summary', 'Shorter document shots and a photo at the end.',
+   'items', jsonb_agg(jsonb_build_object('decision_id', r->'id', 'understood', 'You want less paperwork on screen.', 'changes', jsonb_build_array('Show the EPA page for 3 seconds, not 8.')))) from jsonb_array_elements((select requests from public.impact_story_fix_batches)) r));
+select pg_temp.chk('12P5 the plan is waiting for the founder: the page shows it with its md5, nothing is dispatched',
+   public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'planned'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->'plan'->>'summary' = 'Shorter document shots and a photo at the end.'
+   and public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'plan_md5' = (select plan_md5 from public.impact_story_fix_batches)
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2
+   and jsonb_array_length(public.impact_fix_batches_list()) = 0
+   and (public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->>'existing')::boolean
+   and (select count(*) from net.requests where url like '%impact-fix-run.yml%') = 2);
+select pg_temp.chk('12P6 confirm needs the plan the page showed', pg_temp.err(format('select public.hs_impact_story_fix_confirm(%L, %L, %L)',
+   pg_temp.id('s'), pg_temp.id('fb'), 'stale-md5')) like '%plan changed since this page loaded%'
+   and (select status from public.impact_story_fix_batches) = 'planned');
+-- cancel, then send again: a new plan run carrying the same requests
+select public.hs_impact_story_fix_cancel(pg_temp.id('s')::uuid, pg_temp.id('fb')::uuid);
+select pg_temp.chk('12P7 a cancelled plan changes nothing and its notes can be sent again',
+   (select status from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 'cancelled'
+   and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 2
+   and pg_temp.err(format('select public.hs_impact_story_fix_cancel(%L, %L)', pg_temp.id('s'), pg_temp.id('fb'))) like '%Only a plan%');
+delete from _ids where k = 'fb';
+insert into _ids select 'fb', public.hs_impact_story_fix_start(pg_temp.id('s')::uuid)->'batch'->>'id';
+select public.impact_fix_batch_claim(pg_temp.id('fb')::uuid);
+select public.impact_fix_batch_plan(pg_temp.id('fb')::uuid, (select jsonb_build_object('summary', 'Shorter document shots.',
+   'items', jsonb_agg(jsonb_build_object('decision_id', r->'id', 'understood', 'Less paperwork.', 'changes', jsonb_build_array('Cut the EPA page to 3 seconds.')))) from jsonb_array_elements((select requests from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid)) r));
+select public.hs_impact_story_fix_confirm(pg_temp.id('s')::uuid, pg_temp.id('fb')::uuid, (select plan_md5 from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid));
+select pg_temp.chk('12P8 confirmed: queued for the WORK run, which is dispatched once, and the claim carries the plan',
+   (select status from public.impact_story_fix_batches where id = pg_temp.id('fb')::uuid) = 'queued'
+   and (select body from net.requests order by id desc limit 1) = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', pg_temp.id('fb'), 'mode', 'work'))
+   and public.impact_fix_batches_list()->0->>'phase' = 'work');
+delete from public.impact_story_fix_batches where id <> pg_temp.id('fb')::uuid;
 select public.impact_fix_batch_claim(pg_temp.id('fb')::uuid);
 select pg_temp.chk('12f6 claimed: working, out of the list, cannot be claimed twice',
    public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'working'
