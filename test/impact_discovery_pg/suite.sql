@@ -224,8 +224,15 @@ select pg_temp.chk('10f every decision is in the append-only event log',
 -- 11. research results -----------------------------------------------------------------------------------
 select pg_temp.chk('11a insufficient needs the list of missing evidence',
   pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"insufficient"}')$q$, (pg_temp.cand('rumor')).id)) like '%missing evidence%');
+select pg_temp.chk('11a2 insufficient needs a named reason; no starting document is not one',
+  pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"insufficient","evidence":{"missing":["The permit."]}}')$q$, (pg_temp.cand('rumor')).id)) like '%needs a reason%'
+  and pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"insufficient","evidence":{"missing":["The permit."],"reason":"no_starting_document"}}')$q$, (pg_temp.cand('rumor')).id)) like '%needs a reason%');
+select pg_temp.chk('11a3 no_public_record needs at least 3 searches; premise_false needs the records',
+  pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"insufficient","evidence":{"missing":["x"],"reason":"no_public_record","searched":["a","b"]}}')$q$, (pg_temp.cand('rumor')).id)) like '%at least 3%'
+  and pg_temp.err(format($q$select public.impact_discovery_research(%L, '{"outcome":"insufficient","evidence":{"missing":["x"],"reason":"premise_false"}}')$q$, (pg_temp.cand('rumor')).id)) like '%evidence.sources%'
+  and (pg_temp.cand('rumor')).status <> 'insufficient');
 select public.impact_discovery_research((pg_temp.cand('rumor')).id,
-  '{"outcome":"insufficient","evidence":{"missing":["No agency record or independent report of the alleged spill."]}}');
+  '{"outcome":"insufficient","evidence":{"missing":["No agency record or independent report of the alleged spill."],"reason":"no_public_record","searched":["state spill reports","county emergency notices","local news archive"]}}');
 select pg_temp.chk('11b a topic with no primary source stays a candidate and says what is missing',
   (pg_temp.cand('rumor')).status = 'insufficient' and (pg_temp.cand('rumor')).evidence->'missing'->>0 like 'No agency record%'
   and (pg_temp.cand('rumor')).story_id is null);
@@ -418,6 +425,37 @@ select pg_temp.chk('17o a restored founder topic goes back to research, not to t
   (select status from public.impact_discovery_candidates where id = pg_temp.id('f3')) = 'nominated');
 select pg_temp.chk('17p each suggestion is recorded in the event log',
   (select count(*) from public.impact_discovery_events where kind = 'suggested') = 3);
+
+-- 17q-17x. Starting evidence (2026-11-05): auto / document / topic. It changes where research starts, nothing else.
+select pg_temp.chk('17q a suggestion with no choice starts as auto-detect', (select start_mode from public.impact_discovery_candidates where id = pg_temp.id('f2')) = 'auto');
+select pg_temp.chk('17r an unknown starting-evidence value is refused',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Bad start topic","start":"maybe"}')$q$) like '%auto, document or topic%');
+select pg_temp.chk('17s Source document available needs a link to the document',
+  pg_temp.err($q$select public.hs_impact_discovery_suggest('{"title":"Document topic without a link","start":"document"}')$q$) like '%needs a link to the document%');
+select pg_temp.put('f4', public.hs_impact_discovery_suggest(jsonb_build_object('title', 'House leadership vote', 'start', 'topic',
+  'note', repeat('A long editorial brief. ', 400))) ->> 'id');
+select pg_temp.chk('17t No starting document is accepted with no links, and a long editorial brief (over 2,000 characters) is kept whole',
+  (select start_mode = 'topic' and status = 'nominated' and char_length(submitted_note) > 9000 from public.impact_discovery_candidates where id = pg_temp.id('f4')));
+select pg_temp.chk('17t2 a brief over 12,000 characters is refused',
+  pg_temp.err(format('select public.hs_impact_discovery_suggest(%L)', jsonb_build_object('title', 'Too long a brief', 'note', repeat('x', 12001)))) like '%12,000%');
+select pg_temp.put('f5', public.hs_impact_discovery_suggest('{"title":"Permit PDF topic","start":"document","links":["https://example.gov/permit.pdf"]}') ->> 'id');
+select pg_temp.chk('17u a document topic is stored as document, and the research job and the overview see it',
+  (select start_mode from public.impact_discovery_candidates where id = pg_temp.id('f5')) = 'document'
+  and public.impact_discovery_nominations()->'nominated' @> jsonb_build_array(jsonb_build_object('id', pg_temp.id('f5'), 'start_mode', 'document'))
+  and public.hs_impact_discovery_overview()->'candidates' @> jsonb_build_array(jsonb_build_object('id', pg_temp.id('f5'), 'start_mode', 'document')));
+select public.hs_impact_discovery_set_start(pg_temp.id('f5'), 'topic');
+select pg_temp.chk('17v the starting evidence can be changed before research, and the change is logged',
+  (select start_mode from public.impact_discovery_candidates where id = pg_temp.id('f5')) = 'topic'
+  and exists (select 1 from public.impact_discovery_events where kind = 'start_mode' and candidate_id = pg_temp.id('f5')));
+select pg_temp.chk('17w a topic with no link cannot be switched to Source document available',
+  pg_temp.err(format('select public.hs_impact_discovery_set_start(%L, %L)', pg_temp.id('f4'), 'document')) like '%no link to a document%');
+select pg_temp.chk('17x a verified topic keeps its starting evidence (changing it is refused)',
+  pg_temp.err(format('select public.hs_impact_discovery_set_start(%L, %L)', pg_temp.id('f1'), 'topic')) like '%already verified%');
+select pg_temp.as_user('stranger@example.com');
+select pg_temp.chk('17y a non-admin cannot change the starting evidence; anon cannot execute it',
+  pg_temp.err(format('select public.hs_impact_discovery_set_start(%L, %L)', pg_temp.id('f5'), 'auto')) like '42501%'
+  and not has_function_privilege('anon', 'public.hs_impact_discovery_set_start(uuid, text)', 'execute'));
+select pg_temp.as_user('founder@example.com');
 
 
 -- 18. Start research and Create video (founder, 2026-10-28) ----------------------------------------------

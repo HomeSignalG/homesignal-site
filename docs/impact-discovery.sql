@@ -138,6 +138,16 @@ create unique index if not exists impact_discovery_candidates_one_story on publi
 alter table public.impact_discovery_candidates add column if not exists origin text not null default 'scan';
 alter table public.impact_discovery_candidates add column if not exists submitted_by text;
 alter table public.impact_discovery_candidates add column if not exists submitted_note text;
+-- Starting evidence (founder, 2026-11-05): whether research begins from a document the founder supplied or from the topic
+-- itself. It changes only where research STARTS; the evidence checks, the story pipeline and the factual standard are the
+-- same for every topic. 'auto' lets the research job decide from the leads (homesignal-ingest impact/discovery/starting.py).
+alter table public.impact_discovery_candidates add column if not exists start_mode text not null default 'auto';
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'impact_discovery_candidates_start_mode_check') then
+    alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_start_mode_check
+      check (start_mode in ('auto', 'document', 'topic'));
+  end if;
+end $$;
 alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_origin_check;
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_origin_check check (origin in ('scan', 'founder'));
 alter table public.impact_discovery_candidates alter column lead_uri drop not null;
@@ -147,7 +157,7 @@ alter table public.impact_discovery_candidates add constraint impact_discovery_c
   check (origin = 'founder' or (lead_uri is not null and lead_url is not null));
 alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_note_check;
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_note_check
-  check (submitted_note is null or char_length(submitted_note) <= 2000);
+  check (submitted_note is null or char_length(submitted_note) <= 12000);   -- an editorial brief (2,000 until 2026-11-05)
 alter table public.impact_discovery_candidates enable row level security;
 revoke all on public.impact_discovery_candidates from public, anon, authenticated;
 
@@ -364,7 +374,7 @@ begin
         'evidence_status', c.evidence_status, 'evidence', c.evidence, 'concept', c.concept, 'coverage', c.coverage,
         'related_candidates', c.related_candidates, 'duplicate_of', c.duplicate_of, 'status', c.status, 'status_note', c.status_note,
         'source_slug', c.source_slug, 'story_id', c.story_id, 'discovered_at', c.discovered_at, 'last_seen_at', c.last_seen_at,
-        'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note,
+        'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode,
         'research', public._hs_id_research_run(c.id),
         'video', case when c.story_id is null then null else public._hs_id_video_state(c.story_id) end)
         order by (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
@@ -436,19 +446,23 @@ end $$;
 
 -- "Suggest a topic" (founder, 2026-10-28): a topic the founder wants made into a story. It goes straight to the research
 -- queue (status 'nominated', origin 'founder'). Links are leads to check, never evidence; a story is still created only from
--- a verified source pack. One open suggestion per title.
+-- a verified source pack. One open suggestion per title. Starting evidence (2026-11-05): 'auto' (default), 'document' (needs at
+-- least one link to the document) or 'topic' (research from the topic and the note, no document needed). The note is an
+-- editorial brief and may be long (12,000 characters; it was 2,000 and clipped a brief that held a whole script).
 create or replace function public.hs_impact_discovery_suggest(p_topic jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'title', ''));
         pl text := nullif(btrim(coalesce(p_topic->>'place', '')), ''); cat text := coalesce(nullif(btrim(coalesce(p_topic->>'category', '')), ''), 'other');
         note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); leads jsonb := '[]'::jsonb; u text; c public.impact_discovery_candidates%rowtype;
+        sm text := coalesce(nullif(btrim(coalesce(p_topic->>'start', '')), ''), 'auto');
 begin
+  if sm not in ('auto', 'document', 'topic') then raise exception 'Starting evidence must be auto, document or topic.' using errcode = '22023'; end if;
   if char_length(t) < 5 or char_length(t) > 300 then
     raise exception 'Give the topic a title of 5 to 300 characters.' using errcode = '22023';
   end if;
   if cat !~ '^[a-z_]{2,40}$' then raise exception 'Unknown category.' using errcode = '22023'; end if;
   if pl is not null and char_length(pl) > 200 then raise exception 'The place is longer than 200 characters.' using errcode = '22023'; end if;
-  if note is not null and char_length(note) > 2000 then raise exception 'The note is longer than 2,000 characters.' using errcode = '22023'; end if;
+  if note is not null and char_length(note) > 12000 then raise exception 'The note is longer than 12,000 characters.' using errcode = '22023'; end if;
   if p_topic ? 'links' and jsonb_typeof(p_topic->'links') <> 'array' then raise exception 'Links must be a list.' using errcode = '22023'; end if;
   for u in select distinct btrim(x) from jsonb_array_elements_text(coalesce(p_topic->'links', '[]'::jsonb)) x where btrim(x) <> '' loop
     if u !~* '^https?://[^\s/?#]+\.[^\s/?#]+(/\S*)?$' or char_length(u) > 1000 then
@@ -458,18 +472,44 @@ begin
       'domain', lower(substring(u from '^[A-Za-z]+://(?:www\.)?([^/:?#]+)'))));
   end loop;
   if jsonb_array_length(leads) > 20 then raise exception 'At most 20 links per topic.' using errcode = '22023'; end if;
+  if sm = 'document' and jsonb_array_length(leads) = 0 then
+    raise exception 'Source document available needs a link to the document. Add it under Links, or choose Auto-detect or No starting document.' using errcode = '22023';
+  end if;
   if exists (select 1 from public.impact_discovery_candidates where origin = 'founder' and lower(title) = lower(t)
               and status not in ('rejected', 'dismissed', 'excluded')) then
     raise exception 'You already suggested a topic with this title. It is in the list below.' using errcode = '23505';
   end if;
   insert into public.impact_discovery_candidates (cluster_key, origin, category, track, title, place, score, reasons, evidence_status,
-    evidence, status, submitted_by, submitted_note, discovered_at, last_seen_at)
+    evidence, status, submitted_by, submitted_note, start_mode, discovered_at, last_seen_at)
   values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0, '["You suggested this topic."]'::jsonb,
     case when jsonb_array_length(leads) > 0 then 'leads_found' else 'social_only' end,
-    jsonb_build_object('leads', leads), 'nominated', e, note, now(), now())
+    jsonb_build_object('leads', leads), 'nominated', e, note, sm, now(), now())
   returning * into c;
-  perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads)), e);
-  return jsonb_build_object('id', c.id, 'status', c.status);
+  perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads), 'start', sm), e);
+  return jsonb_build_object('id', c.id, 'status', c.status, 'start_mode', c.start_mode);
+end $$;
+
+-- Change a topic's starting evidence before (or between) research runs, e.g. after a run said "insufficient". Refused once the
+-- topic is verified or has a story, and while a run is working on it.
+create or replace function public.hs_impact_discovery_set_start(p_candidate uuid, p_start text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); c public.impact_discovery_candidates%rowtype;
+begin
+  if p_start not in ('auto', 'document', 'topic') then raise exception 'Starting evidence must be auto, document or topic.' using errcode = '22023'; end if;
+  select * into c from public.impact_discovery_candidates where id = p_candidate for update;
+  if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
+  if c.story_id is not null or (c.evidence_status = 'verified' and c.source_slug is not null) then
+    raise exception 'This topic is already verified. Its starting evidence no longer matters.' using errcode = '55000';
+  end if;
+  if exists (select 1 from public.impact_discovery_research_runs where candidate_id = c.id and status = 'working') then
+    raise exception 'Research is working on this topic. Change it when the run finishes.' using errcode = '55000';
+  end if;
+  if p_start = 'document' and jsonb_array_length(coalesce(c.evidence->'leads', '[]'::jsonb)) = 0 and c.lead_url is null then
+    raise exception 'This topic has no link to a document. Suggest it again with the link, or choose Auto-detect or No starting document.' using errcode = '22023';
+  end if;
+  update public.impact_discovery_candidates set start_mode = p_start, updated_at = now() where id = c.id;
+  perform public._hs_id_event(c.id, null, 'start_mode', jsonb_build_object('from', c.start_mode, 'to', p_start), e);
+  return jsonb_build_object('ok', true, 'start_mode', p_start);
 end $$;
 
 create or replace function public.hs_impact_discovery_settings_save(p_settings jsonb)
@@ -720,7 +760,7 @@ begin
 end $$;
 
 -- The research session reports what it found. 'verified' needs the slug of a merged source pack (impact/sources/<slug>);
--- 'insufficient' needs the list of what is missing. A verified concept replaces the scanner's provisional one.
+-- 'insufficient' needs the list of what is missing and a reason with its evidence. A verified concept replaces the scanner's provisional one.
 create or replace function public.impact_discovery_research(p_candidate uuid, p_payload jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare c public.impact_discovery_candidates%rowtype; outcome text := p_payload->>'outcome';
@@ -734,6 +774,20 @@ begin
   end if;
   if outcome = 'insufficient' and jsonb_array_length(coalesce(p_payload->'evidence'->'missing', '[]')) = 0 then
     raise exception 'insufficient needs the list of missing evidence' using errcode = '22023';
+  end if;
+  -- 2026-11-05: an insufficient topic names why, from three reasons, with its evidence. Having no starting document, or a
+  -- brief whose claims could not all be checked, is not a reason (homesignal-ingest run_research.INSUFFICIENT_REASONS holds
+  -- the same three, so the research job can say so before it gets here).
+  if outcome = 'insufficient' and coalesce(p_payload->'evidence'->>'reason', '') not in ('already_covered', 'no_public_record', 'premise_false') then
+    raise exception 'insufficient needs a reason: already_covered, no_public_record or premise_false (no starting document is not a reason)' using errcode = '22023';
+  end if;
+  if outcome = 'insufficient' and p_payload->'evidence'->>'reason' = 'no_public_record'
+     and jsonb_array_length(case when jsonb_typeof(p_payload->'evidence'->'searched') = 'array' then p_payload->'evidence'->'searched' else '[]'::jsonb end) < 3 then
+    raise exception 'no_public_record needs the searches made (at least 3, in evidence.searched)' using errcode = '22023';
+  end if;
+  if outcome = 'insufficient' and p_payload->'evidence'->>'reason' = 'premise_false'
+     and jsonb_array_length(case when jsonb_typeof(p_payload->'evidence'->'sources') = 'array' then p_payload->'evidence'->'sources' else '[]'::jsonb end) = 0 then
+    raise exception 'premise_false needs the records that show it (evidence.sources)' using errcode = '22023';
   end if;
   update public.impact_discovery_candidates set
     evidence_status = outcome,
@@ -757,7 +811,7 @@ returns jsonb language sql stable security definer set search_path = public as $
     'nominated', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category,
         'track', c.track, 'score', c.score, 'status', c.status, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
         'reasons', c.reasons, 'concept', c.concept, 'nominated_scan_id', c.nominated_scan_id,
-        'origin', c.origin, 'submitted_note', c.submitted_note) order by (c.origin = 'founder') desc, c.score desc)
+        'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode) order by (c.origin = 'founder') desc, c.score desc)
       from public.impact_discovery_candidates c
      where c.status in ('nominated', 'researching') and c.story_id is null and c.duplicate_of is null), '[]'::jsonb),
     'library', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'video_slug', s.video_slug, 'title', s.title, 'origin', s.origin))
@@ -953,7 +1007,7 @@ begin
   perform public._hs_id_event(c.id, null, 'research_working', jsonb_build_object('run', r.id, 'attempt', r.attempts + 1), 'research');
   return jsonb_build_object('ok', true, 'run', r.id,
     'candidate', jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category, 'track', c.track,
-      'origin', c.origin, 'submitted_note', c.submitted_note, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
+      'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
       'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage),
     'library', coalesce((select jsonb_agg(jsonb_build_object('video_slug', s.video_slug, 'title', s.title))
       from public.impact_stories s where s.archived_at is null), '[]'::jsonb));
@@ -1013,7 +1067,7 @@ begin
   foreach f in array array[
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
-    'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)',
+    'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)', 'public.hs_impact_discovery_set_start(uuid, text)',
     'public.hs_impact_discovery_research_start(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';

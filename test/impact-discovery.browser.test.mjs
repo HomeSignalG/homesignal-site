@@ -60,10 +60,12 @@ await page.evaluate(() => {
     if (n === 'hs_impact_discovery_suggest') {
       if (a.p_topic.links.some((u) => !/^https?:\/\//.test(u))) return Promise.resolve({ data: null, error: { message: 'This is not a web link (it must start with http:// or https://): ' + a.p_topic.links[0] } });
       window.db.candidates.unshift({ id: 'f1', origin: 'founder', title: a.p_topic.title, place: a.p_topic.place, category: a.p_topic.category, track: 'core',
-        status: 'nominated', evidence_status: a.p_topic.links.length ? 'leads_found' : 'social_only', score: 0, submitted_note: a.p_topic.note,
+        status: 'nominated', evidence_status: a.p_topic.links.length ? 'leads_found' : 'social_only', score: 0, submitted_note: a.p_topic.note, start_mode: a.p_topic.start,
         evidence: { leads: a.p_topic.links.map((u) => ({ url: u, kind: 'founder' })) }, concept: {}, related: [], metrics: {},
         discovered_at: new Date().toISOString(), last_seen_at: new Date().toISOString(), reasons: ['You suggested this topic.'] });
       return Promise.resolve({ data: { id: 'f1', status: 'nominated' }, error: null }); }
+    if (n === 'hs_impact_discovery_set_start') { const c = window.db.candidates.find((x) => x.id === a.p_candidate); c.start_mode = a.p_start;
+      return Promise.resolve({ data: { ok: true, start_mode: a.p_start }, error: null }); }
     if (n === 'hs_impact_discovery_research_start') { const c = window.db.candidates.find((x) => x.id === a.p_candidate);
       c.research = { id: 'r-' + c.id, status: 'working' }; c.status = 'researching'; c.evidence_status = 'researching';
       return Promise.resolve({ data: { existing: false, research: c.research }, error: null }); }
@@ -169,11 +171,17 @@ await page.fill('#hot-sg-links', 'https://www.cityofpuyallup.org/permit/123\nhtt
 await page.fill('#hot-sg-place', 'Puyallup, WA');
 await page.selectOption('#hot-sg-cat', 'zoning_development');
 await page.fill('#hot-sg-note', 'Up to 95 trucks a day next to a park.');
+ok(await page.evaluate(() => document.getElementById('hot-sg-start').value === 'auto'
+  && [...document.getElementById('hot-sg-start').options].map((o) => o.text).join('|') === 'Auto-detect|Source document available|No starting document — research from topic'
+  && document.getElementById('hot-sg-note').maxLength === 12000),
+  '7c2 the form offers the three starting-evidence options, Auto-detect by default, and takes a brief of up to 12,000 characters');
+await page.selectOption('#hot-sg-start', 'document');
 await page.click('button:has-text("Add topic")');
 await page.waitForFunction(() => /Topic added/.test(document.getElementById('hot').innerText));
 const sent = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_discovery_suggest').pop()[1].p_topic);
 ok(sent.title === 'Van Tramp <fill> project' && sent.place === 'Puyallup, WA' && sent.category === 'zoning_development'
-  && sent.links.length === 2 && sent.note === 'Up to 95 trucks a day next to a park.', '7d Add topic sends the title, place, category, links (one per line) and note');
+  && sent.links.length === 2 && sent.note === 'Up to 95 trucks a day next to a park.' && sent.start === 'document',
+  '7d Add topic sends the title, place, category, links (one per line), note and starting evidence');
 const first = page.locator('.is-card').first();
 const ft = await first.innerText();
 ok(/Van Tramp <fill> project/.test(ft) && /Your pick/.test(ft) && /waiting for research/.test(ft) && /Why it matters: Up to 95 trucks/.test(ft),
@@ -182,7 +190,15 @@ ok(!/of 100/.test(ft) && !/Lead post/.test(ft) && await first.locator('button:ha
   && await first.locator('button:has-text("Exclude Similar")').count() === 0, '7f no score, no Bluesky lead, no Score or Exclude Similar buttons');
 await first.locator('button:has-text("Open Sources")').click();
 ok(/Links you added/.test(await first.innerText()) && /cityofpuyallup\.org/.test(await first.innerText()), '7g Open Sources lists the links you added as leads');
-ok(await page.evaluate(() => !document.getElementById('hot-suggest').open && document.getElementById('hot-sg-title').value === ''), '7h after adding, the form is closed and cleared');
+ok(await page.evaluate(() => !document.getElementById('hot-suggest').open && document.getElementById('hot-sg-title').value === ''
+  && document.getElementById('hot-sg-start').value === 'auto'), '7h after adding, the form is closed and cleared (starting evidence back to Auto-detect)');
+const sel = page.locator('.is-card').first().locator('select[data-hot-start]');
+ok(await sel.inputValue() === 'document' && /Research reads the document you linked first/.test(await page.locator('.is-card').first().innerText()),
+  '7i the card shows its starting evidence and what it means');
+await sel.selectOption('topic');
+await page.waitForFunction(() => /Starting evidence saved/.test(document.getElementById('hot').innerText));
+const ss = await page.evaluate(() => window.calls.filter((c) => c[0] === 'hs_impact_discovery_set_start').pop()[1]);
+ok(ss.p_candidate === 'f1' && ss.p_start === 'topic', '7j changing it on the card saves it for that topic');
 
 // Start research and Create video (founder, 2026-10-28: no Claude window needed)
 const tona = page.locator('article', { hasText: 'Quarry expansion' });

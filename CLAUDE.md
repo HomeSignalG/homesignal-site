@@ -6182,6 +6182,26 @@ water and health near homes, rank them out of 100, and show them above the Impac
   rule and every story check are unchanged. Scans never match or hand out founder topics; the per-scan prepare limit is for
   scanned topics; performance is split by origin. Suite: `test/impact_discovery_pg` §17.
 
+## IMPACT STORIES, TAB 17: STARTING EVIDENCE — DOCUMENT OR TOPIC, ONE PIPELINE (2026-11-05)
+
+Every topic gets the same research, fact-checking, narrative and production. Only where research STARTS differs:
+`impact_discovery_candidates.start_mode` = `auto` (default) | `document` | `topic`, chosen in Hot Topics' Suggest form and
+changeable on the card until verified (`hs_impact_discovery_set_start`; `document` needs a link). `auto` is resolved ONCE, in
+homesignal-ingest `impact/discovery/starting.py` (a link that is a record: a document file, a .gov/.us/.mil host or a records
+vendor; a petition, post or video never is). Both paths build the same source pack and pass the same checks.
+- **Why (the failure it fixes):** "House Speaker Election" (founder pick, 2026-11-05 16:35Z and 16:41Z) came back
+  `insufficient` twice. The link was a change.org petition and the brief a script; the research runbook only knew a
+  development's records, so it listed records it could have fetched (the Oversight vote, FEC filings) and "neutral framing"
+  as "missing" and stopped. The brief was also clipped at 2,000 characters (now 12,000, `impact_discovery_candidates_note_check`).
+- **`impact_discovery_research` refuses an `insufficient` report without `evidence.reason`** in `already_covered` |
+  `no_public_record` (with at least 3 `evidence.searched`) | `premise_false` (with `evidence.sources`). No starting document is
+  never a reason. The ingest runner checks the same three first (`run_research.INSUFFICIENT_REASONS`) and turns a bad report into
+  a failed run that says "Press Research again".
+- ⛔ **Apply order: merge homesignal-ingest first** (its research job then sends the reason), then apply
+  `docs/impact-discovery.sql`, then deploy the page. Applied the other way round, a research run's honest "insufficient" is refused
+  until the ingest change lands.
+- Tests: `test/impact_discovery_pg` 11a2-11a3, 17q-17y; `test/impact-discovery.browser.test.mjs` 7c2, 7d, 7h-7j.
+
 ## ENGAGE ON BLUESKY, TAB 17 (2026-10-28): the strongest posts to answer, drafted, posted BY HAND
 
 Under Hot Topics, a separate section ranks the 3-5 strongest ORIGINAL posts of each discovered topic by an Engagement
