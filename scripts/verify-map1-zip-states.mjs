@@ -216,7 +216,10 @@ for (const c of CASES.filter((c) => c.zip)) {
       dev: dev.length, fac: fac.length,
       // ZIP mode must never carry address-mode geometry on a development record
       devWithDistance: dev.filter(s => s.distance_mi != null || s.e != null || s.n != null).length,
-      notMeasured: /not measured yet/i.test(txt),
+      // The ZIP's own development sentence only. Since #2490 (2026-11-01) the page also prints a
+      // per-SOURCE freshness line, 'Latest available record: not measured yet', which says nothing
+      // about this ZIP's measurement; the bare phrase matched it and failed every measured zero.
+      notMeasured: /Development coverage for (ZIP \d{5}|this ZIP) is not measured yet/i.test(txt),
       // Founder wording 2026-10-02: a ZIP with no Census area (producer 'not_measured') says so,
       // in the sentence pinned whole by test/zip-no-mapped-area-copy.test.mjs. Only a ZIP waiting
       // on a build (producer 'unknown', the synthetic pending case) still says "not measured yet".
