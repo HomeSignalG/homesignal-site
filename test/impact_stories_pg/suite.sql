@@ -105,7 +105,7 @@ select pg_temp.as_user('founder@example.com');
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'generate');
 select pg_temp.work(jsonb_build_object('body', pg_temp.body(), 'derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P1'))));
 select pg_temp.chk('5a generated version 2, still blocked: the narrative says why', pg_temp.cur() = 2 and pg_temp.nst() = 'blocked' and pg_temp.stage() = 'script'
-   and pg_temp.nxt() = 'Review and approve the integrated narrative');
+   and pg_temp.nxt() like 'Fix what the check found in the script%');
 select pg_temp.chk('5b reject needs a note', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 2)', pg_temp.id('s'), 'narrative', 'rejected')) like '%Say what to change%');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'rejected', 2, 'Speak the anger qualifier.', 'Act 6');
 select pg_temp.chk('5c a rejection is tied to its line', (select target from public.impact_story_approvals order by id desc limit 1) = 'Act 6');
@@ -593,6 +593,14 @@ select pg_temp.chk('12f6 claimed: working, out of the list, cannot be claimed tw
    public._hs_is_media(pg_temp.id('s')::uuid)->'fix_batch'->>'status' = 'working'
    and jsonb_array_length(public.impact_fix_batches_list()) = 0
    and pg_temp.err(format('select public.impact_fix_batch_claim(%L)', pg_temp.id('fb'))) like '55000%');
+select pg_temp.chk('12f6b while the fixer works, the next step is "Fixes in progress" and it is not yours',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'owner' = 'working'
+   and public._hs_is_status(pg_temp.id('s')::uuid)->>'next' like 'Fixes in progress%');
+begin;
+update public.impact_story_fix_batches set claimed_at = now() - interval '4 hours' where id = pg_temp.id('fb')::uuid;
+select pg_temp.chk('12f6c a batch claimed over 3 hours ago is stalled, not "in progress"',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'next' not like 'Fixes in progress%');
+rollback;
 select pg_temp.chk('12f7 completion is checked: a summary, every request accounted for, no stray ids, a needs_you request is not done',
    pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","outcomes":[]}')) like '%say what was done%'
    and pg_temp.err(format('select public.impact_fix_batch_complete(%L, %L)', pg_temp.id('fb'), '{"status":"done","summary":"x","outcomes":[]}')) like '%every request needs an outcome%'
@@ -608,6 +616,8 @@ select pg_temp.chk('12f8 done: each request shows its outcome, the batch says th
    and not exists (select 1 from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->'batch'->>'outcome' <> 'fixed')
    and jsonb_array_length(public._hs_is_fix_eligible(pg_temp.id('s')::uuid)) = 0
    and pg_temp.err(format('select public.hs_impact_story_fix_start(%L)', pg_temp.id('s'))) like '%no open fix requests%');
+select pg_temp.chk('12f8b after the fixes finish, the next step is no longer "Fixes in progress"',
+   public._hs_is_status(pg_temp.id('s')::uuid)->>'next' not like 'Fixes in progress%');
 select public.hs_impact_story_media_decide(pg_temp.id('s')::uuid, pg_temp.fid(a), 'approved') from unnest(array['main', 'short_a', 'short_b']) a;
 select pg_temp.chk('12k3 approving a file later closes only its own request, and the request stays listed',
    (select x->>'status' from jsonb_array_elements(public._hs_is_media(pg_temp.id('s')::uuid)->'fix_requests') x where x->>'asset' = 'main') = 'closed'

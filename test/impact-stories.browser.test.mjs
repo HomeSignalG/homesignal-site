@@ -805,6 +805,20 @@ await page.waitForTimeout(120);
 const wbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
 ok(/Working on it/i.test(wbox) && wbox.includes('Nothing is needed from you') && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
    'next step: while the videos render the box says nothing is needed, with no button');
+// fix requests sent: the fixer works, so the box says "Fixes in progress", not "Review each video" (founder, 2026-11-05)
+await page.evaluate(() => {
+  window.__beforeFix = { job: window.db.job, status: window.db.status };
+  window.db.job = { id: 'jdone', kind: 'render', status: 'complete', attempts: 1, created_at: '2026-11-03T23:10:00Z', completed_at: '2026-11-04T00:10:00Z' };
+  window.db.status = ((st) => () => Object.assign(st(), { stage: 'media', owner: 'working', library: 'needs_review',
+    next: 'Fixes in progress: the fixer is working on your fix requests. When it finishes, this says what to do next.' }))(window.db.status);
+  window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(120);
+const fbox = await page.evaluate(() => (document.querySelector('#is #is-next-box') || {}).innerText || '');
+ok(/Fixes in progress/.test(fbox) && !/Your next step/i.test(fbox) && !/Review each video/i.test(fbox)
+   && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
+   'next step: while sent fixes are worked on, the box says Fixes in progress with no button');
+await page.evaluate(() => { window.db.job = window.__beforeFix.job; window.db.status = window.__beforeFix.status; });
 // a Prepare that stopped for a missing photo is the founder's step, not a crash (Menomonie, 2026-11-04)
 await page.evaluate(() => {
   window.__beforeBlocked = { job: window.db.job, status: window.db.status, visuals: window.db.visuals };
