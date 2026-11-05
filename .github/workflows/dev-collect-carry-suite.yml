@@ -1,0 +1,40 @@
+name: dev-collect-carry-suite
+
+# docs/dev-refresh-collect-carry-failed-sources.sql on a DISPOSABLE Postgres: the live collector is rebuilt and fingerprinted to
+# production's body (md5 5afbb783...), every case first runs on that body (CONTROL: one failed source froze the whole page), then the
+# migration is applied (and re-applied as a no-op), the cases run again, and the reversal restores the original exactly. No production
+# secret is read or needed.
+on:
+  pull_request:
+    paths:
+      - 'docs/dev-refresh-collect-*.sql'
+      - 'docs/dev-frs-start-hint.sql'
+      - 'test/dev_collect_carry_pg/**'
+      - 'test/dev_collect_harness/**'
+      - 'test/dev_refresh_restart_pg/**'
+      - '.github/workflows/dev-collect-carry-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  carry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      pg:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: pw, POSTGRES_DB: dev_collect_carry_disposable }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-timeout 3s --health-retries 20
+    env: { PGHOST: localhost, PGPORT: '5432', PGUSER: postgres, PGPASSWORD: pw, PGDATABASE: dev_collect_carry_disposable }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to run if any production credential is present
+        run: |
+          if [ -n "${SUPABASE_DB_URL:-}${SUPABASE_ACCESS_TOKEN:-}${SUPABASE_WRITE_KEY:-}" ]; then echo "ABORT: disposable container only"; exit 1; fi
+      - name: Carry-forward cases, before and after
+        run: |
+          set -o pipefail
+          psql -X -c 'select 1' >/dev/null
+          bash test/dev_collect_carry_pg/run.sh 2>&1 | tee /tmp/carry.log
+          grep -q '^dev-collect-carry: all checks passed' /tmp/carry.log
