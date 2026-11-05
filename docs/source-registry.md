@@ -13429,3 +13429,12 @@ now reads it. Measured through pg_net (requests 24526–24534, 24544–24547, 24
 - 13 status values in the window, all mapped; no per-record public link, so `record_url_precision` is dataset.
 - Map 1 treatment stays PROVEN (`geo.n5_accepted_source`), so the next generation draws the fenced points.
 - Test: `test/socrata-zip-text-suffix.test.ts` (live rows, mutation-checked).
+
+**Fairfax building permits, coverage check (same day).** The 24 records on 20109 all come from
+`fairfax-recent-building-permits`, i.e. PLUSGISRecords layer 8 (building records), not the site-records layer.
+The change history (`dev_change_project`) holds the old layer's 4,120 permit IDs, last seen 2026-08-27; 3,527 were filed on
+or after 2025-11-06. A random sample of 180 of those, looked up by RECORDID on layer 8 (pg_net 24605–24607):
+**180 of 180 found, one row each** (no duplicates from parcel polygons). On 20109 itself: all 10 old in-window permits are
+on the new page, plus 14 the old page never had (mostly issued after 2026-08-27; a few filed before the window and issued
+inside it, since the old layer dated by filing and layer 8 dates by issue). The county's PLUS downtime runs 2026-11-05 to
+11-09; a failure in that window is not a permanent access change.
