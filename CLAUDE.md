@@ -4143,6 +4143,22 @@ retyped). Pinned by `test/app-refresh-zip-write-only-changed.test.mjs`.
 - Rollback: `public.app_refresh_zip_def_archive` holds the pre-change body (tag
   `pre-write-only-changed`); execute it and drop `public.app_coord_outlier`.
 
+### ✅ A FAILED SOURCE KEEPS ITS STORED RECORDS; THE REST OF THE REPORT REFRESHES (founder, 2026-11-05) — APPLIED
+SQL of record **`docs/dev-refresh-collect-carry-failed-sources.sql`** (+ `-reverse.sql`); applied 2026-11-05 21:30Z
+(ledger `20261105213023`), live `dev_refresh_collect` md5(prosrc) `b17263cc…` (was `5afbb783…`).
+- **Why:** CORE GUARD 1 refused the WHOLE ZIP write when any source with stored records failed, so one dead source
+  froze every other source on the page. Measured that day: 690 of 12,744 reports older than 7 days, 74 older than 30.
+- **Now:** `public.dev_with_carried_sources(j)` appends each failed source's stored project records to the response and
+  adds them to its counts by the engine's own rules (index.ts COUNTS, decision.ts `isActiveUndecided`). CORE GUARD 1 is
+  retired; CORE GUARD 2, the shape guard and the EPA plane are unchanged. A source that sent any record this read is
+  never padded with old rows. Failures are still logged (`blocked_update = false`, `detail.carried_forward = n`), and the
+  page's source box says that source's latest read did not complete.
+- **Proven live** the same day: ZIP 35613 refreshed with all 132 Huntsville records kept while Huntsville was down.
+- ⚠️ `blocked_update` is false from this date, so `v_dev_refresh_source_health.blocked_24h` and
+  `dev_change_source_fetch_health.blocked_*` count only older rows; read `fetch_failures_*` for current failures.
+- Tests: `test/dev_collect_carry_pg` (CI `dev-collect-carry-suite`; rebuilds production's body and reproduces the
+  freeze first). ⛔ Any later splice of the collector must start from `b17263cc…`, not from an older docs file.
+
 ### ✅ `dev_refresh_collect()` EVALUATES EACH RESPONSE ONCE (2026-09-24)
 SQL of record for the collector is now **`docs/dev-refresh-collect-once-per-response.sql`**; it
 supersedes the body parked in `docs/epa-decouple-phase1b-split-write.sql` (the ROLLBACK path).

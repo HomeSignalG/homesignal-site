@@ -13405,3 +13405,36 @@ huntsville-building-permits 25. All probes below via pg_net, 2026-11-05.
 **Not replaced:** huntsville-building-permits (the server fails at the
 connection, HTTP/2 framing error from pg_net and "error sending request" from the engine; same URL, so pages recover
 when it answers).
+
+**Follow-up, same day (after deploy, live refreshes of one stuck page per source):** Fairfax 20109 24 permits ·
+Chattanooga 37302 44 · Caltrans 90265 10 · Huntsville 35613 still failing, its 132 records carried forward ·
+sd-stip-structures failed with "Failed to execute query" because the entry's `out_fields` named `HwyNbr`, which layer 10
+does not have (it has `RouteNbr`); removed (pg_net 24497 without it returns rows, 24498 with it returns the same error).
+**kcmo-building-permits answers but has nothing to show:** its `recency_days` is 365 and the city's layer ends at
+2025-06-30, so ZIP 64101 now drops its old Kansas City permits. Kansas City publishes no current public permit layer
+found so far.
+
+**Kansas City replaced, same day (founder lead):** the city publishes **City Issued Permits** on its Socrata portal
+(`data.kcmo.org` `w8jz-wjgn`, attribution "City of Kansas City, Missouri", provenance official). `kcmo-building-permits`
+now reads it. Measured through pg_net (requests 24526–24534, 24544–24547, 24594–24595):
+- 42,661 permits issued 2025-11-05..2026-11-05, newest 2026-11-02. The dataset carries bad future dates (up to 3036),
+  so freshness was read inside a bounded window, never as an unbounded max.
+- Kept: `permit_type` starting `CPPU - Building` or `CPPU - Demolition` (the old entry's scope: new construction,
+  demolition, additions/alterations/repairs), pushed down as `extra_where` so a new subtype arrives as unclassified
+  instead of being dropped. 4,108 in the window, newest 2026-10-30, 4,108 with both address lines, 1,064 with a project name.
+- No coordinates. Each permit is placed by geocoding its own street address (`geocode_assemble`, fenced on the
+  filed ZIP and distance). The ZIP is only in `main_address_line2` ("Kansas City, MO 64156"), so the connector gained
+  `zip_text_suffix` (socrata.ts): `(upper(col) like '% <zip>' OR upper(col) like '% <zip>-%')`. The exact clause
+  returns 9 permits for 64101 and 306 for 64155, equal to a group-by of the same window.
+- 13 status values in the window, all mapped; no per-record public link, so `record_url_precision` is dataset.
+- Map 1 treatment stays PROVEN (`geo.n5_accepted_source`), so the next generation draws the fenced points.
+- Test: `test/socrata-zip-text-suffix.test.ts` (live rows, mutation-checked).
+
+**Fairfax building permits, coverage check (same day).** The 24 records on 20109 all come from
+`fairfax-recent-building-permits`, i.e. PLUSGISRecords layer 8 (building records), not the site-records layer.
+The change history (`dev_change_project`) holds the old layer's 4,120 permit IDs, last seen 2026-08-27; 3,527 were filed on
+or after 2025-11-06. A random sample of 180 of those, looked up by RECORDID on layer 8 (pg_net 24605–24607):
+**180 of 180 found, one row each** (no duplicates from parcel polygons). On 20109 itself: all 10 old in-window permits are
+on the new page, plus 14 the old page never had (mostly issued after 2026-08-27; a few filed before the window and issued
+inside it, since the old layer dated by filing and layer 8 dates by issue). The county's PLUS downtime runs 2026-11-05 to
+11-09; a failure in that window is not a permanent access change.

@@ -527,7 +527,7 @@
   },
   "kcmo-building-permits": {
    "agency": "City of Kansas City, Missouri",
-   "dataset": "services.arcgis.com, service Building_Permits_2020__to_2025_Q3"
+   "dataset": "data.kcmo.org, dataset w8jz-wjgn"
   },
   "kcmo-development-cases": {
    "agency": "City of Kansas City, Missouri",
