@@ -142,7 +142,10 @@ concurrency:
   # PER REF, not one global group. main's deploys only ever contend with other main runs;
   # a branch or pull-request run lands in its own group and cannot cancel a queued deploy.
   # cancel-in-progress stays false so an in-flight actions/deploy-pages is never interrupted.
-  group: pages-build-${{ github.ref }}
+  # v2 (2026-11-05): run #2500's deploy job sat 'waiting' for hours and could not be cancelled
+  # (GitHub: 'not queued yet'), holding the old group so every newer main build was cancelled
+  # before it started. A new group name lets builds run again; the old group dies with that run.
+  group: pages-build-v2-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
