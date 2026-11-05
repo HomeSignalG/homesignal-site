@@ -394,7 +394,8 @@
   },
   "fairfax-recent-building-permits": {
    "agency": "Fairfax County Land Development Services",
-   "dataset": "www.fairfaxcounty.gov, service LDS/DevelopmentTracker"
+   "dataset": "www.fairfaxcounty.gov, service PLUS/PLUSGISRecords",
+   "status_const": "Issued"
   },
   "fdot-active-construction-projects": {
    "agency": "Florida Department of Transportation",

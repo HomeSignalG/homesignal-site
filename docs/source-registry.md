@@ -13400,7 +13400,8 @@ huntsville-building-permits 25. All probes below via pg_net, 2026-11-05.
 | sd-stip-structures | layer 0 → Layer not found | layer **10** "Local Structure Projects" | SDDOT renumbered the service; layer 0 "Structures" is gone and its 25 stored PCNs are in no current layer; layer 10 has 23 PCNs, 0 shared with wired layers 1,2,3,4,6,9 |
 | fairfax-active-site-construction | `LDS/DevelopmentTracker/FeatureServer/1` → Token Required (also the county's public proxy: 403) | `LDS/PLUSApprovedSiteRecords/FeatureServer/0` | same Accela field names incl. per-record `LINK_URL`; 132k records, newest approval 2026-11-04; polygon (centroid). It holds every approved record, not only active ones, so `recency_days: 730` on `SUBMITTED_DATE`: 1,104 records of the kept plan types in that window (Approved 584 · Revised 245 · Closed 206 · Pending Customer 66 unmapped, fail closed) |
 
-**Not replaced:** fairfax-recent-building-permits (no public Fairfax permit layer found: the county's ArcGIS Online
-search returns only the locked Development Tracker), huntsville-building-permits (the server fails at the
+| fairfax-recent-building-permits | `LDS/DevelopmentTracker/FeatureServer/4` → Token Required | `gisint1/rest/services/PLUS/PLUSGISRecords/FeatureServer/8` "PLUS Building Records" (lead from the founder) | 675,588 rows, newest issue 2026-11-05, per-record `LINK_URL`, parcel polygons; no status, name or address column, so title = APPTYPEALIAS, status_const Issued → approved, file_date ISSUEDATE; the four kept types (Residential/Commercial New, Addition/Alteration) total 9,463 in 365 days vs 11,325 in the old layer. Fairfax PLUS is down 2026-11-05 17:00 – 11-09 07:00 ET (Accela move): a failure then is not a removal |
+
+**Not replaced:** huntsville-building-permits (the server fails at the
 connection, HTTP/2 framing error from pg_net and "error sending request" from the engine; same URL, so pages recover
 when it answers).

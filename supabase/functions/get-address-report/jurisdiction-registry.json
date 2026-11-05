@@ -4423,8 +4423,8 @@
       "registry_id": "fairfax-recent-building-permits",
       "geocode_assemble": true,
       "platform": "arcgis",
-      "service_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4",
-      "dataset_url": "https://www.fairfaxcounty.gov/mercator/rest/services/LDS/DevelopmentTracker/FeatureServer/4",
+      "service_url": "https://www.fairfaxcounty.gov/gisint1/rest/services/PLUS/PLUSGISRecords/FeatureServer/8",
+      "dataset_url": "https://www.fairfaxcounty.gov/gisint1/rest/services/PLUS/PLUSGISRecords/FeatureServer/8",
       "jurisdiction": "Fairfax County Land Development Services",
       "coverage": [
         {
@@ -4442,19 +4442,17 @@
       ],
       "column_map": {
         "title": [
-          "APPTYPEALIAS",
-          "PROJECT_NAME"
+          "APPTYPEALIAS"
         ],
         "type_source": "APPTYPEALIAS",
-        "status_raw": "RECORD_STATUS",
-        "file_date": "SUBMITTED_DATE",
-        "decision_date": "APPROVED_DATE",
-        "address": "ADDRESS_1",
+        "file_date": "ISSUEDATE",
         "lat": "__lat",
         "lng": "__lng",
         "case_number": "RECORDID",
         "record_url": "LINK_URL"
       },
+      "file_date_kind": "issued",
+      "status_const": "Issued",
       "include_types": [
         "Residential New",
         "Residential Addition/Alteration",
@@ -4468,26 +4466,17 @@
         "Commercial Addition/Alteration": "Commercial"
       },
       "status_to_bucket": {
-        "proposed": [
-          "Submitted"
-        ],
+        "proposed": [],
         "approved": [
-          "Issued",
-          "Issued - Amendment Pending",
-          "Critical Structures Approved",
-          "Inspection Phase"
+          "Issued"
         ],
-        "operating": [
-          "Inspections Completed"
-        ],
-        "exclude": [
-          "Refund Request Pending"
-        ]
+        "operating": [],
+        "exclude": []
       },
       "recency_days": 365,
       "spatial_zip_radius_mi": 3,
       "record_url_precision": "record",
-      "_receipts": "2026-07-25 pg_net recon (response ids 111626-111653), Batch 5. Same DevelopmentTracker service already proven edge-runtime-reachable by fairfax-active-site-construction (8,112 records live in production), so the egress gate that killed El Paso is already satisfied for this host. LAYER 4 'Recent Building Permits - Centroid Point': 11,325 rows, esriGeometryPoint. FRESHNESS GATE PASSED: max last_edited_date 2026-07-25 (same day), max SUBMITTED_DATE 2026-07-21. RECORD-PRECISION record_url: LINK_URL IS NULL count = 0 -- every row carries a per-record Accela ACA Building deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?type=1000&Module=Building&capID1=...&agencyCode=FFX). RECORD_STATUS is a clean verbatim 7-value vocabulary mapped exactly: Issued 11,055 + Issued - Amendment Pending 219 + Critical Structures Approved 2 + Inspection Phase 1 -> approved; Inspections Completed 1 -> operating; Submitted 1 -> proposed; Refund Request Pending 46 -> exclude (permit being refunded/withdrawn). APPTYPEALIAS is a clean 4-value vocabulary, ALL of it real building construction, so all four are kept: Residential Addition/Alteration 6,604, Commercial Addition/Alteration 2,748, Residential New 1,105, Commercial New 868. TITLE: PROJECT_NAME is blank on 1,921 of 11,325 rows (17%), so the title leads with APPTYPEALIAS and appends PROJECT_NAME when present (Cleveland title:[PERMIT_SUBTYPE,JOB_DESCRIPTION] precedent) -- a record is never titled by its bare permit number. ADDRESS_1 is blank on exactly 1 row. SPATIAL ZIP scoping, not native: ZIP_CODE carries hyphenated ZIP+4 ('20124-1307'), same unreliability as layer 1. recency_days 365 (3,964 of 11,325 rows) -- unlike layer 1 this IS an issuance ledger spanning back to 2021, so the standard 365d permit window applies; showing 5-year-old issued permits as current development would be misleading. SIBLING LAYERS REJECTED WITH RECEIPTS -- all POLYGON, and the arcgis connector flattens POINT geometry only (f.geometry.x/y), so a polygon layer yields no coordinates, no markers, and would degrade every record to area scope: layer 0 'Data Center Development', layer 2 'Active Site Construction - Parcels' (a duplicate of the already-wired layer 1 in parcel form), layer 5 'Recent Building Permits - Parcels' (duplicate of this layer), layer 6 'Certificate of Occupancy', and LDS/PLUSApprovedSiteRecords. Layer index 3 does not exist. NOTE ON YIELD: Fairfax was already 46 of 47 ZIP pages populated by layer 1, so this source adds RECORDS to live pages (charter P3), not newly populated pages (charter P1). | 2026-08-01 coverage extension -> VA Arlington. Config only. Control 20120 (Fairfax, live) = 711. ALL 11 dark Arlington ZIPs carry records: 22213 1,304 / 22205 839 / 22207 597 / 22203 440 / 22204 264 / 22206 217 / 22201 200 / 22214 84 / 22211 67 / 22209 36 / 22202 5 in envelope. Go-live 1,365 records over 11 pages. The sibling entry fairfax-active-site-construction was NOT probed and is NOT extended.",
+      "_receipts": "2026-11-05 REPLACEMENT (lead from the founder): DevelopmentTracker/FeatureServer/4 answers 499 Token Required. PLUS/PLUSGISRecords/FeatureServer/8 'PLUS Building Records' is public (pg_net 24264-24284): 675,588 rows (MapServer twin same count), newest ISSUEDATE 2026-11-05, polygon parcels returned in outSR 4326, per-record Accela LINK_URL. Fields: RECORDID, APPTYPEALIAS, ISSUEDATE, UPDATEDATE, LINK_URL only (no status, project name or address), so title is APPTYPEALIAS, status_const 'Issued' -> approved (an issued permit is Approved, ruling 7.12a), file_date ISSUEDATE (issued). APPTYPEALIAS last 365 days, kept types: Residential New 970, Residential Addition/Alteration 5,975, Commercial New 215, Commercial Addition/Alteration 2,303 (9,463; old layer 4 held 11,325). Fairfax announced PLUS downtime 2026-11-05 17:00 to 2026-11-09 07:00 ET (Accela SaaS move); a failure in that window is not a removal. PREVIOUS RECEIPT: 2026-07-25 pg_net recon (response ids 111626-111653), Batch 5. Same DevelopmentTracker service already proven edge-runtime-reachable by fairfax-active-site-construction (8,112 records live in production), so the egress gate that killed El Paso is already satisfied for this host. LAYER 4 'Recent Building Permits - Centroid Point': 11,325 rows, esriGeometryPoint. FRESHNESS GATE PASSED: max last_edited_date 2026-07-25 (same day), max SUBMITTED_DATE 2026-07-21. RECORD-PRECISION record_url: LINK_URL IS NULL count = 0 -- every row carries a per-record Accela ACA Building deep link (plus.fairfaxcounty.gov/CitizenAccess/urlrouting.ashx?type=1000&Module=Building&capID1=...&agencyCode=FFX). RECORD_STATUS is a clean verbatim 7-value vocabulary mapped exactly: Issued 11,055 + Issued - Amendment Pending 219 + Critical Structures Approved 2 + Inspection Phase 1 -> approved; Inspections Completed 1 -> operating; Submitted 1 -> proposed; Refund Request Pending 46 -> exclude (permit being refunded/withdrawn). APPTYPEALIAS is a clean 4-value vocabulary, ALL of it real building construction, so all four are kept: Residential Addition/Alteration 6,604, Commercial Addition/Alteration 2,748, Residential New 1,105, Commercial New 868. TITLE: PROJECT_NAME is blank on 1,921 of 11,325 rows (17%), so the title leads with APPTYPEALIAS and appends PROJECT_NAME when present (Cleveland title:[PERMIT_SUBTYPE,JOB_DESCRIPTION] precedent) -- a record is never titled by its bare permit number. ADDRESS_1 is blank on exactly 1 row. SPATIAL ZIP scoping, not native: ZIP_CODE carries hyphenated ZIP+4 ('20124-1307'), same unreliability as layer 1. recency_days 365 (3,964 of 11,325 rows) -- unlike layer 1 this IS an issuance ledger spanning back to 2021, so the standard 365d permit window applies; showing 5-year-old issued permits as current development would be misleading. SIBLING LAYERS REJECTED WITH RECEIPTS -- all POLYGON, and the arcgis connector flattens POINT geometry only (f.geometry.x/y), so a polygon layer yields no coordinates, no markers, and would degrade every record to area scope: layer 0 'Data Center Development', layer 2 'Active Site Construction - Parcels' (a duplicate of the already-wired layer 1 in parcel form), layer 5 'Recent Building Permits - Parcels' (duplicate of this layer), layer 6 'Certificate of Occupancy', and LDS/PLUSApprovedSiteRecords. Layer index 3 does not exist. NOTE ON YIELD: Fairfax was already 46 of 47 ZIP pages populated by layer 1, so this source adds RECORDS to live pages (charter P3), not newly populated pages (charter P1). | 2026-08-01 coverage extension -> VA Arlington. Config only. Control 20120 (Fairfax, live) = 711. ALL 11 dark Arlington ZIPs carry records: 22213 1,304 / 22205 839 / 22207 597 / 22203 440 / 22204 264 / 22206 217 / 22201 200 / 22214 84 / 22211 67 / 22209 36 / 22202 5 in envelope. Go-live 1,365 records over 11 pages. The sibling entry fairfax-active-site-construction was NOT probed and is NOT extended.",
       "observed_types_unreviewed": []
     },
     {
