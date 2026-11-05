@@ -639,7 +639,7 @@ create or replace function public._hs_is_status(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; j public.impact_story_jobs%rowtype;
         arts jsonb := '{}'::jsonb; k text; stage text; nxt text; lib text; all_ok boolean := true; m jsonb; vs jsonb;
-        owner text := 'you';
+        owner text := 'you'; nfix int := 0;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
@@ -654,7 +654,11 @@ begin
     stage := 'outline'; lib := 'draft';
     nxt := case when v.body ? 'angles' then 'Analyze again to get the story outline' else 'Analyze story' end;
   elsif v.body->'main' is null then stage := 'outline'; nxt := 'Review the outline, then Generate story'; lib := 'needs_review';
-  elsif not all_ok then stage := 'script'; nxt := 'Review and approve the integrated narrative'; lib := 'needs_review';
+  elsif not all_ok then stage := 'script'; lib := 'needs_review';
+    -- a version the checks refused cannot be approved, so the next step says so (founder, 2026-11-05)
+    nxt := case when arts->'narrative'->>'state' = 'blocked'
+                then 'Fix what the check found in the script (shown in Script & Shorts), then approve it'
+                else 'Review and approve the integrated narrative' end;
   else
     m := public._hs_is_media(p_story);
     vs := public._hs_is_visuals(p_story);
@@ -670,6 +674,14 @@ begin
     end if;
   end if;
   if stage = 'archived' then owner := 'archived'; end if;
+  -- While the fixer works on sent fix requests, the next step is the fixer's, not yours (founder, 2026-11-05: "should say
+  -- fixes in progress now. after fixes are complete review each video"). A batch claimed over 3 hours ago is stalled.
+  select count(*) into nfix from public.impact_story_fix_batches b
+   where b.story_id = p_story and (b.status = 'queued' or (b.status = 'working' and b.claimed_at >= now() - interval '3 hours'));
+  if nfix > 0 and stage <> 'archived' then
+    owner := 'working';
+    nxt := 'Fixes in progress: the fixer is working on your fix requests. When it finishes, this says what to do next.';
+  end if;
   if j.status in ('queued', 'running') and public._hs_is_not_started(j) is not null then
     nxt := 'The job did not start. Press Retry.'; owner := 'you';
   elsif j.status in ('queued', 'running') then
