@@ -600,8 +600,34 @@ await page.evaluate(() => { window.db.media.fix_batch = { status: 'queued', requ
   window.db.media.fix_requests[0].batch = { status: 'queued' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
 txt = await page.locator('#is').innerText();
-ok(txt.includes('Starting: the fixer begins within a minute') && await page.locator('#is [data-act=fixstart]').count() === 0,
+ok(txt.includes('Confirmed: the fixer begins within a minute') && await page.locator('#is [data-act=fixstart]').count() === 0,
    'fixes: while a batch is queued the status shows and the button is gone');
+// Plan first (founder, 2026-11-05): while Claude writes its plan the top box says so; a written plan is shown per request
+// with Confirm (sending its md5) and Cancel, and nothing has changed yet.
+await page.evaluate(() => { window.db.media.fix_batch = { id: 'b9', status: 'planning', requests: 1, requested_at: '2026-11-05T14:00:00Z', claimed_at: '2026-11-05T14:01:00Z' };
+  window.db.media.fix_requests[0].batch = { status: 'planning' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.toLowerCase().includes('claude is writing its plan') && txt.includes('Nothing changes until you confirm') && await page.locator('#is [data-act=fixstart]').count() === 0,
+   'fixes: while the plan is written the top box says so and Fix is not offered again');
+await page.evaluate(() => { const r0 = window.db.media.fix_requests[0];
+  window.db.media.fix_batch = { id: 'b9', status: 'planned', requests: 1, requested_at: '2026-11-05T14:00:00Z', plan_md5: 'md5-of-plan',
+    plan: { summary: 'Shorter document shots and a photo at the end.', items: [{ decision_id: r0.id, understood: 'You want less paperwork on screen.',
+      changes: ['Show the EPA page for 3 seconds, not 8.', 'End on the photo of the well site.'], will_not: 'Add a photo of children: no licensed photo exists.' }] } };
+  r0.batch = { status: 'planned' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+txt = await page.locator('#is').innerText();
+ok(txt.toLowerCase().includes('claude\u2019s plan is ready') && txt.includes('Here is what Claude will change') && txt.includes('Show the EPA page for 3 seconds, not 8.')
+   && txt.includes('Will not do: Add a photo of children') && txt.includes('Understood: You want less paperwork on screen.')
+   && txt.includes('Plan ready: read it and confirm'),
+   'fixes: the plan is shown per request with what was understood, the changes and what it will not do');
+await page.click('#is [data-act=fixconfirm]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_confirm' && c[1].p_batch === 'b9' && c[1].p_plan_md5 === 'md5-of-plan' && c[1].p_story === 's1')),
+   'fixes: Confirm sends the exact plan the page showed (its md5)');
+await page.evaluate(() => window.HS.acqImpactStories.load(window.client, document.getElementById('is')));
+await page.waitForTimeout(80);
+await page.click('#is [data-act=fixplancancel]'); await page.waitForTimeout(50);
+ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_fix_cancel' && c[1].p_batch === 'b9')), 'fixes: Cancel ends the plan');
 await page.evaluate(() => { window.db.media.fix_batch = { status: 'stalled', requests: 1, requested_at: '2026-10-28T12:00:00Z', claimed_at: '2026-10-28T12:01:00Z' };
   window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(80);
@@ -678,6 +704,13 @@ ok(txt.includes('stopped before rendering anything') && txt.includes('Missing es
    && txt.includes('Latest development check') && !(await page.locator('#is b').allInnerTexts()).some((x) => x.includes('<b>')), 'media: a blocked render names what is missing and the licensed candidates');
 ok(await page.locator('#is [data-act=mdecide][data-d=approved][data-id="2"]').isDisabled(), 'media: a file the visual gate failed cannot be approved');
 ok(!(await page.locator('#is').innerHTML()).includes('<b>Person'), 'media: candidate text is escaped');
+// founder 2026-11-05: "i pressed request fix, but i do not know what fix is" — the box starts filled in with what failed
+ok(txt.includes('Rendering again will not change it') && txt.includes('already filled in with what failed'), 'media: a failed check says to request a fix, not to render again');
+await page.click('#is [data-act=fixform][data-id="2"]'); await page.waitForTimeout(50);
+const draft = await page.inputValue('#fx-note-2');
+ok(draft.startsWith('Short A (9:16) failed these checks') && draft.includes('Too many documents and cards (documents, cards and maps fill 54% <b>)') && draft.includes('Show the subject; quote the record over its photo.')
+   && draft.length <= 1000, 'media: the fix box is pre-filled with each failed check, its detail and its action');
+await page.click('#is [data-act=fixcancel][data-id="2"]'); await page.waitForTimeout(50);
 await page.click('#is [data-act=choose][data-id="oak-1"]'); await page.waitForTimeout(50);
 ok(await page.evaluate(() => window.calls.some((c) => c[0] === 'hs_impact_story_choose_asset' && c[1].p_job === 'jb' && c[1].p_subject === 'oak-trees' && c[1].p_candidate === 'oak-1')),
    'media: choosing a photo sends the render, subject and candidate');

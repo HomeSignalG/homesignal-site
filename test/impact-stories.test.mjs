@@ -65,14 +65,21 @@ ok(/m\.fix_requests/.test(js) && /Every request stays here/.test(js) && /fixRequ
 ok(/data-act="fixstart"/.test(js) && /rpc\('hs_impact_story_fix_start'/.test(js) && /'fix_batch', public\._hs_is_fix_batch\(p_story\)/.test(sql)
    && /'public\.hs_impact_story_fix_start\(uuid\)'[,\]]/.test(sql), 'page+sql: Fix sends the open requests as one batch and shows its progress');
 ok(/>Fix \(' \+ waiting/.test(js) && !/Start fixes|once an hour/.test(js)
-   && /impact-fix-run\.yml\/dispatches/.test(sql) && /perform public\._hs_is_fix_dispatch\(b\.id\);\n  return jsonb_build_object\('existing', false/.test(sql)
-   && /'public\._hs_is_fix_dispatch\(uuid\)'[,\]]/.test(sql) && !/claude_code_oauth|sk-ant/i.test(sql),
+   && /impact-fix-run\.yml\/dispatches/.test(sql) && /perform public\._hs_is_fix_dispatch\(b\.id, 'plan'\);\n  return jsonb_build_object\('existing', false/.test(sql)
+   && /'public\._hs_is_fix_dispatch\(uuid, text\)'[,\]]/.test(sql) && !/claude_code_oauth|sk-ant/i.test(sql),
    'page+sql: the button reads Fix and starts the Fix job at once (no schedule), the starter is not callable from the page');
 ok(/Re-rendered, but nothing in the story changed/.test(js) && /\['warn', 'Re-rendered, but nothing/.test(js),
    'page: a re-render from the same story is amber, never green');
 ok(!/prompt\('What should be fixed/.test(js) && /data-act="fixsend"/.test(js), 'page: a fix request is written in a form under the video, not a pop-up');
-ok(/impact_fix_batch_complete\(uuid, jsonb\)'\] loop/.test(sql) && /grant execute on function ' \|\| f \|\| ' to service_role/.test(sql),
-   'sql: the fixer door is service-role only');
+ok(/impact_fix_batch_complete\(uuid, jsonb\)', 'public\.impact_fix_batch_plan\(uuid, jsonb\)'\] loop/.test(sql) && /grant execute on function ' \|\| f \|\| ' to service_role/.test(sql),
+   'sql: the fixer door (claim, plan, complete) is service-role only');
+// Plan first (founder, 2026-11-05): Fix writes a plan; nothing changes until the founder confirms that exact plan.
+ok(/insert into public\.impact_story_fix_batches \(story_id, requests, requested_by, status\) values \(p_story, reqs, e, 'plan_queued'\)/.test(sql)
+   && /p_plan_md5 is distinct from b\.plan_md5/.test(sql) && /perform public\._hs_is_fix_dispatch\(b\.id, 'work'\);\n  return jsonb_build_object\('ok', true/.test(sql),
+   'sql: Fix starts a plan run; only a confirm of the exact plan starts the work run');
+ok(/rpc\('hs_impact_story_fix_confirm', \{ p_story: S\.open, p_batch: id, p_plan_md5: t\.getAttribute\('data-md5'\) \}\)/.test(js)
+   && /data-act="fixplancancel"/.test(js) && /Here is what Claude will change/.test(js),
+   'page: the plan is shown with Confirm (sending the md5 the page showed) and Cancel');
 
 ok(/function viewAccountability\(m, r\)/.test(js) && /viewAccountability\(d\.accountability, r\.accountability\)/.test(js)
    && /p_section: 'accountability'/.test(js) && /'visuals', 'accountability'\) then/.test(sql),

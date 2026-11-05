@@ -186,7 +186,7 @@ revoke all on public.impact_story_media_decisions from public, anon, authenticat
 create table if not exists public.impact_story_fix_batches (
   id            uuid primary key default gen_random_uuid(),
   story_id      uuid not null references public.impact_stories(id),
-  status        text not null default 'queued' check (status in ('queued', 'working', 'done', 'needs_you', 'failed')),
+  status        text not null default 'queued',   -- checked below (impact_story_fix_batches_status_check)
   requests      jsonb not null check (jsonb_typeof(requests) = 'array' and jsonb_array_length(requests) > 0),
   requested_by  text not null,
   requested_at  timestamptz not null default now(),
@@ -199,8 +199,22 @@ create table if not exists public.impact_story_fix_batches (
   version_after integer,
   pr_url        text check (pr_url is null or pr_url ~ '^https://github\.com/HomeSignalG/[A-Za-z0-9._-]+/pull/[0-9]+$')
 );
-create unique index if not exists impact_story_fix_batches_one_active
-  on public.impact_story_fix_batches (story_id) where status in ('queued', 'working');
+-- Plan first (founder, 2026-11-05: "is there a way i can write the fixes in the tab and they will be done correctly").
+-- Fix no longer edits straight away: plan_queued -> planning (Claude reads the notes and the failed checks and writes,
+-- in plain words, what it will change; it edits nothing) -> planned (the page shows the plan) -> the founder confirms
+-- the exact plan shown (its md5) -> queued -> working (Claude makes exactly those changes) -> done | needs_you | failed.
+-- Cancel on a plan ends the batch as cancelled, and its notes can be sent again.
+alter table public.impact_story_fix_batches add column if not exists plan jsonb;
+alter table public.impact_story_fix_batches add column if not exists plan_md5 text;
+alter table public.impact_story_fix_batches add column if not exists planned_at timestamptz;
+alter table public.impact_story_fix_batches add column if not exists confirmed_at timestamptz;
+alter table public.impact_story_fix_batches add column if not exists confirmed_by text;
+alter table public.impact_story_fix_batches drop constraint if exists impact_story_fix_batches_status_check;
+alter table public.impact_story_fix_batches add constraint impact_story_fix_batches_status_check
+  check (status in ('plan_queued', 'planning', 'planned', 'queued', 'working', 'done', 'needs_you', 'failed', 'cancelled'));
+drop index if exists public.impact_story_fix_batches_one_active;
+create unique index impact_story_fix_batches_one_active
+  on public.impact_story_fix_batches (story_id) where status in ('plan_queued', 'planning', 'planned', 'queued', 'working');
 alter table public.impact_story_fix_batches enable row level security;
 revoke all on public.impact_story_fix_batches from public, anon, authenticated;
 
@@ -1716,7 +1730,9 @@ end $$;
 -- reported 'stalled' (the run died); pressing Fix again starts a run that may claim it.
 create or replace function public._hs_is_fix_batch(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
-  select jsonb_build_object('id', b.id, 'status', case when b.status = 'working' and b.claimed_at < now() - interval '3 hours' then 'stalled' else b.status end,
+  select jsonb_build_object('id', b.id, 'status', case when b.status in ('working', 'planning') and b.claimed_at < now() - interval '3 hours' then 'stalled' else b.status end,
+           'phase', case when b.status in ('plan_queued', 'planning', 'planned') or (b.status in ('failed', 'cancelled') and b.confirmed_at is null) then 'plan' else 'work' end,
+           'plan', b.plan, 'plan_md5', b.plan_md5, 'planned_at', b.planned_at, 'confirmed_at', b.confirmed_at,
            'requests', jsonb_array_length(b.requests), 'requested_by', b.requested_by, 'requested_at', b.requested_at,
            'claimed_at', b.claimed_at, 'completed_at', b.completed_at, 'attempts', b.attempts, 'summary', b.summary,
            'next_step', b.next_step, 'outcomes', b.outcomes, 'version_after', b.version_after, 'pr_url', b.pr_url)
@@ -1735,7 +1751,7 @@ returns jsonb language sql stable security definer set search_path = public as $
              'version', n.version, 'actor', n.actor, 'at', n.at,
              'status', case
                when exists (select 1 from public.impact_story_line_notes w where w.withdraws = n.id) then 'withdrawn'
-               when fb.status in ('queued', 'working') then 'sending'
+               when fb.status in ('plan_queued', 'planning', 'planned', 'queued', 'working') then 'sending'
                when fb.status in ('done', 'needs_you') then coalesce(fo.o->>'outcome', 'needs_you')
                else 'open' end,
              'answer', case when fb.status in ('done', 'needs_you') then fo.o->>'note' end,
@@ -1761,7 +1777,7 @@ returns jsonb language sql stable security definer set search_path = public as $
      where x->>'status' = 'open'
        and not exists (select 1 from public.impact_story_fix_batches b where b.story_id = p_story
                          and b.requests @> jsonb_build_array(jsonb_build_object('id', (x->>'id')::bigint))
-                         and (b.status in ('queued', 'working')
+                         and (b.status in ('plan_queued', 'planning', 'planned', 'queued', 'working')
                               or exists (select 1 from jsonb_array_elements(b.outcomes) o
                                           where (o->>'decision_id')::bigint = (x->>'id')::bigint and o->>'outcome' = 'fixed')))
     union all
@@ -1807,29 +1823,34 @@ end $$;
 
 -- Starts the Fix job for a batch (homesignal-ingest impact-fix-run.yml, on main). Never raises on a missing credential:
 -- the batch is recorded failed with a readable reason, so the page shows it instead of a batch that never moves.
-create or replace function public._hs_is_fix_dispatch(p_batch uuid)
+-- p_mode: 'plan' (Claude writes what it will change, edits nothing) or 'work' (Claude makes the confirmed plan).
+drop function if exists public._hs_is_fix_dispatch(uuid);
+create or replace function public._hs_is_fix_dispatch(p_batch uuid, p_mode text)
 returns void language plpgsql security definer
 set search_path to 'public', 'extensions', 'net', 'vault', 'pg_temp' as $$
 declare _pat text;
 begin
+  if p_mode not in ('plan', 'work') then raise exception 'bad fix mode' using errcode = '22023'; end if;
   select decrypted_secret into _pat from vault.decrypted_secrets where name = 'github_actions_pat';
   if _pat is null or btrim(_pat) = '' then
     update public.impact_story_fix_batches set status = 'failed', completed_at = now(),
       summary = 'The fix could not start because no GitHub credential is stored. Nothing was lost. Press Fix again once it is restored.'
-     where id = p_batch and status = 'queued';
+     where id = p_batch and status in ('queued', 'plan_queued');
     return;
   end if;
   perform net.http_post(
     url := 'https://api.github.com/repos/HomeSignalG/homesignal-ingest/actions/workflows/impact-fix-run.yml/dispatches',
-    body := jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', p_batch::text)),
+    body := jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('batch', p_batch::text, 'mode', p_mode)),
     headers := jsonb_build_object('Authorization', 'Bearer ' || _pat, 'Accept', 'application/vnd.github+json',
               'X-GitHub-Api-Version', '2022-11-28', 'User-Agent', 'homesignal-impact-stories', 'Content-Type', 'application/json'),
     timeout_milliseconds := 15000);
 end $$;
 
--- The founder's Fix button. Sends every eligible fix request of the story as one batch and starts the Fix job. A second
--- press while the batch is still queued, or stalled (claimed over 3 hours ago), starts the job again (the first start may
--- have been lost; a second run cannot claim a batch the first already took); while it is working, it returns that batch.
+-- The founder's Fix button. Sends every eligible fix request of the story as one batch and starts the PLAN run: Claude
+-- reads the notes and the failed checks and writes what it will change; nothing is edited until the founder confirms
+-- (hs_impact_story_fix_confirm). A second press while the batch is waiting to start, or stalled (claimed over 3 hours
+-- ago), starts that run again (the first start may have been lost; a second run cannot claim a batch the first already
+-- took). While a plan waits for the founder, or a run is working, it returns that batch.
 create or replace function public.hs_impact_story_fix_start(p_story uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; reqs jsonb; b public.impact_story_fix_batches%rowtype;
@@ -1837,19 +1858,62 @@ begin
   select * into s from public.impact_stories where id = p_story for update;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
   if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
-  select * into b from public.impact_story_fix_batches where story_id = p_story and status in ('queued', 'working');
+  select * into b from public.impact_story_fix_batches where story_id = p_story
+     and status in ('plan_queued', 'planning', 'planned', 'queued', 'working');
   if found then
-    if b.status = 'queued' or b.claimed_at < now() - interval '3 hours' then perform public._hs_is_fix_dispatch(b.id); end if;
+    if b.status = 'plan_queued' or (b.status = 'planning' and b.claimed_at < now() - interval '3 hours') then
+      perform public._hs_is_fix_dispatch(b.id, 'plan');
+    elsif b.status = 'queued' or (b.status = 'working' and b.claimed_at < now() - interval '3 hours') then
+      perform public._hs_is_fix_dispatch(b.id, 'work');
+    end if;
     return jsonb_build_object('existing', true, 'batch', public._hs_is_fix_batch(p_story));
   end if;
   reqs := public._hs_is_fix_eligible(p_story);
   if jsonb_array_length(reqs) = 0 then
     raise exception 'There are no open fix requests to send.' using errcode = '55000';
   end if;
-  insert into public.impact_story_fix_batches (story_id, requests, requested_by) values (p_story, reqs, e) returning * into b;
-  perform public._hs_is_event(p_story, 'fix_batch_queued', jsonb_build_object('batch', b.id, 'requests', jsonb_array_length(reqs)), e);
-  perform public._hs_is_fix_dispatch(b.id);
+  insert into public.impact_story_fix_batches (story_id, requests, requested_by, status) values (p_story, reqs, e, 'plan_queued') returning * into b;
+  perform public._hs_is_event(p_story, 'fix_batch_queued', jsonb_build_object('batch', b.id, 'requests', jsonb_array_length(reqs), 'phase', 'plan'), e);
+  perform public._hs_is_fix_dispatch(b.id, 'plan');
   return jsonb_build_object('existing', false, 'batch', public._hs_is_fix_batch(p_story));
+end $$;
+
+-- The founder confirms the plan exactly as the page showed it (its md5). Only then does Claude change anything.
+create or replace function public.hs_impact_story_fix_confirm(p_story uuid, p_batch uuid, p_plan_md5 text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); b public.impact_story_fix_batches%rowtype;
+begin
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  select * into b from public.impact_story_fix_batches where id = p_batch and story_id = p_story for update;
+  if not found then raise exception 'no such fix batch' using errcode = 'P0002'; end if;
+  if b.status <> 'planned' then raise exception 'This plan is %, so there is nothing to confirm.', b.status using errcode = '55000'; end if;
+  if p_plan_md5 is distinct from b.plan_md5 then
+    raise exception 'The plan changed since this page loaded. Read it again, then confirm.' using errcode = '55000';
+  end if;
+  update public.impact_story_fix_batches set status = 'queued', confirmed_at = now(), confirmed_by = e, attempts = 0,
+         claimed_at = null where id = b.id;
+  perform public._hs_is_event(p_story, 'fix_plan_confirmed', jsonb_build_object('batch', b.id, 'plan_md5', b.plan_md5), e);
+  perform public._hs_is_fix_dispatch(b.id, 'work');
+  return jsonb_build_object('ok', true, 'batch', public._hs_is_fix_batch(p_story));
+end $$;
+
+-- Cancel a plan (waiting, written, or stalled while writing). Nothing was changed; the notes can be sent again.
+create or replace function public.hs_impact_story_fix_cancel(p_story uuid, p_batch uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); b public.impact_story_fix_batches%rowtype;
+begin
+  perform 1 from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  select * into b from public.impact_story_fix_batches where id = p_batch and story_id = p_story for update;
+  if not found then raise exception 'no such fix batch' using errcode = 'P0002'; end if;
+  if not (b.status in ('plan_queued', 'planned') or (b.status = 'planning' and b.claimed_at < now() - interval '3 hours')) then
+    raise exception 'Only a plan that has not been confirmed can be cancelled (this one is %).', b.status using errcode = '55000';
+  end if;
+  update public.impact_story_fix_batches set status = 'cancelled', completed_at = now(),
+         summary = coalesce(summary, 'Cancelled before anything was changed.') where id = b.id;
+  perform public._hs_is_event(p_story, 'fix_plan_cancelled', jsonb_build_object('batch', b.id), e);
+  return jsonb_build_object('ok', true, 'batch', public._hs_is_fix_batch(p_story));
 end $$;
 
 -- The Fix job's door (service role only, through homesignal-ingest impact-fix-run.yml / impact-fix-batch.yml).
@@ -1857,18 +1921,39 @@ create or replace function public.impact_fix_batches_list()
 returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', b.id, 'story_id', b.story_id, 'title', s.title, 'video_slug', s.video_slug,
            'current_version', s.current_version, 'status', b.status, 'requested_at', b.requested_at, 'claimed_at', b.claimed_at,
+           'phase', case when b.status in ('plan_queued', 'planning') then 'plan' else 'work' end,
            'attempts', b.attempts, 'requests', b.requests) order by b.requested_at), '[]'::jsonb)
     from public.impact_story_fix_batches b join public.impact_stories s on s.id = b.story_id
-   where b.status = 'queued' or (b.status = 'working' and b.claimed_at < now() - interval '3 hours')
+   where b.status in ('queued', 'plan_queued') or (b.status in ('working', 'planning') and b.claimed_at < now() - interval '3 hours')
+$$;
+
+-- What the newest finished render's checks found, per file, for the fixer to read beside the founder's notes: each
+-- failed check (label, measurement, what to do), the measurements and the shots (when each starts, its layout and
+-- picture). The page shows the same report under Details.
+create or replace function public._hs_is_fix_checks(p_story uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('asset', a.asset, 'duration_s', a.duration_s,
+           'ok', coalesce((a.qc->'quality'->>'ok')::boolean, true) and coalesce((a.qc->>'ok')::boolean, true),
+           'failures', coalesce(a.qc->'quality'->'failures', '[]'::jsonb),
+           'media_checks_failed', (select coalesce(jsonb_agg(c), '[]'::jsonb) from jsonb_array_elements(coalesce(a.qc->'checks', '[]'::jsonb)) c
+                                    where not coalesce((c->>'ok')::boolean, true)),
+           'storyboard', a.qc->'quality'->'storyboard'->'metrics', 'rendered', a.qc->'quality'->'frames'->'metrics',
+           'targets', coalesce(a.qc->'quality'->'frames'->'targets', a.qc->'quality'->'storyboard'->'targets'),
+           'shots', a.shots) order by a.asset), '[]'::jsonb)
+    from public.impact_story_assets a
+   where a.job_id = (select j.id from public.impact_story_jobs j where j.story_id = p_story and j.kind = 'render'
+                        and j.status = 'complete' order by j.completed_at desc limit 1)
 $$;
 
 create or replace function public.impact_fix_batch_claim(p_batch uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare b public.impact_story_fix_batches%rowtype;
+declare b public.impact_story_fix_batches%rowtype; nxt text;
 begin
   select * into b from public.impact_story_fix_batches where id = p_batch for update;
   if not found then raise exception 'no such batch' using errcode = 'P0002'; end if;
-  if not (b.status = 'queued' or (b.status = 'working' and b.claimed_at < now() - interval '3 hours')) then
+  nxt := case when b.status = 'plan_queued' then 'planning' when b.status = 'queued' then 'working'
+              when b.status in ('planning', 'working') and b.claimed_at < now() - interval '3 hours' then b.status end;
+  if nxt is null then
     raise exception 'batch is % and cannot be claimed', b.status using errcode = '55000';
   end if;
   if b.attempts >= 3 then
@@ -1877,15 +1962,50 @@ begin
     perform public._hs_is_event(b.story_id, 'fix_batch_failed', jsonb_build_object('batch', b.id, 'reason', 'attempts'), 'fixer');
     raise exception 'batch failed after 3 attempts' using errcode = '55000';
   end if;
-  update public.impact_story_fix_batches set status = 'working', claimed_at = now(), attempts = attempts + 1 where id = b.id;
-  perform public._hs_is_event(b.story_id, 'fix_batch_working', jsonb_build_object('batch', b.id, 'attempt', b.attempts + 1), 'fixer');
-  return jsonb_build_object('ok', true, 'batch', b.id, 'story_id', b.story_id, 'requests', b.requests);
+  update public.impact_story_fix_batches set status = nxt, claimed_at = now(), attempts = attempts + 1 where id = b.id;
+  perform public._hs_is_event(b.story_id, 'fix_batch_' || nxt, jsonb_build_object('batch', b.id, 'attempt', b.attempts + 1), 'fixer');
+  return jsonb_build_object('ok', true, 'batch', b.id, 'story_id', b.story_id, 'requests', b.requests,
+    'phase', case when nxt = 'planning' then 'plan' else 'work' end,
+    'plan', case when nxt = 'working' then b.plan end, 'checks', public._hs_is_fix_checks(b.story_id));
+end $$;
+
+-- The plan run's report. p_plan: {summary, items: [{decision_id, understood, changes: [..], will_not}]}, one item per
+-- request of the batch, in plain words. Stored as written; the md5 is what the founder confirms.
+create or replace function public.impact_fix_batch_plan(p_batch uuid, p_plan jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare b public.impact_story_fix_batches%rowtype; items jsonb := p_plan->'items';
+begin
+  select * into b from public.impact_story_fix_batches where id = p_batch for update;
+  if not found then raise exception 'no such batch' using errcode = 'P0002'; end if;
+  if b.status <> 'planning' then raise exception 'batch is %, not planning', b.status using errcode = '55000'; end if;
+  if jsonb_typeof(p_plan) <> 'object' or nullif(btrim(p_plan->>'summary'), '') is null or char_length(p_plan->>'summary') > 1000 then
+    raise exception 'the plan needs a summary of at most 1000 characters' using errcode = '22023';
+  end if;
+  if jsonb_typeof(items) <> 'array' or exists (select 1 from jsonb_array_elements(items) i
+       where jsonb_typeof(i) <> 'object'
+          or not (b.requests @> jsonb_build_array(jsonb_build_object('id', (i->>'decision_id')::bigint)))
+          or nullif(btrim(i->>'understood'), '') is null or char_length(i->>'understood') > 500
+          or jsonb_typeof(coalesce(i->'changes', '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(i->'changes', '[]'::jsonb)) > 12
+          or exists (select 1 from jsonb_array_elements(coalesce(i->'changes', '[]'::jsonb)) c
+                      where jsonb_typeof(c) <> 'string' or btrim(c #>> '{}') = '' or char_length(c #>> '{}') > 400)
+          or char_length(coalesce(i->>'will_not', '')) > 500
+          or (jsonb_array_length(coalesce(i->'changes', '[]'::jsonb)) = 0 and nullif(btrim(i->>'will_not'), '') is null)) then
+    raise exception 'each plan item names a request of this batch, says what was understood, and lists changes or why not' using errcode = '22023';
+  end if;
+  if exists (select 1 from jsonb_array_elements(b.requests) r
+              where (select count(*) from jsonb_array_elements(items) i where (i->>'decision_id')::bigint = (r->>'id')::bigint) <> 1) then
+    raise exception 'the plan needs exactly one item per request' using errcode = '22023';
+  end if;
+  update public.impact_story_fix_batches set status = 'planned', plan = p_plan, plan_md5 = md5(p_plan::text), planned_at = now(),
+         summary = null where id = b.id;
+  perform public._hs_is_event(b.story_id, 'fix_plan_ready', jsonb_build_object('batch', b.id, 'plan_md5', md5(p_plan::text)), 'fixer');
+  return jsonb_build_object('ok', true, 'plan_md5', md5(p_plan::text));
 end $$;
 
 -- Finish a batch. p_payload: {status: done|needs_you|failed, summary, next_step, pr_url, regenerate: generate|analyze|pack|null,
 -- outcomes: [{decision_id, outcome: fixed|needs_you|not_changed, note}]}. done/needs_you must account for every request.
 -- regenerate queues that job on the story (as the Generate / Analyze buttons do) so the fixed script becomes a new version;
--- approving it and rendering stay with the founder.
+-- approving it and rendering stay with the founder. A plan run that could not write its plan finishes as failed.
 create or replace function public.impact_fix_batch_complete(p_batch uuid, p_payload jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare b public.impact_story_fix_batches%rowtype; st text := p_payload->>'status'; outs jsonb := coalesce(p_payload->'outcomes', '[]'::jsonb);
@@ -1893,8 +2013,11 @@ declare b public.impact_story_fix_batches%rowtype; st text := p_payload->>'statu
 begin
   select * into b from public.impact_story_fix_batches where id = p_batch for update;
   if not found then raise exception 'no such batch' using errcode = 'P0002'; end if;
-  if b.status <> 'working' then raise exception 'batch is %, not working', b.status using errcode = '55000'; end if;
+  if b.status not in ('working', 'planning') then raise exception 'batch is %, not working', b.status using errcode = '55000'; end if;
   if st not in ('done', 'needs_you', 'failed') then raise exception 'bad status' using errcode = '22023'; end if;
+  if b.status = 'planning' and (st <> 'failed' or regen is not null) then
+    raise exception 'a plan run can only finish as failed (a written plan is recorded with impact_fix_batch_plan)' using errcode = '22023';
+  end if;
   if nullif(btrim(p_payload->>'summary'), '') is null then raise exception 'say what was done' using errcode = '22023'; end if;
   if regen is not null and regen not in ('generate', 'analyze', 'pack') then raise exception 'bad regenerate' using errcode = '22023'; end if;
   if jsonb_typeof(outs) <> 'array' or exists (select 1 from jsonb_array_elements(outs) o
@@ -1934,7 +2057,8 @@ begin
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
     'public._hs_is_request(uuid, text, text, boolean, text)', 'public._hs_is_choices(uuid)',
-    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid)', 'public._hs_is_line_notes(uuid)',
+    'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid, text)', 'public._hs_is_fix_checks(uuid)',
+    'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
     'public._hs_is_shot_print(jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
@@ -1948,7 +2072,8 @@ begin
     'public.hs_impact_story_section_revision(uuid, integer, text, text)', 'public.hs_impact_story_render(uuid, integer, boolean)',
     'public.hs_impact_story_media_decide(uuid, bigint, text, text, text)', 'public.hs_impact_story_choose_asset(uuid, uuid, text, text)',
     'public.hs_impact_story_unchoose_asset(uuid, text, text)',
-    'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
+    'public.hs_impact_story_fix_start(uuid)', 'public.hs_impact_story_fix_confirm(uuid, uuid, text)', 'public.hs_impact_story_fix_cancel(uuid, uuid)',
+    'public.hs_impact_story_visuals_prepare(uuid, integer, boolean)',
     'public.hs_impact_story_line_note(uuid, text, text, text, boolean)', 'public.hs_impact_story_line_note_withdraw(uuid, bigint)',
     'public.hs_impact_story_visuals_approve(uuid, bigint, text)', 'public.hs_impact_story_visuals_revoke(uuid, bigint, text)',
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',
@@ -1960,7 +2085,7 @@ begin
   end loop;
   foreach f in array array['public.hs_impact_story_job_claim(uuid)', 'public.hs_impact_story_job_fail(uuid, text, jsonb)',
                            'public.hs_impact_story_job_complete(uuid, jsonb)', 'public.impact_fix_batches_list()',
-                           'public.impact_fix_batch_claim(uuid)', 'public.impact_fix_batch_complete(uuid, jsonb)'] loop
+                           'public.impact_fix_batch_claim(uuid)', 'public.impact_fix_batch_complete(uuid, jsonb)', 'public.impact_fix_batch_plan(uuid, jsonb)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
     execute 'grant execute on function ' || f || ' to service_role';
   end loop;
