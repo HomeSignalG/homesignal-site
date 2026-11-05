@@ -172,7 +172,7 @@
   },
   "caltrans-sb1-projects": {
    "agency": "California Department of Transportation (Caltrans)",
-   "dataset": "caltrans-gis.dot.ca.gov, service SB1/BuildingCA_Projects"
+   "dataset": "services1.arcgis.com, service Infrastructure_Project_Point_Prod"
   },
   "cambridge-building-permits-addition-alteration": {
    "agency": "City of Cambridge",
@@ -390,11 +390,12 @@
   },
   "fairfax-active-site-construction": {
    "agency": "Fairfax County Land Development Services",
-   "dataset": "www.fairfaxcounty.gov, service LDS/DevelopmentTracker"
+   "dataset": "www.fairfaxcounty.gov, service LDS/PLUSApprovedSiteRecords"
   },
   "fairfax-recent-building-permits": {
    "agency": "Fairfax County Land Development Services",
-   "dataset": "www.fairfaxcounty.gov, service LDS/DevelopmentTracker"
+   "dataset": "www.fairfaxcounty.gov, service PLUS/PLUSGISRecords",
+   "status_const": "Issued"
   },
   "fdot-active-construction-projects": {
    "agency": "Florida Department of Transportation",
@@ -526,7 +527,7 @@
   },
   "kcmo-building-permits": {
    "agency": "City of Kansas City, Missouri",
-   "dataset": "services.arcgis.com, service All_BuildingPermits_2020_to_2025"
+   "dataset": "services.arcgis.com, service Building_Permits_2020__to_2025_Q3"
   },
   "kcmo-development-cases": {
    "agency": "City of Kansas City, Missouri",

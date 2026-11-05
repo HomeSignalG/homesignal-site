@@ -113,6 +113,11 @@ for (const id of ['portland-neighborhood-contact-applications', 'tigard-or-activ
 ok(JSON.stringify(HS.sourceFreshnessIds([{ source_registry_id: 'b-x' }, { registry_id: 'a-x' }, { zip_authoritative: true, src: 'c-x' },
   { src: 'EPA FRS · registry 1' }, { registry_id: 'Bad Id' }])) === JSON.stringify(['a-x', 'b-x', 'c-x']),
   'ids come from development records only; EPA labels and malformed ids are ignored');
+// An EPA facility's registry_id is its FRS number (Map 1 97702 listed 110000488767 etc. as sources).
+ok(JSON.stringify(HS.sourceFreshnessIds([{ registry_id: '110000488767', layer: 'industrial' },
+  { registry_id: '110004786107' }, { source_registry_id: 'bend-or-permit-applications' }])) === JSON.stringify(['bend-or-permit-applications']),
+  'an EPA FRS facility number is never read as a source id');
+ok(regIds.size > 0 && [...regIds].every((id) => /[a-z]/.test(id)), 'every source registry id contains a letter (the rule above depends on it)');
 
 // 5. Wiring.
 const map1 = read('homesignalmap.html');

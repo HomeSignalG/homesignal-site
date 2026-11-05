@@ -31,8 +31,8 @@ const sd = REG.arcgis.filter((e) => typeof e.service_url === 'string' && e.servi
 const byLayer = new Map(sd.map((e) => [Number(e.service_url.slice(BASE.length + 1)), e]));
 
 ok(sd.length === 7, 'seven SD STIP entries are wired off this service', `found ${sd.length}`);
-ok([0, 1, 2, 3, 4, 6, 9].every((n) => byLayer.has(n)),
-  'wired layers are exactly 0,1,2,3,4,6,9', [...byLayer.keys()].sort((a, b) => a - b).join(','));
+ok([1, 2, 3, 4, 6, 9, 10].every((n) => byLayer.has(n)),
+  'wired layers are exactly 1,2,3,4,6,9,10', [...byLayer.keys()].sort((a, b) => a - b).join(','));
 
 // ── 1. THE DUPLICATE GUARD — the one real overlap ───────────────────────────────
 {
@@ -49,7 +49,7 @@ ok([0, 1, 2, 3, 4, 6, 9].every((n) => byLayer.has(n)),
 // ── 2. The other five entries must NOT yield — their pairs are disjoint ─────────
 // Declaring a yield on a disjoint pair DROPS records (the NY case). This is the direction of
 // the mistake that is easiest to make while "tidying up" the file.
-for (const n of [0, 2, 3, 4, 9]) {
+for (const n of [2, 3, 4, 9, 10]) {
   const e = byLayer.get(n);
   ok(!Object.hasOwn(e, 'yields_to'),
     `layer ${n} (${e.registry_id}) declares NO yield — it shares 0 keys with every other wired layer`);
@@ -63,8 +63,9 @@ for (const n of [0, 2, 3, 4, 9]) {
 // groupBy totals each summed EXACTLY to the layer's own row count, so these are complete
 // vocabularies rather than samples.
 {
-  const ROWS = { 0: 330, 1: 104, 2: 140, 3: 199, 4: 430, 6: 153, 9: 44 };
-  const KEYS = { 0: 216, 1: 74, 2: 105, 3: 108, 4: 59, 6: 31, 9: 42 };
+  // Layer 10 measured 2026-11-05 (pg_net 24163/24177): 23 rows, 23 distinct PCNs, 0 shared with 1,2,3,4,6,9.
+  const ROWS = { 10: 23, 1: 104, 2: 140, 3: 199, 4: 430, 6: 153, 9: 44 };
+  const KEYS = { 10: 23, 1: 74, 2: 105, 3: 108, 4: 59, 6: 31, 9: 42 };
   for (const n of Object.keys(ROWS)) {
     ok(KEYS[n] <= ROWS[n], `layer ${n}: distinct keys (${KEYS[n]}) <= rows (${ROWS[n]}) — multi-segment projects are real, not duplicates`);
   }
@@ -78,10 +79,12 @@ for (const n of [0, 2, 3, 4, 9]) {
   ok(!sd.some((e) => e.service_url.endsWith('/16')),
     'layer 16 "Do Not Map" is NOT wired — the publisher named it an instruction, not a dataset');
 
-  // 19 "Local Structure Projects" shares 48 of its 53 keys with wired layer 0 "Structures".
-  // Wiring it without a yield would double-emit 48 projects for 5 new ones.
-  ok(!sd.some((e) => e.service_url.endsWith('/19')),
-    'layer 19 "Local Structure Projects" is NOT wired — 48 of its 53 keys are already in layer 0');
+  // 2026-11-05: SDDOT renumbered the service and removed layer 0 "Structures". "Local Structure
+  // Projects" moved from 19 to 10 and IS now the structures entry: its 23 PCNs share 0 with the
+  // other wired layers (pg_net 24218-24224), so the old subset reason no longer applies. Layer 19
+  // no longer exists; nothing may point at it.
+  ok(!sd.some((e) => e.service_url.endsWith('/19') || e.service_url.endsWith('/0')),
+    'nothing points at the removed layers 0 "Structures" or 19 (renumbered to 10 on 2026-11-05)');
 
   // 13/14/15 are road-network reference geography, not projects.
   for (const n of [13, 14, 15]) {
