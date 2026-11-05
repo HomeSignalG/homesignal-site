@@ -6105,6 +6105,18 @@ key, checks the change, lands it on ingest main and records Done / Needs you / f
 disabled. A missing credential fails the batch with a readable reason. Apply order: merge the ingest workflow first (a dispatch to a
 workflow not on main is refused), then apply `docs/impact-stories.sql`, then deploy the page. pg checks 12f4b, 12f4c.
 
+### Plan first, then confirm (2026-11-05, founder: "is there a way i can write the fixes in the tab and they will be done correctly")
+- **Fix starts a PLAN run** (`hs_impact_story_fix_start` → batch `plan_queued` → dispatch `mode=plan`): Claude reads the notes
+  and the newest render's checks (`_hs_is_fix_checks`, sent with the claim) and writes, per request, what it understood, the
+  changes in plain words and what it will not do (`impact_fix_batch_plan`, service role; batch `planned`). It edits nothing.
+- **Media review shows the plan**; `hs_impact_story_fix_confirm(story, batch, plan_md5)` accepts only the md5 of the plan the
+  page showed, then dispatches `mode=work`, where Claude makes exactly that plan. `hs_impact_story_fix_cancel` ends it
+  (`cancelled`; its notes can be sent again). Statuses: plan_queued · planning · planned · queued · working · done ·
+  needs_you · failed · cancelled; one active batch per story across the first five.
+- The fix box starts filled in with what failed (#2599); Fix turns those notes into a plan like any others.
+- `_hs_is_fix_dispatch` is now `(uuid, text)`. Apply order: homesignal-ingest (the `mode` input and plan run) first, then the
+  SQL, then the page. pg checks 12P1-12P8.
+
 ## IMPACT STORIES, TAB 17: ACCOUNTABILITY RESEARCH (2026-10-28)
 
 Story Outline shows the draft's responsibility map (`discovery.accountability`, engine homesignal-ingest
