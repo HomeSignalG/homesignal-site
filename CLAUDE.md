@@ -6112,6 +6112,26 @@ Results.
 - Tests: `test/impact_stories_pg` 12e2, 12i2-12i4; `test/impact-stories.browser.test.mjs` (the Stratos case; 11 checks fail on
   the pre-audit page).
 
+## IMPACT STORIES, TAB 17: THE STORYBOARD WORKSPACE, FIVE GATES AND THE PRODUCTION AUDIT (2026-11-05)
+
+Founder brief "Story Editor UX and Narrative Quality". Page only (`lib/acq-impact-stories.js`), no SQL; the engine half is
+homesignal-ingest `impact/audit.py` + `rules.story_profile` (CLAUDE.md there, same date).
+- **Script & Shorts opens on Storyboard**: scene navigator (time, length, purpose, evidence / picture / production dots) |
+  the selected scene (its prepared preview, narration and on-screen text edited in place, timing, transition) | production
+  intelligence (the records it cites with their quotes and links, its pictures with license and file page, its open issues,
+  the audit's suggested changes, Fix this line). "Unresolved issues only", Full screen, and **Read full script** (the whole
+  script, act by act, the question first). The old editor is "Edit main script". Deep links keep `&doc=`.
+- **Six gates on Script, Visuals and Media**: Evidence verified · Script editorial review · Visual rights cleared · Required
+  assets acquired · Production audit · Production ready. Each reads state the database and engine already hold; Production
+  ready never shows while another gate is open. Not a new approval: the render still needs the narrative and visuals approved.
+- **Production audit and "Your brief, topic by topic"** come from the version's validation (`validation.audit`); a version
+  checked before the engine change says "not run yet". Folded to one line when everything passes.
+- **No Quality-of-Life tab for a public-affairs story** (`validation.audit.profile`, else `discovery.profile`).
+- **Not built:** per-scene approval of the script ("approve all unchanged scenes" needs a per-scene decision store); one-click
+  photo replace from the storyboard (it links to Visuals, where choose/replace/reject already live).
+- Tests: `test/impact-stories.browser.test.mjs` (storyboard on the stub), `test/impact-stories-real-drafts.browser.test.mjs`
+  (the real House Speaker and Stratos drafts exported from the engine, `test/fixtures/impact-real/`).
+
 ## IMPACT STORIES, TAB 17: THE FIX BUTTON (2026-10-28, founder: "a button that says fix … a routine is not needed")
 
 Media review lists every fix request; **Fix** (`hs_impact_story_fix_start`) sends the open ones as one batch and, through

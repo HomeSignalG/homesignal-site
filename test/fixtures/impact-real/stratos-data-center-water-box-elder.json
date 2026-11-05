@@ -1,0 +1,3732 @@
+{
+ "slug": "stratos-data-center-water-box-elder",
+ "made_by": "homesignal-ingest impact.draft generate + rules.validate (claude/zen-gates-uqgz5i)",
+ "body": {
+  "arc": {
+   "fear": {
+    "status": "needs_qualification",
+    "reason": "The application itself acknowledges it is not clear how much water would reach the Great Salt Lake, and no decision on it is reported; a risk to examine, not a settled harm.",
+    "reason_claims": [
+     "lake_unclear",
+     "no_engineer_decision"
+    ],
+    "beat": {
+     "text": "Spring water now used for irrigation would go to a data center, and how much reaches the Great Salt Lake is not clear.",
+     "claims": [
+      "salt_wells",
+      "change_use",
+      "lake_unclear"
+     ]
+    },
+    "supporting": [
+     "salt_wells",
+     "change_use",
+     "diversion",
+     "depletion",
+     "lake_unclear",
+     "protests_200",
+     "murray_700",
+     "concerns"
+    ],
+    "counter": [
+     "lake_claim",
+     "pipeline",
+     "engineer_decides"
+    ],
+    "unknowns": [
+     "The nearly 200-page change application and its Beairsto and Loughlin engineering reports (not reviewed; quoted only as news reports quote them)",
+     "How much water the Great Salt Lake receives from Salt Wells Spring Stream today",
+     "Any State Engineer decision after the newest report"
+    ],
+    "qualifier": {
+     "text": "No document here reports a State Engineer decision, so the effect on the lake is not settled.",
+     "claims": [
+      "no_engineer_decision",
+      "lake_unclear"
+     ]
+    },
+    "narration": [
+     {
+      "text": "Up to 1,712 acre-feet of spring water a year, now used for irrigation in Box Elder County, would go to a data center instead under a new application.",
+      "claims": [
+       "salt_wells",
+       "change_use"
+      ],
+      "act": 1
+     },
+     {
+      "text": "An engineering report in the application projects the campus would divert about 1,215 acre-feet of water a year at full buildout.",
+      "claims": [
+       "diversion"
+      ],
+      "act": 3
+     },
+     {
+      "text": "That leaves net depletion of about 987 acre-feet a year.",
+      "claims": [
+       "depletion"
+      ],
+      "act": 3
+     },
+     {
+      "text": "A roughly 2.5-mile pipeline would carry unused water and return flows toward the downstream edge of the ranch.",
+      "claims": [
+       "pipeline"
+      ],
+      "act": 3
+     },
+     {
+      "text": "But the application acknowledges it is not clear how much of that water would reach the Great Salt Lake.",
+      "claims": [
+       "lake_unclear"
+      ],
+      "act": 3
+     },
+     {
+      "text": "Close to 200 people logged concerns about how the project could affect the Great Salt Lake.",
+      "claims": [
+       "protests_200"
+      ],
+      "act": 3
+     },
+     {
+      "text": "The developer's application says there can be no question that more water will reach the Great Salt Lake from Salt Wells Spring Stream than has reached it historically.",
+      "claims": [
+       "lake_claim"
+      ],
+      "act": 4
+     },
+     {
+      "text": "No document here reports a State Engineer decision, so the effect on the lake is not settled.",
+      "claims": [
+       "no_engineer_decision",
+       "lake_unclear"
+      ],
+      "act": 6
+     }
+    ]
+   },
+   "anger": {
+    "status": "needs_qualification",
+    "reason": "Earlier applications were withdrawn and thousands of protests stopped counting; a critic calls it a tactic, Bar H Ranch's consultant gave a different reason, and an ecologist's question drew no immediate response.",
+    "reason_claims": [
+     "protests_wiped",
+     "first_withdrawn",
+     "seed",
+     "no_response"
+    ],
+    "beat": {
+     "text": "Nearly 4,000 formal protests stopped counting when the first application was withdrawn, and a critic's question about the water drew no immediate response.",
+     "claims": [
+      "protests_wiped",
+      "no_response"
+     ]
+    },
+    "supporting": [
+     "first_app_protests",
+     "protests_wiped",
+     "taken_back",
+     "first_withdrawn",
+     "withdraw_letter",
+     "seed",
+     "murray",
+     "murray_700",
+     "abbott",
+     "abbott_ratio",
+     "no_response"
+    ],
+    "counter": [
+     "first_withdrawn",
+     "bar_h_resubmit",
+     "murray_no_reason",
+     "engineer_decides",
+     "county_vote"
+    ],
+    "unknowns": [
+     "The Division of Water Rights docket and protest records (not reviewed)",
+     "Whether the developer later answered the ecologist's question"
+    ],
+    "qualifier": {
+     "text": "Bar H Ranch's water consultant wrote that the first application was withdrawn in light of the county's action; the records read do not show anyone acted improperly.",
+     "claims": [
+      "first_withdrawn",
+      "withdraw_letter",
+      "bar_h_resubmit"
+     ]
+    },
+    "narration": [
+     {
+      "text": "An ecologist says the developer does not explain how it will produce power of that magnitude with that little water.",
+      "claims": [
+       "abbott"
+      ],
+      "act": 4
+     },
+     {
+      "text": "He says it would be a water-to-power ratio 10 to 100 times better than the top-performing facilities today.",
+      "claims": [
+       "abbott_ratio"
+      ],
+      "act": 4
+     },
+     {
+      "text": "KSL did not receive an immediate response from the developer's team.",
+      "claims": [
+       "no_response"
+      ],
+      "act": 4
+     },
+     {
+      "text": "This is not the first try. The first application, started in March, collected about 3,900 protests in about a month.",
+      "claims": [
+       "first_app_protests"
+      ],
+      "act": 5
+     },
+     {
+      "text": "When it was withdrawn in early May, nearly 4,000 formal protests filed against it no longer counted.",
+      "claims": [
+       "protests_wiped",
+       "taken_back"
+      ],
+      "act": 5
+     },
+     {
+      "text": "A water consultant wrote the withdrawal letter, saying the application was withdrawn in light of the county's action, and that Bar H Ranch intends to resubmit.",
+      "claims": [
+       "first_withdrawn",
+       "withdraw_letter",
+       "bar_h_resubmit"
+      ],
+      "act": 5
+     },
+     {
+      "text": "A critic called the withdrawal likely a cynical act to nullify all of the protests.",
+      "claims": [
+       "seed"
+      ],
+      "act": 5
+     },
+     {
+      "text": "Murray Hollow asked on May 22 to cancel its application, which had drawn nearly 700 letters of protest about wildlife, drought and the shrinking Great Salt Lake; its notice did not say why.",
+      "claims": [
+       "murray",
+       "murray_700",
+       "murray_no_reason"
+      ],
+      "act": 5
+     },
+     {
+      "text": "Bar H Ranch's water consultant wrote that the first application was withdrawn in light of the county's action; the records read do not show anyone acted improperly.",
+      "claims": [
+       "first_withdrawn",
+       "withdraw_letter",
+       "bar_h_resubmit"
+      ],
+      "act": 5
+     }
+    ]
+   },
+   "motivation": {
+    "status": "supported",
+    "reason": "The records state who decides and how the public can protest, and that in May residents were organizing a referendum.",
+    "reason_claims": [
+     "engineer_decides",
+     "protest_period",
+     "referendum"
+    ],
+    "beat": {
+     "text": "The State Engineer decides, the public can protest, and every step of this application is on the record.",
+     "claims": [
+      "engineer_decides",
+      "protest_period"
+     ]
+    },
+    "supporting": [
+     "engineer_decides",
+     "protest_period",
+     "filed_oct",
+     "referendum",
+     "county_vote"
+    ],
+    "counter": [
+     "county_vote",
+     "res_2611"
+    ],
+    "unknowns": [
+     "The dates of the advertising and protest period (not in the reports read)",
+     "The MIDA interlocal agreement and resolutions 26-11 and 26-12 (not reviewed)"
+    ],
+    "narration": [
+     {
+      "text": "Utah's State Engineer will determine whether the water can be granted, based on state statute.",
+      "claims": [
+       "engineer_decides"
+      ],
+      "act": 6
+     },
+     {
+      "text": "The Division of Water Rights says the proposal will be publicly advertised for two weeks, with a 20-day protest period.",
+      "claims": [
+       "protest_period"
+      ],
+      "act": 7
+     },
+     {
+      "text": "In May, the Box Elder County Commission voted unanimously to let the data center project move forward.",
+      "claims": [
+       "county_vote"
+      ],
+      "act": 7
+     },
+     {
+      "text": "Its resolution 26-11 gives the Military Installation Development Authority consent to move ahead with a project expected to take 10 years.",
+      "claims": [
+       "res_2611"
+      ],
+      "act": 7
+     },
+     {
+      "text": "In May, a group of residents was organizing to file a referendum against one of those resolutions.",
+      "claims": [
+       "referendum"
+      ],
+      "act": 7
+     },
+     {
+      "text": "As of Oct. 20 reports, the Oct. 15 application is waiting to be reviewed, and no document here reports a State Engineer decision.",
+      "claims": [
+       "filed_oct",
+       "engineer_decides",
+       "no_engineer_decision",
+       "trib_date"
+      ],
+      "act": 8
+     },
+     {
+      "text": "Follow the State Engineer's review of the Oct. 15 application for 1,712 acre-feet on JODY Tracks.",
+      "claims": [
+       "engineer_decides",
+       "filed_oct"
+      ],
+      "act": 8
+     }
+    ]
+   }
+  },
+  "outline": [
+   {
+    "act": 1,
+    "name": "Spring water in the Hansel Valley",
+    "beat": "attachment",
+    "threads": [
+     "fear",
+     "context"
+    ],
+    "summary": "The spring stream, its irrigation water, and the land just south of I-84.",
+    "claims": [
+     "salt_wells",
+     "land"
+    ]
+   },
+   {
+    "act": 2,
+    "name": "What the application asks for",
+    "beat": "disruption",
+    "threads": [
+     "context"
+    ],
+    "summary": "The October application and the data center campus it would supply.",
+    "claims": [
+     "filed_oct",
+     "change_use",
+     "clusters"
+    ]
+   },
+   {
+    "act": 3,
+    "name": "Where the water goes",
+    "beat": "controversy",
+    "threads": [
+     "fear"
+    ],
+    "summary": "Diversion, depletion, the return pipeline, and the open question about the lake.",
+    "claims": [
+     "diversion",
+     "depletion",
+     "pipeline",
+     "lake_unclear"
+    ]
+   },
+   {
+    "act": 4,
+    "name": "Different readings of the same water",
+    "beat": "controversy",
+    "threads": [
+     "fear",
+     "anger"
+    ],
+    "summary": "The developer's claim about the lake, and an ecologist's question that drew no immediate response.",
+    "claims": [
+     "lake_claim",
+     "abbott",
+     "no_response"
+    ]
+   },
+   {
+    "act": 5,
+    "name": "The applications that came before",
+    "beat": "evidence",
+    "threads": [
+     "anger"
+    ],
+    "summary": "Earlier applications, their protests, and their withdrawal.",
+    "claims": [
+     "first_app_protests",
+     "protests_wiped",
+     "murray"
+    ]
+   },
+   {
+    "act": 6,
+    "name": "Who decides",
+    "beat": "turning_point",
+    "threads": [
+     "fear",
+     "motivation"
+    ],
+    "summary": "The State Engineer's review under state statute.",
+    "claims": [
+     "engineer_decides"
+    ]
+   },
+   {
+    "act": 7,
+    "name": "What the public can do",
+    "beat": "action",
+    "threads": [
+     "motivation"
+    ],
+    "summary": "The protest process, the county's vote, and the referendum effort.",
+    "claims": [
+     "protest_period",
+     "county_vote",
+     "referendum"
+    ]
+   },
+   {
+    "act": 8,
+    "name": "Where it stands",
+    "beat": "action",
+    "threads": [
+     "motivation"
+    ],
+    "summary": "The latest status and what to watch.",
+    "claims": [
+     "filed_oct",
+     "engineer_decides"
+    ]
+   }
+  ],
+  "suitability": "The water move and the application's own uncertainty about the Great Salt Lake are stated in news reports of the filing; fear and anger are qualified, motivation is supported, and the earlier withdrawn applications are told as superseded history.",
+  "schema": "impact-story/3",
+  "discovery": {
+   "findings": [
+    {
+     "dimension": "health",
+     "classification": "no_evidence",
+     "finding": {
+      "text": "The reports read do not describe air emissions, noise or other health effects of the proposed generation facility.",
+      "claims": []
+     },
+     "affected": "",
+     "could_lose": "",
+     "counter": []
+    },
+    {
+     "dimension": "health",
+     "classification": "investigative_question",
+     "finding": {
+      "text": "Can power production of that magnitude run on that little water, as an ecologist asks?",
+      "claims": [
+       "abbott",
+       "abbott_ratio"
+      ]
+     },
+     "affected": "People who rely on the region's water",
+     "could_lose": "Confidence that the water figures add up",
+     "counter": [
+      "no_response"
+     ]
+    },
+    {
+     "dimension": "wildlife",
+     "classification": "verified_impact",
+     "finding": {
+      "text": "The application would move up to 1,712 acre-feet a year of Salt Wells Spring Stream water from irrigation to a data center campus.",
+      "claims": [
+       "salt_wells",
+       "change_use",
+       "filed_oct"
+      ]
+     },
+     "affected": "Salt Wells Spring Stream and the land it irrigates",
+     "could_lose": "Water that has gone to irrigation",
+     "counter": [
+      "lake_claim",
+      "diversion"
+     ]
+    },
+    {
+     "dimension": "wildlife",
+     "classification": "documented_potential",
+     "finding": {
+      "text": "How much water reaches the Great Salt Lake could change; the application acknowledges it is not clear how much of the pipeline's water would reach the lake.",
+      "claims": [
+       "lake_unclear",
+       "pipeline",
+       "depletion"
+      ]
+     },
+     "affected": "The Great Salt Lake and the wildlife that depends on it",
+     "could_lose": "Water reaching the lake",
+     "counter": [
+      "lake_claim",
+      "pipeline"
+     ]
+    },
+    {
+     "dimension": "wildlife",
+     "classification": "documented_concern",
+     "finding": {
+      "text": "Nearly 700 letters of protest on the second application raised wildlife, drought and the shrinking Great Salt Lake.",
+      "claims": [
+       "murray_700"
+      ]
+     },
+     "affected": "Wildlife at the Great Salt Lake",
+     "could_lose": "Habitat and lake water",
+     "counter": [
+      "murray"
+     ]
+    },
+    {
+     "dimension": "homes",
+     "classification": "verified_impact",
+     "finding": {
+      "text": "Ranch land just south of I-84 in the Hansel Valley would host 11 clusters of data center buildings and a 7.5-gigawatt generation facility.",
+      "claims": [
+       "land",
+       "clusters"
+      ]
+     },
+     "affected": "The Hansel Valley and Box Elder County",
+     "could_lose": "Open ranch land",
+     "counter": [
+      "res_2611"
+     ]
+    },
+    {
+     "dimension": "financial",
+     "classification": "verified_impact",
+     "finding": {
+      "text": "The developer says it has raised $20 million, is working to raise another $30 million, and has secured about 11,000 acres.",
+      "claims": [
+       "funding",
+       "acres_11000"
+      ]
+     },
+     "affected": "Box Elder County land and its owners",
+     "could_lose": "Land now used for ranching",
+     "counter": [
+      "county_vote"
+     ]
+    },
+    {
+     "dimension": "financial",
+     "classification": "documented_potential",
+     "finding": {
+      "text": "Critics say the project could increase taxes, along with its effects on water and wildlife.",
+      "claims": [
+       "concerns"
+      ]
+     },
+     "affected": "Box Elder County taxpayers",
+     "could_lose": "Money, if taxes rise",
+     "counter": [
+      "county_vote"
+     ]
+    },
+    {
+     "dimension": "accountability",
+     "classification": "verified_impact",
+     "finding": {
+      "text": "Earlier applications were withdrawn: Bar H Ranch's first in early May, and Murray Hollow asked on May 22 to cancel the second; a new one for 1,712 acre-feet was filed Oct. 15.",
+      "claims": [
+       "first_withdrawn",
+       "taken_back",
+       "bar_h_resubmit",
+       "murray",
+       "filed_oct"
+      ]
+     },
+     "affected": "Everyone who filed a protest",
+     "could_lose": "Protests filed on the earlier applications",
+     "counter": [
+      "engineer_decides"
+     ]
+    },
+    {
+     "dimension": "accountability",
+     "classification": "documented_concern",
+     "finding": {
+      "text": "Nearly 4,000 formal protests no longer counted after the early May withdrawal, and close to 200 people logged concerns on the new application.",
+      "claims": [
+       "protests_wiped",
+       "taken_back",
+       "protests_200"
+      ]
+     },
+     "affected": "Utahns who filed protests",
+     "could_lose": "Protests on the record",
+     "counter": [
+      "first_withdrawn",
+      "protest_period"
+     ]
+    },
+    {
+     "dimension": "accountability",
+     "classification": "investigative_question",
+     "finding": {
+      "text": "Was the first withdrawal a step taken in light of the county's action, as Bar H Ranch's water consultant wrote, or a way to nullify the protests, as a critic says?",
+      "claims": [
+       "first_withdrawn",
+       "withdraw_letter",
+       "bar_h_resubmit",
+       "seed"
+      ]
+     },
+     "affected": "Everyone who filed a protest",
+     "could_lose": "Trust in the protest process",
+     "counter": [
+      "first_withdrawn"
+     ]
+    }
+   ],
+   "conflict": {
+    "text": "The developer says more water will reach the Great Salt Lake than historically; the same application acknowledges it is not clear how much would reach it.",
+    "claims": [
+     "lake_claim",
+     "lake_unclear"
+    ],
+    "question": "How much of the water would reach the Great Salt Lake?"
+   },
+   "protections": [
+    {
+     "text": "The Utah State Engineer will determine whether the water can be granted, based on state statute.",
+     "claims": [
+      "engineer_decides"
+     ]
+    },
+    {
+     "text": "The proposal will be publicly advertised for two weeks, with a 20-day protest period.",
+     "claims": [
+      "protest_period"
+     ]
+    },
+    {
+     "text": "A roughly 2.5-mile pipeline would carry unused water and return flows toward the downstream edge of the ranch.",
+     "claims": [
+      "pipeline"
+     ]
+    }
+   ],
+   "participation": {
+    "text": "The Division of Water Rights says the proposal will be advertised for two weeks with a 20-day protest period; the reports read give no dates for it.",
+    "claims": [
+     "protest_period"
+    ],
+    "open": false
+   },
+   "approach": {
+    "trigger": "concern",
+    "why": "The water move is stated and the application itself says its effect on the Great Salt Lake is unclear; concern for the lake, answered by who decides, is the honest feeling. The withdrawn applications stay as questions, not accusations."
+   },
+   "visual_subjects": [
+    {
+     "category": "water",
+     "subject": "The Great Salt Lake",
+     "claims": [
+      "lake_unclear"
+     ]
+    },
+    {
+     "category": "water",
+     "subject": "A spring-fed stream",
+     "claims": [
+      "salt_wells"
+     ]
+    },
+    {
+     "category": "place",
+     "subject": "Ranch land in the Hansel Valley",
+     "claims": [
+      "land"
+     ]
+    },
+    {
+     "category": "wildlife",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "claims": [
+      "murray_700"
+     ]
+    },
+    {
+     "category": "record",
+     "subject": "The application's claim about the lake",
+     "claims": [
+      "lake_claim"
+     ]
+    }
+   ],
+   "subjects": [
+    {
+     "id": "salt-wells-stream",
+     "subject": "A spring-fed stream in a high desert valley",
+     "category": "water",
+     "essential": true,
+     "stake": "changing",
+     "emotion": "concern",
+     "claims": [
+      "salt_wells",
+      "change_use"
+     ],
+     "photos": [],
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "id": "great-salt-lake",
+     "subject": "The Great Salt Lake shoreline",
+     "category": "water",
+     "essential": true,
+     "stake": "threatened",
+     "emotion": "fear",
+     "claims": [
+      "lake_unclear",
+      "protests_200",
+      "murray_700"
+     ],
+     "photos": [],
+     "search": [
+      "Great Salt Lake shoreline",
+      "Great Salt Lake Utah aerial",
+      "Great Salt Lake north arm"
+     ]
+    },
+    {
+     "id": "hansel-valley",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "category": "place",
+     "essential": true,
+     "stake": "changing",
+     "emotion": "concern",
+     "claims": [
+      "land",
+      "acres_11000"
+     ],
+     "photos": [],
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "id": "shorebirds",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "category": "wildlife",
+     "essential": false,
+     "stake": "valuable",
+     "emotion": "concern",
+     "claims": [
+      "murray_700",
+      "concerns"
+     ],
+     "photos": [],
+     "search": [
+      "shorebirds Great Salt Lake",
+      "American avocets Great Salt Lake",
+      "Great Salt Lake birds wetlands"
+     ]
+    },
+    {
+     "id": "ranch-fields",
+     "subject": "Irrigated ranch fields in Box Elder County",
+     "category": "place",
+     "essential": false,
+     "stake": "changing",
+     "emotion": "curiosity",
+     "claims": [
+      "salt_wells",
+      "change_use"
+     ],
+     "photos": [],
+     "search": [
+      "irrigated ranch hay field northern Utah",
+      "Box Elder County hay field irrigation"
+     ]
+    }
+   ]
+  },
+  "concepts": [
+   {
+    "id": "spring-water-and-the-lake",
+    "role": "concern",
+    "trigger": "concern",
+    "title": "Spring water, a data center and the Great Salt Lake",
+    "opening": {
+     "text": "Up to 1,712 acre-feet of spring water a year, now used for irrigation in Box Elder County, would go to a data center instead under a new application.",
+     "claims": [
+      "salt_wells",
+      "change_use"
+     ]
+    },
+    "records": [
+     "salt_wells",
+     "change_use",
+     "filed_oct",
+     "diversion",
+     "depletion",
+     "pipeline",
+     "lake_unclear",
+     "lake_claim",
+     "protests_200",
+     "engineer_decides"
+    ],
+    "stakes": {
+     "text": "Close to 200 people logged concerns about how the project could affect the Great Salt Lake.",
+     "claims": [
+      "protests_200"
+     ]
+    },
+    "conflict": {
+     "text": "The developer says more water will reach the Great Salt Lake than historically; the application acknowledges it is not clear how much of the pipeline's water would reach it.",
+     "claims": [
+      "lake_claim",
+      "lake_unclear"
+     ]
+    },
+    "visuals": [
+     {
+      "category": "water",
+      "subject": "Salt Wells Spring Stream"
+     },
+     {
+      "category": "water",
+      "subject": "The Great Salt Lake"
+     },
+     {
+      "category": "place",
+      "subject": "The Hansel Valley"
+     },
+     {
+      "category": "wildlife",
+      "subject": "Shorebirds"
+     }
+    ],
+    "arc": {
+     "attachment": {
+      "text": "Salt Wells Spring Stream water can be diverted, up to 1,712 acre-feet a year, for irrigation in Box Elder County.",
+      "claims": [
+       "salt_wells"
+      ]
+     },
+     "disruption": {
+      "text": "An application filed Oct. 15 would change that water's use from irrigation to a data center campus.",
+      "claims": [
+       "filed_oct",
+       "change_use"
+      ]
+     },
+     "controversy": {
+      "text": "The application acknowledges it is not clear how much of the pipeline's water would reach the Great Salt Lake.",
+      "claims": [
+       "lake_unclear",
+       "pipeline"
+      ]
+     },
+     "evidence": {
+      "text": "An engineering report projects the campus would divert about 1,215 acre-feet a year, leaving net depletion of about 987.",
+      "claims": [
+       "diversion",
+       "depletion"
+      ]
+     },
+     "turning_point": {
+      "text": "The Utah State Engineer will determine whether the water can be granted under state statute.",
+      "claims": [
+       "engineer_decides"
+      ]
+     },
+     "action": {
+      "text": "Follow the State Engineer's review of the Oct. 15 application for 1,712 acre-feet on JODY Tracks.",
+      "claims": [
+       "engineer_decides",
+       "filed_oct"
+      ]
+     }
+    },
+    "action": {
+     "text": "Follow the State Engineer's review of the Oct. 15 application for 1,712 acre-feet on JODY Tracks.",
+     "claims": [
+      "engineer_decides",
+      "filed_oct"
+     ]
+    },
+    "confidence": "medium",
+    "fit": "The water move and the application's own uncertainty about the lake are both stated; the figures come from news reports of the filing, so it is concern, not alarm."
+   },
+   {
+    "id": "protests-that-stopped-counting",
+    "role": "accountability",
+    "trigger": "accountability",
+    "title": "Nearly 4,000 protests, then a withdrawal",
+    "opening": {
+     "text": "Nearly 4,000 formal protests stopped counting when the first water application was withdrawn in early May.",
+     "claims": [
+      "protests_wiped",
+      "taken_back"
+     ]
+    },
+    "records": [
+     "first_app_protests",
+     "protests_wiped",
+     "first_withdrawn",
+     "withdraw_letter",
+     "bar_h_resubmit",
+     "seed",
+     "murray",
+     "murray_700",
+     "filed_oct",
+     "protests_200"
+    ],
+    "stakes": {
+     "text": "Utahns filed nearly 700 letters of protest on the second application, about wildlife, drought and the shrinking Great Salt Lake.",
+     "claims": [
+      "murray_700"
+     ]
+    },
+    "conflict": {
+     "text": "Bar H Ranch's water consultant wrote that it was withdrawn in light of the county's action; a critic called it likely a cynical act to nullify the protests.",
+     "claims": [
+      "first_withdrawn",
+      "withdraw_letter",
+      "bar_h_resubmit",
+      "seed"
+     ]
+    },
+    "visuals": [
+     {
+      "category": "place",
+      "subject": "The Hansel Valley"
+     },
+     {
+      "category": "wildlife",
+      "subject": "Shorebirds"
+     },
+     {
+      "category": "record",
+      "subject": "The first withdrawal letter"
+     }
+    ],
+    "arc": {
+     "attachment": {
+      "text": "About 3,900 protests were filed on the first application in about a month.",
+      "claims": [
+       "first_app_protests"
+      ]
+     },
+     "disruption": {
+      "text": "Bar H Ranch's water consultant withdrew it, writing that it acted in light of the county's action.",
+      "claims": [
+       "first_withdrawn",
+       "withdraw_letter",
+       "bar_h_resubmit"
+      ]
+     },
+     "controversy": {
+      "text": "A critic called the withdrawal likely a cynical act to nullify the protests.",
+      "claims": [
+       "seed"
+      ]
+     },
+     "evidence": {
+      "text": "Murray Hollow asked on May 22 to cancel its application, which had drawn nearly 700 letters of protest.",
+      "claims": [
+       "murray",
+       "murray_700"
+      ]
+     },
+     "turning_point": {
+      "text": "A new application was filed Oct. 15, and close to 200 people had logged concerns by Monday afternoon.",
+      "claims": [
+       "filed_oct",
+       "protests_200"
+      ]
+     },
+     "action": {
+      "text": "Track the Oct. 15 application and its new protests on JODY Tracks.",
+      "claims": [
+       "filed_oct",
+       "protests_200"
+      ]
+     }
+    },
+    "action": {
+     "text": "Track the Oct. 15 application and its new protests on JODY Tracks.",
+     "claims": [
+      "filed_oct",
+      "protests_200"
+     ]
+    },
+    "confidence": "medium",
+    "fit": "The withdrawals and the lost protests are stated; the reason is disputed, so it is told as a question with both explanations, and the exact withdrawal date is not agreed by the sources, so it is told as early May."
+   },
+   {
+    "id": "the-review-ahead",
+    "role": "empowerment",
+    "trigger": "empowerment",
+    "title": "Who decides on the spring water",
+    "opening": {
+     "text": "Utah's State Engineer will decide whether Salt Wells Spring Stream water can go to a data center, and the public can protest.",
+     "claims": [
+      "engineer_decides",
+      "salt_wells",
+      "protest_period"
+     ]
+    },
+    "records": [
+     "engineer_decides",
+     "protest_period",
+     "filed_oct",
+     "salt_wells",
+     "referendum",
+     "county_vote"
+    ],
+    "stakes": {
+     "text": "The application seeks 1,712 acre-feet of water a year.",
+     "claims": [
+      "filed_oct"
+     ]
+    },
+    "conflict": {
+     "text": "In May, the county commission voted to let the project move forward, and residents were organizing a referendum against one of its resolutions.",
+     "claims": [
+      "county_vote",
+      "referendum"
+     ]
+    },
+    "visuals": [
+     {
+      "category": "water",
+      "subject": "Salt Wells Spring Stream"
+     },
+     {
+      "category": "place",
+      "subject": "The Hansel Valley"
+     }
+    ],
+    "arc": {
+     "attachment": {
+      "text": "Salt Wells Spring Stream water has gone to irrigation in Box Elder County.",
+      "claims": [
+       "salt_wells"
+      ]
+     },
+     "disruption": {
+      "text": "A new application would change its use to supply a data center.",
+      "claims": [
+       "change_use"
+      ]
+     },
+     "controversy": {
+      "text": "Critics say the project could affect water resources, increase taxes and endanger wildlife.",
+      "claims": [
+       "concerns"
+      ]
+     },
+     "evidence": {
+      "text": "The proposal will be publicly advertised for two weeks, with a 20-day protest period.",
+      "claims": [
+       "protest_period"
+      ]
+     },
+     "turning_point": {
+      "text": "The Utah State Engineer will determine whether the water can be granted under state statute.",
+      "claims": [
+       "engineer_decides"
+      ]
+     },
+     "action": {
+      "text": "Watch for the protest period the Division of Water Rights describes, and follow the State Engineer's decision on JODY Tracks.",
+      "claims": [
+       "protest_period",
+       "engineer_decides"
+      ]
+     }
+    },
+    "action": {
+     "text": "Watch for the protest period the Division of Water Rights describes, and follow the State Engineer's decision on JODY Tracks.",
+     "claims": [
+      "protest_period",
+      "engineer_decides"
+     ]
+    },
+    "confidence": "medium",
+    "fit": "The review and the protest process are stated, but the reports give no dates, so the step is to watch for it rather than a dated call."
+   }
+  ],
+  "selection": {
+   "concept": "spring-water-and-the-lake",
+   "mode": "emotional",
+   "why": "The water move is stated and the application itself says its effect on the Great Salt Lake is unclear, so concern for the lake is the strongest honest story; the withdrawals stay in it as questions."
+  },
+  "main": {
+   "acts": [
+    {
+     "act": 1,
+     "name": "Spring water in the Hansel Valley",
+     "scenes": [
+      {
+       "thread": "fear",
+       "purpose": "What is at stake",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "A spring-fed stream in a high desert valley",
+        "category": "water",
+        "emotion": "concern",
+        "subject": "A spring-fed stream in a high desert valley",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "spring-fed stream Utah high desert",
+          "Salt Wells Spring Box Elder County",
+          "irrigation ditch spring stream Utah"
+         ]
+        },
+        "duration": 10,
+        "transition": "fade",
+        "why": "The spring stream water the application would move",
+        "subject_ref": "salt-wells-stream"
+       },
+       "narration": [
+        {
+         "text": "Up to 1,712 acre-feet of spring water a year, now used for irrigation in Box Elder County, would go to a data center instead under a new application.",
+         "claims": [
+          "salt_wells",
+          "change_use"
+         ]
+        }
+       ],
+       "onscreen": {
+        "text": "Up to 1,712 acre-feet a year",
+        "claims": [
+         "salt_wells"
+        ]
+       }
+      },
+      {
+       "thread": "context",
+       "purpose": "Where this is",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Open ranch land in the Hansel Valley, just south of I-84",
+        "category": "place",
+        "emotion": "calm",
+        "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Hansel Valley Utah",
+          "Box Elder County ranch land Interstate 84",
+          "Snowville Utah valley"
+         ]
+        },
+        "duration": 7,
+        "transition": "fade",
+        "why": "The land the data center would use",
+        "subject_ref": "hansel-valley"
+       },
+       "narration": [
+        {
+         "text": "The land is just south of I-84, in the Hansel Valley area of Box Elder County.",
+         "claims": [
+          "land"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 2,
+     "name": "What the application asks for",
+     "scenes": [
+      {
+       "thread": "context",
+       "purpose": "The filing",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Irrigated ranch fields in Box Elder County",
+        "category": "place",
+        "emotion": "curiosity",
+        "subject": "Irrigated ranch fields in Box Elder County",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "irrigated ranch hay field northern Utah",
+          "Box Elder County hay field irrigation"
+         ]
+        },
+        "duration": 9,
+        "transition": "fade",
+        "why": "The irrigation use the application would end",
+        "subject_ref": "ranch-fields"
+       },
+       "narration": [
+        {
+         "text": "The application was filed on Oct. 15 with the Utah Division of Water Rights, seeking a permanent change from irrigation to supply the data center project.",
+         "claims": [
+          "filed_oct",
+          "change_use"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "context",
+       "purpose": "What would be built",
+       "visual": {
+        "kind": "illustrative",
+        "desc": "A data center campus with power plants on open desert land (illustration)",
+        "category": "place",
+        "emotion": "curiosity",
+        "subject": "A data center campus with power plants on open desert land (illustration)",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "illustrative",
+         "generate": "A labelled, simple drawing of rows of low data center buildings and a separate, generic power facility block on open high-desert land; no people"
+        },
+        "duration": 12,
+        "transition": "dissolve",
+        "why": "Shows the parts the reports list: building clusters and a power facility"
+       },
+       "narration": [
+        {
+         "text": "The documents describe 11 clusters of data center buildings and a 7.5-gigawatt generation facility.",
+         "claims": [
+          "clusters"
+         ]
+        },
+        {
+         "text": "As of October 2026 reports, the developer still needs to settle the actual power-generation option, and is also considering renewables and other options.",
+         "claims": [
+          "power_unsettled",
+          "renewables",
+          "trib_date"
+         ]
+        },
+        {
+         "text": "They also list 4,850 employees.",
+         "claims": [
+          "employees"
+         ]
+        },
+        {
+         "text": "The developer says it has secured about 11,000 acres and raised $20 million, with another $30 million to raise.",
+         "claims": [
+          "acres_11000",
+          "funding"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 3,
+     "name": "Where the water goes",
+     "scenes": [
+      {
+       "thread": "fear",
+       "purpose": "How much water",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "A spring-fed stream in a high desert valley",
+        "category": "water",
+        "emotion": "concern",
+        "subject": "A spring-fed stream in a high desert valley",
+        "shot": "wide",
+        "camera": "pan",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "spring-fed stream Utah high desert",
+          "Salt Wells Spring Box Elder County",
+          "irrigation ditch spring stream Utah"
+         ]
+        },
+        "duration": 10,
+        "transition": "fade",
+        "why": "The water the projections describe",
+        "subject_ref": "salt-wells-stream"
+       },
+       "narration": [
+        {
+         "text": "An engineering report in the application projects the campus would divert about 1,215 acre-feet of water a year at full buildout.",
+         "claims": [
+          "diversion"
+         ]
+        },
+        {
+         "text": "That leaves net depletion of about 987 acre-feet a year.",
+         "claims": [
+          "depletion"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "fear",
+       "purpose": "The return pipeline",
+       "visual": {
+        "kind": "data_card",
+        "desc": "Diversion, depletion and the return pipeline",
+        "category": "record",
+        "emotion": "concern",
+        "subject": "Diversion, depletion and the return pipeline",
+        "shot": "card",
+        "camera": "static",
+        "asset": {
+         "status": "card"
+        },
+        "duration": 7,
+        "transition": "dissolve",
+        "why": "The application's figures in one place",
+        "layout": "qol_grid"
+       },
+       "narration": [
+        {
+         "text": "A roughly 2.5-mile pipeline would carry unused water and return flows toward the downstream edge of the ranch.",
+         "claims": [
+          "pipeline"
+         ]
+        }
+       ],
+       "onscreen": {
+        "text": "About 987 acre-feet a year net depletion",
+        "claims": [
+         "depletion"
+        ]
+       }
+      },
+      {
+       "thread": "fear",
+       "purpose": "The open question",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "The Great Salt Lake shoreline",
+        "category": "water",
+        "emotion": "concern",
+        "subject": "The Great Salt Lake shoreline",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Great Salt Lake shoreline",
+          "Great Salt Lake Utah aerial",
+          "Great Salt Lake north arm"
+         ]
+        },
+        "duration": 9,
+        "transition": "fade",
+        "why": "The lake whose share is unclear",
+        "subject_ref": "great-salt-lake"
+       },
+       "narration": [
+        {
+         "text": "But the application acknowledges it is not clear how much of that water would reach the Great Salt Lake.",
+         "claims": [
+          "lake_unclear"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "fear",
+       "purpose": "Who is watching",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Shorebirds on the Great Salt Lake",
+        "category": "wildlife",
+        "emotion": "concern",
+        "subject": "Shorebirds on the Great Salt Lake",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "shorebirds Great Salt Lake",
+          "American avocets Great Salt Lake",
+          "Great Salt Lake birds wetlands"
+         ]
+        },
+        "duration": 7,
+        "transition": "fade",
+        "why": "Wildlife the protest letters raised, at the lake",
+        "subject_ref": "shorebirds"
+       },
+       "narration": [
+        {
+         "text": "Close to 200 people logged concerns about how the project could affect the Great Salt Lake.",
+         "claims": [
+          "protests_200"
+         ]
+        }
+       ],
+       "onscreen": {
+        "text": "Close to 200 people logged concerns",
+        "claims": [
+         "protests_200"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "act": 4,
+     "name": "Different readings of the same water",
+     "scenes": [
+      {
+       "thread": "fear",
+       "purpose": "The developer's claim",
+       "visual": {
+        "kind": "source_document",
+        "desc": "The application's claim about the lake, as quoted",
+        "category": "record",
+        "emotion": "curiosity",
+        "subject": "The application's claim about the lake, as quoted",
+        "shot": "document",
+        "camera": "slow_push",
+        "asset": {
+         "status": "record",
+         "claim": "lake_claim"
+        },
+        "duration": 9,
+        "transition": "cut",
+        "why": "The developer's own words, enlarged",
+        "layout": "evidence_reveal"
+       },
+       "narration": [
+        {
+         "text": "The developer's application says there can be no question that more water will reach the Great Salt Lake from Salt Wells Spring Stream than has reached it historically.",
+         "claims": [
+          "lake_claim"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "anger",
+       "purpose": "The critic's question",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "The Great Salt Lake shoreline",
+        "category": "water",
+        "emotion": "accountability",
+        "subject": "The Great Salt Lake shoreline",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Great Salt Lake shoreline",
+          "Great Salt Lake Utah aerial",
+          "Great Salt Lake north arm"
+         ]
+        },
+        "duration": 12,
+        "transition": "fade",
+        "why": "The lake both sides talk about",
+        "subject_ref": "great-salt-lake"
+       },
+       "narration": [
+        {
+         "text": "An ecologist says the developer does not explain how it will produce power of that magnitude with that little water.",
+         "claims": [
+          "abbott"
+         ]
+        },
+        {
+         "text": "He says it would be a water-to-power ratio 10 to 100 times better than the top-performing facilities today.",
+         "claims": [
+          "abbott_ratio"
+         ]
+        },
+        {
+         "text": "KSL did not receive an immediate response from the developer's team.",
+         "claims": [
+          "no_response"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 5,
+     "name": "The applications that came before",
+     "scenes": [
+      {
+       "thread": "anger",
+       "purpose": "The first application",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Open ranch land in the Hansel Valley, just south of I-84",
+        "category": "place",
+        "emotion": "accountability",
+        "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+        "shot": "wide",
+        "camera": "slow_push",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Hansel Valley Utah",
+          "Box Elder County ranch land Interstate 84",
+          "Snowville Utah valley"
+         ]
+        },
+        "duration": 10,
+        "transition": "fade",
+        "why": "The same valley, the earlier filing",
+        "subject_ref": "hansel-valley"
+       },
+       "narration": [
+        {
+         "text": "This is not the first try. The first application, started in March, collected about 3,900 protests in about a month.",
+         "claims": [
+          "first_app_protests"
+         ]
+        },
+        {
+         "text": "When it was withdrawn in early May, nearly 4,000 formal protests filed against it no longer counted.",
+         "claims": [
+          "protests_wiped",
+          "taken_back"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "anger",
+       "purpose": "Two explanations",
+       "visual": {
+        "kind": "source_document",
+        "desc": "The first withdrawal letter, as quoted",
+        "category": "record",
+        "emotion": "accountability",
+        "subject": "The first withdrawal letter, as quoted",
+        "shot": "document",
+        "camera": "slow_push",
+        "asset": {
+         "status": "record",
+         "claim": "first_withdrawn"
+        },
+        "duration": 8,
+        "transition": "cut",
+        "why": "The consultant's stated reason, enlarged",
+        "layout": "evidence_reveal"
+       },
+       "narration": [
+        {
+         "text": "A water consultant wrote the withdrawal letter, saying the application was withdrawn in light of the county's action, and that Bar H Ranch intends to resubmit.",
+         "claims": [
+          "first_withdrawn",
+          "withdraw_letter",
+          "bar_h_resubmit"
+         ]
+        },
+        {
+         "text": "A critic called the withdrawal likely a cynical act to nullify all of the protests.",
+         "claims": [
+          "seed"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "anger",
+       "purpose": "The second application",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Shorebirds on the Great Salt Lake",
+        "category": "wildlife",
+        "emotion": "accountability",
+        "subject": "Shorebirds on the Great Salt Lake",
+        "shot": "wide",
+        "camera": "pull_back",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "shorebirds Great Salt Lake",
+          "American avocets Great Salt Lake",
+          "Great Salt Lake birds wetlands"
+         ]
+        },
+        "duration": 10,
+        "transition": "fade",
+        "why": "The wildlife protesters wrote about",
+        "subject_ref": "shorebirds"
+       },
+       "narration": [
+        {
+         "text": "Murray Hollow asked on May 22 to cancel its application, which had drawn nearly 700 letters of protest about wildlife, drought and the shrinking Great Salt Lake; its notice did not say why.",
+         "claims": [
+          "murray",
+          "murray_700",
+          "murray_no_reason"
+         ]
+        },
+        {
+         "text": "Bar H Ranch's water consultant wrote that the first application was withdrawn in light of the county's action; the records read do not show anyone acted improperly.",
+         "claims": [
+          "first_withdrawn",
+          "withdraw_letter",
+          "bar_h_resubmit"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 6,
+     "name": "Who decides",
+     "scenes": [
+      {
+       "thread": "motivation",
+       "purpose": "Who decides",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Irrigated ranch fields in Box Elder County",
+        "category": "place",
+        "emotion": "calm",
+        "subject": "Irrigated ranch fields in Box Elder County",
+        "shot": "wide",
+        "camera": "pull_back",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "irrigated ranch hay field northern Utah",
+          "Box Elder County hay field irrigation"
+         ]
+        },
+        "duration": 7,
+        "transition": "fade",
+        "why": "The water right under review",
+        "subject_ref": "ranch-fields"
+       },
+       "narration": [
+        {
+         "text": "Utah's State Engineer will determine whether the water can be granted, based on state statute.",
+         "claims": [
+          "engineer_decides"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "fear",
+       "purpose": "What is still unknown",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "The Great Salt Lake shoreline",
+        "category": "water",
+        "emotion": "calm",
+        "subject": "The Great Salt Lake shoreline",
+        "shot": "wide",
+        "camera": "pull_back",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Great Salt Lake shoreline",
+          "Great Salt Lake Utah aerial",
+          "Great Salt Lake north arm"
+         ]
+        },
+        "duration": 7,
+        "transition": "fade",
+        "why": "The lake whose share the decision bears on",
+        "subject_ref": "great-salt-lake"
+       },
+       "narration": [
+        {
+         "text": "No document here reports a State Engineer decision, so the effect on the lake is not settled.",
+         "claims": [
+          "no_engineer_decision",
+          "lake_unclear"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 7,
+     "name": "What the public can do",
+     "scenes": [
+      {
+       "thread": "motivation",
+       "purpose": "The protest process",
+       "visual": {
+        "kind": "data_card",
+        "desc": "How the review works",
+        "category": "record",
+        "emotion": "empowerment",
+        "subject": "How the review works",
+        "shot": "card",
+        "camera": "static",
+        "asset": {
+         "status": "card"
+        },
+        "duration": 8,
+        "transition": "dissolve",
+        "why": "The process steps the Division describes",
+        "layout": "stakes_timeline"
+       },
+       "narration": [
+        {
+         "text": "The Division of Water Rights says the proposal will be publicly advertised for two weeks, with a 20-day protest period.",
+         "claims": [
+          "protest_period"
+         ]
+        }
+       ]
+      },
+      {
+       "thread": "motivation",
+       "purpose": "What the county did",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "Open ranch land in the Hansel Valley, just south of I-84",
+        "category": "place",
+        "emotion": "empowerment",
+        "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+        "shot": "wide",
+        "camera": "pan",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "Hansel Valley Utah",
+          "Box Elder County ranch land Interstate 84",
+          "Snowville Utah valley"
+         ]
+        },
+        "duration": 12,
+        "transition": "fade",
+        "why": "The land the county vote covers",
+        "subject_ref": "hansel-valley"
+       },
+       "narration": [
+        {
+         "text": "In May, the Box Elder County Commission voted unanimously to let the data center project move forward.",
+         "claims": [
+          "county_vote"
+         ]
+        },
+        {
+         "text": "Its resolution 26-11 gives the Military Installation Development Authority consent to move ahead with a project expected to take 10 years.",
+         "claims": [
+          "res_2611"
+         ]
+        },
+        {
+         "text": "In May, a group of residents was organizing to file a referendum against one of those resolutions.",
+         "claims": [
+          "referendum"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "act": 8,
+     "name": "Where it stands",
+     "scenes": [
+      {
+       "thread": "motivation",
+       "purpose": "Where it stands",
+       "visual": {
+        "kind": "representative_image",
+        "desc": "A spring-fed stream in a high desert valley",
+        "category": "water",
+        "emotion": "empowerment",
+        "subject": "A spring-fed stream in a high desert valley",
+        "shot": "wide",
+        "camera": "pull_back",
+        "asset": {
+         "status": "missing",
+         "search": [
+          "spring-fed stream Utah high desert",
+          "Salt Wells Spring Box Elder County",
+          "irrigation ditch spring stream Utah"
+         ]
+        },
+        "duration": 12,
+        "transition": "fade",
+        "why": "Back to the water at the center of the review",
+        "subject_ref": "salt-wells-stream"
+       },
+       "narration": [
+        {
+         "text": "As of Oct. 20 reports, the Oct. 15 application is waiting to be reviewed, and no document here reports a State Engineer decision.",
+         "claims": [
+          "filed_oct",
+          "engineer_decides",
+          "no_engineer_decision",
+          "trib_date"
+         ]
+        },
+        {
+         "text": "Follow the State Engineer's review of the Oct. 15 application for 1,712 acre-feet on JODY Tracks.",
+         "claims": [
+          "engineer_decides",
+          "filed_oct"
+         ]
+        }
+       ],
+       "onscreen": {
+        "text": "Follow the review on JODY Tracks",
+        "claims": [
+         "engineer_decides"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "qol": [
+   {
+    "topic": "Traffic",
+    "status": "not_addressed",
+    "summary": {
+     "text": "Traffic is not addressed in the reviewed reports.",
+     "claims": []
+    }
+   },
+   {
+    "topic": "Noise",
+    "status": "not_addressed",
+    "summary": {
+     "text": "Noise is not addressed in the reviewed reports.",
+     "claims": []
+    }
+   },
+   {
+    "topic": "Air",
+    "status": "addressed",
+    "summary": {
+     "text": "The documents describe a 7.5-gigawatt generation facility whose actual power-generation option is not settled; the reports read do not describe its emissions.",
+     "claims": [
+      "clusters",
+      "power_unsettled"
+     ]
+    }
+   },
+   {
+    "topic": "Water",
+    "status": "addressed",
+    "summary": {
+     "text": "The campus would divert about 1,215 acre-feet a year, with net depletion of about 987; how much would reach the Great Salt Lake is not clear.",
+     "claims": [
+      "diversion",
+      "depletion",
+      "lake_unclear"
+     ]
+    }
+   },
+   {
+    "topic": "Soil",
+    "status": "not_addressed",
+    "summary": {
+     "text": "Soil is not addressed in the reviewed reports.",
+     "claims": []
+    }
+   },
+   {
+    "topic": "Light",
+    "status": "not_addressed",
+    "summary": {
+     "text": "Light is not addressed in the reviewed reports.",
+     "claims": []
+    }
+   }
+  ],
+  "shorts": {
+   "a": {
+    "question": "How much of this spring water reaches the Great Salt Lake?",
+    "emotion": "FEAR",
+    "title": "Spring water, a data center and the Great Salt Lake",
+    "title_claims": [
+     "salt_wells",
+     "change_use",
+     "lake_unclear"
+    ],
+    "onscreen_hook": "Where does this water go?",
+    "onscreen_claims": [
+     "salt_wells",
+     "lake_unclear"
+    ],
+    "description": {
+     "text": "A new application would move up to 1,712 acre-feet a year of Salt Wells Spring Stream water from irrigation to a data center in Box Elder County; the application acknowledges it is not clear how much would reach the Great Salt Lake.",
+     "claims": [
+      "salt_wells",
+      "change_use",
+      "lake_unclear"
+     ]
+    },
+    "beats": [
+     {
+      "beat": "hook",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "The Great Salt Lake shoreline",
+       "category": "water",
+       "emotion": "concern",
+       "subject": "The Great Salt Lake shoreline",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "Great Salt Lake shoreline",
+         "Great Salt Lake Utah aerial",
+         "Great Salt Lake north arm"
+        ]
+       },
+       "duration": 3,
+       "transition": "cut",
+       "why": "The lake the question is about",
+       "subject_ref": "great-salt-lake"
+      },
+      "narration": [
+       {
+        "text": "How much water reaches the Great Salt Lake?",
+        "claims": [
+         "lake_unclear"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "care",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "A spring-fed stream in a high desert valley",
+       "category": "water",
+       "emotion": "concern",
+       "subject": "A spring-fed stream in a high desert valley",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "spring-fed stream Utah high desert",
+         "Salt Wells Spring Box Elder County",
+         "irrigation ditch spring stream Utah"
+        ]
+       },
+       "duration": 5,
+       "transition": "cut",
+       "why": "The spring stream water at stake",
+       "subject_ref": "salt-wells-stream"
+      },
+      "narration": [
+       {
+        "text": "This spring stream's water would go to a data center.",
+        "claims": [
+         "salt_wells",
+         "change_use"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "conflict",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "Shorebirds on the Great Salt Lake",
+       "category": "wildlife",
+       "emotion": "concern",
+       "subject": "Shorebirds on the Great Salt Lake",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "shorebirds Great Salt Lake",
+         "American avocets Great Salt Lake",
+         "Great Salt Lake birds wetlands"
+        ]
+       },
+       "duration": 7,
+       "transition": "dissolve",
+       "why": "Wildlife at the lake",
+       "subject_ref": "shorebirds"
+      },
+      "narration": [
+       {
+        "text": "The application says it is not clear how much would reach the lake.",
+        "claims": [
+         "lake_unclear"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "evidence",
+      "visual": {
+       "kind": "data_card",
+       "desc": "Net depletion",
+       "category": "record",
+       "emotion": "concern",
+       "subject": "Net depletion",
+       "shot": "card",
+       "camera": "static",
+       "asset": {
+        "status": "card"
+       },
+       "duration": 8,
+       "transition": "dissolve",
+       "why": "The application's own figure"
+      },
+      "narration": [
+       {
+        "text": "Its engineering report projects net depletion of about 987 acre-feet a year.",
+        "claims": [
+         "depletion"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "action",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "Open ranch land in the Hansel Valley, just south of I-84",
+       "category": "place",
+       "emotion": "empowerment",
+       "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "Hansel Valley Utah",
+         "Box Elder County ranch land Interstate 84",
+         "Snowville Utah valley"
+        ]
+       },
+       "duration": 8,
+       "transition": "fade",
+       "why": "The valley under review",
+       "subject_ref": "hansel-valley"
+      },
+      "narration": [
+       {
+        "text": "The Utah State Engineer will decide. Follow it on JODY Tracks.",
+        "claims": [
+         "engineer_decides"
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "b": {
+    "question": "Why did nearly 4,000 protests stop counting?",
+    "emotion": "ANGER",
+    "title": "Nearly 4,000 protests stopped counting after a withdrawal",
+    "title_claims": [
+     "protests_wiped"
+    ],
+    "onscreen_hook": "Nearly 4,000 protests, gone",
+    "onscreen_claims": [
+     "protests_wiped"
+    ],
+    "description": {
+     "text": "The first water application for the Box Elder County data center drew nearly 4,000 formal protests, which no longer counted once it was withdrawn in early May; a new application was filed Oct. 15.",
+     "claims": [
+      "protests_wiped",
+      "taken_back",
+      "filed_oct"
+     ]
+    },
+    "beats": [
+     {
+      "beat": "hook",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "Open ranch land in the Hansel Valley, just south of I-84",
+       "category": "place",
+       "emotion": "accountability",
+       "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "Hansel Valley Utah",
+         "Box Elder County ranch land Interstate 84",
+         "Snowville Utah valley"
+        ]
+       },
+       "duration": 3,
+       "transition": "cut",
+       "why": "The valley the protests were about",
+       "subject_ref": "hansel-valley"
+      },
+      "narration": [
+       {
+        "text": "Nearly 4,000 protests stopped counting here.",
+        "claims": [
+         "protests_wiped"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "care",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "Shorebirds on the Great Salt Lake",
+       "category": "wildlife",
+       "emotion": "accountability",
+       "subject": "Shorebirds on the Great Salt Lake",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "shorebirds Great Salt Lake",
+         "American avocets Great Salt Lake",
+         "Great Salt Lake birds wetlands"
+        ]
+       },
+       "duration": 5,
+       "transition": "cut",
+       "why": "The wildlife protesters wrote about",
+       "subject_ref": "shorebirds"
+      },
+      "narration": [
+       {
+        "text": "Critics say it could affect water and endanger wildlife.",
+        "claims": [
+         "concerns"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "conflict",
+      "visual": {
+       "kind": "source_document",
+       "desc": "The first withdrawal letter, as quoted",
+       "category": "record",
+       "emotion": "accountability",
+       "subject": "The first withdrawal letter, as quoted",
+       "shot": "document",
+       "camera": "slow_push",
+       "asset": {
+        "status": "record",
+        "claim": "first_withdrawn"
+       },
+       "duration": 7,
+       "transition": "cut",
+       "why": "The consultant's stated reason",
+       "layout": "evidence_reveal"
+      },
+      "narration": [
+       {
+        "text": "Bar H Ranch's consultant withdrew it, citing the county's action.",
+        "claims": [
+         "first_withdrawn",
+         "withdraw_letter",
+         "bar_h_resubmit"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "evidence",
+      "visual": {
+       "kind": "data_card",
+       "desc": "The second application",
+       "category": "record",
+       "emotion": "accountability",
+       "subject": "The second application",
+       "shot": "card",
+       "camera": "static",
+       "asset": {
+        "status": "card"
+       },
+       "duration": 8,
+       "transition": "dissolve",
+       "why": "The second withdrawal"
+      },
+      "narration": [
+       {
+        "text": "Murray Hollow asked May 22 to cancel its application, which drew nearly 700 protest letters.",
+        "claims": [
+         "murray",
+         "murray_700"
+        ]
+       }
+      ]
+     },
+     {
+      "beat": "action",
+      "visual": {
+       "kind": "representative_image",
+       "desc": "A spring-fed stream in a high desert valley",
+       "category": "water",
+       "emotion": "empowerment",
+       "subject": "A spring-fed stream in a high desert valley",
+       "shot": "wide",
+       "camera": "slow_push",
+       "asset": {
+        "status": "missing",
+        "search": [
+         "spring-fed stream Utah high desert",
+         "Salt Wells Spring Box Elder County",
+         "irrigation ditch spring stream Utah"
+        ]
+       },
+       "duration": 8,
+       "transition": "fade",
+       "why": "The water application under review as of October 2026",
+       "subject_ref": "salt-wells-stream"
+      },
+      "narration": [
+       {
+        "text": "A new one was filed Oct. 15. Track it on JODY Tracks.",
+        "claims": [
+         "filed_oct"
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "packaging": {
+   "titles": [
+    {
+     "text": "Spring water, a data center and the Great Salt Lake: what the Box Elder records say",
+     "claims": [
+      "salt_wells",
+      "change_use",
+      "lake_unclear"
+     ]
+    },
+    {
+     "text": "The Stratos data center's new water application, and the question about the Great Salt Lake",
+     "claims": [
+      "filed_oct",
+      "lake_unclear"
+     ]
+    },
+    {
+     "text": "Nearly 4,000 protests no longer counted: the earlier Box Elder data center water applications",
+     "claims": [
+      "protests_wiped"
+     ]
+    }
+   ],
+   "thumbnail": {
+    "text": "Where does this spring water go?",
+    "claims": [
+     "salt_wells",
+     "lake_unclear"
+    ],
+    "visual": {
+     "kind": "representative_image",
+     "category": "water",
+     "emotion": "concern",
+     "subject": "A spring-fed stream in a high desert valley",
+     "asset": {
+      "status": "missing",
+      "search": [
+       "spring-fed stream Utah high desert",
+       "Salt Wells Spring Box Elder County",
+       "irrigation ditch spring stream Utah"
+      ]
+     },
+     "why": "The water at the center of the application",
+     "subject_ref": "salt-wells-stream"
+    }
+   },
+   "description": {
+    "text": "A water rights change application filed Oct. 15 asks to move up to 1,712 acre-feet a year of Salt Wells Spring Stream water from irrigation to the Stratos data center project in Box Elder County, Utah. This video reads the news reports on the application, the developer's claim about the Great Salt Lake, an ecologist's question, and the earlier applications that were withdrawn. The Utah State Engineer will decide.",
+    "claims": [
+     "filed_oct",
+     "salt_wells",
+     "change_use",
+     "lake_claim",
+     "abbott",
+     "first_withdrawn",
+     "murray",
+     "engineer_decides"
+    ]
+   },
+   "hashtags": [
+    "#JODYTracks",
+    "#BoxElderCounty",
+    "#GreatSaltLake",
+    "#Utah",
+    "#DataCenter"
+   ],
+   "bluesky": {
+    "hook": {
+     "text": "Spring water for a data center: how much reaches the Great Salt Lake?",
+     "claims": [
+      "salt_wells",
+      "change_use",
+      "lake_unclear"
+     ]
+    },
+    "geo_tags": [
+     "Box Elder County",
+     "Great Salt Lake"
+    ]
+   }
+  }
+ },
+ "pack": {
+  "schema": "impact-pack/1",
+  "slug": "stratos-data-center-water-box-elder",
+  "intake": "independent",
+  "title": "Stratos data center water rights change application, Hansel Valley, Box Elder County, Utah",
+  "record_id": null,
+  "verified_at": "2026-10-27T22:54:46Z",
+  "age_days": 9,
+  "fresh": true,
+  "fresh_days": 30,
+  "sources": [
+   {
+    "id": "des",
+    "label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "file": "01-index.html"
+   },
+   {
+    "id": "trib",
+    "label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "file": "02-index.html"
+   },
+   {
+    "id": "fox_refile",
+    "label": "FOX 13, data center project re-files water rights application (Oct 2026)",
+    "url": "https://www.fox13now.com/news/politics/kevin-olearys-data-center-project-re-files-water-rights-application",
+    "file": "03-kevin-olearys-data-center-project-re-files-water-r.html"
+   },
+   {
+    "id": "park",
+    "label": "Park Record (Salt Lake Tribune / Grist), Second water right application for the Utah data center project withdrawn (May 27, 2026)",
+    "url": "https://www.parkrecord.com/2026/05/27/second-water-right-application-for-kevin-olearys-utah-data-center-project-withdrawn/",
+    "file": "04-index.html"
+   },
+   {
+    "id": "dispatch",
+    "label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "file": "05-index.html"
+   },
+   {
+    "id": "upr",
+    "label": "Utah Public Radio, second water rights application and protests (May 19, 2026)",
+    "url": "https://www.upr.org/utah-news/2026-05-19/box-elder-data-center-protest",
+    "file": "06-box-elder-data-center-protest.html"
+   },
+   {
+    "id": "fox_vote",
+    "label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "file": "07-box-elder-county-commission-expected-to-vote-on-co.html"
+   }
+  ],
+  "claims": [
+   {
+    "id": "land",
+    "status": "stated",
+    "text": "Where the land is.",
+    "quote": "Land proposed to be used for the Stratos Project data center is pictured just south of I-84 in the Hansel Valley area of Box Elder County",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": [
+     "84"
+    ]
+   },
+   {
+    "id": "filed_oct",
+    "status": "stated",
+    "text": "The current application.",
+    "quote": "The application was filed on Oct. 15, seeking 1,712 acre-feet of water a year on the property purchased in Box Elder County",
+    "source": "fox_refile",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, data center project re-files water rights application (Oct 2026)",
+    "source_url": "https://www.fox13now.com/news/politics/kevin-olearys-data-center-project-re-files-water-rights-application",
+    "numbers": [
+     "15",
+     "1712"
+    ]
+   },
+   {
+    "id": "engineer_decides",
+    "status": "stated",
+    "text": "Who decides.",
+    "quote": "It will be reviewed, and the Utah State Engineer will determine if it can be granted the water based upon state statute",
+    "source": "fox_refile",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, data center project re-files water rights application (Oct 2026)",
+    "source_url": "https://www.fox13now.com/news/politics/kevin-olearys-data-center-project-re-files-water-rights-application",
+    "numbers": []
+   },
+   {
+    "id": "change_use",
+    "status": "stated",
+    "text": "Irrigation water to the data center.",
+    "quote": "The application for permanent change of water use from irrigation operations to supply the data center project was submitted Thursday to the Utah Division of Water Rights",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "salt_wells",
+    "status": "stated",
+    "text": "The water right.",
+    "quote": "divert up to 1,712 acre-feet of water each year from the Salt Wells Spring Stream for irrigation",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "1712"
+    ]
+   },
+   {
+    "id": "clusters",
+    "status": "stated",
+    "text": "Scale of the project (the power plant type is not settled).",
+    "quote": "the project would include 11 clusters of data center buildings and a 7.5-gigawatt generation facility",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": [
+     "11",
+     "7.5"
+    ]
+   },
+   {
+    "id": "employees",
+    "status": "stated",
+    "text": "Workforce listed.",
+    "quote": "It also lists 4,850 employees",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": [
+     "4850"
+    ]
+   },
+   {
+    "id": "diversion",
+    "status": "stated",
+    "text": "Projected diversion.",
+    "quote": "the data center campus would divert about 1,215 acre-feet of water annually at full buildout",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "1215"
+    ]
+   },
+   {
+    "id": "depletion",
+    "status": "stated",
+    "text": "Projected net depletion.",
+    "quote": "leaving net depletion of about 987 acre-feet a year",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "987"
+    ]
+   },
+   {
+    "id": "pipeline",
+    "status": "stated",
+    "text": "Proposed return pipeline.",
+    "quote": "The application also proposes a roughly 2.5-mile pipeline that would carry unused water and return flows toward the downstream edge of the ranch property",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "2.5"
+    ]
+   },
+   {
+    "id": "lake_claim",
+    "status": "flagged",
+    "text": "The developer's claim.",
+    "quote": "there can be no question that more water will reach the Great Salt Lake from Salt Wells Spring Stream than has reached it historically",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "lake_unclear",
+    "status": "stated",
+    "text": "The application's own uncertainty.",
+    "quote": "not clear how much of the water flowing through that pipeline would reach the Great Salt Lake, the application acknowledges",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "abbott",
+    "status": "flagged",
+    "text": "A critic's challenge.",
+    "quote": "they don’t tell us how they’re going to achieve power production of that magnitude with that little water",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "abbott_ratio",
+    "status": "flagged",
+    "text": "A critic's comparison.",
+    "quote": "This would be a water-to-power ratio that is 10 to 100 times better than the top-performing facilities today",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": [
+     "10",
+     "100"
+    ]
+   },
+   {
+    "id": "no_response",
+    "status": "stated",
+    "text": "The developer did not respond to the critique.",
+    "quote": "did not receive an immediate response",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "protest_period",
+    "status": "stated",
+    "text": "How residents can respond.",
+    "quote": "The proposal will be publicly advertised for two weeks, and there will be a 20-day protest period",
+    "source": "des",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Deseret News / KSL, Stratos Project water application reveals new details on massive data center (Oct 16, 2026)",
+    "source_url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "numbers": [
+     "2",
+     "20"
+    ]
+   },
+   {
+    "id": "protests_200",
+    "status": "stated",
+    "text": "Protests on the current application.",
+    "quote": "By Monday afternoon, close to 200 people had logged their concerns about the project and how it could affect the Great Salt Lake",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "200"
+    ]
+   },
+   {
+    "id": "acres_11000",
+    "status": "stated",
+    "text": "Land assembled.",
+    "quote": "secured about 11,000 acres through purchase agreements",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "11000"
+    ]
+   },
+   {
+    "id": "funding",
+    "status": "stated",
+    "text": "Financing.",
+    "quote": "The developer says it has raised $20 million and is working to raise another $30 million to advance the project",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "1000000",
+     "20",
+     "30"
+    ]
+   },
+   {
+    "id": "first_app_protests",
+    "status": "stated",
+    "text": "The first application.",
+    "quote": "The water permit application started in March and collected about 3,900 protests in about a month",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": [
+     "3900"
+    ]
+   },
+   {
+    "id": "first_withdrawn",
+    "status": "stated",
+    "text": "The first application withdrawn, in a letter from Bar H Ranch's water consultant.",
+    "quote": "In light of the County’s action on Monday, we are withdrawing the current change application at this time",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "protests_wiped",
+    "status": "stated",
+    "text": "Protests on the withdrawn application no longer counted.",
+    "quote": "The company behind the data center withdrew its first application on May 5, which meant the nearly 4,000 formal protests filed against it disappeared",
+    "source": "upr",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Utah Public Radio, second water rights application and protests (May 19, 2026)",
+    "source_url": "https://www.upr.org/utah-news/2026-05-19/box-elder-data-center-protest",
+    "numbers": [
+     "4000",
+     "5"
+    ]
+   },
+   {
+    "id": "seed",
+    "status": "flagged",
+    "text": "A critic's view of the withdrawal.",
+    "quote": "likely a cynical act by the developers to nullify all of the protests that were filed",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "murray",
+    "status": "stated",
+    "text": "The second application withdrawn.",
+    "quote": "Murray Hollow L.C. filed a brief notice with the Division of Water Rights on May 22 requesting cancellation of its change application",
+    "source": "park",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Park Record (Salt Lake Tribune / Grist), Second water right application for the Utah data center project withdrawn (May 27, 2026)",
+    "source_url": "https://www.parkrecord.com/2026/05/27/second-water-right-application-for-kevin-olearys-utah-data-center-project-withdrawn/",
+    "numbers": [
+     "22"
+    ]
+   },
+   {
+    "id": "murray_700",
+    "status": "stated",
+    "text": "What protesters raised.",
+    "quote": "The application received nearly 700 letters of protest from Utahns across the state who expressed concerns about wildlife, drought and the shrinking Great Salt Lake",
+    "source": "park",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Park Record (Salt Lake Tribune / Grist), Second water right application for the Utah data center project withdrawn (May 27, 2026)",
+    "source_url": "https://www.parkrecord.com/2026/05/27/second-water-right-application-for-kevin-olearys-utah-data-center-project-withdrawn/",
+    "numbers": [
+     "700"
+    ]
+   },
+   {
+    "id": "county_vote",
+    "status": "stated",
+    "text": "County vote.",
+    "quote": "The Box Elder County Commission has voted unanimously to allow a massive data center project to move forward",
+    "source": "fox_vote",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "source_url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "numbers": []
+   },
+   {
+    "id": "res_2612",
+    "status": "stated",
+    "text": "Resolution 26-12.",
+    "quote": "which allows an \"interlocal agreement\" between Box Elder County and the Military Installation Development Authority",
+    "source": "fox_vote",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "source_url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "numbers": []
+   },
+   {
+    "id": "res_2611",
+    "status": "stated",
+    "text": "Resolution 26-11 and timeline.",
+    "quote": "resolution 26-11, gives MIDA consent to move ahead with the project, which is expected to take 10 years",
+    "source": "fox_vote",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "source_url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "numbers": [
+     "10",
+     "11",
+     "26"
+    ]
+   },
+   {
+    "id": "campus_40000",
+    "status": "stated",
+    "text": "Campus size as reported in May.",
+    "quote": "proposed data center with a 40,000-acre campus in an unincorporated area in western Box Elder County",
+    "source": "fox_vote",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "source_url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "numbers": [
+     "40000"
+    ]
+   },
+   {
+    "id": "referendum",
+    "status": "stated",
+    "text": "Residents organizing a referendum.",
+    "quote": "a group of residents are also organizing to file a referendum against one of the resolutions commissioners approved on Monday",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": [
+     "1"
+    ]
+   },
+   {
+    "id": "cottam",
+    "status": "flagged",
+    "text": "A resident's concern.",
+    "quote": "I am concerned about our water because we’re already in a water crisis",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "old_app_1900",
+    "status": "stated",
+    "text": "The earlier (withdrawn) application; superseded.",
+    "quote": "The application would change the use of 1,900 acre-feet from agricultural to industrial",
+    "source": "fox_vote",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "FOX 13, Box Elder County Commission votes to allow controversial data center (May 2026)",
+    "source_url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "numbers": [
+     "1900"
+    ]
+   },
+   {
+    "id": "concerns",
+    "status": "stated",
+    "text": "What critics raise.",
+    "quote": "The project has faced criticism for how it could affect water resources, increase taxes, and endanger wildlife",
+    "source": "upr",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Utah Public Radio, second water rights application and protests (May 19, 2026)",
+    "source_url": "https://www.upr.org/utah-news/2026-05-19/box-elder-data-center-protest",
+    "numbers": []
+   },
+   {
+    "id": "no_engineer_decision",
+    "status": "not_in_docs",
+    "text": "No document here reports a State Engineer decision on the October 2026 application.",
+    "quote": null,
+    "source": null,
+    "page": null,
+    "value": null,
+    "terms": [
+     "approved the application",
+     "granted the application",
+     "denied the application",
+     "rejected the application"
+    ],
+    "checked": [
+     "trib",
+     "fox_refile",
+     "des"
+    ],
+    "source_label": null,
+    "source_url": null,
+    "numbers": []
+   },
+   {
+    "id": "withdraw_letter",
+    "status": "stated",
+    "text": "Who wrote the first withdrawal letter, and when.",
+    "quote": "Logan Riley, a water consultant wrote to the division on Wednesday afternoon",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "bar_h_resubmit",
+    "status": "stated",
+    "text": "Bar H Ranch planned to resubmit.",
+    "quote": "Bar H. Ranch intends to resubmit in a timely manner",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "taken_back",
+    "status": "stated",
+    "text": "When the first application was taken back, per the Dispatch.",
+    "quote": "was taken back on Thursday",
+    "source": "dispatch",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Idaho Capital Sun / Utah News Dispatch, Company withdraws its bid for data center water (May 8, 2026)",
+    "source_url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "numbers": []
+   },
+   {
+    "id": "murray_no_reason",
+    "status": "stated",
+    "text": "Murray Hollow gave no reason.",
+    "quote": "The notice did not say why Murray Hollow opted to withdraw the application",
+    "source": "park",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "Park Record (Salt Lake Tribune / Grist), Second water right application for the Utah data center project withdrawn (May 27, 2026)",
+    "source_url": "https://www.parkrecord.com/2026/05/27/second-water-right-application-for-kevin-olearys-utah-data-center-project-withdrawn/",
+    "numbers": []
+   },
+   {
+    "id": "power_unsettled",
+    "status": "stated",
+    "text": "The power-generation option is not settled.",
+    "quote": "There still is a lot that O’Leary Digital needs to settle about the project, based on its application, including the actual power-generation option",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "renewables",
+    "status": "stated",
+    "text": "Other power options under consideration.",
+    "quote": "the developer also is considering renewables and other options",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": []
+   },
+   {
+    "id": "trib_date",
+    "status": "stated",
+    "text": "Date of the newest report in this pack.",
+    "quote": "Oct. 20, 2026, 6:00 a.m.",
+    "source": "trib",
+    "page": null,
+    "value": null,
+    "terms": null,
+    "checked": null,
+    "source_label": "The Salt Lake Tribune, data center again draws protests over Great Salt Lake water (Oct 20, 2026)",
+    "source_url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "numbers": [
+     "00",
+     "20",
+     "2026",
+     "6"
+    ]
+   }
+  ],
+  "conflicts": [],
+  "editor_notes": [
+   "The May 2026 applications (Bar H Ranch 1,900 acre-feet; Murray Hollow) were withdrawn and are superseded by the Oct 15, 2026 application for 1,712 acre-feet. Facts come from news reports, not the filing itself."
+  ],
+  "not_examined": [
+   "The nearly 200-page change application and its Beairsto and Loughlin engineering reports (not fetched; quoted only as the news reports quote them)",
+   "The Division of Water Rights docket and protest records",
+   "The MIDA interlocal agreement and Box Elder County resolutions 26-11 and 26-12",
+   "Any State Engineer decision after Oct 20, 2026"
+  ],
+  "warnings": [
+   "Not reviewed: The nearly 200-page change application and its Beairsto and Loughlin engineering reports (not fetched; quoted only as the news reports quote them)",
+   "Not reviewed: The Division of Water Rights docket and protest records",
+   "Not reviewed: The MIDA interlocal agreement and Box Elder County resolutions 26-11 and 26-12",
+   "Not reviewed: Any State Engineer decision after Oct 20, 2026"
+  ],
+  "files": [
+   {
+    "path": "01-index.html",
+    "url": "https://www.deseret.com/utah/2026/10/16/stratos-project-water-application-reveals-new-details-on-massive-data-center/",
+    "sha256": "352882009d91b9de6492cc025765b4495dd1d8ef4c7f0acda8459d8515fab2ea"
+   },
+   {
+    "path": "02-index.html",
+    "url": "https://www.sltrib.com/news/2026/10/20/kevin-olearys-utah-data-center/",
+    "sha256": "5bf7cde4ff7f78e1147fecb5dc6f5a8f163090c240470a65fedfab9da9188eed"
+   },
+   {
+    "path": "03-kevin-olearys-data-center-project-re-files-water-r.html",
+    "url": "https://www.fox13now.com/news/politics/kevin-olearys-data-center-project-re-files-water-rights-application",
+    "sha256": "760976b3242bf8edf116df0def0027f80cd123631bd48b980b0c98292e87e7b7"
+   },
+   {
+    "path": "04-index.html",
+    "url": "https://www.parkrecord.com/2026/05/27/second-water-right-application-for-kevin-olearys-utah-data-center-project-withdrawn/",
+    "sha256": "2f133fa8a6d9eb654919946d208e3840c905978f6287c7ae005ecabe04cee444"
+   },
+   {
+    "path": "05-index.html",
+    "url": "https://idahocapitalsun.com/2026/05/08/repub/company-withdraws-its-bid-for-data-center-water-but-not-because-its-backing-down/",
+    "sha256": "6c82eb18c8da56655d97c3e2ad1077f5cd79f7b571b396c081822be45b85f07d"
+   },
+   {
+    "path": "06-box-elder-data-center-protest.html",
+    "url": "https://www.upr.org/utah-news/2026-05-19/box-elder-data-center-protest",
+    "sha256": "0056fac9867e0b06c5c264c5bf8dc8f0a28ab1362e53faa9594e5435de4c3f0d"
+   },
+   {
+    "path": "07-box-elder-county-commission-expected-to-vote-on-co.html",
+    "url": "https://www.fox13now.com/news/local-news/box-elder-county/box-elder-county-commission-expected-to-vote-on-controversial-proposal-to-build-massive-data-center",
+    "sha256": "d3c1f53f94cc2313a9fb108ee922705024a8fb3c75b0d9a970c1f173e8a59435"
+   }
+  ],
+  "hash": "34f94313862724549292ad394e8e32081fed3c4a012fc4e920ef9ae28e55e2bd"
+ },
+ "validation": {
+  "pack": {
+   "ok": true,
+   "blocking": [],
+   "warnings": [
+    "Not reviewed: The nearly 200-page change application and its Beairsto and Loughlin engineering reports (not fetched; quoted only as the news reports quote them)",
+    "Not reviewed: The Division of Water Rights docket and protest records",
+    "Not reviewed: The MIDA interlocal agreement and Box Elder County resolutions 26-11 and 26-12",
+    "Not reviewed: Any State Engineer decision after Oct 20, 2026"
+   ]
+  },
+  "arc": {
+   "fear": {
+    "ok": true,
+    "blocking": [],
+    "warnings": [],
+    "status": "needs_qualification"
+   },
+   "anger": {
+    "ok": true,
+    "blocking": [],
+    "warnings": [],
+    "status": "needs_qualification"
+   },
+   "motivation": {
+    "ok": true,
+    "blocking": [],
+    "warnings": [],
+    "status": "supported"
+   }
+  },
+  "outline": {
+   "ok": true,
+   "blocking": [],
+   "warnings": []
+  },
+  "main": {
+   "ok": true,
+   "blocking": [],
+   "warnings": [
+    "QOL chart: this story predates the developer-vs-documents chart; its rows compare nothing."
+   ]
+  },
+  "short_a": {
+   "ok": true,
+   "blocking": [],
+   "warnings": []
+  },
+  "short_b": {
+   "ok": true,
+   "blocking": [],
+   "warnings": [],
+   "exception": false
+  },
+  "packaging": {
+   "ok": true,
+   "blocking": [],
+   "warnings": []
+  },
+  "v3": {
+   "scaffold": {
+    "dimensions": {
+     "health": [
+      "salt_wells",
+      "lake_claim",
+      "first_withdrawn",
+      "old_app_1900"
+     ],
+     "wildlife": [
+      "salt_wells",
+      "pipeline",
+      "lake_claim",
+      "murray_700",
+      "concerns"
+     ],
+     "homes": [
+      "engineer_decides",
+      "protest_period",
+      "seed",
+      "referendum",
+      "cottam"
+     ],
+     "financial": [
+      "filed_oct",
+      "salt_wells",
+      "diversion",
+      "depletion",
+      "pipeline",
+      "funding",
+      "old_app_1900"
+     ],
+     "accountability": [
+      "engineer_decides",
+      "murray",
+      "murray_no_reason"
+     ]
+    },
+    "participation": [],
+    "flagged": [
+     "lake_claim",
+     "abbott",
+     "abbott_ratio",
+     "seed",
+     "cottam"
+    ],
+    "not_in_docs": [
+     "no_engineer_decision"
+    ],
+    "conflicts": [],
+    "not_examined": [
+     "The nearly 200-page change application and its Beairsto and Loughlin engineering reports (not fetched; quoted only as the news reports quote them)",
+     "The Division of Water Rights docket and protest records",
+     "The MIDA interlocal agreement and Box Elder County resolutions 26-11 and 26-12",
+     "Any State Engineer decision after Oct 20, 2026"
+    ]
+   },
+   "scores": {
+    "spring-water-and-the-lake": {
+     "total": 90,
+     "parts": {
+      "evidence integrity": 22,
+      "backing": 25,
+      "visual power": 20,
+      "conflict clarity": 10,
+      "agency": 10,
+      "confidence": 3
+     }
+    },
+    "protests-that-stopped-counting": {
+     "total": 85,
+     "parts": {
+      "evidence integrity": 23,
+      "backing": 25,
+      "visual power": 14,
+      "conflict clarity": 10,
+      "agency": 10,
+      "confidence": 3
+     }
+    },
+    "the-review-ahead": {
+     "total": 74,
+     "parts": {
+      "evidence integrity": 25,
+      "backing": 12,
+      "visual power": 14,
+      "conflict clarity": 10,
+      "agency": 10,
+      "confidence": 3
+     }
+    }
+   },
+   "concepts": {
+    "spring-water-and-the-lake": {
+     "blocking": [],
+     "warnings": []
+    },
+    "protests-that-stopped-counting": {
+     "blocking": [],
+     "warnings": []
+    },
+    "the-review-ahead": {
+     "blocking": [],
+     "warnings": []
+    }
+   },
+   "missing_assets": [
+    {
+     "where": "Act 1 scene 1",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "where": "Act 1 scene 2",
+     "category": "place",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "where": "Act 2 scene 1",
+     "category": "place",
+     "subject": "Irrigated ranch fields in Box Elder County",
+     "search": [
+      "irrigated ranch hay field northern Utah",
+      "Box Elder County hay field irrigation"
+     ]
+    },
+    {
+     "where": "Act 3 scene 1",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "where": "Act 3 scene 3",
+     "category": "water",
+     "subject": "The Great Salt Lake shoreline",
+     "search": [
+      "Great Salt Lake shoreline",
+      "Great Salt Lake Utah aerial",
+      "Great Salt Lake north arm"
+     ]
+    },
+    {
+     "where": "Act 3 scene 4",
+     "category": "wildlife",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "search": [
+      "shorebirds Great Salt Lake",
+      "American avocets Great Salt Lake",
+      "Great Salt Lake birds wetlands"
+     ]
+    },
+    {
+     "where": "Act 4 scene 2",
+     "category": "water",
+     "subject": "The Great Salt Lake shoreline",
+     "search": [
+      "Great Salt Lake shoreline",
+      "Great Salt Lake Utah aerial",
+      "Great Salt Lake north arm"
+     ]
+    },
+    {
+     "where": "Act 5 scene 1",
+     "category": "place",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "where": "Act 5 scene 3",
+     "category": "wildlife",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "search": [
+      "shorebirds Great Salt Lake",
+      "American avocets Great Salt Lake",
+      "Great Salt Lake birds wetlands"
+     ]
+    },
+    {
+     "where": "Act 6 scene 1",
+     "category": "place",
+     "subject": "Irrigated ranch fields in Box Elder County",
+     "search": [
+      "irrigated ranch hay field northern Utah",
+      "Box Elder County hay field irrigation"
+     ]
+    },
+    {
+     "where": "Act 6 scene 2",
+     "category": "water",
+     "subject": "The Great Salt Lake shoreline",
+     "search": [
+      "Great Salt Lake shoreline",
+      "Great Salt Lake Utah aerial",
+      "Great Salt Lake north arm"
+     ]
+    },
+    {
+     "where": "Act 7 scene 2",
+     "category": "place",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "where": "Act 8 scene 1",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "where": "Short A hook",
+     "category": "water",
+     "subject": "The Great Salt Lake shoreline",
+     "search": [
+      "Great Salt Lake shoreline",
+      "Great Salt Lake Utah aerial",
+      "Great Salt Lake north arm"
+     ]
+    },
+    {
+     "where": "Short A care",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "where": "Short A conflict",
+     "category": "wildlife",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "search": [
+      "shorebirds Great Salt Lake",
+      "American avocets Great Salt Lake",
+      "Great Salt Lake birds wetlands"
+     ]
+    },
+    {
+     "where": "Short A action",
+     "category": "place",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "where": "Short B hook",
+     "category": "place",
+     "subject": "Open ranch land in the Hansel Valley, just south of I-84",
+     "search": [
+      "Hansel Valley Utah",
+      "Box Elder County ranch land Interstate 84",
+      "Snowville Utah valley"
+     ]
+    },
+    {
+     "where": "Short B care",
+     "category": "wildlife",
+     "subject": "Shorebirds on the Great Salt Lake",
+     "search": [
+      "shorebirds Great Salt Lake",
+      "American avocets Great Salt Lake",
+      "Great Salt Lake birds wetlands"
+     ]
+    },
+    {
+     "where": "Short B action",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    },
+    {
+     "where": "Thumbnail",
+     "category": "water",
+     "subject": "A spring-fed stream in a high desert valley",
+     "search": [
+      "spring-fed stream Utah high desert",
+      "Salt Wells Spring Box Elder County",
+      "irrigation ditch spring stream Utah"
+     ]
+    }
+   ],
+   "short_timing": {
+    "a": [
+     {
+      "beat": "hook",
+      "ends": 3.8
+     },
+     {
+      "beat": "care",
+      "ends": 9.2
+     },
+     {
+      "beat": "conflict",
+      "ends": 15.6
+     },
+     {
+      "beat": "evidence",
+      "ends": 21.7
+     },
+     {
+      "beat": "action",
+      "ends": 27.7
+     }
+    ],
+    "b": [
+     {
+      "beat": "hook",
+      "ends": 3.1
+     },
+     {
+      "beat": "care",
+      "ends": 8.0
+     },
+     {
+      "beat": "conflict",
+      "ends": 13.3
+     },
+     {
+      "beat": "evidence",
+      "ends": 20.6
+     },
+     {
+      "beat": "action",
+      "ends": 27.3
+     }
+    ]
+   },
+   "quality": {
+    "criteria": {
+     "attachment": 2,
+     "conflict clarity": 2,
+     "visual power": 1,
+     "progression": 2,
+     "evidence integrity": 2,
+     "resolution": 2,
+     "agency": 2
+    },
+    "total": 13,
+    "max": 14,
+    "reject": [],
+    "ok": true
+   },
+   "chapters": [
+    {
+     "t": 0,
+     "name": "Spring water in the Hansel Valley"
+    },
+    {
+     "t": 19,
+     "name": "What the application asks for"
+    },
+    {
+     "t": 57,
+     "name": "Where the water goes"
+    },
+    {
+     "t": 96,
+     "name": "Different readings of the same water"
+    },
+    {
+     "t": 129,
+     "name": "The applications that came before"
+    },
+    {
+     "t": 188,
+     "name": "Who decides"
+    },
+    {
+     "t": 203,
+     "name": "What the public can do"
+    },
+    {
+     "t": 235,
+     "name": "Where it stands"
+    }
+   ],
+   "photos": [],
+   "accountability": {
+    "map": null,
+    "leads": {
+     "names": [
+      {
+       "name": "Military Installation Development",
+       "claims": [
+        "res_2612"
+       ]
+      }
+     ],
+     "roles": {
+      "developer": [
+       "funding",
+       "seed",
+       "res_2612",
+       "renewables"
+      ],
+      "operator": [
+       "change_use",
+       "clusters"
+      ],
+      "parent": [
+       "change_use",
+       "murray"
+      ],
+      "applicant": [
+       "filed_oct",
+       "change_use",
+       "pipeline",
+       "lake_unclear",
+       "first_app_protests",
+       "first_withdrawn",
+       "protests_wiped",
+       "murray",
+       "murray_700",
+       "old_app_1900",
+       "murray_no_reason",
+       "power_unsettled"
+      ],
+      "consultant": [
+       "engineer_decides",
+       "withdraw_letter"
+      ],
+      "agency": [
+       "land",
+       "filed_oct",
+       "engineer_decides",
+       "change_use",
+       "first_withdrawn",
+       "murray",
+       "murray_700",
+       "county_vote",
+       "res_2612",
+       "campus_40000",
+       "referendum",
+       "withdraw_letter"
+      ],
+      "decision_maker": [
+       "engineer_decides",
+       "county_vote",
+       "referendum"
+      ],
+      "respondent": [
+       "no_response"
+      ]
+     }
+    },
+    "verified": false,
+    "missing": [
+     "the responsibility map"
+    ]
+   },
+   "ok": true,
+   "blocking": [],
+   "warnings": [
+    "Subject salt-wells-stream is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "Subject great-salt-lake is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "Subject hansel-valley is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "21 visual(s) need a licensed photo (Act 1 scene 1; Act 1 scene 2; Act 2 scene 1; Act 3 scene 1; Act 3 scene 3; Act 3 scene 4). For an essential subject the render stops and offers licensed candidates to choose in Media Review; any other shows its record until a photo is chosen in Visuals.",
+    "Responsibility: Accountability: this draft predates the responsibility map; who did what has not been researched.",
+    "Quality gate: visual power scores 1 of 2."
+   ]
+  },
+  "audit": {
+   "ok": false,
+   "legacy": true,
+   "checks": [
+    {
+     "id": "question",
+     "label": "The story asks one clear question",
+     "ok": false,
+     "detail": "no central question (main.question)",
+     "action": "Write the question the video answers in main.question, ending with '?', and open Act 1 on it."
+    },
+    {
+     "id": "new_info",
+     "label": "Every scene adds something new",
+     "ok": true,
+     "detail": "each scene adds a record",
+     "action": ""
+    },
+    {
+     "id": "repeated",
+     "label": "No line is said twice",
+     "ok": true,
+     "detail": "no repeated lines",
+     "action": ""
+    },
+    {
+     "id": "source_intros",
+     "label": "Tells a story, not a list of sources",
+     "ok": true,
+     "detail": "0 of 30 lines open on their source",
+     "action": ""
+    },
+    {
+     "id": "subjects",
+     "label": "Every essential subject is shown and named",
+     "ok": true,
+     "detail": "3 essential subject(s) shown",
+     "action": ""
+    },
+    {
+     "id": "conclusion",
+     "label": "The ending answers the question",
+     "ok": true,
+     "detail": "the last act answers the question",
+     "action": ""
+    },
+    {
+     "id": "runtime",
+     "label": "Fits its running time",
+     "ok": true,
+     "detail": "about 3:50 of narration",
+     "action": ""
+    },
+    {
+     "id": "fairness",
+     "label": "Opposing facts are represented",
+     "ok": true,
+     "detail": "counter-evidence is spoken",
+     "action": ""
+    },
+    {
+     "id": "currency",
+     "label": "Sources are current",
+     "ok": true,
+     "detail": "sources checked 2026-10-27T22:54:46Z",
+     "action": ""
+    },
+    {
+     "id": "brief",
+     "label": "Your brief is answered",
+     "ok": true,
+     "detail": "no brief was given",
+     "action": ""
+    }
+   ],
+   "coverage": [],
+   "blocking": [],
+   "warnings": [
+    "The story asks one clear question: no central question (main.question)"
+   ],
+   "profile": "development"
+  },
+  "narrative": {
+   "ok": true,
+   "blocking": [],
+   "warnings": [
+    "Main script: QOL chart: this story predates the developer-vs-documents chart; its rows compare nothing.",
+    "Emotional engine: Subject salt-wells-stream is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "Emotional engine: Subject great-salt-lake is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "Emotional engine: Subject hansel-valley is essential and has no licensed photo yet. The render will stop and search for one; choose it in Media Review, then render again.",
+    "Emotional engine: 21 visual(s) need a licensed photo (Act 1 scene 1; Act 1 scene 2; Act 2 scene 1; Act 3 scene 1; Act 3 scene 3; Act 3 scene 4). For an essential subject the render stops and offers licensed candidates to choose in Media Review; any other shows its record until a photo is chosen in Visuals.",
+    "Emotional engine: Responsibility: Accountability: this draft predates the responsibility map; who did what has not been researched.",
+    "Emotional engine: Quality gate: visual power scores 1 of 2.",
+    "Production audit: The story asks one clear question: no central question (main.question)"
+   ]
+  },
+  "pack_hash": "34f94313862724549292ad394e8e32081fed3c4a012fc4e920ef9ae28e55e2bd"
+ }
+}
