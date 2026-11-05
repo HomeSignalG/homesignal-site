@@ -13405,3 +13405,11 @@ huntsville-building-permits 25. All probes below via pg_net, 2026-11-05.
 **Not replaced:** huntsville-building-permits (the server fails at the
 connection, HTTP/2 framing error from pg_net and "error sending request" from the engine; same URL, so pages recover
 when it answers).
+
+**Follow-up, same day (after deploy, live refreshes of one stuck page per source):** Fairfax 20109 24 permits ·
+Chattanooga 37302 44 · Caltrans 90265 10 · Huntsville 35613 still failing, its 132 records carried forward ·
+sd-stip-structures failed with "Failed to execute query" because the entry's `out_fields` named `HwyNbr`, which layer 10
+does not have (it has `RouteNbr`); removed (pg_net 24497 without it returns rows, 24498 with it returns the same error).
+**kcmo-building-permits answers but has nothing to show:** its `recency_days` is 365 and the city's layer ends at
+2025-06-30, so ZIP 64101 now drops its old Kansas City permits. Kansas City publishes no current public permit layer
+found so far.
