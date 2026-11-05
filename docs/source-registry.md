@@ -13382,3 +13382,25 @@ records (correct), and the 53 h rotation had not revisited them. Re-firing them 
 (layers 89 and 1298). A per-host concurrency limit in the engine is the durable fix; until then re-fire Portland
 ZIPs at most 2–4 at a time. Separately, layer 89's own newest `ISSUEDATE` is 2026-10-01: the city has not
 published newer residential permits, which is not an ingest fault.
+
+## SOURCE REPLACEMENTS AFTER A NATIONAL STUCK-PAGE AUDIT (2026-11-05)
+
+**Why:** 690 of 12,744 ZIP development reports were more than 7 days old and 74 more than 30, all retried in the last
+72 h. The refresh refuses to replace stored records with nothing when a source fails, so one dead source froze each
+whole page. Blocked pages per source (`dev_refresh_source_failures`, last 72 h, pages >7 days old):
+caltrans-sb1-projects 483 · fairfax-recent-building-permits 64 · kcmo-building-permits 49 ·
+fairfax-active-site-construction 47 · sd-stip-structures 26 · chattanooga-permits-archive 26 ·
+huntsville-building-permits 25. All probes below via pg_net, 2026-11-05.
+
+| source | old answer | replacement | evidence |
+|---|---|---|---|
+| caltrans-sb1-projects | `SB1/BuildingCA_Projects` → 499 Token Required | Caltrans ArcGIS Online org `8CpMUd3fdw6aXef7` (owner DRISI.SB1), `Infrastructure_Project_Point_Prod/FeatureServer/0` | same fields (ProjectTitle, ProjectStatus, Category, CityName, ProjectID), multipoint, last edit 2026-10; ProjectStatus Completed 15,965 · In Progress 7,814 · Planned 3,840 · To be announced 4,401 (excluded by the existing `extra_where`) |
+| kcmo-building-permits | `All_BuildingPermits_2020_to_2025` → Token Required | same org, `Building_Permits_2020__to_2025_Q3/FeatureServer/0` | identical `USER_*` schema, 101,622 rows, newest `USER_Issue_Date` 2025-06-30 (a snapshot, as before) |
+| chattanooga-permits-archive | `.../FeatureServer/0` → Invalid URL | same service, layer **25** `z_permits_Chatt` | same fields, 44,289 rows |
+| sd-stip-structures | layer 0 → Layer not found | layer **10** "Local Structure Projects" | SDDOT renumbered the service; layer 0 "Structures" is gone and its 25 stored PCNs are in no current layer; layer 10 has 23 PCNs, 0 shared with wired layers 1,2,3,4,6,9 |
+| fairfax-active-site-construction | `LDS/DevelopmentTracker/FeatureServer/1` → Token Required (also the county's public proxy: 403) | `LDS/PLUSApprovedSiteRecords/FeatureServer/0` | same Accela field names incl. per-record `LINK_URL`; 132k records, newest approval 2026-11-04; polygon (centroid). It holds every approved record, not only active ones, so `recency_days: 730` on `SUBMITTED_DATE`: 1,104 records of the kept plan types in that window (Approved 584 · Revised 245 · Closed 206 · Pending Customer 66 unmapped, fail closed) |
+
+**Not replaced:** fairfax-recent-building-permits (no public Fairfax permit layer found: the county's ArcGIS Online
+search returns only the locked Development Tracker), huntsville-building-permits (the server fails at the
+connection, HTTP/2 framing error from pg_net and "error sending request" from the engine; same URL, so pages recover
+when it answers).

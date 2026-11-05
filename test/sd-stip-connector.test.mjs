@@ -36,7 +36,7 @@ try {
 const REG = JSON.parse(readFileSync(join(root, 'supabase/functions/get-address-report/jurisdiction-registry.json'), 'utf8'));
 const IDS = ['sd-stip-structures', 'sd-stip-safety-points', 'sd-stip-construction-reconstruction',
   'sd-stip-resurfacing', 'sd-stip-pavement-preservation', 'sd-stip-safety-lines', 'sd-stip-railroad-crossings'];
-const LAYER_OF = { 'sd-stip-structures': 0, 'sd-stip-safety-points': 1, 'sd-stip-construction-reconstruction': 2,
+const LAYER_OF = { 'sd-stip-structures': 10, 'sd-stip-safety-points': 1, 'sd-stip-construction-reconstruction': 2,
   'sd-stip-resurfacing': 3, 'sd-stip-pavement-preservation': 4, 'sd-stip-safety-lines': 6, 'sd-stip-railroad-crossings': 9 };
 const BASE = 'https://dotgis.sd.gov/spearfishformation/rest/services/STIP/DOT_STIP_Approved/MapServer/';
 
@@ -70,7 +70,12 @@ for (const e of ENTRIES) {
   // Houston-subset class (48/53 PCNs ⊂ L0), L7/L8/L21 are the Developmental 2030-2033
   // forecast program, L5/L20 are below threshold — all logged in _receipts.
   const wiredLayers = all.map((e) => Number(e.service_url.split('/').pop()));
-  for (const dropped of [5, 7, 8, 12, 18, 19, 20, 21]) {
+  // 2026-11-05: SDDOT renumbered the service. Layer 0 "Structures" is gone (its 25 stored PCNs are in
+  // no current layer); "Local Structure Projects" is now layer 10 and is the structures entry (0 of its
+  // 23 PCNs are in layers 1,2,3,4,6,9). Live layer list: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18.
+  // Still un-wired: 5 ADA, 7/8/17 Developmental STIP 2031-2034, 11 Local Road Projects,
+  // 12 Shared Use Paths, 18 Shoulder Improvement (13-16 are reference / "Do Not Map", checked elsewhere).
+  for (const dropped of [5, 7, 8, 11, 12, 17, 18]) {
     ok(!wiredLayers.includes(dropped), `dropped layer ${dropped} stays un-wired (receipted decision)`);
   }
 }
