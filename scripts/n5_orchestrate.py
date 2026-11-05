@@ -113,6 +113,14 @@ FINISH_START_LIMIT_S = int(os.environ.get("FINISH_START_LIMIT_S", "3000"))
 # classified them: read from the committed file every time, never transcribed (claims rule 7).
 DECLARED_NO_BOUNDARY_CSV = os.environ.get("DECLARED_NO_BOUNDARY_CSV", "").strip() or \
     os.path.join(HERE, "..", "docs", "maps-coverage", "fix4", "no-boundary-zip-classification.csv")
+# The public ZIP coverage model the page reads (lib/zip-coverage.json, built by
+# scripts/build_zip_coverage.py). A ZIP whose page_mode is not "standard" shows a coverage panel
+# INSTEAD of Map 1, so the page never draws a map for it and the browser proof cannot compare
+# one: such a ZIP is left out of the proof sample. Read from the committed file every time.
+# (2026-11-05: n5-national-2026-11-04 drew 11240, verification_pending, as its one unmeasured
+# ZIP; every proof timed out waiting for a map and the generation sat READY for 24 hours.)
+ZIP_COVERAGE_JSON = os.environ.get("ZIP_COVERAGE_JSON", "").strip() or \
+    os.path.join(HERE, "..", "lib", "zip-coverage.json")
 # How many ZIPs the browser renders under both generations. ZIPs whose membership changes
 # between the two come first (up to PROOF_CHANGED_ZIPS), then PROOF_LARGE_ZIPS of the changed
 # ones too big for that slice, then one unmeasured ZIP, then a deterministic spread of ordinary
@@ -788,9 +796,29 @@ def declared_no_boundary():
     return zips
 
 
+def coverage_limited_zips():
+    """ZIPs whose page shows the coverage panel instead of a map: every entry in the public
+    coverage model whose page_mode is not "standard" (an unknown mode counts as limited, as the
+    page treats it). An unreadable or empty model STOPS: guessing would bring the timeout back."""
+    try:
+        with open(ZIP_COVERAGE_JSON, encoding="utf-8") as f:
+            zips = json.load(f)["zips"]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise SystemExit(f"STOP: cannot read the ZIP coverage model {ZIP_COVERAGE_JSON}: {e}")
+    if not isinstance(zips, dict) or not zips:
+        raise SystemExit(f"STOP: no ZIPs in the ZIP coverage model {ZIP_COVERAGE_JSON}")
+    out = sorted(z for z, e in zips.items()
+                 if not (isinstance(e, dict) and e.get("page_mode") == "standard"))
+    if not out or not all(len(z) == 5 and z.isdigit() for z in out):
+        raise SystemExit(f"STOP: no coverage-limited ZIPs, or a malformed ZIP, in {ZIP_COVERAGE_JSON}")
+    return out
+
+
 def proof_sample(gen, base):
     """The ZIPs the browser renders under both generations: changed ones first (a few of the
-    large ones included), then one unmeasured, then a deterministic spread. Read-only."""
+    large ones included), then one unmeasured, then a deterministic spread. Read-only.
+    A ZIP whose page draws no map (coverage_limited_zips) is never sampled."""
+    limited = "array[" + ",".join(lit(z) for z in coverage_limited_zips()) + "]::text[]"
     rows = sql(f"""
 with ch as (
   select zcta5 zip from (
@@ -802,17 +830,17 @@ with ch as (
   group by zcta5),
 c as (select s.zip::text zip, 1 k, md5(s.zip || {lit(gen)}) o
         from geo.maps_zip_geography_status s join ch on ch.zip = s.zip
-       where s.generation_id = {lit(gen)} and s.membership_rows <= {PROOF_MAX_MEMBERS}
+       where s.generation_id = {lit(gen)} and s.zip::text <> all({limited}) and s.membership_rows <= {PROOF_MAX_MEMBERS}
        order by o limit {PROOF_CHANGED_ZIPS}),
 u as (select s.zip::text zip, 2 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
-       where s.generation_id = {lit(gen)} and s.status <> 'boundary_complete' order by o limit 1),
+       where s.generation_id = {lit(gen)} and s.zip::text <> all({limited}) and s.status <> 'boundary_complete' order by o limit 1),
 lg as (select s.zip::text zip, 1 k, md5(s.zip || {lit(gen)}) o
         from geo.maps_zip_geography_status s join ch on ch.zip = s.zip
-       where s.generation_id = {lit(gen)} and s.membership_rows > {PROOF_MAX_MEMBERS}
+       where s.generation_id = {lit(gen)} and s.zip::text <> all({limited}) and s.membership_rows > {PROOF_MAX_MEMBERS}
          and s.membership_rows <= {PROOF_LARGE_MAX_MEMBERS}
        order by o limit {PROOF_LARGE_ZIPS}),
 r as (select s.zip::text zip, 3 k, md5(s.zip || {lit(gen)}) o from geo.maps_zip_geography_status s
-       where s.generation_id = {lit(gen)} and s.status = 'boundary_complete'
+       where s.generation_id = {lit(gen)} and s.zip::text <> all({limited}) and s.status = 'boundary_complete'
          and s.membership_rows between 1 and {PROOF_MAX_MEMBERS}
        order by o limit {PROOF_ZIPS})
 select zip from (select distinct on (zip) zip, k, o from (select * from c union all select * from lg
