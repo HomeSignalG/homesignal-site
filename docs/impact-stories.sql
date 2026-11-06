@@ -405,6 +405,56 @@ create policy impact_media_admin_upload on storage.objects
   for insert to authenticated with check (bucket_id = 'impact-media' and public.hs_is_dashboard_admin()
     and name ~ '^[0-9a-f-]{36}/uploads/[0-9a-f-]{36}\.(jpg|png)$');
 
+-- CREATOR-DIRECTED STORIES (founder brief 2026-11-06, "Build creator-directed Impact Stories"). A story is made in one of
+-- two modes: 'jody' (JODY researches and writes it; everything above) or 'creator' (the founder supplies the script scene
+-- by scene; homesignal-ingest impact/creator.py). In creator mode the founder's words are LOCKED: research fact-checks
+-- them and FLAGS problems with a suggested replacement, but never changes them. The words change only through the
+-- founder's own revision (a row below), which travels to the engine as a Fix request of kind 'creator_script' and comes
+-- back as a new version. The one narrative approval ("Approve & Lock Script") covers the script; it is refused while a
+-- high-risk flag is open, a low-risk flag is undecided, or a revision is waiting (_hs_is_creator_state).
+alter table public.impact_stories add column if not exists creation_mode text not null default 'jody';
+alter table public.impact_stories drop constraint if exists impact_stories_creation_mode_check;
+alter table public.impact_stories add constraint impact_stories_creation_mode_check check (creation_mode in ('jody', 'creator'));
+
+-- Every version of the founder's script: the original (copied from the topic when the story is created), each revision
+-- they propose (their own edits, or a suggestion they accepted), and withdrawals. Append-only. The id comes from the
+-- same sequence as the fix requests, so a revision can be one request in a Fix batch.
+create table if not exists public.impact_story_creator_scripts (
+  id          bigint primary key default nextval('public.impact_story_media_decisions_id_seq'::regclass),
+  story_id    uuid not null references public.impact_stories(id),
+  kind        text not null check (kind in ('original', 'revision', 'withdraw')),
+  script      jsonb,
+  script_hash text check (script_hash is null or script_hash ~ '^[0-9a-f]{32}$'),
+  based_on    text,                        -- the script version this revision was made from
+  source      text check (source is null or source in ('topic', 'edit', 'accept_suggestion')),
+  note        text check (note is null or char_length(note) <= 1000),
+  withdraws   bigint references public.impact_story_creator_scripts(id),
+  actor       text not null,
+  at          timestamptz not null default now(),
+  check ((kind = 'withdraw') = (withdraws is not null)),
+  check (kind = 'withdraw' or (script is not null and script_hash is not null))
+);
+create index if not exists impact_story_creator_scripts_story on public.impact_story_creator_scripts (story_id, id);
+alter table public.impact_story_creator_scripts enable row level security;
+revoke all on public.impact_story_creator_scripts from public, anon, authenticated;
+
+-- The founder's decision on one fact-check flag of one script version: 'keep' (keep my words; low-risk flags only) or
+-- 'accept' (the suggestion went into a revision). Keyed by the engine's flag key (impact/creator.py _item_key), so a
+-- decision never carries over to a different sentence, verdict, suggestion or script version. Append-only.
+create table if not exists public.impact_story_creator_flag_decisions (
+  id          bigint generated always as identity primary key,
+  story_id    uuid not null references public.impact_stories(id),
+  script_hash text not null check (script_hash ~ '^[0-9a-f]{32}$'),
+  flag_key    text not null check (flag_key ~ '^[0-9a-f]{32}$'),
+  decision    text not null check (decision in ('keep', 'accept')),
+  note        text check (note is null or char_length(note) <= 1000),
+  actor       text not null,
+  at          timestamptz not null default now()
+);
+create index if not exists impact_story_creator_flag_decisions_story on public.impact_story_creator_flag_decisions (story_id, script_hash);
+alter table public.impact_story_creator_flag_decisions enable row level security;
+revoke all on public.impact_story_creator_flag_decisions from public, anon, authenticated;
+
 -- Append-only: approvals and events are evidence, never edited.
 create or replace function public._hs_is_append_only() returns trigger language plpgsql as $$
 begin raise exception 'impact story % rows are append-only', tg_table_name using errcode = '42501'; end $$;
@@ -438,6 +488,12 @@ create trigger impact_story_visual_events_append_only before update or delete on
 drop trigger if exists impact_story_line_notes_append_only on public.impact_story_line_notes;
 create trigger impact_story_line_notes_append_only before update or delete on public.impact_story_line_notes
   for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_creator_scripts_append_only on public.impact_story_creator_scripts;
+create trigger impact_story_creator_scripts_append_only before update or delete on public.impact_story_creator_scripts
+  for each row execute function public._hs_is_append_only();
+drop trigger if exists impact_story_creator_flag_decisions_append_only on public.impact_story_creator_flag_decisions;
+create trigger impact_story_creator_flag_decisions_append_only before update or delete on public.impact_story_creator_flag_decisions
+  for each row execute function public._hs_is_append_only();
 drop trigger if exists impact_story_media_decisions_append_only on public.impact_story_media_decisions;
 create trigger impact_story_media_decisions_append_only before update or delete on public.impact_story_media_decisions
   for each row execute function public._hs_is_append_only();
@@ -466,6 +522,94 @@ begin
   return e;
 end $$;
 
+-- ── creator-directed stories: the script contract (mirrors homesignal-ingest impact/creator.py and lib/creator-script.js) ──
+-- The script version: md5 of every scene's n, stage, stage_label, headline and narration, fields joined by U+001F and
+-- scenes by U+001E. impact/creator.py script_hash builds the same string, so the engine and the database name a version
+-- the same way.
+create or replace function public._hs_is_creator_hash(p jsonb)
+returns text language sql immutable as $$
+  select md5(coalesce(string_agg(coalesce(s->>'n', '') || chr(31) || coalesce(s->>'stage', '') || chr(31)
+           || coalesce(s->>'stage_label', '') || chr(31) || coalesce(s->>'headline', '') || chr(31) || coalesce(s->>'narration', ''),
+           chr(30) order by o), ''))
+    from jsonb_array_elements(case when jsonb_typeof(p->'scenes') = 'array' then p->'scenes' else '[]'::jsonb end) with ordinality x(s, o)
+$$;
+
+-- The contract's refusals in plain words (empty = usable). Mirrors impact/creator.py problems().
+create or replace function public._hs_is_creator_problems(p jsonb)
+returns text[] language plpgsql immutable as $$
+declare out text[] := '{}'; s jsonb; i int := 0; tot int := 0; k text; u jsonb; v text; ws text := E' \t\n\r\x0b\x0c';
+begin
+  if p is null or jsonb_typeof(p) <> 'object' then return array['the creator script is not an object']; end if;
+  if p->>'format' is distinct from 'creator-script/1' then out := out || 'the creator script''s format must be creator-script/1'::text; end if;
+  if coalesce(jsonb_typeof(p->'target_seconds'), 'null') <> 'null' and (jsonb_typeof(p->'target_seconds') <> 'number'
+     or (p->>'target_seconds') !~ '^[0-9]{1,6}$' or (p->>'target_seconds')::int not between 10 and 3600) then
+    out := out || 'the target duration must be 10 to 3600 seconds'::text;
+  end if;
+  if char_length(coalesce(p->>'raw', '')) > 200000 then out := out || 'the pasted storyboard is longer than 200000 characters'::text; end if;
+  if coalesce(jsonb_typeof(p->'scenes'), 'null') <> 'array' or jsonb_array_length(p->'scenes') = 0 then
+    return out || 'the creator script has no scenes'::text;
+  end if;
+  if jsonb_array_length(p->'scenes') > 60 then out := out || format('at most 60 scenes (has %s)', jsonb_array_length(p->'scenes')); end if;
+  for s in select x from jsonb_array_elements(p->'scenes') x loop
+    i := i + 1;
+    if jsonb_typeof(s) <> 'object' then out := out || format('Scene %s is not an object', i); continue; end if;
+    if (s->>'n') is distinct from i::text or jsonb_typeof(s->'n') <> 'number' then
+      out := out || format('Scene %s is numbered %s; scenes are numbered 1, 2, 3 ... in order', i, coalesce(s->>'n', 'nothing'));
+    end if;
+    if coalesce(s->>'stage', '') not in ('fear', 'anger', 'motivation', 'custom') then
+      out := out || format('Scene %s: the emotional stage must be fear, anger, motivation or custom', i);
+    end if;
+    if s->>'stage' = 'custom' and char_length(coalesce(s->>'stage_label', '')) not between 1 and 60 then
+      out := out || format('Scene %s: name the custom stage (1 to 60 characters)', i);
+    end if;
+    if coalesce(s->>'stage', '') <> 'custom' and coalesce(s->>'stage_label', '') <> '' then
+      out := out || format('Scene %s: only a custom stage has a name', i);
+    end if;
+    if coalesce(jsonb_typeof(s->'seconds'), 'null') <> 'null' and ((s->>'seconds') !~ '^[0-9]{1,6}$' or (s->>'seconds')::int not between 1 and 600) then
+      out := out || format('Scene %s: the duration must be 1 to 600 seconds', i);
+    end if;
+    if coalesce(btrim(s->>'narration', ws), '') = '' then out := out || format('Scene %s has no narration', i); end if;
+    if char_length(coalesce(s->>'narration', '')) > 5000 then out := out || format('Scene %s: the narration is longer than 5000 characters', i); end if;
+    if char_length(coalesce(s->>'headline', '')) > 300 then out := out || format('Scene %s: the headline is longer than 300 characters', i); end if;
+    foreach k in array array['visual', 'audio'] loop
+      if char_length(coalesce(s->>k, '')) > 2000 then out := out || format('Scene %s: the %s direction is longer than 2000 characters', i, k); end if;
+    end loop;
+    foreach k in array array['headline', 'narration', 'visual', 'audio', 'stage_label'] loop
+      if coalesce(jsonb_typeof(s->k), 'null') not in ('null', 'string') then
+        out := out || format('Scene %s: %s must be text', i, k);
+      elsif jsonb_typeof(s->k) = 'string' then
+        v := s->>k;
+        if v <> btrim(v, ws) or position(chr(13) in v) > 0 then
+          out := out || format('Scene %s: %s is not stored in its clean form (outer spaces or CR)', i, k);
+        end if;
+      end if;
+    end loop;
+    if coalesce(jsonb_typeof(s->'sources'), 'null') not in ('null', 'array') or jsonb_array_length(coalesce(nullif(s->'sources', 'null'::jsonb), '[]')) > 10 then
+      out := out || format('Scene %s: at most 10 source links', i);
+    else
+      for u in select x from jsonb_array_elements(coalesce(nullif(s->'sources', 'null'::jsonb), '[]')) x loop
+        if jsonb_typeof(u) <> 'string' or (u #>> '{}') !~* '^https?://[^\s/?#]+\.[^\s/?#]+(/\S*)?$' or char_length(u #>> '{}') > 1000 then
+          out := out || format('Scene %s: %s is not a web link', i, left(u #>> '{}', 80));
+        end if;
+      end loop;
+    end if;
+    tot := tot + char_length(coalesce(s->>'narration', ''));
+  end loop;
+  if tot > 60000 then out := out || format('the narration totals %s characters (at most 60000)', tot); end if;
+  return out;
+end $$;
+
+-- Raises the first problems in one readable message, or returns the script's version hash.
+create or replace function public._hs_is_creator_require(p jsonb)
+returns text language plpgsql immutable as $$
+declare pr text[] := public._hs_is_creator_problems(p);
+begin
+  if cardinality(pr) > 0 then
+    raise exception 'Your script cannot be saved: %', array_to_string(pr[1:5], '; ') using errcode = '22023';
+  end if;
+  return public._hs_is_creator_hash(p);
+end $$;
+
 -- The slice of a body one approval covers. Mirrors impact/rules.py::artifact_slice.
 create or replace function public._hs_is_artifact(p_body jsonb, p_artifact text)
 returns jsonb language sql immutable as $$
@@ -477,6 +621,9 @@ returns jsonb language sql immutable as $$
          || case when coalesce(p_body->'discovery', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('discovery', p_body->'discovery') else '{}'::jsonb end
          || case when coalesce(p_body->'concepts', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('concepts', p_body->'concepts') else '{}'::jsonb end
          || case when coalesce(p_body->'selection', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('selection', p_body->'selection') else '{}'::jsonb end
+         -- a creator-directed story: the founder's script and its fact-check are part of what is approved (and locked)
+         || case when coalesce(p_body->'creator_script', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('creator_script', p_body->'creator_script') else '{}'::jsonb end
+         || case when coalesce(p_body->'creator_review', 'null'::jsonb) <> 'null'::jsonb then jsonb_build_object('creator_review', p_body->'creator_review') else '{}'::jsonb end
     when 'angle' then jsonb_build_object('selected', p_body->'selected_angle',
          'card', (select a from jsonb_array_elements(coalesce(p_body->'angles', '[]'::jsonb)) a
                    where a->>'id' = p_body->>'selected_angle' limit 1))
@@ -500,7 +647,7 @@ $$;
 create or replace function public._hs_is_artifact_state(p_story uuid, p_artifact text)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; a public.impact_story_approvals%rowtype;
-        h text; chk jsonb; st text; why text;
+        h text; chk jsonb; st text; why text; cg jsonb;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
@@ -516,6 +663,11 @@ begin
     st := 'blocked'; why := 'The sources were last checked more than ' || coalesce(s.pack->>'fresh_days', '30') || ' days ago. Re-check sources.';
   else
     st := 'pending'; why := 'Ready for your decision.';
+  end if;
+  -- a creator-directed story: "Approve & Lock Script" needs every flag on the founder's words resolved and no revision waiting
+  if p_artifact = 'narrative' and st = 'pending' and s.creation_mode = 'creator' then
+    cg := public._hs_is_creator_state(p_story);
+    if not coalesce((cg->>'ok')::boolean, false) then st := 'blocked'; why := cg->>'why'; end if;
   end if;
   if a.id is not null then
     if a.decision = 'approved' and a.artifact_hash = h and st = 'pending' then st := 'approved'; why := 'Approved on version ' || a.version || '.';
@@ -679,7 +831,7 @@ create or replace function public._hs_is_status(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; j public.impact_story_jobs%rowtype;
         arts jsonb := '{}'::jsonb; k text; stage text; nxt text; lib text; all_ok boolean := true; m jsonb; vs jsonb;
-        owner text := 'you';
+        owner text := 'you'; cs jsonb;
 begin
   select * into s from public.impact_stories where id = p_story;
   select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
@@ -694,7 +846,17 @@ begin
     stage := 'outline'; lib := 'draft';
     nxt := case when v.body ? 'angles' then 'Analyze again to get the story outline' else 'Analyze story' end;
   elsif v.body->'main' is null then stage := 'outline'; nxt := 'Review the outline, then Generate story'; lib := 'needs_review';
-  elsif not all_ok then stage := 'script'; nxt := 'Review and approve the integrated narrative'; lib := 'needs_review';
+  elsif not all_ok then
+    stage := 'script'; nxt := 'Review and approve the integrated narrative'; lib := 'needs_review';
+    if s.creation_mode = 'creator' then   -- a creator-directed story: the founder's script comes first
+      cs := public._hs_is_creator_state(p_story);
+      nxt := case when cs->'pending'->>'status' = 'proposed' then 'Send your revised script with Fix'
+                  when cs->'pending'->>'status' in ('sending', 'applying') then 'Applying your revised script…'
+                  when (cs->>'high')::int > 0 or (cs->>'low_open')::int > 0 then 'Review the flags on your script'
+                  when (cs->>'ok')::boolean then 'Approve & lock your script'
+                  else 'Review your script' end;
+      if cs->'pending'->>'status' in ('sending', 'applying') then owner := 'working'; end if;
+    end if;
   else
     m := public._hs_is_media(p_story);
     vs := public._hs_is_visuals(p_story);
@@ -852,6 +1014,7 @@ begin
   return jsonb_build_object(
     'story', to_jsonb(s) - 'pack', 'pack', s.pack, 'status', public._hs_is_status(p_story), 'media', public._hs_is_media(p_story),
     'visuals', public._hs_is_visuals(p_story), 'line_notes', public._hs_is_line_notes(p_story),
+    'creator', public._hs_is_creator_state(p_story),
     'version', case when v.version is null then null else jsonb_build_object('version', v.version, 'parent', v.parent,
       'origin', v.origin, 'body', v.body, 'validation', v.validation, 'derived', v.derived,
       'checked', v.validated_pack_hash is not distinct from s.pack_hash and v.validation is not null,
@@ -1197,7 +1360,11 @@ begin
   return public._hs_is_queue(p_story, 'render', jsonb_build_object('scope', 'render|' || (na->>'hash') || '|impact-render-3|'
     || (ck->>'key') || '|' || vm.manifest_hash,
     'narrative_hash', na->>'hash', 'renderer', 'impact-render-3', 'asset_choices', ch, 'rejected_photos', ck->'rejected',
-    'visual_manifest', jsonb_build_object('hash', vm.manifest_hash, 'opts', vm.opts, 'manifest_id', vm.id)), e, p_new);
+    'visual_manifest', jsonb_build_object('hash', vm.manifest_hash, 'opts', vm.opts, 'manifest_id', vm.id))
+    -- a creator-directed story: the locked script version (also inside the narrative hash) is named on the job
+    || case when s.creation_mode = 'creator' then jsonb_build_object('creator_script_hash',
+         public._hs_is_creator_hash((select v.body->'creator_script' from public.impact_story_versions v
+                                     where v.story_id = p_story and v.version = s.current_version))) else '{}'::jsonb end, e, p_new);
 end $$;
 
 -- Gate 2: approve, reject (with what to fix, optionally at m:ss) or revoke ONE rendered file of the current set.
@@ -1765,9 +1932,184 @@ returns jsonb language sql stable security definer set search_path = public as $
      where n.story_id = p_story and n.kind <> 'withdraw') q
 $$;
 
+-- Where a creator-directed story's script stands: the version in the current draft (locked), every revision with its status
+-- (current · proposed · sending · applying · superseded · withdrawn), the fact-check flags of the current version with the
+-- founder's decisions, and whether "Approve & Lock Script" may be pressed now (ok / why). A JODY-written story returns
+-- {mode: 'jody'}. The engine's flags are read only from a validation made against the CURRENT source pack.
+create or replace function public._hs_is_creator_state(p_story uuid)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare s public.impact_stories%rowtype; v public.impact_story_versions%rowtype; cur text; val jsonb; revs jsonb; pend jsonb;
+        flags jsonb; hi int; lo int; why text; okk boolean;
+begin
+  select * into s from public.impact_stories where id = p_story;
+  if not found or s.creation_mode <> 'creator' then return jsonb_build_object('mode', 'jody'); end if;
+  select * into v from public.impact_story_versions where story_id = p_story and version = s.current_version;
+  cur := case when v.body ? 'creator_script' then public._hs_is_creator_hash(v.body->'creator_script') end;
+  val := case when v.validation is not null and v.validated_pack_hash is not distinct from s.pack_hash then v.validation->'creator' end;
+  select coalesce(jsonb_agg(r order by (r->>'id')::bigint desc), '[]'::jsonb) into revs from (
+    select jsonb_build_object('id', c.id, 'kind', c.kind, 'script_hash', c.script_hash, 'based_on', c.based_on, 'source', c.source,
+             'note', c.note, 'actor', c.actor, 'at', c.at, 'script', c.script,
+             'status', case
+               when exists (select 1 from public.impact_story_creator_scripts w where w.withdraws = c.id) then 'withdrawn'
+               when c.script_hash = cur then 'current'
+               when fb.status in ('plan_queued', 'planning', 'planned', 'queued', 'working') then 'sending'
+               when fb.status = 'done' and c.id = (select max(x.id) from public.impact_story_creator_scripts x
+                                                    where x.story_id = p_story and x.kind = 'revision') then 'applying'
+               when c.kind = 'revision' and c.id = (select max(x.id) from public.impact_story_creator_scripts x
+                                                     where x.story_id = p_story and x.kind = 'revision'
+                                                       and not exists (select 1 from public.impact_story_creator_scripts w where w.withdraws = x.id))
+                 then 'proposed'
+               else 'superseded' end,
+             'batch', case when fb.id is null then null else jsonb_build_object('id', fb.id, 'status', fb.status, 'next_step', fb.next_step,
+                        'outcome', (select o->>'outcome' from jsonb_array_elements(fb.outcomes) o where (o->>'decision_id')::bigint = c.id limit 1),
+                        'answer', (select o->>'note' from jsonb_array_elements(fb.outcomes) o where (o->>'decision_id')::bigint = c.id limit 1)) end) r
+      from public.impact_story_creator_scripts c
+      left join lateral (select b.* from public.impact_story_fix_batches b where b.story_id = p_story
+                          and b.requests @> jsonb_build_array(jsonb_build_object('id', c.id))
+                          order by b.requested_at desc limit 1) fb on true
+     where c.story_id = p_story and c.kind <> 'withdraw') q;
+  select r into pend from jsonb_array_elements(revs) r where r->>'status' in ('proposed', 'sending', 'applying') order by (r->>'id')::bigint desc limit 1;
+  select coalesce(jsonb_agg(f || jsonb_build_object(
+           'decision', (select d.decision from public.impact_story_creator_flag_decisions d where d.story_id = p_story
+                         and d.script_hash = cur and d.flag_key = f->>'key' order by d.id desc limit 1),
+           'decision_note', (select d.note from public.impact_story_creator_flag_decisions d where d.story_id = p_story
+                         and d.script_hash = cur and d.flag_key = f->>'key' order by d.id desc limit 1),
+           'in_revision', pend is not null and (f->>'field') in ('narration', 'headline') and coalesce(f->>'sentence', '') <> ''
+             and position(f->>'sentence' in coalesce((select sc->>(f->>'field') from jsonb_array_elements(pend->'script'->'scenes') sc
+                                                   where sc->>'n' = f->>'scene' limit 1), '')) = 0)
+         order by (f->>'scene')::int nulls last), '[]'::jsonb)
+    into flags from jsonb_array_elements(coalesce(val->'flags', '[]'::jsonb)) f;
+  select count(*) filter (where f->>'risk' = 'high'),
+         count(*) filter (where f->>'risk' = 'low' and f->>'decision' is null and not (f->>'in_revision')::boolean)
+    into hi, lo from jsonb_array_elements(flags) f;
+  okk := false;
+  if cur is null then why := 'The story has no copy of your script yet. Research writes it.';
+  elsif v.validation is null or v.validated_pack_hash is distinct from s.pack_hash then why := 'Your script is being fact-checked against the current sources.';
+  elsif val is null then why := 'This version carries no fact-check of your script. Ask Claude to redo it (send your script again with Fix).';
+  elsif pend is not null and pend->>'status' = 'proposed' then why := 'You proposed a revised script. Send it with Fix (or withdraw it) before you approve.';
+  elsif pend is not null then why := 'Your revised script is being applied and fact-checked. Approve the new version when it is ready.';
+  elsif hi > 0 then why := format('%s sentence%s of your script %s a high-risk problem. Accept the suggestion or edit the scene; it cannot be kept as is.',
+                              hi, case when hi = 1 then '' else 's' end, case when hi = 1 then 'has' else 'have' end);
+  elsif lo > 0 then why := format('Decide on %s flag%s: accept the suggestion, edit, or keep your words.', lo, case when lo = 1 then '' else 's' end);
+  elsif not coalesce((val->>'ok')::boolean, false) then why := coalesce('Your script: ' || (val->'blocking'->>0), 'Your script does not pass its checks.');
+  else okk := true; why := 'Your script is checked. Approving locks it for production.';
+  end if;
+  return jsonb_build_object('mode', 'creator', 'current_hash', cur, 'script', v.body->'creator_script', 'checked', val is not null,
+    'flags', flags, 'items', jsonb_array_length(coalesce(val->'items', '[]'::jsonb)), 'high', hi, 'low_open', lo,
+    'timing', coalesce(val->'timing', '[]'::jsonb), 'arc', coalesce(val->'arc', '[]'::jsonb), 'scenes', coalesce(val->'scenes', '[]'::jsonb),
+    'revisions', revs, 'pending', pend, 'ok', okk, 'why', why);
+end $$;
+
+-- Save a revised script (the founder's own edits). Becomes the one waiting revision; Fix sends it to the engine, which
+-- applies it word for word, redoes the fact-check and writes a new version.
+create or replace function public.hs_impact_story_creator_revise(p_story uuid, p_expected_version integer, p_script jsonb,
+                                                                 p_note text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; h text; st jsonb; rid bigint;
+begin
+  select * into s from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if s.creation_mode <> 'creator' then raise exception 'This story was written by JODY; it has no creator script.' using errcode = '55000'; end if;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  if s.current_version <> p_expected_version then
+    raise exception 'This story changed since you opened it (now version %). Reload first.', s.current_version using errcode = '40001';
+  end if;
+  if char_length(coalesce(p_note, '')) > 1000 then raise exception 'Keep the note under 1000 characters.' using errcode = '22023'; end if;
+  h := public._hs_is_creator_require(p_script);
+  st := public._hs_is_creator_state(p_story);
+  if h = st->>'current_hash' then raise exception 'This is the script the story has now. Change something first.' using errcode = '22023'; end if;
+  if st->'pending'->>'status' in ('sending', 'applying') then
+    raise exception 'Your last revision is being applied. Wait for the new version, then revise it.' using errcode = '55000';
+  end if;
+  if st->'pending'->>'script_hash' = h then return jsonb_build_object('unchanged', true, 'creator', st); end if;
+  insert into public.impact_story_creator_scripts (story_id, kind, script, script_hash, based_on, source, note, actor)
+  values (p_story, 'revision', p_script, h, st->>'current_hash', 'edit', nullif(btrim(p_note), ''), e) returning id into rid;
+  perform public._hs_is_event(p_story, 'creator_revision', jsonb_build_object('id', rid, 'script_hash', h, 'source', 'edit'), e);
+  return jsonb_build_object('id', rid, 'creator', public._hs_is_creator_state(p_story));
+end $$;
+
+-- The founder's answer to one flag of the current script version. 'keep' keeps their words (a low-risk flag only; a
+-- high-risk problem is never kept). 'accept' puts the suggestion into the waiting revision (or starts one from the
+-- current script): the sentence must appear exactly once in that scene's field.
+create or replace function public.hs_impact_story_creator_flag_decide(p_story uuid, p_expected_version integer, p_flag_key text,
+                                                                      p_decision text, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); s public.impact_stories%rowtype; st jsonb; f jsonb; base jsonb; based text; fld text; txt text;
+        sent text; sug text; n int; i int := 0; sc jsonb; newsc jsonb := '[]'::jsonb; h text; rid bigint; pend jsonb;
+begin
+  if p_decision not in ('keep', 'accept') then raise exception 'Choose keep or accept.' using errcode = '22023'; end if;
+  select * into s from public.impact_stories where id = p_story for update;
+  if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
+  if s.creation_mode <> 'creator' then raise exception 'This story was written by JODY; it has no creator script.' using errcode = '55000'; end if;
+  if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  if s.current_version <> p_expected_version then
+    raise exception 'This story changed since you opened it (now version %). Reload first.', s.current_version using errcode = '40001';
+  end if;
+  if char_length(coalesce(p_note, '')) > 1000 then raise exception 'Keep the note under 1000 characters.' using errcode = '22023'; end if;
+  st := public._hs_is_creator_state(p_story);
+  select x into f from jsonb_array_elements(st->'flags') x where x->>'key' = p_flag_key limit 1;
+  if f is null then raise exception 'That flag is not on the current version of your script.' using errcode = 'P0002'; end if;
+  if p_decision = 'keep' then
+    if f->>'risk' <> 'low' then
+      raise exception 'A high-risk problem cannot be kept. Accept the suggestion or edit the scene.' using errcode = '55000';
+    end if;
+    insert into public.impact_story_creator_flag_decisions (story_id, script_hash, flag_key, decision, note, actor)
+    values (p_story, st->>'current_hash', p_flag_key, 'keep', nullif(btrim(p_note), ''), e);
+    perform public._hs_is_event(p_story, 'creator_flag_kept', jsonb_build_object('flag', p_flag_key, 'scene', f->'scene'), e);
+    return jsonb_build_object('creator', public._hs_is_creator_state(p_story));
+  end if;
+  sug := f->>'suggestion'; sent := f->>'sentence'; fld := f->>'field';
+  if nullif(btrim(coalesce(sug, '')), '') is null or coalesce(sent, '') = '' or fld not in ('narration', 'headline') then
+    raise exception 'This flag has no suggestion to accept. Edit the scene yourself.' using errcode = '55000';
+  end if;
+  pend := st->'pending';
+  if pend->>'status' in ('sending', 'applying') then
+    raise exception 'Your last revision is being applied. Wait for the new version.' using errcode = '55000';
+  end if;
+  if pend->>'status' = 'proposed' then base := pend->'script'; based := pend->>'based_on';
+  else base := st->'script'; based := st->>'current_hash'; end if;
+  for sc in select x from jsonb_array_elements(base->'scenes') x loop
+    i := i + 1;
+    if sc->>'n' = f->>'scene' then
+      txt := coalesce(sc->>fld, '');
+      n := case when sent = '' then 0 else (char_length(txt) - char_length(replace(txt, sent, ''))) / char_length(sent) end;
+      if n <> 1 then
+        raise exception 'Scene % does not contain that sentence exactly once any more (your revision already changed it). Edit the scene yourself.', f->>'scene'
+          using errcode = '55000';
+      end if;
+      sc := jsonb_set(sc, array[fld], to_jsonb(btrim(replace(txt, sent, btrim(sug)))));
+    end if;
+    newsc := newsc || jsonb_build_array(sc);
+  end loop;
+  base := jsonb_set(base, '{scenes}', newsc);
+  h := public._hs_is_creator_require(base);
+  insert into public.impact_story_creator_scripts (story_id, kind, script, script_hash, based_on, source, note, actor)
+  values (p_story, 'revision', base, h, based, 'accept_suggestion',
+          left(coalesce(nullif(btrim(p_note), ''), 'Accepted the suggestion for scene ' || (f->>'scene') || '.'), 1000), e) returning id into rid;
+  insert into public.impact_story_creator_flag_decisions (story_id, script_hash, flag_key, decision, note, actor)
+  values (p_story, st->>'current_hash', p_flag_key, 'accept', nullif(btrim(p_note), ''), e);
+  perform public._hs_is_event(p_story, 'creator_revision', jsonb_build_object('id', rid, 'script_hash', h, 'source', 'accept_suggestion', 'flag', p_flag_key), e);
+  return jsonb_build_object('id', rid, 'creator', public._hs_is_creator_state(p_story));
+end $$;
+
+-- Take back the waiting revision before it is sent. The current (locked) script is unchanged.
+create or replace function public.hs_impact_story_creator_revision_withdraw(p_story uuid, p_revision bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); st jsonb; r jsonb;
+begin
+  st := public._hs_is_creator_state(p_story);
+  select x into r from jsonb_array_elements(coalesce(st->'revisions', '[]'::jsonb)) x where (x->>'id')::bigint = p_revision;
+  if r is null then raise exception 'No such revision on this story.' using errcode = 'P0002'; end if;
+  if r->>'status' <> 'proposed' then raise exception 'Only a revision you have not sent can be withdrawn (this one is %).', r->>'status' using errcode = '55000'; end if;
+  insert into public.impact_story_creator_scripts (story_id, kind, withdraws, actor) values (p_story, 'withdraw', p_revision, e);
+  perform public._hs_is_event(p_story, 'creator_revision_withdrawn', jsonb_build_object('id', p_revision), e);
+  return jsonb_build_object('creator', public._hs_is_creator_state(p_story));
+end $$;
+
 -- The fix requests a new batch would carry: rejected decisions nothing has acted on (no later approval of that file, no
 -- render since), not already in an active batch, and not already fixed by an earlier batch; plus every open note on a
--- script line (kind 'line', with the line's path and text, and whether research comes first).
+-- script line (kind 'line', with the line's path and text, and whether research comes first); plus, in a creator-directed
+-- story, the founder's waiting script revision (kind 'creator_script': the engine applies it word for word).
 create or replace function public._hs_is_fix_eligible(p_story uuid)
 returns jsonb language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(r order by (r->>'id')::bigint), '[]'::jsonb) from (
@@ -1784,7 +2126,13 @@ returns jsonb language sql stable security definer set search_path = public as $
     select jsonb_build_object('id', (l->>'id')::bigint, 'kind', 'line', 'asset', 'script', 'path', l->>'path', 'line', l->>'line',
              'note', l->>'note', 'research', (l->>'research')::boolean, 'version', (l->>'version')::int, 'at', l->>'at')
       from jsonb_array_elements(public._hs_is_line_notes(p_story)) l
-     where l->>'status' = 'open') q
+     where l->>'status' = 'open'
+    union all
+    select jsonb_build_object('id', (c->'pending'->>'id')::bigint, 'kind', 'creator_script', 'asset', 'script',
+             'script', c->'pending'->'script', 'script_hash', c->'pending'->>'script_hash', 'rev', (c->'pending'->>'id')::bigint,
+             'based_on', c->'pending'->>'based_on', 'note', coalesce(c->'pending'->>'note', 'My revised script.'), 'at', c->'pending'->>'at')
+      from (select public._hs_is_creator_state(p_story) c) x
+     where c->'pending'->>'status' = 'proposed') q
 $$;
 
 -- Save a note on one script line. p_research = true asks the fixer to look up the official documents first.
@@ -1800,6 +2148,10 @@ begin
   select * into s from public.impact_stories where id = p_story for update;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
   if s.archived_at is not null then raise exception 'This story is archived. Restore it first.' using errcode = '55000'; end if;
+  if s.creation_mode = 'creator' and p_path ~ '^main\.(.*\.)?(narration|onscreen)(\.|$)' then
+    raise exception 'These are your own words, and they are locked. Change them under Your script (Edit scene), so the change is fact-checked and versioned.'
+      using errcode = '55000';
+  end if;
   insert into public.impact_story_line_notes (story_id, version, path, line_text, kind, note, actor)
   values (p_story, s.current_version, p_path, left(p_line, 2000), case when p_research then 'research' else 'fix' end, btrim(p_note), e)
   returning id into nid;
@@ -2060,7 +2412,8 @@ begin
     'public._hs_is_fix_batch(uuid)', 'public._hs_is_fix_eligible(uuid)', 'public._hs_is_fix_dispatch(uuid, text)', 'public._hs_is_fix_checks(uuid)',
     'public._hs_is_line_notes(uuid)',
     'public._hs_is_choice_key(uuid)', 'public._hs_is_visuals(uuid)', 'public._hs_is_rejections(uuid)', 'public._hs_is_shot_decisions(bigint)',
-    'public._hs_is_shot_print(jsonb)'] loop
+    'public._hs_is_shot_print(jsonb)', 'public._hs_is_creator_hash(jsonb)', 'public._hs_is_creator_problems(jsonb)',
+    'public._hs_is_creator_require(jsonb)', 'public._hs_is_creator_state(uuid)'] loop
     execute 'revoke all on function ' || f || ' from public, anon, authenticated';
   end loop;
   foreach f in array array[
@@ -2079,7 +2432,9 @@ begin
     'public.hs_impact_story_upload_photo(uuid, text, uuid, text, text, text, boolean, boolean)',
     'public.hs_impact_story_photo_reject(uuid, bigint, text, text)', 'public.hs_impact_story_photo_restore(uuid, text)',
     'public.hs_impact_story_shot_decide(uuid, bigint, text, text, text, text, text)',
-    'public.hs_impact_story_shots_approve(uuid, bigint, text, text, _text)', 'public.hs_impact_story_photos_reject(uuid, bigint, _text, text)'] loop
+    'public.hs_impact_story_shots_approve(uuid, bigint, text, text, _text)', 'public.hs_impact_story_photos_reject(uuid, bigint, _text, text)',
+    'public.hs_impact_story_creator_revise(uuid, integer, jsonb, text)', 'public.hs_impact_story_creator_flag_decide(uuid, integer, text, text, text)',
+    'public.hs_impact_story_creator_revision_withdraw(uuid, bigint)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

@@ -6475,3 +6475,33 @@ What people say about data centers, against what documented evidence shows. SQL 
   - `verify-claim-check-media-live.yml` (daily 15:41 UTC): renders the LIVE page's own detail view, from its live script and
     CSP, for a real Bluesky post and a real YouTube video in Chromium. It fails on any preview that does not load, a player
     that does not answer, or any CSP violation.
+
+## IMPACT STORIES, TAB 17: CREATOR-DIRECTED STORIES — THE FOUNDER'S WORDS ARE LOCKED (2026-11-06) — BUILT, SQL NOT APPLIED
+
+A story is made one of two ways, chosen when it is suggested (`impact_discovery_candidates.creation_mode`, copied to
+`impact_stories.creation_mode`): **JODY writes the story** (`jody`, the default, unchanged) or **Creator provides the script**
+(`creator`). Contract `creator-script/1` (`lib/creator-script.js` here, `impact/creator.py` in homesignal-ingest; same limits, same
+hash): scenes numbered in order, each with stage fear | anger | motivation | custom (named), seconds, headline, narration, visual,
+audio, sources. Up to 60 scenes and 60,000 characters of narration; the pasted storyboard is kept in `raw`. The version hash is md5 of
+`n␟stage␟stage_label␟headline␟narration` joined by U+001E (the 14-scene EPA methane fixture → `0a716a89…`, pinned on both sides).
+- **Suggest form (Hot Topics):** a mode switch and a scene editor (`lib/acq-impact-creator.js`). It parses a pasted storyboard, lists
+  every line it could not place (nothing is dropped), lets the founder add, duplicate, move and remove scenes, shows the arc and the
+  spoken-time estimate, and saves a draft (`hs_impact_discovery_creator_script_save`, refused on a stale hash) or sends it to research.
+- **Research may challenge the script, never rewrite it.** The engine stores the script word for word in `creator_script`, ties every
+  main-video scene to it (`creator_scene`), and writes `creator_review`: one item per sentence with a verdict, risk, records and a
+  narrow suggestion. The research and fix land steps refuse any draft whose words differ from the founder's.
+- **"Your script" tab:** flags in place; Accept (puts the suggestion in a waiting revision), Edit (founder writes it), Keep my words
+  (low-risk only, with a reason). High-risk flags (unsupported, outdated, incorrect) cannot be kept. A revision is sent with Fix
+  (plan → confirm → work), applied exactly, then Analyze checks the new version. Revisions and decisions are append-only
+  (`impact_story_creator_scripts`, `impact_story_creator_flag_decisions`); the original stays in the history.
+- **"Approve & Lock Script"** is the one narrative approval; `_hs_is_creator_state` blocks it while a high-risk flag is open, a low-risk
+  flag is undecided, a revision is waiting, or the fact-check is not for the current version. The approval covers `creator_script` and
+  `creator_review` (JODY-written bodies hash as before). Line notes on locked narration/headlines are refused.
+- **Render:** the job carries `creator_script_hash`; `creator_gate` (engine) compares the TTS input per scene with the locked words
+  before any audio is made, and stops (`ScriptLocked`) on any difference. A scene is held to at least its requested seconds; narration
+  is never cut. The audio is NOT transcribed back; the manifest says so.
+- **Editorial vs factual:** in a creator story the editorial audit checks (new information, repetition, source intros, ending,
+  runtime, brief) are warnings; factual and legal checks still block.
+- ⛔ **Apply order:** merge homesignal-ingest first, then apply `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then
+  deploy the page. Not applied to production (founder: not until approved). Existing stories are `jody` and unchanged.
+- Tests: `test/creator-script.test.mjs`, `test/impact-creator.browser.test.mjs`, `test/impact_creator_pg` (`impact-creator-suite.yml`).
