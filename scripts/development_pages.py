@@ -34,6 +34,7 @@ ROLE_LABEL = {
 ENTITY_ORDER = {r: i for i, r in enumerate((
     "governing_body", "filing_receiver", "applicant", "master_developer", "buyer_under_contract",
     "landowner_of_record", "designer", "consultant"))}
+RECORD_LINKS_MAX = 12   # record pages listed on a dossier page
 DOC_KINDS = ("source_record", "water_filing", "government_record", "document", "dc_entity")
 ENTITY_GROUPS = (
     ("Developer and governing agencies", ("governing_body", "filing_receiver", "master_developer")),
@@ -168,6 +169,48 @@ def load(path, required):
                 sys.exit(f"ERROR: development dossier {key!r}: a link has no https source")
         out[key] = d
     return out
+
+
+TITLE_MAX = 64      # Google shows about 60 characters; the brand overlay swaps "HomeSignal" for a name one longer
+DESC_MAX = 155      # what a search result shows of a description
+_ABBREV = {"inc", "co", "corp", "llc", "ltd", "lp", "st", "dr", "mr", "mrs", "ms", "no", "u.s", "vs", "etc"}
+
+
+def page_title(name, where):
+    """The page title: the project's name, then where it is, then the brand. The Type pill stays on
+    the page (it is the source's word and can read oddly in a title); a title that would run past
+    TITLE_MAX drops the place and keeps the name."""
+    full = f"{name}, {where} | HomeSignal" if where else f"{name} | HomeSignal"
+    return full if len(full) <= TITLE_MAX else f"{name} | HomeSignal"
+
+
+def meta_description(text, fallback):
+    """The description search results show: whole sentences from the dossier's own summary that fit
+    in DESC_MAX, so the first facts (what, where) lead. A sentence ends at . ! or ? before a capital
+    letter, never after an abbreviation ("Inc."). One sentence too long for the limit is cut at a word
+    and ends with an ellipsis. Nothing is reworded."""
+    t = re.sub(r"\s+", " ", str(text or "")).strip()
+    if not t:
+        return fallback
+    sents, start = [], 0
+    for m in re.finditer(r"[.!?](?=\s+[A-Z\"'(])", t):
+        last = t[start:m.end()].rsplit(None, 1)[-1].rstrip(".").lower()
+        if last in _ABBREV:
+            continue
+        sents.append(t[start:m.end()].strip())
+        start = m.end()
+    if start < len(t):
+        sents.append(t[start:].strip())
+    out = ""
+    for x in sents:
+        nxt = f"{out} {x}".strip()
+        if len(nxt) > DESC_MAX:
+            break
+        out = nxt
+    if out:
+        return out
+    cut = t[:DESC_MAX - 1].rsplit(" ", 1)[0].rstrip(",;:- ")
+    return cut + "\u2026"
 
 
 def classifier_input(d):
@@ -563,24 +606,33 @@ def render(d, pages, built, head, crumb_place=None):
     kind, life = d.get("_type") or "", d.get("_lifecycle") or ""
     canon = f'{d.get("_base", "")}{d["path"]}'
     summary = _stmts(d, "summary")
-    # Title: the name and the place; the Type only when the name does not already say it.
-    title = (f"{name}" + (f" ({kind})" if kind and kind.lower() not in name.lower() else "")
-             + (f", {where_long}" if where_long else "") + " | HomeSignal")
     has = [w for w, ok in (("official records", bool(_links(d, *DOC_KINDS))),
-                           ("associated parcels", bool(_links(d, "land_assembly"))),
-                           ("developer details", any(l.get("role") == "master_developer" for l in _links(d, "organization"))),
+                           ("parcels", bool(_links(d, "land_assembly"))),
+                           ("the developer", any(l.get("role") == "master_developer" for l in _links(d, "organization"))),
                            ("water filings", bool(_links(d, "water_filing"))),
                            ("timeline", True)) if ok]
     lead = (f"{life.lower()} " if life and "unknown" not in life.lower() else "")
     auto_desc = (f"Track the {lead}{name}" + (f" in {where_long}" if where_long else "") + ": "
                  + (", ".join(has[:-1]) + " and " + has[-1] if len(has) > 1 else has[0]) + ".")
-    desc = (summary[0]["body"] if summary else auto_desc)[:300]
+    desc = meta_description(summary[0]["body"] if summary else auto_desc, auto_desc)
+    title = page_title(name, where_long)
+    if where and title == page_title(name, ""):
+        title = page_title(name, where)   # the full state name did not fit; try the short form
+    modified = str(d.get("updated_at") or "")[:10]
+    modified = modified if DAY_RE.match(modified) else ""
     # Breadcrumb: home, the county (no page of its own, so plain text and not in the structured
     # list), the development.
     crumbs = [("HomeSignal", "/"), (name, d["path"])]
-    ld = {"@context": "https://schema.org", "@type": "BreadcrumbList",
-          "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
-                               "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    crumb_ld = {"@type": "BreadcrumbList",
+                "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n,
+                                     "item": f'{d.get("_base", "")}{u}'} for i, (n, u) in enumerate(crumbs)]}
+    # The page itself. dateModified is the day the dossier's own links or statements last changed
+    # (the snapshot's updated_at), never the build day; with none on record it is left out.
+    page_ld = {"@type": "WebPage", "@id": canon, "url": canon, "name": name, "description": desc,
+               "inLanguage": "en-US"}
+    if modified:
+        page_ld["dateModified"] = modified
+    ld = {"@context": "https://schema.org", "@graph": [crumb_ld, page_ld]}
     crumb_nav = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="/">HomeSignal</a> › '
                  + (f'<span>{esc(where)}</span> › ' if where else "")
                  + f'<span aria-current="page">{esc(name)}</span></nav>')
@@ -615,10 +667,12 @@ def render(d, pages, built, head, crumb_place=None):
             z = x.get("zip")
             if z in pages:
                 land.append(f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+                            f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a>'
                             f' <span class="small">{esc(x.get("parcels"))} associated parcel'
                             f'{"" if x.get("parcels") == 1 else "s"}</span></li>')
     other = [z for z in zips if not any(f"/map/{z}/" in s for s in land)]
-    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a></li>' for z in other]
+    land += [f'<li><a href="/map/{esc(z)}/">ZIP {esc(z)} ({esc(pages[z]["name"])}) on the map</a>'
+             f' · <a href="/community/{esc(z)}/">ZIP {esc(z)} page</a></li>' for z in other]
     map_inner = (f'<ul class="plain">{"".join(land)}</ul><p class="small">Associated land is land the linked records '
                  f'tie to this project. It is not a confirmed project footprint unless an approved site plan says so.</p>'
                  if land else "")
@@ -700,6 +754,9 @@ def render(d, pages, built, head, crumb_place=None):
         cov = ('<div class="jody"><p class="small">HomeSignal\'s own explainers. They are editorial, not government '
                'records, and are listed only after they are public.</p>' + cov + '</div>')
 
+    recs = "".join(f'<li><a href="{esc(u)}">{esc(prose(n))}</a></li>' for n, u in (d.get("_records") or []))
+    recs = (f'<ul class="plain">{recs}</ul><p class="small">The record pages on this site for the filings linked '
+            f'above. Each opens the agency\'s own record.</p>') if recs else ""
     nxt = _stmt_list(_stmts(d, "next"), "dnext") + _protest_deadlines(d)
     # Each part: id, heading, content, and what to say when it is empty (None: say nothing).
     parts = [
@@ -709,6 +766,7 @@ def render(d, pages, built, head, crumb_place=None):
         ("next", "What's next", nxt, "No upcoming hearing or deadline confirmed in the sources HomeSignal tracks."),
         ("entities", "Entities", orgs, None),
         ("documents", "Official documents", f'<ul class="cards">{docs}</ul>' if docs else "", None),
+        ("records", "Related record pages", recs, None),
         ("timeline", "Timeline", _timeline(d), None),
         ("map", "Associated land and parcel maps", map_inner, None),
         ("coverage", "HomeSignal coverage", cov, None),
@@ -728,11 +786,9 @@ def render(d, pages, built, head, crumb_place=None):
         + "".join(_section(i, t, inner) for i, t, inner, _ in shown)
         + gaps
         + '<footer class="method"><p class="small">Every fact on this page links to its source. A link is shown only '
-          'after a HomeSignal reviewer checked it against the source. Page compiled '
-          f'<time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
-        + (f'<p class="small">Last change to the reviewed records on this page: '
-           f'<time datetime="{esc(str(d.get("updated_at"))[:10])}">{esc(day(d.get("updated_at")))}</time>.</p>'
-           if day(d.get("updated_at")) else "")
+          'after a HomeSignal reviewer checked it against the source. '
+          + (f'Last updated <time datetime="{esc(modified)}">{esc(day(modified))}</time>. ' if modified else "")
+          + f'Page compiled <time datetime="{esc(built)}">{BUILT_HUMAN}</time>.</p>'
         + "".join(f'<p class="small">Status of {esc(prose(_filing_name(l.get("facts") or {})))} last checked with the state: '
                   f'<time datetime="{esc(str(c)[:10])}">{esc(day(c))}</time>.</p>'
                   for l in _links(d, "water_filing")
@@ -758,10 +814,14 @@ def link_pages(dossiers, pages, projects):
         for z in zips_of(d):
             if z in pages:
                 pages[z].setdefault("dossiers", []).append((d["display_name"], d["path"]))
+        seen = set()
         for l in _links(d, "source_record"):
             pr = projects.get(l.get("ref"))
             if pr is not None:
                 pr.setdefault("part_of", []).append((d["display_name"], d["path"]))
+                if pr["path"] not in seen and len(seen) < RECORD_LINKS_MAX:
+                    seen.add(pr["path"])
+                    d.setdefault("_records", []).append((pr["title"], pr["path"]))
 
 
 LAND_INDEX_SCHEMA = "development-land-index/1"

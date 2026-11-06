@@ -5931,8 +5931,8 @@ official records so you do not miss things like change and amendments"*. SQL of 
     carries its source. A reviewer `summary` statement replaces it.
   - **No contradictory gaps:** an open protest window is listed under What's next (`_protest_deadlines`), and the gap list is
     one line per gap, only for "What changed" and "What's next" (and a missing summary).
-  - **Title** "<name>[ (<Type>)], <County>, <State name> | HomeSignal" (the Type only when the name does not say it); the
-    description lists what the page holds.
+  - **Title** `page_title` (#2644, 64 characters at most, no Type word): "<name>, <County>, <State name> | HomeSignal",
+    else the two-letter state, else the name alone. With no reviewer summary, the description lists what the page holds.
   - **Source citations have no `nofollow`** (`_src`); the Follow and protest-form actions keep it.
   - **Timeline is events:** a water filing and the same-day documents naming its number are one event with each document
     as a source; news is labelled "Reported" / "News report".
