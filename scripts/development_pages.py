@@ -608,8 +608,7 @@ def _derived_summary(d, name, kind, life, where):
                                  l.get("evidence_url"), l.get("evidence_label")))
     if not out:
         return ""
-    return (f'<ul class="dsum">{"".join(out)}</ul><p class="small">Summary assembled by HomeSignal from the reviewed '
-            f'records on this page. Each sentence links to its source.</p>')
+    return f'<ul class="dsum">{"".join(out)}</ul>'
 
 
 def _post_text(s):
