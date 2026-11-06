@@ -6522,3 +6522,24 @@ detected); the overview, nominations and the research claim send `story_type`, `
 - Engine half and the How-To Short rules: homesignal-ingest CLAUDE.md "STORY TYPES AND THE HOW-TO SHORT".
 - Either apply order is safe (the engine treats a missing type as investigative; the page shows no control without it).
 - Tests: `test/impact_discovery_pg` 19a-19m, `test/impact-participation.browser.test.mjs` (fixture exported from the engine).
+
+## IMPACT STORIES, TAB 17: ANOTHER VIDEO FROM THE SAME VERIFIED RESEARCH (2026-11-06)
+
+One researched event can carry several videos of different story types (the type is the section above; this adds no
+second classifier). Engine half: homesignal-ingest `impact/deliverables.py` (CLAUDE.md "ONE VERIFIED RESEARCH PACK,
+SEVERAL VIDEOS"): a new video is its own pack `<base>--<video>` that reuses chosen claims byte for byte, re-checked on
+every build, and at most 25% of its narration may repeat the original's.
+- **Button:** a story whose research is checked shows "Create another video from this research" (`researchPanel` in
+  `lib/acq-impact-stories.js`): story type (required), title, note, links → `hs_impact_story_another_video(story, video)`.
+  It files a founder topic with `reuse_story_id` = the original's root, `story_type` as chosen, and starts research. It
+  refuses: research not checked, no type, a video of that type already in the library, or one already being researched.
+- **Columns:** `impact_stories.research_of` (the original); `impact_discovery_candidates.reuse_story_id` (asked) and
+  `reused_from` (the base pack research actually used, validated as `<base>` of a `<base>--<video>` slug). The claim
+  payload carries `reuse_slug`, so research builds on that pack first.
+- **Library:** cards show the type, the deadline the draft quotes from a record (`discovery.action.deadline.date`, via
+  `_hs_is_record_deadline`), and "Shares verified research with …"; a deadline within 21 days sorts first. Never a
+  deadline that is not in a record.
+- `_hs_is_story_type` reads the draft's type, else `_hs_id_story_type` on the topic through dynamic SQL, so
+  impact-stories.sql still applies on a database without impact-discovery.sql.
+- **Apply order:** merge homesignal-ingest first, then `docs/impact-stories.sql`, then `docs/impact-discovery.sql`, then the page.
+- Tests: `test/impact_discovery_pg` §20 (20a-20o), `test/impact-stories-another-video.browser.test.mjs`, `test/impact-stories.test.mjs`.

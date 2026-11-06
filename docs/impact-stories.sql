@@ -63,6 +63,14 @@ alter table public.impact_stories add column if not exists origin text not null 
 alter table public.impact_stories add column if not exists discovery_candidate_id uuid;
 alter table public.impact_stories drop constraint if exists impact_stories_origin_check;
 alter table public.impact_stories add constraint impact_stories_origin_check check (origin in ('manual', 'auto_discovery'));
+-- One verified research pack, several videos (founder, 2026-11-06). A story whose source pack is `<base>--<video>` reuses
+-- the verified claims of the story whose pack is `<base>` (homesignal-ingest impact/deliverables.py re-checks the reuse on
+-- every build). `research_of` names that ORIGINAL story; the original is never changed by a video built on its research.
+-- What each video is FOR is its story type (the draft's discovery.story_type), never a column here. Additive.
+alter table public.impact_stories add column if not exists research_of uuid references public.impact_stories(id);
+alter table public.impact_stories drop constraint if exists impact_stories_research_of_check;
+alter table public.impact_stories add constraint impact_stories_research_of_check check (research_of is null or research_of <> id);
+create index if not exists impact_stories_research_of on public.impact_stories (research_of) where research_of is not null;
 
 create table if not exists public.impact_story_versions (
   story_id     uuid not null references public.impact_stories(id),
@@ -991,6 +999,39 @@ begin
                      from public.youtube_video_reviews r), '[]'::jsonb);
 end $$;
 
+-- A story's type: what its current draft declares (discovery.story_type, the engine's one record of it), else what its
+-- topic resolved to (impact-discovery.sql _hs_id_story_type, read at run time), else investigative (every story written
+-- before story types existed).
+create or replace function public._hs_is_story_type(p_story uuid)
+returns text language plpgsql stable security definer set search_path = public as $$
+declare t text;
+begin
+  select v.body->'discovery'->>'story_type' into t from public.impact_stories s
+    join public.impact_story_versions v on v.story_id = s.id and v.version = s.current_version where s.id = p_story;
+  if t in ('investigative', 'public_policy', 'participation') then return t; end if;
+  begin   -- the topic's resolved type, when impact-discovery.sql is applied (it is applied after this file)
+    execute 'select public._hs_id_story_type(c.story_type, c.title, c.submitted_note)
+               from public.impact_discovery_candidates c where c.story_id = $1 limit 1' into t using p_story;
+  exception when undefined_table or undefined_function or undefined_column then t := null;
+  end;
+  if t in ('investigative', 'public_policy', 'participation') then return t; end if;
+  return 'investigative';
+end $$;
+
+-- A participation story's deadline, as its draft states it from a cited record (discovery.action.deadline.date, checked by
+-- homesignal-ingest impact/participation.py). Null for any other story, or when the draft does not state one.
+create or replace function public._hs_is_record_deadline(p_story uuid)
+returns date language plpgsql stable security definer set search_path = public as $$
+declare d text;
+begin
+  if public._hs_is_story_type(p_story) <> 'participation' then return null; end if;
+  select v.body->'discovery'->'action'->'deadline'->>'date' into d from public.impact_stories s
+    join public.impact_story_versions v on v.story_id = s.id and v.version = s.current_version where s.id = p_story;
+  if d is null or d !~ '^\d{4}-\d{2}-\d{2}$' then return null; end if;
+  return d::date;
+exception when others then return null;
+end $$;
+
 create or replace function public.hs_impact_story_list()
 returns jsonb language plpgsql stable security definer set search_path = public as $$
 begin
@@ -999,9 +1040,27 @@ begin
       'id', s.id, 'title', s.title, 'place', s.place, 'video_slug', s.video_slug, 'primary_emotion', s.primary_emotion,
       'current_version', s.current_version, 'updated_at', s.updated_at, 'archived', s.archived_at is not null,
       'verified_at', s.pack->>'verified_at', 'status', public._hs_is_status(s.id),
-      'origin', s.origin, 'discovery_candidate_id', s.discovery_candidate_id) order by s.updated_at desc)
-    from public.impact_stories s), '[]'::jsonb);
+      'origin', s.origin, 'discovery_candidate_id', s.discovery_candidate_id,
+      'story_type', x.story_type, 'deadline', x.deadline, 'research_of', s.research_of,
+      'research_title', (select r.title from public.impact_stories r where r.id = s.research_of))
+      -- a participation story whose record-stated deadline is in the next 21 days comes first (founder, 2026-11-06)
+      order by case when s.archived_at is null and x.deadline between current_date and current_date + 21 then x.deadline end nulls last,
+               s.updated_at desc)
+    from public.impact_stories s
+    cross join lateral (select public._hs_is_story_type(s.id) story_type, public._hs_is_record_deadline(s.id) deadline) x), '[]'::jsonb);
 end $$;
+
+-- The videos that share one verified research pack: the original story and every story built on it, each with its type.
+create or replace function public._hs_is_research_videos(p_story uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  with root as (select coalesce(s.research_of, s.id) id from public.impact_stories s where s.id = p_story)
+  select coalesce(jsonb_agg(jsonb_build_object('id', s.id, 'title', s.title, 'video_slug', s.video_slug,
+           'story_type', public._hs_is_story_type(s.id), 'deadline', public._hs_is_record_deadline(s.id),
+           'original', s.research_of is null, 'archived', s.archived_at is not null, 'current', s.id = p_story,
+           'next', public._hs_is_status(s.id)->>'next')
+           order by (s.research_of is null) desc, s.created_at), '[]'::jsonb)
+    from public.impact_stories s, root where s.id = root.id or s.research_of = root.id
+$$;
 
 create or replace function public.hs_impact_story_get(p_story uuid)
 returns jsonb language plpgsql stable security definer set search_path = public as $$
@@ -1014,6 +1073,8 @@ begin
   return jsonb_build_object(
     'story', to_jsonb(s) - 'pack', 'pack', s.pack, 'status', public._hs_is_status(p_story), 'media', public._hs_is_media(p_story),
     'visuals', public._hs_is_visuals(p_story), 'line_notes', public._hs_is_line_notes(p_story),
+    -- every video built on the same verified research (the original first), each with its own type and status
+    'research_videos', public._hs_is_research_videos(p_story),
     'creator', public._hs_is_creator_state(p_story),
     'version', case when v.version is null then null else jsonb_build_object('version', v.version, 'parent', v.parent,
       'origin', v.origin, 'body', v.body, 'validation', v.validation, 'derived', v.derived,
@@ -1058,8 +1119,8 @@ declare e text := public._hs_is_admin(); o public.impact_stories%rowtype; s publ
 begin
   select * into o from public.impact_stories where id = p_story;
   if not found then raise exception 'no such story' using errcode = 'P0002'; end if;
-  insert into public.impact_stories (video_slug, title, place, duplicated_from, created_by)
-  values (o.video_slug, left('Copy of ' || o.title, 200), o.place, o.id, e) returning * into s;
+  insert into public.impact_stories (video_slug, title, place, duplicated_from, created_by, research_of)
+  values (o.video_slug, left('Copy of ' || o.title, 200), o.place, o.id, e, o.research_of) returning * into s;
   perform public._hs_is_event(s.id, 'duplicated', jsonb_build_object('from', o.id), e);
   return jsonb_build_object('story_id', s.id, 'job', public._hs_is_queue(s.id, 'pack', '{}'::jsonb, e));
 end $$;
@@ -2405,6 +2466,7 @@ begin
   foreach f in array array[
     'public._hs_is_admin()', 'public._hs_is_artifact(jsonb, text)', 'public._hs_is_hash(jsonb, text)',
     'public._hs_is_fresh(public.impact_stories)', 'public._hs_is_artifact_state(uuid, text)', 'public._hs_is_status(uuid)',
+    'public._hs_is_story_type(uuid)', 'public._hs_is_record_deadline(uuid)', 'public._hs_is_research_videos(uuid)',
     'public._hs_is_event(uuid, text, jsonb, text)', 'public._hs_is_dispatch(uuid)', 'public._hs_is_queue(uuid, text, jsonb, text, boolean)',
     'public._hs_is_retry(uuid, text)', 'public._hs_is_followup(uuid, text)', 'public._hs_is_append_only()', 'public._hs_is_version_guard()',
     'public._hs_is_stuck_after(text)', 'public._hs_is_media(uuid)', 'public._hs_is_not_started(public.impact_story_jobs)',
