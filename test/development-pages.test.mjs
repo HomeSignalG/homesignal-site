@@ -28,101 +28,7 @@ const PLANE = JSON.parse(readFileSync(join(FIXDIR, 'development_seo_plane.json')
 let pass = 0, fail = 0;
 const ok = (c, m, d = '') => { if (c) { pass++; console.log('PASS —', m); } else { fail++; console.error('FAIL —', m, d); } };
 
-const SITEMAP = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://jodytracks.com/</loc>
-  </url>
-</urlset>
-`;
-const PKEY = 'arcgis:town-permits:BLD-2026-0001|1';
-const W = 'https://water.example.gov/change/x123';
-
-function dossiers() {
-  return {
-    schema: 'development-dossiers/1', generated_at: '2026-10-29T00:00:00Z',
-    dossiers: {
-      'valley-campus': {
-        project_key: 'valley-campus', state: 'MA', path: '/development/ma/valley-campus/',
-        display_name: 'Valley data center <campus>', name_source: 'resolved_project', name_basis: 'descriptive',
-        defining: { kind: 'dc_entity', role: 'defining_record', evidence_url: 'https://atlas.example.org/dc/1',
-                    evidence_label: 'Data-center listing', facts: { classification: 'CONFIRMED_DC' } },
-        links: [
-          { kind: 'dc_entity', ref: 'fe2068de-0000-4000-8000-000000000001', role: 'defining_record', grade: 'a',
-            evidence_url: 'https://atlas.example.org/dc/1', evidence_label: 'Data-center listing', text: 'Valley campus (atlas record dc-1; status proposed)',
-            facts: { classification: 'CONFIRMED_DC' } },
-          { kind: 'land_assembly', ref: 'valley-campus', role: 'associated_land', grade: 'a', evidence_url: 'https://county.example.gov/parcels',
-            facts: { display_name: 'Valley data center <campus>', display_name_basis: 'descriptive',
-                     zips: [{ zip: '01002', parcels: 12, primary: true }, { zip: '01003', parcels: 1, primary: false }] } },
-          { kind: 'water_filing', ref: 'ut_dwr:x123', role: 'water_change_application', grade: 'a', evidence_url: W,
-            evidence_label: 'Change record x123', date: null,
-            facts: { filing_no: 'x123', filing_type: 'Permanent change application', status: 'Unapproved',
-                     filed_on: '2026-10-15', date_label: 'Priority date', record_url: W, points: 2 } },
-          { kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'landowner_of_record', grade: 'a', evidence_url: W,
-            evidence_label: 'Change record x123', text: 'Owner of the water right being changed, filed 2026-10-15', facts: {} },
-          { kind: 'government_record', ref: 'https://board.example.gov/agenda/9', role: 'agenda_item', grade: 'a',
-            evidence_url: 'https://board.example.gov/agenda/9', evidence_label: 'Board agenda', text: 'Board agenda item 9',
-            date: '2026-07-15', date_label: 'On agenda', aspect: 'Approvals', facts: {} },
-          { kind: 'youtube_video', ref: 'youtube:q-phnTGrMRQ', role: 'explains', grade: 'a',
-            evidence_url: 'https://www.youtube.com/watch?v=q-phnTGrMRQ',
-            facts: { title: 'What the water filing says', url: 'https://www.youtube.com/watch?v=q-phnTGrMRQ', kind: 'main' } },
-          { kind: 'youtube_video', ref: 'youtube:shortAAAAAA', role: 'explains', grade: 'a',
-            evidence_url: 'https://www.youtube.com/shorts/shortAAAAAA',
-            facts: { title: 'The filing in 40 seconds #Shorts #jodytracks', url: 'https://www.youtube.com/shorts/shortAAAAAA', kind: 'short' } },
-          { kind: 'bluesky_post', ref: 'bsky:at://did:plc:x/app.bsky.feed.post/aaa', role: 'explains', grade: 'a',
-            evidence_url: 'https://bsky.app/profile/x/post/aaa',
-            facts: { text: 'A filing to move ranch water to a data center', published_at: '2026-10-29T15:00:00Z' } },
-        ],
-        statements: [
-          { kind: 'summary', body: 'A data center campus proposed for ranch land.', evidence_url: W, evidence_label: 'Change record x123' },
-          { kind: 'unknown', body: 'Whether the board adopted the agenda item.' },
-          { kind: 'next', body: 'No hearing has been scheduled on the filing.', checked_on: '2026-10-28' },
-        ],
-        withheld: [{ kind: 'youtube_video', ref: 'youtube:privateAAAA' }], updated_at: '2026-10-29T10:00:00Z',
-      },
-      'olympia-mixed-use': {
-        project_key: 'olympia-mixed-use', state: 'MA', path: '/development/ma/olympia-mixed-use/',
-        display_name: 'Olympia mixed-use building', name_source: 'project', name_basis: null,
-        defining: { kind: 'source_record', ref: PKEY, role: 'defining_record', evidence_url: 'https://permits.example.gov/r/1',
-                    evidence_label: 'Permit BLD-2026-0001',
-                    facts: { name: 'Olympia Apartments', type: 'Residential', status: 'Approved', zips: ['01002'] } },
-        links: [
-          { kind: 'source_record', ref: PKEY, role: 'defining_record', grade: 'a', evidence_url: 'https://permits.example.gov/r/1',
-            evidence_label: 'Permit BLD-2026-0001', date: '2026-09-01', date_label: 'Filed',
-            facts: { name: 'Olympia Apartments', type: 'Residential', status: 'Approved', zips: ['01002'] } },
-        ],
-        statements: [{ kind: 'summary', body: 'A four-story apartment building.', evidence_url: 'https://permits.example.gov/r/1' }],
-        withheld: [], updated_at: '2026-10-20T00:00:00Z',
-      },
-    },
-  };
-}
-
-function inputs() {
-  const { cities, ...zipPlane } = JSON.parse(JSON.stringify(PLANE));
-  return {
-    zipPlane,
-    cities: { version: '1.0.0', identity: zipPlane.identity, generated_at: zipPlane.generated_at, cities },
-    projects: { version: '1.0.0', identity: zipPlane.identity, generated_at: zipPlane.generated_at, scope: 'featured',
-      projects: { [PKEY]: { registry_id: 'town-permits', case: 'BLD-2026-0001', name: 'Olympia Apartments', type: 'Residential',
-        status: 'Approved', source_url: 'https://permits.example.gov/r/1', zips: ['01002'], date: '2026-09-01', date_kind: 'filed' } } },
-  };
-}
-
-function build(dv, { now = '2026-10-29T00:00:00' } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'devfix-'));
-  const inp = inputs();
-  writeFileSync(join(dir, 'zip-pages.json'), ZIPS);
-  writeFileSync(join(dir, 'development_seo_plane.json'), JSON.stringify(inp.zipPlane));
-  writeFileSync(join(dir, 'development_seo_cities.json'), JSON.stringify(inp.cities));
-  writeFileSync(join(dir, 'development_seo_projects.json'), JSON.stringify(inp.projects));
-  if (dv !== undefined) writeFileSync(join(dir, 'development_dossiers.json'), typeof dv === 'string' ? dv : JSON.stringify(dv));
-  const out = mkdtempSync(join(tmpdir(), 'dev-'));
-  writeFileSync(join(out, 'sitemap.xml'), SITEMAP);
-  const r = spawnSync('python3', [GEN, '--fixture', join(dir, 'zip-pages.json'), '--out', out, '--now', now], { encoding: 'utf8' });
-  return { r, out };
-}
-const read = (out, p) => readFileSync(join(out, ...p.split('/').filter(Boolean), 'index.html'), 'utf8');
+import { SITEMAP, PKEY, W, dossiers, inputs, build, read } from './lib/development-pages-fixture.mjs';
 
 const { r, out } = build(dossiers());
 ok(r.status === 0, 'the build succeeds', (r.stderr || '').slice(-600));
@@ -179,7 +85,7 @@ ok(vMap && vMap.length === 4 && JSON.stringify(vMap) === JSON.stringify(vDos),
 // 3. facts and their sources in the raw HTML
 ok(pa.includes('Permanent change application x123') && pa.includes(`href="${W}"`), 'the water filing and its record');
 ok(pa.includes('<p class="t">Example Ranch, Inc.</p><p><strong>Landowner of record</strong>'), 'the entity and its role');
-ok(pa.includes('<h2 id="h-entities">Entities</h2>') && !/Organizations/.test(pa), 'the section is called Entities');
+ok(pa.includes('<h2 id="h-entities">Organizations &amp; People</h2>'), 'the entities tile is called Organizations & People');
 // one card per entity: a second role for the same entity sits under the same name
 const two = dossiers();
 two.dossiers['valley-campus'].links.push({ kind: 'organization', ref: 'MA:Example Ranch, Inc.', role: 'applicant', grade: 'b', evidence_url: W,
@@ -257,7 +163,7 @@ const withProtest = (end, form = PF) => {
 const pOpen = read(build(withProtest('2026-12-01')).out, A);
 ok(pOpen.includes('<p class="t">Protest period open until Dec 1, 2026</p>') && pOpen.includes(`<a class="btn" href="${PF}"`)
    && pOpen.includes(`href="${PH}"`) && pOpen.includes('lists it as protested'), 'an open protest window shows the agency\'s form');
-ok(pOpen.indexOf('class="protest"') < pOpen.indexOf('<nav class="toc"'), 'the protest box sits in the page header');
+ok(pOpen.indexOf('class="protest"') > 0 && pOpen.indexOf('class="protest"') < pOpen.indexOf('<section class="tile"'), 'the protest box sits in the page header, above the tiles');
 ok(read(build(withProtest('2026-12-01'), { now: '2026-12-01T20:00:00' }).out, A).includes(`href="${PF}"`), 'the last day still shows it');
 ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="protest"'), 'a closed window shows no form');
 ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="due"'), 'a closed window leaves the timeline too');
@@ -316,7 +222,7 @@ ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no bo
      'it counts the associated land without calling it a footprint');
   ok(!pg.includes('No HomeSignal summary published') && !/upcoming hearing or deadline/.test(pg),
      'no gap line contradicts the summary or the open protest window');
-  ok(/<section id="next"[^>]*>.*Dec 1, 2026<\/strong>: protest period ends for Permanent change application x123/.test(pg),
+  ok(/<div class="tb" id="next">.*Dec 1, 2026<\/strong>: protest period ends for Permanent change application x123/.test(pg),
      'the protest deadline is listed under What\'s next');
   const tl = (pg.match(/<ol class="timeline">.*?<\/ol>/) || [''])[0];
   const oct15 = tl.split('<li>').filter((li) => li.includes('datetime="2026-10-15"'));
@@ -334,12 +240,12 @@ ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no bo
   ok(tl.indexOf('datetime="2026-12-01"') < tl.indexOf('datetime="2026-10-15"'), 'the deadline sits at the top (newest first)');
   ok(pg.includes('An upcoming deadline is marked and sits at the top.'), 'the timeline intro says a deadline is listed');
   ok(/<span>Reported<\/span>.*?<span class="chip">News report<\/span>/.test(tl), 'a news report is marked as reporting');
-  const ents = (pg.match(/<section id="entities".*?<\/section>/) || [''])[0];
+  const ents = (pg.match(/<div class="tb" id="entities">.*?<\/details>/) || [''])[0];
   ok(ents.indexOf('<h3>Developer and governing agencies</h3>') >= 0
      && ents.indexOf('<h3>Developer and governing agencies</h3>') < ents.indexOf('<h3>Applicants, buyers and landowners</h3>')
      && ents.indexOf('<h3>Applicants, buyers and landowners</h3>') < ents.indexOf('<h3>Consultants and designers</h3>'),
      'entities are grouped: decision-makers, then applicants and owners, then consultants');
-  ok(pg.includes('<h2 id="h-map">Associated land and parcel maps</h2>') && !pg.includes('Map &amp; land'), 'the land section says what it holds');
+  ok(pg.includes('<h2 id="h-map">Land &amp; Maps</h2>') && pg.includes('Associated parcels and links to the ZIP maps'), 'the land tile says what it holds');
   const main = pg.slice(pg.indexOf('<main'), pg.indexOf('</main>'));
   const cites = [...main.matchAll(/<a href="https:\/\/[^"]+" rel="([^"]+)"/g)].map((m) => m[1]);
   ok(cites.length > 10 && cites.every((r) => r === 'noopener'), 'source citations carry no nofollow', JSON.stringify(cites));
@@ -431,7 +337,7 @@ ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
   ok(!('dateModified' in wp(nd)) && !nd.includes('Last updated <time'), 'with no change date on record, none is claimed');
   ok(/href="\/community\/01002\/">ZIP 01002 page<\/a>/.test(pa) && /href="\/community\/01003\/">ZIP 01003 page<\/a>/.test(pa),
      'each ZIP in Map & land links to its ZIP page as well as its map page');
-  const recs = (pb.match(/<section id="records"[\s\S]*?<\/section>/) || [''])[0];
+  const recs = (pb.match(/<div id="records">[\s\S]*?<\/div>/) || [''])[0];
   ok(/<a href="\/project\/[^"]+\/">Olympia Apartments<\/a>/.test(recs), 'a linked source record is listed with its record page', recs.slice(0, 300));
   ok(!pa.includes('id="records"') && !/Not on record yet:[^<]*record page/.test(pa), 'with no linked record page the section is not drawn or called a gap');
   const py = (code) => spawnSync('python3', ['-c', 'import sys,json; sys.path.insert(0,"scripts"); import development_pages as d; ' + code], { cwd: root, encoding: 'utf8' });
@@ -454,6 +360,39 @@ ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
   const tv = JSON.parse(tt.stdout || '[]');
   ok(tv[0] === 'Stratos data center project, Box Elder County, Utah | HomeSignal' && tv[0].length <= 64, 'the title names the project and the place', JSON.stringify(tv));
   ok(tv[1] === 'A very long project name that goes on and on and on | HomeSignal' && tv[2] === 'Name | HomeSignal', 'a title too long drops the place and keeps the name; no place, no comma', JSON.stringify(tv));
+}
+
+// 3f. Expandable information tiles (2026-11-06): the sections are closed <details> tiles; the
+// name, place, Type, lifecycle, summary, Follow and an open protest window stay visible above them.
+{
+  const pg = read(build(withProtest('2026-12-01')).out, A);
+  const tiles = pg.slice(pg.indexOf('<div class="tiles">'), pg.indexOf('</div>', pg.lastIndexOf('</details>')));
+  const det = tiles.match(/<details[^>]*>/g) || [];
+  ok(det.length >= 6 && det.every((t) => t === '<details>'), 'every tile is a <details> that starts closed', JSON.stringify(det));
+  ok(!/<script(?! type="application\/ld\+json")/.test(pg) && !pg.includes('<nav class="toc"'), 'no script, and the separate jump list is gone');
+  const heads = [...pg.matchAll(/<summary>.*?<h2 id="h-([a-z]+)">(.*?)<\/h2><span class="ts">(.*?)<\/span>.*?<\/summary><div class="tb" id="([a-z]+)">/g)];
+  ok(heads.length === det.length && heads.every((m) => m[1] === m[4] && m[3].length > 0),
+     'each tile has a heading and a one-line description in its summary, and the body carries the section id', JSON.stringify(heads.map((m) => [m[1], m[2], m[4]])));
+  ok(JSON.stringify(heads.map((m) => m[1])) === JSON.stringify(['overview', 'next', 'timeline', 'entities', 'documents', 'map', 'coverage']),
+     'the tiles in order; empty ones are not drawn', JSON.stringify(heads.map((m) => m[1])));
+  ok(/<h2 id="h-coverage">HomeSignal Coverage<\/h2><span class="ts">2 videos, 1 Bluesky post<\/span>/.test(pg)
+     && /<h2 id="h-timeline">Project Timeline<\/h2><span class="ts">\d+ dated events?, newest first<\/span>/.test(pg),
+     'descriptions carry counts from the page\'s own lists');
+  const hero = pg.slice(pg.indexOf('<section class="hero"'), pg.indexOf('<div class="tiles">'));
+  ok(hero.includes('<h1') && hero.includes('class="where"') && hero.includes('class="pill type"') && hero.includes('class="pill life"')
+     && hero.includes('Follow this development') && hero.includes('Protest period open until Dec 1, 2026') && !hero.includes('<details'),
+     'name, place, Type, lifecycle, Follow and the open deadline are outside the tiles');
+  ok(/<svg [^>]*focusable="false">/.test(tiles) && /<span class="ti" aria-hidden="true">/.test(tiles), 'icons are decorative');
+  ok(pg.includes('.tile details[open]>summary .chev{transform:') && pg.includes('.tile summary::-webkit-details-marker{display:none}'),
+     'the chevron turns when a tile is open and the default marker is hidden');
+  // presentation-only: every source link in the old page is still on the new page
+  const links = (t) => new Set([...t.matchAll(/href="(https:\/\/[^"]+)"/g)].map((m) => m[1]));
+  ok([...links(pa)].length > 5 && [...links(pa)].every((u) => pa.includes(u)), 'control: links counted');
+  const impactX = dossiers();
+  impactX.dossiers['valley-campus'].statements.push({ kind: 'impact', body: 'Truck traffic on the ranch road.', evidence_url: W, evidence_label: 'Change record x123' });
+  const pi = read(build(impactX).out, A);
+  ok(/<h2 id="h-impacts">Community impacts<\/h2>.*Truck traffic on the ranch road\./s.test(pi) && !pa.includes('id="impacts"'),
+     'Community impacts is drawn only when a record names an effect');
 }
 
 // 8. determinism and the build day
