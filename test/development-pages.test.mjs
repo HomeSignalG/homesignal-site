@@ -302,6 +302,54 @@ const refused = written.filter((p) => !exact.includes(p) && !prefixes.some((x) =
 ok(written.some((p) => p.startsWith('development/')) && refused.length === 0,
    'the artifact audit accepts every file the build writes', JSON.stringify(refused.slice(0, 10)));
 
+// 7d. Search-result basics (2026-11-06): a title and description that fit, the page's own structured
+// data with the day the dossier last changed, a visible last-updated line, and more links to our own pages.
+{
+  const dec = (t) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+  const title = (h) => dec((h.match(/<title>([\s\S]*?)<\/title>/) || [, ''])[1]);
+  const desc = (h) => dec((h.match(/<meta name="description" content="([\s\S]*?)">/) || [, ''])[1]);
+  const ldOf = (h) => JSON.parse((h.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [, 'null'])[1]);
+  for (const [p, h] of [[A, pa], [B, pb]]) {
+    ok(title(h).length > 0 && title(h).length <= 64 && !title(h).includes(' — '), `${p}: the title fits a search result`, title(h));
+    ok(desc(h).length > 0 && desc(h).length <= 155, `${p}: the description fits a search result`, String(desc(h).length));
+    const g = (ldOf(h) || {})['@graph'] || [];
+    ok(g.some((x) => x['@type'] === 'BreadcrumbList') && g.some((x) => x['@type'] === 'WebPage'), `${p}: breadcrumbs and the page itself are in the structured data`);
+  }
+  const wp = (h) => ((ldOf(h) || {})['@graph'] || []).find((x) => x['@type'] === 'WebPage') || {};
+  ok(wp(pa).dateModified === '2026-10-29' && wp(pb).dateModified === '2026-10-20', 'dateModified is the dossier\'s own last change, not the build day',
+     JSON.stringify([wp(pa).dateModified, wp(pb).dateModified]));
+  ok(pa.includes('Last updated <time datetime="2026-10-29">Oct 29, 2026</time>.'), 'the page says when it was last updated');
+  const noDate = dossiers();
+  delete noDate.dossiers['valley-campus'].updated_at;
+  const nd = read(build(noDate).out, A);
+  ok(!('dateModified' in wp(nd)) && !nd.includes('Last updated <time'), 'with no change date on record, none is claimed');
+  ok(/href="\/community\/01002\/">ZIP 01002 page<\/a>/.test(pa) && /href="\/community\/01003\/">ZIP 01003 page<\/a>/.test(pa),
+     'each ZIP in Map & land links to its ZIP page as well as its map page');
+  const recs = (pb.match(/<section id="records"[\s\S]*?<\/section>/) || [''])[0];
+  ok(/<a href="\/project\/[^"]+\/">Olympia Apartments<\/a>/.test(recs), 'a linked source record is listed with its record page', recs.slice(0, 300));
+  ok(!pa.includes('id="records"') && !/Not on record yet:[^<]*record page/.test(pa), 'with no linked record page the section is not drawn or called a gap');
+  const py = (code) => spawnSync('python3', ['-c', 'import sys,json; sys.path.insert(0,"scripts"); import development_pages as d; ' + code], { cwd: root, encoding: 'utf8' });
+  const STRATOS = 'A data center campus proposed for ranch land in Hansel Valley, in western Box Elder County. In October 2026, Bar H Ranch, Inc. asked the Utah Division of Water Rights to move water now used to irrigate the ranch to the project. The filing names O\'Leary Digital Utah DC Sub I, LLC as the developer.';
+  const md = py(`print(json.dumps(d.meta_description(${JSON.stringify(STRATOS)}, "fallback")))`);
+  const mdv = JSON.parse(md.stdout || '""');
+  ok(mdv === 'A data center campus proposed for ranch land in Hansel Valley, in western Box Elder County.', 'the description is the first whole sentence that fits, and "Inc." does not end a sentence', mdv + md.stderr);
+  // An abbreviation followed by a capital letter is not a sentence end: with this text the whole thing is one
+  // sentence too long for a description, so it is cut at a word. Split at "Inc." it would return the short head.
+  const INC = 'The applicant is Bar H Ranch, Inc. Utah regulators received its filing in October 2026 to move water now used to irrigate the ranch to a proposed data center campus.';
+  const incd = JSON.parse(py(`print(json.dumps(d.meta_description(${JSON.stringify(INC)}, "fallback")))`).stdout || '""');
+  ok(incd.includes('Bar H Ranch, Inc. Utah') && incd.endsWith('\u2026') && incd.length <= 155, '"Inc." followed by a capital does not end a sentence', incd);
+  ok(/href="\/community\/01002\/">ZIP 01002 page<\/a>/.test(pb), 'a ZIP that comes from a linked record, not a land assembly, links to its ZIP page too');
+  const longOne = py('print(json.dumps(d.meta_description("word " * 80, "fallback")))');
+  const lv = JSON.parse(longOne.stdout || '""');
+  ok(lv.length <= 155 && lv.endsWith('\u2026') && !lv.endsWith(' \u2026'), 'one sentence too long is cut at a word and ends with an ellipsis', lv);
+  const fb = py('print(json.dumps(d.meta_description("", "fallback")))');
+  ok(JSON.parse(fb.stdout || '""') === 'fallback', 'with no summary the plain fallback is used');
+  const tt = py('print(json.dumps([d.page_title("Stratos data center project", "Box Elder County, Utah"), d.page_title("A very long project name that goes on and on and on", "Box Elder County, Utah"), d.page_title("Name", "")]))');
+  const tv = JSON.parse(tt.stdout || '[]');
+  ok(tv[0] === 'Stratos data center project, Box Elder County, Utah | HomeSignal' && tv[0].length <= 64, 'the title names the project and the place', JSON.stringify(tv));
+  ok(tv[1] === 'A very long project name that goes on and on and on | HomeSignal' && tv[2] === 'Name | HomeSignal', 'a title too long drops the place and keeps the name; no place, no comma', JSON.stringify(tv));
+}
+
 // 8. determinism and the build day
 const again = build(dossiers());
 ok(read(again.out, A) === pa, 'identical input produces a byte-identical page');
