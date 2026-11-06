@@ -847,7 +847,12 @@ begin
     nxt := case when v.body ? 'angles' then 'Analyze again to get the story outline' else 'Analyze story' end;
   elsif v.body->'main' is null then stage := 'outline'; nxt := 'Review the outline, then Generate story'; lib := 'needs_review';
   elsif not all_ok then
-    stage := 'script'; nxt := 'Review and approve the integrated narrative'; lib := 'needs_review';
+    stage := 'script'; lib := 'needs_review';
+    -- a blocked script cannot be approved (the button is off), so the next step is to fix it, never to approve it
+    -- (founder, 2026-11-06: an Approve that did nothing while the step said "approve").
+    nxt := case when arts->'narrative'->>'state' = 'blocked'
+                then 'Fix the script first: the checks found problems, listed under Integrated narrative. Write what to change with "Fix this line", then press Fix. Approve turns on once the script passes.'
+                else 'Review and approve the integrated narrative' end;
     if s.creation_mode = 'creator' then   -- a creator-directed story: the founder's script comes first
       cs := public._hs_is_creator_state(p_story);
       nxt := case when cs->'pending'->>'status' = 'proposed' then 'Send your revised script with Fix'
