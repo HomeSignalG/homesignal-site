@@ -18,7 +18,7 @@ ok(/Auto-discovered — Ready for Review/.test(stories), '1d the library labels 
 
 // 2. every RPC the page calls is admin-gated and granted to authenticated only
 const called = [...new Set([...js.matchAll(/rpc\('([a-z_]+)'/g)].map((m) => m[1]))];
-ok(called.length === 10, '2a the page calls exactly the ten founder functions (' + called.join(', ') + ')');
+ok(called.length === 11, '2a the page calls exactly the eleven founder functions (' + called.join(', ') + ')');
 const storiesSql = read('docs/impact-stories.sql');
 for (const f of called) {
   const src = f.startsWith('hs_impact_story_') ? storiesSql : sql;
