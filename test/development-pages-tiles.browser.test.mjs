@@ -3,15 +3,15 @@
 // them, and checks in Chromium at 1440px and 390px: tiles start closed, open and close on click
 // and from the keyboard, several stay open at once, a link to a section opens its tile and shows
 // it below the sticky site header, the page header keeps the critical facts visible, nothing
-// scrolls sideways, and dark mode keeps the tiles readable. The page runs no script, so all of
-// this is the browser's own <details> behaviour.
+// scrolls sideways, and dark mode keeps the tiles readable. The tiles use no script: opening and
+// closing is the browser's own <details> behaviour (the page's only script is the site header's).
 //
 // Run: node test/development-pages-tiles.browser.test.mjs   (SHOT_DIR=<dir> also saves screenshots)
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { mkdirSync } from 'node:fs';
 import { join, normalize } from 'node:path';
-import { W, dossiers, build } from './lib/development-pages-fixture.mjs';
+import { root, W, dossiers, build } from './lib/development-pages-fixture.mjs';
 
 let chromium;
 try {
@@ -59,8 +59,12 @@ const server = createServer(async (req, res) => {
   let p = normalize(join(out, decodeURIComponent(req.url.split('?')[0].split('#')[0])));
   if (!p.startsWith(out)) { res.writeHead(403).end(); return; }
   if (p.endsWith('/')) p = join(p, 'index.html');
-  try { res.writeHead(200, { 'content-type': 'text/html' }).end(await readFile(p)); }
-  catch { res.writeHead(404).end('not found'); }
+  // Shared site files the page loads (the header script) come from the repo, not the build output.
+  const url = req.url.split('?')[0];
+  if (url.startsWith('/lib/')) p = normalize(join(root, url));
+  let body;
+  try { body = await readFile(p); } catch { res.writeHead(404).end('not found'); return; }
+  res.writeHead(200, { 'content-type': p.endsWith('.js') ? 'text/javascript' : 'text/html' }).end(body);
 });
 await new Promise((res) => server.listen(0, '127.0.0.1', res));
 const BASE = `http://127.0.0.1:${server.address().port}`;
