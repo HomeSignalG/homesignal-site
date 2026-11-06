@@ -57,6 +57,25 @@ create table if not exists public.impact_stories (
 );
 alter table public.impact_stories enable row level security;
 revoke all on public.impact_stories from public, anon, authenticated;
+-- Story numbers (founder, 2026-11-06): every story has a sequential number starting at 8000, like the 3000-series video
+-- projects. Stories that already exist are numbered 8000.. in the order they were created; new ones take the next number
+-- from the sequence. Idempotent: it only numbers rows that have none. A failed insert can leave a gap, never a repeat.
+create sequence if not exists public.impact_story_number_seq start with 8000 minvalue 8000;
+alter table public.impact_stories add column if not exists story_number integer;
+do $$ begin
+  if exists (select 1 from public.impact_stories where story_number is null) then
+    update public.impact_stories s set story_number = n.num
+      from (select id, nextval('public.impact_story_number_seq')::integer as num
+              from (select id from public.impact_stories where story_number is null order by created_at, id) o) n
+     where s.id = n.id;
+  end if;
+end $$;
+alter table public.impact_stories alter column story_number set default nextval('public.impact_story_number_seq');
+alter table public.impact_stories alter column story_number set not null;
+create unique index if not exists impact_stories_story_number_key on public.impact_stories (story_number);
+alter table public.impact_stories drop constraint if exists impact_stories_story_number_check;
+alter table public.impact_stories add constraint impact_stories_story_number_check check (story_number >= 8000);
+revoke all on sequence public.impact_story_number_seq from public, anon, authenticated;
 -- Where a story came from (2026-10-27, Hot Topics): 'manual' (the founder created it) or 'auto_discovery' (prepared from
 -- a Bluesky-discovered topic whose source pack was verified; docs/impact-discovery.sql). Additive; existing rows are manual.
 alter table public.impact_stories add column if not exists origin text not null default 'manual';
@@ -996,7 +1015,7 @@ returns jsonb language plpgsql stable security definer set search_path = public 
 begin
   perform public._hs_is_admin();
   return coalesce((select jsonb_agg(jsonb_build_object(
-      'id', s.id, 'title', s.title, 'place', s.place, 'video_slug', s.video_slug, 'primary_emotion', s.primary_emotion,
+      'id', s.id, 'story_number', s.story_number, 'title', s.title, 'place', s.place, 'video_slug', s.video_slug, 'primary_emotion', s.primary_emotion,
       'current_version', s.current_version, 'updated_at', s.updated_at, 'archived', s.archived_at is not null,
       'verified_at', s.pack->>'verified_at', 'status', public._hs_is_status(s.id),
       'origin', s.origin, 'discovery_candidate_id', s.discovery_candidate_id) order by s.updated_at desc)

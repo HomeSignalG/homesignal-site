@@ -62,6 +62,12 @@ select pg_temp.chk('2c the worker is dispatched on main with the job id only', (
    = jsonb_build_object('ref', 'main', 'inputs', jsonb_build_object('job_id', (pg_temp.lastjob()).id::text))
    and (select url from net.requests order by id desc limit 1) like '%/homesignal-ingest/actions/workflows/impact-story-job.yml/dispatches');
 select pg_temp.chk('2d title defaults to the verified project title', (select title from public.impact_stories where id = pg_temp.id('s')::uuid) like '3003 Gig Harbor%');
+select pg_temp.chk('2d2 the first story is numbered 8000 and the list returns it',
+  (select story_number from public.impact_stories where id = pg_temp.id('s')::uuid) = 8000
+  and (select (e->>'story_number')::int from jsonb_array_elements(public.hs_impact_story_list()) e where e->>'id' = pg_temp.id('s')) = 8000);
+select pg_temp.chk('2d3 numbers are unique, none below 8000, and visitors cannot use the sequence',
+  (select count(*) = count(distinct story_number) and min(story_number) >= 8000 from public.impact_stories)
+  and not has_sequence_privilege('anon', 'public.impact_story_number_seq', 'usage'));
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'pack');
 select pg_temp.chk('2e a duplicate click returns the same job', (select count(*) from public.impact_story_jobs where story_id = pg_temp.id('s')::uuid) = 1
    and (select count(*) from net.requests) = 1);
