@@ -5924,6 +5924,23 @@ official records so you do not miss things like change and amendments"*. SQL of 
   form and guide is named per source in that function (Utah: Division of Water Rights "Protest of Application", $15 fee);
   the renderer names no agency. The page shows the box in its header while `protest_end` >= the build day, and drops it the
   day after. Tests: `test/development-pages.test.mjs` 3c, suite checks 20-23.
+- **SEO/editorial review (founder, 2026-11-06), all in `development_pages.py`, one code path for every dossier:**
+  - **A summary under the H1** (`_derived_summary`), assembled only from reviewed links: the Type and lifecycle from the
+    defining record, the master developer and governing body, each water filing with its stated status ("That status is for
+    the water-rights application, not for the development as a whole"), and the associated-parcel count. Every sentence
+    carries its source. A reviewer `summary` statement replaces it.
+  - **No contradictory gaps:** an open protest window is listed under What's next (`_protest_deadlines`), and the gap list is
+    one line per gap, only for "What changed" and "What's next" (and a missing summary).
+  - **Title** "<name>[ (<Type>)], <County>, <State name> | HomeSignal" (the Type only when the name does not say it); the
+    description lists what the page holds.
+  - **Source citations have no `nofollow`** (`_src`); the Follow and protest-form actions keep it.
+  - **Timeline is events:** a water filing and the same-day documents naming its number are one event with each document
+    as a source; news is labelled "Reported" / "News report".
+  - Entities are grouped; "Map & land" is "Associated land and parcel maps"; the footer gives the record dates and links to
+    how-it-works and contact.
+  - **Bluesky updates:** only reviewer-linked posts (`bluesky_post` links), newest five, text without links or hashtags,
+    "View post on Bluesky", plus `facts.source_url` when present. Never timeline events.
+  - Tests: `test/development-pages.test.mjs` 3e.
 
 ## IMPACT STORIES, TAB 17 (2026-10-25): built from the founder's v2.4 handoff
 
