@@ -53,9 +53,9 @@
 <script src="config.js"></script>
 <script src="seed/delvalle.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
-<script src="lib/data.js?v=3ef05390"></script>
+<script src="lib/data.js?v=c047cd53"></script>
 <script src="lib/topic-prefs.js?v=fe87d99b"></script>
-<script src="lib/templates.js?v=54c12a4f"></script>
+<script src="lib/templates.js?v=ddc4a550"></script>
 <script src="lib/premium-waitlist.js?v=3cb9baaf"></script>
 <script src="lib/community-request.js?v=e1d9c7d7"></script>
 <script src="shell.js?v=96cfbb3e"></script>
@@ -352,7 +352,8 @@ HS.onReady(async function () {
         + groups[g].map(function(ch){ return HS.tpl.storyCard(ch); }).join('');
     }).join('') : (!open.length && !quiet.length
       ? '<div class="quiet" style="margin-top:4px"><b>Nothing in this category right now.</b> ' + HS.esc(TAB_EMPTY[tab] || '') + '</div>'
-      : '');
+      : '')
+      + (tab === 'meetings' ? HS.tpl.lastMetHTML(meetings.lastMet) : '');
 
     paintQuietAndControls(quiet);
   }
