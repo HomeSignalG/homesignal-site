@@ -12,7 +12,8 @@ anything the database already decided:
   * the project's name: the snapshot's one name (resolved_projects.display_name when linked).
 Pure functions: gen_zip_pages.py passes in its own head/escape helpers and writes the files.
 """
-import html, json, os, re, subprocess, sys
+import hashlib, html, json, os, re, subprocess, sys
+from urllib.parse import quote
 
 SCHEMA = "development-dossiers/1"
 PATH_RE = re.compile(r"^/development/[a-z]{2}/[a-z0-9]+(?:-[a-z0-9]+)*/$")
@@ -68,18 +69,28 @@ def _one(rx, text, what):
     return m[0]
 
 
+RETURN_TOKEN = "__HS_RETURN_PATH__"
+
+
 def site_chrome():
     """The site's own header and footer, taken from partials/shell.html, and their rules from
     app.css and layout.css, so a dossier page shows the same links as every other page. Nothing
-    is copied by hand. The header's Share / Sign in / account buttons need shell.js, which this
-    page does not load, so they are left out; the Menu button opens the nav without a script."""
+    is copied by hand. The header's Share / Sign in / account buttons are kept; the page does not
+    load shell.js, so lib/dossier-header.js gives them the shell's behaviour (Share is hidden until
+    that script runs, Sign in is a link that works without it). The Menu button opens the nav
+    without a script. RETURN_TOKEN in the Sign in link is replaced with the page's own path."""
     shell = _read("partials/shell.html")
     header = _one(r'<header class="hs-header" id="hs-top">.*?</header>', shell, "site header")
     footer = _one(r'<footer class="hs-footer" id="hs-footer">.*?</footer>', shell, "site footer")
     actions = _one(r'\n[ \t]*<div class="hs-header__actions">.*?\n[ \t]*</div>(?=\n[ \t]*</div>\n</header>)',
                    header, "header actions block")
-    menu = ('\n    <div class="hs-header__actions"><label class="hs-header__menu" for="hs-menutoggle" '
-            'aria-label="Menu">☰</label></div>')
+    menu = ('\n    <div class="hs-header__actions">'
+            '\n      <button class="hs-header__share" type="button" id="hs-share" hidden>Share</button>'
+            f'\n      <a class="hs-header__signin" id="hs-signin" href="/?signin=1&amp;return={RETURN_TOKEN}">Sign in</a>'
+            '\n      <a class="avatar hs-header__avatar" id="hs-avatar" href="/properties.html" title="My Places" '
+            'aria-label="My Places" hidden>··</a>'
+            '\n      <label class="hs-header__menu" for="hs-menutoggle" aria-label="Menu">☰</label>'
+            '\n    </div>')
     header = header.replace(actions, menu, 1)
     header = header.replace('<nav class="hs-nav"', '<input type="checkbox" id="hs-menutoggle" class="hs-menutoggle" '
                             'aria-label="Show the menu">\n    <nav class="hs-nav"', 1)
@@ -95,6 +106,11 @@ def site_chrome():
            'Roboto,Helvetica,Arial,sans-serif;line-height:1.4}\n' + cont + '\n' + rules + '\n'
            '.hs-menutoggle{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}\n'
            '.hs-header__menu{cursor:pointer}\n'
+           '.hs-header [hidden]{display:none!important}\n'
+           'a.hs-header__signin{display:inline-flex;align-items:center;text-decoration:none;box-sizing:border-box}\n'
+           'a.hs-header__avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,'
+           'var(--green-2),var(--green-deep));color:#fff;display:grid;place-items:center;font-size:13px;'
+           'font-weight:700;text-decoration:none}\n'
            '.hs-menutoggle:focus-visible~.hs-header__actions .hs-header__menu{outline:2px solid var(--green);outline-offset:2px}\n'
            '@media (max-width:1023px){.hs-menutoggle:checked~.hs-nav{display:flex}}\n')
     return chrome[0], chrome[1], css
@@ -130,6 +146,9 @@ YT_ID_RE = re.compile(r"^https://(?:www\.)?(?:youtube\.com/(?:watch\?v=|shorts/)
 # YouTube's own thumbnail host; the page's CSP allows images from it and nothing else new.
 CSP_FROM = "img-src 'self' data:; font-src 'self';"
 CSP_TO = "img-src 'self' data: https://i.ytimg.com; font-src 'self';"
+CSP_SCRIPT_FROM = "script-src 'none';"
+CSP_SCRIPT_TO = "script-src 'self';"
+HEADER_JS_V = hashlib.md5(_read("lib/dossier-header.js").encode()).hexdigest()[:8]
 
 
 def yt_id(url):
@@ -801,11 +820,18 @@ def render(d, pages, built, head, crumb_place=None):
     h = head(title, desc, canon, og_type="article", ld=ld)
     h = re.sub(r'<link rel="stylesheet" href="/(?:layout|app)\.css[^"]*">\n?', "", h)
     h = h.replace("</head>", f"<style>{CHROME_CSS}{CSS.strip()}</style>\n</head>", 1)
+    # The header's account buttons (lib/dossier-header.js) are the page's only script: same-origin,
+    # no inline code.
+    if CSP_SCRIPT_FROM not in h:
+        sys.exit("ERROR: development page head has no script-src 'none' to replace")
+    h = h.replace(CSP_SCRIPT_FROM, CSP_SCRIPT_TO, 1)
     if vids_all:
         if CSP_FROM not in h:
             sys.exit("ERROR: development page head has no img-src to widen for video thumbnails")
         h = h.replace(CSP_FROM, CSP_TO, 1)
-    return h + f'<body>\n{body}\n</body>\n</html>\n'
+    body = body.replace(RETURN_TOKEN, quote(d["path"], safe=""), 1)
+    return (h + f'<body>\n{body}\n<script src="/lib/dossier-header.js?v={HEADER_JS_V}" defer></script>\n'
+            '</body>\n</html>\n')
 
 
 def link_pages(dossiers, pages, projects):

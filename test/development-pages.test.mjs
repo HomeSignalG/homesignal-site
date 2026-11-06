@@ -5,7 +5,7 @@
 // named by its land assembly) and one non-data-centre (defining record = a source record that has
 // a /project/ page). Pinned:
 //   1. a page per dossier at its path; indexable, self-canonical, one H1, in the master and the
-//      `development` family sitemap; no script but inert structured data
+//      `development` family sitemap; only the header's own script, and inert structured data
 //   2. Type and lifecycle come from lib/project-type.js run on the defining record
 //   3. every section's facts and their source links are in the raw HTML; media in its own list
 //   4. a descriptive name says so; a record name does not
@@ -141,8 +141,10 @@ for (const [p, h] of [[A, pa], [B, pb]]) {
   ok(h.includes(`<link rel="canonical" href="https://jodytracks.com${p}">`), `${p} is self-canonical`);
   ok((h.match(/<h1[ >]/g) || []).length === 1, `${p} has one H1`);
   ok(!/href="\/(layout|app)\.css/.test(h) && /<style>[^<]*\.wrap\{/.test(h), `${p} carries its own layout, not the app shell's stylesheets`);
-  ok(!/<script(?![^>]*application\/ld\+json)/.test(h), `${p} ships no script but structured data`);
-  ok(/script-src 'none'/.test(h), `${p} forbids scripts in its CSP`);
+  const scripts = [...h.matchAll(/<script\b[^>]*>/g)].map(m => m[0]).filter(t => !/application\/ld\+json/.test(t));
+  ok(scripts.length === 1 && /^<script src="\/lib\/dossier-header\.js\?v=[0-9a-f]{8}" defer><\/?/.test(scripts[0] + '<'),
+     `${p} ships only the header script and structured data`, JSON.stringify(scripts));
+  ok(/script-src 'self';/.test(h) && !/script-src[^;]*unsafe-inline/.test(h), `${p} allows only same-origin scripts, no inline code`);
 }
 
 // 2. Type and lifecycle from the one authority
@@ -458,8 +460,17 @@ ok(h(st1, A) && JSON.stringify(h(st1, A).h) === JSON.stringify(h(st2, A).h), 'a 
   const pg = read(out, A);
   const pHead = (pg.match(/<header class="hs-header"[\s\S]*?<\/header>/) || [''])[0];
   const pFoot = (pg.match(/<footer class="hs-footer"[\s\S]*?<\/footer>/) || [''])[0];
-  ok(pHead && JSON.stringify(hrefs(pHead)) === JSON.stringify(hrefs(sHead)), 'the header has the site header\'s links, in order',
-     JSON.stringify([hrefs(pHead), hrefs(sHead)]));
+  const navOf = (t) => (t.match(/<nav class="hs-nav"[\s\S]*?<\/nav>/) || [''])[0];
+  const brandOf = (t) => t.slice(0, t.indexOf('<nav class="hs-nav"'));
+  ok(pHead && JSON.stringify(hrefs(brandOf(pHead) + navOf(pHead))) === JSON.stringify(hrefs(brandOf(sHead) + navOf(sHead))),
+     'the header has the site header\'s links, in order', JSON.stringify([hrefs(pHead), hrefs(sHead)]));
+  // 2026-11-06 (founder: "where is share button and login in top right corner"): the account buttons are the site's.
+  ok(/<button class="hs-header__share" type="button" id="hs-share" hidden>Share<\/button>/.test(pHead), 'the header has the Share button');
+  ok(pHead.includes('<a class="hs-header__signin" id="hs-signin" href="/?signin=1&amp;return=%2Fdevelopment%2Fma%2Fvalley-campus%2F">Sign in</a>'),
+     'Sign in opens the site sign-in and returns to this page');
+  ok(/<a class="avatar hs-header__avatar" id="hs-avatar" href="\/properties\.html"[^>]* hidden>/.test(pHead), 'the account avatar is there, hidden until signed in');
+  ok(!pg.includes('__HS_RETURN_PATH__'), 'no return placeholder is left on the page');
+  ok(/\.hs-header \[hidden\]\{display:none!important\}/.test(pg), 'hidden header buttons stay hidden');
   ok(pFoot && JSON.stringify(hrefs(pFoot)) === JSON.stringify(hrefs(sFoot)), 'the footer has the site footer\'s links, in order',
      JSON.stringify([hrefs(pFoot), hrefs(sFoot)]));
   ok(hrefs(sHead).length >= 8 && hrefs(sFoot).length >= 8, 'control: the site header and footer were read');

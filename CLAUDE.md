@@ -5884,9 +5884,13 @@ One page per real-world development, built from REVIEWED links to objects HomeSi
 - **One name.** A project that links a land assembly takes `resolved_projects.display_name`, and a second name is
   refused. A descriptive name (basis `descriptive`) says so on the page.
 - **The header and footer are the site's own (founder, 2026-11-01).** `development_pages.py::site_chrome` reads them from
-  `partials/shell.html` and their rules from `app.css` / `layout.css` at build time, so they cannot drift. Share, Sign in and the
-  account button need `shell.js` and are left out; the phone Menu opens with a checkbox. Test 3d in `test/development-pages.test.mjs`.
-- **Pages ship no script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
+  `partials/shell.html` and their rules from `app.css` / `layout.css` at build time, so they cannot drift. The phone Menu opens with a
+  checkbox. Test 3d in `test/development-pages.test.mjs`.
+- **Share, Sign in and the account avatar are back in the header (founder, 2026-11-06: "where is share button and login").** The page
+  does not load `shell.js`; its ONE script is `lib/dossier-header.js` (CSP `script-src 'self'`, no inline code): Share uses the
+  share sheet or copies the link; a session stored in this browser shows the initials avatar (to My Places), else Sign in is a plain
+  link to `/?signin=1&return=<page>` (works without the script). Test `test/dossier-header.browser.test.mjs`.
+- **No other script.** Follow opens `follow-development.html` (noindex), which uses `HS.toggleFollow`
   (`app_follows` target_type `development`). Development follows are not yet listed in My Places.
 - `pages.yml` fetches `email-assets/seo/development-dossiers.json`; a missing object (Storage 400 `not_found`) means
   none yet, and any other failure stops the build. Family sitemap `development`.
