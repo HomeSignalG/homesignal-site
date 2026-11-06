@@ -105,7 +105,7 @@ select pg_temp.as_user('founder@example.com');
 select public.hs_impact_story_request(pg_temp.id('s')::uuid, 'generate');
 select pg_temp.work(jsonb_build_object('body', pg_temp.body(), 'derived', jsonb_build_object('validation', pg_temp.ok_val(false, 'P1'))));
 select pg_temp.chk('5a generated version 2, still blocked: the narrative says why', pg_temp.cur() = 2 and pg_temp.nst() = 'blocked' and pg_temp.stage() = 'script'
-   and pg_temp.nxt() = 'Review and approve the integrated narrative');
+   and pg_temp.nxt() like 'Fix the script first:%' and pg_temp.nxt() not like '%Review and approve%');
 select pg_temp.chk('5b reject needs a note', pg_temp.err(format('select public.hs_impact_story_decide(%L, %L, %L, 2)', pg_temp.id('s'), 'narrative', 'rejected')) like '%Say what to change%');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'rejected', 2, 'Speak the anger qualifier.', 'Act 6');
 select pg_temp.chk('5c a rejection is tied to its line', (select target from public.impact_story_approvals order by id desc limit 1) = 'Act 6');
@@ -115,6 +115,7 @@ select pg_temp.chk('5d save creates version 3 and queues a re-check', pg_temp.cu
 select pg_temp.chk('5e until the re-check, nothing is approvable', pg_temp.nst() = 'checking');
 select pg_temp.work(jsonb_build_object('derived', jsonb_build_object('validation', pg_temp.ok_val(true, 'P1'))));
 select pg_temp.chk('5f re-check attaches to version 3 (no new version)', pg_temp.cur() = 3 and pg_temp.nst() = 'pending');
+select pg_temp.chk('5f2 once the script passes, the next step is to approve it', pg_temp.nxt() = 'Review and approve the integrated narrative');
 select public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3);
 select pg_temp.chk('5g one approval: on to the Visuals step', pg_temp.stage() = 'visuals' and public._hs_is_status(pg_temp.id('s')::uuid)->>'library' = 'needs_review');
 select pg_temp.chk('5h approving twice records nothing new', (select (public.hs_impact_story_decide(pg_temp.id('s')::uuid, 'narrative', 'approved', 3))->>'unchanged') = 'true'
