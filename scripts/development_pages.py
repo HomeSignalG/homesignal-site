@@ -368,6 +368,14 @@ def _timeline(d):
         for r in docs:
             ev["sources"].append((r["link"].get("evidence_url"), r["title"]))
             ev["aspect"] = ev["aspect"] or r["aspect"]
+    # An open protest window is the one future date on the timeline (founder, 2026-11-06: "put it
+    # in the timeline and add link"). Same rule as the header box: shown only while it is open.
+    for w in _open_protests(d):
+        pr = w["pr"]
+        rows.append({"date": w["end"], "label": "Deadline", "aspect": w["link"].get("aspect"),
+                     "title": f'Deadline to protest {w["filing"]}', "kind": "deadline", "link": w["link"],
+                     "form": w["form"], "form_label": pr.get("form_label") or "File a protest",
+                     "sources": [(pr.get("record_url"), "State change record")]})
     rows.sort(key=lambda r: r["date"], reverse=True)
     if not rows:
         return ""
@@ -383,19 +391,23 @@ def _timeline(d):
 
     lis = []
     for r in rows:
-        news = r["kind"] == "news_report"
-        chips = ([esc(r["aspect"])] if r["aspect"] else []) + (["News report"] if news else [])
+        news, due = r["kind"] == "news_report", r["kind"] == "deadline"
+        chips = ([esc(r["aspect"])] if r["aspect"] else []) + (["News report"] if news else []) + (["Upcoming"] if due else [])
         label = "Reported" if news else (r["label"] or "")
         sl = srcs(r)
         lis.append(
-            f'<li><div class="tdate"><time datetime="{esc(r["date"])}">{esc(day(r["date"]))}</time>'
+            ('<li class="due">' if due else '<li>') + f'<div class="tdate"><time datetime="{esc(r["date"])}">{esc(day(r["date"]))}</time>'
             f'<span>{esc(label)}</span></div><div class="tbody">'
             + ('<p class="chips">' + "".join(f'<span class="chip">{c}</span>' for c in chips) + '</p>' if chips else "")
             + f'<p>{esc(prose(r["title"]))}</p>'
             + (f'<p>{esc(prose(r["body"]))}</p>' if r.get("body") else "")
+            + (f'<p><a class="tform" href="{esc(r["form"])}" rel="nofollow noopener">{esc(r["form_label"])}</a></p>'
+               if due else "")
             + (f'<p class="small">{"Sources" if len(r["sources"]) > 1 else "Source"}: {sl}</p>' if sl else "")
             + '</div></li>')
-    return (f'<p class="small">Dates are each source\'s own, newest first. News reports are marked; they are '
+    upcoming = (" An upcoming deadline is marked and sits at the top."
+                if any(r["kind"] == "deadline" for r in rows) else "")
+    return (f'<p class="small">Dates are each source\'s own, newest first.{upcoming} News reports are marked; they are '
             f'not government actions. HomeSignal videos and posts are listed separately below.</p>'
             f'<ol class="timeline">{"".join(lis)}</ol>')
 
@@ -453,6 +465,8 @@ h3{font-size:1.05rem;margin:1.2rem 0 .4rem}section{scroll-margin-top:4rem}
 .timeline{list-style:none;padding:0;margin:0;border-left:2px solid var(--line)}
 .timeline>li{display:grid;grid-template-columns:7.5rem 1fr;gap:.8rem;padding:.8rem 0 .8rem .9rem;position:relative}
 .timeline>li::before{content:"";position:absolute;left:-6px;top:1.15rem;width:10px;height:10px;border-radius:50%;background:var(--green)}
+.timeline>li.due::before{background:var(--bg);border:2px solid var(--green);width:8px;height:8px}
+.tform{font-weight:700}
 .tdate{font-size:.85rem;font-variant-numeric:tabular-nums}.tdate time{display:block;font-weight:700}.tdate span{color:var(--ink2)}
 .tbody{min-width:0}.tbody p{margin:.2rem 0}
 @media (max-width:520px){.timeline>li{grid-template-columns:1fr;gap:.2rem}}

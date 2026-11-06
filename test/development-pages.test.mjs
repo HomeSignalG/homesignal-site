@@ -258,6 +258,7 @@ ok(pOpen.includes('<p class="t">Protest period open until Dec 1, 2026</p>') && p
 ok(pOpen.indexOf('class="protest"') < pOpen.indexOf('<nav class="toc"'), 'the protest box sits in the page header');
 ok(read(build(withProtest('2026-12-01'), { now: '2026-12-01T20:00:00' }).out, A).includes(`href="${PF}"`), 'the last day still shows it');
 ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="protest"'), 'a closed window shows no form');
+ok(!read(build(withProtest('2026-12-01'), { now: '2026-12-02T00:00:00' }).out, A).includes('class="due"'), 'a closed window leaves the timeline too');
 ok(!read(build(withProtest('2026-12-01', 'http://agency.example.gov/f')).out, A).includes('class="protest"'), 'a form link that is not https is not shown');
 ok(!read(build(withProtest('soon')).out, A).includes('class="protest"'), 'an undated window is not shown');
 ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no box');
@@ -322,6 +323,14 @@ ok(!pa.includes('class="protest"'), 'a filing with no protest window shows no bo
      && li.includes('Change application x123, as filed, with exhibits') && li.includes('Sources:')),
      'the event names the applicant and lists each document as a source');
   ok(oct15.some((li) => li.includes('Request to consolidate x1234')), 'x1234 is not folded into x123');
+  const due = tl.split('<li').filter((li) => li.includes('datetime="2026-12-01"'));
+  ok(due.length === 1 && due[0].startsWith(' class="due"') && due[0].includes('<span>Deadline</span>')
+     && due[0].includes('Deadline to protest Permanent change application x123')
+     && due[0].includes('<a class="tform" href="https://agency.example.gov/protest-form" rel="nofollow noopener">File a protest with the agency</a>')
+     && due[0].includes('State change record</a>'),
+     'the open protest deadline is on the timeline with the form and the state record', due.join('|'));
+  ok(tl.indexOf('datetime="2026-12-01"') < tl.indexOf('datetime="2026-10-15"'), 'the deadline sits at the top (newest first)');
+  ok(pg.includes('An upcoming deadline is marked and sits at the top.'), 'the timeline intro says a deadline is listed');
   ok(/<span>Reported<\/span>.*?<span class="chip">News report<\/span>/.test(tl), 'a news report is marked as reporting');
   const ents = (pg.match(/<section id="entities".*?<\/section>/) || [''])[0];
   ok(ents.indexOf('<h3>Developer and governing agencies</h3>') >= 0
