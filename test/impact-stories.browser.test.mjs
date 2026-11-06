@@ -900,6 +900,41 @@ ok(/no photo found/i.test(bbox) && bbox.includes('no usable licensed photo of Fa
    && await page.locator('#is #is-next-box .is-btn.primary').count() === 0,
    'next step: a Prepare stopped for no photo names the subjects, never asks for an upload, and offers no Retry');
 await page.evaluate(() => { Object.assign(window.db, window.__beforeBlocked); });
+// A render refused because the pictures no longer match the approved set (founder, 2026-11-06, EPA methane story:
+// "i have no idea if it is fixing requests or i am supposed to press retry"). Retry would fail the same way.
+await page.evaluate(() => {
+  window.__beforeDrift = { status: window.db.status, media: JSON.parse(JSON.stringify(window.db.media)) };
+  const base = window.db.status, m = window.db.media;
+  m.current = true; m.hum = false; delete m.blocked; m.fix_batch = null;
+  m.fix_requests = [1, 2, 3, 4, 5, 6].map((i) => ({ id: i, asset: 'short_a', note: 'Short A failed these checks ' + i, at: '2026-11-06T20:00:00Z', status: 'open' }));
+  window.db.status = () => Object.assign(base(), { stage: 'media', owner: 'you', next: 'Review each video and the thumbnail',
+    job: { id: 'jrd', kind: 'render', status: 'failed', attempts: 1, created_at: '2026-11-06T21:24:10Z', completed_at: '2026-11-06T21:26:12Z',
+      error: "The story's pictures changed since you approved them (approved d06bd8b0bc42, now 1c45ee035ca9). Prepare the visuals again and approve them; nothing was rendered." } });
+  window.HS.acqImpactStories.load(window.client, document.getElementById('is'));
+});
+await page.waitForTimeout(80);
+await page.click('#is [data-act=step][data-step=media]'); await page.waitForTimeout(50);
+let dtxt = await page.locator('#is-next-box').innerText();
+ok(/send your 6 fix requests/i.test(dtxt) && /Retry would stop the same way/i.test(dtxt) && !/Something went wrong/i.test(dtxt),
+   'picture drift: the top box says the next step is to send the 6 fix requests, and why Retry would not help');
+ok(await page.locator('#is #is-next-box [data-act=retry]').count() === 0
+   && await page.locator('#is #is-next-box .is-btn.primary[data-act=fixstart]', { hasText: 'Fix (6)' }).count() === 1
+   && await page.locator('#is #is-next-box [data-act=vprep][data-new="1"]').count() === 1,
+   'picture drift: no Retry; Fix (6) is the one green button, Prepare the pictures is the alternative');
+let dmed = await page.locator('#is-media-now').innerText();
+ok(!/Ready for your review/i.test(dmed) && /newest render did not run/i.test(dmed), 'picture drift: Media review no longer says "Ready for your review"');
+await page.evaluate(() => { window.db.media.fix_requests = []; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+dtxt = await page.locator('#is-next-box').innerText();
+ok(/prepare the pictures again/i.test(dtxt) && await page.locator('#is #is-next-box .is-btn.primary[data-act=vprep][data-new="1"]').count() === 1
+   && await page.locator('#is #is-next-box [data-act=retry]').count() === 0,
+   'picture drift, no fixes waiting: the one button prepares the pictures again');
+await page.evaluate(() => { window.db.media.fix_batch = { status: 'working', requests: 6, requested_at: '2026-11-06T21:30:00Z' }; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
+await page.waitForTimeout(80);
+dtxt = await page.locator('#is-next-box').innerText();
+ok(/working on it/i.test(dtxt) && /Nothing is needed from you/.test(dtxt) && await page.locator('#is #is-next-box button').count() === 0,
+   'picture drift while the fixer works: the top box says nothing is needed, with no buttons');
+await page.evaluate(() => { window.db.status = window.__beforeDrift.status; window.db.media = window.__beforeDrift.media; });
 // library: grouped by whose turn it is, stories above Hot Topics, one label per card
 await page.evaluate(() => { location.hash = ''; window.HS.acqImpactStories._state.open = null; window.HS.acqImpactStories._state.data = null; window.HS.acqImpactStories.load(window.client, document.getElementById('is')); });
 await page.waitForTimeout(120);
