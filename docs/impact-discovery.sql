@@ -148,6 +148,18 @@ do $$ begin
       check (start_mode in ('auto', 'document', 'topic'));
   end if;
 end $$;
+-- Creation mode (founder brief 2026-11-06, "Build creator-directed Impact Stories"): 'jody' (JODY researches the topic and
+-- writes the story; the default and everything before) or 'creator' (the founder supplies the script scene by scene:
+-- exact narration and headlines, the emotional stage, visual and audio direction). The script is "creator-script/1"
+-- (homesignal-ingest impact/creator.py; checked here by _hs_is_creator_problems) and its version is creator_script_hash.
+-- Research fact-checks the script and flags problems; it never changes the founder's words.
+alter table public.impact_discovery_candidates add column if not exists creation_mode text not null default 'jody';
+alter table public.impact_discovery_candidates add column if not exists creator_script jsonb;
+alter table public.impact_discovery_candidates add column if not exists creator_script_hash text;
+alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_creation_mode_check;
+alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_creation_mode_check
+  check (creation_mode in ('jody', 'creator') and (creation_mode = 'creator') = (creator_script is not null)
+         and (creator_script is null or creator_script_hash ~ '^[0-9a-f]{32}$'));
 alter table public.impact_discovery_candidates drop constraint if exists impact_discovery_candidates_origin_check;
 alter table public.impact_discovery_candidates add constraint impact_discovery_candidates_origin_check check (origin in ('scan', 'founder'));
 alter table public.impact_discovery_candidates alter column lead_uri drop not null;
@@ -400,6 +412,7 @@ begin
         'last_verified_at', c.last_verified_at, 'origin', c.origin, 'submitted_by', c.submitted_by, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode,
         'objective', c.objective, 'deadline', c.deadline, 'reuse_story_id', c.reuse_story_id, 'reused_from', c.reused_from,
         'reuse_title', (select o1.title from public.impact_stories o1 where o1.id = c.reuse_story_id),
+        'creation_mode', c.creation_mode, 'creator_script', c.creator_script, 'creator_script_hash', c.creator_script_hash,
         'research', public._hs_id_research_run(c.id),
         'video', case when c.story_id is null then null else public._hs_id_video_state(c.story_id) end)
         order by public._hs_id_deadline_rank(c.deadline), (c.origin = 'founder') desc, (c.track = 'core') desc, c.score desc, c.last_seen_at desc)
@@ -481,6 +494,7 @@ declare e text := public._hs_is_admin(); t text := btrim(coalesce(p_topic->>'tit
         note text := nullif(btrim(coalesce(p_topic->>'note', '')), ''); leads jsonb := '[]'::jsonb; u text; c public.impact_discovery_candidates%rowtype;
         sm text := coalesce(nullif(btrim(coalesce(p_topic->>'start', '')), ''), 'auto');
         obj text := nullif(btrim(coalesce(p_topic->>'objective', '')), ''); dl date;
+        mode text := coalesce(nullif(btrim(coalesce(p_topic->>'mode', '')), ''), 'jody'); cs jsonb; ch text;
 begin
   if obj is not null and obj not in ('investigative', 'participation', 'education', 'follow_up') then
     raise exception 'Unknown video type.' using errcode = '22023';
@@ -488,6 +502,13 @@ begin
   if nullif(btrim(coalesce(p_topic->>'deadline', '')), '') is not null then
     begin dl := (p_topic->>'deadline')::date; exception when others then raise exception 'The deadline must be a date (YYYY-MM-DD).' using errcode = '22023'; end;
     if dl < current_date then raise exception 'That deadline has already passed.' using errcode = '22023'; end if;
+  end if;
+  if mode not in ('jody', 'creator') then raise exception 'Creation mode must be jody or creator.' using errcode = '22023'; end if;
+  if mode = 'creator' then
+    cs := p_topic->'creator_script';
+    ch := public._hs_is_creator_require(cs);   -- refuses with the script's problems in plain words
+  elsif coalesce(p_topic->'creator_script', 'null'::jsonb) <> 'null'::jsonb then
+    raise exception 'A script was sent with "Let JODY write the story". Choose "I will provide the script" to keep it.' using errcode = '22023';
   end if;
   if sm not in ('auto', 'document', 'topic') then raise exception 'Starting evidence must be auto, document or topic.' using errcode = '22023'; end if;
   if char_length(t) < 5 or char_length(t) > 300 then
@@ -513,13 +534,16 @@ begin
     raise exception 'You already suggested a topic with this title. It is in the list below.' using errcode = '23505';
   end if;
   insert into public.impact_discovery_candidates (cluster_key, origin, category, track, title, place, score, reasons, evidence_status,
-    evidence, status, submitted_by, submitted_note, start_mode, discovered_at, last_seen_at, objective, deadline)
-  values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0, '["You suggested this topic."]'::jsonb,
+    evidence, status, submitted_by, submitted_note, start_mode, creation_mode, creator_script, creator_script_hash, discovered_at, last_seen_at, objective, deadline)
+  values ('founder:' || gen_random_uuid(), 'founder', cat, 'core', t, pl, 0,
+    case when mode = 'creator' then '["You suggested this topic and wrote its script."]'::jsonb else '["You suggested this topic."]'::jsonb end,
     case when jsonb_array_length(leads) > 0 then 'leads_found' else 'social_only' end,
-    jsonb_build_object('leads', leads), 'nominated', e, note, sm, now(), now(), obj, dl)
+    jsonb_build_object('leads', leads), 'nominated', e, note, sm, mode, cs, ch, now(), now(), obj, dl)
   returning * into c;
-  perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads), 'start', sm), e);
-  return jsonb_build_object('id', c.id, 'status', c.status, 'start_mode', c.start_mode);
+  perform public._hs_id_event(c.id, null, 'suggested', jsonb_build_object('title', t, 'place', pl, 'category', cat, 'links', jsonb_array_length(leads),
+    'start', sm, 'mode', mode, 'scenes', case when cs is null then null else jsonb_array_length(cs->'scenes') end, 'script_hash', ch), e);
+  return jsonb_build_object('id', c.id, 'status', c.status, 'start_mode', c.start_mode, 'creation_mode', c.creation_mode,
+    'creator_script_hash', c.creator_script_hash);
 end $$;
 
 -- Change a topic's starting evidence before (or between) research runs, e.g. after a run said "insufficient". Refused once the
@@ -543,6 +567,38 @@ begin
   update public.impact_discovery_candidates set start_mode = p_start, updated_at = now() where id = c.id;
   perform public._hs_id_event(c.id, null, 'start_mode', jsonb_build_object('from', c.start_mode, 'to', p_start), e);
   return jsonb_build_object('ok', true, 'start_mode', p_start);
+end $$;
+
+-- Save the founder's script on a topic before research starts (Save Draft), or between runs. Refused once the topic has
+-- a story (from then on the story's own revisions are the record: hs_impact_story_creator_revise) and while a run is
+-- working on it. p_expected_hash: the version the page showed (null for a topic that had no script); a stale page is refused.
+create or replace function public.hs_impact_discovery_creator_script_save(p_candidate uuid, p_script jsonb, p_expected_hash text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e text := public._hs_is_admin(); c public.impact_discovery_candidates%rowtype; h text;
+begin
+  select * into c from public.impact_discovery_candidates where id = p_candidate for update;
+  if not found then raise exception 'no such topic' using errcode = 'P0002'; end if;
+  if c.origin <> 'founder' then raise exception 'Only a topic you suggested can carry your script.' using errcode = '55000'; end if;
+  if c.story_id is not null then
+    raise exception 'This topic already has a story. Revise the script in the story (Your script).' using errcode = '55000';
+  end if;
+  if exists (select 1 from public.impact_discovery_research_runs where candidate_id = c.id and status in ('queued', 'working')) then
+    raise exception 'Research is working on this topic. Change the script when the run finishes.' using errcode = '55000';
+  end if;
+  if c.creator_script_hash is distinct from p_expected_hash then
+    raise exception 'The script changed since you opened it. Reload, then make your change again.' using errcode = '40001';
+  end if;
+  h := public._hs_is_creator_require(p_script);
+  if h = c.creator_script_hash and c.creator_script = p_script then
+    return jsonb_build_object('unchanged', true, 'creator_script_hash', h);
+  end if;
+  update public.impact_discovery_candidates set creation_mode = 'creator', creator_script = p_script, creator_script_hash = h,
+         evidence_status = case when evidence_status in ('verified', 'insufficient') then 'leads_found' else evidence_status end,
+         status = case when status = 'insufficient' then 'nominated' else status end, updated_at = now()
+   where id = c.id;
+  perform public._hs_id_event(c.id, null, 'creator_script_saved', jsonb_build_object('from', c.creator_script_hash, 'to', h,
+    'scenes', jsonb_array_length(p_script->'scenes')), e);
+  return jsonb_build_object('ok', true, 'creator_script_hash', h);
 end $$;
 
 create or replace function public.hs_impact_discovery_settings_save(p_settings jsonb)
@@ -644,9 +700,13 @@ begin
              when 'follow_up' then 'follow-up' else 'investigative' end using errcode = '55000';
     end if;
   end if;
-  insert into public.impact_stories (video_slug, title, place, created_by, origin, discovery_candidate_id, objective, research_of, deadline)
+  insert into public.impact_stories (video_slug, title, place, created_by, origin, discovery_candidate_id, objective, research_of, deadline, creation_mode)
   values (c.source_slug, left(c.title, 200), c.place, p_actor, 'auto_discovery', c.id, coalesce(c.objective, 'investigative'),
-          orig.id, c.deadline) returning * into s;
+          orig.id, c.deadline, c.creation_mode) returning * into s;
+  if c.creation_mode = 'creator' then   -- the founder's script, version 1 of the story's script record
+    insert into public.impact_story_creator_scripts (story_id, kind, script, script_hash, source, actor)
+    values (s.id, 'original', c.creator_script, c.creator_script_hash, 'topic', coalesce(c.submitted_by, p_actor));
+  end if;
   perform public._hs_is_event(s.id, 'created', jsonb_build_object('video_slug', c.source_slug, 'discovery_candidate_id', c.id,
           'bluesky', c.lead_url, 'auto', p_auto), p_actor);
   update public.impact_discovery_candidates set story_id = s.id, status = 'preparing', updated_at = now() where id = c.id;
@@ -1116,6 +1176,7 @@ begin
   return jsonb_build_object('ok', true, 'run', r.id,
     'candidate', jsonb_build_object('id', c.id, 'title', c.title, 'place', c.place, 'category', c.category, 'track', c.track,
       'origin', c.origin, 'submitted_note', c.submitted_note, 'start_mode', c.start_mode, 'lead_url', c.lead_url, 'evidence', c.evidence, 'related', c.related,
+      'creation_mode', c.creation_mode, 'creator_script', c.creator_script, 'creator_script_hash', c.creator_script_hash,
       'reasons', c.reasons, 'concept', c.concept, 'coverage', c.coverage, 'objective', c.objective, 'deadline', c.deadline,
       -- the ORIGINAL research pack of the story the founder chose (a video built on a video builds on the same original)
       'reuse_slug', (select coalesce(o2.video_slug, o1.video_slug) from public.impact_stories o1
@@ -1180,7 +1241,8 @@ begin
     'public.hs_impact_discovery_overview(boolean)', 'public.hs_impact_discovery_scan_now()',
     'public.hs_impact_discovery_decide(uuid, text, text)', 'public.hs_impact_discovery_open_story(uuid)',
     'public.hs_impact_discovery_settings_save(jsonb)', 'public.hs_impact_discovery_suggest(jsonb)', 'public.hs_impact_discovery_set_start(uuid, text)',
-    'public.hs_impact_discovery_research_start(uuid)', 'public.hs_impact_story_another_video(uuid, jsonb)'] loop
+    'public.hs_impact_discovery_research_start(uuid)', 'public.hs_impact_story_another_video(uuid, jsonb)',
+    'public.hs_impact_discovery_creator_script_save(uuid, jsonb, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated';
   end loop;

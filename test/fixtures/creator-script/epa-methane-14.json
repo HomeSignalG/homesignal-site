@@ -1,0 +1,163 @@
+{
+ "format": "creator-script/1",
+ "target_seconds": 270,
+ "raw": "EPA METHANE RULE — CREATOR STORYBOARD\nTarget length: 4:30\n\nSCENE 1 — FEAR (8s)\nHEADLINE: 72 HOURS OF FLARING\nNARRATION: Seventy-two hours. That is how long some oil and gas operators can now burn off gas during certain malfunctions, instead of twenty-four.\nVISUAL: A gas flare burning at night over a dark field. Slow push in.\nAUDIO: Low drone, then silence before the last word.\nSOURCES: https://www.federalregister.gov/documents/2026/10/14/2026-20001/oil-and-natural-gas-sector\n\nSCENE 2 — FEAR (10s)\nHEADLINE: \"DOES NOT CONCERN HUMAN HEALTH\"\nNARRATION: In the rule explaining that change, the EPA wrote that \"this action does not concern human health.\"\nVISUAL: The rule's text, enlarged around the sentence.\nAUDIO: A single low tone.\n\nSCENE 3 — FEAR (12s)\nHEADLINE: WHO LIVES NEAR THE FLARES?\nNARRATION: Families living near well pads breathe what a flare does not burn. Children breathe more air per pound of body weight than adults.\nVISUAL: A school playground with a well pad on the horizon.\nAUDIO: Distant children's voices, faded.\n\nSCENE 4 — FEAR (9s)\nHEADLINE: WHAT IS IN THE SMOKE\nNARRATION: Methane is a powerful greenhouse gas, and flares can release other pollutants when they do not burn completely.\nVISUAL: Close-up of a flare stack against the sky.\n\nSCENE 5 — ANGER (11s)\nHEADLINE: THE CHILDREN'S HEALTH POLICY\nNARRATION: The EPA has a policy on children's health. Because the agency decided this action does not concern human health, it said that policy does not apply.\nVISUAL: EPA policy document, highlighted.\n\nSCENE 6 — ANGER (10s)\nHEADLINE: WHAT WAS ASSESSED?\nNARRATION: So what did the agency assess before deciding? The rule's own analysis is where the answer should be.\nVISUAL: Slow pan across the docket index.\n\nSCENE 7 — ANGER (12s)\nHEADLINE: $45 BILLION\nNARRATION: The EPA estimates the proposal would save the industry about $45 billion. It is proposed, not final.\nVISUAL: A data card with the figure and the word PROPOSED.\n\nSCENE 8 — ANGER (10s)\nHEADLINE: EPA'S EXPLANATION\nNARRATION: The agency says the change means fewer wells shut in, and longer flaring only where the alternative would emit more.\nVISUAL: The EPA's explanation, quoted on screen.\n\nSCENE 9 — ANGER (9s)\nHEADLINE: A NARROW READING\nNARRATION: That is a legal reading of when a rule \"concerns\" health. Critics say it is too narrow.\nVISUAL: Two quotes side by side.\n\nSCENE 10 — ANGER (11s)\nHEADLINE: WHO IS WATCHING?\nNARRATION: The Super Emitter Program lets approved third parties report large methane releases from space and from the air.\nVISUAL: Aircraft over a field of wells.\n\nSCENE 11 — ANGER (10s)\nHEADLINE: THE PROPOSAL\nNARRATION: In October, the EPA proposed changes to how that program works.\nVISUAL: The October proposal's first page.\n\nSCENE 12 — MOTIVATION (12s)\nHEADLINE: NOVEMBER 16–17: PUBLIC HEARING\nNARRATION: You can speak. The EPA holds a virtual public hearing on November 16 and 17.\nVISUAL: A laptop showing the hearing registration page.\nAUDIO: Music lifts.\n\nSCENE 13 — MOTIVATION (10s)\nHEADLINE: DECEMBER 16: WRITTEN COMMENTS\nNARRATION: Written comments are due December 16.\nVISUAL: The regulations.gov docket page.\n\nSCENE 14 — MOTIVATION (8s)\nHEADLINE: JODYTRACKS.COM\nNARRATION: Follow the rule, and every record behind this story, at jodytracks.com.\nVISUAL: JODY logo end card.\nAUDIO: Music resolves.",
+ "scenes": [
+  {
+   "n": 1,
+   "stage": "fear",
+   "stage_label": "",
+   "seconds": 8,
+   "headline": "72 HOURS OF FLARING",
+   "narration": "Seventy-two hours. That is how long some oil and gas operators can now burn off gas during certain malfunctions, instead of twenty-four.",
+   "visual": "A gas flare burning at night over a dark field. Slow push in.",
+   "audio": "Low drone, then silence before the last word.",
+   "sources": [
+    "https://www.federalregister.gov/documents/2026/10/14/2026-20001/oil-and-natural-gas-sector"
+   ]
+  },
+  {
+   "n": 2,
+   "stage": "fear",
+   "stage_label": "",
+   "seconds": 10,
+   "headline": "\"DOES NOT CONCERN HUMAN HEALTH\"",
+   "narration": "In the rule explaining that change, the EPA wrote that \"this action does not concern human health.\"",
+   "visual": "The rule's text, enlarged around the sentence.",
+   "audio": "A single low tone.",
+   "sources": []
+  },
+  {
+   "n": 3,
+   "stage": "fear",
+   "stage_label": "",
+   "seconds": 12,
+   "headline": "WHO LIVES NEAR THE FLARES?",
+   "narration": "Families living near well pads breathe what a flare does not burn. Children breathe more air per pound of body weight than adults.",
+   "visual": "A school playground with a well pad on the horizon.",
+   "audio": "Distant children's voices, faded.",
+   "sources": []
+  },
+  {
+   "n": 4,
+   "stage": "fear",
+   "stage_label": "",
+   "seconds": 9,
+   "headline": "WHAT IS IN THE SMOKE",
+   "narration": "Methane is a powerful greenhouse gas, and flares can release other pollutants when they do not burn completely.",
+   "visual": "Close-up of a flare stack against the sky.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 5,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 11,
+   "headline": "THE CHILDREN'S HEALTH POLICY",
+   "narration": "The EPA has a policy on children's health. Because the agency decided this action does not concern human health, it said that policy does not apply.",
+   "visual": "EPA policy document, highlighted.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 6,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 10,
+   "headline": "WHAT WAS ASSESSED?",
+   "narration": "So what did the agency assess before deciding? The rule's own analysis is where the answer should be.",
+   "visual": "Slow pan across the docket index.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 7,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 12,
+   "headline": "$45 BILLION",
+   "narration": "The EPA estimates the proposal would save the industry about $45 billion. It is proposed, not final.",
+   "visual": "A data card with the figure and the word PROPOSED.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 8,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 10,
+   "headline": "EPA'S EXPLANATION",
+   "narration": "The agency says the change means fewer wells shut in, and longer flaring only where the alternative would emit more.",
+   "visual": "The EPA's explanation, quoted on screen.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 9,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 9,
+   "headline": "A NARROW READING",
+   "narration": "That is a legal reading of when a rule \"concerns\" health. Critics say it is too narrow.",
+   "visual": "Two quotes side by side.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 10,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 11,
+   "headline": "WHO IS WATCHING?",
+   "narration": "The Super Emitter Program lets approved third parties report large methane releases from space and from the air.",
+   "visual": "Aircraft over a field of wells.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 11,
+   "stage": "anger",
+   "stage_label": "",
+   "seconds": 10,
+   "headline": "THE PROPOSAL",
+   "narration": "In October, the EPA proposed changes to how that program works.",
+   "visual": "The October proposal's first page.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 12,
+   "stage": "motivation",
+   "stage_label": "",
+   "seconds": 12,
+   "headline": "NOVEMBER 16–17: PUBLIC HEARING",
+   "narration": "You can speak. The EPA holds a virtual public hearing on November 16 and 17.",
+   "visual": "A laptop showing the hearing registration page.",
+   "audio": "Music lifts.",
+   "sources": []
+  },
+  {
+   "n": 13,
+   "stage": "motivation",
+   "stage_label": "",
+   "seconds": 10,
+   "headline": "DECEMBER 16: WRITTEN COMMENTS",
+   "narration": "Written comments are due December 16.",
+   "visual": "The regulations.gov docket page.",
+   "audio": "",
+   "sources": []
+  },
+  {
+   "n": 14,
+   "stage": "motivation",
+   "stage_label": "",
+   "seconds": 8,
+   "headline": "JODYTRACKS.COM",
+   "narration": "Follow the rule, and every record behind this story, at jodytracks.com.",
+   "visual": "JODY logo end card.",
+   "audio": "Music resolves.",
+   "sources": []
+  }
+ ]
+}

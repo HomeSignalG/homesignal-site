@@ -1,0 +1,78 @@
+EPA METHANE RULE — CREATOR STORYBOARD
+Target length: 4:30
+
+SCENE 1 — FEAR (8s)
+HEADLINE: 72 HOURS OF FLARING
+NARRATION: Seventy-two hours. That is how long some oil and gas operators can now burn off gas during certain malfunctions, instead of twenty-four.
+VISUAL: A gas flare burning at night over a dark field. Slow push in.
+AUDIO: Low drone, then silence before the last word.
+SOURCES: https://www.federalregister.gov/documents/2026/10/14/2026-20001/oil-and-natural-gas-sector
+
+SCENE 2 — FEAR (10s)
+HEADLINE: "DOES NOT CONCERN HUMAN HEALTH"
+NARRATION: In the rule explaining that change, the EPA wrote that "this action does not concern human health."
+VISUAL: The rule's text, enlarged around the sentence.
+AUDIO: A single low tone.
+
+SCENE 3 — FEAR (12s)
+HEADLINE: WHO LIVES NEAR THE FLARES?
+NARRATION: Families living near well pads breathe what a flare does not burn. Children breathe more air per pound of body weight than adults.
+VISUAL: A school playground with a well pad on the horizon.
+AUDIO: Distant children's voices, faded.
+
+SCENE 4 — FEAR (9s)
+HEADLINE: WHAT IS IN THE SMOKE
+NARRATION: Methane is a powerful greenhouse gas, and flares can release other pollutants when they do not burn completely.
+VISUAL: Close-up of a flare stack against the sky.
+
+SCENE 5 — ANGER (11s)
+HEADLINE: THE CHILDREN'S HEALTH POLICY
+NARRATION: The EPA has a policy on children's health. Because the agency decided this action does not concern human health, it said that policy does not apply.
+VISUAL: EPA policy document, highlighted.
+
+SCENE 6 — ANGER (10s)
+HEADLINE: WHAT WAS ASSESSED?
+NARRATION: So what did the agency assess before deciding? The rule's own analysis is where the answer should be.
+VISUAL: Slow pan across the docket index.
+
+SCENE 7 — ANGER (12s)
+HEADLINE: $45 BILLION
+NARRATION: The EPA estimates the proposal would save the industry about $45 billion. It is proposed, not final.
+VISUAL: A data card with the figure and the word PROPOSED.
+
+SCENE 8 — ANGER (10s)
+HEADLINE: EPA'S EXPLANATION
+NARRATION: The agency says the change means fewer wells shut in, and longer flaring only where the alternative would emit more.
+VISUAL: The EPA's explanation, quoted on screen.
+
+SCENE 9 — ANGER (9s)
+HEADLINE: A NARROW READING
+NARRATION: That is a legal reading of when a rule "concerns" health. Critics say it is too narrow.
+VISUAL: Two quotes side by side.
+
+SCENE 10 — ANGER (11s)
+HEADLINE: WHO IS WATCHING?
+NARRATION: The Super Emitter Program lets approved third parties report large methane releases from space and from the air.
+VISUAL: Aircraft over a field of wells.
+
+SCENE 11 — ANGER (10s)
+HEADLINE: THE PROPOSAL
+NARRATION: In October, the EPA proposed changes to how that program works.
+VISUAL: The October proposal's first page.
+
+SCENE 12 — MOTIVATION (12s)
+HEADLINE: NOVEMBER 16–17: PUBLIC HEARING
+NARRATION: You can speak. The EPA holds a virtual public hearing on November 16 and 17.
+VISUAL: A laptop showing the hearing registration page.
+AUDIO: Music lifts.
+
+SCENE 13 — MOTIVATION (10s)
+HEADLINE: DECEMBER 16: WRITTEN COMMENTS
+NARRATION: Written comments are due December 16.
+VISUAL: The regulations.gov docket page.
+
+SCENE 14 — MOTIVATION (8s)
+HEADLINE: JODYTRACKS.COM
+NARRATION: Follow the rule, and every record behind this story, at jodytracks.com.
+VISUAL: JODY logo end card.
+AUDIO: Music resolves.
