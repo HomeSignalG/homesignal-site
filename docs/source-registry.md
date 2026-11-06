@@ -13438,3 +13438,23 @@ or after 2025-11-06. A random sample of 180 of those, looked up by RECORDID on l
 on the new page, plus 14 the old page never had (mostly issued after 2026-08-27; a few filed before the window and issued
 inside it, since the old layer dated by filing and layer 8 dates by issue). The county's PLUS downtime runs 2026-11-05 to
 11-09; a failure in that window is not a permanent access change.
+
+## SOURCE FIXES, 2026-11-06 (Austin, MoDOT; FDOT and Huntsville measured, not changed)
+
+- **austin-issued-construction-permits**: failing on every ZIP since 2026-10-21 with HTTP 400. Replaying the
+  connector's own URL returned `Type mismatch for upper, is number`: `original_zip` became a number column. Set
+  `zip_numeric: true`; the same filters with `original_zip=78747` return 6 rows, newest applieddate 2026-08-20 (pg_net 30644/30645).
+- **modot-stip-locations-accepted**: `DRAFT_STIP_Locations` was removed from MoDOT's ArcGIS Online org (layer answers
+  "Invalid URL", failing since 2026-11-06 15:30Z). MoDOT's own public STIP map reads
+  `mapping.modot.org/arcgis/rest/services/BusinessInt/STIP/MapServer/0`: 3,533 features, SFY 2027-2031, fields JOB_NO,
+  SFY, DESCRIPTION, ROUTE, BEGIN_COUNTY_NAME, ESTIMATED_COST. 54 of a random 60 previously stored job numbers are present.
+  No status column, so `status_const` "Programmed in STIP 2027-2031" (approved bucket). Not used: the org's STIP_26_30 /
+  MapSTIP (2026-2030 program, status is an undocumented integer code) and `mapping.modot.mo.gov` TMS_SIMS_STIP (Token Required).
+- **fdot-active-construction-projects**: not changed. `gis.fdot.gov` answered 502 (Azure Application Gateway) to the layer,
+  its metadata and a count on 2026-11-06 17:49Z; every FDOT web map found on ArcGIS Online reads the same server, and the only
+  other copy is a 2019 WFS. Its stored records are carried forward while it fails.
+- **huntsville-building-permits**: the server is alive; HTTP/2 is what breaks. pg_net gets "Stream error in the HTTP/2
+  framing layer" and the engine "error sending request", while a GitHub runner's HTTP/1.1 request (homesignal-ingest
+  recon-fetch run 42265451897) returns count 19,015 and a newest issue date of 2026-10-17. The arcgis connector gains
+  `http1_only` (sources/http1.ts: `Deno.createHttpClient({ http2: false })`); if the runtime cannot make that client the
+  fetch fails with "http1_only: ..." rather than using HTTP/2. Test: `test/arcgis-http1-only.test.ts`.
