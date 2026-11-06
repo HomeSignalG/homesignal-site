@@ -7,6 +7,8 @@ const ok = (c, name) => { console.log((c ? 'PASS' : 'FAIL') + ' — ' + name); i
 const read = (p) => readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const js = read('lib/acq-impact-stories.js');
 const sql = read('docs/impact-stories.sql');
+// "Create another video from this research" lives beside the research queue it files into (2026-11-06)
+const rpcSql = sql + '\n' + read('docs/impact-discovery.sql');
 const html = read('acquisition.html');
 const code = js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
@@ -26,10 +28,10 @@ ok(html.includes('lib/acq-impact-stories.js?v=' + key), 'shell: the cache key is
 const called = [...new Set([...code.matchAll(/rpc\('([a-z_0-9]+)'/g)].map((m) => m[1]))];
 ok(called.length >= 10, 'page calls ' + called.length + ' functions');
 for (const f of called) {
-  const def = sql.match(new RegExp('create or replace function public\\.' + f + '\\(([^)]*)\\)[\\s\\S]*?\\$\\$;', 'm'));
-  ok(!!def, f + ': defined in docs/impact-stories.sql');
+  const def = rpcSql.match(new RegExp('create or replace function public\\.' + f + '\\(([^)]*)\\)[\\s\\S]*?\\$\\$;', 'm'));
+  ok(!!def, f + ': defined in the SQL of record');
   ok(def && /_hs_is_admin\(\)/.test(def[0]), f + ': checks the dashboard allowlist');
-  ok(new RegExp("'public\\." + f + "\\([^']*\\)'[^\\]]*\\]\\s*loop\\s*execute 'revoke all on function ' \\|\\| f \\|\\| ' from public, anon';\\s*execute 'grant execute on function ' \\|\\| f \\|\\| ' to authenticated'").test(sql), f + ': granted to authenticated, revoked from anon');
+  ok(new RegExp("'public\\." + f + "\\([^']*\\)'[^\\]]*\\]\\s*loop\\s*execute 'revoke all on function ' \\|\\| f \\|\\| ' from public, anon';\\s*execute 'grant execute on function ' \\|\\| f \\|\\| ' to authenticated'").test(rpcSql), f + ': granted to authenticated, revoked from anon');
 }
 for (const f of ['hs_impact_story_job_claim', 'hs_impact_story_job_complete', 'hs_impact_story_job_fail']) {
   ok(!called.includes(f), f + ': never called from the browser');
